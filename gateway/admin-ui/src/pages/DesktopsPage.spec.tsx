@@ -8,6 +8,7 @@ vi.mock('../api.ts', () => ({
   applyDesktopAction: vi.fn(),
   getDesktopDetail: vi.fn(),
   getDesktopPolicy: vi.fn(),
+  getDesktopEnvironment: vi.fn(),
   listDesktops: vi.fn(),
   listProjects: vi.fn(),
   listUsers: vi.fn(),
@@ -41,6 +42,7 @@ describe('DesktopsPage', () => {
     vi.mocked(api.applyDesktopAction).mockResolvedValue({ ok: true } as never)
     vi.mocked(api.listUsers).mockResolvedValue([])
     vi.mocked(api.listProjects).mockResolvedValue([])
+    vi.mocked(api.getDesktopEnvironment).mockResolvedValue({ state: 'detected', reason: 'display-environment' })
   })
 
   it('enables clear only while the selected resource is unavailable', async () => {

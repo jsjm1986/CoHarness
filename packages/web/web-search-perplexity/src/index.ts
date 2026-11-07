@@ -9,15 +9,20 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
+import { assertUsableApiKey } from '@deepseek-ai/dsh-llm'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-web'
-import { MAX_WEB_RESPONSE_MAX_BYTES } from '@deepseek-ai/dsh-web'
+import { MAX_WEB_RESPONSE_MAX_BYTES, registerModelSearch, WebError } from '@deepseek-ai/dsh-web'
+import type { Session } from '@deepseek-ai/dsh-session'
+import type { PerplexitySearchLlmRequest, PerplexitySearchProviderOptions } from './provider.ts'
 import {
   PerplexitySearchProvider,
   PERPLEXITY_DEFAULT_BASE_URL,
   PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES,
   PERPLEXITY_DEFAULT_MAX_TOKENS,
   PERPLEXITY_DEFAULT_MODEL,
+  PERPLEXITY_PROVIDER_ID,
 } from './provider.ts'
 
 export {
@@ -28,7 +33,7 @@ export {
   PERPLEXITY_PROVIDER_ID,
   PerplexitySearchProvider,
 } from './provider.ts'
-export type { PerplexityRecency, PerplexitySearchProviderOptions } from './provider.ts'
+export type { PerplexityRecency, PerplexitySearchProviderOptions, PerplexitySearchLlmRequest, PreparedPerplexitySearch } from './provider.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'web-search-perplexity'
@@ -38,8 +43,12 @@ export const inject = ['web']
 
 /** Plugin config (all optional — `apply` fills env-var and constant defaults). */
 export interface Config {
+  /** Governed LLM route; defaults to `perplexity` when model policy is installed or required. */
+  provider?: string
   /** Perplexity API key. Falls back to `$PERPLEXITY_API_KEY`. Empty → unavailable. */
   apiKey?: string
+  /** Standalone credential reference; defaults to `PERPLEXITY_API_KEY`. */
+  apiKeyEnv?: string
   /** Endpoint base; `/chat/completions` is appended. Defaults to the public API. */
   baseURL?: string
   /** Search model name. Defaults to `sonar`. */
@@ -53,7 +62,9 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
-  apiKey: z.string(),
+  provider: z.string().min(1),
+  apiKey: z.string().role('secret'),
+  apiKeyEnv: z.string().role('credential-ref'),
   baseURL: z.string(),
   model: z.string(),
   maxTokens: z.number().step(1).min(1),
@@ -61,16 +72,56 @@ export const Config: z<Config> = z.object({
   searchRecency: z.union(['day', 'week', 'month', 'year'] as const),
 })
 
+type ResolvedSearchOptions = PerplexitySearchProviderOptions & { provider?: string; maxResponseBytes: number }
+
 /** Register the Perplexity search provider with `ctx.web`. */
 export function apply(ctx: Context, config: Config): void {
-  ctx.web.registerSearchProvider(new PerplexitySearchProvider({
-    // Every environment layer may name this key: the product trusts the
-    // project it is launched in, and the managed store is not involved here.
-    apiKey: config.apiKey ?? launchEnvironmentOf(ctx).get('PERPLEXITY_API_KEY')?.value ?? '',
-    baseURL: config.baseURL ?? PERPLEXITY_DEFAULT_BASE_URL,
-    model: config.model ?? PERPLEXITY_DEFAULT_MODEL,
-    maxTokens: config.maxTokens ?? PERPLEXITY_DEFAULT_MAX_TOKENS,
-    maxResponseBytes: config.maxResponseBytes ?? PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES,
-    ...config.searchRecency !== undefined ? { searchRecency: config.searchRecency } : {},
-  }))
+  credentialRef(config.apiKeyEnv ?? 'PERPLEXITY_API_KEY')
+  const resolve = (session: Session | undefined): ResolvedSearchOptions => {
+    const reference = credentialRef(config.apiKeyEnv ?? 'PERPLEXITY_API_KEY')
+    const ambient = launchEnvironmentOf(ctx).get(reference)?.value
+    const literal = config.apiKey
+    const apiKey = literal ?? ambient ?? ''
+    const credentials = ctx.get('credentials')
+    return {
+      ...config.provider === undefined ? {} : { provider: config.provider },
+      apiKey,
+      baseURL: config.baseURL ?? PERPLEXITY_DEFAULT_BASE_URL,
+      model: config.model ?? PERPLEXITY_DEFAULT_MODEL,
+      maxTokens: config.maxTokens ?? PERPLEXITY_DEFAULT_MAX_TOKENS,
+      maxResponseBytes: config.maxResponseBytes ?? PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES,
+      recordRequest: (request) => { session?.append('web/perplexity-search-llm-request', request) },
+      ...config.searchRecency === undefined ? {} : { searchRecency: config.searchRecency },
+      ...credentials === undefined && apiKey.length === 0 ? {} : {
+        resolveHeaders: async () => {
+          const value = literal !== undefined && literal.length > 0 ? literal
+            : credentials === undefined ? ambient : (await credentials.resolve(reference))?.value
+          if (value === undefined || value.length === 0) {
+            throw new WebError(`Perplexity search requires ${reference} in the credentials service or launch environment.`,
+              'WEB_PROVIDER_CREDENTIAL_MISSING')
+          }
+          return { authorization: `Bearer ${assertUsableApiKey(value, 'web-search-perplexity', reference)}` }
+        },
+      },
+    }
+  }
+  registerModelSearch<ResolvedSearchOptions, PerplexitySearchLlmRequest>(ctx, {
+    id: PERPLEXITY_PROVIDER_ID,
+    label: 'Perplexity search',
+    options: resolve,
+    available: options => new PerplexitySearchProvider(options).available(),
+    prepare: (llm, model, request, options, signal) => llm.prepareOperation(model, 'perplexity-web-search', {
+      query: request.query, maxResponseBytes: options.maxResponseBytes,
+      ...options.searchRecency === undefined ? {} : { searchRecency: options.searchRecency },
+    }, signal),
+    record: (session, request) => { session.append('web/perplexity-search-llm-request', request) },
+    independent: (request, options, signal, assertOwnership) => new PerplexitySearchProvider({
+      ...options,
+      recordRequest(input) {
+        assertOwnership()
+        options.recordRequest?.(input)
+        assertOwnership()
+      },
+    }).search(request, signal),
+  })
 }

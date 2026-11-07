@@ -335,6 +335,7 @@ export class PermissionPresetService extends TypertRemoteService {
           }
           const authority = executionAuthorityOf(this.ctx)
           const policy = this.ctx.get('permissionPresetAuthorization')
+          const registry = this.ctx.get('agents')
           if (authority !== undefined && policy?.authorizeSelection === undefined) {
             throw new Error('permission: managed selection requires live authorization')
           }
@@ -342,6 +343,10 @@ export class PermissionPresetService extends TypertRemoteService {
           signal.throwIfAborted()
           if (!sameExecutionAuthority(executionAuthorityOf(this.ctx), authority) || this.ctx.get('permissionPresetAuthorization') !== policy) {
             throw new Error('permission: selection authorization changed before applying')
+          }
+          const currentRegistry = this.ctx.get('agents')
+          if ((registry !== undefined || currentRegistry !== undefined) && currentRegistry?.get(agent.id) !== agent) {
+            throw new Error('permission: the command\'s Agent is no longer active')
           }
           this.apply(agent.session, name, (policy) => { this.ctx.approval.setPolicy(agent, policy) }, 'selection')
           return { kind: 'success', text: `preset ${name}` }

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-browser-authentication-lock-waits.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-browser-authentication-lock-waits.md
+document:
+  en: 8a071a6146a4ace1bda37c009ee3769bef8ff066
+  zh: d059a0dddd6afc26b24cb9f5923de76f0e3c7ab9
+/agent-note-browser-authority-after-authentication-lock-waits:
+  en: 60619a0e211b9166
+  zh: 02f1c078b50b4325
+/agent-note-browser-authority-after-authentication-lock-waits/problem:
+  en: 717348ee43843ce9
+  zh: 50deb9765015c7be
+/agent-note-browser-authority-after-authentication-lock-waits/decision:
+  en: 975c40cdfe893e1c
+  zh: fbc994d9a272e6f2
+/agent-note-browser-authority-after-authentication-lock-waits/consequences:
+  en: 4a8478b814e40a61
+  zh: b1bacf8605cd106f
+/agent-note-browser-authority-after-authentication-lock-waits/verification:
+  en: 144143be2aaba123
+  zh: fe6d130f31b089e9
+/agent-note-browser-authority-after-authentication-lock-waits/alternatives-considered:
+  en: 09906d49e70404d8
+  zh: cc331ed09205b0c4

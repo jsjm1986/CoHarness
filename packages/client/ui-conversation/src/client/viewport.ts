@@ -154,7 +154,11 @@ export class ConversationViewportController implements ConversationViewport {
    */
   setPersistenceScope(principal: string | undefined): void {
     if (this.disposed || principal === this.persistenceScope) return
-    if (this.persistenceScope !== undefined) this.sessions.beginNavigation()
+    // Supersede stale view intents, but never an intent holding an input
+    // block: that hold belongs to an in-flight user operation whose commit
+    // must still land when the Host settles it.
+    if (this.persistenceScope !== undefined
+      && this.sessions.list.getSnapshot().navigationBlockedSessionId === undefined) this.sessions.beginNavigation()
     this.persistenceScope = principal
     this.unavailablePanes.clear()
     this.spaceSessionId = undefined
@@ -179,14 +183,22 @@ export class ConversationViewportController implements ConversationViewport {
     this.sessions.setAdditionalStaged([])
   }
 
-  /** Enable retained windows only while the workbench contribution is mounted.
-   * @param enabled - whether the optional controls are mounted.
+  /** Retain windows while the Workbench contribution is registered,
+   * including while another main panel is visible.
+   * @param enabled - whether the optional Workbench contribution is available.
    */
   setEnabled(enabled: boolean): void {
-    if (this.enabled === enabled) return
+    if (this.disposed || this.enabled === enabled) return
     this.enabled = enabled
-    this.syncStaged()
     const state = this.store.getSnapshot()
+    if (state.mode === 'workbench') {
+      if (enabled) this.prepareWorkbenchRestore(state.paneIds)
+      else if (state.paneIds.length > 0) {
+        this.catalogReady = false
+        this.restorationPending = true
+      }
+    }
+    this.syncStaged()
     if (enabled && state.mode === 'workbench' && state.activePaneId !== undefined
       && validSession(this.sessions, state.activePaneId, this.workspaces)) this.select(state.activePaneId)
   }
@@ -461,6 +473,8 @@ export class ConversationViewportController implements ConversationViewport {
       draft.paneRatios = normalizedRatios(draft.paneIds.length, target.paneRatios)
     })
     this.reconcileSessions()
+    this.selectWorkbenchFocus()
+    this.persistWorkbenches()
   }
   createWorkbench(name: string): string {
     this.assertEditable()
@@ -487,6 +501,7 @@ export class ConversationViewportController implements ConversationViewport {
       name: name.trim(),
       paneIds: source === undefined ? [] : [...source.paneIds],
       paneRatios: source === undefined ? [] : [...source.paneRatios],
+      ...(source?.activePaneId === undefined ? {} : { activePaneId: source.activePaneId }),
       updatedAt: Date.now(),
     }
     this.workbenches.set(nextId, target)
@@ -501,6 +516,8 @@ export class ConversationViewportController implements ConversationViewport {
       if (active === undefined) delete draft.activePaneId
       else draft.activePaneId = active
     })
+    this.reconcileSessions()
+    this.selectWorkbenchFocus()
     this.persistWorkbenches()
     return nextId
   }
@@ -560,6 +577,7 @@ export class ConversationViewportController implements ConversationViewport {
 
   private restoreWorkbenches(record: WorkbenchRecord | undefined): void {
     this.restorationPending = record !== undefined
+      && (record.version === 2 || record.workbenches.some(row => row.paneIds.length > 0))
     this.keyVersion = record?.version ?? (this.sessions.keyFor === undefined ? 2 : 3)
     this.workbenches.clear()
     this.activeWorkbenchId = record?.activeId ?? 'default'
@@ -594,7 +612,7 @@ export class ConversationViewportController implements ConversationViewport {
     const firstBaseline = !this.baselineReady
     this.baselineReady = true
     const state = this.store.getSnapshot()
-    if (state.mode === 'single') { this.syncStaged(); return }
+    if (!this.enabled || state.mode === 'single') { this.syncStaged(); return }
     for (const id of this.unavailablePanes) if (validSession(this.sessions, id, this.workspaces)) this.unavailablePanes.delete(id)
     const valid = state.paneIds.filter(id => validSession(this.sessions, id, this.workspaces)
       || this.unavailablePanes.has(id)
@@ -614,7 +632,7 @@ export class ConversationViewportController implements ConversationViewport {
       })
     }
     this.syncStaged()
-    if (firstBaseline && this.enabled && active !== undefined
+    if (firstBaseline && active !== undefined
       && validSession(this.sessions, active, this.workspaces)) this.select(active)
   }
 
@@ -630,7 +648,16 @@ export class ConversationViewportController implements ConversationViewport {
     this.sessions.setAdditionalStaged(ids)
   }
 
+  private selectWorkbenchFocus(): void {
+    const state = this.store.getSnapshot()
+    if (this.enabled && state.mode === 'workbench' && state.pendingIdentity !== true
+      && state.activePaneId !== undefined
+      && validSession(this.sessions, state.activePaneId, this.workspaces)) this.select(state.activePaneId)
+  }
+
   private select(sessionId: SessionId): void {
-    if (this.sessions.list.getSnapshot().current !== sessionId) this.sessions.open(sessionId)
+    // Pane focus can come from a restored layout rather than a user pick, so
+    // it must not publish the Agent on its own — engagement still resolves it.
+    if (this.sessions.list.getSnapshot().current !== sessionId) this.sessions.open(sessionId, { activate: false })
   }
 }

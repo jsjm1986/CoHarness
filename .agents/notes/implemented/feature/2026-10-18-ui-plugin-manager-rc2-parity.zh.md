@@ -12,7 +12,7 @@ Status: implemented
 
 每个增量都以 fork 形态落在 fork 模型上：
 
-- `PluginManagerPage` 采用上游的分组模型——内置插件配置（过滤到 Host 所服务 settings 命名空间的 `plugins.item` 条目）、实验性插件、已安装插件——以及 `EXTENSION_BUNDLES`/`MORE_BUNDLES` 排序：常驻组合包排在主列表，暂存组合包只在启用时进入主列表，更多页列出全部官方组合包并把 Codex 与 Claude Code 子智能体排在最后。fork 独有的 `schedule-bundle` 因带有 `locale/en.json`、`locale/zh.json` 与 `icon.svg` 而加入 `MORE_BUNDLES`；缺少这套元信息的包一律不列出。
+- `PluginManagerPage` 采用上游的分组模型——内置功能（按 [patch 行绑定](2026-10-23-plugins-item-patch-row-binding.zh.md)绑定到各自 patch 行的 `plugins.item` 条目）、可选插件、已安装插件——以及 `EXTENSION_BUNDLES`/`MORE_BUNDLES` 排序：常驻组合包排在主列表，暂存组合包只在启用时进入主列表，更多页列出全部官方组合包并把 Codex 与 Claude Code 子智能体排在最后。fork 独有的 `schedule-bundle` 因带有 `locale/en.json`、`locale/zh.json` 与 `icon.svg` 而加入 `MORE_BUNDLES`；缺少这套元信息的包一律不列出。
 - `manager-store` 保留 fork 以 `settingsScope` 支撑的 `configForm`、`manage`/`denied` 授权门、`clientSync` 状态与重试，以及 `scopePolicy` 说明行。`packageView()` 在更新的 Host 发布上游目录字段（`official`、`availability`、`installTarget`）时原样转发，否则由 `optional` 推导 `official`、由可选/已安装/缺失事实推导 `availability`，使按需安装、精确 `saveExact` 目标与先删后装的**更新**通道在 Host 报告目标处端到端生效。`saveExact` 通过结构化扩展挂在安装选项上，因为 fork 生成的安装 schema 尚未声明它。
 - `slot-contract` 在本地重新声明 `BundleAvailability`，并让 `ConfigPageForm` 继续使用 `SettingsScopeSnapshot`/`SettingsMutationScope`；`plugins.tab`、`plugins.add.actions` 与 `PluginTabInstall` 与上游一致。
 - 详情页按包名渲染 `BUNDLE_PREVIEWS` SVG——`src/client/assets/` 下徽章技能与语音输入组合包每种已发布语言各一张 640×300 素材——解码失败时回退到本地化的 `previewUnavailable`；包没有配图声明接口。

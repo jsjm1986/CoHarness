@@ -23,7 +23,8 @@ async function bench() {
     api: { settings: { describe: async () => ({ result: { ok: false } }) } },
     isLoopback: false,
   } as never)
-  ctx.provide('remote', { $on: () => () => {} } as never)
+  const remote$on = { $on: () => () => {} }
+  ctx.provide('remote', { ...remote$on, $forTarget: () => remote$on } as never)
   ctx.provide('shortcuts', { register: vi.fn(() => () => {}) } as never)
   const gate = new ReleaseChangeGate(undefined)
   ctx.provide('modules', { entries: { releaseChange: gate.change, dismissRelease: () => { gate.dismiss() } } } as never)

@@ -65,6 +65,20 @@ it('skips consent when the status already covers the grant set', async () => {
   expect(f.confirm).not.toHaveBeenCalled()
 })
 
+it.each([false, true])('explains an unavailable desktop before consent or attach (consented=%s)', async (consented) => {
+  const f = fixture(consented)
+  f.status.mockResolvedValue({ ...statusView(consented), available: false })
+  render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
+  await screen.findByText(en.unavailable)
+  expect(f.confirm).not.toHaveBeenCalled()
+  expect(f.attach).not.toHaveBeenCalled()
+  expect(f.openScreen).not.toHaveBeenCalled()
+  f.status.mockResolvedValue(statusView(consented))
+  fireEvent.click(screen.getByRole('button', { name: en.retry }))
+  if (!consented) await screen.findByText(en.consentTitle)
+  else await waitFor(() => { expect(f.attach).toHaveBeenCalledOnce() })
+})
+
 it('disconnects the screen on unmount', async () => {
   const f = fixture(true)
   const view = render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)

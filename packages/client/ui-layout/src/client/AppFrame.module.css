@@ -8,21 +8,6 @@
   overflow: clip;
   scrollbar-gutter: auto;
   background: var(--dsw-alias-bg-base);
-  /* Collapse/expand animates the tracks on the deepsuite sider curve
-     (--ds-ease-in-out / --ds-transition-duration-slow, ui-theme base.css). */
-  transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out);
-}
-
-/* Dragging writes widths at pointer cadence; easing them would detach the
-   column from the handle. */
-.frame[data-dragging] {
-  transition: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .frame {
-    transition: none;
-  }
 }
 
 /* Compact template is CSS-owned: shell topbar row over one content column.
@@ -66,7 +51,23 @@
   flex: 1;
   align-items: center;
   justify-content: center;
+  gap: var(--dsw-space-2);
   padding: 0 var(--dsw-space-2);
+}
+
+.topbarEnvironment {
+  display: flex;
+  min-width: 0;
+  max-width: 50%;
+  align-items: center;
+}
+
+.topbarEnvironment:empty {
+  display: none;
+}
+
+.topbarEnvironment button {
+  min-height: var(--dsw-touch-target);
 }
 
 .topbarActions {
@@ -242,6 +243,19 @@
   overflow: hidden;
 }
 
+.railEnvironment {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  min-width: 0;
+  padding: var(--dsw-space-2) var(--dsw-space-3) 0;
+}
+
+.railEnvironment:empty,
+.railEnvironment:has(> :global([data-slot]):empty) {
+  display: none;
+}
+
 .frame:not([data-viewport='compact']) .centerCol {
   /* 16px right margin = the details card's 8px frame inset + an 8px gap
      between the two floating cards; collapsed keeps the symmetric 8. */
@@ -255,6 +269,16 @@
 
 .frame:not([data-viewport='compact'])[data-details-collapsed] .centerCol {
   margin-right: var(--dsw-space-2);
+}
+
+.frame:not([data-viewport='compact']):has([data-workbench]) .centerCol {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.frame:not([data-viewport='compact']):has([data-workbench]) .sidebarCol {
+  border-right: 0.5px solid var(--dsw-alias-border-l1);
 }
 
 /* Home-indicator clearance for the bottom-pinned composer; zero elsewhere. */
@@ -317,19 +341,6 @@
   cursor: col-resize;
   z-index: 15;
   touch-action: none;
-  /* Rides the same curve as the tracks so the pill stays on the moving
-     border during collapse/expand; paused while dragging (frame rule). */
-  transition: left var(--ds-transition-duration-slow) var(--ds-ease-in-out);
-}
-
-.frame[data-dragging] .handle {
-  transition: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .handle {
-    transition: none;
-  }
 }
 
 .handle[data-side='details']::after {

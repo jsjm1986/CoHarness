@@ -1,0 +1,13 @@
+{
+  "name": "ssh-admission-owner-pairing-current",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/ssh/ssh/README.md packages/ssh/subprocess-ssh/README.md .agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T15:23:06.213504+00:00",
+  "seconds": 2.349,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "29467b0c93a7a02488641153696b84e4d5c147e9708e273c5ef6535e27a9295d",
+  "inputsAfter": "d0ae8f377dee48de3982e01279e4105bd34963ee45d4ceaea12b6ad02ec623fb",
+  "outputSha256": "6cf4dec8c643ab6dd1553361f8f61895898a353cbbad6f8642d845d148bffcb5",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/ssh/ssh/README.md packages/ssh/subprocess-ssh/README.md .agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/proposed/feature/2026-10-23-node-resource-admission.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded packages/ssh/subprocess-ssh/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-lifecycle-and-route-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests --retry=0",
+  "startedAt": "2026-10-24T09:58:22.402586+00:00",
+  "seconds": 8.304,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b6b87d08eabb18afb035f2de953f81f350e7c061f7882f160ba929bd003a37ab",
+  "inputsAfter": "b6b87d08eabb18afb035f2de953f81f350e7c061f7882f160ba929bd003a37ab",
+  "postgresToolDirectory": null,
+  "outputSha256": "73bd93213ed5bd3c3838a416c1f9ecef29e5470e6c87346f2a2a1236f5db510b",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  56 passed (56)\n   Start at  17:58:26\n   Duration  3.89s (transform 2.83s, setup 104ms, import 3.50s, tests 2.02s, environment 0ms)\n\n"
+}

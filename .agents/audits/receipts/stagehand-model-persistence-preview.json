@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-persistence-preview",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm --silent run verify-persistence-changes --json",
+  "startedAt": "2026-10-23T18:47:00.634353+00:00",
+  "seconds": 17.313,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "inputsAfter": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "outputSha256": "e0915fc18c014835e381a56445498ccc488fef3e618deab449ae22d7c8c33694",
+  "outputTail": "{\"schemaVersion\":1,\"ok\":false,\"operation\":\"check\",\"message\":\"unacknowledged persistence type changes:\\n  event:browser-use/stagehand-llm-request: root added (same-version allowed)\",\"code\":\"unacknowledged-changes\",\"changes\":[{\"root\":\"event:browser-use/stagehand-llm-request\",\"path\":\"event:browser-use/stagehand-llm-request\",\"kind\":\"root-added\",\"description\":\"root added\",\"requiresCompatibilityReview\":false}],\"roots\":[{\"root\":\"event:browser-use/stagehand-llm-request\",\"kind\":\"event\",\"before\":null,\"after\":\"25c645080c2da89aa1c6f386d7348d315e4c35c76883399268bd5e227495e33e\"}],\"files\":[]}\n"
+}

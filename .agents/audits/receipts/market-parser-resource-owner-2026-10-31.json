@@ -1,0 +1,122 @@
+{
+  "at": "2026-10-31T07:16:17.067000+00:00",
+  "finding": "B394",
+  "title": "Plugin market parsing starts real Workers after its resource provider changes during admission",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/boot/plugin-market/src/index.ts",
+    "packages/boot/plugin-market/src/parse-thread.ts",
+    "packages/boot/plugin-market/tests/resource-admission.spec.ts",
+    "packages/boot/plugin-market/tests/fixtures/resource-owner.mjs",
+    "snapshots/session/plugin-market-resource-owner.snapshot.ts",
+    "snapshots/session/plugin-market-resource-owner/expected.jsonl",
+    "packages/boot/plugin-market/README.md",
+    "packages/boot/plugin-market/README.zh.md",
+    "packages/boot/plugin-market/README.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
+    ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.zh.md",
+    ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/plugin-market-parser-owner/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/plugin-market-parser-owner/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/plugin-market-parser-owner/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-source-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-source-snapshot.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-docs.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-built-worker-regression.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-origin-fetch.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T070835Z/market-owner-pairing.json"
+  ],
+  "causalEvidence": "Two public market-search regressions fail against the original source. A private complete old package starts real parser Workers and returns successful results after provider withdrawal or replacement. Updated source and Node22/24 Loader replays with a real profile manager and local HTTP server refuse both stale starts before creating any thread, return original permits, and successfully retry. Unchanged managed and independent searches still complete.",
+  "behavior": "Retain the resource provider when dispatching parsing, compare its original Cordis Service before physical start, and pass a synchronous ownership check through the parser admission wait. Existing parser termination, uncertain ownership, error aggregation, shared-reader lifetime and buffer-transfer semantics remain.",
+  "verification": {
+    "uniqueRelatedCases": 120,
+    "sourceCases": 117,
+    "newSourceCases": 2,
+    "builtWorkerCases": 2,
+    "applicationSnapshots": 1,
+    "snapshotRows": 4,
+    "standardCoverage": {
+      "packages/boot/plugin-market/src/index.ts": {
+        "statements": [
+          183,
+          183
+        ],
+        "branches": [
+          119,
+          119
+        ],
+        "functions": [
+          45,
+          45
+        ],
+        "lines": [
+          153,
+          153
+        ]
+      },
+      "packages/boot/plugin-market/src/parse-thread.ts": {
+        "statements": [
+          79,
+          79
+        ],
+        "branches": [
+          34,
+          34
+        ],
+        "functions": [
+          21,
+          21
+        ],
+        "lines": [
+          62,
+          62
+        ]
+      }
+    },
+    "coverageLimits": "All four metrics cover the market index service and parser-thread module only; no exclusions or thresholds changed.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 157,
+    "documentation": "Final bilingual pairing, budgets, catalog and export JSDoc pass. Full doc-sync is not claimed.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "evidenceSetupCorrection": "The first old-package run could not resolve schemastery through a root node_modules link. Its private package link was corrected to the original package node_modules. Only the later complete-dependency run establishes the behavioral negative.",
+  "noteReview": {
+    "owner": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
+    "decision": "Extend the active market feature decision with parser ownership and shared-reader lifetime. The separate index-format decision remains applicable; no duplicate or archived note is changed."
+  },
+  "baseline": {
+    "at": "2026-10-31T07:12:59.336087+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950"
+  },
+  "mergeRequirement": "Apply only these fifteen B394 source paths and rebuild matching market main/Worker artifacts on the current candidate. Preserve all peer changes and prior B392/B393 deltas; cumulative older references must not replace newer merged artifacts.",
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review browser and Inspector Worker admission, independent model-search resource identity and authority-only SDK composition.",
+    "Continue remote pipes, resource-only remote execution and nonconflicting business permissions.",
+    "Peer owns realtime UI projection, policy-package publication permissions and related Gateway changes. Required-plugin readiness remains open.",
+    "Real paid API verification stays deferred. No root deployment, production database or physical Linux/Windows acceptance is claimed."
+  ]
+}

@@ -10,10 +10,103 @@ import {
 } from '../src/config.ts'
 
 describe('loadConfig', () => {
+  it('shares font metadata only among local runtimes and accepts an explicit opt-out', () => {
+    const cfg = loadConfig({})
+    expect(cfg.officeFontMetadataCacheDirectory).toBe(resolve(cfg.stateRoot, 'cache', 'office-font-metadata'))
+    expect(loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: '/private/fonts/cache' }).officeFontMetadataCacheDirectory)
+      .toBe('/private/fonts/cache')
+    expect(loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: 'off' }).officeFontMetadataCacheDirectory).toBeUndefined()
+    const systemd = { HGW_LAUNCHER: 'systemd', HGW_PROJECT_PATH_ROOTS: '/srv/projects' }
+    expect(loadConfig(systemd).officeFontMetadataCacheDirectory).toBeUndefined()
+    expect(() => loadConfig({ ...systemd, HGW_OFFICE_FONT_METADATA_CACHE_DIR: '/private/fonts/cache' }))
+      .toThrow('HGW_OFFICE_FONT_METADATA_CACHE_DIR requires HGW_LAUNCHER=local')
+    for (const path of ['', 'relative/cache', '/cache\0invalid']) {
+      expect(() => loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: path })).toThrow('HGW_OFFICE_FONT_METADATA_CACHE_DIR')
+    }
+  })
+
+  it('validates bounded private event principal renewal settings', () => {
+    expect(loadConfig({}).streamPrincipalRenewal).toEqual({ enabled: true, intervalMs: 10000, requestTimeoutMs: 5000, maxBatchSize: 64 })
+    expect(loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'false' }).streamPrincipalRenewal.enabled).toBe(false)
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'yes' })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED')
+    for (const key of ['HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '1025' })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH')
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS')
+  })
+
+  it('retains local browser recovery deadlines and validates node-specific overrides', () => {
+    expect(loadConfig({})).toMatchObject({ runtimeBrowserReadyTimeoutMs: 15000, runtimeBrowserStreamTimeoutMs: 3000, runtimeBrowserRpcTimeoutMs: 30000 })
+    expect(loadConfig({ HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS: '120000', HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS: '60000', HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS: '120000' }))
+      .toMatchObject({ runtimeBrowserReadyTimeoutMs: 120000, runtimeBrowserStreamTimeoutMs: 60000, runtimeBrowserRpcTimeoutMs: 120000 })
+    for (const key of ['HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS', 'HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS', 'HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', String(MAX_TIMER_DELAY_MS + 1)]) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+  })
+  it('retains local Runtime request deadlines and validates slower resource-accounting transport', () => {
+    expect(loadConfig({})).toMatchObject({ runtimeRequestTimeoutMs: 5000, runtimeCleanupTimeoutMs: 30000 })
+    expect(loadConfig({ HGW_RUNTIME_REQUEST_TIMEOUT_MS: '60000', HGW_RUNTIME_CLEANUP_TIMEOUT_MS: '120000' }))
+      .toMatchObject({ runtimeRequestTimeoutMs: 60000, runtimeCleanupTimeoutMs: 120000 })
+    for (const key of ['HGW_RUNTIME_REQUEST_TIMEOUT_MS', 'HGW_RUNTIME_CLEANUP_TIMEOUT_MS']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', String(MAX_TIMER_DELAY_MS + 1)]) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_RUNTIME_REQUEST_TIMEOUT_MS: '30000' })).toThrow('HGW_RUNTIME_CLEANUP_TIMEOUT_MS')
+  })
+  it('bounds push delivery work and keeps claim leases longer than the send budget', () => {
+    expect(loadConfig({})).toMatchObject({ pushDeliveryTimeoutMs: 30000, pushDeliveryLeaseMs: 120000 })
+    expect(loadConfig({ HGW_PUSH_DELIVERY_TIMEOUT_MS: '500', HGW_PUSH_DELIVERY_LEASE_MS: '3000' }))
+      .toMatchObject({ pushDeliveryTimeoutMs: 500, pushDeliveryLeaseMs: 3000 })
+    for (const key of ['HGW_PUSH_DELIVERY_TIMEOUT_MS', 'HGW_PUSH_DELIVERY_LEASE_MS']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', String(MAX_TIMER_DELAY_MS + 1)]) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_PUSH_DELIVERY_TIMEOUT_MS: '1000', HGW_PUSH_DELIVERY_LEASE_MS: '1000' })).toThrow('HGW_PUSH_DELIVERY_LEASE_MS')
+  })
+  it('canonicalizes a relative state root before deriving private supervisor and credential paths', () => {
+    const cfg = loadConfig({ HGW_STATE_ROOT: '../../hgw-config-parser-state' })
+    expect(cfg.stateRoot).toBe(resolve('../../hgw-config-parser-state'))
+    expect(cfg.runtimeCredentialDir).toBe(join(cfg.stateRoot, 'runtime-credentials'))
+  })
+  it('validates progress response bytes and usage replay batch configuration', () => {
+    expect(loadConfig({}).progress).toMatchObject({ maxResponseBytes: 1048576, usageReplayBatchSize: 64 })
+    expect(loadConfig({ HGW_PROGRESS_RESPONSE_LIMIT_BYTES: '4096', HGW_PROGRESS_USAGE_REPLAY_BATCH: '2' }).progress)
+      .toMatchObject({ maxResponseBytes: 4096, usageReplayBatchSize: 2 })
+    for (const key of ['HGW_PROGRESS_RESPONSE_LIMIT_BYTES', 'HGW_PROGRESS_USAGE_REPLAY_BATCH']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+  })
   it('accepts an explicit SQL executor wrapper and rejects an empty command', () => {
     expect(loadConfig({ HGW_PSQL_COMMAND: '/opt/postgres/bin/psql' }).psqlCommand).toEqual(['/opt/postgres/bin/psql'])
     expect(loadConfig({}).psqlCommand).toBeUndefined()
     expect(() => loadConfig({ HGW_PSQL_COMMAND: '' })).toThrow('HGW_PSQL_COMMAND')
+  })
+
+  it('validates node-wide Runtime admission and performance settings', () => {
+    expect(loadConfig({}).runtimeCapacity).toEqual({ maxStarting: 2, maxResident: 0, maxQueued: 32, maxQueueWaitMs: 30000 })
+    expect(loadConfig({ HGW_RUNTIME_MAX_RESIDENT: '0' }).runtimeCapacity.maxResident).toBe(0)
+    expect(loadConfig({}).performanceEnabled).toBe(true)
+    expect(loadConfig({}).performanceEventLoopResolutionMs).toBe(20)
+    expect(loadConfig({ HGW_PERFORMANCE_ENABLED: 'false' }).performanceEnabled).toBe(false)
+    for (const key of ['HGW_RUNTIME_MAX_STARTING', 'HGW_RUNTIME_MAX_RESIDENT', 'HGW_RUNTIME_MAX_QUEUED', 'HGW_RUNTIME_QUEUE_WAIT_MS', 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS']) {
+      for (const value of ['-1', '1.5', 'wat', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+      if (key !== 'HGW_RUNTIME_MAX_RESIDENT') expect(() => loadConfig({ [key]: '0' })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_RUNTIME_MAX_STARTING: '3', HGW_RUNTIME_MAX_RESIDENT: '2' })).toThrow('HGW_RUNTIME_MAX_STARTING')
+    expect(() => loadConfig({ HGW_RUNTIME_QUEUE_WAIT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_RUNTIME_QUEUE_WAIT_MS')
+    expect(() => loadConfig({ HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS')
+    expect(() => loadConfig({ HGW_PERFORMANCE_ENABLED: 'on' })).toThrow('HGW_PERFORMANCE_ENABLED')
+    expect(loadConfig({ HGW_RUNTIME_MAX_STARTING: '4', HGW_RUNTIME_MAX_RESIDENT: '12', HGW_RUNTIME_MAX_QUEUED: '9', HGW_RUNTIME_QUEUE_WAIT_MS: '2000' }).runtimeCapacity)
+      .toEqual({ maxStarting: 4, maxResident: 12, maxQueued: 9, maxQueueWaitMs: 2000 })
+  })
+
+  it('validates production PostgreSQL pool capacity and checkout deadlines', () => {
+    expect(loadConfig({})).toMatchObject({ databaseMaxConnections: 10, databaseMaxCheckoutQueue: 256, databaseConnectionTimeoutMs: 5000 })
+    expect(loadConfig({ HGW_DATABASE_MAX_CONNECTIONS: '12', HGW_DATABASE_MAX_CHECKOUT_QUEUE: '20', HGW_DATABASE_CONNECTION_TIMEOUT_MS: '750' }))
+      .toMatchObject({ databaseMaxConnections: 12, databaseMaxCheckoutQueue: 20, databaseConnectionTimeoutMs: 750 })
+    for (const key of ['HGW_DATABASE_MAX_CONNECTIONS', 'HGW_DATABASE_MAX_CHECKOUT_QUEUE', 'HGW_DATABASE_CONNECTION_TIMEOUT_MS']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_DATABASE_CONNECTION_TIMEOUT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_DATABASE_CONNECTION_TIMEOUT_MS')
   })
 
   it('provides workable defaults', () => {
@@ -267,12 +360,36 @@ describe('loadConfig', () => {
       'HGW_ACCESS_INVALIDATION_POLL_MS',
       'HGW_EXECUTION_WATCH_HEARTBEAT_MS',
       'HGW_READINESS_TIMEOUT_MS',
+      'HGW_SYSTEMD_COMMAND_TIMEOUT_MS',
+      'HGW_TUNNEL_STARTUP_TIMEOUT_MS',
+      'HGW_TUNNEL_CLOSE_TIMEOUT_MS',
+      'HGW_TUNNEL_PROBE_INTERVAL_MS',
     ]) {
       expect(() => loadConfig({ [variable]: String(MAX_TIMER_DELAY_MS + 1) }))
         .toThrow(new RegExp(`${variable}.*${String(MAX_TIMER_DELAY_MS)}`))
     }
     expect(loadConfig({ HGW_UPSTREAM_TIMEOUT_MS: String(MAX_TIMER_DELAY_MS) }).upstreamTimeoutMs)
       .toBe(MAX_TIMER_DELAY_MS)
+  })
+
+  it('validates connector startup, close and registration polling times before launch', () => {
+    expect(loadConfig({})).toMatchObject({ tunnelStartupTimeoutMs: 30000, tunnelCloseTimeoutMs: 5000, tunnelProbeIntervalMs: 25 })
+    expect(loadConfig({ HGW_TUNNEL_STARTUP_TIMEOUT_MS: '100', HGW_TUNNEL_CLOSE_TIMEOUT_MS: '50', HGW_TUNNEL_PROBE_INTERVAL_MS: '5' }))
+      .toMatchObject({ tunnelStartupTimeoutMs: 100, tunnelCloseTimeoutMs: 50, tunnelProbeIntervalMs: 5 })
+    for (const name of ['HGW_TUNNEL_STARTUP_TIMEOUT_MS', 'HGW_TUNNEL_CLOSE_TIMEOUT_MS', 'HGW_TUNNEL_PROBE_INTERVAL_MS']) {
+      expect(() => loadConfig({ [name]: '0' })).toThrow(name)
+      expect(() => loadConfig({ [name]: 'invalid' })).toThrow(name)
+    }
+    expect(() => loadConfig({ HGW_TUNNEL_STARTUP_TIMEOUT_MS: '10', HGW_TUNNEL_PROBE_INTERVAL_MS: '20' }))
+      .toThrow('HGW_TUNNEL_PROBE_INTERVAL_MS must not exceed')
+  })
+
+  it('validates the native systemctl client deadline', () => {
+    expect(loadConfig({}).systemdCommandTimeoutMs).toBe(120000)
+    expect(loadConfig({ HGW_SYSTEMD_COMMAND_TIMEOUT_MS: '500' }).systemdCommandTimeoutMs).toBe(500)
+    for (const value of ['0', '-1', 'invalid']) {
+      expect(() => loadConfig({ HGW_SYSTEMD_COMMAND_TIMEOUT_MS: value })).toThrow('HGW_SYSTEMD_COMMAND_TIMEOUT_MS')
+    }
   })
 
   it('keeps the steward space disabled by default and validates it when enabled', () => {

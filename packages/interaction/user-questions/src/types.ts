@@ -3,6 +3,7 @@
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { Agent } from '@deepseek-ai/dsh-agent/types'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
+import type { CollaborationParticipant } from '@deepseek-ai/dsh-collaboration/types'
 import type {} from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-session-projection/types'
 
@@ -113,11 +114,17 @@ declare module '@deepseek-ai/dsh-llm' {
      * hide that persists nothing, and an unanswered question ends through its
      * timeout instead. Sessions recorded before that change still carry it, so
      * readers keep both outcomes. Readers preserve the message without this
-     * producer; only the `userQuestions` projection reads the kind, to close
-     * the question and to record the answers it carried.
+     * producer. The `userQuestions` projection reads the kind to close the
+     * question and record its answers; collaboration context attributes project replies.
      * @persistenceAttribution
      */
-    'user-question-reply': { kind: 'user-question-reply'; callId: ToolCallId; outcome: 'answered' | 'dismissed' }
+    'user-question-reply': {
+      kind: 'user-question-reply'
+      callId: ToolCallId
+      outcome: 'answered' | 'dismissed'
+      /** Authenticated project answerer snapshot retained with the reply. */
+      participant?: CollaborationParticipant
+    }
   }
 }
 
@@ -134,7 +141,7 @@ export interface AskUserQuestionRequestEvent {
   questions: AskUserQuestionItem[]
   /** Agent identity projected to the corresponding Client Context in transit. */
   agent?: Agent
-  /** Cancellation lifetime of the pending request. */
+  /** Cancellation of this question; the service combines caller, service and Agent lifetimes for answerers. */
   signal?: AbortSignal
   /**
    * Tool call the Client card is keyed by. Timed answerers attach to the

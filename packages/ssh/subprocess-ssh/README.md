@@ -31,6 +31,8 @@ Ordinary spawn returns a handle while remote allocation proceeds. Piped stdin an
 
 Terminal requests forward `shellActivity` to the execution provider, and `inspectActivity()` returns its validated state and revision. Opted-in terminals remain addressable after root exit until their owner explicitly terminates them; the SSH helper lease still governs connection-level cleanup.
 
+A terminal request signal cancels allocation. After publication, the caller explicitly terminates the handle; provider disposal and node-permit withdrawal retain termination authority. The provider registers its shared quiescent cleanup with the SSH connection so enclosing-owner disposal keeps the transport available through the last process termination or wait.
+
 A direct exit reported by `done` does not prove managed-range quiescence; `waitForExit()` observes that separately. Its optional signal bounds the entire observation, including pending allocation and termination, and cancellation returns `false` without stopping the process. An already confirmed empty range returns `true`; genuine observation failures reject. `terminate()` targets the same remote owner. Connection loss rejects unconfirmed work, and automatic replay never follows an ambiguous launch or mutation.
 
 -----
@@ -46,6 +48,12 @@ Terminal shell facts and executable verification come from the remote helper. Lo
 The helper reserves and authenticates all required streams before launch. Stdout, stderr, stdin and fd 7 use separate SSH channels. Collected output publishes a final bounded raw-tail snapshot with whole-stream byte offsets, so network lag cannot change the completed observation. Optional spill files use the local provider’s private retained-output directory on the remote host.
 
 Remote execution delegates to [`subprocess-local`](../../subprocess/subprocess-local/README.md). Native process ownership and platform fallbacks therefore have the same meaning as local execution on that remote OS. SSH carries requests and observations; it does not itself confine the payload.
+
+Process preparation forwards only the helper's declared execution fields. Session attribution, resource origin and cancellation signals stay with the host admission owner; they are not remote process parameters.
+
+Both process and terminal starts retain the host admission check across remote preparation and authenticated stream connection, and recheck immediately before `process.start`. A withdrawn or replaced owner refuses dispatch. Confirmed terminal rollback releases its original permit; a failed termination acknowledgement retains uncertain occupation. Failed ordinary handles retire only after range quiescence and stream closure, including when `done` rejects.
+
+Ordinary startup records each authenticated stream as it arrives. A failed stream cancels sibling attempts and waits for all of them to settle, then joins every allocated socket's closure before rejecting `done`. Successful range observation and provider disposal retain that startup cleanup even when the helper has already acknowledged termination. A cancelled observation remains bounded and reports unfinished cleanup; later confirmation can complete the original permit.
 
 </details>
 

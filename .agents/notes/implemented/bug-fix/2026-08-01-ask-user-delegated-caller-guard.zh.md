@@ -14,6 +14,8 @@ Status: implemented
 
 如果存在 `AskUserQuestionRequest.agent`，`UserQuestionService.ask()` 会通过 `ctx.agents` 验证该 agent 就是注册表中的存活实例，并且只在 `ctx.agents.roots()` 包含该实例时才允许调用。缺失注册表或传入仅 id 相同的陈旧对象时，以 `CALLER_NOT_LIVE` 失败；存活 agent 归属于另一个存活 agent 时，以 `DELEGATED_CALLER` 失败。该检查位于现有的已中止和空批次守卫之后、意图校验或提供方分派之前，因此归属于其他 agent 的子级绝不会触发 UI 等待。
 
+[前台提问生命周期决策](2026-11-02-foreground-question-ownership.zh.md)在答案结算及计划应用期间持续维护这一身份约束。
+
 以运行时所有权为权限依据。携带谱系的会话在无所有者的情况下恢复时就是运行时根，可以提问；存活子级即使持久化 `delegationDepth` 为零，仍无资格提问。不带 agent 的程序化调用继续沿用现有提供方路径。
 
 共享失败文本与具体消费方无关，并给出可执行指引：子级把尚未解决的问题或决策写入最终结果。委托约定本就会把该结果传给父级，父级可据此决定是否询问人类。服务和子级都不会宣称存在实际上并不存在的向上消息传递或回答转发能力。

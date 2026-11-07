@@ -40,7 +40,7 @@ import {
 import { assertSubagentMaxDepth } from './depth.ts'
 import { foldSubagentDescriptor, snapshotSubagentDescriptor } from './descriptor.ts'
 import { establishCatalogChild } from './catalog.ts'
-import { SubagentError } from './error.ts'
+import { SubagentError, renderSubagentFailure } from './error.ts'
 import { isAdjacentAgentSendMessageTool } from './internal.ts'
 import type { ActivationObserver } from './lifecycle.ts'
 import type {
@@ -537,7 +537,7 @@ export class SubagentContinuationManager {
         await this.activations.dispose(activation)
       } catch (cleanupError: unknown) {
         this.ctx.logger.warn(
-          `subagent continuation: disposal after admission or catalog append failure also failed: ${String(cleanupError)}`,
+          `subagent continuation: disposal after admission or catalog append failure also failed: ${renderSubagentFailure(cleanupError)}`,
         )
       }
       throw error

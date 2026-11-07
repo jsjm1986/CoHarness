@@ -1,20 +1,36 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { setImmediate } from 'node:timers/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
-import { createUserMessage, ToolCallId, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
-import type { MemoryWriter } from '@deepseek-ai/dsh-memory'
-import { agentFor, memoryHarness } from '../../memory/tests/harness.ts'
+import LlmRuntime, { createUserMessage, LlmAdapter, ToolCallId, type GenerateOptions, type LlmCallConfig, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { MemoryWriter, MemorySwitches } from '@deepseek-ai/dsh-memory'
+import { MEMORY_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-memory'
+import { agentFor, memoryHarness, settingsStub } from '../../memory/tests/harness.ts'
+import { MemorySettings } from '../../../settings/settings/tests/memory.ts'
 import * as MemoryContext from '../src/index.ts'
 import type { MemoryCatalogSource, MemoryRecallSource } from '../src/index.ts'
 
 const signal = new AbortController().signal
 
+/** Supply live memory settings without replacing other services' composition defaults. */
+function provideMemorySettings(ctx: Context, switches: MemorySwitches): void {
+  const settings = settingsStub(switches)
+  ctx.provide('settings', {
+    installSection(...args: Parameters<typeof settings.installSection>) {
+      return args[1] === MEMORY_SETTINGS_NAMESPACE ? settings.installSection(...args) : { watch() {} }
+    },
+  } as never)
+}
+
 /** Boot the context plugin over the memory harness plus tools/system-prompt. */
-async function harness(config: Partial<MemoryContext.Config> = {}) {
-  const h = await memoryHarness()
+async function harness(config: Partial<MemoryContext.Config> = {}, switches?: MemorySwitches) {
+  const h = await memoryHarness({ beforeService: (ctx) => {
+    if (switches !== undefined) provideMemorySettings(ctx, switches)
+  } })
   await h.ctx.plugin(AgentRegistry)
   await h.ctx.plugin(SystemPrompt)
   await h.ctx.plugin(ToolRuntime)
@@ -70,6 +86,48 @@ const save = (h: Awaited<ReturnType<typeof memoryHarness>>, agent: Agent, key: s
   }, writer(agent))
 
 describe('memory-context', () => {
+  it('withdraws a catalog whose scope is disabled while its storage list is pending', async () => {
+    const switches = { enabled: true, recall: false, extraction: false, consolidation: false }
+    const h = await harness({}, switches)
+    const agent = agentFor(h.ctx, 'catalog-switch-agent')
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    await save(h, agent, 'release-freeze')
+    const list = h.service.list.bind(h.service)
+    vi.spyOn(h.service, 'list').mockImplementation(async (scope) => {
+      const rows = await list(scope)
+      entered.resolve(undefined)
+      await release.promise
+      return rows
+    })
+    try {
+      const pending = step(h.ctx, agent)
+      await entered.promise
+      switches.enabled = false
+      release.resolve(undefined)
+      expect((await pending).catalog).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('finishes an outstanding catalog read without publishing after unload', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'catalog-unload-agent')
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    await save(h, agent, 'release-freeze')
+    const list = h.service.list.bind(h.service)
+    vi.spyOn(h.service, 'list').mockImplementation(async (scope) => {
+      const rows = await list(scope)
+      entered.resolve(undefined)
+      await release.promise
+      return rows
+    })
+    const pending = step(h.ctx, agent)
+    try {
+      await entered.promise
+      await h.ctx.fiber.dispose()
+      release.resolve(undefined)
+      expect((await pending).catalog).toBeUndefined()
+    } finally { release.resolve(undefined); await pending; await h.ctx.fiber.dispose() }
+  })
   it('publishes the first catalog with entries, source rows, and the first-publication frame', async () => {
     const h = await harness()
     const agent = agentFor(h.ctx, 'ctx-agent', { cwd: '/repo' })
@@ -257,6 +315,7 @@ describe('memory-context', () => {
     // apply() is the contract the plugin loader invokes; a config below the
     // schema floor drives the defensive publish-nothing path.
     MemoryContext.apply(h.ctx, {
+      maxOutputTokens: 5000,
       catalogMaxBytes: 50,
       delegatedSessions: false,
       recallMaxBytes: 4096,
@@ -495,11 +554,198 @@ describe('memory-context', () => {
 })
 
 describe('memory recall', () => {
+  it('leaves independent LLM requests outside recall authorization', async () => {
+    const h = await recallHarness()
+    const authorize = vi.fn(async () => { throw new Error('not admitted recall') })
+    h.ctx.provide('executionAuthority', { authorize } as never)
+    class Adapter extends LlmAdapter {
+      async *stream(): AsyncIterable<StreamChunk> { yield { type: 'finish', reason: { kind: 'stop' } } }
+    }
+    await h.ctx.plugin(LlmRuntime)
+    h.ctx.effect(() => h.ctx.llm.registerAdapter(['test-provider'], new Adapter()))
+    try {
+      const chunks: StreamChunk[] = []
+      for await (const chunk of h.ctx.llm.stream({ provider: 'test-provider', model: 'test-model', messages: [] })) chunks.push(chunk)
+      expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } })
+      expect(authorize).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['later-step', 'cancelled', 'unload'] as const)('does not start prepared recall after request admission is %s', async (kind) => {
+    const h = await recallHarness(), parent = new AbortController()
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(h.ctx, ['{"keys":["release-freeze"]}'])
+    try {
+      await save(h, h.agent, 'release-freeze')
+      const dispatch = agentEvents(h.ctx, h.agent), messages = [human('when is the release frozen?')]
+      await dispatch.waterfall('agent/pre-step', { messages, turn: 1, step: 1, signal: parent.signal },
+        () => Promise.resolve({ kind: 'enter' as const, messages }))
+      const request = dispatch.waterfall('agent/request', { turn: 1, step: kind === 'later-step' ? 2 : 1, signal: parent.signal }, async () => {
+        entered.resolve(undefined); await release.promise; return { provider: 'test-provider', model: 'test-model' }
+      })
+      await entered.promise
+      if (kind === 'cancelled') parent.abort()
+      if (kind === 'unload') await h.contextFiber.dispose()
+      release.resolve(undefined)
+      await request
+      expect(calls).toHaveLength(0)
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('skips recall when its issuing service cannot capture the admitted question', async () => {
+    const h = await recallHarness(), debug = vi.spyOn(h.ctx.logger, 'debug')
+    h.ctx.provide('executionAuthority', { capture: () => { throw new Error('execution stream unavailable') } } as never)
+    const calls = fakeLlm(h.ctx, ['{"keys":["release-freeze"]}'])
+    try {
+      await save(h, h.agent, 'release-freeze')
+      await step1(h, [human('when is the release frozen?')])
+      expect(calls).toHaveLength(0)
+      expect(debug.mock.calls.some(call => String(call[0]).includes('could not capture execution'))).toBe(true)
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('rechecks scopes after final execution authorization without treating read recall as a memory write', async () => {
+    const switches = { enabled: true, recall: true, extraction: false, consolidation: false }
+    const h = await recallHarness({}, { recall: true }, switches), debug = vi.spyOn(h.ctx.logger, 'debug')
+    let readComplete = false
+    const authorize = vi.fn(async (capability: string) => {
+      expect(capability).toBe('execute')
+      if (readComplete) switches.enabled = false
+      return { inputs: [] }
+    })
+    h.ctx.provide('executionAuthority', {
+      capture: () => ({ parentSessionId: h.agent.id, inputs: [], unverifiedHistory: false }),
+      runCaptured: <T>(_agent: Agent, _scope: unknown, work: () => T): T => work(), authorize,
+    } as never)
+    fakeLlm(h.ctx, ['{"keys":["release-freeze"]}'])
+    await save(h, h.agent, 'release-freeze')
+    const read = h.service.read.bind(h.service), finished = Promise.withResolvers<undefined>()
+    vi.spyOn(h.service, 'read').mockImplementation(async (...args) => { const entry = await read(...args); readComplete = true; return entry })
+    const scopesFor = h.service.scopesFor.bind(h.service)
+    vi.spyOn(h.service, 'scopesFor').mockImplementation((agent) => {
+      const scopes = scopesFor(agent)
+      if (!switches.enabled) finished.resolve(undefined)
+      return scopes
+    })
+    try {
+      await step1(h, [human('when is the release frozen?')])
+      await finished.promise
+      expect(authorize).toHaveBeenCalled()
+      expect(h.inject).not.toHaveBeenCalled()
+      expect(debug.mock.calls.some(call => String(call[0]).includes('selector failed'))).toBe(false)
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['error', 'aborted'] as const)('drops valid selector JSON from a terminal %s outcome', async (kind) => {
+    const h = await recallHarness(), debug = vi.spyOn(h.ctx.logger, 'debug')
+    fakeLlm(h.ctx, [async function* () {
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: '{"keys":["release-freeze"]}' } }
+      yield { type: 'finish', reason: { kind, failure: { code: 'SELECTOR_FAILED', message: 'selector did not complete' } } }
+    }])
+    try {
+      await save(h, h.agent, 'release-freeze')
+      await step1(h, [human('when is the release frozen?')])
+      await vi.waitFor(() => {
+        expect(h.inject.mock.calls.length > 0 || debug.mock.calls.some(call => String(call[0]).includes('memory recall selector failed'))).toBe(true)
+      })
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('retains the admitted question participant for recall instead of its pre-step identity', async () => {
+    const h = await recallHarness(), execution = new AsyncLocalStorage<number>()
+    const capture = vi.fn(() => ({
+      parentSessionId: h.agent.id, inputs: [], unverifiedHistory: false, primaryActorUserId: actor,
+    }))
+    let actor = 1
+    h.ctx.provide('executionAuthority', {
+      capture,
+      runCaptured: <T>(_agent: Agent, scope: { primaryActorUserId: number }, work: () => T): T =>
+        execution.run(scope.primaryActorUserId, work),
+      authorize: async () => ({ inputs: [], primaryActorUserId: execution.getStore() ?? actor }),
+    } as never)
+    const calls = fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
+    try {
+      await save(h, h.agent, 'release-freeze')
+      const batch = [human('when is the release frozen?')]
+      await agentEvents(h.ctx, h.agent).waterfall('agent/pre-step', { messages: batch, turn: 1, step: 1, signal },
+        () => Promise.resolve({ kind: 'enter' as const, messages: batch }))
+      expect(capture).not.toHaveBeenCalled()
+      actor = 2
+      await agentEvents(h.ctx, h.agent).waterfall('agent/request', { turn: 1, step: 1, signal },
+        () => Promise.resolve({ provider: 'test-provider', model: 'test-model' }))
+      await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(1) })
+      expect(capture).toHaveBeenCalledTimes(1)
+      expect(calls[0]!.executionIdentity).toEqual({ inputs: [], primaryActorUserId: 2 })
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('drops recall content after its captured issuer is replaced during an entry read', async () => {
+    const h = await recallHarness()
+    const authority = { capture: () => ({ parentSessionId: h.agent.id, inputs: [], unverifiedHistory: false }),
+      runCaptured: <T>(_agent: Agent, _scope: unknown, work: () => T): T => work(),
+      authorize: async () => ({ inputs: [], primaryActorUserId: 42 }) }
+    const remove = h.ctx.provide('executionAuthority', authority as never)
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const debug = vi.spyOn(h.ctx.logger, 'debug')
+    fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
+    await save(h, h.agent, 'release-freeze')
+    const read = h.service.read.bind(h.service)
+    vi.spyOn(h.service, 'read').mockImplementation(async (...args) => {
+      const entry = await read(...args); entered.resolve(undefined); await release.promise; return entry
+    })
+    try {
+      await step1(h, [human('when is the release frozen?')])
+      await entered.promise
+      remove(); h.ctx.provide('executionAuthority', { ...authority, authorize: async () => ({ inputs: [], primaryActorUserId: 77 }) } as never)
+      release.resolve(undefined)
+      await vi.waitFor(() => {
+        expect(h.inject.mock.calls.length > 0 || debug.mock.calls.some(call => String(call[0]).includes('memory recall selector failed'))).toBe(true)
+      })
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('cancels queued recall as soon as its primary turn aborts before turn/end', async () => {
+    const h = await recallHarness(), parent = new AbortController()
+    const requested = Promise.withResolvers<AbortSignal>(), release = Promise.withResolvers<undefined>()
+    let invoked = false, released = 0
+    h.ctx.provide('resourceBudget', { async acquire(request: { signal: AbortSignal }) {
+      requested.resolve(request.signal); await release.promise
+      return { signal: new AbortController().signal, release: async () => { released++ }, uncertain: async () => {} }
+    } } as never)
+    class Adapter extends LlmAdapter {
+      async *stream(): AsyncIterable<StreamChunk> { invoked = true; yield { type: 'finish', reason: { kind: 'stop' } } }
+    }
+    await h.ctx.plugin(LlmRuntime)
+    h.ctx.effect(() => h.ctx.llm.registerAdapter(['test-provider'], new Adapter()))
+    try {
+      await save(h, h.agent, 'release-freeze')
+      await step1(h, [human('when is the release frozen?')], 1, parent.signal)
+      const queued = await requested.promise
+      parent.abort(new Error('primary turn revoked'))
+      expect(queued.aborted).toBe(true)
+      release.resolve(undefined)
+      await h.contextFiber.dispose()
+      expect(invoked).toBe(false)
+      expect(released).toBe(1)
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each([0, 0.5, Number.MAX_SAFE_INTEGER + 1])('rejects unsupported selector output limit %s', (maxOutputTokens) => {
+    expect(() => MemoryContext.Config({ maxOutputTokens } as MemoryContext.Config)).toThrow()
+  })
+
   /** A fake `llm` service replaying the selector's canned replies in call order. */
   function fakeLlm(ctx: Context, replies: readonly (string | ((options: GenerateOptions) => AsyncIterable<StreamChunk>))[]) {
     const calls: GenerateOptions[] = []
     let next = 0
     ctx.provide('llm', {
+      async prepareCall(config: LlmCallConfig) {
+        return { config, stream: (options: GenerateOptions) => ctx.llm.stream({ ...options, ...config }) }
+      },
       stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
         calls.push(options)
         const reply = replies[Math.min(next, replies.length - 1)]
@@ -517,31 +763,121 @@ describe('memory recall', () => {
   }
 
   /** Boot the recall path: catalog plugin plus a routed agent whose inject is observed. */
-  async function recallHarness(config: Partial<MemoryContext.Config> = {}, memoryConfig: Record<string, unknown> = { recall: true }) {
-    const h = await memoryHarness({ config: memoryConfig })
+  async function recallHarness(
+    config: Partial<MemoryContext.Config> = {},
+    memoryConfig: Record<string, unknown> = { recall: true },
+    switches?: MemorySwitches,
+  ) {
+    const h = await memoryHarness({ config: memoryConfig, beforeService: (ctx) => {
+      if (switches !== undefined) provideMemorySettings(ctx, switches)
+    } })
     await h.ctx.plugin(AgentRegistry)
     await h.ctx.plugin(SystemPrompt)
     await h.ctx.plugin(ToolRuntime)
-    await h.ctx.plugin(MemoryContext, config as MemoryContext.Config)
+    const contextFiber = h.ctx.plugin(MemoryContext, config as MemoryContext.Config)
+    await contextFiber
     const agent = agentFor(h.ctx, 'recall-agent', { cwd: '/repo' })
     agent.options.provider = 'test-provider'
     agent.options.model = 'test-model'
     const inject = vi.spyOn(agent, 'inject')
-    return { ...h, agent, inject }
+    return { ...h, agent, inject, contextFiber }
   }
+
+  it.each([false, true])('joins real selector cleanup during unload (Session already disposed: %s)', async (disposeSession) => {
+    const h = await recallHarness()
+    const entered = Promise.withResolvers<undefined>(), cleanup = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>(), stop = Promise.withResolvers<undefined>()
+    let modelSignal: AbortSignal | undefined
+    class Adapter extends LlmAdapter {
+      override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return { provider, id: model, name: model }
+      }
+      async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        modelSignal = options.signal!
+        const aborted = Promise.withResolvers<undefined>()
+        const onAbort = (): void => { aborted.resolve(undefined) }
+        modelSignal.addEventListener('abort', onAbort, { once: true })
+        entered.resolve(undefined)
+        try { await Promise.race([aborted.promise, stop.promise]) }
+        finally {
+          modelSignal.removeEventListener('abort', onAbort)
+          cleanup.resolve(undefined)
+          await release.promise
+        }
+      }
+    }
+    await h.ctx.plugin(LlmRuntime)
+    h.ctx.effect(() => h.ctx.llm.registerAdapter(['test-provider'], new Adapter()))
+    let closing: Promise<void> | undefined
+    try {
+      await save(h, h.agent, 'release-freeze')
+      await step1(h, [human('when is the deploy frozen?')])
+      await entered.promise
+      expect(h.ctx.bail('runtime/idle-release-check')).toBe('busy')
+      if (disposeSession) h.ctx.emit('session/disposed', h.agent.session)
+      let disposed = false
+      closing = h.contextFiber.dispose().then(() => { disposed = true })
+      await setImmediate()
+      expect(modelSignal?.aborted).toBe(true)
+      await cleanup.promise
+      expect(disposed).toBe(false)
+      expect(h.ctx.bail('runtime/idle-release-check')).toBe('busy')
+      release.resolve(undefined)
+      await closing
+      expect(h.ctx.bail('runtime/idle-release-check')).toBeUndefined()
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally {
+      stop.resolve(undefined)
+      release.resolve(undefined)
+      await closing
+      await h.ctx.fiber.dispose()
+    }
+  })
 
   /** The human message a turn's first step claims. */
   function human(text: string): UserMessage {
     return createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
   }
 
-  /** Run one step-1 waterfall carrying `batch`, letting the catalog listener fire recall. */
-  async function step1(h: Awaited<ReturnType<typeof recallHarness>>, batch: UserMessage[], turn = 1): Promise<void> {
-    await agentEvents(h.ctx, h.agent).waterfall(
-      'agent/pre-step',
-      { messages: batch, turn, step: 1, signal },
-      () => Promise.resolve({ kind: 'enter' as const, messages: batch }),
+  it('refuses selector admission after an already-entered pre-step listener resumes during unloading', async () => {
+    const h = await recallHarness()
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
+    await save(h, h.agent, 'release-freeze')
+    const list = vi.spyOn(h.service, 'list')
+    const messages = [human('when is the deploy frozen?')]
+    const stepping = agentEvents(h.ctx, h.agent).waterfall(
+      'agent/pre-step', { messages, turn: 1, step: 1, signal }, async () => {
+        entered.resolve(undefined)
+        await release.promise
+        return { kind: 'enter' as const, messages }
+      },
     )
+    try {
+      await entered.promise
+      await h.contextFiber.dispose()
+      release.resolve(undefined)
+      expect(await stepping).toEqual({ kind: 'enter', messages })
+      expect(list).not.toHaveBeenCalled()
+      expect(calls).toEqual([])
+    } finally {
+      release.resolve(undefined)
+      await stepping
+      await h.ctx.fiber.dispose()
+    }
+  })
+
+  /** Run one step-1 waterfall carrying `batch`, letting the catalog listener fire recall. */
+  async function step1(h: Awaited<ReturnType<typeof recallHarness>>, batch: UserMessage[], turn = 1, turnSignal = signal): Promise<void> {
+    const dispatch = agentEvents(h.ctx, h.agent)
+    const decision = await dispatch.waterfall('agent/pre-step',
+      { messages: batch, turn, step: 1, signal: turnSignal },
+      () => Promise.resolve({ kind: 'enter' as const, messages: batch }))
+    if (decision.kind === 'reject') return
+    const target = h.agent.session.requestHeader()?.config ?? h.agent.options
+    if (target.provider === undefined || !target.provider || target.model === undefined || !target.model) return
+    await dispatch.waterfall('agent/request', { turn, step: 1, signal: turnSignal },
+      () => Promise.resolve({ provider: target.provider!, model: target.model! }))
   }
 
   /** Commit an injected recall message to the durable log, as the admitting step does. */
@@ -549,9 +885,171 @@ describe('memory recall', () => {
     agent.session.append('user/message', message, { surfaceOp: 'append' })
   }
 
+  it.each(['enabled', 'recall'] as const)('drops selector picks after %s is withdrawn during the model response', async (setting) => {
+    const switches = { enabled: true, recall: true, extraction: false, consolidation: false }
+    const h = await recallHarness({}, { recall: true }, switches)
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const finished = Promise.withResolvers<undefined>()
+    fakeLlm(h.ctx, [() => (async function* (): AsyncIterable<StreamChunk> {
+      entered.resolve(undefined)
+      await release.promise
+      yield { type: 'text-delta', index: 0, text: '{"keys":["release-freeze"]}' }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: '{"keys":["release-freeze"]}' } }
+      finished.resolve(undefined)
+    })()])
+    await save(h, h.agent, 'release-freeze')
+    try {
+      await step1(h, [human('when is the deploy frozen?')])
+      await entered.promise
+      switches[setting] = false
+      release.resolve(undefined)
+      await finished.promise
+      await setImmediate()
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['commit', 'attach', 'detach'] as const)('withdraws a queued selector after settings %s', async (change) => {
+    const switches = { enabled: true, recall: true, extraction: false, consolidation: false }
+    const h = await recallHarness({}, { recall: change !== 'detach' }, change === 'commit' ? switches : undefined)
+    let settingsFiber: ReturnType<Context['plugin']> | undefined
+    if (change === 'detach') {
+      settingsFiber = h.ctx.plugin(MemorySettings, { doc: { memory: switches } })
+      await settingsFiber
+      await vi.waitFor(() => { expect(h.service.switches().recall).toBe(true) })
+    }
+    const requested = Promise.withResolvers<AbortSignal>(), grant = Promise.withResolvers<undefined>()
+    let releases = 0, invoked = false
+    const budget: Pick<Context['resourceBudget'], 'acquire'> = { async acquire(request) {
+      if (request.signal === undefined) throw new Error('Selector admission requires its lifetime')
+      requested.resolve(request.signal)
+      await grant.promise
+      return { signal: new AbortController().signal, release: async () => { releases++ }, uncertain: async () => {} }
+    } }
+    h.ctx.provide('resourceBudgetRequired', true)
+    h.ctx.provide('resourceBudget', budget as Context['resourceBudget'])
+    class Adapter extends LlmAdapter {
+      override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return { provider, id: model, name: model }
+      }
+      async *stream(): AsyncIterable<StreamChunk> { invoked = true; yield { type: 'finish', reason: { kind: 'stop' } } }
+    }
+    await h.ctx.plugin(LlmRuntime)
+    h.ctx.effect(() => h.ctx.llm.registerAdapter(['test-provider'], new Adapter()))
+    try {
+      await save(h, h.agent, 'release-freeze')
+      await step1(h, [human('when is the deploy frozen?')])
+      const queued = await requested.promise
+      h.ctx.emit('memory/switches-updated')
+      h.ctx.emit('settings/updated', 'unrelated-memory-test' as typeof MEMORY_SETTINGS_NAMESPACE, {}, {}, 'update')
+      h.ctx.emit('settings/updated', MEMORY_SETTINGS_NAMESPACE, switches, switches, 'provider')
+      expect(queued.aborted).toBe(false)
+      const previous = { ...switches }
+      if (change === 'detach') await settingsFiber!.dispose()
+      else {
+        switches.recall = false
+        if (change === 'commit') h.ctx.emit('settings/updated', MEMORY_SETTINGS_NAMESPACE, switches, previous, 'update')
+        else {
+          provideMemorySettings(h.ctx, switches)
+          await vi.waitFor(() => { expect(h.service.switches().recall).toBe(false) })
+        }
+      }
+      expect(h.service.switches().recall).toBe(false)
+      expect(queued.aborted).toBe(true)
+      grant.resolve(undefined)
+      await h.contextFiber.dispose()
+      expect(invoked).toBe(false)
+      expect(releases).toBe(1)
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally { grant.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['metadata', 'preparation', 'cancelled-preparation'] as const)('withdraws a selector during %s before dispatch', async (phase) => {
+    const switches = { enabled: true, recall: true, extraction: false, consolidation: false }
+    const h = await recallHarness({}, { recall: true }, switches)
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(h.ctx, ['{"keys":["release-freeze"]}'])
+    const prepared = h.ctx.llm.prepareCall.bind(h.ctx.llm)
+    if (phase === 'metadata') {
+      h.ctx.llm.resolveModelInfo = async (provider, model) => {
+        entered.resolve(undefined); await release.promise
+        return { provider, id: model, name: model }
+      }
+    } else {
+      vi.spyOn(h.ctx.llm, 'prepareCall').mockImplementation(async (...args) => {
+        const call = await prepared(...args)
+        entered.resolve(undefined); await release.promise
+        return call
+      })
+    }
+    await save(h, h.agent, 'release-freeze')
+    try {
+      await step1(h, [human('when is the deploy frozen?')])
+      await entered.promise
+      const previous = { ...switches }
+      switches.enabled = false
+      if (phase === 'cancelled-preparation') h.ctx.emit('settings/updated', MEMORY_SETTINGS_NAMESPACE, switches, previous, 'update')
+      release.resolve(undefined)
+      await setImmediate()
+      expect(calls).toEqual([])
+      expect(h.agent.session.snapshotEvents().filter(event => event.type === 'memory/recall-request')).toEqual([])
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('stops reading remaining selector picks when recall is withdrawn during the first read', async () => {
+    const switches = { enabled: true, recall: true, extraction: false, consolidation: false }
+    const h = await recallHarness({}, { recall: true }, switches)
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    await save(h, h.agent, 'first-rule')
+    await save(h, h.agent, 'second-rule')
+    fakeLlm(h.ctx, ['{"keys":["first-rule","second-rule"]}'])
+    const read = h.service.read.bind(h.service)
+    const observed = vi.spyOn(h.service, 'read').mockImplementation(async (...args) => {
+      const entry = await read(...args)
+      entered.resolve(undefined); await release.promise
+      return entry
+    })
+    try {
+      await step1(h, [human('which deployment rules apply?')])
+      await entered.promise
+      switches.recall = false
+      release.resolve(undefined)
+      await setImmediate()
+      expect(observed).toHaveBeenCalledTimes(1)
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['enabled', 'recall'] as const)('withdraws recalled content after %s changes during its full-entry read', async (setting) => {
+    const switches = { enabled: true, recall: true, extraction: false, consolidation: false }
+    const h = await recallHarness({}, { recall: true }, switches)
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    await save(h, h.agent, 'release-freeze')
+    fakeLlm(h.ctx, ['{"keys":["release-freeze"]}'])
+    const read = h.service.read.bind(h.service)
+    vi.spyOn(h.service, 'read').mockImplementation(async (...args) => {
+      const entry = await read(...args)
+      entered.resolve(undefined); await release.promise
+      return entry
+    })
+    try {
+      await step1(h, [human('when is the deploy frozen?')])
+      await entered.promise
+      switches[setting] = false
+      release.resolve(undefined)
+      await setImmediate()
+      expect(h.inject).not.toHaveBeenCalled()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
   it('injects the selector\'s picks as a memory-recall message', async () => {
     const h = await recallHarness()
-    fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
+    const recorded: MemoryContext.MemoryRecallRequestEventData[] = []
+    h.ctx.on('session/event', (_session, event) => {
+      if (event.type === 'memory/recall-request') recorded.push(event.data)
+    })
+    const calls = fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
     await save(h, h.agent, 'release-freeze')
     await step1(h, [human('when is the deploy frozen?')])
     await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(1) })
@@ -563,6 +1061,9 @@ describe('memory recall', () => {
     expect(text).toContain('<saved_memory key="release-freeze">')
     expect(text).toContain('body of release-freeze')
     expect(text).toContain('</saved_memory>')
+    const { sessionId: _session, signal: _signal, purpose: _purpose, resourceOrigin: _origin, ...request } = calls[0]!
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toEqual({ request })
     await h.ctx.fiber.dispose()
   })
 
@@ -752,6 +1253,17 @@ describe('memory recall', () => {
     await h.ctx.fiber.dispose()
   })
 
+  it('uses the configured independent selector output cap', async () => {
+    const h = await recallHarness({ maxOutputTokens: 64 })
+    const calls = fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
+    try {
+      await save(h, h.agent, 'release-freeze')
+      await step1(h, [human('when is the deploy frozen?')])
+      await vi.waitFor(() => { expect(calls).toHaveLength(1) })
+      expect(calls[0]!.maxTokens).toBe(64)
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
   it('marks a recalled entry older than a day with a staleness note', async () => {
     const h = await recallHarness()
     fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
@@ -919,7 +1431,92 @@ describe('memory recall', () => {
     // Only the first entry fit inside the injection budget.
     expect(body).toContain('<saved_memory key="release-freeze">')
     expect(body).not.toContain('second-fact')
+    expect((injected.source as MemoryRecallSource).keys).toEqual(['personal:release-freeze'])
     await h.ctx.fiber.dispose()
+  })
+
+  it.each(['记', '🧠'])('keeps complete UTF-8 characters inside input and entry byte limits (%s)', async (character) => {
+    const h = await recallHarness({ recallInputMaxBytes: 256, recallEntryMaxBytes: 64 })
+    try {
+      const calls = fakeLlm(h.ctx, ['{"keys": ["unicode-fact"]}'])
+      await h.service.save({
+        scope: { kind: 'personal' }, key: 'unicode-fact', kind: 'background',
+        summary: 'Unicode fact', content: `ab${character.repeat(100)}`,
+      }, writer(h.agent))
+      await step1(h, [human(`hi ${character.repeat(100)}`)])
+      await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(1) })
+      const instruction = calls[0]!.messages[0]!.content[0]
+      const input = instruction?.type === 'text' ? instruction.text : ''
+      const width = Buffer.byteLength(character, 'utf8')
+      expect(input).toContain(`hi ${character.repeat(Math.floor((256 - 3) / width))}`)
+      expect(input).not.toContain('\uFFFD')
+      const block = h.inject.mock.calls[0]![0].content[0]
+      const text = block?.type === 'text' ? block.text : ''
+      expect(text).toContain(`\nab${character.repeat(Math.floor((64 - 2) / width))}\n</saved_memory>`)
+      expect(text).not.toContain('\uFFFD')
+    } finally {
+      await h.ctx.fiber.dispose()
+    }
+  })
+
+  it('records only fitted recall addresses and leaves omitted entries eligible on the next turn', async () => {
+    const h = await recallHarness({ recallMaxBytes: 360, recallEntryMaxBytes: 64 })
+    try {
+      fakeLlm(h.ctx, ['{"keys": ["release-freeze", "second-fact"]}', '{"keys": ["second-fact"]}'])
+      await save(h, h.agent, 'release-freeze')
+      await h.service.save({
+        scope: { kind: 'personal' }, key: 'second-fact', kind: 'background',
+        summary: 'Second fact', content: 'y'.repeat(300),
+      }, writer(h.agent))
+      await step1(h, [human('tell me everything')])
+      await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(1) })
+      const first = h.inject.mock.calls[0]![0]
+      expect((first.source as MemoryRecallSource).keys).toEqual(['personal:release-freeze'])
+      commitRecall(h.agent, first)
+      h.agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+      await setImmediate()
+      await step1(h, [human('what about the second fact?')], 2)
+      await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(2) })
+      expect((h.inject.mock.calls[1]![0].source as MemoryRecallSource).keys).toEqual(['personal:second-fact'])
+    } finally {
+      await h.ctx.fiber.dispose()
+    }
+  })
+
+  it('resolves a key shared by two scopes to the first row in catalog order', async () => {
+    const h = await recallHarness()
+    try {
+      fakeLlm(h.ctx, ['{"keys": ["shared-key"]}'])
+      await save(h, h.agent, 'shared-key')
+      await h.service.save({
+        scope: { kind: 'workspace', directory: '/repo' }, key: 'shared-key', kind: 'guidance',
+        summary: 'Workspace entry', content: 'workspace-only content',
+      }, writer(h.agent))
+      await step1(h, [human('which shared key?')])
+      await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(1) })
+      const message = h.inject.mock.calls[0]![0]
+      expect((message.source as MemoryRecallSource).keys).toEqual(['personal:shared-key'])
+      const block = message.content[0]
+      expect(block?.type === 'text' ? block.text : '').toContain('body of shared-key')
+    } finally {
+      await h.ctx.fiber.dispose()
+    }
+  })
+
+  it('injects a selected address once when the selector repeats its key', async () => {
+    const h = await recallHarness()
+    try {
+      fakeLlm(h.ctx, ['{"keys": ["release-freeze", "release-freeze"]}'])
+      await save(h, h.agent, 'release-freeze')
+      await step1(h, [human('when is the deploy frozen?')])
+      await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(1) })
+      const message = h.inject.mock.calls[0]![0]
+      expect((message.source as MemoryRecallSource).keys).toEqual(['personal:release-freeze'])
+      const block = message.content[0]
+      expect((block?.type === 'text' ? block.text : '').match(/<saved_memory /gu)).toHaveLength(1)
+    } finally {
+      await h.ctx.fiber.dispose()
+    }
   })
 
   it('drops the whole injection when even the empty frame overruns the budget', async () => {

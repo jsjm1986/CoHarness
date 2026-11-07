@@ -4,6 +4,8 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { basename } from 'node:path'
 import { Readable } from 'node:stream'
+import { decodeUserDocIdentity, type UserDocIdentity } from '@deepseek-ai/dsh-userdoc'
+import { USERDOC_IDENTITY_HEADER } from '@deepseek-ai/dsh-host-userdoc-http'
 import type { UserRow } from './auth.ts'
 import type { GatewayPrincipalClaims, GatewayPrincipalSigner } from './principal.ts'
 import { PRINCIPAL_HEADER } from './principal.ts'
@@ -14,10 +16,16 @@ import type {
   GatewayProjectService,
   GatewayUserService,
 } from './services.ts'
-import { RuntimeLeaseUnavailableError, type ProjectRuntime, type RuntimeTarget } from './instances.ts'
+import { RuntimeLeaseUnavailableError, type ProjectRuntime, type RuntimeTarget, type RuntimeEndpoint } from './instances.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
+import { RuntimeCatalogError, type RuntimeId, type RuntimeNodeId } from './runtime-catalog.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
+
+/** Authenticated document actor; browser copies do not carry execution authority. */
+type DocumentTransferPrincipal = Pick<GatewayPrincipalClaims, 'user' | 'scope' | 'organization'>
+  & Partial<Pick<GatewayPrincipalClaims, 'runtime'>>
+type DocumentTransferSubject = Pick<RuntimeCredentialSubject, 'organizationId' | 'target'>
 
 const MAX_TRANSFER_FILES = 50
 const MAX_DOCUMENT_ID_BYTES = 4096
@@ -181,9 +189,10 @@ function scheduleTransferPlanCleanup(): void {
 }
 
 /** Versioned scope selector accepted by the document transfer endpoint. */
-export type DocumentTransferScope =
+export type DocumentTransferScope = (
   | { readonly kind: 'personal' }
   | { readonly kind: 'project'; readonly projectId: number }
+) & { readonly runtimeId?: RuntimeId; readonly nodeId?: RuntimeNodeId }
 
 /** One source document selected for a snapshot copy. */
 export interface DocumentTransferSelection {
@@ -209,6 +218,7 @@ export interface DocumentTransferTargetRef {
   readonly bytes: number
   readonly mediaType: string
   readonly modifiedAt: number
+  readonly identity?: UserDocIdentity
 }
 
 /** Per-file transfer outcome; a failed item never prevents later items from running. */
@@ -273,8 +283,8 @@ export class DocumentTransferError extends Error {
 export interface RuntimeDocumentTransferHandler {
   (input: {
     readonly request: IncomingMessage
-    readonly subject: RuntimeCredentialSubject
-    readonly principal: GatewayPrincipalClaims
+    readonly subject: DocumentTransferSubject
+    readonly principal: DocumentTransferPrincipal
     readonly payload: unknown
     readonly signal: AbortSignal
   }): Promise<DocumentTransferResponse>
@@ -283,8 +293,8 @@ export interface RuntimeDocumentTransferHandler {
 /** Runtime callback shape for the capability endpoint. */
 export interface RuntimeDocumentTransferCapabilitiesHandler {
   (input: {
-    readonly subject: RuntimeCredentialSubject
-    readonly principal: GatewayPrincipalClaims
+    readonly subject: DocumentTransferSubject
+    readonly principal: DocumentTransferPrincipal
     /** Aborts when the loopback caller disconnects. */
     readonly signal?: AbortSignal
   }): Promise<DocumentTransferCapabilities>
@@ -293,8 +303,8 @@ export interface RuntimeDocumentTransferCapabilitiesHandler {
 /** Runtime callback shape for an authorized alternate-scope listing. */
 export interface RuntimeDocumentTransferListHandler {
   (input: {
-    readonly subject: RuntimeCredentialSubject
-    readonly principal: GatewayPrincipalClaims
+    readonly subject: DocumentTransferSubject
+    readonly principal: DocumentTransferPrincipal
     readonly payload: unknown
     /** Aborts when the loopback caller disconnects. */
     readonly signal?: AbortSignal
@@ -352,7 +362,7 @@ export interface GatewayDocumentTransferUploadHandler {
 }
 
 /** Operations exposed by the authenticated full-scope document broker. */
-export type GatewayDocumentScopeOperation = 'list' | 'directories' | 'content' | 'trash' | 'restore' | 'purge' | 'folders' | 'move' | 'delete'
+export type GatewayDocumentScopeOperation = 'list' | 'directories' | 'content' | 'trash' | 'restore' | 'purge' | 'folders' | 'move' | 'delete' | 'overview' | 'history'
 
 /** Public Gateway callback for browsing or mutating one authorized scope. */
 export interface GatewayDocumentScopeHandler {
@@ -375,6 +385,8 @@ export interface GatewayDocumentAdminHandler {
     readonly scope: DocumentTransferScope
     readonly personalOwnerId?: number
     readonly docId: string
+    readonly identity?: { readonly incarnationId: string; readonly revision: number }
+    readonly trashId?: string
     readonly action: 'trash' | 'restore' | 'purge'
     readonly signal: AbortSignal
   }): Promise<Response>
@@ -383,8 +395,8 @@ export interface GatewayDocumentAdminHandler {
 /** Runtime callback for target-folder metadata in an authorized scope. */
 export interface RuntimeDocumentTransferDirectoriesHandler {
   (input: {
-    readonly subject: RuntimeCredentialSubject
-    readonly principal: GatewayPrincipalClaims
+    readonly subject: DocumentTransferSubject
+    readonly principal: DocumentTransferPrincipal
     readonly payload: unknown
     /** Aborts when the loopback caller disconnects. */
     readonly signal?: AbortSignal
@@ -398,8 +410,8 @@ export interface RuntimeDocumentTransferDirectoriesHandler {
 /** Runtime callback for creating a folder in a writable target scope. */
 export interface RuntimeDocumentTransferDirectoryCreateHandler {
   (input: {
-    readonly subject: RuntimeCredentialSubject
-    readonly principal: GatewayPrincipalClaims
+    readonly subject: DocumentTransferSubject
+    readonly principal: DocumentTransferPrincipal
     readonly payload: unknown
     /** Aborts when the loopback caller disconnects. */
     readonly signal?: AbortSignal
@@ -409,8 +421,8 @@ export interface RuntimeDocumentTransferDirectoryCreateHandler {
 /** Runtime callback for a metadata-only copy plan. */
 export interface RuntimeDocumentTransferPlanHandler {
   (input: {
-    readonly subject: RuntimeCredentialSubject
-    readonly principal: GatewayPrincipalClaims
+    readonly subject: DocumentTransferSubject
+    readonly principal: DocumentTransferPrincipal
     readonly payload: unknown
     /** Aborts when the loopback caller disconnects. */
     readonly signal?: AbortSignal
@@ -448,6 +460,12 @@ export interface DocumentTransferDependencies {
    * operations run against the scope's document root without starting a runtime.
    */
   readonly local?: import('./documents-local.ts').LocalDocumentBroker
+  /** Browser data plane: authenticated, node-addressed document requests without Runtime allocation. */
+  readonly browser?: {
+    authorize(scope: DocumentTransferScope, action: 'read' | 'write'): Promise<ScopeIdentity>
+    url(scope: DocumentTransferScope, path: string): string
+    headers(signal: AbortSignal): Promise<Headers>
+  }
 }
 
 interface ScopeIdentity {
@@ -456,6 +474,8 @@ interface ScopeIdentity {
   readonly label: string
   readonly projectName?: string
   readonly mode?: 'ro' | 'rw'
+  readonly runtimeId?: RuntimeId
+  readonly nodeId?: RuntimeNodeId
 }
 
 interface RuntimeHandle {
@@ -578,21 +598,51 @@ function validRelativeId(value: unknown, allowEmpty: boolean): value is string {
 
 function scope(value: unknown): DocumentTransferScope {
   const candidate = record(value)
-  if (candidate?.kind === 'personal') return { kind: 'personal' }
+  if (candidate?.runtimeId !== undefined && (typeof candidate.runtimeId !== 'string'
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(candidate.runtimeId))) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document Runtime identity.')
+  }
+  const selected = candidate?.runtimeId === undefined ? {} : { runtimeId: candidate.runtimeId as RuntimeId }
+  if (candidate?.nodeId !== undefined) {
+    if (typeof candidate.nodeId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(candidate.nodeId)) {
+      throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document computer identity.')
+    }
+    Object.assign(selected, { nodeId: candidate.nodeId as RuntimeNodeId })
+  }
+  if (candidate?.kind === 'personal') return { kind: 'personal', ...selected }
   if (candidate?.kind === 'project' && positiveInteger(candidate.projectId)) {
-    return { kind: 'project', projectId: candidate.projectId }
+    return { kind: 'project', projectId: candidate.projectId, ...selected }
   }
   throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document transfer scope.')
 }
 
-/** Decode the compact scope key used by the browser-facing upload route. */
-export function parseDocumentScopeKey(value: unknown): DocumentTransferScope {
-  if (value === 'personal') return { kind: 'personal' }
+/**
+ * Decode the scope and exact Runtime selection used by browser document routes.
+ * @param value - personal or project scope key from the request query.
+ * @param runtimeId - optional allocated Runtime UUID; an omitted selection must resolve unambiguously.
+ * @returns validated document scope and optional execution identity.
+ */
+export function parseDocumentScopeKey(value: unknown, runtimeId?: unknown, nodeId?: unknown): DocumentTransferScope {
+  if (value === 'personal') return scope({ kind: 'personal', runtimeId, nodeId })
   if (typeof value === 'string' && /^project:[1-9][0-9]*$/u.test(value)) {
     const projectId = Number(value.slice('project:'.length))
-    if (Number.isSafeInteger(projectId) && projectId > 0) return { kind: 'project', projectId }
+    if (Number.isSafeInteger(projectId) && projectId > 0) return scope({ kind: 'project', projectId, runtimeId, nodeId })
   }
   throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document upload scope.')
+}
+
+/** Preserve the current signed Runtime when its owner is the requested document scope. */
+function scopeForPrincipal(requested: DocumentTransferScope, principal: DocumentTransferPrincipal): DocumentTransferScope {
+  if (requested.nodeId !== undefined || requested.runtimeId !== undefined || principal.runtime?.runtimeId === undefined) return requested
+  if (requested.kind === 'personal' ? principal.runtime.kind !== 'user' || principal.runtime.id !== principal.user.id
+    : principal.runtime.kind !== 'project' || principal.runtime.id !== requested.projectId) return requested
+  return { ...requested, runtimeId: principal.runtime.runtimeId }
+}
+
+function requestForPrincipal(value: unknown, principal: DocumentTransferPrincipal): DocumentTransferRequest {
+  const request = requestValue(value)
+  return { ...request, source: scopeForPrincipal(request.source, principal), target: scopeForPrincipal(request.target, principal),
+    ...(request.targets === undefined ? {} : { targets: request.targets.map(target => scopeForPrincipal(target, principal)) }) }
 }
 
 function requestValue(value: unknown): DocumentTransferRequest {
@@ -611,7 +661,7 @@ function requestValue(value: unknown): DocumentTransferRequest {
   }
   const targets = rawTargets === undefined ? undefined : rawTargets.map(scope)
   if (targets !== undefined) {
-    const keys = targets.map(item => item.kind === 'personal' ? 'personal' : `project:${String(item.projectId)}`)
+    const keys = targets.map(item => JSON.stringify([item.nodeId, item.kind, item.kind === 'personal' ? null : item.projectId]))
     if (new Set(keys).size !== keys.length) {
       throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Duplicate document transfer target.')
     }
@@ -648,7 +698,7 @@ function requestValue(value: unknown): DocumentTransferRequest {
 }
 
 function sameScope(left: DocumentTransferScope, right: DocumentTransferScope): boolean {
-  if (left.kind !== right.kind) return false
+  if (left.kind !== right.kind || left.nodeId !== right.nodeId) return false
   if (left.kind === 'personal' || right.kind === 'personal') return true
   return left.projectId === right.projectId
 }
@@ -796,8 +846,8 @@ function waitForTransferPoll(delayMs: number, signal: AbortSignal): Promise<void
 
 /** Start a target upload and release the source body when setup fails. */
 async function startSnapshotUpload(
-  targetRuntime: RuntimeHandle,
-  targetAssertion: string,
+  base: string,
+  targetHeaders: (signal: AbortSignal) => Promise<Headers>,
   source: Response,
   name: string,
   directory: string,
@@ -807,13 +857,13 @@ async function startSnapshotUpload(
   responseLimit: number,
 ): Promise<StartedSnapshotUpload> {
   try {
-    const base = `http://127.0.0.1:${String(targetRuntime.port)}/api/documents/uploads`
-    const authHeaders = headersFor(targetRuntime, targetAssertion)
+    const authHeaders = await targetHeaders(signal)
     authHeaders.set('content-type', 'application/json')
     const started = await fetch(base, {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({ version: 1, name, directory, bytes, fingerprint }),
+      redirect: 'error',
       signal,
     })
     const startedBody = await responseJson(started, responseLimit)
@@ -851,6 +901,42 @@ async function startSnapshotUpload(
   }
 }
 
+function identityMetadata(value: Record<string, unknown>): { readonly identity?: UserDocIdentity } {
+  if (value.identity === undefined) return {}
+  const identity = decodeUserDocIdentity(value.identity)
+  if (identity === undefined) throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid document metadata.')
+  return { identity }
+}
+
+function contentIdentity(response: Response): UserDocIdentity | undefined {
+  const encoded = response.headers.get(USERDOC_IDENTITY_HEADER)
+  if (encoded === null) return undefined
+  let value: unknown
+  try {
+    if (!/^[A-Za-z0-9_-]+$/u.test(encoded)) throw new Error('Invalid identity encoding.')
+    value = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
+  } catch {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime returned invalid document identity.')
+  }
+  const identity = decodeUserDocIdentity(value)
+  if (identity === undefined) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime returned invalid document identity.')
+  }
+  return identity
+}
+
+function contentName(response: Response, fallback: string): string {
+  const header = response.headers.get('content-disposition')
+  if (header === null) return fallback
+  const encoded = /^attachment; filename\*=UTF-8''(.+)$/u.exec(header)?.[1]
+  if (encoded === undefined) throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'Invalid document filename metadata.')
+  let name: string
+  try { name = decodeURIComponent(encoded) }
+  catch { throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'Invalid document filename encoding.') }
+  if (name === '' || name.length > 255 || /[\\/\u0000-\u001f\u007f]/u.test(name)) throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'Invalid document filename.')
+  return name
+}
+
 function targetRef(value: unknown): DocumentTransferTargetRef {
   const candidate = record(value)
   if (!validRelativeId(candidate?.docId, false) || !nonEmptyString(candidate.name)
@@ -866,6 +952,7 @@ function targetRef(value: unknown): DocumentTransferTargetRef {
     bytes: candidate.bytes,
     mediaType: candidate.mediaType,
     modifiedAt: candidate.modifiedAt,
+    ...identityMetadata(candidate),
   }
 }
 
@@ -896,9 +983,15 @@ function documentLimits(value: unknown): DocumentTransferListResponse['limits'] 
   }
 }
 
+function uploadUrl(base: string, suffix: string): string {
+  const url = new URL(base)
+  url.pathname += suffix
+  return url.toString()
+}
+
 async function uploadSnapshotToRuntime(
-  targetRuntime: RuntimeHandle,
-  targetAssertion: string,
+  base: string,
+  targetHeaders: (signal: AbortSignal) => Promise<Headers>,
   source: Response,
   name: string,
   directory: string,
@@ -906,13 +999,13 @@ async function uploadSnapshotToRuntime(
   fingerprint: string,
   signal: AbortSignal,
   responseLimit: number,
+  cleanupTimeoutMs: number,
 ): Promise<DocumentTransferTargetRef> {
   if (source.body === null || !Number.isSafeInteger(bytes) || bytes < 0) {
     throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime did not provide a usable document body.')
   }
-  const base = `http://127.0.0.1:${String(targetRuntime.port)}/api/documents/uploads`
   const startedValue = await startSnapshotUpload(
-    targetRuntime, targetAssertion, source, name, directory, bytes, fingerprint, signal, responseLimit,
+    base, targetHeaders, source, name, directory, bytes, fingerprint, signal, responseLimit,
   )
   const uploadId = startedValue.uploadId
   if (startedValue.state === 'complete') {
@@ -986,12 +1079,12 @@ async function uploadSnapshotToRuntime(
       finalHash.update(chunk)
       const chunkHash = createHash('sha256').update(chunk).digest('hex')
       if (offset >= startedValue.receivedBytes) {
-        const headers = headersFor(targetRuntime, targetAssertion)
+        const headers = await targetHeaders(signal)
         headers.set('content-range', `bytes ${String(offset)}-${String(offset + chunk.byteLength - 1)}/${String(bytes)}`)
         headers.set('content-length', String(chunk.byteLength))
         headers.set('x-dsh-chunk-sha256', chunkHash)
-        const response = await fetch(`${base}/${encodeURIComponent(uploadId)}/chunks/${String(index)}`, {
-          method: 'PUT', headers, body: chunk, signal, duplex: 'half',
+        const response = await fetch(uploadUrl(base, `/${encodeURIComponent(uploadId)}/chunks/${String(index)}`), {
+          method: 'PUT', headers, body: chunk, signal, duplex: 'half', redirect: 'error',
         } as RequestInit & { duplex: 'half' })
         const body = await responseJson(response, responseLimit)
         if (!response.ok) {
@@ -1012,11 +1105,11 @@ async function uploadSnapshotToRuntime(
     if (offset !== bytes || pendingBytes !== 0) {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source document byte count changed during transfer.')
     }
-    const completeHeaders = headersFor(targetRuntime, targetAssertion)
+    const completeHeaders = await targetHeaders(signal)
     completeHeaders.set('content-type', 'application/json')
-    let currentResponse = await fetch(`${base}/${encodeURIComponent(uploadId)}/complete`, {
+    let currentResponse = await fetch(uploadUrl(base, `/${encodeURIComponent(uploadId)}/complete`), {
       method: 'POST', headers: completeHeaders,
-      body: JSON.stringify({ version: 1, sha256: finalHash.digest('hex') }), signal,
+      body: JSON.stringify({ version: 1, sha256: finalHash.digest('hex') }), signal, redirect: 'error',
     })
     let currentBody = await responseJson(currentResponse, responseLimit)
     if (!currentResponse.ok) {
@@ -1036,7 +1129,9 @@ async function uploadSnapshotToRuntime(
         )
       }
       await waitForTransferPoll(Math.min(100, remaining), signal)
-      currentResponse = await fetch(`${base}/${encodeURIComponent(uploadId)}`, { headers: headersFor(targetRuntime, targetAssertion), signal })
+      currentResponse = await fetch(uploadUrl(base, `/${encodeURIComponent(uploadId)}`), {
+        headers: await targetHeaders(signal), signal, redirect: 'error',
+      })
       currentBody = await responseJson(currentResponse, responseLimit)
       if (!currentResponse.ok) {
         const error = responseError(currentBody)
@@ -1055,16 +1150,20 @@ async function uploadSnapshotToRuntime(
     return completed
   } catch (error) {
     await reader.cancel(error).catch(() => {})
-    await fetch(`${base}/${encodeURIComponent(uploadId)}`, {
-      method: 'DELETE', headers: headersFor(targetRuntime, targetAssertion), signal: undefined,
-    }).catch(() => {})
+    const cleanupSignal = AbortSignal.timeout(cleanupTimeoutMs)
+    await targetHeaders(cleanupSignal).then(headers => fetch(uploadUrl(base, `/${encodeURIComponent(uploadId)}`), {
+      method: 'DELETE', headers, signal: cleanupSignal, redirect: 'error',
+    })).then(response => response.body?.cancel()).catch(() => {
+      // Revoked authority or an unavailable runtime leaves the session to its
+      // expiry sweep; cancellation must not replace the original copy failure.
+    })
     throw error
   } finally {
     reader.releaseLock()
   }
 }
 
-function syntheticUser(principal: GatewayPrincipalClaims): UserRow {
+function syntheticUser(principal: DocumentTransferPrincipal): UserRow {
   return {
     id: principal.user.id,
     username: principal.user.username,
@@ -1090,14 +1189,17 @@ async function runtimeFor(
       throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Personal document scope lookup is unavailable.')
     }
     if (user === null) throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Personal document scope is unavailable.')
-    let running: { port: number; generation: number }
+    let running: RuntimeEndpoint
     try {
-      running = await deps.instances.ensureRunning(user)
-    } catch {
+      running = await deps.instances.ensureRunning({ ...user, ...(identity.runtimeId === undefined ? {} : { runtimeId: identity.runtimeId }) })
+    } catch (error) {
+      if (error instanceof RuntimeCatalogError && error.code === 'runtime-catalog/ambiguous-target') {
+        throw new DocumentTransferError('DOCUMENT_RUNTIME_SELECTION_REQUIRED', 409, 'Select the personal Runtime for this document operation.')
+      }
       throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Personal document runtime is unavailable.')
     }
     return {
-      target: { kind: 'user', id: actor.id },
+      target: { kind: 'user', id: actor.id, ...(running.runtimeId === undefined ? {} : { runtimeId: running.runtimeId }) },
       port: running.port,
       generation: running.generation,
       scope: identity,
@@ -1110,19 +1212,20 @@ async function runtimeFor(
     throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Project document scope lookup is unavailable.')
   }
   if (project === null) throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Project document scope is unavailable.')
-  let running: { port: number; generation: number }
+  let running: RuntimeEndpoint
   try {
     running = await deps.instances.ensureRunning({
       kind: 'project',
       id: project.id,
       name: project.name,
       path: project.path,
+      ...(identity.runtimeId === undefined ? {} : { runtimeId: identity.runtimeId }),
     } satisfies ProjectRuntime)
   } catch {
     throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Project document runtime is unavailable.')
   }
   return {
-    target: { kind: 'project', id: project.id },
+    target: { kind: 'project', id: project.id, ...(running.runtimeId === undefined ? {} : { runtimeId: running.runtimeId }) },
     port: running.port,
     generation: running.generation,
     scope: identity,
@@ -1136,6 +1239,62 @@ function headersFor(handle: RuntimeHandle, assertion: string): Headers {
     origin: `http://${authority}`,
     [PRINCIPAL_HEADER]: assertion,
   })
+}
+
+async function transferScope(
+  deps: DocumentTransferDependencies,
+  actor: UserRow,
+  runtime: RuntimeHandle,
+  action: 'read' | 'write',
+): Promise<GatewayPrincipalClaims['scope']> {
+  if (runtime.scope.kind === 'personal') return { kind: 'personal' }
+  let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>>
+  try {
+    membership = await deps.collaboration.projectForUser(runtime.scope.id, actor.id)
+  } catch {
+    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document transfer authorization is unavailable.')
+  }
+  if (membership === null || (action === 'write' && membership.mode !== 'rw' && !membership.administrator)) {
+    throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Document transfer access is no longer available.')
+  }
+  return {
+    kind: 'project', projectId: runtime.scope.id, projectName: membership.name,
+    mode: action === 'write' ? 'rw' : membership.mode,
+  }
+}
+
+/** Renew one request only after both scopes and the initiating account remain authorized. */
+async function transferRequestHeaders(
+  deps: DocumentTransferDependencies,
+  actorId: number,
+  source: RuntimeHandle,
+  target: RuntimeHandle,
+  destination: 'source' | 'target',
+  administratorOnly: boolean,
+  signal: AbortSignal,
+): Promise<Headers> {
+  signal.throwIfAborted()
+  let actor: UserRow | null
+  try { actor = await deps.users.getById(actorId) } catch {
+    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document transfer account lookup is unavailable.')
+  }
+  if (actor === null || actor.status !== 'active') {
+    throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Document transfer account is no longer available.')
+  }
+  if (administratorOnly && actor.role !== 'admin') {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN', 403, 'Only organization administrators can copy to multiple project targets.')
+  }
+  const [sourceScope, targetScope] = await Promise.all([
+    transferScope(deps, actor, source, 'read'),
+    transferScope(deps, actor, target, 'write'),
+  ])
+  signal.throwIfAborted()
+  const runtime = destination === 'source' ? source : target
+  return headersFor(runtime, deps.principals.issue({
+    user: actor,
+    scope: destination === 'source' ? sourceScope : targetScope,
+    runtime: { ...runtime.target, generation: runtime.generation },
+  }))
 }
 
 interface AuthorizedScope {
@@ -1152,7 +1311,7 @@ async function authorizedScope(
   action: 'read' | 'write',
 ): Promise<AuthorizedScope> {
   if (requested.kind === 'personal') {
-    const identity: ScopeIdentity = { kind: 'personal', id: actor.id, label: 'Personal documents' }
+    const identity: ScopeIdentity = { kind: 'personal', id: actor.id, label: 'Personal documents', runtimeId: requested.runtimeId }
     const runtime = await runtimeFor(deps, identity, actor)
     return {
       identity,
@@ -1160,7 +1319,7 @@ async function authorizedScope(
       assertion: deps.principals.issue({
         user: actor,
         scope: { kind: 'personal' },
-        runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+        runtime: { ...runtime.target, generation: runtime.generation },
       }),
     }
   }
@@ -1183,6 +1342,7 @@ async function authorizedScope(
     label: membership.name,
     projectName: membership.name,
     mode: membership.mode,
+    runtimeId: requested.runtimeId,
   }
   const runtime = await runtimeFor(deps, identity, actor)
   return {
@@ -1196,14 +1356,14 @@ async function authorizedScope(
         projectName: membership.name,
         mode: action === 'write' ? 'rw' : membership.mode,
       },
-      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+      runtime: { ...runtime.target, generation: runtime.generation },
     }),
   }
 }
 
 async function audit(
   deps: DocumentTransferDependencies,
-  principal: GatewayPrincipalClaims,
+  principal: DocumentTransferPrincipal,
   transferId: string,
   source: ScopeIdentity,
   target: ScopeIdentity,
@@ -1217,10 +1377,10 @@ async function audit(
     detail: JSON.stringify({
       version: 1,
       transferId,
-      source: { kind: source.kind, id: source.id, documentId: item.docId, name: item.name },
+      source: { kind: source.kind, id: source.id, nodeId: source.nodeId, documentId: item.docId, name: item.name },
       target: {
         kind: target.kind,
-        id: target.id,
+        id: target.id, nodeId: target.nodeId,
         ...(item.targetDocId === undefined ? {} : { documentId: item.targetDocId }),
       },
       status: item.status,
@@ -1230,13 +1390,165 @@ async function audit(
   })
 }
 
+async function copyDocuments(
+  deps: DocumentTransferDependencies,
+  principal: DocumentTransferPrincipal,
+  input: DocumentTransferRequest,
+  sourceIdentity: ScopeIdentity,
+  targetIdentity: ScopeIdentity,
+  sourceUrl: string,
+  targetBase: string,
+  sourceHeadersFor: (signal: AbortSignal) => Promise<Headers>,
+  targetHeadersFor: (signal: AbortSignal) => Promise<Headers>,
+  signal: AbortSignal,
+): Promise<DocumentTransferResponse> {
+      const transferId = randomUUID()
+      const items: DocumentTransferItem[] = []
+      for (const document of input.documents) {
+      signal.throwIfAborted()
+      const name = sourceName(document.docId)
+      let sourceResponse: Response | undefined
+      try {
+        const contentUrl = new URL(sourceUrl)
+        contentUrl.searchParams.set('id', document.docId)
+        // The copy needs the declared byte count and identity bytes; asking for
+        // identity encoding keeps a compressed runtime response from dropping
+        // content-length.
+        const sourceHeaders = await sourceHeadersFor(signal)
+        sourceHeaders.set('accept-encoding', 'identity')
+        sourceResponse = await fetch(contentUrl, {
+          method: 'GET',
+          headers: sourceHeaders,
+          signal,
+          redirect: 'error',
+        })
+        if (!sourceResponse.ok || sourceResponse.body === null) {
+          const error = responseError(await responseJson(sourceResponse, responseLimit(deps)))
+          const status = sourceResponse.status >= 400 && sourceResponse.status < 500 ? sourceResponse.status : 502
+          throw new DocumentTransferError(error.code, status, error.message)
+        }
+        const sourceDocumentIdentity = contentIdentity(sourceResponse)
+        const mediaType = (sourceResponse.headers.get('content-type') ?? 'application/octet-stream').split(';', 1)[0] ?? 'application/octet-stream'
+        const lengthHeader = sourceResponse.headers.get('content-length')
+        const declaredBytes = lengthHeader === null ? undefined : Number(lengthHeader)
+        if (declaredBytes === undefined || !Number.isSafeInteger(declaredBytes) || declaredBytes < 0) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime did not provide a stable document size.')
+        }
+        const ref = await uploadSnapshotToRuntime(
+          targetBase,
+          targetHeadersFor,
+          sourceResponse,
+          contentName(sourceResponse, name),
+          input.directory ?? '',
+          declaredBytes,
+          createHash('sha256').update(`${transferId}\u0000${document.docId}`).digest('hex'),
+          signal,
+          responseLimit(deps),
+          documentScopeTimeoutMs(deps),
+        )
+        const bytes = declaredBytes !== undefined && Number.isSafeInteger(declaredBytes) && declaredBytes >= 0
+          ? declaredBytes
+          : ref.bytes
+        items.push({ status: 'copied', source: { name, bytes, mediaType }, target: ref })
+        await deps.catalog?.recordCopy({
+          actorUserId: principal.user.id,
+          sourceNodeId: input.source.nodeId, targetNodeId: input.target.nodeId,
+          source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
+          targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
+          sourceDocId: document.docId,
+          ...(sourceDocumentIdentity === undefined ? {} : { sourceIdentity: sourceDocumentIdentity }),
+          sourceName: name,
+          target: {
+            docId: ref.docId,
+            directoryId: String(ref.docId).split('/').slice(0, -1).join('/'),
+            name: ref.name,
+            bytes: ref.bytes,
+            mediaType: ref.mediaType,
+            modifiedAt: ref.modifiedAt,
+            ...(ref.identity === undefined ? {} : { identity: ref.identity }),
+          },
+          operationId: transferId,
+        }).catch(() => {})
+        await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
+          docId: document.docId, name, status: 'copied', targetDocId: ref.docId, bytes,
+        })
+      } catch (error) {
+        if (error instanceof DocumentTransferError && error.status === 404) {
+          const item = { status: 'failed' as const, source: { name }, error: { code: error.code, message: error.message } }
+          items.push(item)
+          await deps.catalog?.recordCopy({
+            actorUserId: principal.user.id,
+          sourceNodeId: input.source.nodeId, targetNodeId: input.target.nodeId,
+            source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
+            targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
+            sourceDocId: document.docId,
+            sourceName: name,
+            error: item.error,
+            operationId: transferId,
+          }).catch(() => {})
+          await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
+            docId: document.docId, name, status: 'failed', code: error.code,
+          })
+          continue
+        }
+        if (signal.aborted) throw signal.reason
+        const item = {
+          status: 'failed' as const,
+          source: { name },
+          error: error instanceof DocumentTransferError
+            ? { code: error.code, message: error.message }
+            : { code: 'DOCUMENT_TRANSFER_FAILED', message: 'Document transfer failed.' },
+        }
+        items.push(item)
+        await deps.catalog?.recordCopy({
+          actorUserId: principal.user.id,
+          sourceNodeId: input.source.nodeId, targetNodeId: input.target.nodeId,
+          source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
+          targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
+          sourceDocId: document.docId,
+          sourceName: name,
+          error: item.error,
+          operationId: transferId,
+        }).catch(() => {})
+        await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
+          docId: document.docId, name, status: 'failed', code: item.error.code,
+        })
+      } finally {
+        if (sourceResponse?.body !== null && sourceResponse?.body !== undefined && !sourceResponse.body.locked) {
+          await sourceResponse.body.cancel().catch(() => {})
+        }
+      }
+      }
+      return {
+        version: 1,
+        transferId,
+        source: { kind: sourceIdentity.kind, label: sourceIdentity.label },
+        target: { kind: targetIdentity.kind, label: targetIdentity.label },
+        items,
+      }
+}
+
 /** Create the authenticated Gateway broker used by runtime document consumers. */
 function createSingleDocumentTransferHandler(
   deps: DocumentTransferDependencies,
+  administratorOnly: boolean,
 ): RuntimeDocumentTransferHandler {
   return async ({ subject, principal, payload, signal }) => {
     const input = requestValue(payload)
     const actor = syntheticUser(principal)
+    if (deps.browser !== undefined) {
+      const browser = deps.browser
+      const [source, target] = await Promise.all([browser.authorize(input.source, 'read'), browser.authorize(input.target, 'write')])
+      if (source.kind === target.kind && source.nodeId === target.nodeId && source.id === target.id) throw new DocumentTransferError('DOCUMENT_TRANSFER_SAME_SCOPE', 409, 'The source and target document roots must differ.')
+      const headers = async (authorizationSignal: AbortSignal): Promise<Headers> => {
+        authorizationSignal.throwIfAborted()
+        await Promise.all([browser.authorize(input.source, 'read'), browser.authorize(input.target, 'write')])
+        return browser.headers(authorizationSignal)
+      }
+      return copyDocuments(deps, principal, input, source, target,
+        browser.url(input.source, '/api/documents/scope/content'),
+        browser.url(input.target, '/api/documents/transfer/uploads'), headers, headers, signal)
+    }
     // The signed principal identifies the actor; scope membership checks below
     // authorize arbitrary project pairs without requiring a scope switch first.
 
@@ -1265,163 +1577,37 @@ function createSingleDocumentTransferHandler(
     }
 
     const sourceIdentity: ScopeIdentity = input.source.kind === 'personal'
-      ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
+      ? { kind: 'personal', id: actor.id, label: 'Personal documents', runtimeId: input.source.runtimeId }
       : {
         kind: 'project',
         id: input.source.projectId,
         label: sourceMembership?.name ?? 'Project documents',
         projectName: sourceMembership?.name,
         mode: sourceMembership?.mode,
+        runtimeId: input.source.runtimeId,
       }
     const targetIdentity: ScopeIdentity = input.target.kind === 'personal'
-      ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
+      ? { kind: 'personal', id: actor.id, label: 'Personal documents', runtimeId: input.target.runtimeId }
       : {
         kind: 'project',
         id: input.target.projectId,
         label: targetMembership?.name ?? 'Project documents',
         projectName: targetMembership?.name,
         mode: targetMembership?.mode,
+        runtimeId: input.target.runtimeId,
       }
 
     const [sourceRuntime, targetRuntime] = await Promise.all([
       runtimeFor(deps, sourceIdentity, actor),
       runtimeFor(deps, targetIdentity, actor),
     ])
-    const sourceAssertion = deps.principals.issue({
-      user: actor,
-      scope: sourceIdentity.kind === 'personal'
-        ? { kind: 'personal' }
-        : {
-          kind: 'project',
-          projectId: sourceIdentity.id,
-          projectName: sourceIdentity.projectName ?? sourceIdentity.label,
-          mode: sourceIdentity.mode ?? 'ro',
-        },
-      runtime: { kind: sourceRuntime.target.kind, id: sourceRuntime.target.id, generation: sourceRuntime.generation },
-    })
-    const targetAssertion = deps.principals.issue({
-      user: actor,
-      scope: targetIdentity.kind === 'personal'
-        ? { kind: 'personal' }
-        : {
-          kind: 'project',
-          projectId: targetIdentity.id,
-          projectName: targetIdentity.projectName ?? targetIdentity.label,
-          mode: targetIdentity.mode ?? 'rw',
-        },
-      runtime: { kind: targetRuntime.target.kind, id: targetRuntime.target.id, generation: targetRuntime.generation },
-    })
     return withRuntimeLeases(deps, [sourceRuntime, targetRuntime], async () => {
-      const transferId = randomUUID()
-      const items: DocumentTransferItem[] = []
-      for (const document of input.documents) {
-      signal.throwIfAborted()
-      const name = sourceName(document.docId)
-      try {
-        const sourceUrl = `http://127.0.0.1:${String(sourceRuntime.port)}/api/documents/content?id=${encodeURIComponent(document.docId)}`
-        // The copy needs the declared byte count and identity bytes; asking for
-        // identity encoding keeps a compressed runtime response from dropping
-        // content-length.
-        const sourceHeaders = headersFor(sourceRuntime, sourceAssertion)
-        sourceHeaders.set('accept-encoding', 'identity')
-        const sourceResponse = await fetch(sourceUrl, {
-          method: 'GET',
-          headers: sourceHeaders,
-          signal,
-        })
-        if (!sourceResponse.ok || sourceResponse.body === null) {
-          const error = responseError(await responseJson(sourceResponse, responseLimit(deps)))
-          const status = sourceResponse.status >= 400 && sourceResponse.status < 500 ? sourceResponse.status : 502
-          throw new DocumentTransferError(error.code, status, error.message)
-        }
-        const mediaType = (sourceResponse.headers.get('content-type') ?? 'application/octet-stream').split(';', 1)[0] ?? 'application/octet-stream'
-        const lengthHeader = sourceResponse.headers.get('content-length')
-        const declaredBytes = lengthHeader === null ? undefined : Number(lengthHeader)
-        if (declaredBytes === undefined || !Number.isSafeInteger(declaredBytes) || declaredBytes < 0) {
-          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime did not provide a stable document size.')
-        }
-        const ref = await uploadSnapshotToRuntime(
-          targetRuntime,
-          targetAssertion,
-          sourceResponse,
-          name,
-          input.directory ?? '',
-          declaredBytes,
-          createHash('sha256').update(`${transferId}\u0000${document.docId}`).digest('hex'),
-          signal,
-          responseLimit(deps),
-        )
-        const bytes = declaredBytes !== undefined && Number.isSafeInteger(declaredBytes) && declaredBytes >= 0
-          ? declaredBytes
-          : ref.bytes
-        items.push({ status: 'copied', source: { name, bytes, mediaType }, target: ref })
-        await deps.catalog?.recordCopy({
-          actorUserId: principal.user.id,
-          source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
-          targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
-          sourceDocId: document.docId,
-          sourceName: name,
-          target: {
-            docId: ref.docId,
-            directoryId: String(ref.docId).split('/').slice(0, -1).join('/'),
-            name: ref.name,
-            bytes: ref.bytes,
-            mediaType: ref.mediaType,
-            modifiedAt: ref.modifiedAt,
-          },
-          operationId: transferId,
-        }).catch(() => {})
-        await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
-          docId: document.docId, name, status: 'copied', targetDocId: ref.docId, bytes,
-        })
-      } catch (error) {
-        if (error instanceof DocumentTransferError && error.status === 404) {
-          const item = { status: 'failed' as const, source: { name }, error: { code: error.code, message: error.message } }
-          items.push(item)
-          await deps.catalog?.recordCopy({
-            actorUserId: principal.user.id,
-            source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
-            targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
-            sourceDocId: document.docId,
-            sourceName: name,
-            error: item.error,
-            operationId: transferId,
-          }).catch(() => {})
-          await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
-            docId: document.docId, name, status: 'failed', code: error.code,
-          })
-          continue
-        }
-        if (signal.aborted) throw signal.reason
-        const item = {
-          status: 'failed' as const,
-          source: { name },
-          error: error instanceof DocumentTransferError
-            ? { code: error.code, message: error.message }
-            : { code: 'DOCUMENT_TRANSFER_FAILED', message: 'Document transfer failed.' },
-        }
-        items.push(item)
-        await deps.catalog?.recordCopy({
-          actorUserId: principal.user.id,
-          source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
-          targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
-          sourceDocId: document.docId,
-          sourceName: name,
-          error: item.error,
-          operationId: transferId,
-        }).catch(() => {})
-        await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
-          docId: document.docId, name, status: 'failed', code: item.error.code,
-        })
-      }
-      }
-      return {
-        version: 1,
-        transferId,
-        source: { kind: sourceIdentity.kind, label: sourceIdentity.label },
-        target: { kind: targetIdentity.kind, label: targetIdentity.label },
-        items,
-      }
+      return copyDocuments(deps, principal, input, sourceIdentity, targetIdentity,
+        `http://127.0.0.1:${String(sourceRuntime.port)}/api/documents/content`,
+        `http://127.0.0.1:${String(targetRuntime.port)}/api/documents/uploads`,
+        authorizationSignal => transferRequestHeaders(deps, actor.id, sourceRuntime, targetRuntime, 'source', administratorOnly, authorizationSignal),
+        authorizationSignal => transferRequestHeaders(deps, actor.id, sourceRuntime, targetRuntime, 'target', administratorOnly, authorizationSignal), signal)
+
     })
   }
 }
@@ -1430,14 +1616,15 @@ function createSingleDocumentTransferHandler(
 export function createDocumentTransferHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferHandler {
-  const single = createSingleDocumentTransferHandler(deps)
+  const single = createSingleDocumentTransferHandler(deps, false)
+  const fanout = createSingleDocumentTransferHandler(deps, true)
   return async (input) => {
-    const request = requestValue(input.payload)
-    if (request.targets === undefined || request.targets.length <= 1) return single(input)
+    const request = requestForPrincipal(input.payload, input.principal)
+    if (request.targets === undefined || request.targets.length <= 1) return single({ ...input, payload: request })
     if (input.principal.user.role !== 'admin') {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN', 403, 'Only organization administrators can copy to multiple project targets.')
     }
-    const seenTargets = new Set(request.targets.map(target => target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`))
+    const seenTargets = new Set(request.targets.map(target => JSON.stringify([target.nodeId, target.kind, target.kind === 'personal' ? null : target.projectId])))
     if (seenTargets.size !== request.targets.length) {
       throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Duplicate document transfer target.')
     }
@@ -1449,7 +1636,7 @@ export function createDocumentTransferHandler(
     }> = []
     for (const target of request.targets) {
       try {
-        const result = await single({
+        const result = await fanout({
           ...input,
           payload: {
             version: 1,
@@ -1495,16 +1682,19 @@ export function createDocumentTransferCommitHandler(
 ): RuntimeDocumentTransferHandler {
   const transfer = createDocumentTransferHandler(deps)
   return async (input) => {
-    const request = requestValue(input.payload)
+    const request = requestForPrincipal(input.payload, input.principal)
     if (request.planId === undefined) {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_REQUIRED', 400, 'A transfer plan is required before commit.')
     }
     const plan = transferPlans.get(request.planId)
-    if (plan === undefined || plan.expiresAt <= Date.now()
+    const expired = plan !== undefined && plan.expiresAt <= Date.now()
+    if (plan === undefined || expired
       || plan.actorId !== input.principal.user.id
       || plan.organization !== input.principal.organization) {
-      releaseTransferPlan(request.planId)
-      scheduleTransferPlanCleanup()
+      if (expired) {
+        releaseTransferPlan(request.planId)
+        scheduleTransferPlanCleanup()
+      }
       throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_EXPIRED', 409, 'The transfer plan has expired or belongs to another actor.')
     }
     if (JSON.stringify(plan.source) !== JSON.stringify(request.source)
@@ -1516,7 +1706,7 @@ export function createDocumentTransferCommitHandler(
     }
     releaseTransferPlan(request.planId)
     scheduleTransferPlanCleanup()
-    return transfer({ ...input, payload: { ...record(input.payload), planId: undefined } })
+    return transfer({ ...input, payload: { ...request, planId: undefined } })
   }
 }
 
@@ -1609,6 +1799,17 @@ async function listDocumentsForActor(
   }
   if (candidate.state !== undefined && candidate.state !== 'active' && candidate.state !== 'trash') {
     throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope state.')
+  }
+  if (deps.browser !== undefined) {
+    const identity = await deps.browser.authorize(requested, 'read')
+    const url = new URL(deps.browser.url(requested, '/api/documents/scope'))
+    for (const key of ['directory', 'cursor', 'limit', 'type', 'sort', 'state'] as const) {
+      if (candidate[key] !== undefined) url.searchParams.set(key, String(candidate[key]))
+    }
+    if (typeof candidate.query === 'string') url.searchParams.set('q', candidate.query)
+    const upstream = documentUpstreamSignal(deps, signal)
+    const response = await fetch(url, { headers: await deps.browser.headers(upstream.signal), signal: upstream.signal, redirect: 'error' })
+    return projectScopeListing(identity, response.status, await responseJson(response, responseLimit(deps)))
   }
   if (deps.local !== undefined) {
     const parameters = new URLSearchParams()
@@ -1720,7 +1921,11 @@ function projectScopeListing(
 export function createDocumentTransferListHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferListHandler {
-  return ({ principal, payload, signal }) => listDocumentsForActor(deps, syntheticUser(principal), payload, signal)
+  return ({ principal, payload, signal }) => {
+    const candidate = record(payload)
+    return listDocumentsForActor(deps, syntheticUser(principal), candidate?.version !== 1 ? payload
+      : { ...candidate, scope: scopeForPrincipal(scope(candidate.scope), principal) }, signal)
+  }
 }
 
 /** Create the same broker for the public Gateway document route. */
@@ -1774,6 +1979,7 @@ export function safeUploadSession(value: unknown): Record<string, unknown> {
       bytes: ref.bytes,
       mediaType: ref.mediaType,
       modifiedAt: ref.modifiedAt,
+      ...identityMetadata(ref),
       path: '',
     }
   }
@@ -1890,6 +2096,8 @@ export function scopeRuntimePath(operation: GatewayDocumentScopeOperation): stri
     case 'folders': return '/api/documents/folders'
     case 'move': return '/api/documents/move'
     case 'delete': return '/api/documents/trash'
+    case 'overview': return '/api/documents/overview'
+    case 'history': return '/api/documents/history'
     default:
       return assertNeverScopeOperation(operation)
   }
@@ -1985,11 +2193,12 @@ export function createGatewayDocumentScopeHandler(
       if (operation === 'content' && response.ok) {
         const mediaType = (response.headers.get('content-type') ?? '').split(';', 1)[0] ?? ''
         const inline = incoming.searchParams.get('inline') === '1' && inlinePreviewMedia(mediaType)
+        const frameAncestors = inline && mediaType === 'application/pdf' ? "'self'" : "'none'"
         const contentDisposition = response.headers.get('content-disposition')
         const outputHeaders = new Headers(response.headers)
         outputHeaders.set('cache-control', 'private, no-store')
         outputHeaders.set('x-content-type-options', 'nosniff')
-        outputHeaders.set('content-security-policy', "default-src 'none'; img-src 'self' data:; frame-ancestors 'none'; sandbox")
+        outputHeaders.set('content-security-policy', `default-src 'none'; img-src 'self' data:; frame-ancestors ${frameAncestors}; sandbox`)
         if (inline) outputHeaders.set('content-disposition', 'inline')
         else if (contentDisposition === null) outputHeaders.set('content-disposition', 'attachment')
         handedOff = true
@@ -2031,7 +2240,7 @@ async function authorizedAdministratorScope(
   }
   const owner = await deps.users.getById(personalOwnerId)
   if (owner === null) throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Personal document scope is unavailable.')
-  const identity: ScopeIdentity = { kind: 'personal', id: owner.id, label: 'Personal documents' }
+  const identity: ScopeIdentity = { kind: 'personal', id: owner.id, label: 'Personal documents', runtimeId: requested.runtimeId }
   const runtime = await runtimeFor(deps, identity, owner)
   return {
     identity,
@@ -2039,7 +2248,7 @@ async function authorizedAdministratorScope(
     assertion: deps.principals.issue({
       user: actor,
       scope: { kind: 'personal' },
-      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+      runtime: { ...runtime.target, generation: runtime.generation },
       purpose: 'document-admin',
     }),
   }
@@ -2049,9 +2258,9 @@ async function authorizedAdministratorScope(
 export function createGatewayDocumentAdminHandler(
   deps: DocumentTransferDependencies,
 ): GatewayDocumentAdminHandler {
-  return async ({ user, scope: requested, personalOwnerId, docId, action, signal }) => {
+  return async ({ user, scope: requested, personalOwnerId, docId, identity, trashId, action, signal }) => {
     if (deps.local !== undefined) {
-      return deps.local.serveAdmin({ user, scope: requested, personalOwnerId, docId, action, signal })
+      return deps.local.serveAdmin({ user, scope: requested, personalOwnerId, docId, identity, trashId, action, signal })
     }
     const authorized = await authorizedAdministratorScope(deps, user, requested, personalOwnerId)
     const release = await acquireRuntimeLease(deps, authorized.runtime)
@@ -2061,6 +2270,11 @@ export function createGatewayDocumentAdminHandler(
         : action === 'restore' ? '/api/documents/restore' : '/api/documents/purge'
       const target = new URL(path, `http://127.0.0.1:${String(authorized.runtime.port)}`)
       target.searchParams.set('id', docId)
+      if (identity !== undefined) {
+        target.searchParams.set('incarnationId', identity.incarnationId)
+        target.searchParams.set('revision', String(identity.revision))
+      }
+      if (trashId !== undefined) target.searchParams.set('trashId', trashId)
       const method = action === 'purge' ? 'DELETE' : 'POST'
       const startedAt = Date.now()
       const upstream = documentUpstreamSignal(deps, signal)
@@ -2106,7 +2320,7 @@ export function createDocumentTransferDirectoriesHandler(
   return async ({ principal, payload, signal }) => {
     const candidate = record(payload)
     if (candidate?.version !== 1) throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document directory request.')
-    const requested = scope(candidate.scope)
+    const requested = scopeForPrincipal(scope(candidate.scope), principal)
     const actor = syntheticUser(principal)
     const listing = async (): Promise<{ readonly status: number; readonly body: unknown; readonly identity: Pick<ScopeIdentity, 'kind' | 'label'> }> => {
       if (deps.local !== undefined) return deps.local.listDirectories(actor, requested, signal)
@@ -2169,7 +2383,7 @@ export function createDocumentTransferDirectoryCreateHandler(
       || candidate.name.length > 255 || !validRelativeId(candidate.directory, true)) {
       throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid target document directory.')
     }
-    const requested = scope(candidate.scope)
+    const requested = scopeForPrincipal(scope(candidate.scope), principal)
     const actor = syntheticUser(principal)
     const directory = candidate.directory as string
     const name = candidate.name as string
@@ -2224,13 +2438,18 @@ export function createDocumentTransferPlanHandler(
   const list = createDocumentTransferListHandler(deps)
   const limits = resolvePlanLimits(deps.transferPlanLimits)
   return async ({ subject, principal, payload, signal }) => {
-    const input = requestValue(payload)
+    const input = requestForPrincipal(payload, principal)
     if (input.targets !== undefined && input.targets.length > 1 && principal.user.role !== 'admin') {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN', 403, 'Only organization administrators can create multi-target plans.')
     }
     const targetScopes = input.targets ?? [input.target]
     const targetSummaries: DocumentTransferScopeSummary[] = []
     for (const target of targetScopes) {
+      if (deps.browser !== undefined) {
+        const identity = await deps.browser.authorize(target, 'write')
+        targetSummaries.push({ kind: identity.kind, label: identity.label })
+        continue
+      }
       if (target.kind === 'personal') {
         targetSummaries.push({ kind: 'personal', label: 'Personal documents' })
         continue
@@ -2244,39 +2463,64 @@ export function createDocumentTransferPlanHandler(
       }
       targetSummaries.push({ kind: 'project', label: membership.name })
     }
-    const wanted = new Set(input.documents.map(document => document.docId))
+    const sourceDirectories = new Map<string, Set<string>>()
+    for (const { docId } of input.documents) {
+      const directory = docId.split('/').slice(0, -1).join('/')
+      const wanted = sourceDirectories.get(directory) ?? new Set<string>()
+      wanted.add(docId)
+      sourceDirectories.set(directory, wanted)
+    }
     const found = new Map<string, DocumentTransferTargetRef>()
     let sourceSummary: DocumentTransferScopeSummary | undefined
-    let cursor: string | undefined
-    const seenCursors = new Set<string>()
-    let pages = 0
-    do {
-      if (cursor !== undefined) {
-        if (seenCursors.has(cursor) || pages >= 500) {
-          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime returned a repeating document cursor.')
+    if (deps.browser !== undefined) {
+      const browser = deps.browser
+      const identity = await browser.authorize(input.source, 'read')
+      sourceSummary = { kind: identity.kind, label: identity.label }
+      for (const document of input.documents) {
+        const upstream = documentUpstreamSignal(deps, signal)
+        const url = new URL(browser.url(input.source, '/api/documents/scope/content'))
+        url.searchParams.set('id', document.docId)
+        const response = await fetch(url, { method: 'HEAD', headers: await browser.headers(upstream.signal), signal: upstream.signal, redirect: 'error' })
+        if (!response.ok) throw new DocumentTransferError(response.status === 404 ? 'DOCUMENT_NOT_FOUND' : 'DOCUMENT_TRANSFER_FAILED', response.status, 'Source document metadata is unavailable.')
+        const length = response.headers.get('content-length'), modified = response.headers.get('last-modified')
+        if (length === null || !/^(0|[1-9][0-9]*)$/u.test(length) || modified === null) throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'Source document metadata is incomplete.')
+        found.set(document.docId, targetRef({ docId: document.docId, name: contentName(response, sourceName(document.docId)),
+          bytes: Number(length), mediaType: (response.headers.get('content-type') ?? 'application/octet-stream').split(';', 1)[0],
+          modifiedAt: Date.parse(modified), identity: contentIdentity(response) }))
+      }
+    } else {
+      let pages = 0
+      for (const [directory, remaining] of sourceDirectories) {
+        let cursor: string | undefined
+        const seenCursors = new Set<string>()
+        do {
+          if (pages >= 500 || (cursor !== undefined && seenCursors.has(cursor))) {
+            throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime returned a repeating document cursor.')
+          }
+          if (cursor !== undefined) seenCursors.add(cursor)
+          pages += 1
+          const listed = await list({
+            subject,
+            principal,
+            signal,
+            payload: {
+              version: 1,
+              scope: input.source,
+              directory,
+              limit: 100,
+              ...(cursor === undefined ? {} : { cursor }),
+            },
+          })
+          sourceSummary = listed.scope
+          for (const document of listed.documents) {
+            if (remaining.delete(document.docId)) found.set(document.docId, document)
+          }
+          cursor = listed.nextCursor
+        } while (cursor !== undefined && remaining.size > 0)
+        if (remaining.size > 0) {
+          throw new DocumentTransferError('DOCUMENT_NOT_FOUND', 404, 'One or more source documents are unavailable.')
         }
-        seenCursors.add(cursor)
       }
-      pages += 1
-      const listed = await list({
-        subject,
-        principal,
-        signal,
-        payload: {
-          version: 1,
-          scope: input.source,
-          limit: 100,
-          ...(cursor === undefined ? {} : { cursor }),
-        },
-      })
-      sourceSummary = listed.scope
-      for (const document of listed.documents) {
-        if (wanted.has(document.docId)) found.set(document.docId, document)
-      }
-      cursor = listed.nextCursor
-    } while (cursor !== undefined && found.size < wanted.size)
-    if (found.size !== wanted.size) {
-      throw new DocumentTransferError('DOCUMENT_NOT_FOUND', 404, 'One or more source documents are unavailable.')
     }
     const documents = input.documents.map(document => found.get(document.docId)!)
     const now = Date.now()

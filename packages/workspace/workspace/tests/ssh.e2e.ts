@@ -40,7 +40,7 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
       const hello = await ctx.ssh.ready
       root = `${hello.workspace}/registry-${randomUUID()}`
       const run = async (script: string) => {
-        const handle = ctx!.subprocess.spawn({
+        const handle = await ctx!.subprocess.spawn({
           argv: [hello.executable, '-e', script, root!], cwd: hello.workspace,
           stdio: { stdin: 'ignore', stdout: { maxBytes: 4096 }, stderr: { maxBytes: 4096 } }, graceMs: 2000,
         })
@@ -69,7 +69,7 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
       try {
         if (ctx !== undefined && root !== undefined) {
           const hello = await ctx.ssh.ready
-          const handle = ctx.subprocess.spawn({
+          const handle = await ctx.subprocess.spawn({
             argv: [hello.executable, '-e', "require('node:fs').rmSync(process.argv[1],{recursive:true,force:true})", root], cwd: hello.workspace,
             stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 2000,
           })

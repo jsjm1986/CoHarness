@@ -1,0 +1,18 @@
+- button "Select workbench":
+  - text: Selection A
+  - img
+- img "2 of 4 panes in use"
+- banner:
+  - text: Current Personal
+  - navigation "Session hierarchy":
+    - button "Use the read tool twice" [disabled]
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "Open right sidebar":
+    - img
+- button "Layout":
+  - img
+- button "Add conversation":
+  - img
+  - text: Add conversation

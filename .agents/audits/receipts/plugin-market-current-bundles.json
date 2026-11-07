@@ -1,0 +1,14 @@
+{
+  "name": "plugin-market-current-bundles",
+  "cwd": "packages/boot/plugin-market",
+  "command": "../../../node_modules/.bin/tsdown",
+  "startedAt": "2026-10-24T22:02:19.520820+00:00",
+  "seconds": 2.463,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "inputsAfter": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "postgresToolDirectory": null,
+  "outputSha256": "d3d46b0fe9dfe4d0e70fb05e8a826df40fc7c709d1f7e7959c9372f91c7605eb",
+  "outputTail": "ℹ tsdown v0.23.0 powered by rolldown v1.2.7\nℹ config file: /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-market/tsdown.config.ts \nℹ entry: lib/types/index.js\nℹ target: es2024\nℹ tsconfig: tsconfig.json\nℹ entry: lib/types/worker.js\nℹ target: es2024\nℹ tsconfig: tsconfig.json\nℹ Build start\nℹ [ESM] lib/index.js  29.88 kB │ gzip: 9.61 kB\nℹ [ESM] 1 files, total: 29.88 kB\n✔ Build complete in 49ms\nℹ Hint: consider adding deps.onlyBundle option to avoid unintended bundling of dependencies, or set deps.onlyBundle: false to disable this hint.\nSee more at https://tsdown.dev/options/dependencies#deps-onlybundle\nDetected dependencies in bundle:\n- semver\nℹ [CJS] lib/worker.cjs  69.76 kB │ gzip: 15.47 kB\nℹ [CJS] 1 files, total: 69.76 kB\n✔ Build complete in 57ms\n"
+}

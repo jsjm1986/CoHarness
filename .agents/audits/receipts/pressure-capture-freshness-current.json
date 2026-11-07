@@ -1,0 +1,14 @@
+{
+  "name": "pressure-capture-freshness-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/node-resource-budget-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T22:43:48.418449+00:00",
+  "seconds": 8.605,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "48dc3784fb25d77d1d01346f05fba71eeb2b23f492abb4f7d725d2f0945d328a",
+  "inputsAfter": "48dc3784fb25d77d1d01346f05fba71eeb2b23f492abb4f7d725d2f0945d328a",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "9ed5bfffa8a8c9c6a5ba857794c08461797457130a059aef6e01f66950207bee",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  31 passed (31)\n   Start at  06:43:51\n   Duration  5.68s (transform 291ms, setup 0ms, import 434ms, tests 5.11s, environment 0ms)\n\n"
+}

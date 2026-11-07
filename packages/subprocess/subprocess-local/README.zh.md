@@ -31,6 +31,10 @@ kind: "package-reference"
 
 在与消费方相同的组合中加载本提供方。它没有任何配置字段：每项选择都随 spawn 请求到达，因此随部署变化的决策留在调用方的配置里。 `terminalEnvironment()` 在 POSIX 读取非空的 `SHELL`，缺失时使用账户登录 shell；在 Windows 读取非空的 `ComSpec`。空值会被省略，由消费者选择平台回退。
 
+普通进程的参数与宽限期校验，以及终端的空程序校验，在本地启动前完成。这些已知失败保留原始错误并归还未使用的资源许可，使后续请求能够使用同一容量。清理状态无法确认的启动失败仍保留不确定占用。
+
+两种分配方法也会在启动前拒绝程序名、参数、目录及环境变量键或值中的空字节。这些失败保留原有的 `ERR_INVALID_ARG_VALUE` code 和消息，并归还未使用的许可。
+
 ```yaml
 - name: '@deepseek-ai/dsh-subprocess-local'
 - name: '@deepseek-ai/dsh-bash-local'
@@ -42,11 +46,13 @@ kind: "package-reference"
 
 Windows 普通子进程通过 `windowsHide` 启动私有 Job runner，并为原生目标请求隐藏初始窗口。标准流和 Job 归属不依赖窗口可见性；显式创建自身窗口的命令不在此保证范围内。
 
+Linux 原生 pipe 和 PTY scope 从内核 cgroup 成员信息中保留受管本地 Runtime 的 slice。探测 scope 使用相同 slice，使独立进程组和 SDK 后代仍属于外层 Runtime。环境变量不能选择其他 slice。参见[本地 Runtime 监督](../../../gateway/README.zh.md#performance-and-runtime-admission)。
+
 ### 收集输出
 
-收集模式在内存中保留一条流的最后 `maxBytes`——错误与最终结果通常聚集在末尾——并在配置了 `spill` 上限时把完整流追加到 OS 临时目录下每进程目录中的私有文件（`0700` 目录、`0600` 随机命名文件）。某条流大于 spill 上限时，会丢弃不完整的 spill，只返回带截断标记的尾部。spill 是尽力而为：当 spill 文件无法打开或追加（每进程目录被临时文件清理工具删除、`EACCES`、`EMFILE`、`ENOSPC`）时，收集器丢弃该 spill，通过插件 logger 记录一条 `error`，并继续收集内存尾部，因此结果带截断标记且没有 spill 路径。读取基于偏移量且从不消费，因此后台读取与批量读取在退出前后都可以共存。
+收集模式在内存中保留一条流的最后 `maxBytes`——错误与最终结果通常聚集在末尾——并在配置了 `spill` 上限时把完整流追加到 OS 临时目录下每进程目录中的私有文件（`0700` 目录、`0600` 随机命名文件）。某条流大于 spill 上限时，会丢弃不完整的 spill，只返回带截断标记的尾部。每次 spill 追加都会重试部分写入，直到请求的所有字节落盘；零进度视为 spill 失败。spill 是尽力而为：当 spill 文件无法打开或追加（每进程目录被临时文件清理工具删除、`EACCES`、`EMFILE`、`ENOSPC`）时，收集器丢弃该 spill，通过插件 logger 记录一条 `error`，并继续收集内存尾部，因此结果带截断标记且没有 spill 路径。读取基于偏移量且从不消费，因此后台读取与批量读取在退出前后都可以共存。
 
-`./output` 导出向进程适配器共享该收集器与保留 spill 的存储。`snapshot()` 返回保留的原始字节及总字节数，使远程适配器能够保留偏移量，而无需转发完整的流。
+`./output` 导出向进程适配器共享该收集器与保留 spill 的存储。`snapshot()` 返回保留的原始字节及总字节数，使远程适配器能够保留偏移量，而无需转发完整的流。导入模块或选择调用方拥有的 spill 存储，不会添加默认目录的退出监听器；默认目录所有者仅在首次创建存储后注册清理。
 
 ### 控制传输
 
@@ -57,6 +63,11 @@ Windows 普通子进程通过 `windowsHide` 启动私有 Job runner，并为原�
 
 `spawnTerminal` 分配真实 PTY 并桥接 UTF-8 文本；你可以检查当前前台进程组并向其发送信号，还可以等待一次 `terminate()` 操作。在受支持的 Linux 宿主上，原始终端 argv 直接在 user-systemd scope 内运行；node-pty PID、会话 leader、控制终端、前台 `inputWaiting` 与就绪状态保持不变，而 scope 会拥有已重新设定父进程或调用 `setsid` 的后代。在 fallback 宿主上，清理会保留根进程树和可观察会话中的精确身份，但无法重新发现每个已经逃逸的后代。Linux 的精确输入等待要求前台线程的 fd 0 标识 shell 的控制终端，且线程当前的 syscall 正在等待该 fd；如果内核拒绝 syscall 探测，上层 PTY 后端会改用空闲推断。在 Windows 上，SIGINT 以 Ctrl-C 输入写入投递，SIGTSTP 与 SIGHUP 不受支持，拆卸会通过进程表验证 shell 已终止，因为被外部终止的 shell 可能永远不会触发 PTY 退出通知。
 
+终端拆卸使用进程单调时间计算后代与 Windows shell 的宽限期。墙上时钟调整不会阻止或提前触发升级。宽限期到期只允许进入下一档终止，只有验证进程退出才能成功完成清理。不完整或未经确认的 POSIX 进程表观察会保留已知后代并拒绝报告清理成功，包括根进程退出之后。观察恢复后重试；提供方保留宿主退出回调，直到验证清理成功。Windows 保留逐个进程身份的直接存活检查。
+
+macOS 原生进程查询与 Windows `taskkill` 辅助进程各自使用所属 spawn 的 `graceMs` 作为执行期限，并向上取整到整数毫秒。期限到达时向辅助进程发送 `SIGKILL` 并等待其关闭；这不能证明工作进程已退出。进程观察失败仍表示未知，信号投递失败仍保留工作进程的清理责任与资源占用。该期限分别约束每个辅助进程，不是整个拆卸流程或不可中断内核操作的总期限。
+
+
 使用 `shellActivity: true` 时，普通非登录的 `bash -i` 与 `zsh -i` 会安装私有生命周期记录，同时保留用户启动文件和提示符配置。Bash 需要 4.4 或更高版本，并允许写入提示符 hook；Zsh 观察空的顶层 ZLE 提示符，排除 `vared`、选择和续行提示符。输入、shell 状态迁移和进程观察变化都会推进活动 revision。前台、后台及停止的后代任务阻止空闲判断；原生 Linux 还要求 systemd scope 中恰好只有一个 task，覆盖进程树以外仍归其所有的工作；进程表扫描不完整、自定义 trap 和 Zsh 异步文件描述符 handler 会返回 unknown。进程表枚举失败会拒绝本次观察；活动保持 unknown，清理保留所有权，直到进程表可读并能完成验证。进程清理成功后删除私有文件。其他 shell、Windows、自定义参数以及经 sandbox 包装的可执行文件仍可使用，但活动为 unknown。
 
 启用后，根进程退出不会终止仍在运行的后代。明确为空的 Linux 受管范围或完整且为空的 Linux 会话可允许回收保留的记录；macOS 无法在根进程退出后确认未观察到的进程范围，会将该记录保持为 unknown。原有 fallback 可见性限制仍然适用：shell 生命周期记录不能让已逃逸且未观察到的后代变得可发现。这些记录协调普通 shell 行为，不用于防御同一用户的恶意进程。
@@ -65,7 +76,11 @@ Windows 普通子进程通过 `windowsHide` 启动私有 Job runner，并为原�
 
 正常 dispose 会终止每个仍在运行的受管范围与终端会话并等待其完全停稳。在 JavaScript 可观察的宿主退出期间——直接 `process.exit()`、默认未捕获异常、默认未处理 rejection——同步最终清理会请求 Linux scope 终止其成员，同步终止每个 Windows runner 以关闭其唯一 Job handle，并为 fallback 使用既有 PGID、`taskkill` 或已捕获身份操作。它不创建 Promise 或定时器，也不声称已经完全停稳。同一退出阶段会删除未持有任何已完成 spill 文件的每进程私有 spill 目录；已完成的 spill 文件作为完整输出恢复产物保留，直到外部机制清理。未处理的 `SIGTERM`/`SIGINT`/`SIGHUP`、`SIGKILL`、fatal OOM、native crash 与断电需要外部 supervisor。
 
+dispose 失败后，只要仍拥有受管进程、终端或控制端点，就保留退出回调。后续终端清理成功会移除保留的记录；最后一个所有者确认释放时，也会移除已卸载提供方的回调。未知范围继续保留退出保护。
+
 Linux 普通进程和终端进程即使在 bootstrap 消费启动请求前被取消，也会保留实际观察到的终止信号。如果没有请求对应的终止信号，未消费的请求仍会报启动失败；已记录的 pre-exec 错误始终优先。`waitForExit()` 独立证明 scope 已为空，其中也包括 payload 在进入该 scope 的 cgroup 前就被杀死、manager 因此让它保持 active 却没有任何进程的 scope。状态查询期间若发出终止信号，会重新查询后再判定清理是否成功。请求终止后，启动请求已消费且 scope 进程数为零即可证明完全停稳，无需等待直接进程的退出通知。如果最终 scope 信号发送失败，直接进程接受 `SIGKILL` 或被独立确认已不存在，owner 才可以等待一次尚未送达的直接进程停稳通知，再重新查询尚未证明为空的 active 范围。此等待独立于输出排空和整个范围的停稳。新取得的 scope 状态必须证明范围已为空；仍有进程存活或进程数未知时，仍报告信号失败。
+
+Linux 原生控制探测与查询具有五秒命令期限，会强制终止停滞客户端，包括忽略 SIGTERM 的程序。查询失败保留未知的 scope 所有权；客户端关闭不能证明任务进程范围已清空。同一期限覆盖同步信号发送与空单元回收命令，不限制目标任务。参见[原生控制所有权决策](../../../.agents/notes/implemented/bug-fix/2026-10-25-systemd-control-command-ownership.zh.md)。
 
 ### 可能出错的地方
 
@@ -83,7 +98,13 @@ Linux 普通进程和终端进程即使在 bootstrap 消费启动请求前被取
 
 ### 设计理念
 
-每次 spawn 都为信号发送与完全停稳选择同一个 owner。受支持的 Linux 普通命令与终端启动使用临时 user-systemd scope，受支持的 Windows 普通命令使用由 helper 持有、关闭时终止成员的 Job。macOS、旧版或不可用的 user-systemd，以及不可用的 Windows 原生支持使用既有 detached 进程组、`taskkill` 或终端会话观察，并只告警一次。native 路径可能已经启动命令后，本提供方绝不会通过 fallback 重放该命令。
+每次 spawn 都为信号发送与完全停稳选择同一个 owner。受支持的 Linux 普通命令与终端启动使用临时 user-systemd scope，受支持的 Windows 普通命令使用由 helper 持有、关闭时终止成员的 Job。macOS、不可用的 user-systemd，以及不可用的 Windows 原生支持使用既有 detached 进程组、`taskkill` 或终端会话观察，并只告警一次。native 路径可能已经启动命令后，本提供方绝不会通过 fallback 重放该命令。
+
+Linux 进程组后备机制在进程记录不可读或格式错误、无法完成仅剩僵尸的观察时保留所有权。找到活跃进程组成员仍能确认占用。POSIX 终端最终清理在所属 spawn 配置的 `graceMs` 内重试不完整的进程表观察；到期仍不完整就拒绝释放所有权。参见[进程观察决策](../../../.agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.zh.md)。
+
+POSIX 身份查询会拒绝不完整快照中缺失的记录。可见记录仍能证明其自身身份和状态。Linux 直接身份读取将 `ENOENT` 与 `ESRCH` 视为不存在；其他读取失败、stat 数据格式错误及 PID 不匹配会拒绝本次观察。stat 记录必须匹配请求的 PID，且 `/proc` 挂载须对应 Runtime 的 PID 命名空间。这些检查保留未知状态，而不报告未经确认的退出。
+
+Windows 终端清理在进程表或身份读取失败时报告 Win32 API 及错误码。权限拒绝或等待失败不能证明进程已退出；已知后代及提供方的退出保护继续保留，直到重试成功并确认清理。
 
 ### 源码地图
 
@@ -146,10 +167,11 @@ spill 文件以 `0600` 权限、`O_EXCL` 与随机名称在 `0700` 每进程目�
 这些限制说明本提供方何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是通用平台对比或任务积压。
 
 - **Linux 直接进程退出没有独立截止时间**——直接 `SIGKILL` 获得确认后，不可中断的内核 I/O 可能让 dispose 无限期等待；`graceMs` 和 scope 查询的轮询预算不限制此等待。
-- **native ownership 有明确宿主要求**——Linux 需要可读的 user manager 与 `systemd-run --expand-environment=no`；旧版 systemd 使用带告警的 PGID fallback。macOS 因没有受支持的公开 persistent owner，始终使用该 fallback。
-- **native 选择具有有界的每次 spawn 成本**——Linux 会重复检查 bootstrap 入口、libc `execve`/`fcntl` bindings、存活的 user manager 与 literal-argv scope 支持，直到这套完整探测首次成功；后续符合条件的普通命令或终端 spawn 只重新检查存活的 user manager。Windows 会在每次普通 spawn 前重新检查 runner 入口、bindings 与当前 Job 支持。Linux 深度探测的成功状态与 fallback 告警去重会在提供方生命周期内持续保留。所有探测都会在用户命令可能运行前完成，子进程探测的超时为 5 秒。每次 Linux 启动都会创建私有请求目录，以 50 毫秒间隔检查尚未确定的 scope 建立状态；scope 已建立且仍 active 后，查询间隔按指数增长，最多为 5 秒。Windows 普通命令会保留一个 runner 与一条 IPC 通道，直到 Job 报告活动进程数为零。目标会直接继承标准句柄，不使用 named-pipe stdio 或结果文件。
+- **native ownership 有明确宿主要求**——Linux 需要可读的 user manager，其 `systemd-run` 支持 `--collect`（systemd 236 及以后），且 scope 参数保持原样不展开：254 及以后版本会收到 `--expand-environment=no`，更早版本因 scope 模式本就不展开参数而不再附加。没有可用 user manager 的宿主使用带告警的 PGID fallback。macOS 因没有受支持的公开 persistent owner，始终使用该 fallback。
+- **native 选择具有有界的每次 spawn 成本**——Linux 在首个符合条件的普通命令或终端 spawn 上检查 bootstrap 入口、libc `execve`/`fcntl` bindings、可达的 user manager 与 literal-argv scope 探测，并保留该结论（包括失败或超时的探测）。user manager 通过监听 `$XDG_RUNTIME_DIR/systemd/private`（即 `systemd-run --user` 连接的 socket）的进程识别，该监听记录于内核同一网络命名空间的 unix socket 表（`/proc/net/unix`）；读取该表的成本与其大小成正比。结论为可用后，每个符合条件的 spawn 在 `PATH` 解析到的 `systemd-run` 的 device、inode、大小或修改时间发生变化时重新探测，否则只确认 manager：存在监听者即不启动子进程直接确认；否则以一次 `systemctl --user show` 查询裁决，查询失败则本次 spawn 使用 fallback。bootstrap 从未消费其启动请求的 scope 启动（例如发给仍在监听但已挂起的 manager）会让该命令失败，在此之前已发出的 scope 启动同样失败，且下一个符合条件的 spawn 重新探测。结论为不可用后，只有出现不同的监听者才重新探测，因此稍后启动的 manager 无需重启提供方即可被采用。Windows 会在每次普通 spawn 前重新检查 runner 入口、bindings 与当前 Job 支持。fallback 告警去重同样在提供方生命周期内持续保留。所有探测都会在用户命令可能运行前完成；每个子进程探测超时为 5 秒，拒绝 `--expand-environment=no` 的 `systemd-run` 会不带该参数再探测一次。每次 Linux 启动都会创建私有请求目录，以 50 毫秒间隔检查尚未确定的 scope 建立状态；scope 已建立且仍 active 后，查询间隔按指数增长，最多为 5 秒。Windows 普通命令会保留一个 runner 与一条 IPC 通道，直到 Job 报告活动进程数为零。目标会直接继承标准句柄，不使用 named-pipe stdio 或结果文件。
 - **Windows Job inheritance 有明确排除项**——普通后代默认继承 Job，但 breakaway 进程不在保证范围。目标只在 Job 分配后启动；runner 若在 create-to-assignment 极窄区间遭外力终止，可能留下 suspended target。
-- **Windows 终端信号是控制台级的**——SIGINT 以 `\x03` Ctrl-C 输入写入投递，由 conhost 转为控制台级 CTRL_C 事件；SIGTSTP 与 SIGHUP 被拒绝（不可用）；不带 `/F` 的 `taskkill` 无法终止控制台进程，因此拆卸的 TERM 档是 `/F` 升级前的宽限等待。Windows 就绪没有精确的 stdin-wait 档：prompt-marker 快路径把 shell pid 作为伪前台进程组比较，其余由静默与计时档覆盖。
+- **Windows 终端信号是控制台级的**——SIGINT 以 `\x03` Ctrl-C 输入写入投递，由控制台宿主（在 Windows 上是 node-pty 捆绑的 OpenConsole）转为控制台级 CTRL_C 事件；SIGTSTP 与 SIGHUP 被拒绝（不可用）；不带 `/F` 的 `taskkill` 无法终止控制台进程，因此拆卸的 TERM 档是 `/F` 升级前的宽限等待。Windows 就绪没有精确的 stdin-wait 档：prompt-marker 快路径把 shell pid 作为伪前台进程组比较，其余由静默与计时档覆盖。
+- **Windows 终端分配依赖 node-pty 捆绑的控制台宿主资产**——每个 Windows 终端都以 `useConptyDll: true` spawn，分配会相对 node-pty 自身 addon 解析 `conpty/conpty.dll` 与 `OpenConsole.exe`；资产缺失或解包错误会让 `spawnTerminal` 抛错而非回退到操作系统控制台宿主。node-pty 将该选项标记为实验性，node-pty 升级可能改变此行为。见[捆绑控制台宿主说明](../../../.agents/notes/implemented/bug-fix/2026-09-28-pty-bundled-console-host.zh.md)。
 - **fallback 终端 ownership 仍依赖观察**——在 macOS 或缺少可用 user-systemd 的 Linux 上，子进程如果在任何前台检查快照之前重新设定父进程，或离开自有终端会话，就可能逃出进程表扫描。本地提供方不会新增持续进程表监视器；受支持的 Linux native 模式改由 scope membership 持有这些后代。
 - **进程内清理要求退出阶段仍能执行 JavaScript**——直接 `process.exit()`、默认未捕获异常和默认未处理 rejection 会发出 Node 同步 `exit` 事件。未安装 handler 时，`SIGTERM`、`SIGINT` 或 `SIGHUP` 的默认 OS 处置不会发出该事件；应用只有安装执行正常 dispose 或调用 `process.exit()` 的 handler 才能覆盖这些信号。`SIGKILL`、fatal OOM、`process.abort()`、native crash、断电，以及任何无法运行 JavaScript 的故障，都需要外部 supervisor、容器 init 或等价的 OS owner 负责。
 - **凭据清除依赖名称启发式规则**——只匹配 `*KEY*`／`*PASSWORD*`／`*SECRET*`／`*TOKEN*`；名称不同的 secret（例如 `*PASSPHRASE*`）会继续传递，对误删变量引入白名单属于已记录的后续工作。

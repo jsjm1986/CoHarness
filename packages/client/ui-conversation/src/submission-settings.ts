@@ -21,10 +21,7 @@ export const DEFAULT_BUSY_ENTER_BEHAVIOR: BusyEnterBehavior = 'queue'
 export const DEFAULT_CHAT_CONTENT_WIDTH = 748
 /** Minimum and maximum user-selectable transcript width. */
 export const CHAT_CONTENT_WIDTH_RANGE = { min: 560, max: 1080 } as const
-/** Default chat text size in pixels. */
-export const DEFAULT_CHAT_FONT_SIZE = 14
-/** Supported chat text-size range. */
-export const CHAT_FONT_SIZE_RANGE = { min: 12, max: 17 } as const
+
 
 /** Field carrying the work-details presentation mode. */
 export const TRANSCRIPT_VIEW_FIELD = 'transcriptView'
@@ -87,8 +84,6 @@ export interface ConversationSettings {
   chatContentWidth: number
   /** Fill the pane instead of clamping to `chatContentWidth`. */
   chatFullWidth?: boolean
-  /** Persisted transcript font size. */
-  chatFontSize: number
   /** Work-details preference; absence uses the client default, and legacy saved values remain accepted. */
   transcriptView?: TranscriptViewMode | typeof LEGACY_TRANSCRIPT_VIEW_MODE | typeof LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE | null
   /** Independent collapse timing; absence preserves completion-time folding. */
@@ -104,7 +99,6 @@ export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [BUSY_ENTER_FIELD]: z.union([...BUSY_ENTER_BEHAVIORS]).default(DEFAULT_BUSY_ENTER_BEHAVIOR),
   chatContentWidth: z.number().min(CHAT_CONTENT_WIDTH_RANGE.min).max(CHAT_CONTENT_WIDTH_RANGE.max).default(DEFAULT_CHAT_CONTENT_WIDTH),
   chatFullWidth: z.boolean().default(false),
-  chatFontSize: z.number().min(CHAT_FONT_SIZE_RANGE.min).max(CHAT_FONT_SIZE_RANGE.max).default(DEFAULT_CHAT_FONT_SIZE),
   linkOpening: z.union(['sidebar', 'new-tab']).default(DEFAULT_LINK_OPENING),
   performanceUsage: z.union([...PERFORMANCE_USAGE_MODES]).default(DEFAULT_PERFORMANCE_USAGE),
   // Missing and unrecognized modes defer to the client's default.

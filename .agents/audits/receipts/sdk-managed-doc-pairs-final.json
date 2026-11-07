@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-doc-pairs-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/architecture/2026-10-24-model-policy-owner-lifetime.md .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md .agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md docs/event-producer-consumer.md docs/subsystems/llm-streaming.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md packages/llm/llm/README.md packages/subagent/subagent-dsh-sdk/README.md plugins/dsh-model-governance/README.md",
+  "startedAt": "2026-10-24T16:51:35.599725+00:00",
+  "seconds": 1.533,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1dfa105e6ee9dd01c2c8d2c394fae440f4697fd6942aa1128c4cf018bcccff07",
+  "inputsAfter": "c4c6b105b322e28444efa5a8d13d34b83f8b01c4064ef016b4df3941d4fad376",
+  "postgresToolDirectory": null,
+  "outputSha256": "034513d734cb1a03ac4ea12b054d98ba3399656b3f8644e5ea146e35b2ba5b29",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-dsh-sdk/README.i18n.yaml\nverify-translation-pairing: 2 record(s) written; run the check to validate the pairs.\n"
+}

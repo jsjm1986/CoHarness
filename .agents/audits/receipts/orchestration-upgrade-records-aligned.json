@@ -1,0 +1,14 @@
+{
+  "name": "orchestration-upgrade-records-aligned",
+  "cwd": ".",
+  "command": "pnpm run verify-upgrade-records",
+  "startedAt": "2026-10-25T07:09:49.777367+00:00",
+  "seconds": 41.774,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0e7fff5bb0081358171f64c27bc281c61eeeb4eaefa64ff4e451fbfe904f5da5",
+  "inputsAfter": "0e7fff5bb0081358171f64c27bc281c61eeeb4eaefa64ff4e451fbfe904f5da5",
+  "postgresToolDirectory": null,
+  "outputSha256": "24e41573cddd6f9a28832c58f969efd7e3205dff23d5b96d474ecc502d63d3f1",
+  "outputTail": "$ tsx scripts/verify-upgrade-records.ts\nupgrade-records: 22 record file(s) conform; every row carries commit coverage or an explicit reason.\n"
+}

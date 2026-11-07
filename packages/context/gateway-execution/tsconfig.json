@@ -97,6 +97,15 @@
     },
     {
       "path": "../../session/session-format-v5-to-v6"
+    },
+    {
+      "path": "../resource-budget"
+    },
+    {
+      "path": "../../util/native-command"
+    },
+    {
+      "path": "../../core/system-prompt"
     }
   ]
 }

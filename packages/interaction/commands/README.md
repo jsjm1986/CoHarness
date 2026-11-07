@@ -61,6 +61,12 @@ A command may declare `input.attachments` to accept composer images and generic 
 
 An interactive adapter calls `execute(agent, line, attachments, signal)` with the exact receiving agent, the full command line, and the submission's ordered attachments. It returns the settled `CommandExecution` — the normalized result plus its lifecycle `commandId` — or `undefined` for invalid syntax or an unknown name. `list(agent)` and `find(agent, name)` serve discovery after agent-scoped shadowing.
 
+The selected registration must still be effective when its handler starts. Removing or replacing it, or adding an agent-scoped override while attachments are admitted, returns a logged error. The invocation never transfers to another handler; the caller can retry against the current command.
+
+Pending attachment admission and handler cleanup veto automatic idle disposal for the exact calling Agent. Cancelling the UI wait keeps that protection until the handler promise settles. Service withdrawal cancels accepted commands and waits for their admission and real handler cleanup before removing the idle veto. A retained service reference cannot start another command. When an Agent registry is composed, removal or replacement of the original Agent prevents handler entry; independent compositions can omit the registry.
+
+Cancellation is checked after Session publication and attachment storage, before entering a handler. A request cancelled at this point rejects with its cancellation reason and records a failed run; no command handler starts.
+
 ### Cancellation
 
 The caller's abort signal stops the registry from awaiting a handler; a handler that ignores the signal may continue its own external side effects after the caller stops waiting. A cancelled or thrown handler settles as a `command/done` error in the log.
@@ -105,7 +111,7 @@ Attachment enforcement happens in the executor: images are committed through `ad
 Read these pages when the package-level contract is not enough. They move from the shared command vocabulary to the design evidence and adjacent surfaces.
 
 - [Commands subsystem reference](../../../docs/subsystems/commands.md) — registry semantics, input metadata, and the `ctx.commands` Cordis surface.
-- [Command registration Agent Note](../../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md) — the boundary and dispatch contract behind this service.
+- [historical Command registration Agent Note](../../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md) — the boundary and dispatch contract behind this service.
 - [Interaction group map](../README.md) — adjacent approval, permission, and question packages.
 - [Plan mode package](../../plan/plan-mode/README.md) — a shipped command producer that drives model-visible work.
 

@@ -64,7 +64,8 @@ afterEach(async () => {
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
 })
 
-describe('session-checkpoint-policy request boundary', () => {
+describe.each(['model', 'orchestration'] as const)('session-checkpoint-policy request boundary: %s', (kind) => {
+  class RequestAdapter extends RecordingAdapter { override readonly callKind = kind }
   it('awaits the live session checkpoint before constructing the downstream model stream', async () => {
     const ctx = await setup()
     const session = ctx.sessions.create(SessionId('request-checkpoint'))
@@ -76,7 +77,7 @@ describe('session-checkpoint-policy request boundary', () => {
       await gate.promise
       order.push('flush:end')
     })
-    ctx.llm.registerAdapter(['mock'], new RecordingAdapter(order))
+    ctx.llm.registerAdapter(['mock'], new RequestAdapter(order))
 
     const pending = drain(ctx.llm.stream({
       provider: 'mock', model: 'mock', messages: [], sessionId: session.id,
@@ -92,7 +93,7 @@ describe('session-checkpoint-policy request boundary', () => {
     const ctx = await setup()
     const order: string[] = []
     ctx.on('session/flush', () => { order.push('flush') })
-    ctx.llm.registerAdapter(['mock'], new RecordingAdapter(order))
+    ctx.llm.registerAdapter(['mock'], new RequestAdapter(order))
     await drain(ctx.llm.stream({ provider: 'mock', model: 'mock', messages: [] }))
     expect(order).toEqual(['adapter'])
   })
@@ -101,7 +102,7 @@ describe('session-checkpoint-policy request boundary', () => {
     const ctx = await setup()
     const order: string[] = []
     ctx.on('session/flush', () => { order.push('flush') })
-    ctx.llm.registerAdapter(['mock'], new RecordingAdapter(order))
+    ctx.llm.registerAdapter(['mock'], new RequestAdapter(order))
     await drain(ctx.llm.stream({
       provider: 'mock', model: 'mock', messages: [], sessionId: SessionId('detached'),
     }))
@@ -113,7 +114,7 @@ describe('session-checkpoint-policy request boundary', () => {
     const session = ctx.sessions.create(SessionId('request-failure'))
     const order: string[] = []
     ctx.on('session/flush', () => Promise.reject(new Error('disk unavailable')))
-    ctx.llm.registerAdapter(['mock'], new RecordingAdapter(order))
+    ctx.llm.registerAdapter(['mock'], new RequestAdapter(order))
     await expect(drain(ctx.llm.stream({
       provider: 'mock', model: 'mock', messages: [], sessionId: session.id,
     }))).rejects.toThrow('disk unavailable')

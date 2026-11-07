@@ -1,0 +1,14 @@
+{
+  "name": "audit-final-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-browser-authentication-lock-waits.md .agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.md",
+  "startedAt": "2026-10-24T02:00:14.229656+00:00",
+  "seconds": 2.657,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "def7c4a3f0225c64cf742988f6fd40ed341facba68277c4c7df2bf14be2d21af",
+  "inputsAfter": "81b2d1574e9d05b29fa612f1a49491f7fed8ea7dcb7a2b8bccb35b3cd6961528",
+  "postgresToolDirectory": null,
+  "outputSha256": "9c8278dffcfa6d1729bdf651e3b3ced15e15f04d76c199b0a485a66cd267b092",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/bug-fix/2026-10-24-browser-authentication-lock-waits.md .agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-browser-authentication-lock-waits.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

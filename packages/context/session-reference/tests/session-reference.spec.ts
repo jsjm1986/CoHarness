@@ -714,6 +714,99 @@ describe('session reference discovery and preparation', () => {
     }])
   })
 
+  it.each(['read', 'spill'] as const)('withholds a reference revoked during its %s', async (stage) => {
+    const ctx = await harness({ maxReferenceBytes: 180 })
+    const release = Promise.withResolvers<undefined>()
+    try {
+      await ctx.plugin(RecordingSpill)
+      const target = ctx.sessions.create(SessionId('target'))
+      const source = ctx.sessions.create(SessionId('source'))
+      appendText(source, 'PRIVATE_REFERENCE'.repeat(300))
+      let readable = true
+      ctx.provide('collaboration', {
+        capture: () => ({ readableSessionIds: (ids: readonly SessionId[]) =>
+          Promise.resolve(new Set(readable ? ids : [])) }),
+      } as never)
+      const entered = Promise.withResolvers<undefined>()
+      if (stage === 'read') {
+        const original = ctx.sessionQuery.readSurface.bind(ctx.sessionQuery)
+        vi.spyOn(ctx.sessionQuery, 'readSurface').mockImplementation(async (...args) => {
+          entered.resolve(undefined)
+          await release.promise
+          return original(...args)
+        })
+      } else {
+        const original = ctx.spillStore.saveText.bind(ctx.spillStore)
+        vi.spyOn(ctx.spillStore, 'saveText').mockImplementation(async (input) => {
+          entered.resolve(undefined)
+          await release.promise
+          return original(input)
+        })
+      }
+      const pending = ctx.sessionReferenceResolver.prepare(fakeAgent(target), [], [{ sessionId: source.id }])
+      const denied = expect(pending).rejects.toMatchObject({ code: 'SESSION_REFERENCE_READ_FAILED' })
+      await entered.promise
+      readable = false
+      release.resolve(undefined)
+      await denied
+      if (stage === 'read') expect((ctx.spillStore as RecordingSpill).saves).toHaveLength(0)
+    } finally {
+      release.resolve(undefined)
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('fails closed when the collaboration provider unloads during a source read', async () => {
+    const ctx = await harness()
+    const release = Promise.withResolvers<undefined>()
+    try {
+      const provider = await ctx.plugin({ name: 'readability-provider', apply(scope: Context) {
+        scope.provide('collaboration', {
+          capture: () => ({ readableSessionIds: (ids: readonly SessionId[]) => Promise.resolve(new Set(ids)) }),
+        } as never)
+      } })
+      const target = ctx.sessions.create(SessionId('target'))
+      const source = ctx.sessions.create(SessionId('source'))
+      appendText(source, 'private fact')
+      const entered = Promise.withResolvers<undefined>()
+      const original = ctx.sessionQuery.readSurface.bind(ctx.sessionQuery)
+      vi.spyOn(ctx.sessionQuery, 'readSurface').mockImplementation(async (...args) => {
+        entered.resolve(undefined)
+        await release.promise
+        return original(...args)
+      })
+      const pending = ctx.sessionReferenceResolver.prepare(fakeAgent(target), [], [{ sessionId: source.id }])
+      const denied = expect(pending).rejects.toMatchObject({ code: 'SESSION_REFERENCE_READ_FAILED' })
+      await entered.promise
+      await provider.dispose()
+      release.resolve(undefined)
+      await denied
+    } finally {
+      release.resolve(undefined)
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('sanitizes authorization-provider failures at the final reference check', async () => {
+    const ctx = await harness()
+    try {
+      const target = ctx.sessions.create(SessionId('target'))
+      const source = ctx.sessions.create(SessionId('source'))
+      appendText(source, 'private fact')
+      let checks = 0
+      ctx.provide('collaboration', {
+        capture: () => ({ readableSessionIds: (ids: readonly SessionId[]) => {
+          if (++checks === 1) return Promise.resolve(new Set(ids))
+          throw new Error('PRIVATE_PROVIDER_DIAGNOSTIC')
+        } }),
+      } as never)
+      const failure: unknown = await ctx.sessionReferenceResolver.prepare(fakeAgent(target), [], [{ sessionId: source.id }])
+        .catch((error: unknown) => error)
+      expect(failure).toMatchObject({ message: 'referenced session authorization is unavailable' })
+      expect(failure).not.toHaveProperty('cause')
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('rejects direct references that the active collaboration ACL cannot read', async () => {
     const ctx = await harness()
     const target = ctx.sessions.create(SessionId('target'))

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, onTestFinished } from 'vitest'
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client'
 import { Context } from '@deepseek-ai/cordis'
 import AttachmentStore, { AttachmentError, AttachmentId } from '@deepseek-ai/dsh-attachment'
@@ -12,6 +12,7 @@ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { PostToolDecision } from '@deepseek-ai/dsh-tools'
 import { publicToolName, syncTools, type ToolBridgeOptions } from '@deepseek-ai/dsh-mcp-client/src/tools.ts'
 import { createTransport } from '@deepseek-ai/dsh-mcp-client/src/transport.ts'
+import { McpProcessOwner } from '../src/managed-stdio.ts'
 import type { Config } from '@deepseek-ai/dsh-mcp-client'
 
 const testToolSignal = new AbortController().signal
@@ -1021,7 +1022,7 @@ describe('tool execution', () => {
 })
 
 describe('createTransport', () => {
-  it('creates StdioClientTransport for stdio config', () => {
+  it('requires a managed process owner for stdio config', async () => {
     const config: Config = {
       transport: 'stdio',
       serverName: 'srv',
@@ -1032,7 +1033,10 @@ describe('createTransport', () => {
       toolCallTimeoutMs: 60_000,
       failOnStartupError: false,
     }
-    const transport = createTransport(config)
+    expect(() => createTransport(config)).toThrow('requires its managed process owner')
+    const ctx = new Context(), owner = new McpProcessOwner(ctx, config)
+    onTestFinished(async () => { try { await owner.close() } finally { await ctx.fiber.dispose() } })
+    const transport = createTransport(config, owner)
     expect(transport).toBeDefined()
     expect(transport).toHaveProperty('start')
     expect(transport).toHaveProperty('close')
@@ -1068,53 +1072,29 @@ describe('createTransport', () => {
     expect(transport).toHaveProperty('close')
   })
 
-  it('scrubs sensitive env vars and forwards the rest', () => {
-    const original = { ...process.env }
-    try {
-      process.env.SAFE_VAR = 'kept'
-      process.env.MY_SECRET = 'hidden'
-      process.env.API_KEY = 'hidden'
-      process.env.AUTH_TOKEN = 'hidden'
-
-      const config: Config = {
-        transport: 'stdio',
-        serverName: 'srv',
-        command: 'echo',
-        args: [],
-        env: { EXTRA: 'injected' },
-        cwd: '',
-        toolCallTimeoutMs: 60_000,
-        failOnStartupError: false,
-      }
-      // StdioClientTransport keeps its env private; the observable contract is
-      // that createTransport(config) returns a transport without throwing.
-      const transport = createTransport(config)
-      expect(transport).toBeDefined()
-    } finally {
-      delete process.env.SAFE_VAR
-      delete process.env.MY_SECRET
-      delete process.env.API_KEY
-      delete process.env.AUTH_TOKEN
-      for (const key of Object.keys(process.env)) {
-        if (!(key in original)) Reflect.deleteProperty(process.env, key)
-      }
-    }
-  })
-
-  it('merges explicit env on top of scrubbed ambient env', () => {
-    const config: Config = {
-      transport: 'stdio',
-      serverName: 'srv',
-      command: 'echo',
-      args: [],
-      env: { CUSTOM: 'value' },
-      cwd: '',
-      toolCallTimeoutMs: 60_000,
-      failOnStartupError: false,
-    }
-    const transport = createTransport(config)
-    expect(transport).toBeDefined()
-  })
+  it('scrubs ambient credentials and retains explicit environment entries in a real managed child', async () => {
+    vi.stubEnv('SAFE_VAR', 'kept')
+    vi.stubEnv('API_KEY', 'hidden')
+    vi.stubEnv('AUTH_TOKEN', 'hidden')
+    vi.stubEnv('MY_SECRET', 'hidden')
+    const ctx = new Context()
+    const owner = new McpProcessOwner(ctx, {
+      transport: 'stdio', serverName: 'environment', command: process.execPath,
+      args: ['-e', 'console.log(JSON.stringify({jsonrpc:"2.0",method:"test/env",params:{safe:process.env.SAFE_VAR,key:process.env.API_KEY??null,token:process.env.AUTH_TOKEN??null,secret:process.env.MY_SECRET,extra:process.env.EXTRA}}));setInterval(()=>{},1000)'],
+      env: { EXTRA: 'injected', MY_SECRET: 'explicit' }, cwd: process.cwd(),
+      toolCallTimeoutMs: 5_000, failOnStartupError: true, processGraceMs: 50,
+    })
+    onTestFinished(async () => {
+      try { await owner.close() } finally { await ctx.fiber.dispose(); vi.unstubAllEnvs() }
+    })
+    const transport = owner.transport(), received = Promise.withResolvers<unknown>()
+    transport.onmessage = (message) => { received.resolve(message) }
+    await transport.start()
+    expect(await received.promise).toMatchObject({
+      method: 'test/env', params: { safe: 'kept', key: null, token: null, secret: 'explicit', extra: 'injected' },
+    })
+    await transport.close()
+  }, 20_000)
 })
 
 describe('tool execution — non-object args fallback', () => {

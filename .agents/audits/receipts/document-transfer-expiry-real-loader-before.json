@@ -1,0 +1,14 @@
+{
+  "name": "document-transfer-expiry-real-loader-before",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/document-transfer-loader.spec.ts",
+  "startedAt": "2026-10-26T02:00:49.375018+00:00",
+  "seconds": 2.796,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "95de3ed324d46963389f7d9fbfcd7cc39d80b1d197175d4991ef1f4e53f05377",
+  "inputsAfter": "95de3ed324d46963389f7d9fbfcd7cc39d80b1d197175d4991ef1f4e53f05377",
+  "postgresToolDirectory": null,
+  "outputSha256": "7d08fa6f7bdb3a1a708372d7c148daf433c666027a87d19cb958017777e52ec8",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/document-transfer-loader.spec.ts (1 test | 1 failed) 1640ms\n   × preserves plan ownership and renews only currently authorized copies through the Loader 1639ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/document-transfer-loader.spec.ts > preserves plan ownership and renews only currently authorized copies through the Loader\nError: Command failed: /Users/a1234/.nvm/versions/node/v25.8.1/bin/node --import file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/esm/index.mjs /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/document-transfer-loader.mjs src\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: [{\"status\":\"failed\",\"source\":{\"name\":\"report.txt\"},\"error\":{\"code\":\"DOCUMENT_TRANSFER_FAILED\",\"message\":\"Document transfer failed.\"}}]\n\n'failed' !== 'copied'\n\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/document-transfer-loader.mjs:104:10)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 'failed',\n  expected: 'copied',\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n\n ❯ <anonymous> tests/fixtures/document-transfer-loader.mjs:104:10\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  10:00:50\n   Duration  1.83s (transform 22ms, setup 0ms, import 41ms, tests 1.64s, environment 0ms)\n\n"
+}

@@ -1,13 +1,13 @@
 ---
-description: "English | 中文"
+description: "以实验性名称发布、与默认产品依赖隔离的实验性 Cordis 插件和运行时库。"
 kind: "package-group"
 ---
 
-# experimental/：私有实验性包
+# experimental/：实验性包
 
 [English](README.md) | 中文
 
-本组包含使用仓库真实运行时、但不进入正式发布的原型与内部专用 Cordis 插件。组内包均为私有包，不承诺稳定性或支持，但仍须满足与发布包相同的工程、安全、文档、生命周期、测试和快照要求。
+本组包含采用实验性约定的 Cordis 插件和运行时库。除发布策略排除的包外，组内包随 dsh 发布家族发布；发布不代表稳定性或支持承诺。组内包仍须满足与发布包相同的工程、安全、文档、生命周期、测试和快照要求。
 
 | 包 | 职责 | ctx key |
 |---|---|---|
@@ -15,7 +15,7 @@ kind: "package-group"
 | `tool-agent-team/` | 按 Agent 作用域提供的 Agent Teams 模型工具与协作指引 | — |
 | [`ptc-runtime-python/`](ptc-runtime-python/README.zh.md) | 代码执行 seam 的 CPython 子进程后端 | `ctx.ptcRuntime` |
 
-[子树规则](AGENTS.md)规定依赖隔离、发布排除与 promotion。
+[子树规则](AGENTS.md)规定依赖隔离、发布策略与 promotion。
 
 [Agent Teams 子系统页](../../docs/subsystems/agent-team.zh.md)负责持久 Team 类型与 `ctx.agentTeams` 服务 API。
 

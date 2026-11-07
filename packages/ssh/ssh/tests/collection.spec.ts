@@ -49,7 +49,7 @@ describe.skipIf(process.platform === 'win32')('SSH collected output', () => {
     let spill: string | undefined
     try {
       const bytes = Buffer.from([0x61, 0x62, 0x63, 0x64, 0xff, 0x65, 0x66, 0x67])
-      const handle = ctx.subprocess.spawn({
+      const handle = await ctx.subprocess.spawn({
         argv: [process.execPath, '-e', `process.stdout.write(Buffer.from(${JSON.stringify([...bytes])}))`], cwd: helper.root, graceMs: 500,
         stdio: { stdin: 'ignore', stdout: { maxBytes: 4, spill: { maxBytes: 16 } }, stderr: { maxBytes: 8 } },
       })

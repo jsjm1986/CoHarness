@@ -1,0 +1,14 @@
+{
+  "name": "perplexity-native-policy-before",
+  "cwd": ".",
+  "command": "node --import ./.agents/audits/.local/native-policy-built-peers.mjs .agents/audits/.local/reproduce-perplexity-policy.mjs",
+  "startedAt": "2026-10-24T07:28:16.662422+00:00",
+  "seconds": 0.517,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b4b41fde1551170987bb07c9e670e15d5f9c5fdd1cf50ba7ea494acb267f816e",
+  "inputsAfter": "b4b41fde1551170987bb07c9e670e15d5f9c5fdd1cf50ba7ea494acb267f816e",
+  "postgresToolDirectory": null,
+  "outputSha256": "f6634122811936e2d8fb10f330252954b429aba478b23dd8732bfdfae59596c7",
+  "outputTail": "{\"policyAllowsRoute\":false,\"requests\":1,\"admissions\":0,\"usageRecords\":0,\"sources\":1}\n"
+}

@@ -3,15 +3,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError,
 } from '../src/client/userdoc-client.ts'
-import { UserDocDirectoryId, type UserDocIdType } from '@deepseek-ai/dsh-userdoc'
+import { UserDocDirectoryId, type UserDocIdType, type UserDocScope } from '@deepseek-ai/dsh-userdoc'
 
 const rootDirectoryId = UserDocDirectoryId('')
 
 const ref = {
   docId: '2026-08-17/a.txt' as UserDocIdType,
+  path: '',
   name: 'a.txt',
   bytes: 1,
   mediaType: 'text/plain',
+  modifiedAt: 1,
 }
 
 interface MockXhr {
@@ -238,6 +240,23 @@ describe('createUserDocClient', () => {
     ])
   })
 
+  it('addresses the exact trash action when restoring and purging', async () => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      calls.push(url)
+      return { ok: true, text: async () => JSON.stringify({ version: 1, document: ref }) }
+    }))
+    const client = createUserDocClient()
+    const trashId = '11111111-1111-4111-8111-111111111111'
+    await client.restore(ref.docId, undefined, undefined, undefined, trashId)
+    await client.purge(ref.docId, undefined, trashId)
+    expect(calls).toEqual([
+      `/api/documents/restore?id=${encodeURIComponent(ref.docId)}&trashId=${trashId}`,
+      `/api/documents/purge?id=${encodeURIComponent(ref.docId)}&trashId=${trashId}`,
+    ])
+  })
+
   it('uploads one resumable chunk and reports byte progress', async () => {
     const loaded: number[] = []
     const session = {
@@ -245,7 +264,8 @@ describe('createUserDocClient', () => {
       name: 'a.txt', directoryId: '', bytes: 5, fingerprint: 'fingerprint', chunkBytes: 65536,
       receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
     }
-    const complete = { ...session, receivedBytes: 5, state: 'complete', ref }
+    const uploaded = { ...ref, bytes: 5 }
+    const complete = { ...session, receivedBytes: 5, state: 'complete', ref: uploaded }
     const calls: Array<{ url: string; method: string }> = []
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
@@ -265,7 +285,7 @@ describe('createUserDocClient', () => {
     const result = await createUserDocClient().upload(new File(['hello'], 'a.txt'), rootDirectoryId, undefined, (value) => {
       loaded.push(value)
     })
-    expect(result).toEqual(ref)
+    expect(result).toEqual(uploaded)
     expect(loaded).toContain(4)
     expect(loaded.at(-1)).toBe(5)
     expect(calls.map(call => call.method)).toEqual(['POST', 'POST'])
@@ -325,6 +345,44 @@ describe('createUserDocClient', () => {
       expect(url.searchParams.get('dshPrincipal')).toBe('7')
       expect(url.searchParams.get('dshTarget')).toBe('personal')
       expect(url.searchParams.get('scope')).toBe(scoped ? 'project:41' : null)
+    }
+    expect(urls[1]!.pathname).toContain('/chunks/')
+  })
+
+  it.each(['personal', 'project'] as const)('keeps a %s upload at its captured computer through every transport', async (kind) => {
+    const session = {
+      uploadId: '00000000-0000-4000-8000-000000000012',
+      name: 'a.txt', directoryId: '', bytes: 1, fingerprint: 'fingerprint', chunkBytes: 65536,
+      receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
+    }
+    const complete = { ...session, receivedBytes: 1, state: 'complete', ref }
+    const nodeA = 'computer-a' as NonNullable<UserDocScope['nodeId']>
+    const nodeB = 'computer-b' as NonNullable<UserDocScope['nodeId']>
+    let location: UserDocScope = kind === 'personal'
+      ? { kind, nodeId: nodeA } : { kind, projectId: 41, nodeId: nodeA }
+    const urls: URL[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(typeof input === 'string' ? input : 'url' in input ? input.url : input.href, 'http://fixture')
+      urls.push(url)
+      location = { kind: 'personal', nodeId: nodeB }
+      return { ok: true, status: 200, text: async () => JSON.stringify(url.pathname.endsWith('/complete') ? complete : session) }
+    }))
+    installXhr((xhr) => {
+      xhr.open = vi.fn((_method: string, url: string) => { urls.push(new URL(url, 'http://fixture')) })
+      xhr.send = vi.fn(function send(this: MockXhr) { this.status = 200; this.responseText = '{}'; this.onload?.() })
+    })
+    const client = createUserDocClient((path) => {
+      const url = new URL(path, 'http://fixture')
+      url.searchParams.set('dshPrincipal', '7')
+      return `${url.pathname}${url.search}`
+    }, () => location)
+    await client.upload(new File(['x'], 'a.txt'), rootDirectoryId)
+    expect(urls).toHaveLength(3)
+    for (const url of urls) {
+      expect(url.pathname).toMatch(/^\/api\/documents\/transfer\/uploads(?:\/|$)/u)
+      expect(url.searchParams.get('scope')).toBe(kind === 'personal' ? 'personal' : 'project:41')
+      expect(url.searchParams.get('dshNode')).toBe('computer-a')
+      expect(url.searchParams.get('dshPrincipal')).toBe('7')
     }
     expect(urls[1]!.pathname).toContain('/chunks/')
   })

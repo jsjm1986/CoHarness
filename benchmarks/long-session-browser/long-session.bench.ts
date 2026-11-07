@@ -131,7 +131,7 @@ it('waits for visible marker text in the latest Assistant step', async () => {
 
 it('opens, pages, navigates and streams into a 240-turn browser history', async () => {
   if (webSnapshotMode() !== 'replay') throw new Error('browser benchmarks require keyless replay mode')
-  const samples: { open: number; page: number; trajectory: number; first: number; streamTask: number; streamWall: number; input: number; inputOverlapped: boolean; heapMb: number; nodes: number }[] = []
+  const samples: { startup: number; returnToChat: number; open: number; page: number; trajectory: number; first: number; streamTask: number; streamWall: number; input: number; inputOverlapped: boolean; heapMb: number; nodes: number }[] = []
   for (let sample = 0; sample < SAMPLES; sample++) {
     const failures: unknown[] = []
     const root = await mkdtemp(join(tmpdir(), 'dsh-browser-benchmark-'))
@@ -148,7 +148,11 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           const page = await newEnglishPage(browser)
           const consoleWatch = watchConsole(page)
           page.setDefaultTimeout(30000)
-          await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+          const startup = await measure(page, async () => {
+            await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+            await page.waitForSelector('[class*="frame"]')
+            await page.getByRole('treeitem').first().waitFor()
+          })
           expect(new URL(page.url()).origin).toBe(scaffold.baseUrl)
           console.log(JSON.stringify({ benchmark: 'long-session-browser/server', url: scaffold.baseUrl, browser: browser.version(), sample }))
           await page.waitForSelector('[class*="frame"]')
@@ -187,8 +191,10 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
             await page.getByRole('searchbox', { name: 'Search trajectory', exact: true }).waitFor()
             await page.getByRole('row').last().waitFor()
           })
-          await page.getByRole('tab', { name: 'Chat', exact: true }).click()
-          await page.waitForFunction(({ selector, expected }) => document.querySelectorAll(selector).length === expected, { selector: TAIL, expected: HISTORY_TURNS })
+          const returnToChat = await measure(page, async () => {
+            await page.getByRole('tab', { name: 'Chat', exact: true }).click()
+            await page.waitForFunction(({ selector, expected }) => document.querySelectorAll(selector).length === expected, { selector: TAIL, expected: HISTORY_TURNS })
+          })
           const composer = page.locator('textarea:enabled').last()
           await composer.fill('Continue the synthetic review and summarize the validation. '.repeat(30))
           const cdp = await page.context().newCDPSession(page)
@@ -227,7 +233,7 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           const metrics = (await cdp.send('Performance.getMetrics')).metrics
           const heap = metrics.find(metric => metric.name === 'JSHeapUsedSize')
           if (heap === undefined) throw new Error('Chromium heap metric missing')
-          samples.push({ open, page: Math.max(...pages), trajectory, first, streamTask, streamWall, input, inputOverlapped, heapMb: heap.value / 1048576, nodes: await page.locator('*').count() })
+          samples.push({ startup, returnToChat, open, page: Math.max(...pages), trajectory, first, streamTask, streamWall, input, inputOverlapped, heapMb: heap.value / 1048576, nodes: await page.locator('*').count() })
           console.log(JSON.stringify({ benchmark: 'long-session-browser/sample', sample, initialTurns, pages, ...samples.at(-1) }))
           await watchInputOverlap(composer)
           await composer.click()
@@ -253,6 +259,7 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
     ...Object.fromEntries(Object.entries(REFERENCE).map(([key, value]) => [key, ciTimeBudget(value) + (key === 'streamWall' ? REPLAY_DURATION_MS : 0)])),
     open: OPEN_BUDGET_MS, page: PAGE_BUDGET_MS, trajectory: TRAJECTORY_BUDGET_MS,
   }
+  console.log(JSON.stringify({ benchmark: 'long-session-browser/diagnostic', startup: median(samples.map(sample => sample.startup)), returnToChat: median(samples.map(sample => sample.returnToChat)) }))
   console.log(JSON.stringify({ benchmark: 'long-session-browser/median', turns: HISTORY_TURNS, deltas: DELTAS, paceMs: PACE_MS, samples, aggregate, referenceMs: REFERENCE, expectedOpenCiMs: EXPECTED_OPEN_CI_MS, expectedPageCiMs: EXPECTED_PAGE_CI_MS, expectedTrajectoryCiMs: EXPECTED_TRAJECTORY_CI_MS, budgets }))
   for (const [key, value] of Object.entries(aggregate)) expectEndpointWithinBudget(value, budgets[key]!)
 })

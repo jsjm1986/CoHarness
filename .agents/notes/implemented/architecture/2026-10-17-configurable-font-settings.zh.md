@@ -20,6 +20,8 @@ Status: implemented
 
 **作用域 decode 解析账户裸层。** `account-or-host` 绑定声明 `decode: decodeThemeSection`,将每份 section 经 `ThemeSettingsSchema` 解析。账户偏好镜像可能发布早于字体字段的 section(其 `ui-theme` 白名单仅含 `preference`),而复合合并在 Host 层尚未就绪时会把这份裸 section 透出;schema 解析会补齐缺失字段,使两条通道上的 `getSnapshot().value` 都维持文档所述的"schema 解析后 section"契约([字段路由](../bug-fix/2026-10-03-account-or-host-field-routing.zh.md))。
 
+Gateway 连接通过[账号字体偏好存储](../bug-fix/2026-11-01-account-font-preferences.zh.md)持久化六项字段。选定的设置 scope 持有该账号 transport；独立部署保留 Host 持久化。字体规范化、呈现、快捷键和待定写入栅栏仍由主题插件负责。
+
 ## Alternatives considered
 
 **在消费端容忍缺字段。** 在 `durableFontFamilies` 与 `sectionFontSizes` 里读 `section.textFontFamily ?? ''` 会在读取点复制 schema 的默认表,并让每个后续消费方重新发现同一个缺口;在作用域边界解析才是该作用域已文档化的契约。

@@ -59,6 +59,7 @@ const sessionList: SessionList = {
   archivedById: {},
   current: SID,
   phase: 'ready',
+  state: 'idle', error: null,
   subagentsByParent: {},
   jobsBySession: {},
   observedJobs: {},

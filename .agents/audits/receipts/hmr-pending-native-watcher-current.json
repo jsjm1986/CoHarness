@@ -1,0 +1,14 @@
+{
+  "name": "hmr-pending-native-watcher-current",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/boot/hmr/tests/watch-config.spec.ts --coverage --coverage.include=packages/boot/hmr/src/watch-config.ts --coverage.reportsDirectory=.agents/audits/.local/hmr-pending-ready-coverage --coverage.reporter=text --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T02:21:57.166460+00:00",
+  "seconds": 35.148,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "43555581c029bad4460fc4ef7b5c6469196399874eb313242ceb480a3cf6d9e6",
+  "inputsAfter": "43555581c029bad4460fc4ef7b5c6469196399874eb313242ceb480a3cf6d9e6",
+  "postgresToolDirectory": null,
+  "outputSha256": "497e29715e37de690a41f101626c9420434b623896117ce760761c06006edbee",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  1 passed (1)\n      Tests  20 passed (20)\n   Start at  10:22:10\n   Duration  22.01s (transform 356ms, setup 45ms, import 432ms, tests 21.08s, environment 0ms)\n\n % Coverage report from v8\n-----------------|---------|----------|---------|---------|-------------------\nFile             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-----------------|---------|----------|---------|---------|-------------------\nAll files        |   98.71 |    96.29 |     100 |   98.36 |                   \n watch-config.ts |   98.71 |    96.29 |     100 |   98.36 | 105               \n-----------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 98.71% ( 77/78 )\nBranches     : 96.29% ( 26/27 )\nFunctions    : 100% ( 11/11 )\nLines        : 98.36% ( 60/61 )\n================================================================================\nERROR: Coverage for lines (98.36%) does not meet global threshold (100%) for packages/boot/hmr/src/watch-config.ts\nERROR: Coverage for statements (98.71%) does not meet global threshold (100%) for packages/boot/hmr/src/watch-config.ts\nERROR: Coverage for branches (96.29%) does not meet global threshold (100%) for packages/boot/hmr/src/watch-config.ts\n"
+}

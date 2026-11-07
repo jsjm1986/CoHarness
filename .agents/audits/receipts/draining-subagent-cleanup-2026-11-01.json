@@ -1,0 +1,213 @@
+{
+  "finding": "B442",
+  "status": "fixed_verified_named_active_scope_drain_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T12:22:23.404789+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-origin.json",
+    "fetchCompletedAt": "2026-11-01T12:14:50.969396+00:00"
+  },
+  "problem": "A single disposal snapshot misses a second failed foreground run handed back while the first cleanup is awaited; the sibling-owned idle-release listener disappears before physical resources settle. Source and original built SDK probes leave the second native response open, and replacement can allocate before it closes.",
+  "fix": "One explicitly composed effect owns the exact listener disposer and the asynchronous adopted-run drain. It drains newly adopted failures after every awaited batch, keeps the listener through the active drain and removes it in finally on both success and reported failure. Holder-owned background runs remain with their controllers.",
+  "verification": {
+    "distinctBusinessCases": 735,
+    "relatedPackageCases": 731,
+    "newUnitCases": 3,
+    "typescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "versionRepeatsAndSubsetsNotAdded": true,
+    "checks": [
+      {
+        "name": "draining-final-regression",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-regression.json"
+      },
+      {
+        "name": "draining-final-unit",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-unit.json"
+      },
+      {
+        "name": "draining-final-source-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-source-sdk.json"
+      },
+      {
+        "name": "draining-final-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-node22.json"
+      },
+      {
+        "name": "draining-final-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-node24.json"
+      },
+      {
+        "name": "draining-final-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-python-sdk.json"
+      },
+      {
+        "name": "draining-final-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-build.json"
+      },
+      {
+        "name": "draining-final-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-host-types.json"
+      },
+      {
+        "name": "draining-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-export-docs.json"
+      },
+      {
+        "name": "draining-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-config.json"
+      },
+      {
+        "name": "draining-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-doc-quick.json"
+      },
+      {
+        "name": "draining-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-python-lint.json"
+      },
+      {
+        "name": "draining-lint-post-type-fix",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-lint-post-type-fix.json"
+      },
+      {
+        "name": "draining-test-preservation",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-test-preservation.json"
+      },
+      {
+        "name": "draining-owned-index-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-owned-index-coverage.json"
+      },
+      {
+        "name": "draining-origin",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-origin.json"
+      },
+      {
+        "name": "draining-old-source",
+        "status": "expected_original_business_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-old-source.json"
+      },
+      {
+        "name": "draining-original-built-resolved",
+        "status": "expected_original_business_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-original-built-resolved.json"
+      },
+      {
+        "name": "draining-entry-debt-measurement",
+        "status": "failed_existing_file_coverage_debt_recorded",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-entry-debt-measurement.json",
+        "details": "All469 Core cases pass. A private diagnostic removes only the existing index baseline exclusion, retains every100% threshold and records index91.55/85.71/96.55/91.91. Repository coverage policy is unchanged."
+      },
+      {
+        "name": "draining-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-final-repository-references.json"
+      }
+    ],
+    "changedEntryCoverage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/changed-entry-coverage.json",
+    "helperCoverage": "run-lease.ts100% all4 metrics;27statements/10branches/11functions/21lines.",
+    "existingEntryCoverageDebt": {
+      "lines": {
+        "total": 198,
+        "covered": 182,
+        "skipped": 0,
+        "pct": 91.91
+      },
+      "functions": {
+        "total": 58,
+        "covered": 56,
+        "skipped": 0,
+        "pct": 96.55
+      },
+      "statements": {
+        "total": 225,
+        "covered": 206,
+        "skipped": 0,
+        "pct": 91.55
+      },
+      "branches": {
+        "total": 112,
+        "covered": 96,
+        "skipped": 0,
+        "pct": 85.71
+      }
+    },
+    "entryMeasurementReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-entry-debt-measurement.json",
+    "entryExclusionWasNotChanged": true,
+    "originalGraph": "192-file frozen Core package; original source index and built index hash-match B441. Its declared workspace dependency symlink was restored after an initial built probe failed module resolution; only the later exact business assertion failures count as counterfactual evidence.",
+    "preservedTests": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/test-preservation.json",
+    "otherUnchangedTestFiles": 13,
+    "nativeCases": "Actual two open loopback HTTP response streams; SDK stdio/Loader profile; explicit cleanup barrier; parent idle veto while draining; confirmed original release and physical connection closure before service withdrawal returns and before replacement allocation.",
+    "retainedFailedAttempts": [
+      "draining-cleanup-before",
+      "draining-idle-before",
+      "draining-types-lint",
+      "draining-host-types",
+      "draining-old-built-node22"
+    ],
+    "limitations": "No claim of repository-wide coverage, all service-lifetime safety, cross-computer production acceptance or official Responses verification."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/draining-cleanup-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.zh.md",
+    "apps/cli/tests/profiles/sdk/draining-subagent-cleanup.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/draining-subagent-cleanup/expected.json",
+    "examples/headless-agent/tests/fixtures/draining-subagent-cleanup/model.mjs",
+    "examples/headless-agent/tests/fixtures/draining-subagent-cleanup/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/draining-subagent-cleanup/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/draining-subagent-cleanup/runtime.mjs",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent/src/index.ts",
+    "packages/subagent/subagent/tests/run-cleanup.spec.ts",
+    "python/sdk/tests/test_draining_subagent_cleanup_expected.py"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 170,
+  "artifactReferences": {
+    "packages/subagent/subagent/lib/index.js": "0e460f78b188306c7f84bd4bd45e31b8a3118368d6516a73aacea59b8332f55f",
+    "packages/subagent/subagent/lib/types/index.js": "45e456a0fa22f577e9681f20f69e0c434141f5302ff05f1fa80ad1554a0e21dc",
+    "packages/subagent/subagent/lib/types/index.d.ts": "76b97250d33a5bc855aeeb52f5e8366ab2012c8f8ea350a33b055b54773fbfb3",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+  },
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/note-review.json",
+  "remaining": [
+    "All12 domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue hand-back after completed service disposal, in-flight start/withdrawal and persistent failed teardown ownership. B442 proves transfers during an active drain and listener ordering, not all late callers or failed shutdown recovery.",
+    "Existing Subagent index coverage debt remains open: statements91.55%, branches85.71%, functions96.55%, lines91.91% under a private measurement with unchanged100% thresholds. Every measured statement/function/branch in the changed constructor section was hit. Do not remove its baseline entry until the complete file reaches the gate.",
+    "Continue remaining Workflow/Ralph failures, queued continuation and permission transitions, model/tool/Inspector admission and authorization, account/computer isolation, documents/runtime business rules and remaining file/platform coverage outside peer-reserved surfaces.",
+    "The B416-B442 index records per-batch verified deltas, not an assembled release or production acceptance. Preserve B417 matching required-on-read writers/readers/SDKs, header7 and committed Session generations; no old-reader downgrade.",
+    "Latest trusted peer report remains live R26/schema103, R27 tests only, frozen R28 HTML refusal candidate not deployed. Gateway html/server, corresponding tests/browser/docs and earlier reserved UI files remain peer-owned; no production mutation or repeated peer question.",
+    "Official Responses real-interface verification remains explicitly deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T120750Z/B416-B442-integration-index.json"
+}

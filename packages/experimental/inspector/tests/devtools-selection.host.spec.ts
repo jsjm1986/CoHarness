@@ -8,12 +8,16 @@ const bootstrap = readFileSync(new URL('../assets/devtools/connect.js', import.m
 
 it('keeps an absent selector global and decodes one selected Client', () => {
   expect(readInspectorClientSelection(new URL('http://inspector/cdp'))).toBeUndefined()
+  expect(readInspectorClientSelection(new URL('http://inspector/cdp?sourceScope=host'))).toBeNull()
   const url = new URL('http://inspector/cdp')
   url.searchParams.set(INSPECTOR_CLIENT_QUERY, 'client/page?x=1&y=2')
   expect(readInspectorClientSelection(url)).toBe('client/page?x=1&y=2')
 })
 
-it.each(['clientSourceId=', 'clientSourceId=a&clientSourceId=b', `clientSourceId=${'x'.repeat(257)}`])(
+it.each([
+  'clientSourceId=', 'clientSourceId=a&clientSourceId=b', `clientSourceId=${'x'.repeat(257)}`,
+  'sourceScope=', 'sourceScope=client', 'sourceScope=host&sourceScope=host', 'sourceScope=host&clientSourceId=a',
+])(
   'rejects malformed selections instead of opening a global connection: %s', (query) => {
     expect(() => readInspectorClientSelection(new URL(`http://inspector/cdp?${query}`))).toThrow()
   },
@@ -32,6 +36,19 @@ it.each(['http', 'https'])('preserves the embedding Client selection and deploym
   expect(selected.pathname).toBe('/app/inspector/devtools/cdp')
   expect(readInspectorClientSelection(selected)).toBe('client/page?x=1&y=2')
   expect(preferences.get('disable-locale-info-bar')).toBe('true')
+})
+
+it.each(['http', 'https'])('forwards an explicit Host-only scope over %s', (protocol) => {
+  const location = new URL(`${protocol}://inspector/app/inspector/devtools/devtools_app.html?sourceScope=host`)
+  let result: URL | undefined
+  runInNewContext(bootstrap, { URL, window: {
+    location, history: { state: null, replaceState: (_state: null, _title: string, url: URL) => { result = url } },
+  } })
+  const selected = new URL(`${protocol === 'https' ? 'wss' : 'ws'}://${result!.searchParams.get(protocol === 'https' ? 'wss' : 'ws')}`)
+  expect(selected.pathname).toBe('/app/inspector/devtools/cdp')
+  expect(selected.searchParams.get('sourceScope')).toBe('host')
+  expect(selected.searchParams.has(INSPECTOR_CLIENT_QUERY)).toBe(false)
+  expect(readInspectorClientSelection(selected)).toBeNull()
 })
 
 it('keeps an explicit debugging endpoint unchanged', () => {

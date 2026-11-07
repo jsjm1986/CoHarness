@@ -1,4 +1,14 @@
+import { parseConversationSessionIdentity } from './session-identity.ts'
+import { parseConversationArchiveId, type ConversationArchiveId } from './archive-identity.ts'
 import { auditSummary } from './audit-summary.ts'
+import { RuntimeStartBlockedError, RuntimeStopError, RuntimeGenerationConflictError, type RuntimeTarget } from './instances.ts'
+import { RuntimeManagementError } from './runtime-management.ts'
+import { runtimeManagementApi } from './runtime-management-api.ts'
+import { RuntimeCatalogError } from './runtime-catalog.ts'
+import { RuntimeCapacityError } from './runtime-capacity.ts'
+import { RuntimeAccountError } from './launcher.ts'
+import { NodeResourceBudgetError } from './node-resource-budget.ts'
+import { PostgresCheckoutQueueFullError } from './postgres/database.ts'
 import type { AuditFamily } from './audit.ts'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -20,6 +30,7 @@ import type {
   ModelProviderProtocol,
   ModelProviderStatus,
   ModelSettingsPathOp,
+  RuntimeModelPolicy,
 } from './model-governance.ts'
 import { listProjectDirectories } from './project-directories.ts'
 import type { GrantMode } from './projects.ts'
@@ -39,8 +50,13 @@ import { WebhookReceiptError } from './postgres/webhook-delivery-service.ts'
 import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
 import { WebhookIntakeError } from './webhook-intake.ts'
 import { RemoteDesktopServiceError } from './remote-desktop-service.ts'
+import { inspectDesktopEnvironment } from '@deepseek-ai/dsh-native-command'
 import { SshTargetError } from './postgres/ssh-target-service.ts'
 import { NodeConfigurationError } from './node-config-store.ts'
+import { NodeAccessError } from './node-access.ts'
+import { DeploymentTopologyError } from './deployment-topology.ts'
+import { NodeServiceError } from './node-service-stream.ts'
+import { NodeChannelError } from './node-channel-protocol.ts'
 import { MaintenanceError } from './postgres/maintenance-service.ts'
 import { BackupError } from './postgres/backup-service.ts'
 import { DeploymentCommandError } from './deployment-commands.ts'
@@ -49,13 +65,28 @@ import { ResourceAccessError, resourcePolicyOwner } from './resource-access.ts'
 import { stewardPolicyOwner } from './steward-access.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 
+/** Resolve optional Admin coordinates without borrowing the target owner's personal authority. */
+async function selectedAdminRuntime(deps: GatewayDeps, actor: UserRow, req: IncomingMessage, target: RuntimeTarget, bodyId?: unknown): Promise<RuntimeTarget> {
+  const queryId = new URL(req.url ?? '/', 'http://admin').searchParams.get('dshRuntime')
+  const id = bodyId ?? queryId
+  if (id === null || id === undefined) return target
+  if (typeof id !== 'string' || bodyId !== undefined && queryId !== null && bodyId !== queryId) throw new RuntimeCatalogError(400, 'runtime-catalog/target-mismatch')
+  if (deps.runtimeCatalog?.resolveForAdministrator === undefined) throw new RuntimeCatalogError(503, 'runtime-catalog/unavailable')
+  const environment = await deps.runtimeCatalog.resolveForAdministrator(actor, id)
+  if (environment.owner.kind !== (target.kind === 'user' ? 'personal' : 'project') || environment.owner.id !== target.id) {
+    throw new RuntimeCatalogError(400, 'runtime-catalog/target-mismatch')
+  }
+  if (deps.nodeServiceIdentity !== undefined && environment.node.id !== deps.nodeServiceIdentity.nodeId) throw new RuntimeCatalogError(503, 'runtime-catalog/remote-unavailable')
+  return { ...target, runtimeId: environment.id }
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' })
   res.end(JSON.stringify(body))
 }
 
-function sendError(res: ServerResponse, status: number, error: string): void {
-  sendJson(res, status, { error })
+function sendError(res: ServerResponse, status: number, error: string, code?: string): void {
+  sendJson(res, status, { error, ...(code === undefined ? {} : { code }) })
 }
 
 function sendNoContent(res: ServerResponse): void {
@@ -107,13 +138,27 @@ async function mapInBatches<T, R>(
   return results as R[]
 }
 
-function mapError(error: unknown): { status: number; error: string } {
+function mapError(error: unknown): { status: number; error: string; code?: string } {
+  if (error instanceof RuntimeAccountError) return { status: error.status, error: error.message, code: error.code }
+  if (error instanceof RuntimeCatalogError) return { status: error.status, error: error.code, code: error.code }
+  if (error instanceof RuntimeGenerationConflictError) return { status: 409, error: error.message, code: error.code }
+  if (error instanceof RuntimeManagementError) return { status: error.status, error: error.code, code: error.code }
+  if (error instanceof PostgresCheckoutQueueFullError) return { status: 503,
+    error: 'The database is at capacity. Reload the current state before trying again.', code: error.code }
+  if (error instanceof RuntimeStopError) return { status: 503, error: 'runtime-stop-failed' }
+  if (error instanceof RuntimeStartBlockedError) return { status: error.code === 'INSTANCE_STOPPED' ? 409 : 503, error: error.message, code: error.code }
+  if (error instanceof RuntimeCapacityError) return { status: 503,
+    error: 'The server is at its Runtime capacity. Try again after another Runtime is released.', code: error.code }
+  if (error instanceof NodeResourceBudgetError) return { status: error.status, error: error.message, code: `resource-${error.reason}` }
   if (error instanceof WebhookReceiptError) return { status: error.status, error: error.message }
   if (error instanceof WebhookEndpointError) return { status: error.status, error: error.message }
   if (error instanceof WebhookIntakeError) return { status: error.status, error: error.message }
   if (error instanceof RemoteDesktopServiceError) return { status: error.status, error: error.message }
   if (error instanceof SshTargetError) return { status: error.status, error: error.message }
   if (error instanceof NodeConfigurationError) return { status: error.status, error: error.message }
+  if (error instanceof NodeAccessError) return { status: error.status, error: error.code }
+  if (error instanceof DeploymentTopologyError || error instanceof NodeServiceError) return { status: error.status, error: error.code }
+  if (error instanceof NodeChannelError) return { status: error.status, error: error.code }
   if (error instanceof MaintenanceError) return { status: error.status, error: error.message }
   if (error instanceof BackupError) return { status: error.status, error: error.message }
   if (error instanceof DeploymentCommandError) return { status: 500, error: 'deployment-command-failed' }
@@ -130,8 +175,11 @@ function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof Error && error.message === 'cannot-delete-self') {
     return { status: 409, error: 'cannot-delete-self' }
   }
-  if (error instanceof CollaborationDeniedError && error.code === 'visibility-locked') {
+  if (error instanceof CollaborationDeniedError && (error.code === 'visibility-locked' || error.code === 'steward-reserved')) {
     return { status: 409, error: error.code }
+  }
+  if (error instanceof CollaborationDeniedError && error.code === 'forbidden') {
+    return { status: 403, error: error.code }
   }
   if (error instanceof DesktopCoordinationError) {
     const status = error.code === 'not-found' ? 404 : error.code === 'forbidden' ? 403
@@ -168,7 +216,7 @@ function mapError(error: unknown): { status: number; error: string } {
 /**
  * JSON router for `/admin/api/*`. Other `/admin` paths return false so static hosting can serve them.
  * @param deps - users, projects, audit, instances
- * @returns admin handler that writes 200 JSON, 204, or `{ error }` at 400/404/409/413
+ * @returns admin handler that writes 200 JSON, 204, or readable `{ error }` with the owning service's failure status; Runtime admission also supplies `code`, with409 for conflicts and503 for unavailable capacity or authority.
  */
 export function createAdminApiHandler(
   deps: GatewayDeps,
@@ -183,7 +231,10 @@ export function createAdminApiHandler(
     } catch (error) {
       if (res.writableEnded) throw error
       const mapped = mapError(error)
-      if (mapped.status === 500) console.error('[gateway] admin api failed:', error)
+      if (mapped.status === 500 || error instanceof RuntimeStopError
+        || error instanceof RemoteDesktopServiceError && error.status === 503
+        || error instanceof NodeConfigurationError && error.status === 503
+        || error instanceof MaintenanceError && error.status === 503) console.error('[gateway] admin api failed:', error)
       if (req.method !== 'GET' && req.method !== 'HEAD') {
         // Mutating endpoints that throw leave no per-endpoint audit row; record the
         // failed attempt here so administrative denials and errors are never silent.
@@ -193,7 +244,7 @@ export function createAdminApiHandler(
           console.error('[gateway] admin api audit write failed:', auditError)
         }
       }
-      sendError(res, mapped.status, mapped.error)
+      sendError(res, mapped.status, mapped.error, mapped.code)
     }
     return true
   }
@@ -211,16 +262,46 @@ async function dispatch(
 ): Promise<boolean> {
   const method = req.method ?? 'GET'
   const ip = req.socket.remoteAddress ?? ''
+  if (pathname === '/admin/api/desktop-environment' && method === 'GET') {
+    res.setHeader('cache-control', 'no-store')
+    sendJson(res, 200, await inspectDesktopEnvironment())
+    return true
+  }
+  if (await runtimeManagementApi(deps, req, res, admin, pathname, body)) return true
+  if (pathname === '/admin/api/deployment/current-node' && method === 'GET') {
+    res.setHeader('cache-control', 'no-store')
+    if (deps.nodeServiceIdentity === undefined) { sendError(res, 503, 'node-service/unavailable'); return true }
+    sendJson(res, 200, { nodeId: deps.nodeServiceIdentity.nodeId, name: deps.cfg.computeNodeName,
+      forwardingEnabled: deps.topology === undefined ? deps.cfg.nodeService.forwarding : (await deps.topology.adminRead(admin)).scope === 'organization',
+      ...(deps.topology === undefined ? {} : { deployment: await deps.topology.adminRead(admin) }) })
+    return true
+  }
+  if (pathname === '/admin/api/deployment/node-connection') {
+    if (deps.nodeConnection === undefined) { sendError(res, 503, 'node-connection-unavailable'); return true }
+    res.setHeader('cache-control', 'no-store')
+    if (method === 'GET') sendJson(res, 200, await deps.nodeConnection.view(admin))
+    else if (method === 'POST') {
+      const request = parseObject(body)
+      const result = request.action === 'start' ? await deps.nodeConnection.start(admin)
+        : request.action === 'save' ? await deps.nodeConnection.save(admin, request.values)
+          : undefined
+      if (result === undefined) throw new NodeConfigurationError(400, 'node-connection-invalid-request')
+      await deps.audit.write({ userId: admin.id, action: `admin.deployment.node-connection.${String(request.action)}`,
+        detail: JSON.stringify({ revision: result.revision }), ip })
+      sendJson(res, 200, result)
+    } else { res.setHeader('allow', 'GET, POST'); sendError(res, 405, 'method-not-allowed') }
+    return true
+  }
   if (pathname === '/admin/api/deployment/configuration') {
     if (deps.nodeConfiguration === undefined) { sendError(res, 503, 'node-configuration-unavailable'); return true }
-    if (method === 'GET') { sendJson(res, 200, await deps.nodeConfiguration.view()); return true }
+    if (method === 'GET') { sendJson(res, 200, await deps.nodeConfiguration.view(admin.id)); return true }
     if (method !== 'POST') return false
     const input = parseObject(body)
     if (typeof input.organizationId !== 'string' || typeof input.nodeId !== 'string'
       || typeof input.revision !== 'number' || !Number.isSafeInteger(input.revision) || input.revision < 0) throw new NodeConfigurationError(400, 'node-configuration-identity-and-revision-required')
     const identity = { organizationId: input.organizationId, nodeId: input.nodeId }
     let result
-    if (input.action === 'save') result = await deps.nodeConfiguration.save(identity, input.revision, input.values)
+    if (input.action === 'save') result = await deps.nodeConfiguration.save(identity, input.revision, input.values, admin.id)
     else if (input.action === 'apply') result = await deps.nodeConfiguration.requestApply(identity, input.revision, admin.id)
     else throw new NodeConfigurationError(400, 'invalid-node-configuration-action')
     await deps.audit.write({ userId: admin.id, action: `admin.deployment.configuration.${input.action}`,
@@ -231,13 +312,13 @@ async function dispatch(
   if (pathname === '/admin/api/webhook-deliveries' && method === 'GET') {
     if (deps.webhookDeliveries === undefined) { sendError(res, 503, 'webhook-deliveries-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
-    sendJson(res, 200, await deps.webhookDeliveries.list(query.get('endpointId'), query.get('cursor') ?? undefined,
+    sendJson(res, 200, await deps.webhookDeliveries.list(admin.id, query.get('endpointId'), query.get('cursor') ?? undefined,
       query.has('limit') ? Number(query.get('limit')) : undefined))
     return true
   }
   if (pathname === '/admin/api/webhook-endpoints' && method === 'GET') {
     if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
-    sendJson(res, 200, { endpoints: await deps.webhookEndpoints.list() })
+    sendJson(res, 200, { endpoints: await deps.webhookEndpoints.list(admin.id) })
     return true
   }
   if (pathname === '/admin/api/webhook-endpoints' && method === 'POST') {
@@ -250,7 +331,7 @@ async function dispatch(
   }
   if (pathname === '/admin/api/webhook-endpoints/update' && method === 'POST') {
     if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
-    const endpoint = await deps.webhookEndpoints.update(parseObject(body))
+    const endpoint = await deps.webhookEndpoints.update(parseObject(body), admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-endpoints.update',
       detail: JSON.stringify({ targetId: endpoint.publicId, revision: endpoint.revision }), ip })
     sendJson(res, 200, endpoint)
@@ -259,7 +340,7 @@ async function dispatch(
   if (pathname === '/admin/api/webhook-endpoints/mutate' && method === 'POST') {
     if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
     const input = parseObject(body)
-    const endpoint = await deps.webhookEndpoints.mutate(input)
+    const endpoint = await deps.webhookEndpoints.mutate(input, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-endpoints.mutate',
       detail: JSON.stringify({ targetId: input.targetId, action: input.action }), ip })
     sendJson(res, 200, endpoint === null ? { removed: true } : endpoint)
@@ -268,7 +349,7 @@ async function dispatch(
   if (pathname === '/admin/api/webhook-deliveries/redispatch' && method === 'POST') {
     if (deps.webhookIntake === undefined) { sendError(res, 503, 'webhook-dispatch-unavailable'); return true }
     const input = parseObject(body)
-    const receipt = await deps.webhookIntake.redispatch(input.receiptId)
+    const receipt = await deps.webhookIntake.redispatch(input.receiptId, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-deliveries.redispatch',
       detail: JSON.stringify({ receiptId: input.receiptId, redispatchId: receipt.id, state: receipt.state }), ip })
     sendJson(res, 200, receipt)
@@ -277,12 +358,11 @@ async function dispatch(
 
   if (pathname === '/admin/api/deployment' && method === 'GET') {
     if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
-    const [state, plan, operations] = await Promise.all([
-      deps.maintenance.state(),
+    const [state, plan] = await Promise.all([
+      deps.maintenance.administration(admin.id),
       deps.migrationPlan?.() ?? Promise.resolve(undefined),
-      deps.maintenance.listOperations(20),
     ])
-    sendJson(res, 200, { ...state, migrations: plan ?? null, operations })
+    sendJson(res, 200, { ...state, migrations: plan ?? null })
     return true
   }
   if (pathname === '/admin/api/tunnel' && method === 'GET') {
@@ -329,12 +409,64 @@ async function dispatch(
     sendJson(res, 200, state)
     return true
   }
+  if (pathname === '/admin/api/deployment/nodes/access' && method === 'GET') {
+    res.setHeader('cache-control', 'no-store')
+    if (deps.nodeAccess === undefined) { sendError(res, 503, 'node-access/unavailable'); return true }
+    const query = new URL(req.url ?? pathname, 'http://gateway').searchParams
+    const cursor = query.get('cursor'), limit = query.get('limit')
+    sendJson(res, 200, await deps.nodeAccess.list(admin, { ...(cursor === null ? {} : { cursor }), ...(limit === null ? {} : { limit }) }))
+    return true
+  }
+  if (pathname === '/admin/api/deployment/nodes/enrollments' && method === 'POST') {
+    res.setHeader('cache-control', 'no-store')
+    if (deps.nodeAccess === undefined) { sendError(res, 503, 'node-access/unavailable'); return true }
+    const result = await deps.nodeAccess.issue(admin, parseObject(body))
+    await deps.audit.write({ userId: admin.id, action: 'admin.deployment.nodes.enrollment',
+      detail: JSON.stringify({ nodeId: result.nodeId, enrollmentId: result.enrollmentId, revision: result.revision }), ip })
+    sendJson(res, 201, result)
+    return true
+  }
+  const nodeProbe = /^\/admin\/api\/deployment\/nodes\/access\/([^/]+)\/probe$/u.exec(pathname)
+  if (nodeProbe !== null && method === 'POST') {
+    res.setHeader('cache-control', 'no-store')
+    if (deps.nodeChannels === undefined) { sendError(res, 503, 'node-channel/unavailable'); return true }
+    const cancellation = new AbortController()
+    const cancel = () => { if (!res.writableFinished) cancellation.abort() }
+    res.once('close', cancel)
+    try {
+      const info = await deps.nodeChannels.probe(admin, nodeProbe[1]!, cancellation.signal)
+      if (!res.destroyed) sendJson(res, 200, info)
+    } catch (error) {
+      if (!(error instanceof NodeChannelError && error.code === 'node-channel/cancelled' && res.destroyed)) throw error
+    } finally { res.removeListener('close', cancel) }
+    return true
+  }
+  const nodeAccess = /^\/admin\/api\/deployment\/nodes\/access\/([^/]+)$/u.exec(pathname)
+  if (nodeAccess !== null && method === 'POST') {
+    res.setHeader('cache-control', 'no-store')
+    if (deps.nodeAccess === undefined) { sendError(res, 503, 'node-access/unavailable'); return true }
+    const input = parseObject(body)
+    if (input.action === 'detach' && deps.nodeServices?.pauseIdle === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
+    if (input.action === 'detach') await deps.nodeServiceProxy?.closeIdle?.(nodeAccess[1]! as import('./runtime-catalog.ts').RuntimeNodeId)
+    const resume = input.action === 'detach' ? deps.nodeServices?.pauseIdle?.(nodeAccess[1]! as import('./runtime-catalog.ts').RuntimeNodeId) : undefined
+    let result
+    try {
+      result = await deps.nodeAccess.mutate(admin, nodeAccess[1]!, input)
+      deps.nodeChannels?.revoke(result.nodeId)
+      deps.nodeServices?.revoke(result.nodeId)
+    } finally { resume?.() }
+    await deps.audit.write({ userId: admin.id, action: 'admin.deployment.nodes.access',
+      detail: JSON.stringify({ nodeId: result.nodeId, revision: result.revision, action: 'token' in result ? 'issue-enrollment' : result.status }), ip })
+    sendJson(res, 200, result)
+    return true
+  }
   if (pathname === '/admin/api/deployment/nodes/status' && method === 'POST') {
     if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
     const input = parseObject(body)
     const nodeId = str(input, 'nodeId')
     const status = str(input, 'status')
     if (nodeId === undefined) throw new MaintenanceError(400, 'node-id-required')
+    await deps.topology?.assertNode(nodeId)
     const node = await deps.maintenance.setNodeStatus(admin.id, nodeId,
       status === 'draining' ? 'draining' : status === 'offline' ? 'offline' : status === 'active' ? 'active'
         : (() => { throw new MaintenanceError(400, 'invalid-node-status') })())
@@ -344,16 +476,13 @@ async function dispatch(
     return true
   }
   if (pathname === '/admin/api/deployment/restore' && method === 'POST') {
-    if (deps.maintenance === undefined || deps.backups === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
     const input = parseObject(body)
     const backupId = str(input, 'backupId')
     if (backupId === undefined) throw new MaintenanceError(400, 'backup-id-required')
-    const backup = await deps.backups.get(backupId)
-    if (backup.status !== 'verified' && backup.status !== 'restored') throw new MaintenanceError(409, 'backup-not-verified')
-    if (backup.managedSnapshot === null || backup.sha256 === null) throw new MaintenanceError(409, 'backup-lacks-complete-managed-data-manifest')
-    const operation = await deps.maintenance.requestRestore(admin.id, backup.id)
+    const operation = await deps.maintenance.requestRestore(admin.id, backupId)
     await deps.audit.write({ userId: admin.id, action: 'admin.deployment.restore.request',
-      detail: JSON.stringify({ backupId: backup.id, operationId: operation.id, status: operation.status }), ip })
+      detail: JSON.stringify({ backupId, operationId: operation.id, status: operation.status }), ip })
     sendJson(res, 200, operation)
     return true
   }
@@ -375,6 +504,7 @@ async function dispatch(
     const input = parseObject(body)
     const id = str(input, 'id')
     if (id === undefined) throw new BackupError(400, 'backup-id-required')
+    if (!/^[0-9a-f-]{36}$/iu.test(id)) throw new BackupError(400, 'invalid-backup-id')
     const record = await deps.backupWork.verify(id)
     await deps.audit.write({ userId: admin.id, action: 'admin.backups.verify',
       detail: JSON.stringify({ backupId: id, status: record.status }), ip })
@@ -411,7 +541,7 @@ async function dispatch(
     return true
   }
 
-  if (pathname === '/admin/api/archives' && method === 'GET') {
+  if (pathname === '/admin/api/archives/records' && method === 'GET') {
     if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
     const query = new URL(req.url ?? '/', 'http://admin').searchParams
     const number = (key: string, minimum = 0): number | undefined => {
@@ -447,7 +577,7 @@ async function dispatch(
       ...(from === undefined ? {} : { fromMs: from }), ...(to === undefined ? {} : { toMs: to }),
       ...(limit === undefined ? {} : { limit }), ...(offset === undefined ? {} : { offset }),
     }
-    sendJson(res, 200, await deps.archives.adminList(filter))
+    sendJson(res, 200, await deps.archives.adminList(filter, admin.id))
     await write('admin.archives.list', { filter: { ...filter, query: filter.query === undefined ? undefined : '[provided]' } })
     return true
   }
@@ -468,7 +598,7 @@ async function dispatch(
     const preview = await deps.archives.previewEmptyDrafts({
       ...(ageMs === undefined ? {} : { olderThanMs: ageMs }),
       ...(limit === undefined ? {} : { limit }),
-    })
+    }, admin.id)
     sendJson(res, 200, preview)
     await write('admin.archives.empty-drafts.preview', { count: preview.candidates.length, cutoff: preview.cutoff })
     return true
@@ -479,49 +609,55 @@ async function dispatch(
       sendError(res, 503, 'conversation-archive-unavailable'); return true
     }
     const input = parseObject(body)
-    const ids = input.ids
+    const rawSessions = input.sessions
+    const sessions = Array.isArray(rawSessions) ? rawSessions.map(parseConversationSessionIdentity) : []
     const cutoff = input.cutoff
-    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 200
-      || !ids.every(id => typeof id === 'string' && id !== '')
+    if (!Array.isArray(rawSessions) || sessions.length === 0 || sessions.length > 200
+      || sessions.some(session => session === undefined)
+      || new Set(sessions.map(session => JSON.stringify(session))).size !== sessions.length
       || (cutoff !== undefined
         && (typeof cutoff !== 'number' || !Number.isSafeInteger(cutoff) || cutoff < 0 || cutoff > Date.now()))) {
       sendError(res, 400, 'invalid empty-draft batch'); return true
     }
-    const trashed = await deps.archives.trashEmptyDrafts(ids as string[], admin.id, cutoff as number | undefined)
-    await write('admin.archives.empty-drafts.trash', { requested: ids.length, trashed: trashed.length })
+    const trashed = await deps.archives.trashEmptyDrafts(sessions as NonNullable<typeof sessions[number]>[], admin.id, cutoff as number | undefined)
+    await write('admin.archives.empty-drafts.trash', { requested: sessions.length, trashed: trashed.length })
     sendJson(res, 200, { trashed })
     return true
   }
 
-  const archiveStatusPath = /^\/admin\/api\/archives\/([^/]+)\/status$/.exec(pathname)
+  const archiveStatusPath = /^\/admin\/api\/archives\/records\/([^/]+)\/status$/.exec(pathname)
   if (archiveStatusPath !== null && method === 'GET') {
     if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
-    const record = await deps.archives.status(decodeURIComponent(archiveStatusPath[1] ?? ''))
+    const archiveId = parseConversationArchiveId(archiveStatusPath[1])
+    if (archiveId === undefined) { sendError(res, 400, 'invalid archive identity'); return true }
+    const record = await deps.archives.status(archiveId, admin.id)
     if (record === null) { sendError(res, 404, 'archive not found'); return true }
     sendJson(res, 200, record)
     return true
   }
 
-  const archivePath = /^\/admin\/api\/archives\/([^/]+)$/.exec(pathname)
-  const archiveExportPath = /^\/admin\/api\/archives\/([^/]+)\/export$/.exec(pathname)
+  const archivePath = /^\/admin\/api\/archives\/records\/([^/]+)$/.exec(pathname)
+  const archiveExportPath = /^\/admin\/api\/archives\/records\/([^/]+)\/export$/.exec(pathname)
   if (archiveExportPath !== null && method === 'GET') {
     if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
-    const rootSessionId = decodeURIComponent(archiveExportPath[1] ?? '')
+    const archiveId = parseConversationArchiveId(archiveExportPath[1])
+    if (archiveId === undefined) { sendError(res, 400, 'invalid archive identity'); return true }
     const detail = deps.archives.exportDetail === undefined
-      ? await deps.archives.detail(rootSessionId, 0, 100_000)
-      : await deps.archives.exportDetail(rootSessionId)
+      ? await deps.archives.detail(archiveId, 0, 100_000, admin.id)
+      : await deps.archives.exportDetail(archiveId, admin.id)
     if (detail === null) { sendError(res, 404, 'archive not found'); return true }
     res.writeHead(200, {
       'content-type': 'application/json; charset=utf-8',
-      'content-disposition': `attachment; filename="${rootSessionId.replace(/[^A-Za-z0-9._-]/g, '_')}.json"`,
+      'content-disposition': `attachment; filename="${archiveId}.json"`,
     })
     res.end(JSON.stringify(detail))
-    await write('admin.archives.export', { rootSessionId })
+    await write('admin.archives.export', { archiveId, rootSessionId: detail.record.rootSessionId })
     return true
   }
   if (archivePath !== null && method === 'GET') {
     if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
-    const rootSessionId = decodeURIComponent(archivePath[1] ?? '')
+    const archiveId = parseConversationArchiveId(archivePath[1])
+    if (archiveId === undefined) { sendError(res, 400, 'invalid archive identity'); return true }
     const fromSeq = new URL(req.url ?? '/', 'http://admin').searchParams.get('fromSeq')
     const limit = new URL(req.url ?? '/', 'http://admin').searchParams.get('limit')
     const parsedFrom = fromSeq === null ? 0 : Number(fromSeq)
@@ -529,18 +665,18 @@ async function dispatch(
     if (!Number.isSafeInteger(parsedFrom) || parsedFrom < 0 || !Number.isSafeInteger(parsedLimit) || parsedLimit < 1) {
       sendError(res, 400, 'invalid archive detail pagination'); return true
     }
-    const detail = await deps.archives.detail(rootSessionId, parsedFrom, parsedLimit)
+    const detail = await deps.archives.detail(archiveId, parsedFrom, parsedLimit, admin.id)
     if (detail === null) { sendError(res, 404, 'archive not found'); return true }
     sendJson(res, 200, detail)
-    await write('admin.archives.view', { rootSessionId })
+    await write('admin.archives.view', { archiveId, rootSessionId: detail.record.rootSessionId })
     return true
   }
 
-  if (pathname === '/admin/api/archives/actions' && method === 'POST') {
+  if (pathname === '/admin/api/archives/records/actions' && method === 'POST') {
     if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
     const input = parseObject(body)
     const action = input.action
-    const ids = input.ids
+    const ids = input.archiveIds
     const idempotencyKey = input.idempotencyKey
     if ((action !== 'restore' && action !== 'trash' && action !== 'purge' && action !== 'settle')
       || !Array.isArray(ids) || ids.length === 0 || ids.length > 50
@@ -548,23 +684,27 @@ async function dispatch(
       || (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey === ''))) {
       sendError(res, 400, 'invalid archive action'); return true
     }
-    const results: Array<{ rootSessionId: string; ok: boolean; error?: string }> = []
-    for (const rootSessionId of ids as string[]) {
+    const archiveIds = ids.map(parseConversationArchiveId)
+    if (archiveIds.some(id => id === undefined) || new Set(archiveIds).size !== archiveIds.length) {
+      sendError(res, 400, 'invalid archive identity'); return true
+    }
+    const results: Array<{ archiveId: ConversationArchiveId; ok: boolean; error?: string }> = []
+    for (const archiveId of archiveIds as ConversationArchiveId[]) {
       try {
         if (action === 'purge') {
-          const accepted = await deps.archives.purge(rootSessionId, admin.id, idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
+          const accepted = await deps.archives.purge(archiveId, admin.id, idempotencyKey === undefined ? undefined : `${idempotencyKey}:${archiveId}`)
           if (!accepted) throw new Error('archive not found')
         } else if (action === 'settle') {
-          const settled = await deps.archives.settle(rootSessionId, admin.id)
+          const settled = await deps.archives.settle(archiveId, admin.id)
           if (settled === null) throw new Error('archive not found')
         } else {
-          const value = await deps.archives.setState(rootSessionId, action === 'restore' ? 'archived' : 'trash', admin.id,
-            idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
+          const value = await deps.archives.setState(archiveId, action === 'restore' ? 'archived' : 'trash', admin.id,
+            idempotencyKey === undefined ? undefined : `${idempotencyKey}:${archiveId}`)
           if (value === null) throw new Error('archive not found')
         }
-        results.push({ rootSessionId, ok: true })
+        results.push({ archiveId, ok: true })
       } catch (error: unknown) {
-        results.push({ rootSessionId, ok: false, error: error instanceof Error ? error.message : String(error) })
+        results.push({ archiveId, ok: false, error: error instanceof Error ? error.message : String(error) })
       }
     }
     await write(`admin.archives.${action}`, { count: ids.length, succeeded: results.filter(item => item.ok).length })
@@ -572,10 +712,38 @@ async function dispatch(
     return true
   }
 
+  if (pathname === '/admin/api/archives' || pathname.startsWith('/admin/api/archives/')) {
+    sendError(res, 410, 'archive-api-upgrade-required')
+    return true
+  }
+
+  if (pathname === '/admin/api/progress/digest-model') {
+    if (deps.progress === undefined) { sendError(res, 503, 'progress unavailable'); return true }
+    if (method === 'GET') { sendJson(res, 200, await deps.progress.digestModelSettings(admin.id)); return true }
+    if (method === 'POST') {
+      const parsed = JSON.parse(body || '{}') as { model?: unknown }
+      if (parsed.model !== undefined && parsed.model !== null && typeof parsed.model !== 'string') {
+        sendError(res, 400, 'digest-model-format')
+        return true
+      }
+      const model = parsed.model === undefined || parsed.model === null ? null : parsed.model
+      const settings = await deps.progress.setDigestModel(model, admin.id)
+      await write('admin.progress.digest-model', { model })
+      sendJson(res, 200, settings)
+      return true
+    }
+    return false
+  }
+  if (pathname === '/admin/api/plugins/overview' && method === 'GET') {
+    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
+    sendJson(res, 200, await deps.pluginManagement.overview(admin))
+    return true
+  }
   if (pathname === '/admin/api/plugins/target' && method === 'GET') {
     if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
-    sendJson(res, 200, await deps.pluginManagement.target(admin, { kind: query.get('kind'), id: Number(query.get('id')) }))
+    sendJson(res, 200, await deps.pluginManagement.target(admin, { kind: query.get('kind'), id: Number(query.get('id')),
+      ...(query.has('dshRuntime') ? { runtimeId: query.get('dshRuntime') } : {}) }))
     return true
   }
   if (pathname === '/admin/api/plugins/invoke' && method === 'POST') {
@@ -606,7 +774,8 @@ async function dispatch(
     if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
     if (method === 'GET') {
       const query = new URL(req.url ?? pathname, 'http://admin').searchParams
-      sendJson(res, 200, await deps.pluginManagement.state(admin, { kind: query.get('kind'), id: Number(query.get('id')) }))
+      sendJson(res, 200, await deps.pluginManagement.state(admin, { kind: query.get('kind'), id: Number(query.get('id')),
+        ...(query.has('dshRuntime') ? { runtimeId: query.get('dshRuntime') } : {}) }))
     } else {
       const input = parseObject(body)
       const view = await deps.pluginManagement.saveState(admin, input)
@@ -619,13 +788,14 @@ async function dispatch(
   if (pathname === '/admin/api/terminals' && method === 'GET') {
     if (deps.terminalManagement === undefined) { sendError(res, 503, 'terminal-management-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
-    const target = resourcePolicyOwner(query.get('kind'), Number(query.get('id')), 'terminal')
+    const target = await selectedAdminRuntime(deps, admin, req, resourcePolicyOwner(query.get('kind'), Number(query.get('id')), 'terminal'))
     sendJson(res, 200, await deps.terminalManagement.list(admin, target))
     return true
   }
   if (pathname === '/admin/api/terminals/close' && method === 'POST') {
     if (deps.terminalManagement === undefined) { sendError(res, 503, 'terminal-management-unavailable'); return true }
-    const input = parseObject(body), target = resourcePolicyOwner(input.kind, input.targetId, 'terminal')
+    const input = parseObject(body), target = await selectedAdminRuntime(deps, admin, req,
+      resourcePolicyOwner(input.kind, input.targetId, 'terminal'), input.runtimeId)
     const entry = { nodeId: input.nodeId, generation: input.generation, ownerId: input.ownerId, id: input.id }
     await deps.terminalManagement.close(admin, target, entry)
     await write('admin.terminals.close', { target, ...entry })
@@ -666,8 +836,9 @@ async function dispatch(
     } else {
       const input = parseObject(body)
       const owner = ownerOf(input.kind, input.id, resource)
-      const result = await access.set(owner, input.enabled, input.revision)
-      await write(`admin.${resource}s.permission`, { ...result })
+      const result = await access.set(owner, input.enabled, input.revision, admin.id)
+      await write(`admin.${resource}s.permission`, { ...result,
+        ...(deps.nodeServiceIdentity === undefined ? {} : { nodeId: deps.nodeServiceIdentity.nodeId }) })
       sendJson(res, 200, result)
     }
     return true
@@ -675,7 +846,7 @@ async function dispatch(
 
   if (pathname === '/admin/api/ssh-targets' && method === 'GET') {
     if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
-    sendJson(res, 200, { targets: await deps.sshTargets.list() })
+    sendJson(res, 200, { targets: await deps.sshTargets.list(admin.id) })
     return true
   }
 
@@ -689,7 +860,7 @@ async function dispatch(
 
   if (pathname === '/admin/api/ssh-targets/update' && method === 'POST') {
     if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
-    const target = await deps.sshTargets.update(parseObject(body))
+    const target = await deps.sshTargets.update(parseObject(body), admin.id)
     await write('admin.ssh-targets.update', { targetId: target.publicId, name: target.name, revision: target.revision })
     sendJson(res, 200, target)
     return true
@@ -698,7 +869,7 @@ async function dispatch(
   if (pathname === '/admin/api/ssh-targets/mutate' && method === 'POST') {
     if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
     const input = parseObject(body)
-    const target = await deps.sshTargets.mutate(input)
+    const target = await deps.sshTargets.mutate(input, admin.id)
     await write('admin.ssh-targets.mutate', { targetId: input.targetId, action: input.action })
     sendJson(res, 200, target === null ? { removed: true } : target)
     return true
@@ -707,7 +878,7 @@ async function dispatch(
   if (pathname === '/admin/api/ssh-targets/share' && method === 'POST') {
     if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
     const input = parseObject(body)
-    const target = await deps.sshTargets.share(admin.id, input)
+    const target = await deps.sshTargets.shareAsAdministrator(admin.id, input)
     await write('admin.ssh-targets.share', { targetId: input.targetId, projectId: input.projectId, shared: input.shared === true })
     sendJson(res, 200, target)
     return true
@@ -715,12 +886,12 @@ async function dispatch(
 
   if (pathname === '/admin/api/remote-desktop/endpoints' && method === 'GET') {
     if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
-    sendJson(res, 200, { endpoints: await deps.remoteDesktop.endpoints() })
+    sendJson(res, 200, { endpoints: await deps.remoteDesktop.endpoints(admin.id) })
     return true
   }
   if (pathname === '/admin/api/remote-desktop/endpoints' && method === 'POST') {
     if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
-    const rows = await deps.remoteDesktop.saveEndpoints(parseObject(body).endpoints)
+    const rows = await deps.remoteDesktop.saveEndpoints(parseObject(body).endpoints, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.endpoints.save',
       detail: JSON.stringify({ endpoints: rows.length }), ip })
     sendJson(res, 200, { endpoints: rows })
@@ -728,13 +899,13 @@ async function dispatch(
   }
   if (pathname === '/admin/api/remote-desktop/grants' && method === 'GET') {
     if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
-    sendJson(res, 200, { grants: await deps.remoteDesktop.listGrants() })
+    sendJson(res, 200, { grants: await deps.remoteDesktop.listGrants(admin.id) })
     return true
   }
   if (pathname === '/admin/api/remote-desktop/grants' && method === 'POST') {
     if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
     const input = parseObject(body)
-    const row = await deps.remoteDesktop.createGrant(input, admin.username)
+    const row = await deps.remoteDesktop.createGrant(input, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant',
       detail: JSON.stringify({ principal: row.principal, target: row.target, level: row.level }), ip })
     sendJson(res, 200, { grant: row })
@@ -743,7 +914,7 @@ async function dispatch(
   if (pathname === '/admin/api/remote-desktop/grants/level' && method === 'POST') {
     if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
     const input = parseObject(body)
-    const row = await deps.remoteDesktop.setLevel(input.id, input.level)
+    const row = await deps.remoteDesktop.setLevel(input.id, input.level, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant-level',
       detail: JSON.stringify({ id: row.id, level: row.level }), ip })
     sendJson(res, 200, { grant: row })
@@ -752,7 +923,7 @@ async function dispatch(
   if (pathname === '/admin/api/remote-desktop/grants/revoke' && method === 'POST') {
     if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
     const input = parseObject(body)
-    const row = await deps.remoteDesktop.revoke(input.id)
+    const row = await deps.remoteDesktop.revoke(input.id, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant-revoke',
       detail: JSON.stringify({ id: row.id }), ip })
     sendJson(res, 200, { grant: row })
@@ -762,7 +933,7 @@ async function dispatch(
     if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
     const limit = Number.parseInt(query.get('limit') ?? '100', 10)
-    sendJson(res, 200, { events: await deps.remoteDesktop.audit(Number.isSafeInteger(limit) ? limit : 100) })
+    sendJson(res, 200, { events: await deps.remoteDesktop.audit(Number.isSafeInteger(limit) ? limit : 100, admin.id) })
     return true
   }
   if (pathname === '/admin/api/desktops' && method === 'GET') {
@@ -826,7 +997,7 @@ async function dispatch(
       return Number.isSafeInteger(number) && number > 0 ? number : undefined
     }
     if (scopeKind !== null && scopeKind !== 'personal' && scopeKind !== 'project') { sendError(res, 400, 'invalid scope'); return true }
-    if (state !== null && state !== 'active' && state !== 'trash' && state !== 'purged' && state !== 'deleted' && state !== 'all') { sendError(res, 400, 'invalid state'); return true }
+    if (state !== null && state !== 'active' && state !== 'trash' && state !== 'purged' && state !== 'missing' && state !== 'deleted' && state !== 'all') { sendError(res, 400, 'invalid state'); return true }
     const project = positive(projectId); const owner = positive(ownerUserId)
     const requestedLimit = positive(limit)
     const requestedOffset = offset === null ? undefined : Number(offset)
@@ -888,6 +1059,8 @@ async function dispatch(
             scope: target.scope.kind === 'personal' ? { kind: 'personal' } : target.scope,
             ...(target.scope.kind === 'personal' ? { personalOwnerId: target.scope.userId } : {}),
             docId: target.docId,
+            ...(target.identity === undefined ? {} : { identity: target.identity }),
+            ...(target.trashId === undefined ? {} : { trashId: target.trashId }),
             action,
             signal: new AbortController().signal,
           })
@@ -947,6 +1120,8 @@ async function dispatch(
             scope: target.scope.kind === 'personal' ? { kind: 'personal' } : target.scope,
             ...(target.scope.kind === 'personal' ? { personalOwnerId: target.scope.userId } : {}),
             docId: target.docId,
+            ...(target.identity === undefined ? {} : { identity: target.identity }),
+            ...(target.trashId === undefined ? {} : { trashId: target.trashId }),
             action: 'trash',
             signal: new AbortController().signal,
           })
@@ -1017,7 +1192,7 @@ async function dispatch(
       }
       const role = rawRole === 'admin' ? 'admin' as const : 'user' as const
       const displayName = str(input, 'displayName')
-      const user = await deps.users.create({ username, password, role, displayName })
+      const user = await deps.users.create({ username, password, role, displayName }, admin.id)
       await write('admin.users', { username, role })
       sendJson(res, 200, user)
       return true
@@ -1032,13 +1207,15 @@ async function dispatch(
     const op = userInstance[2] as 'start' | 'stop' | 'restart'
     const target = await deps.users.getById(userId)
     if (target === null) { sendError(res, 404, 'user not found'); return true }
-    if (op === 'stop') await deps.instances.stop(userId)
-    else if (op === 'start') await deps.instances.ensureRunning(target, 'explicit')
+    const address = await selectedAdminRuntime(deps, admin, req, { kind: 'user', id: userId })
+    const subject = { ...target, ...(address.runtimeId === undefined ? {} : { runtimeId: address.runtimeId }) }
+    if (op === 'stop') await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
+    else if (op === 'start') await deps.instances.ensureRunning(subject, 'explicit', admin.id)
     else {
-      await deps.instances.stop(userId)
-      await deps.instances.ensureRunning(target, 'explicit')
+      await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
+      await deps.instances.ensureRunning(subject, 'explicit', admin.id)
     }
-    await write(`admin.instances.${op}`, { id: userId })
+    await write(`admin.instances.${op}`, { id: userId, runtimeId: address.runtimeId })
     sendNoContent(res)
     return true
   }
@@ -1050,7 +1227,7 @@ async function dispatch(
     if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
     const password = str(parseObject(body), 'password')
     if (password === undefined) { sendError(res, 400, 'password required'); return true }
-    await deps.users.resetPassword(userId, password)
+    await deps.users.resetPassword(userId, password, admin.id)
     invalidateAccess?.({ userId })
     await write('admin.users.reset-password', { id: userId })
     sendNoContent(res)
@@ -1080,10 +1257,12 @@ async function dispatch(
     }
     if (method === 'DELETE') {
       if (userId === admin.id) throw new Error('cannot-delete-self')
-      const removed = await deps.instances.withStopped(
-        userId,
-        async () => deps.users.remove(userId),
-      )
+      const targets = deps.instances.targetsForOwner === undefined ? [userId]
+        : (await deps.instances.targetsForOwner(userId)).map(runtime => runtime.runtimeId === undefined ? userId : runtime)
+      targets.sort((left, right) => String(typeof left === 'number' ? left : left.runtimeId).localeCompare(String(typeof right === 'number' ? right : right.runtimeId)))
+      const remove = (index: number): Promise<boolean> => index === targets.length ? Promise.resolve(deps.users.remove(userId, admin.id))
+        : deps.instances.withStopped(targets[index]!, () => remove(index + 1), admin.id)
+      const removed = await remove(0)
       if (!removed) { sendError(res, 404, 'user not found'); return true }
       invalidateAccess?.({ userId })
       await write('admin.users.delete', { id: userId, username: target.username })
@@ -1110,7 +1289,7 @@ async function dispatch(
         ...(status === undefined ? {} : { status }),
         ...(displayName === undefined ? {} : { displayName }),
         ...(typeof autoReviewEligible === 'boolean' ? { autoReviewEligible } : {}),
-      })
+      }, admin.id)
       if (role !== undefined || status !== undefined || autoReviewEligible !== undefined) invalidateAccess?.({ userId })
       if (autoReviewEligible !== undefined) await write('admin.users.auto-review-eligibility', { id: userId, autoReviewEligible })
       if (role !== undefined) {
@@ -1119,7 +1298,10 @@ async function dispatch(
         await write('admin.users.role', { id: userId, role })
       }
       if (status !== undefined) {
-        if (status === 'disabled') await deps.instances.stop(userId)
+        if (status === 'disabled') {
+          const targets = deps.instances.targetsForOwner === undefined ? [userId] : await deps.instances.targetsForOwner(userId)
+          for (const runtime of targets) await deps.instances.stop(runtime)
+        }
         await write('admin.users.status', { id: userId, status })
       }
       if (displayName !== undefined) await write('admin.users.display-name', { id: userId })
@@ -1127,20 +1309,23 @@ async function dispatch(
       // Compatibility with hand-built test/legacy services that have not yet
       // adopted the atomic patch method. Production UserService providers do.
       if (role !== undefined) {
-        await deps.users.setRole(userId, role)
+        await deps.users.setRole(userId, role, admin.id)
         invalidateAccess?.({ userId })
         await applyGrantsToUser(deps, userId, admin.id)
         if (deps.governance !== undefined) await applyModelGovernanceToUser(deps, userId)
         await write('admin.users.role', { id: userId, role })
       }
       if (status !== undefined) {
-        await deps.users.setStatus(userId, status)
+        await deps.users.setStatus(userId, status, admin.id)
         invalidateAccess?.({ userId })
-        if (status === 'disabled') await deps.instances.stop(userId)
+        if (status === 'disabled') {
+          const targets = deps.instances.targetsForOwner === undefined ? [userId] : await deps.instances.targetsForOwner(userId)
+          for (const runtime of targets) await deps.instances.stop(runtime)
+        }
         await write('admin.users.status', { id: userId, status })
       }
       if (displayName !== undefined) {
-        await deps.users.setDisplayName(userId, displayName)
+        await deps.users.setDisplayName(userId, displayName, admin.id)
         await write('admin.users.display-name', { id: userId })
       }
     }
@@ -1174,7 +1359,7 @@ async function dispatch(
         userAllowed: bool('userAllowed', false), inputMicrosPerMillion: integer('inputMicrosPerMillion'),
         outputMicrosPerMillion: integer('outputMicrosPerMillion'), cacheReadMicrosPerMillion: integer('cacheReadMicrosPerMillion'),
         cacheWriteMicrosPerMillion: integer('cacheWriteMicrosPerMillion'),
-      })
+      }, admin.id)
       await write('admin.models.upsert', { provider, model })
       await refreshModelPolicies()
       sendNoContent(res); return true
@@ -1198,6 +1383,7 @@ async function dispatch(
       const view = await deps.governance.mutateOrganizationModelSettings(
         settingsOps(input.ops),
         expectedRevision as number | undefined,
+        admin.id,
       )
       await refreshModelPolicies()
       await write('admin.model-settings.mutate', { opCount: (input.ops as unknown[]).length })
@@ -1221,14 +1407,14 @@ async function dispatch(
     if (method === 'PUT') {
       const value = str(input, 'value')
       if (value === undefined) { sendError(res, 400, 'value required'); return true }
-      await deps.governance.setOrganizationCredential(ref, value)
+      await deps.governance.setOrganizationCredential(ref, value, admin.id)
       await refreshModelPolicies()
       await write('admin.model-settings.credential.set', { ref })
       sendNoContent(res)
       return true
     }
     if (method === 'DELETE') {
-      await deps.governance.unsetOrganizationCredential(ref)
+      await deps.governance.unsetOrganizationCredential(ref, admin.id)
       await refreshModelPolicies()
       await write('admin.model-settings.credential.unset', { ref })
       sendNoContent(res)
@@ -1246,6 +1432,7 @@ async function dispatch(
     const apiKey = str(input, 'apiKey')
     sendJson(res, 200, {
       models: await deps.governance.discoverOrganizationModels({
+        actorUserId: admin.id,
         ...provider === undefined ? {} : { provider },
         ...baseURL === undefined ? {} : { baseURL },
         ...api === undefined ? {} : { api },
@@ -1297,7 +1484,7 @@ async function dispatch(
         authMode: authMode as ModelProviderAuthMode,
         status: status as ModelProviderStatus,
         ...credential === undefined ? {} : { credential: credential as string | null },
-      })
+      }, admin.id)
       await write('admin.model-providers.upsert', { provider, status })
       await refreshModelPolicies()
       sendNoContent(res)
@@ -1314,8 +1501,14 @@ async function dispatch(
       if (userId === null) { sendError(res, 400, 'invalid userId'); return true }
       const target = await deps.users.getById(userId)
       if (target === null) { sendError(res, 404, 'user not found'); return true }
+      let effective: RuntimeModelPolicy
+      if (target.status === 'active') effective = await deps.governance.policyFor(target)
+      else {
+        if (deps.governance.configurationRevision === undefined) { sendError(res, 503, 'model-policy-revision-unavailable'); return true }
+        effective = { version: await deps.governance.configurationRevision(), defaultAllowed: false, models: [], providers: [] }
+      }
       sendJson(res, 200, {
-        effective: await deps.governance.policyFor(target),
+        effective,
         overrides: await deps.governance.userOverrides(userId),
       }); return true
     }
@@ -1326,7 +1519,7 @@ async function dispatch(
         sendError(res, 400, 'userId, provider, model and boolean|null allowed required'); return true
       }
       if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
-      await deps.governance.setUserAccess(userId, provider, model, allowed as boolean | null)
+      await deps.governance.setUserAccess(userId, provider, model, allowed as boolean | null, admin.id)
       await applyModelGovernanceToUser(deps, userId)
       await write('admin.models.user-access', { userId, provider, model, allowed }); sendNoContent(res); return true
     }
@@ -1363,7 +1556,7 @@ async function dispatch(
           sendError(res, 400, 'all assignment takes only projectId and true|null allowed')
           return true
         }
-        await deps.governance.setAllProjectAccess(projectId, allowed)
+        await deps.governance.setAllProjectAccess(projectId, allowed, admin.id)
         await applyModelGovernanceToProject(deps, projectId)
         await write('admin.models.project-access-all', { projectId, allowed })
         sendNoContent(res)
@@ -1375,7 +1568,7 @@ async function dispatch(
         sendError(res, 400, 'projectId, provider, model and boolean|null allowed required')
         return true
       }
-      await deps.governance.setProjectAccess(projectId, provider, model, allowed as boolean | null)
+      await deps.governance.setProjectAccess(projectId, provider, model, allowed as boolean | null, admin.id)
       await applyModelGovernanceToProject(deps, projectId)
       await write('admin.models.project-access', { projectId, provider, model, allowed })
       sendNoContent(res)
@@ -1423,7 +1616,7 @@ async function dispatch(
       }
       return value
     }
-    await deps.governance.setQuota(subjectType, subjectId, nullable('tokenLimit'), nullable('companyCostMicrosLimit'))
+    await deps.governance.setQuota(subjectType, subjectId, nullable('tokenLimit'), nullable('companyCostMicrosLimit'), admin.id)
     await write('admin.models.quota', { subjectType, subjectId }); sendNoContent(res); return true
   }
 
@@ -1541,7 +1734,7 @@ async function dispatch(
       const name = str(input, 'name')
       const path = str(input, 'path')
       if (name === undefined) { sendError(res, 400, 'name required'); return true }
-      const project = await deps.projects.create({ name, path, createdBy: admin.id })
+      const project = await deps.projects.create({ name, path, createdBy: admin.id, actorUserId: admin.id })
       await write('admin.projects.create', { id: project.id, name, path: project.path })
       sendJson(res, 200, project)
       return true
@@ -1558,7 +1751,7 @@ async function dispatch(
     if (method === 'PUT') {
       const mode = str(parseObject(body), 'mode')
       if (mode !== 'ro' && mode !== 'rw') { sendError(res, 400, 'invalid mode'); return true }
-      await deps.projects.setMember(projectId, userId, mode as GrantMode)
+      await deps.projects.setMember(projectId, userId, mode as GrantMode, admin.id)
       invalidateAccess?.({ userId })
       await write('admin.members.set', { projectId, userId, mode })
       await apply(userId)
@@ -1566,7 +1759,7 @@ async function dispatch(
       return true
     }
     if (method === 'DELETE') {
-      await deps.projects.removeMember(projectId, userId)
+      await deps.projects.removeMember(projectId, userId, admin.id)
       invalidateAccess?.({ userId })
       await write('admin.members.remove', { projectId, userId })
       await apply(userId)
@@ -1584,8 +1777,8 @@ async function dispatch(
     const project = await deps.projects.getById(projectId)
     if (project === null) { sendError(res, 404, 'project not found'); return true }
     const target = { kind: 'project' as const, id: projectId }
-    if (op !== 'start') await deps.instances.stop(target)
-    if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit')
+    if (op !== 'start') await deps.instances.stop(target, 'manual', admin.id)
+    if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit', admin.id)
     await write(`admin.project-instances.${op}`, { projectId })
     sendNoContent(res)
     return true
@@ -1640,15 +1833,17 @@ async function dispatch(
     if (method === 'PATCH') {
       const name = str(parseObject(body), 'name')
       if (name === undefined) { sendError(res, 400, 'name required'); return true }
-      await deps.projects.rename(projectId, name)
+      await deps.projects.rename(projectId, name, admin.id)
       await write('admin.projects.rename', { id: projectId, name })
       sendNoContent(res)
       return true
     }
     if (method === 'DELETE') {
+      if (project.kind === 'steward') throw new CollaborationDeniedError('steward-reserved')
       const userIds = await deps.instances.withStopped(
         { kind: 'project', id: projectId },
-        async () => deps.projects.remove(projectId),
+        async () => deps.projects.remove(projectId, admin.id),
+        admin.id,
       )
       invalidateAccess?.({ projectId })
       for (const userId of userIds) invalidateAccess?.({ userId })
@@ -1693,6 +1888,9 @@ async function dispatch(
     }
     if (filter.userId !== undefined && (!Number.isInteger(filter.userId) || filter.userId <= 0)) {
       throw new Error('invalid audit userId')
+    }
+    if ([filter.limit, filter.offset].some(value => value !== undefined && !Number.isSafeInteger(value))) {
+      throw new Error('invalid audit pagination')
     }
     if (filter.fromMs !== undefined && filter.toMs !== undefined && filter.fromMs > filter.toMs) {
       throw new Error('invalid audit time range')

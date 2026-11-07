@@ -35,7 +35,7 @@ All calls are exclusive, so a model-ordered batch observes earlier mutations and
 
 All three canonical values match the compact JSON already rendered to Native callers: `{ goal: null }` or `{ goal: { id, revision, objective, phase, roundsStarted, maxGoalRounds, blockedReason? }, activation }`. Programmatic consumers therefore receive the same domain structure without parsing the rendered JSON.
 
-An autonomous goal round that successfully reports `complete` or `blocked` marks that tool execution with `concludeTurn()` so the physical turn stops after the step. Direct-human mutations never contribute this stop: the assistant may acknowledge the change and concurrent human steering remains available to the loop.
+An autonomous goal round that successfully reports `complete` or `blocked` adds a logged wrap-up instruction, and the assistant gives its closing response through the ordinary no-tool stop path. Direct-human mutations retain ordinary turn flow. The [round wrap-up decision](../../../.agents/notes/implemented/bug-fix/2026-08-02-goal-round-wrapup-message.md) owns the context and stopping behavior.
 
 <a id="authority"></a>
 ## Authority
@@ -56,7 +56,7 @@ Complete and blocked also accept the exact current goal round: a goal-sourced `u
     blockedAfterConsecutiveRounds: 3
 ```
 
-The value must be a positive safe integer. It supplies both the hard lower bound on model self-blocking and the number named in model guidance.
+The value must be a positive safe integer. It supplies both the hard lower bound on model self-blocking and the number named in model guidance. Each explicit resume starts a fresh blocking interval for that goal; previously admitted rounds still count toward the total goal budget.
 
 <a id="model-experience"></a>
 ## Model Experience

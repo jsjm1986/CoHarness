@@ -1,0 +1,292 @@
+{
+  "findings": [
+    "B419",
+    "B420"
+  ],
+  "updatedAt": "2026-11-01T01:11:36.938692+00:00",
+  "status": "fixed_verified_named_native_translation_cases_remaining_review_open",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-origin-final.json",
+    "fetchedAt": "2026-11-01T01:05:34.649242+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "scope": "Native translation owner/credential/configuration eligibility through resource admission and provider I/O, including effective Settings snapshots.",
+  "bugs": [
+    {
+      "id": "B419",
+      "cause": "Checks before stream entry do not protect queued resource admission or asynchronous provider preparation.",
+      "fix": "Prepared streams retain per-call async authorization with effective cancellation and synchronous current-owner checks at adapter entry and every physical request, including retries."
+    },
+    {
+      "id": "B420",
+      "cause": "Translator eligibility reads composition credential/configuration fields while the native provider can read a different immutable Settings snapshot.",
+      "fix": "Read the effective Settings credential reference and retain its resolved snapshot alongside the Loader composition generation; invalidate in-flight uncached requests on publication or withdrawal."
+    }
+  ],
+  "verification": {
+    "distinctRelatedTests": 1104,
+    "relatedPackageTests": 1090,
+    "typescriptSdkScenarios": 7,
+    "pythonSdkScenarios": 7,
+    "repeatedVersionAndSourceRunsNotAdded": true,
+    "sourceAndBuiltTypeScriptModes": [
+      "source",
+      "Node22 built",
+      "Node24 built"
+    ],
+    "realProviderScope": "Actual Loader, native Official adapter, actual FileSettings, JSONL/SQLite persistence and SDK; fixture-owned credentials and loopback HTTP only. Account route uses the composition-supplied adapter fixture because the fork has no shipped Account provider package.",
+    "nativeTranslationCoverage": {
+      "lines": {
+        "total": 119,
+        "covered": 119,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 30,
+        "covered": 30,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 157,
+        "covered": 157,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 98,
+        "covered": 98,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "coreGuardCoverage": {
+      "newCallSitesCovered": [
+        {
+          "line": 1231,
+          "source": "await prepared?.guard?.authorize(projectedOptions.signal)",
+          "executions": [
+            93
+          ]
+        },
+        {
+          "line": 1240,
+          "source": "prepared?.guard?.assertCurrent()",
+          "executions": [
+            75
+          ]
+        },
+        {
+          "line": 1249,
+          "source": "prepared?.guard?.assertCurrent()",
+          "executions": [
+            14
+          ]
+        }
+      ],
+      "existingFileTotals": {
+        "total": {
+          "lines": {
+            "total": 363,
+            "covered": 361,
+            "skipped": 0,
+            "pct": 99.44
+          },
+          "statements": {
+            "total": 408,
+            "covered": 404,
+            "skipped": 0,
+            "pct": 99.01
+          },
+          "functions": {
+            "total": 91,
+            "covered": 91,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 330,
+            "covered": 324,
+            "skipped": 0,
+            "pct": 98.18
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/src/index.ts": {
+          "lines": {
+            "total": 363,
+            "covered": 361,
+            "skipped": 0,
+            "pct": 99.44
+          },
+          "functions": {
+            "total": 91,
+            "covered": 91,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 408,
+            "covered": 404,
+            "skipped": 0,
+            "pct": 99.01
+          },
+          "branches": {
+            "total": 330,
+            "covered": 324,
+            "skipped": 0,
+            "pct": 98.18
+          }
+        }
+      },
+      "gatingPolicyChanged": false,
+      "existingCiExemption": "scripts/coverage-baseline.ts; unchanged"
+    },
+    "normalPassedChecks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-related-cancellation-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-source-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-node22-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-node24-corrected.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-python-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-tsc-cancellation-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-runtime-bundle-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-host-types-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-docs-quick-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-config-catalog-final-check.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-export-jsdoc.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-pairing-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-lint-clean.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-python-lint-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/prepared-guard-built-consumer.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-dependency-catalog.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-module-graph.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-lockfile-online.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-origin-final.json"
+    ],
+    "negativeChecks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-admission-owner-negative.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-effective-settings-negative.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-settings-negative.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-old-source.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-old-node22.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-before-settings-source.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-sdk-before-settings-node22.json"
+    ],
+    "counterfactuals": "Complete original LLM/translator packages fail3 and pass1 SDK case in source and built modes. Complete pre-Settings translator with guarded core fails only the3 Settings cases and passes4 in both modes. Private packages and dependencies are preserved unchanged.",
+    "builtConsumer": "Ordinary NodeNext declarations accept a complete guard and reject one missing assertCurrent.",
+    "documentation": "Final quick lane20/20; initial19/20 had an owned stale type-equivalent declaration, repaired with matching JSDoc and an added manifest entry. Export JSDoc and config-catalog checks pass. Full41 doc-sync was not run.",
+    "lint": "Final8-file command and Python ruff pass. An earlier overlength fixture line was corrected.",
+    "setupFailuresExcludedFromBusinessNegatives": [
+      "Initial SDK fixture omitted model context / explicit translator lookup; final actual fixtures corrected.",
+      "Offline lock update lacked pruned registry metadata; normal online lock-only update passed and changed only two translator dev dependency entries.",
+      "One Node24 launch had an extra node argument; the corrected seven-case command passed."
+    ],
+    "testResources": {
+      "newProductionAllocations": 0,
+      "processes": "Actual SDK runtimes, Node workers and ephemeral loopback listeners are owned and closed; temporary workspaces are removed.",
+      "resourcePermits": "Unused/quiescent model permits release once; queued owner changes dispatch no HTTP; revoked permits cancel asynchronous authorization.",
+      "paidRequests": 0,
+      "productionDeploymentsByRoot": 0,
+      "postgresTestDatabasesAdded": 0
+    }
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T001207Z/translation-admission-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.zh.md",
+    "apps/cli/tests/profiles/sdk/translation-admission.expected.e2e.ts",
+    "docs/config-catalog.i18n.yaml",
+    "docs/config-catalog.md",
+    "docs/config-catalog.zh.md",
+    "docs/dependency-catalog.json",
+    "docs/module-graph.i18n.yaml",
+    "docs/module-graph.md",
+    "docs/module-graph.zh.md",
+    "docs/subsystems/llm-streaming.i18n.yaml",
+    "docs/subsystems/llm-streaming.md",
+    "docs/subsystems/llm-streaming.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/translation-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/translation-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/translation-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/translation-admission/expected.json",
+    "examples/headless-agent/tests/fixtures/translation-admission/model.mjs",
+    "examples/headless-agent/tests/fixtures/translation-admission/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/translation-admission/runtime.cordis.yml",
+    "packages/experimental/translator/README.i18n.yaml",
+    "packages/experimental/translator/README.md",
+    "packages/experimental/translator/README.zh.md",
+    "packages/experimental/translator/package.json",
+    "packages/experimental/translator/src/deepseek.ts",
+    "packages/experimental/translator/tests/deepseek.spec.ts",
+    "packages/experimental/translator/tests/paid-fixture.ts",
+    "packages/experimental/translator/tsconfig.json",
+    "packages/llm/llm/README.i18n.yaml",
+    "packages/llm/llm/README.md",
+    "packages/llm/llm/README.zh.md",
+    "packages/llm/llm/src/index.ts",
+    "packages/llm/llm/tests/prepared-guard.spec.ts",
+    "pnpm-lock.yaml",
+    "python/sdk/tests/test_translation_admission_expected.py",
+    "scripts/type-equiv.manifest.json"
+  ],
+  "readOnlyPrerequisiteCount": 4179,
+  "runtimeReferenceCount": 2,
+  "mergeRequirements": [
+    "Apply only sourceDeltaPaths; prerequisite files are read-only context and must never overwrite newer peer source.",
+    "Rebuild LLM and translator together from the matching complete source tree. Older LLM JavaScript silently ignores the extra guard argument. Runtime references are comparison artifacts, not production overlays.",
+    "Shared lockfile, type-equivalence manifest and generated catalogs require hunk-level integration over current peer changes. The lockfile own patch contains exactly two dev dependency entries.",
+    "No Session event or format changes, no committed Session generation writes and no database migration are introduced by this packet. B416/B417/B418 matching-reader integration remains independently pending with the peer."
+  ],
+  "notes": {
+    "reviewedActiveRecords": [
+      ".agents/notes/implemented/feature/2026-10-18-cot-translation-port.md",
+      ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.md"
+    ],
+    "decision": "retain active security and ownership rationale",
+    "reason": "Prepared stream eligibility and synchronous provider-I/O ownership checks govern future native consumers; they are not mechanical or cosmetic notes. The translation feature note retains its broader product purpose. No archived notes changed.",
+    "newNote": ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.md"
+  },
+  "remaining": [
+    "Integrate this B419/B420 packet through the peer matching build. Rebuild LLM and translator together; read-only prerequisites and reference bundles are not production overlays. Earlier B416/B417/B418 reader integration remains independently pending.",
+    "Continue remaining auxiliary and extension model consumers: translator purpose/trace and interactive attribution, request ownership, preparation/admission authorization and result publication. Do not add Session ids that enable unrelated native Session-log delivery.",
+    "Review remaining direct resource consumers, subprocess/native containment, cross-account/computer permissions, documents/filesystem races, diagnostic and database argument privacy. All12 domains and B04/B25 remain open.",
+    "Core LLM index retains existing CI coverage debt: diagnostic measurement is99.01% statements,98.18% branches,100% functions,99.44% lines; new guard call sites all executed. No coverage policy or threshold was weakened.",
+    "Peer owns multi-computer operational acceptance, REAL040 native font persistence, REAL042 node-service capacity and the resource-expiry/historical-review error report. Do not duplicate edits or repeatedly poll.",
+    "Official paid Responses verification remains deferred by the user; no paid inference or root production deployment is claimed."
+  ],
+  "peerReport": {
+    "status": "peer_reported_not_root_reverified",
+    "release": "R23",
+    "deployed": true,
+    "schemaVersion": 103,
+    "maintenanceEpoch": 100,
+    "dataEpochChanged": false,
+    "pendingRootPackets": [
+      "B416",
+      "B417",
+      "B418",
+      "B419",
+      "B420"
+    ],
+    "operationalAcceptanceOpen": [
+      "REAL040 native font persistence",
+      "REAL042 node-service shared connection capacity",
+      "historical-review storage error wrapping a real resource admission expiry"
+    ],
+    "hostInterference": "Peer identified and suspended18 owned old QA browser processes without ending them; root provided more than five minutes without heavy checks. No permission or resource budget was bypassed.",
+    "sourceOwnership": "Root did not modify peer node-service, Gateway runtime resource provider, native-command or GUI acceptance code."
+  },
+  "globalReviewComplete": false
+}

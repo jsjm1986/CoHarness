@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-02-foreground-question-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-02-foreground-question-ownership.md
+document:
+  en: ffb444c8515455269e008401649668e9ca910e7b
+  zh: 2ecd0ae565c5c5b62b608a829459bc8edb8133b8
+/agent-note-retain-foreground-question-ownership-through-answer-application:
+  en: 53a01693bb7266b8
+  zh: b724c14f88e6d117
+/agent-note-retain-foreground-question-ownership-through-answer-application/problem:
+  en: 4744bd3902c3d8ee
+  zh: d802a2243315f285
+/agent-note-retain-foreground-question-ownership-through-answer-application/decision:
+  en: 743812c583d050b8
+  zh: 8c9f74a2ab21141a
+/agent-note-retain-foreground-question-ownership-through-answer-application/alternatives-considered:
+  en: ecd12f9c23615137
+  zh: 475f8436980a68e8
+/agent-note-retain-foreground-question-ownership-through-answer-application/consequences:
+  en: a5e73c88321585fb
+  zh: fa5695d376859d27

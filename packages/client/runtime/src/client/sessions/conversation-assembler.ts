@@ -141,11 +141,15 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
   private readonly contextsByKind = new Map<string, InternalContext[]>()
   private readonly contextsBySeq = new Map<number, Set<InternalContext>>()
   private readonly inputs = new Map<number, ConversationEventInput>()
+  private readonly transientSeqs = new Map<LlmAttemptId, Set<number>>()
   private readonly locationIndex = new ConversationLocationIndex()
   private readonly dirty = new Set<InternalContext>()
   private readonly revised = new Set<InternalContext>()
   private readonly dependents = new Map<string, Set<InternalContext>>()
   private readonly views = new Map<string, ViewState>()
+  private readonly retiredContexts = new Set<InternalContext>()
+  private readonly retiredLocationData: ConversationLocationDataChange[] = []
+  private readonly withdrawnTargets = new Set<string>()
   private hasMore = false
   private replacePending = true
   private timelineDirty = true
@@ -172,12 +176,16 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     this.contextsByKind.clear()
     this.contextsBySeq.clear()
     this.inputs.clear()
+    this.transientSeqs.clear()
     this.dirty.clear()
     this.revised.clear()
     this.dependents.clear()
+    this.retiredContexts.clear()
+    this.retiredLocationData.length = 0
+    this.withdrawnTargets.clear()
     this.hasMore = hasMore
     const sorted = [...entries].sort((left, right) => left.event.seq - right.event.seq)
-    for (const entry of sorted) this.inputs.set(entry.event.seq, entry)
+    for (const entry of sorted) this.setInput(entry)
     this.locationIndex.rebuild(sorted)
     this.timelineDirty = true
     for (const entry of sorted) this.matchInput(entry)
@@ -196,7 +204,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
   append(input: ConversationEventInput): ConversationPublication {
     if (this.inputs.has(input.event.seq)) return 'none'
     this.revised.clear()
-    this.inputs.set(input.event.seq, input)
+    this.setInput(input)
     let publication: ConversationPublication = 'none'
     if (isLocationBoundaryEvent(input.event)) {
       const previousTimeline = this.locationIndex.snapshot()
@@ -229,7 +237,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     const fresh = entries
       .filter(entry => !this.inputs.has(entry.event.seq))
       .sort((left, right) => left.event.seq - right.event.seq)
-    for (const entry of fresh) this.inputs.set(entry.event.seq, entry)
+    for (const entry of fresh) this.setInput(entry)
     this.hasMore = hasMore
     const previousTimeline = this.locationIndex.snapshot()
     const changedLocations = this.locationIndex.rebuild(this.sortedInputs())
@@ -253,22 +261,51 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
    * Replace one attempt's transient `assistant/live-chunk` rows with its
    * committed durable settlement, or drop them on abandonment. Transients
    * leave `inputs` so a later window rebuild cannot resurrect them; the
-   * settlement event joins the same ordered window.
+   * settlement event joins the same ordered window. Only Contexts owning
+   * retired rows, changed Locations, or predecessor dependencies replay.
    * @param attemptId - process-local attempt whose live rows are now redundant.
    * @param entry - durable settlement committed for that attempt, when committed.
    * @returns immediate publication request when the window changed.
    */
   settleAssistant(attemptId: LlmAttemptId, entry?: ConversationEventInput): ConversationPublication {
-    let removed = false
-    for (const [seq, input] of this.inputs) {
-      if (input.event.type === 'assistant/live-chunk' && input.event.data.attemptId === attemptId) {
-        this.inputs.delete(seq)
-        removed = true
-      }
+    const retiredSeqs = this.transientSeqs.get(attemptId)
+    if (retiredSeqs === undefined && entry === undefined) return 'none'
+    this.revised.clear()
+    const affected = new Set<InternalContext>()
+    for (const seq of retiredSeqs ?? []) {
+      this.inputs.delete(seq)
+      for (const context of this.contextsBySeq.get(seq) ?? []) affected.add(context)
+      this.contextsBySeq.delete(seq)
     }
-    if (entry !== undefined) this.inputs.set(entry.event.seq, entry)
-    if (!removed && entry === undefined) return 'none'
-    return this.replaceWindow(this.sortedInputs(), this.hasMore)
+    this.transientSeqs.delete(attemptId)
+    for (const context of affected) {
+      context.matches = context.matches.filter(match => !retiredSeqs?.has(match.event.seq))
+      this.retiredContexts.add(context)
+    }
+    const existingEntry = entry === undefined ? undefined : this.inputs.get(entry.event.seq)
+    if (entry !== undefined) this.setInput(entry)
+    // An unflushed initial replacement has no published identities to retain;
+    // replacing an existing durable row also requires rematching that row.
+    if (this.replacePending || existingEntry !== undefined) {
+      return this.replaceWindow(this.sortedInputs(), this.hasMore)
+    }
+    const previousTimeline = this.locationIndex.snapshot()
+    const changedLocations = this.locationIndex.rebuild(this.sortedInputs())
+    if (this.locationIndex.snapshot() !== previousTimeline) this.timelineDirty = true
+    for (const context of this.refreshMatchLocations(changedLocations)) affected.add(context)
+    const pending = new Map<string, PendingMatch[]>()
+    if (entry !== undefined) this.collectInput(entry, pending)
+    this.applyPendingMatches(pending, affected)
+    for (const context of affected) {
+      if (context.matches.length > 0) continue
+      this.removeContext(context)
+      affected.delete(context)
+    }
+    for (const context of affected) this.retiredContexts.add(context)
+    this.replayContexts(affected)
+    this.replayDependencies(this.retiredContexts)
+    this.revised.clear()
+    return 'immediate'
   }
 
   /**
@@ -285,7 +322,8 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
    * @returns whether any view snapshot was rebuilt or incrementally applied.
    */
   flush(): boolean {
-    if (!this.replacePending && this.dirty.size === 0 && !this.timelineDirty) return false
+    if (!this.replacePending && this.dirty.size === 0 && !this.timelineDirty
+      && this.withdrawnTargets.size === 0 && this.retiredLocationData.length === 0) return false
     if (this.replacePending) {
       this.replaceLocationData()
       const allByTarget = new Map<string, ConversationViewNode[]>()
@@ -305,6 +343,9 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
       }
       this.replacePending = false
       this.dirty.clear()
+      this.retiredContexts.clear()
+      this.retiredLocationData.length = 0
+      this.withdrawnTargets.clear()
       this.timelineDirty = false
       this.locationIndex.publishData()
       return true
@@ -319,18 +360,32 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
       const previous = context.current.get(target) ?? null
       const node = this.buildNode(context, target)
       if (node === null && previous !== null) {
-        throw new Error(
-          `conversation Definition "${context.kind}" withdrew materialized target "${target}"; return the same key with hidden visibility instead`,
-        )
+        if (!this.retiredContexts.has(context)) {
+          throw new Error(
+            `conversation Definition "${context.kind}" withdrew materialized target "${target}"; return the same key with hidden visibility instead`,
+          )
+        }
+        this.withdrawnTargets.add(target)
       }
       context.current.set(target, node)
       if (node !== null) upsertsByTarget.get(target)?.push(node)
     }
     this.dirty.clear()
+    this.retiredContexts.clear()
     const timelineDirty = this.timelineDirty
     this.timelineDirty = false
     let published = false
     for (const view of this.views.values()) {
+      if (this.withdrawnTargets.has(view.target)) {
+        const nodes: ConversationViewNode[] = []
+        for (const context of this.contexts.values()) {
+          const node = context.current.get(view.target)
+          if (node !== undefined && node !== null) nodes.push(node)
+        }
+        view.snapshot = view.builder.replace({ nodes, timeline: this.locationIndex.snapshot() })
+        published = true
+        continue
+      }
       const upserts = upsertsByTarget.get(view.target) ?? []
       if (upserts.length === 0 && !timelineDirty) continue
       view.snapshot = view.builder.apply({
@@ -339,6 +394,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
       })
       published = true
     }
+    this.withdrawnTargets.clear()
     this.locationIndex.publishData()
     return published
   }
@@ -371,6 +427,30 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
 
   private sortedInputs(): ConversationEventInput[] {
     return [...this.inputs.values()].sort((left, right) => left.event.seq - right.event.seq)
+  }
+
+  private setInput(input: ConversationEventInput): void {
+    this.inputs.set(input.event.seq, input)
+    if (input.event.type !== 'assistant/live-chunk') return
+    const seqs = this.transientSeqs.get(input.event.data.attemptId) ?? new Set<number>()
+    seqs.add(input.event.seq)
+    this.transientSeqs.set(input.event.data.attemptId, seqs)
+  }
+
+  private removeContext(context: InternalContext): void {
+    this.contexts.delete(context.key)
+    const siblings = this.contextsByKind.get(context.kind)
+    if (siblings !== undefined) this.contextsByKind.set(context.kind, siblings.filter(candidate => candidate !== context))
+    this.replaceDependencies(context, new Map())
+    this.dirty.delete(context)
+    this.retiredContexts.delete(context)
+    for (const scope of LOCATION_DATA_SCOPES) {
+      const previous = context.locationData[scope]
+      if (previous !== null) this.retiredLocationData.push({ owner: context.key, previous, next: null })
+    }
+    for (const [target, node] of context.current) {
+      if (node !== null) this.withdrawnTargets.add(target)
+    }
   }
 
   private matchInput(input: ConversationEventInput): ConversationPublication {
@@ -710,7 +790,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     this.contextsByKind.set(kind, merged)
   }
 
-  private replayDependencies(): boolean {
+  private replayDependencies(retired?: Set<InternalContext>): boolean {
     let replayed = false
     const ordered = [...this.contexts.values()]
       .filter(context => startSeq(context) !== undefined)
@@ -731,6 +811,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
         }
       }
       if (changed) {
+        retired?.add(context)
         this.replayContext(context)
         replayed = true
       }
@@ -813,7 +894,8 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
   }
 
   private applyDirtyLocationData(): boolean {
-    let changed = false
+    let changed = this.locationIndex.applyData(this.retiredLocationData)
+    this.retiredLocationData.length = 0
     for (const scope of LOCATION_DATA_SCOPES) {
       const changes: ConversationLocationDataChange[] = []
       for (const context of this.dirty) {

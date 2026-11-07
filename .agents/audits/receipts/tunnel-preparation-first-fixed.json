@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-first-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-access.spec.ts tests/tunnel-install.spec.ts tests/shutdown.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T23:25:08.351315+00:00",
+  "seconds": 3.014,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cced5201dfb1fd93beea515358b70531eaf893205ae40a97fde0755c8e844352",
+  "inputsAfter": "cced5201dfb1fd93beea515358b70531eaf893205ae40a97fde0755c8e844352",
+  "postgresToolDirectory": null,
+  "outputSha256": "c059aed2ad625b2974a046da078501ac8b575c2658272d7e6cc8c979b33d5294",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/tunnel-access.spec.ts (29 tests | 1 failed) 77ms\n     × installs the pinned binary through the injectable installer 3ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/tunnel-access.spec.ts > GatewayTunnelAccess > installs the pinned binary through the injectable installer\nAssertionError: expected \"vi.fn()\" to be called with arguments: [ '/state/tunnel' ]\n\nReceived:\n\n  1st vi.fn() call:\n\n  [\n    \"/state/tunnel\",\n+   AbortSignal {\n+     Symbol(kEvents): Map {},\n+     Symbol(events.maxEventTargetListeners): 0,\n+     Symbol(events.maxEventTargetListenersWarned): false,\n+     Symbol(kHandlers): Map {},\n+     Symbol(kAborted): false,\n+     Symbol(kReason): undefined,\n+     Symbol(kComposite): false,\n+   },\n  ]\n\n\nNumber of calls: 1\n\n ❯ tests/tunnel-access.spec.ts:495:21\n    493|     const { deps } = makeDeps({ install })\n    494|     const view = await new GatewayTunnelAccess(deps).install()\n    495|     expect(install).toHaveBeenCalledWith('/state/tunnel')\n       |                     ^\n    496|     expect(view.binary).toEqual(binary)\n    497|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 2 passed (3)\n      Tests  1 failed | 34 passed (35)\n   Start at  07:25:10\n   Duration  884ms (transform 145ms, setup 0ms, import 346ms, tests 846ms, environment 0ms)\n\n"
+}

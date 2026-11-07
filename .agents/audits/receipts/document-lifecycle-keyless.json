@@ -1,0 +1,14 @@
+{
+  "name": "document-lifecycle-keyless",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/document-catalog-service.spec.ts tests/document-catalog.spec.ts tests/document-transfer.spec.ts tests/documents-local.spec.ts tests/server.spec.ts --retry=0",
+  "startedAt": "2026-10-24T02:49:50.676525+00:00",
+  "seconds": 6.973,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "699457317d7501cfef2d5573318f457923bd7b4210a11945e53b36b22c96882d",
+  "inputsAfter": "636ca765b12030db43535afb2f4be798770c746ccf351c1d9454bc5183e8e53c",
+  "postgresToolDirectory": null,
+  "outputSha256": "a213557f878d89267ce74042e05d698d4c51e4d02cfebb57c6f7259938f01bd5",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  5 passed (5)\n      Tests  81 passed (81)\n   Start at  10:49:52\n   Duration  5.43s (transform 2.46s, setup 0ms, import 3.18s, tests 4.73s, environment 0ms)\n\n"
+}

@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/api/remotes/README.md
 document:
-  en: 52cc08863d69345ce5d5bd61672ea75b85b87e5f
-  zh: fc1ddd9db709b6fe7a2aece25e75064906e01c21
+  en: 40923d376b5e174467f2a4f8a9e2653a27a2238a
+  zh: 52ea82eda6dfd48daffe5d408cafa36530aa964f
 /:
   en: f1ab04d31454027d
   zh: 61495d48365178df
 /deepseek-ai-dsh-api-remotes:
-  en: d7b488d8ca302831
-  zh: 91d69b077c98bac9
+  en: fce1b2fa28b3abee
+  zh: b9a6a3e0fe627cdd
 /deepseek-ai-dsh-api-remotes/summary:
   en: 3c54c157bb823fd0
   zh: 0db6778e94ae671c

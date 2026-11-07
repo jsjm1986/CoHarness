@@ -11,7 +11,7 @@ import {
   pluginManagementSaveState, pluginManagementState,
   type PluginDesiredEntry, type PluginDesiredState, type PluginManagementState, type PluginManagementTarget,
 } from '../api.ts'
-import type { BundleInfo, PluginEntryId, PluginInfo } from '../../../../packages/boot/plugin-manager/src/types.ts'
+import type { BundleInfo, PluginEntryId, PluginInfo, PluginManagementCatalog } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import { pluginManagementRemote, type PluginManagementRemote } from './transport.ts'
 import { resolveLocalized, translatePlugin } from './presentation.ts'
 import { adminLanguage } from '../language.ts'
@@ -71,8 +71,12 @@ export interface PluginComposition {
   applyLive(key: string, call: (remote: PluginManagementRemote) => Promise<{ ok: boolean; error?: { message: string } }>): Promise<void>
   save(state: PluginDesiredState | null): Promise<void>
   discard(): void
-  /** Re-read the durable state and the live lists, e.g. after a manager-side write. */
-  refresh(): void
+  /** Accept the live manager's generation-checked catalog for this target. */
+  acceptCatalog(this: void, catalog: PluginManagementCatalog): void
+  /** Bind the live owner's catalog refresh; disposal removes only this registration. */
+  bindLiveRefresh(this: void, refresh: () => Promise<void>): () => void
+  /** Re-read durable startup state after a manager-side write. */
+  refresh(this: void): void
 }
 
 function entryChoice(entry: PluginDesiredEntry | undefined): EntryChoice {
@@ -102,18 +106,23 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
   const [busy, setBusy] = useState(false)
   const [busyRow, setBusyRow] = useState('')
   const remoteRef = useRef<PluginManagementRemote | null>(null)
+  const lifetimeRef = useRef<AbortController | null>(null)
+  const liveRefreshRef = useRef<(() => Promise<void>) | null>(null)
+  const stateRead = useRef(0)
   const language = adminLanguage()
   const t = translatePlugin(language)
 
   useEffect(() => {
-    setView(null); setStorageDown(false); setDraft(null); setPlugins(null); setBundles(null); setError(''); setNotice('')
+    setView(null); setStorageDown(false); setDraft(null); setPlugins(null); setBundles(null); setError(''); setNotice(''); setBusy(false); setBusyRow('')
     remoteRef.current = null
     const abort = new AbortController()
-    void pluginManagementState(kind, id, abort.signal).then((next) => {
-      if (!abort.signal.aborted) setView(next)
+    lifetimeRef.current = abort
+    const read = ++stateRead.current
+    void pluginManagementState(kind, id, abort.signal, target.target.runtimeId).then((next) => {
+      if (!abort.signal.aborted && read === stateRead.current) setView(next)
     }).catch((cause: unknown) => {
       // Deployments without the PostgreSQL store still manage live instances; degrade instead of failing the page.
-      if (!abort.signal.aborted) {
+      if (!abort.signal.aborted && read === stateRead.current) {
         if (cause instanceof AdminRequestError && cause.status === 503) setStorageDown(true)
         else setError(String(cause))
       }
@@ -121,11 +130,19 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     if (live) {
       const remote = pluginManagementRemote(target, abort.signal, () => {}, invalidate ?? (message => { setError(message) }))
       remoteRef.current = remote
-      void remote.pluginManager.listPlugins().then((answer) => { if (answer.ok && !abort.signal.aborted) setPlugins(answer.value) })
-      void remote.pluginManager.listBundles().then((answer) => { if (answer.ok && !abort.signal.aborted) setBundles(answer.value) })
     }
     return () => { abort.abort() }
   }, [kind, id, target, live, invalidate])
+
+  const acceptCatalog = useCallback((catalog: PluginManagementCatalog) => {
+    if (lifetimeRef.current === null || lifetimeRef.current.signal.aborted) return
+    setPlugins(catalog.managementAvailable ? catalog.plugins : null)
+    setBundles(catalog.managementAvailable ? catalog.bundles : null)
+  }, [])
+  const bindLiveRefresh = useCallback((refresh: () => Promise<void>) => {
+    liveRefreshRef.current = refresh
+    return () => { if (liveRefreshRef.current === refresh) liveRefreshRef.current = null }
+  }, [])
 
   const entries = useMemo(() => {
     const merged = new Map<string, CompositionEntry>()
@@ -142,10 +159,14 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
       })
     }
     for (const entry of view?.observed?.entries ?? []) {
-      put(entry.id, { moduleName: entry.name, observed: entryChoice(entry) })
+      const meta = view?.meta?.entries[entry.id]
+      put(entry.id, { moduleName: entry.name, observed: entryChoice(entry),
+        ...(meta?.title === undefined ? {} : { title: resolveLocalized(meta.title, language) }) })
     }
     for (const entry of draft?.entries ?? view?.state?.entries ?? []) {
-      put(entry.id, { moduleName: entry.name, desired: entryChoice(entry) })
+      const meta = view?.meta?.entries[entry.id]
+      put(entry.id, { moduleName: entry.name, desired: entryChoice(entry),
+        ...(meta?.title === undefined ? {} : { title: resolveLocalized(meta.title, language) }) })
     }
     // With nothing saved, the startup column mirrors the current composition so the administrator edits a visible baseline.
     if (draft === null && (view === null || view.state === null)) {
@@ -169,9 +190,15 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
         observed: bundle.enabled,
       })
     }
-    for (const name of view?.observed?.bundles ?? []) put(name, { observed: true })
+    for (const name of view?.observed?.bundles ?? []) {
+      const meta = view?.meta?.bundles[name]
+      put(name, { observed: true, ...(meta?.title === undefined ? {} : { title: resolveLocalized(meta.title, language) }) })
+    }
     const desiredSet = draft?.bundles ?? view?.state?.bundles ?? view?.observed?.bundles
-    for (const name of desiredSet ?? []) put(name, { desired: true })
+    for (const name of desiredSet ?? []) {
+      const meta = view?.meta?.bundles[name]
+      put(name, { desired: true, ...(meta?.title === undefined ? {} : { title: resolveLocalized(meta.title, language) }) })
+    }
     return [...names.values()].sort((a, b) => (a.title ?? a.name).localeCompare(b.title ?? b.name))
   }, [bundles, view, draft, language])
 
@@ -195,48 +222,59 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
 
   const applyLive = async (key: string, call: (remote: PluginManagementRemote) => Promise<{ ok: boolean; error?: { message: string } }>) => {
     const remote = remoteRef.current
-    if (remote === null) return
+    const lifetime = lifetimeRef.current
+    if (remote === null || lifetime === null || lifetime.signal.aborted) return
     setBusyRow(key); setError(''); setNotice('')
     try {
       const answer = await call(remote)
+      if (lifetime !== lifetimeRef.current || lifetime.signal.aborted) return
       if (!answer.ok) { setError(answer.error?.message ?? t('wireUnconfirmed')); return }
       const hadDraft = dirty
       // The live change already applied; a refresh failure must not mask that fact.
-      const nextView = await pluginManagementState(kind, id).catch((cause: unknown) => {
+      const read = ++stateRead.current
+      const nextView = await pluginManagementState(kind, id, lifetime.signal).catch((cause: unknown) => {
+        if (lifetime !== lifetimeRef.current || lifetime.signal.aborted || read !== stateRead.current) return null
         if (!(cause instanceof AdminRequestError && cause.status === 503)) setError(String(cause))
         return null
       })
-      if (nextView !== null) setView(nextView)
+      if (lifetime !== lifetimeRef.current || lifetime.signal.aborted) return
+      if (nextView !== null && read === stateRead.current) setView(nextView)
       setDraft(null)
-      // The runtime already reloaded its inventory; the columns resync on the next paint.
-      void remote.pluginManager.listPlugins().then((answer) => { if (answer.ok) setPlugins(answer.value) })
+      await liveRefreshRef.current?.()
+      if (lifetime !== lifetimeRef.current || lifetime.signal.aborted) return
       setNotice(hadDraft ? t('compositionAppliedReset') : t('compositionApplied'))
-    } finally { setBusyRow('') }
+    } finally { if (lifetime === lifetimeRef.current && !lifetime.signal.aborted) setBusyRow('') }
   }
 
   const save = async (state: PluginDesiredState | null) => {
-    if (view === null) return
+    const lifetime = lifetimeRef.current
+    if (view === null || lifetime === null || lifetime.signal.aborted) return
     setBusy(true)
     try {
-      const next = await pluginManagementSaveState({ target: { kind, id }, revision: view.revision, state })
+      const next = await pluginManagementSaveState({ target: { kind, id, runtimeId: target.target.runtimeId }, revision: view.revision, state })
+      if (lifetime !== lifetimeRef.current || lifetime.signal.aborted) return
+      stateRead.current++
       setView(next); setDraft(null); setError('')
       setNotice(state === null ? t('compositionCleared') : t('compositionSaved', { revision: next.revision }))
     } catch (cause) {
+      if (lifetime !== lifetimeRef.current || lifetime.signal.aborted) return
       if (cause instanceof AdminRequestError && cause.status === 409) {
-        const latest = await pluginManagementState(kind, id).catch(() => null)
-        if (latest !== null) { setView(latest); setDraft(null) }
+        const read = ++stateRead.current
+        const latest = await pluginManagementState(kind, id, lifetime.signal).catch(() => null)
+        if (lifetime !== lifetimeRef.current || lifetime.signal.aborted) return
+        if (latest !== null && read === stateRead.current) { setView(latest); setDraft(null) }
         setError(t('compositionConflict'))
       } else setError(String(cause))
-    } finally { setBusy(false) }
+    } finally { if (lifetime === lifetimeRef.current && !lifetime.signal.aborted) setBusy(false) }
   }
 
   const refresh = useCallback(() => {
-    void pluginManagementState(kind, id).then(setView).catch(() => {})
-    const remote = remoteRef.current
-    if (remote !== null) {
-      void remote.pluginManager.listPlugins().then((answer) => { if (answer.ok) setPlugins(answer.value) })
-      void remote.pluginManager.listBundles().then((answer) => { if (answer.ok) setBundles(answer.value) })
-    }
+    const lifetime = lifetimeRef.current
+    if (lifetime === null || lifetime.signal.aborted) return
+    const read = ++stateRead.current
+    void pluginManagementState(kind, id, lifetime.signal).then(next => {
+      if (lifetime === lifetimeRef.current && !lifetime.signal.aborted && read === stateRead.current) setView(next)
+    }).catch(() => { /* A background state refresh leaves the current startup draft available. */ })
   }, [kind, id])
 
   const persist = !storageDown
@@ -249,6 +287,6 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     error, notice, busy, busyRow, draft, dirty, applied, pending,
     setEntryDesired, setBundleDesired, applyLive, save,
     discard: () => { setDraft(null) },
-    refresh,
+    acceptCatalog, bindLiveRefresh, refresh,
   }
 }

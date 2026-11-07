@@ -17,8 +17,6 @@
 import { createRequire } from 'node:module'
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-command-feedback'
-import type {} from '@deepseek-ai/dsh-message-feedback'
 import { Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   SessionTelemetryBackend,
@@ -74,6 +72,7 @@ function trackedAgentFactory(config: OTLPExporterNodeConfigBase, track: Set<Tran
     return agent
   }
 }
+
 
 /** Session-sharing policy selected by {@link Config.mode}. */
 export enum SessionTelemetryMode {
@@ -139,8 +138,10 @@ export interface Config {
    * `compression`, `keepAlive`, …) minus self-observability metering, which
    * no owning MeterProvider exists to consume. `url` is the one field this
    * package requires and validates itself.
+
    */
   exporter?: Omit<OTLPExporterNodeConfigBase, 'selfObsMeterProvider'> & {
+
     /** Full logs endpoint (e.g. `https://collector.example.com/v1/logs`). Required outside `DISABLED`; validated at load. */
     url?: string
   }
@@ -150,8 +151,10 @@ export interface Config {
    * fills, and self-observability metering, which no owning MeterProvider
    * exists to consume). A watchdog warning never releases an unsettled
    * transport slot.
+
    */
   processor?: TelemetryProcessorOptions
+
   /** Uncompressed OTLP request byte limit, at most 4,000,000. */
   maxRequestBytes?: number
   /** Maximum time spent awaiting the SDK provider's complete shutdown path. */
@@ -164,6 +167,7 @@ export interface Config {
  * so their errors name the fields. Both SDK option objects pass through unchanged:
  * the SDK defines and validates their fields. Re-declaring them here would
  * silently drop every field this plugin did not repeat.
+
  */
 export const Config: z<Config> = z.object({
   mode: z.union(Object.values(SessionTelemetryMode)).default(DEFAULT_TELEMETRY_MODE),

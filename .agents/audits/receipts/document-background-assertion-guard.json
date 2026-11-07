@@ -1,0 +1,14 @@
+{
+  "name": "document-background-assertion-guard",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/verify-no-unknown-casts.ts",
+  "startedAt": "2026-10-26T20:30:49.535229+00:00",
+  "seconds": 38.761,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fbec6ea9dd9b0ee9b79d49edb425d713ec15a3ea1e3eb95c3b0179c2796fee80",
+  "inputsAfter": "fbec6ea9dd9b0ee9b79d49edb425d713ec15a3ea1e3eb95c3b0179c2796fee80",
+  "postgresToolDirectory": null,
+  "outputSha256": "9f013069a93536df06a502be5ad25189668eab01f45b387ba8c264d9dd88e2e8",
+  "outputTail": "verify-no-unknown-casts: no new assertions; 1863 existing assertions remain.\n"
+}

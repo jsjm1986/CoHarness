@@ -55,11 +55,13 @@ describe('mutationPath', () => {
 
   it('yields nothing for reads, unknown tools, and incomplete arguments', () => {
     expect(mutationPath('write', undefined)).toBeUndefined()
+    expect(mutationPath('write', null)).toBeUndefined()
     expect(mutationPath('write', [])).toBeUndefined()
     expect(mutationPath('read', { file_path: 'a.txt' })).toBeUndefined()
     expect(mutationPath('write', { file_path: ' ', content: 'x' })).toBeUndefined()
     expect(mutationPath('write', { file_path: 'a.txt' })).toBeUndefined()
     expect(mutationPath('edit', { file_path: 'a.txt', old_string: 'x' })).toBeUndefined()
+    expect(mutationPath('edit', { file_path: 'a.txt', old_string: 1, new_string: 'y' })).toBeUndefined()
     expect(mutationPath('str_replace_editor', { command: 'view', path: 'b.txt' })).toBeUndefined()
     expect(mutationPath('str_replace_editor', { command: 'create', path: '' })).toBeUndefined()
   })

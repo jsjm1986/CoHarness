@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-install-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T23:18:43.956014+00:00",
+  "seconds": 4.154,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8091d26dca7f63d0ac3cf3a02031096a03ec26041ff7e7d841d8374f91f2abbb",
+  "inputsAfter": "8091d26dca7f63d0ac3cf3a02031096a03ec26041ff7e7d841d8374f91f2abbb",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

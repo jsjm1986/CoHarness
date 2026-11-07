@@ -13,7 +13,7 @@ describe('PostgresCollaborationService conversation titles', () => {
     const service = new PostgresCollaborationService({ ...context, pool: { query } as unknown as Pool })
     await service.listAccountConversations(2)
     const text = (query.mock.calls[0] as unknown as [string])[0]
-    expect(text).toContain('COALESCE(harness.human_session_title(r.title)')
+    expect(text).toContain('COALESCE(to_json(harness.human_session_title(r.title)), (SELECT harness.conversation_search_text(search.content,search.content_nul_parts,80)')
     expect(text).toContain(`search.role='user'`)
     expect(text).toContain('harness.human_session_title(search.content) IS NOT NULL')
     expect(text).toContain('ORDER BY search.occurred_at,search.event_seq LIMIT 1')

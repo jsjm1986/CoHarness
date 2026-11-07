@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/storage/storage-json/README.md
 document:
-  en: 7cdc9e918e2dfbe38020dae677a55e4ebc17d2aa
-  zh: 30256ad1d69c2bdf0128ecbe6d793a33b62a7951
+  en: 491eb90c11e3e284081f804de7cbed72b3afa4ea
+  zh: 58cd34365d4251986d2cfae22f01aba8b940d03f
 /:
   en: d09ec006ecc765b0
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: 92b2d929e790e060
   zh: bc28dfcce810f342
 /deepseek-ai-dsh-storage-json/model:
-  en: acf0ad33f88b87ef
-  zh: d650d6e67a1e9cea
+  en: 72da51609d735f00
+  zh: 71872278ed0e9cca
 /deepseek-ai-dsh-storage-json/config:
   en: b375ae9b54137796
   zh: 9fd58e410ca74c82

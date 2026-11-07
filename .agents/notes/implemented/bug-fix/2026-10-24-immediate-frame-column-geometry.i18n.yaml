@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-24-immediate-frame-column-geometry.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-immediate-frame-column-geometry.md
+document:
+  en: 6da18d333e125572325b71e228483039f4e95e7a
+  zh: 95d27e21d97726afe4365962da46c0fab6bcb67b
+/agent-note-immediate-frame-column-geometry:
+  en: e8e20fba697e1673
+  zh: f41218a0e3607884
+/agent-note-immediate-frame-column-geometry/problem:
+  en: 33813600bee9b042
+  zh: 13377ac8d3e36fbb
+/agent-note-immediate-frame-column-geometry/decision:
+  en: 60d10095295772b9
+  zh: 7f4d93c02803760c
+/agent-note-immediate-frame-column-geometry/alternatives-considered:
+  en: 98b3cc317da0bfbe
+  zh: 4539598af6c47f87
+/agent-note-immediate-frame-column-geometry/consequences:
+  en: c05e78ebfe3f74d4
+  zh: ca408d5957fad6ab

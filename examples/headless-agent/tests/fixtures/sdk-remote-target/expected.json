@@ -1,0 +1,10 @@
+{
+  "refusal": {
+    "target": 17,
+    "code": "UNSUPPORTED_CAPABILITY",
+    "message": "SDK subagents require a local Session. Choose a subagent provider that supports the Session’s SSH target."
+  },
+  "processAdmissions": 0,
+  "modelAdmissions": 1,
+  "released": 1
+}

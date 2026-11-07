@@ -83,6 +83,8 @@ kind: "package-reference"
 
 Messages 以内容块发送文本、思考、工具调用和工具结果，以 `output_config.effort` 发送推理强度，并以 Files 引用或内联 base64 发送图片。声明 `systemPromptUpdate: in-history` 的模型保留初始顶层 system，在对应 user/tool-result 轮次之后发送新的 system 快照；未声明能力时，使用最新快照作为顶层 system。回放元数据保留模型与思考签名。无效的回放元数据产生警告并省略签名，不丢弃文本或工具历史。 模型条目可声明 `toolUpdate: addition-only` 或 `in-history`；默认 `deepseek-flash` 条目声明 `addition-only`。投影后的 developer 工具更新转换为 system 角色的 `tool_addition` 和 `tool_removal` 块，引用已声明名称，延迟声明携带 `defer_loading`。包含这些块的请求发送 `mid-conversation-tool-changes-2026-07-01` beta 请求头。 Messages 会省略 assistant 的空文本块，并跳过转换后没有内容的 assistant 消息，包括其他协议保存的历史。已存储的 Session 内容保持原样。
 
+原生 `deepseek-web-search` 操作与普通 Messages 调用保留同一预备连接、鉴权和用户归属。执行前可取得精确无密钥输入；实际用量保留本次凭据来源，包括结果映射失败前已取得的用量。
+
 ### API Key 凭据
 
 `deepseek-official` 仅解析配置的 API Key 引用。Messages 和 Files 请求通过 `x-api-key` 发送 API Key，且拒绝重定向，凭据因此不会离开已配置的来源。
@@ -121,6 +123,8 @@ Files 模式通过 `maxRequestFilesBytes` 与 `maxImagesPerRequest` 限制保留
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
+
+运行时模型授权会在凭据、图片和请求扩展准备完成后、每次 Messages 或 Files 请求前重新检查。授权拒绝保留其结构化失败，不能触发内联图片回退。
 
 <details>
 <summary>实现细节——点击展开</summary>

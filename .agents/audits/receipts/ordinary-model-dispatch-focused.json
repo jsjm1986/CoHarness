@@ -1,0 +1,14 @@
+{
+  "name": "ordinary-model-dispatch-focused",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm-pi-ai/tests/native-stream.spec.ts packages/llm/llm-deepseek/tests/search-operation.spec.ts packages/llm/llm-deepseek/tests/files-api.spec.ts packages/llm/llm-deepseek/tests/files.spec.ts packages/llm/llm-deepseek/tests/file-store.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-25T05:15:15.022969+00:00",
+  "seconds": 2.258,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bbb65e19234eace5dcef7bb04a36b1fd1417b46efa53a7565fd8fa13820f5cf0",
+  "inputsAfter": "bbb65e19234eace5dcef7bb04a36b1fd1417b46efa53a7565fd8fa13820f5cf0",
+  "postgresToolDirectory": null,
+  "outputSha256": "f75482861aff5307d142829e441550829eac74d0177e86c2b4a0c3847ab2b635",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  5 passed (5)\n      Tests  160 passed (160)\n   Start at  13:15:16\n   Duration  827ms (transform 531ms, setup 67ms, import 726ms, tests 440ms, environment 0ms)\n\n"
+}

@@ -3,6 +3,7 @@ import { readGatewayResponseJson, type GatewayRuntime } from '@deepseek-ai/dsh-g
 import type { SshAuthorization, SshInvalidationSubject, SshResolvedTarget } from '@deepseek-ai/dsh-ssh'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
+import { discardGatewayRead } from './response.ts'
 
 const resolvedConfig = z.object({
   host: z.string().min(1), node: z.string().min(1), helper: z.string().min(1),
@@ -44,7 +45,7 @@ export class GatewaySshAuthorization implements SshAuthorization {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ targetId }), principal, signal: combined,
     })
-    if (!response.ok) { await response.body?.cancel(); throw denied() }
+    if (!response.ok) { discardGatewayRead(response.body); throw denied() }
     const value: unknown = await readGatewayResponseJson(response, undefined, combined)
     combined.throwIfAborted()
     const config = isRecord(value) ? resolvedConfig.safeParse(value.config) : undefined

@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-final-pair-check",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts packages/ssh/ssh/README.md packages/subagent/subagent-codex/README.md packages/preset/agent-preset-registry/README.md docs/subsystems/ssh.md .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md .agents/notes/implemented/architecture/2026-10-25-managed-codex-ssh-model-requests.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md",
+  "startedAt": "2026-10-25T13:17:32.029048+00:00",
+  "seconds": 2.371,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "inputsAfter": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "postgresToolDirectory": null,
+  "outputSha256": "3e5bf4bd57522dae4845911b9bd2ad0830d96439f7b07432159ef148698c0b2d",
+  "outputTail": "verify-translation-pairing: 7 named pair(s) consistent; the corpus-wide check still runs in doc-sync.\n"
+}

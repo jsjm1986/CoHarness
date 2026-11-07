@@ -1,0 +1,13 @@
+{
+  "name": "gateway-model-generation-unit",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/progress-service.spec.ts tests/node-resource-pressure.spec.ts",
+  "startedAt": "2026-10-23T20:59:46.419227+00:00",
+  "seconds": 3.229,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "af3e7f35b71d6f878f5477c34b8e33c8c18b8cbb69e63cc66f79a14cb534717b",
+  "inputsAfter": "af3e7f35b71d6f878f5477c34b8e33c8c18b8cbb69e63cc66f79a14cb534717b",
+  "outputSha256": "c0297bbc892c840433a50c58df90cc56ae8ecd3aac82e0855661227b42bba142",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  26 passed (26)\n   Start at  04:59:49\n   Duration  376ms (transform 117ms, setup 0ms, import 198ms, tests 227ms, environment 0ms)\n\n"
+}

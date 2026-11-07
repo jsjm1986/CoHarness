@@ -1,0 +1,14 @@
+{
+  "name": "native-search-nodenext-consumers",
+  "cwd": ".",
+  "command": "pnpm run verify-node-next-types",
+  "startedAt": "2026-10-24T04:07:33.182131+00:00",
+  "seconds": 4.335,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "21d2a07d66ae3c7cdcc9bbbe3df12065deb15e639866d0cefd8606479956f361",
+  "inputsAfter": "21d2a07d66ae3c7cdcc9bbbe3df12065deb15e639866d0cefd8606479956f361",
+  "postgresToolDirectory": null,
+  "outputSha256": "a0a8d9757a0653cfdd1df58f6f6cc54a66ac52145d2e0211c34f9e64edd26c53",
+  "outputTail": "$ tsx scripts/verify-node-next-types.ts\nverify-node-next-types: 363 workspace package declaration API(s) compile under NodeNext.\n"
+}

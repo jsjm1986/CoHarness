@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-infrastructure-model-activity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-infrastructure-model-activity.md
+document:
+  en: faa0ca29eb82f5c6a9329c013a1b8a323889a7ca
+  zh: 74d4b184e0b7022bf46628f5b96564e3d271688f
+/agent-note-runtime-model-maintenance-has-independent-activity-ownership:
+  en: 1fb3abc5dd46086e
+  zh: 108de7622f84a39f
+/agent-note-runtime-model-maintenance-has-independent-activity-ownership/problem:
+  en: 8b3c67b6e97f9f69
+  zh: ea9ea9378243c8bc
+/agent-note-runtime-model-maintenance-has-independent-activity-ownership/decision:
+  en: 6a05a66730cc0386
+  zh: abf29d560edbd98c
+/agent-note-runtime-model-maintenance-has-independent-activity-ownership/alternatives-considered:
+  en: a7638b3f74a75c99
+  zh: 45283a46af64a1b7
+/agent-note-runtime-model-maintenance-has-independent-activity-ownership/consequences:
+  en: eb9be49965ac36aa
+  zh: ce689c756981aed7
+/agent-note-runtime-model-maintenance-has-independent-activity-ownership/verification:
+  en: adf1da2f835ccb8c
+  zh: fd73ad975afed66a

@@ -1,5 +1,6 @@
 /* jscpd:ignore-start */
 /** Browser HTTP client for the optional Host user-document service. */
+import { userDocLocationUrl } from '@deepseek-ai/dsh-userdoc/identity'
 import type {
   UserDocDirectoryIdType,
   UserDocDirectoryPage,
@@ -144,8 +145,10 @@ export interface UserDocClient {
   listTrash(signal?: AbortSignal): Promise<{ readonly version: 1; readonly documents: readonly UserDocTrashRef[] }>
   listTrashPage?(query?: UserDocListQuery, signal?: AbortSignal): Promise<{ readonly version: 1 } & UserDocTrashPage>
   trash(docId: UserDocIdType, signal?: AbortSignal): Promise<UserDocTrashRef>
-  restore(docId: UserDocIdType, directoryId?: UserDocDirectoryIdType, name?: string, signal?: AbortSignal): Promise<UserDocRef>
-  purge(docId: UserDocIdType, signal?: AbortSignal): Promise<void>
+  restore(
+    docId: UserDocIdType, directoryId?: UserDocDirectoryIdType, name?: string, signal?: AbortSignal, trashId?: string,
+  ): Promise<UserDocRef>
+  purge(docId: UserDocIdType, signal?: AbortSignal, trashId?: string): Promise<void>
   listTrashInScope(
     scope: UserDocScope, signal?: AbortSignal,
   ): Promise<{ readonly version: 1; readonly documents: readonly UserDocTrashRef[] }>
@@ -154,9 +157,9 @@ export interface UserDocClient {
   ): Promise<{ readonly version: 1 } & UserDocTrashPage>
   trashInScope(scope: UserDocScope, docId: UserDocIdType, signal?: AbortSignal): Promise<UserDocTrashRef>
   restoreInScope(
-    scope: UserDocScope, docId: UserDocIdType, directoryId?: UserDocDirectoryIdType, name?: string, signal?: AbortSignal,
+    scope: UserDocScope, docId: UserDocIdType, directoryId?: UserDocDirectoryIdType, name?: string, signal?: AbortSignal, trashId?: string,
   ): Promise<UserDocRef>
-  purgeInScope(scope: UserDocScope, docId: UserDocIdType, signal?: AbortSignal): Promise<void>
+  purgeInScope(scope: UserDocScope, docId: UserDocIdType, signal?: AbortSignal, trashId?: string): Promise<void>
   /** Copy snapshots between the current user's personal scope and one project scope. */
   transfer(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferResponse>
   plan(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferPlanResponse>
@@ -175,7 +178,7 @@ export interface UserDocClient {
   ): Promise<UserDocDirectoryRef>
   overview(signal?: AbortSignal): Promise<UserDocCatalogOverview>
   overviewPage?(query?: UserDocListQuery, signal?: AbortSignal): Promise<UserDocCatalogOverview>
-  history(signal?: AbortSignal): Promise<UserDocCatalogHistory>
+  history(signal?: AbortSignal, scope?: UserDocScope): Promise<UserDocCatalogHistory>
   contentUrl(docId: UserDocIdType, inline?: boolean): string
   scopedContentUrl(scope: UserDocScope, docId: UserDocIdType, inline?: boolean): string
 }
@@ -208,6 +211,7 @@ function contentUrl(docId: UserDocIdType, inline = false): string {
 
 function scopedContentUrl(scope: UserDocScope, docId: UserDocIdType, inline = false): string {
   const params = new URLSearchParams({ scope: scopeKey(scope), id: String(docId) })
+  if (scope.nodeId !== undefined) params.set('dshNode', scope.nodeId)
   if (inline) params.set('inline', '1')
   return `${SCOPE_PATH}/content?${params.toString()}`
 }
@@ -217,11 +221,14 @@ function scopeKey(scope: UserDocScope): string {
 }
 
 function scopeQuery(scope: UserDocScope): string {
-  return `?scope=${encodeURIComponent(scopeKey(scope))}`
+  const query = new URLSearchParams({ scope: scopeKey(scope) })
+  if (scope.nodeId !== undefined) query.set('dshNode', scope.nodeId)
+  return `?${query}`
 }
 
 function scopedPath(path: string, scope: UserDocScope, params: Record<string, string> = {}): string {
   const query = new URLSearchParams({ scope: scopeKey(scope), ...params })
+  if (scope.nodeId !== undefined) query.set('dshNode', scope.nodeId)
   return `${SCOPE_PATH}${path}?${query.toString()}`
 }
 
@@ -411,25 +418,31 @@ function uploadNetworkError(status: number): Error {
 /**
  * Create the default relative-path document client.
  * @param privateResourceUrl - binds native upload chunks to the verified document identity.
+ * @param location - captured document scope and computer, independent of later navigation.
  * @returns a client targeting the current host's document route.
  */
-export function createUserDocClient(privateResourceUrl: (url: string) => string = url => url): UserDocClient {
+export function createUserDocClient(privateResourceUrl: (url: string) => string = url => url,
+  location?: () => UserDocScope | undefined): UserDocClient {
+  const address = (path: string): string => privateResourceUrl(userDocLocationUrl(path, location?.()))
+  const requestAddress = (input: RequestInfo | URL): string => address(typeof input === 'string' ? input : 'href' in input ? input.href : input.url)
+  const json = <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => requestJson<T>(requestAddress(input), init)
+  const readJson = <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => requestReadJson<T>(requestAddress(input), init)
   return {
-    list: signal => requestReadJson<UserDocListResponse>(ROOT, requestInit('GET', signal)),
-    browse: (directoryId, signal, query) => requestReadJson<UserDocDirectoryResponse>(
+    list: signal => readJson<UserDocListResponse>(ROOT, requestInit('GET', signal)),
+    browse: (directoryId, signal, query) => readJson<UserDocDirectoryResponse>(
       `${ROOT}?directory=${encodeURIComponent(directoryId)}${listingSuffix(query)}`, requestInit('GET', signal),
     ),
     browseScope: async (scope, directoryId, signal, query) => {
       try {
-        return await requestReadJson<UserDocDirectoryResponse>(
-          `${SCOPE_PATH}?scope=${encodeURIComponent(scopeKey(scope))}&directory=${encodeURIComponent(directoryId)}${listingSuffix(query)}`,
+        return await readJson<UserDocDirectoryResponse>(
+          `${SCOPE_PATH}${scopeQuery(scope)}&directory=${encodeURIComponent(directoryId)}${listingSuffix(query)}`,
           requestInit('GET', signal),
         )
       } catch (error) {
         // Older/standalone hosts expose the metadata-only transfer listing;
         // retain that path while the full scope broker is rolling out.
         if (!(error instanceof UserDocServiceUnavailableError)) throw error
-        const fallback = await requestReadJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
+        const fallback = await readJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
           ...requestInit('POST', signal),
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -463,11 +476,12 @@ export function createUserDocClient(privateResourceUrl: (url: string) => string 
         }
       }
     },
-    listDirectories: signal => requestReadJson<UserDocDirectoriesResponse>(`${ROOT}/directories`, requestInit('GET', signal)),
+    listDirectories: signal => readJson<UserDocDirectoriesResponse>(`${ROOT}/directories`, requestInit('GET', signal)),
     upload: (file, directoryId, signal, onProgress) => {
-      const query = new URL(privateResourceUrl(ROOT), 'http://dsh.internal').search
+      const target = new URL(address(`${ROOT}/uploads`), 'http://dsh.internal')
+      const query = target.search
       return resumableUpload(file, directoryId, signal, onProgress, {
-        root: ROOT, query, resumeNamespace: query,
+        root: target.pathname.slice(0, -'/uploads'.length), query, resumeNamespace: query,
         requestJson,
         networkError: uploadNetworkError,
         responseError: errorFrom,
@@ -477,73 +491,76 @@ export function createUserDocClient(privateResourceUrl: (url: string) => string 
       const query = new URL(privateResourceUrl(`${SCOPED_UPLOAD_PATH.slice(1)}${scopeQuery(scope)}`), 'http://dsh.internal').search
       return resumableUpload(file, directoryId, signal, onProgress, {
         root: SCOPED_UPLOAD_PATH.slice(1), query, resumeNamespace: query,
-        requestJson,
+        requestJson: json,
         networkError: uploadNetworkError,
         responseError: errorFrom,
       })
     },
-    createDirectory: (parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(
+    createDirectory: (parentDirectoryId, name, signal) => json<UserDocDirectoryRef>(
       `${ROOT}/folders?directory=${encodeURIComponent(parentDirectoryId)}&name=${encodeURIComponent(name)}`,
       requestInit('POST', signal),
     ),
-    renameDirectory: (directoryId, name, signal) => requestJson<UserDocDirectoryRef>(
+    renameDirectory: (directoryId, name, signal) => json<UserDocDirectoryRef>(
       `${ROOT}/folders?id=${encodeURIComponent(directoryId)}&name=${encodeURIComponent(name)}`,
       requestInit('PATCH', signal),
     ),
     removeDirectory: async (directoryId, signal) => {
-      await requestJson<undefined>(`${ROOT}/folders?id=${encodeURIComponent(directoryId)}`, requestInit('DELETE', signal))
+      await json<undefined>(`${ROOT}/folders?id=${encodeURIComponent(directoryId)}`, requestInit('DELETE', signal))
     },
-    move: (docId, directoryId, signal) => requestJson<UserDocRef>(
+    move: (docId, directoryId, signal) => json<UserDocRef>(
       `${ROOT}/move?id=${encodeURIComponent(docId)}&directory=${encodeURIComponent(directoryId)}`,
       requestInit('POST', signal),
     ),
     remove: async (docId, signal) => {
       try {
-        await requestJson<undefined>(`${ROOT}?id=${encodeURIComponent(docId)}`, requestInit('DELETE', signal))
+        await json<undefined>(`${ROOT}?id=${encodeURIComponent(docId)}`, requestInit('DELETE', signal))
       } catch (error) {
         if (error instanceof UserDocServiceUnavailableError) return
         if (error instanceof UserDocHttpError && error.status === 404) return
         throw error
       }
     },
-    moveInScope: (scope, docId, directoryId, signal) => requestJson<UserDocRef>(
+    moveInScope: (scope, docId, directoryId, signal) => json<UserDocRef>(
       scopedPath('/move', scope, { id: String(docId), directory: String(directoryId) }), requestInit('POST', signal)),
     removeInScope: async (scope, docId, signal) => {
-      await requestJson<undefined>(scopedPath('', scope, { id: String(docId) }), requestInit('DELETE', signal))
+      await json<undefined>(scopedPath('', scope, { id: String(docId) }), requestInit('DELETE', signal))
     },
-    createDirectoryInScope: (scope, parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(
+    createDirectoryInScope: (scope, parentDirectoryId, name, signal) => json<UserDocDirectoryRef>(
       scopedPath('/folders', scope, { directory: String(parentDirectoryId), name }), requestInit('POST', signal)),
-    renameDirectoryInScope: (scope, directoryId, name, signal) => requestJson<UserDocDirectoryRef>(
+    renameDirectoryInScope: (scope, directoryId, name, signal) => json<UserDocDirectoryRef>(
       scopedPath('/folders', scope, { id: String(directoryId), name }), requestInit('PATCH', signal)),
     removeDirectoryInScope: async (scope, directoryId, signal) => {
-      await requestJson<undefined>(scopedPath('/folders', scope, { id: String(directoryId) }), requestInit('DELETE', signal))
+      await json<undefined>(scopedPath('/folders', scope, { id: String(directoryId) }), requestInit('DELETE', signal))
     },
-    listTrash: signal => requestReadJson<{ version: 1; documents: readonly UserDocTrashRef[] }>(TRASH_PATH, requestInit('GET', signal)),
-    listTrashPage: (query, signal) => requestReadJson<{ version: 1 } & UserDocTrashPage>(
+    listTrash: signal => readJson<{ version: 1; documents: readonly UserDocTrashRef[] }>(TRASH_PATH, requestInit('GET', signal)),
+    listTrashPage: (query, signal) => readJson<{ version: 1 } & UserDocTrashPage>(
       `${TRASH_PATH}${listingSuffix(query).replace(/^&/u, '?')}`, requestInit('GET', signal),
     ),
     trash: async (docId, signal) => {
-      const response = await requestJson<{ version: 1; document: UserDocTrashRef }>(
+      const response = await json<{ version: 1; document: UserDocTrashRef }>(
         `${TRASH_PATH}?id=${encodeURIComponent(docId)}`, requestInit('POST', signal),
       )
       return response.document
     },
-    restore: async (docId, directoryId, name, signal) => {
+    restore: async (docId, directoryId, name, signal, trashId) => {
       const params: Record<string, string> = { id: String(docId) }
       if (directoryId !== undefined) params.directory = String(directoryId)
       if (name !== undefined) params.name = name
-      const response = await requestJson<{ version: 1; document: UserDocRef }>(
+      if (trashId !== undefined) params.trashId = trashId
+      const response = await json<{ version: 1; document: UserDocRef }>(
         `${RESTORE_PATH}?${new URLSearchParams(params).toString()}`, requestInit('POST', signal),
       )
       return response.document
     },
-    purge: async (docId, signal) => {
-      await requestJson<undefined>(`${PURGE_PATH}?id=${encodeURIComponent(docId)}`, requestInit('DELETE', signal))
+    purge: async (docId, signal, trashId) => {
+      const params = new URLSearchParams({ id: String(docId) })
+      if (trashId !== undefined) params.set('trashId', trashId)
+      await json<undefined>(`${PURGE_PATH}?${params.toString()}`, requestInit('DELETE', signal))
     },
-    listTrashInScope: (scope, signal) => requestReadJson<{ version: 1; documents: readonly UserDocTrashRef[] }>(
+    listTrashInScope: (scope, signal) => readJson<{ version: 1; documents: readonly UserDocTrashRef[] }>(
       scopedPath('/trash', scope), requestInit('GET', signal),
     ),
-    listTrashInScopePage: (scope, query, signal) => requestReadJson<{ version: 1 } & UserDocTrashPage>(
+    listTrashInScopePage: (scope, query, signal) => readJson<{ version: 1 } & UserDocTrashPage>(
       scopedPath('/trash', scope, {
         ...(query?.cursor === undefined ? {} : { cursor: query.cursor }),
         ...(query?.limit === undefined ? {} : { limit: String(query.limit) }),
@@ -554,37 +571,38 @@ export function createUserDocClient(privateResourceUrl: (url: string) => string 
       }), requestInit('GET', signal),
     ),
     trashInScope: async (scope, docId, signal) => {
-      const response = await requestJson<{ version: 1; document: UserDocTrashRef }>(
+      const response = await json<{ version: 1; document: UserDocTrashRef }>(
         scopedPath('/trash', scope, { id: String(docId) }), requestInit('POST', signal),
       )
       return response.document
     },
-    restoreInScope: async (scope, docId, directoryId, name, signal) => {
+    restoreInScope: async (scope, docId, directoryId, name, signal, trashId) => {
       const params: Record<string, string> = { id: String(docId) }
       if (directoryId !== undefined) params.directory = String(directoryId)
       if (name !== undefined) params.name = name
-      const response = await requestJson<{ version: 1; document: UserDocRef }>(
+      if (trashId !== undefined) params.trashId = trashId
+      const response = await json<{ version: 1; document: UserDocRef }>(
         scopedPath('/restore', scope, params), requestInit('POST', signal),
       )
       return response.document
     },
-    purgeInScope: async (scope, docId, signal) => {
-      await requestJson<undefined>(scopedPath('/purge', scope, { id: String(docId) }), requestInit('DELETE', signal))
+    purgeInScope: async (scope, docId, signal, trashId) => {
+      await json<undefined>(scopedPath('/purge', scope, { id: String(docId), ...(trashId === undefined ? {} : { trashId }) }), requestInit('DELETE', signal))
     },
-    transfer: (request, signal) => requestJson<UserDocTransferResponse>(TRANSFER_PATH, {
+    transfer: (request, signal) => json<UserDocTransferResponse>(TRANSFER_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
     }),
-    plan: (request, signal) => requestJson<UserDocTransferPlanResponse>(PLAN_PATH, {
+    plan: (request, signal) => json<UserDocTransferPlanResponse>(PLAN_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
     }),
-    commit: (request, signal) => requestJson<UserDocTransferResponse>(COMMIT_PATH, {
+    commit: (request, signal) => json<UserDocTransferResponse>(COMMIT_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
     }),
-    retry: (request, signal) => requestJson<UserDocTransferResponse>(RETRY_PATH, {
+    retry: (request, signal) => json<UserDocTransferResponse>(RETRY_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
     }),
-    capabilities: signal => requestJson<UserDocTransferCapabilities>(CAPABILITIES_PATH, requestInit('GET', signal)),
-    listScope: (scope, signal, directoryId, query) => requestReadJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
+    capabilities: signal => json<UserDocTransferCapabilities>(CAPABILITIES_PATH, requestInit('GET', signal)),
+    listScope: (scope, signal, directoryId, query) => readJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({
         version: 1,
         scope,
@@ -597,19 +615,19 @@ export function createUserDocClient(privateResourceUrl: (url: string) => string 
         ...(query?.state === undefined ? {} : { state: query.state }),
       }),
     }),
-    listScopeDirectories: (scope, signal) => requestReadJson<UserDocTransferDirectoriesResponse>(DIRECTORIES_PATH, {
+    listScopeDirectories: (scope, signal) => readJson<UserDocTransferDirectoriesResponse>(DIRECTORIES_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, scope }),
     }),
-    createScopeDirectory: (scope, parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(DIRECTORY_CREATE_PATH, {
+    createScopeDirectory: (scope, parentDirectoryId, name, signal) => json<UserDocDirectoryRef>(DIRECTORY_CREATE_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, scope, directory: parentDirectoryId, name }),
     }).then(directory => ({ ...directory, path: '' })),
-    overview: signal => requestReadJson<UserDocCatalogOverview>(OVERVIEW_PATH, requestInit('GET', signal)),
-    overviewPage: (query, signal) => requestReadJson<UserDocCatalogOverview>(
+    overview: signal => readJson<UserDocCatalogOverview>(OVERVIEW_PATH, requestInit('GET', signal)),
+    overviewPage: (query, signal) => readJson<UserDocCatalogOverview>(
       `${OVERVIEW_PATH}${listingSuffix(query).replace(/^&/u, '?')}`, requestInit('GET', signal),
     ),
-    history: signal => requestReadJson<UserDocCatalogHistory>(HISTORY_PATH, requestInit('GET', signal)),
-    contentUrl,
-    scopedContentUrl,
+    history: (signal, scope) => readJson<UserDocCatalogHistory>(scope === undefined ? HISTORY_PATH : scopedPath('/history', scope), requestInit('GET', signal)),
+    contentUrl: (id, inline) => address(contentUrl(id, inline)),
+    scopedContentUrl: (scope, id, inline) => address(scopedContentUrl(scope, id, inline)),
   }
 }
 

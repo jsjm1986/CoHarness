@@ -1,0 +1,14 @@
+{
+  "name": "auto-review-model-coverage",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/experimental/auto-review/tests/auto-review.spec.ts packages/experimental/auto-review/tests/managed-execution.spec.ts --coverage --coverage.include=packages/experimental/auto-review/src/index.ts --coverage.reportsDirectory=.agents/audits/.local/auto-review-model-coverage --coverage.reporter=text --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T02:55:04.152531+00:00",
+  "seconds": 17.022,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6809732b7b19fe9e1fbfd6a8b89d5eafa5679db73f51da26429c999e55d2039f",
+  "inputsAfter": "6809732b7b19fe9e1fbfd6a8b89d5eafa5679db73f51da26429c999e55d2039f",
+  "postgresToolDirectory": null,
+  "outputSha256": "fd262ec2bbae00c03ff64bef1a6cfe73cd0b4edad943c240682eb67fd13b483a",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n ❯ |thread-safe| packages/experimental/auto-review/tests/auto-review.spec.ts (33 tests | 1 failed) 227ms\n     × uses the latest route and exactly the filtered logged five-section input 12ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/experimental/auto-review/tests/auto-review.spec.ts > native review request > uses the latest route and exactly the filtered logged five-section input\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ packages/experimental/auto-review/tests/auto-review.spec.ts:448:38\n    446|     expect(request.messages[0]).not.toHaveProperty('id')\n    447|     expect(Object.isFrozen(request.messages[0]?.content[0])).toBe(true)\n    448|     expect(Object.isFrozen(request)).toBe(true)\n       |                                      ^\n    449|\n    450|     const sections = requestSections(request)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 1 passed (2)\n      Tests  1 failed | 51 passed (52)\n   Start at  10:55:18\n   Duration  2.25s (transform 1.70s, setup 77ms, import 2.22s, tests 487ms, environment 0ms)\n\n"
+}

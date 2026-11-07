@@ -1,0 +1,14 @@
+{
+  "name": "upload-owned-postgres-start",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/restart-owned-postgres-persistent.py",
+  "startedAt": "2026-10-25T10:12:25.966502+00:00",
+  "seconds": 2.114,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "31332053f5b8238eb31949b6ef171d9dd769a1649ccc44b2ddcda6fb3abe0f13",
+  "inputsAfter": "31332053f5b8238eb31949b6ef171d9dd769a1649ccc44b2ddcda6fb3abe0f13",
+  "postgresToolDirectory": null,
+  "outputSha256": "550e8f4760f66cd844fe3eba35adf0156237c71b04af273ecfded37771d25487",
+  "outputTail": "waiting for server to start.... done\nserver started\nReused owned PostgreSQL18 cluster on56818; existing audit data retained.\n"
+}

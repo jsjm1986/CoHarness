@@ -1,14 +1,24 @@
-import { randomBytes } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, lstatSync, mkdirSync, readFileSync } from 'node:fs'
+import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { join } from 'node:path'
+import { type Document, isScalar, isSeq, parseDocument, Scalar } from 'yaml'
 import type { GatewayConfig } from './config.ts'
-import type { ProjectRuntime } from './instances.ts'
-import { ORGANIZATION_PROVIDER_PATTERN, type ModelUsageSubject } from './model-governance.ts'
+import type { PersonalRuntime, ProjectRuntime } from './instances.ts'
+import { personalRuntimeLayout } from './runtime-layout.ts'
+import { ORGANIZATION_PROVIDER_PATTERN, type ModelIntakeSubject } from './model-governance.ts'
 import type { GatewayModelGovernanceService } from './services.ts'
-import type { UserRow } from './auth.ts'
 import type { GatewayDeps } from './server.ts'
 
-interface PreviousPolicy { intakeToken?: unknown, intakeUrl?: unknown, version?: unknown }
+interface PreviousPolicy {
+  intakeToken?: unknown
+  intakeUrl?: unknown
+  version?: unknown
+  defaultAllowed?: unknown
+  models?: unknown
+  providers?: unknown
+  userDeclaredAllowed?: unknown
+}
 
 const MANAGED_DEFAULT_START = '# gateway-managed organization default: begin\n'
 const MANAGED_DEFAULT_END = '# gateway-managed organization default: end\n'
@@ -31,23 +41,28 @@ interface ModelPolicyProjection {
 type ModelGovernanceRefreshDeps = Pick<GatewayDeps, 'cfg' | 'governance'> & {
   users: Pick<GatewayDeps['users'], 'list'>
   projects: Pick<GatewayDeps['projects'], 'list'>
+  instances?: Pick<GatewayDeps['instances'], 'targetsForOwner' | 'storageOf'>
 }
 
-/** Per-process projection cache; the durable policy revision remains authoritative. */
-const projectionVersions = new Map<string, number>()
+/** Account privileges can change without a model configuration revision. */
+const projectionFingerprints = new Map<string, string>()
 const projectionQueues = new Map<string, Promise<void>>()
-const refreshTasks = new Map<string, Promise<void>>()
+const refreshTasks = new Map<string, { pending: boolean }>()
 /** Bound concurrent policy-file work below the PostgreSQL pool size. */
 const MODEL_POLICY_REFRESH_CONCURRENCY = 4
 /** Projection versions are an optimization cache, never an unbounded roster. */
 const MAX_PROJECTION_VERSION_ENTRIES = 10_000
 
-function projectionKey(subject: ModelUsageSubject, dshHome: string): string {
+function projectionKey(subject: ModelIntakeSubject, dshHome: string): string {
   return `${subject.kind}:${String(subject.id)}:${dshHome}`
 }
 
-function sameSubject(left: ModelUsageSubject | null, right: ModelUsageSubject): boolean {
-  return left?.kind === right.kind && left.id === right.id
+function sameSubject(left: ModelIntakeSubject | null, right: ModelIntakeSubject): boolean {
+  return left?.kind === right.kind && left.id === right.id && left.runtimeId === right.runtimeId
+}
+
+function policyFingerprint(policy: Pick<PreviousPolicy, 'version' | 'defaultAllowed' | 'models' | 'providers'>): string {
+  return createHash('sha256').update(JSON.stringify([policy.version, policy.defaultAllowed, policy.models, policy.providers])).digest('hex')
 }
 
 /**
@@ -73,72 +88,100 @@ export function defaultModelFromPolicy(policy: ModelPolicyProjection): { provide
   return undefined
 }
 
-function withoutManagedDefault(source: string): string {
-  const start = source.indexOf(MANAGED_DEFAULT_START)
-  if (start < 0) return source
+function withoutManagedDefault(source: string): { base: string; start: number } {
+  const start = source.match(/^# gateway-managed organization default: begin\n/m)?.index ?? -1
+  if (start < 0) return { base: source, start }
   const end = source.indexOf(MANAGED_DEFAULT_END, start + MANAGED_DEFAULT_START.length)
   if (end < 0) throw new Error('cordis.patch.yml contains an incomplete managed organization default block')
-  return `${source.slice(0, start)}${source.slice(end + MANAGED_DEFAULT_END.length)}`
-}
-
-function managedDefaultBlock(defaultModel: { provider: string; model: string } | undefined): string {
-  if (defaultModel === undefined) return ''
-  // JSON string literals are valid YAML scalars and keep arbitrary route ids
-  // from changing the generated patch structure.
-  return `${MANAGED_DEFAULT_START}- id: agent-default-model\n  config:\n    provider: ${JSON.stringify(defaultModel.provider)}\n    model: ${JSON.stringify(defaultModel.model)}\n${MANAGED_DEFAULT_END}`
+  return { base: `${source.slice(0, start)}${source.slice(end + MANAGED_DEFAULT_END.length)}`, start }
 }
 
 /** Keep the generated default below user settings while preserving all other home patches. */
-function updateManagedDefaultPatch(
+async function updateManagedDefaultPatch(
   dshHome: string,
   policy: ModelPolicyProjection,
-): void {
+): Promise<void> {
   const path = join(dshHome, 'cordis.patch.yml')
   if (!existsSync(path)) return
   const current = readFileSync(path, 'utf8')
-  const base = withoutManagedDefault(current).trimEnd()
-  const block = managedDefaultBlock(defaultModelFromPolicy(policy))
-  const retained = base === '' ? '[]' : base
-  const next = block === '' ? `${retained}\n` : `${retained}\n${block}`
-  if (next === current) return
-  const temp = `${path}.${process.pid}.${Date.now()}.${randomBytes(6).toString('hex')}.tmp`
-  try {
-    writeFileSync(temp, next, { mode: 0o644 })
-    renameSync(temp, path)
-  } catch (error) {
-    if (existsSync(temp)) unlinkSync(temp)
-    throw error
+  const { base, start } = withoutManagedDefault(current)
+  const options = {
+    customTags: [{ tag: 'tag:yaml.org,2002:js', resolve: (value: string) => value }],
   }
+  let document: Document = parseDocument(base, options)
+  const error = document.errors[0]
+  if (error !== undefined) throw error
+  if (document.contents === null || isScalar(document.contents) && document.contents.value === null) {
+    if (start >= 0) {
+      // Keep trailing comments and document-end markers after the owned row
+      // when removing it leaves no user rows.
+      document = parseDocument(`${base.slice(0, start)}[]\n${base.slice(start)}`, options)
+    } else {
+      const empty = document.createNode([])
+      empty.commentBefore = document.contents?.commentBefore
+      empty.comment = document.contents?.comment
+      document.contents = empty
+    }
+  }
+  if (!isSeq(document.contents)) throw new Error('cordis.patch.yml must contain a YAML sequence')
+  document.contents.flow = false
+  if (document.contents.comment) {
+    document.comment = [document.contents.comment, document.comment].filter(Boolean).join('\n')
+    document.contents.comment = null
+  }
+  const defaultModel = defaultModelFromPolicy(policy)
+  if (defaultModel !== undefined) {
+    const provider = new Scalar(defaultModel.provider)
+    const model = new Scalar(defaultModel.model)
+    provider.type = model.type = Scalar.QUOTE_DOUBLE
+    const row = document.createNode({ id: 'agent-default-model', config: { provider, model } })
+    row.commentBefore = MANAGED_DEFAULT_START.slice(1, -1)
+    row.comment = MANAGED_DEFAULT_END.slice(1, -1)
+    document.add(row)
+  }
+  const next = String(document)
+  if (next === current) return
+  const owner = lstatSync(dshHome)
+  await writeFileAtomic(path, next, { mode: 0o600, owner })
 }
 
 async function writeProjection(
   cfg: GatewayConfig,
   governance: GatewayModelGovernanceService,
   dshHome: string,
-  subject: ModelUsageSubject,
+  subject: ModelIntakeSubject,
   policy: Awaited<ReturnType<GatewayModelGovernanceService['policyFor']>>,
 ): Promise<string> {
+  if (governance.resolveIntakeSubject !== undefined) subject = await governance.resolveIntakeSubject(subject)
   const path = join(dshHome, 'model-governance.json')
   mkdirSync(dshHome, { recursive: true, mode: 0o700 })
   const intakeUrl = `http://127.0.0.1:${cfg.intakePort}/usage`
   let token: string | undefined, current = false
   if (existsSync(path)) {
+    const source = readFileSync(path, 'utf8')
+    let parsed: unknown
     try {
-      const previous = JSON.parse(readFileSync(path, 'utf8')) as PreviousPolicy
+      parsed = JSON.parse(source)
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error
+      // Invalid JSON has no reusable credential; replace it from current policy.
+    }
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const previous = parsed as PreviousPolicy
       if (typeof previous.intakeToken === 'string'
         && sameSubject(await governance.subjectForIntakeToken(previous.intakeToken), subject)) {
         token = previous.intakeToken
-        current = previous.version === policy.version && previous.intakeUrl === intakeUrl
+        current = policyFingerprint(previous) === policyFingerprint(policy) && previous.intakeUrl === intakeUrl
+          && previous.userDeclaredAllowed === (subject.kind === 'user')
       }
-    } catch { /* replace malformed old projection */ }
+    }
   }
   // The base bundle's legacy default is intentionally not authorized by the
   // organization policy. Projecting an authorized organization route here
   // gives accounts without a personal selection a usable starting point;
   // settings.yaml remains the higher-precedence user choice.
-  updateManagedDefaultPatch(dshHome, policy)
-  // A file already carrying this revision and a live credential is the current
-  // projection; reconcile and restart passes stay byte-stable.
+  await updateManagedDefaultPatch(dshHome, policy)
+  // Matching effective policy and a live credential keep reconciliation byte-stable.
   if (current) return path
   token ??= await governance.issueIntakeToken(subject)
   const body = {
@@ -150,31 +193,29 @@ async function writeProjection(
     // selected by the Gateway policy.
     userDeclaredAllowed: subject.kind === 'user',
   }
-  const temp = `${path}.${process.pid}.${Date.now()}.tmp`
-  writeFileSync(temp, JSON.stringify(body, null, 2), { mode: 0o600 })
-  renameSync(temp, path)
-  chmodSync(path, 0o600)
+  const owner = lstatSync(dshHome)
+  await writeFileAtomic(path, JSON.stringify(body, null, 2), { mode: 0o600, owner })
   return path
 }
 
-/** Apply a policy only when its durable revision (or file) changed. */
+/** Apply a policy when its effective contents, revision or file changed. */
 async function ensureProjection(
   cfg: GatewayConfig,
   governance: GatewayModelGovernanceService,
   dshHome: string,
-  subject: ModelUsageSubject,
+  subject: ModelIntakeSubject,
   readPolicy: () => Promise<Awaited<ReturnType<GatewayModelGovernanceService['policyFor']>>>,
 ): Promise<void> {
   const key = projectionKey(subject, dshHome)
   await queueProjection(key, governance, async () => {
     const policy = await readPolicy()
     const path = join(dshHome, 'model-governance.json')
-    if (projectionVersions.get(key) === policy.version && existsSync(path)) {
-      rememberProjectionVersion(key, policy.version)
+    if (projectionFingerprints.get(key) === policyFingerprint(policy) && existsSync(path)) {
+      rememberProjection(key, policy)
       return
     }
     await writeProjection(cfg, governance, dshHome, subject, policy)
-    rememberProjectionVersion(key, policy.version)
+    rememberProjection(key, policy)
   })
 }
 
@@ -193,13 +234,13 @@ async function queueProjection<T>(key: string, governance: GatewayModelGovernanc
 }
 
 /** Remember one projection version using insertion order as a small LRU. */
-function rememberProjectionVersion(key: string, version: number): void {
-  projectionVersions.delete(key)
-  projectionVersions.set(key, version)
-  while (projectionVersions.size > MAX_PROJECTION_VERSION_ENTRIES) {
-    const oldest = projectionVersions.keys().next().value
+function rememberProjection(key: string, policy: Pick<PreviousPolicy, 'version' | 'defaultAllowed' | 'models' | 'providers'>): void {
+  projectionFingerprints.delete(key)
+  projectionFingerprints.set(key, policyFingerprint(policy))
+  while (projectionFingerprints.size > MAX_PROJECTION_VERSION_ENTRIES) {
+    const oldest = projectionFingerprints.keys().next().value
     if (oldest === undefined) return
-    projectionVersions.delete(oldest)
+    projectionFingerprints.delete(oldest)
   }
 }
 
@@ -231,7 +272,17 @@ export async function refreshModelGovernance(
     const failure = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected')
     if (failure !== undefined) throw failure.reason
   }
-  await runBounded(users, user => writeModelGovernanceFile(deps.cfg, deps.governance!, user).then(() => undefined))
+  await runBounded(users.filter(user => user.status === 'active'), async user => {
+    if (deps.instances?.targetsForOwner === undefined || deps.instances.storageOf === undefined) {
+      await writeModelGovernanceFile(deps.cfg, deps.governance!, user)
+      return
+    }
+    for (const target of await deps.instances.targetsForOwner(user.id)) {
+      const storage = await deps.instances.storageOf(target)
+      if (storage.provisioning === 'preparing') continue
+      await writeModelGovernanceFile(deps.cfg, deps.governance!, { ...user, ...storage })
+    }
+  })
   await runBounded(projects, project => writeProjectModelGovernanceFile(deps.cfg, deps.governance!, {
     kind: 'project', id: project.id, name: project.name, path: project.path,
   }).then(() => undefined))
@@ -239,15 +290,15 @@ export async function refreshModelGovernance(
 
 /** Atomically project one user's effective model policy and stable intake credential. */
 export async function writeModelGovernanceFile(
-  cfg: GatewayConfig, governance: GatewayModelGovernanceService, user: UserRow,
+  cfg: GatewayConfig, governance: GatewayModelGovernanceService, user: PersonalRuntime,
 ): Promise<string> {
-  const dshHome = join(cfg.usersRoot, user.username, 'dsh')
-  const subject = { kind: 'user' as const, id: user.id }
+  const { dshHome } = personalRuntimeLayout(cfg, user)
+  const subject = { kind: 'user' as const, id: user.id, ...(user.runtimeId === undefined ? {} : { runtimeId: user.runtimeId }) }
   const key = projectionKey(subject, dshHome)
   return queueProjection(key, governance, async () => {
     const policy = await governance.policyFor(user)
     const path = await writeProjection(cfg, governance, dshHome, subject, policy)
-    rememberProjectionVersion(key, policy.version)
+    rememberProjection(key, policy)
     return path
   })
 }
@@ -259,12 +310,12 @@ export async function writeProjectModelGovernanceFile(
   project: ProjectRuntime,
 ): Promise<string> {
   const dshHome = join(cfg.projectRuntimesRoot, String(project.id), 'dsh')
-  const subject = { kind: 'project' as const, id: project.id }
+  const subject = { kind: 'project' as const, id: project.id, ...(project.runtimeId === undefined ? {} : { runtimeId: project.runtimeId }) }
   const key = projectionKey(subject, dshHome)
   return queueProjection(key, governance, async () => {
     const policy = await governance.policyForProject(project.id)
     const path = await writeProjection(cfg, governance, dshHome, subject, policy)
-    rememberProjectionVersion(key, policy.version)
+    rememberProjection(key, policy)
     return path
   })
 }
@@ -273,10 +324,10 @@ export async function writeProjectModelGovernanceFile(
 export async function ensureModelGovernanceForUser(
   cfg: GatewayConfig,
   governance: GatewayModelGovernanceService,
-  user: UserRow,
+  user: PersonalRuntime,
 ): Promise<void> {
-  const dshHome = join(cfg.usersRoot, user.username, 'dsh')
-  await ensureProjection(cfg, governance, dshHome, { kind: 'user', id: user.id }, () => Promise.resolve(governance.policyFor(user)))
+  const { dshHome } = personalRuntimeLayout(cfg, user)
+  await ensureProjection(cfg, governance, dshHome, { kind: 'user', id: user.id, ...(user.runtimeId === undefined ? {} : { runtimeId: user.runtimeId }) }, () => Promise.resolve(governance.policyFor(user)))
 }
 
 /** Lazily refresh one project runtime's policy before it handles a request. */
@@ -286,55 +337,75 @@ export async function ensureModelGovernanceForProject(
   project: ProjectRuntime,
 ): Promise<void> {
   const dshHome = join(cfg.projectRuntimesRoot, String(project.id), 'dsh')
-  await ensureProjection(cfg, governance, dshHome, { kind: 'project', id: project.id }, () => Promise.resolve(governance.policyForProject(project.id)))
+  await ensureProjection(cfg, governance, dshHome, { kind: 'project', id: project.id, ...(project.runtimeId === undefined ? {} : { runtimeId: project.runtimeId }) }, () => Promise.resolve(governance.policyForProject(project.id)))
 }
 
 /**
  * Retry a complete policy projection after a database mutation. The database
  * revision is durable; this task is only an eventually-consistent file cache,
  * so a transient filesystem/runtime failure must not turn a committed admin
- * mutation into a half-failed request.
+ * mutation into a half-failed request. Triggers received during a pass retain
+ * one pending pass, which reads the current durable policy for every subject.
  */
 export function scheduleModelGovernanceRefresh(
   deps: ModelGovernanceRefreshDeps,
 ): void {
   if (deps.governance === undefined) return
   const key = `${deps.cfg.usersRoot}:${deps.cfg.projectRuntimesRoot}`
-  if (refreshTasks.has(key)) return
+  const running = refreshTasks.get(key)
+  if (running !== undefined) {
+    running.pending = true
+    return
+  }
+  const state = { pending: true }
+  refreshTasks.set(key, state)
   const task = (async () => {
-    let delay = 250
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      try {
-        await refreshModelGovernance(deps)
-        return
-      } catch (error: unknown) {
-        if (attempt === 5) {
-          console.error('[gateway] model policy projection remains pending:', error)
-          return
+    try {
+      while (state.pending) {
+        state.pending = false
+        let delay = 250
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          try {
+            await refreshModelGovernance(deps)
+            break
+          } catch (error: unknown) {
+            if (attempt === 5) {
+              console.error('[gateway] model policy projection remains pending:', error)
+              break
+            }
+            await new Promise<void>(resolve => {
+              const timer = setTimeout(resolve, delay)
+              timer.unref?.()
+            })
+            delay = Math.min(10_000, delay * 2)
+          }
         }
-        await new Promise<void>(resolve => {
-          const timer = setTimeout(resolve, delay)
-          timer.unref?.()
-        })
-        delay = Math.min(10_000, delay * 2)
       }
+    } finally {
+      if (refreshTasks.get(key) === state) refreshTasks.delete(key)
     }
   })()
-  refreshTasks.set(key, task)
-  void task.finally(() => {
-    if (refreshTasks.get(key) === task) refreshTasks.delete(key)
-  }).catch(() => {})
+  void task.catch(error => { console.error('[gateway] model policy refresh worker failed:', error) })
 }
 
 /** Rewrite policy; a running instance applies it through the plugin's file watcher. */
 export async function applyModelGovernanceToUser(
-  deps: Pick<GatewayDeps, 'cfg' | 'governance' | 'users'>,
+  deps: Pick<GatewayDeps, 'cfg' | 'governance' | 'users'> & { instances?: Pick<GatewayDeps['instances'], 'targetsForOwner' | 'storageOf'> },
   userId: number,
 ): Promise<void> {
   if (deps.governance === undefined) throw new Error('model governance unavailable')
   const user = await deps.users.getById(userId)
   if (user === null) throw new Error(`no user ${userId}`)
-  await writeModelGovernanceFile(deps.cfg, deps.governance, user)
+  if (user.status !== 'active') return
+  if (deps.instances?.targetsForOwner === undefined || deps.instances.storageOf === undefined) {
+    await writeModelGovernanceFile(deps.cfg, deps.governance, user)
+    return
+  }
+  for (const target of await deps.instances.targetsForOwner(userId)) {
+    const storage = await deps.instances.storageOf(target)
+    if (storage.provisioning === 'preparing') continue
+    await writeModelGovernanceFile(deps.cfg, deps.governance, { ...user, ...storage })
+  }
 }
 
 /** Rewrite one project's shared policy; a running runtime applies it through the file watcher. */

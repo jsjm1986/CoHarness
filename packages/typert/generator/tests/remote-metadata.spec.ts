@@ -228,6 +228,7 @@ declare module '@fixture/remote/types' {
         return statement.moduleSpecifier.text
       })
       expect(imports.sort()).toEqual(['@deepseek-ai/dsh-typert-protocol/remote-info', 'zod'])
+      expect(source).toContain('}, { strictObject: z.strictObject })')
       const parameterSpecs: ts.ObjectLiteralExpression[] = []
       const collectParameters = (node: ts.Node): void => {
         if (ts.isPropertyAssignment(node) && node.name.getText(tree) === 'parameters') {
@@ -540,7 +541,7 @@ export class GoalService extends TypertRemoteService {
     if (artifact?.remote === undefined) throw new Error('missing Remote artifact')
     for (const source of [artifact.js, artifact.remote.js]) {
       expect(source).toContain("import { z } from 'zod'")
-      expect(source).toContain('}, z)')
+      expect(source).toContain('}, { strictObject: z.strictObject })')
     }
     const host = await executableRemoteModule<{ TYPERT: { schemas: unknown[]; invocations: RuntimeMethod[] } }>(artifact.js)
     const remote = await executable(artifact.remote.js)

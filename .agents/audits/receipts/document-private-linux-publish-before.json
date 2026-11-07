@@ -1,0 +1,14 @@
+{
+  "name": "document-private-linux-publish-before",
+  "cwd": ".",
+  "command": "limactl shell redroid -- sudo -n -- /tmp/coharness-document-audit.xhw1BMPE/node-v24.19.0-linux-arm64/bin/node /tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs --uid --case publish",
+  "startedAt": "2026-10-26T23:19:14.962585+00:00",
+  "seconds": 1.858,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "469ca847ae7e12a9db49d8569ba3e3b5bdff3d50ecfd2f45b8d76b1376da6813",
+  "inputsAfter": "469ca847ae7e12a9db49d8569ba3e3b5bdff3d50ecfd2f45b8d76b1376da6813",
+  "postgresToolDirectory": null,
+  "outputSha256": "dc5380cf77d3244cb037c379367345b5aea01a7297339b4154b965854d276e68",
+  "outputTail": "{\"operation\":\"legacy-cross-uid\",\"ordinary\":\"EACCES\",\"actor\":\"EACCES\"}\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: publish wrote outside the admitted parent\n+ actual - expected\n\n  [\n+   'published.txt',\n    'source.txt'\n  ]\n\n    at file:///tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs:962:10 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: [ 'published.txt', 'source.txt' ],\n  expected: [ 'source.txt' ],\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v24.19.0\n"
+}

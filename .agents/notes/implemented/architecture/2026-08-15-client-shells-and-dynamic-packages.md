@@ -30,6 +30,12 @@ Shared UI libraries still expose synchronous TypeScript and React values to many
 
 The `staticLinked` preset leaves every bare specifier as an external import in `lib/index.js` and emits relative CSS assets beside it. The Vite host resolves and deduplicates those imports and decides final chunk boundaries. A static library therefore does not copy the host's bundling policy into its own artifact.
 
+### Dynamic output formatting
+
+Dynamic Client entries and lazy chunks use format-only minification: `compress: false`, `mangle: false`, preserved function and class names, and unchanged internal export names. Legal and optimizer-annotation comments remain in JavaScript; ordinary documentation remains available through the original source content in chained source maps. The Node and `staticLinked` build forms keep independent output settings.
+
+This policy reduces the bytes every cold browser receives without changing private dependency placement or shared module identities. Cordis uses function names during registration, and package-local lazy imports must retain the module table's asynchronous loading operation. The compiler's `renderChunk` stage rewrites generated quoted imports to `require.async` before minification chooses the final literal spelling; a real preset fixture verifies this order and executes its lazy chunk through `ClientModuleSystem`. A compiler upgrade that changes this order must preserve the asynchronous rewrite and source-map chain.
+
 ### Shared module requests
 
 Dynamic browser bundles implicitly externalize the common baseline: `PLATFORM_MODULES` names shell-seeded React, Cordis, and static UI identities, while `PRELOADED_CLIENT_EXTERNALS` names runtime's parser-preloaded dynamic identity. A package uses `dsh.client.external` only for an exact non-baseline value request. Type-only imports are erased and create no request; permitted third-party implementation libraries remain private bundle contents.
@@ -75,6 +81,10 @@ Ordinary installed libraries remain `dependencies`: a dynamic build may bundle a
 
 **Hardcode preload URLs in `apps/web/index.html`.** URLs and `rev` values belong to the host's current graph. Rewriting the served HTML keeps the queue, bundle URLs, and manifest on one graph revision.
 
+**Enable semantic compression or identifier mangling for dynamic bundles.** Both widen the behavior that needs compatibility evidence. Format-only output already removes repeated whitespace and documentation while retaining names used by Cordis; further compression needs separate reflection, lazy-loading, and assembled-application validation.
+
+**Instrument declarations with `keepNames`.** When both an entry and its lazy chunk declare named functions or classes, Rolldown extracts the name helper into a synchronously required runtime chunk. The module table cannot materialize an unregistered private chunk through synchronous `require`. Disabled compression and mangling preserve the ordinary bundle's reflection names without that helper; the real preset fixture compares entry and lazy names against unformatted output and rejects additional synchronous chunk requests.
+
 ## Consequences
 
 Bundle contents stay stable when an npm dependency moves between peer and development sections, because each build face declares externality directly. Static libraries remain host-assembled, while dynamic packages retain uniform artifacts and lifecycle governance.
@@ -82,5 +92,7 @@ Bundle contents stay stable when an npm dependency moves between peer and develo
 The startup protocol depends on the modules and runtime package ids, and modules must remain self-contained at runtime. A missing bootstrap registration fails before Cordis starts; later plugin import, apply, and service-wait failures remain visible through the boot page's ACTIVE scan.
 
 The shell consumes built `lib/` products, so source and browser artifacts can drift until the relevant build or watcher runs. Typechecking source alone does not prove the served application uses the same code.
+
+Output formatting reduces transfer bytes, but each private dependency still has its own copy in each consumer bundle. Byte counts alone do not establish a faster usable workbench; release validation also covers the final compressed responses, module boot, lazy pages, and browser completion endpoint.
 
 The two static UI libraries remain deliberate exceptions. Converting either one to a dynamic package requires moving all value consumers to services or slots and removing its identity from the static seed in the same change.

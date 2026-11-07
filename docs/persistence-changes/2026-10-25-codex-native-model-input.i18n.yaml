@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-10-25-codex-native-model-input.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-25-codex-native-model-input.md
+document:
+  en: 7dd53928346868b8cb48aec06ad9e9df6fd7d67c
+  zh: f73785741c2a1f157c4506cd24645612773d3e4b
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-25-codex-native-model-input:
+  en: 3820d99e23e21229
+  zh: 4f359397549b1416
+/2026-10-25-codex-native-model-input/summary:
+  en: 614069c2eee9fd15
+  zh: ef7d507bcb586b43
+/2026-10-25-codex-native-model-input/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-25-codex-native-model-input/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-25-codex-native-model-input/compatibility:
+  en: 83c855f348d087fb
+  zh: e45f4c71025d9b30
+/2026-10-25-codex-native-model-input/verification:
+  en: 4bdb33a4d9ebbf2e
+  zh: e4e5cbd451edc447
+/2026-10-25-codex-native-model-input/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

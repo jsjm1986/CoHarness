@@ -12,6 +12,8 @@ Status: implemented
 
 远程桌面管理有且只有一个家：gateway admin 面（`/admin` → Remote Desktop）。`settings.section` 贡献连同整个包一并移除——删除 `packages/client/ui-remote-desktop-admin`，摘掉其 `web-app` 组合项与清单依赖，清理或重生成所有列出它的注册表（coverage baseline、README Model Experience 契约、upstream-sync 清单、tsconfig paths/references、各生成编目）。终端用户保留经 `ui-remote-desktop` 侧栏 guide 的 consent → attach → RFB 流程；没有任何用户可操作能力丢失，因为被移除的区块执行的是经会话 wire 的管理员操作，而非面向用户的设置。
 
+Gateway 将服务端认证的账号 id 传给端点、授权及审计操作。PostgreSQL 在文件工作完成前保留活跃组织、当前活跃管理员账号及成员身份；授权归属使用该保留账号的当前用户名。被撤权管理员不能沿用先前 HTTP 检查继续执行。变更先取得共享文件锁再准入管理员，并保留权限至发布。数据库连接丢失会中止操作信号，原子文件发布在发起 rename 前检查该信号。已发起的 rename 仍可能提交，因此失败响应后应先读取当前状态再重试。[文件状态决策](../bug-fix/2026-10-20-remote-desktop-file-state-and-wire-error-repairs.zh.md)负责协作写入及缓存失效规则。
+
 ## 已考虑的替代方案
 
 **保留包挂载但仅对 admin 主体可见。** 否决：用户设置里仍会挂着一个管理区块，且 gateway admin 页已以更完整的端点编辑器渲染同一批操作——同一决策的两个家必然分叉。

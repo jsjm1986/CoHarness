@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
 import { DocumentsPage } from './DocumentsPage.tsx'
@@ -20,6 +21,24 @@ vi.mock('../api.ts', async (importOriginal) => {
 })
 
 describe('DocumentsPage', () => {
+  it('opens the mobile document detail with a named keyboard action', async () => {
+    const document = (await api.listAdminDocuments())[0]!
+    vi.mocked(api.getAdminDocument).mockResolvedValue({ document, history: [], copies: [] })
+    render(<DocumentsPage />)
+    const open = await screen.findByRole('button', { name: '查看详情 设计说明.md' })
+    open.focus()
+    await userEvent.keyboard('{Enter}')
+    await screen.findByRole('dialog', { name: '设计说明.md' })
+    expect(api.getAdminDocument).toHaveBeenCalledExactlyOnceWith(document.catalogId)
+  })
+
+  it('does not describe an unread document catalog as empty', async () => {
+    vi.mocked(api.listAdminDocuments).mockRejectedValueOnce(new Error('documents-unavailable'))
+    render(<DocumentsPage />)
+    expect((await screen.findByRole('alert')).textContent).toBe('documents-unavailable')
+    expect(screen.queryByText('没有匹配的文档')).toBeNull()
+    expect(screen.queryByText('0 条记录')).toBeNull()
+  })
   afterEach(() => cleanup())
 
   beforeEach(() => {
@@ -77,6 +96,32 @@ describe('DocumentsPage', () => {
       fireEvent.click(dialog.getByRole('button', { name: '转移所有权' }))
       await waitFor(() => expect(api.transferAdminDocumentOwnership).toHaveBeenCalledWith(document.catalogId, 2))
     }
+  })
+
+  it.each(['trash', 'purged', 'missing'] as const)('hides ownership transfer for a project document in %s', async state => {
+    const original = (await api.listAdminDocuments())[0]!
+    const document: api.AdminDocument = { ...original, scope: { kind: 'project', id: 3, label: 'Shared' }, state }
+    vi.mocked(api.listAdminDocuments).mockResolvedValue([document])
+    vi.mocked(api.getAdminDocument).mockResolvedValue({ document, history: [], copies: [] })
+    render(<DocumentsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '查看详情' }))
+    const dialog = within(await screen.findByRole('dialog', { name: '设计说明.md' }))
+    expect(dialog.queryByRole('button', { name: '转移所有权' })).toBeNull()
+    if (state === 'missing') expect(dialog.getByText('文件缺失')).toBeTruthy()
+  })
+
+  it('filters missing records without presenting them as permanently purged', async () => {
+    const original = (await api.listAdminDocuments())[0]!
+    vi.mocked(api.listAdminDocuments).mockResolvedValue([{ ...original, state: 'missing' }])
+    render(<DocumentsPage />)
+    await screen.findByRole('button', { name: '查看详情' })
+    const state = screen.getByLabelText('状态')
+    fireEvent.change(state, { target: { value: 'missing' } })
+    fireEvent.click(screen.getByRole('button', { name: '应用筛选' }))
+    await waitFor(() => expect(api.listAdminDocumentsPage).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'missing' })))
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('文件缺失')).toBeTruthy()
+    expect(table.queryByText('已永久清理')).toBeNull()
   })
 
   it('renders document owner sources with localized labels', async () => {

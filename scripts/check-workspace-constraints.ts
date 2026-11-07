@@ -10,6 +10,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { load as loadYaml } from 'js-yaml'
 import {
+  EXPERIMENTAL_PACKAGE_NAME_PREFIX,
   isPublicExperimentalPackageDirectory,
   PRIVATE_EXPERIMENTAL_PACKAGE_DIRECTORIES,
 } from './experimental-package-policy.ts'
@@ -49,14 +50,12 @@ const publicNativePackages = new Set([
 ])
 /** Deliberate source payloads whose exact bytes are part of the package's audit surface. */
 const publicationSourceAllowlist: Readonly<Record<string, readonly string[]>> = {
-  '@deepseek-ai/node-addon-system': ['src/main.c', 'src/flock.c'],
+  '@deepseek-ai/node-addon-system': ['src/main.c', 'src/flock.c', 'src/directory.c'],
 }
 /** Public source home recorded in maintained package manifests. */
 const publishedRepositoryUrl = 'git+https://github.com/deepseek-ai/deepseek-harness.git'
 /** Packages that participate in the experimental policy. */
 const experimentalPackageDirectory = /^packages\/experimental\/[^/]+$/
-/** npm namespace reserved for experimental packages. */
-const experimentalPackageNamePrefix = '@deepseek-ai/dsh-experimental-'
 /** Private reference tool run from the repository; it publishes no files. */
 const pluginMarketGeneratorDirectory = 'apps/plugin-market-generator'
 /**
@@ -201,10 +200,15 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-client-ui-sidebar-documentpreview': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
   // Workbench loads its PDF renderer and spreadsheet parser/renderer on demand, including licensed Worker assets.
-  '@deepseek-ai/dsh-client-ui-workbench': ['lib/client.excel.js', 'lib/client.frontmatter-fields.js', 'lib/client.LazyExcelBody.js', 'lib/client.pdf.js'],
+  '@deepseek-ai/dsh-client-ui-workbench': [
+    'lib/client.cmaps.js', 'lib/client.excel.js', 'lib/client.fonts.js',
+    'lib/client.frontmatter-fields.js', 'lib/client.pdf.js', 'lib/client.wasm.js',
+  ],
   // TODO(alpha.2): restore 'lib/apply-injections.js' when the worker-page
   // index-injection interpreter is ported with its first consumer.
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],
+  // Document icons distribute their upstream license notice.
+  '@deepseek-ai/dsh-client-ui-documents': ['LICENSE.material-icon-theme'],
   '@deepseek-ai/dsh-client-ui-theme': ['lib/styles'],
   // The physical-key protocol is a public entry usable without the browser service.
   '@deepseek-ai/dsh-client-shortcuts': ['lib/protocol.js'],
@@ -223,6 +227,16 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // The Web Host mounts the default-off settings owner independently of each
   // Agent-scoped delegation-tool instance.
   '@deepseek-ai/dsh-tool-subagent': ['lib/model-selection-settings.js'],
+  // The Gateway's resource wire entry includes its standalone validators.
+  '@deepseek-ai/dsh-resource-budget': ['lib/wire.js'],
+  // Browser consumers decode document identity without loading the document service.
+  '@deepseek-ai/dsh-userdoc': ['lib/identity.js'],
+  // The runtime provider and Gateway server adapter share generated frame and protocol chunks.
+  '@deepseek-ai/dsh-userdoc-gateway': ['lib/protocol.js', 'lib/server.js', 'lib/frame-*.js', 'lib/protocol-*.js'],
+  '@deepseek-ai/dsh-gateway-runtime': ['lib/resource-budget.js'],
+  '@deepseek-ai/dsh-gateway-execution': ['lib/desktop-availability.js'],
+  // SDK children load their independent control plugin before profile entries.
+  '@deepseek-ai/dsh-subagent-dsh-sdk': ['lib/managed.js'],
   // The JSONL backend resolves its private verification Worker relative to
   // import.meta.url; it is shipped without a public package subpath.
   '@deepseek-ai/dsh-session-persistence-jsonl': ['lib/worker.cjs'],
@@ -257,6 +271,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
     'lib/runner.js',
     'lib/runner-*.js',
     'lib/output.js',
+    'lib/output-*.js',
     'scripts/ensure-spawn-helper.mjs',
   ],
   // tsdown shares the repository/pack code between the lib entry and the bin
@@ -382,8 +397,8 @@ export function checkExperimentalManifest(
   if (!experimentalPackageDirectory.test(dir)) return []
   const label = manifest.name ?? dir
   const errors: string[] = []
-  if (manifest.name?.startsWith(experimentalPackageNamePrefix) !== true) {
-    errors.push(`${label}: experimental package name must start with ${JSON.stringify(experimentalPackageNamePrefix)}`)
+  if (manifest.name?.startsWith(EXPERIMENTAL_PACKAGE_NAME_PREFIX) !== true) {
+    errors.push(`${label}: experimental package name must start with ${JSON.stringify(EXPERIMENTAL_PACKAGE_NAME_PREFIX)}`)
   }
   if (isPublicExperimentalPackageDirectory(dir, privateDirectories)) {
     if (manifest.private === true) errors.push(`${label}: public experimental package must not set "private": true`)

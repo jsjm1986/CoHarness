@@ -5,13 +5,12 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { Config } from '../src/config.ts'
 import { en, zh } from '../src/client/excel/locales.ts'
-import type { ExcelBodyProps, LoadedExcelBodyProps } from '../src/client/excel/LazyExcelBody.tsx'
+import type { ExcelBodyProps, LoadedExcelBodyProps } from '../src/client/excel/viewer.ts'
 
 const mocked = vi.hoisted(() => ({ parse: vi.fn(), workbook: vi.fn((_props: unknown) => null) }))
 vi.mock('../src/client/excel/parse.ts', () => ({ parseExcel: mocked.parse }))
 vi.mock('@fortune-sheet/react', () => ({ Workbook: mocked.workbook }))
 import { ExcelBody } from '../src/client/excel/excel.tsx'
-import { LazyExcelBody } from '../src/client/excel/LazyExcelBody.tsx'
 
 const props = { data: new Uint8Array([1]), limits: Config({}).excel, t: makeTranslate(en), path: 'book.xlsx' } as ExcelBodyProps
 const loadedProps = { ...props, format: 'xlsx', loading: <p role="status">{en.loading}</p> } satisfies LoadedExcelBodyProps
@@ -97,14 +96,6 @@ it.each(['invalid', 'tooLarge', 'timeout', 'encoding', 'unexpected'])('shows loc
   fireEvent.click(screen.getByRole('button', { name: en.retry }))
   await waitFor(() => { expect(mocked.workbook).toHaveBeenCalledOnce() })
   expect(mocked.parse).toHaveBeenCalledTimes(2)
-})
-
-it.each(['xlsx', 'xls', 'csv', 'tsv'])('loads the spreadsheet chunk for %s', async (format) => {
-  mocked.parse.mockResolvedValue(value)
-  render(<LazyExcelBody {...props} path={`book.${format}`} />)
-  await waitFor(() => { expect(mocked.workbook).toHaveBeenCalledOnce() })
-  expect(screen.queryByRole('button', { name: en.formulaWarning })).toBeNull()
-  expect(mocked.parse.mock.calls[0]![1]).toBe(format)
 })
 
 it('uses generic guidance for non-Error failures and ignores rejection after unmount', async () => {

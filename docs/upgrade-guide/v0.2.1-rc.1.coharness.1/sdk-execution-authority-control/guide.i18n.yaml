@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-execution-authority-control/guide.md
+document:
+  en: bfb2eda29a9249f74b845a1c16b96a8bd19eadcb
+  zh: 6038669088201f4d41cecdad799a64c287000ae1
+/:
+  en: 197cfdaeab627af0
+  zh: 0dc39a4a66183ff4
+/retain-parent-execution-authority-in-sdk-children:
+  en: 12b620dc5cc88ae3
+  zh: 09b4f2b1bc8cf5b9
+/retain-parent-execution-authority-in-sdk-children/change:
+  en: d5578117cdff72ed
+  zh: a1a6cc6f988ce012
+/retain-parent-execution-authority-in-sdk-children/migration:
+  en: 541d161891883ea7
+  zh: bf498a42d6e76240

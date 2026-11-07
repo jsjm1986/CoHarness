@@ -16,8 +16,11 @@
                 defaultReasoningEffort: max
 
 - insert:
+    - id: mcp-resource-admission-fixture
+      name: './resource-admission-fixture.mjs'
     - id: mcp-resource-catalog
       name: '@deepseek-ai/dsh-mcp-client'
+      inject: [resourceBudget]
       config:
         transport: stdio
         serverName: catalog

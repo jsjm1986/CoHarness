@@ -1,0 +1,438 @@
+{
+  "at": "2026-10-31T01:22:00.348211+00:00",
+  "findings": [
+    "B380",
+    "B381"
+  ],
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T003545Z",
+  "sourcePaths": [
+    "packages/subagent/subagent-dsh-sdk/src/managed.ts",
+    "packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+    "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+    "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown-child.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/model-shutdown.jsonl",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/resource-completion.jsonl",
+    "packages/subagent/subagent-dsh-sdk/README.md",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subagent/subagent-dsh-sdk/src/managed.ts": "4a92f4447c8960b4b99173ab99fabdce33ebfc6475498f47e43345efda03e8c5",
+    "packages/subagent/subagent-dsh-sdk/src/managed-client.ts": "3a9a7c7056f261445ad3f8047d268e0280bf160990786326d63e23ca7034d454",
+    "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts": "cf15e64b85fd8056f3a1d8fd31d3c0ca08a399d42a2bd3f7d499a6ad20099c08",
+    "packages/subagent/subagent-dsh-sdk/src/bridge.ts": "985d30c6125f09e152d820b844055a1ccb8c6986072fb0dbd1578018c25bae24",
+    "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts": "baaba3b3e6d9091c345757dfb444bab7bd3bf76ccd09edd014959a553b88c533",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts": "8cce72abdfa5139a06d682769c0cfaa0fb0623b429b61a73f1a5883ba2283f3e",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs": "0e07c4eec48011f3a44183e954e0905cdfeda38860cc45780d28b319a40c613f",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown-child.mjs": "fc5cecbcf43373a89ab9a652e8904a5642dc65edb9f8255bcec07ef27d214a76",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs": "e85804b2cf6119c73091c9ae6a4ff58f605b4b0e0d9890e9e35143178faed6dd",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs": "10e4d9c1fe90121b029c6408c06fc27837f5998b81a9e412f471b3eae30d5f2e",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/model-shutdown.jsonl": "3636487729ef47d4392458e285548813b16071de2b0473102ec5fe784468f78d",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/resource-completion.jsonl": "eca5027c2ebf74766999e9bba76be956da3f098578b36010e6731268bc00ee9d",
+    "packages/subagent/subagent-dsh-sdk/README.md": "64372ac6c93547d24c3a6916e587b7d3a27c7990326f0bece6e1cd7121501887",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md": "2b5005988c03c78957491a4ecca856bab92ad577de85fff624effcae61bf818c",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml": "3046aa59bcea8da72647e218853c84464879b912f37ae4f8e3afe1335240c11a",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md": "74b9d9aa3c924551d05388d693b9d40e346157fbd1a764387f672d055688f761",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md": "f3178db551e8e17ad3df4a0d870c45be8196d3b38a93a24da465f1be35a5f42f",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml": "c36ce37ad132b8156c5bd22e5902f62109305f2fa057bfc0026d68e1edbc09f8",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md": "fd745f540c1fc97013ebf6227ed36649b90a98a96cf20f0c09dc2502cacdbe23",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md": "ea1258a6fb923743c903521f37fde8d0814560eed494593e45bd637f5bb1f4a6",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml": "d2df3877d47207d1bce8f70d77612d7dd14072393170a61fbfaf802503c09ca1"
+  },
+  "builtArtifacts": {
+    "packages/subagent/subagent-dsh-sdk/lib/index.js": "4aed1a7ee4e62efe0a9f7c9d21ca03f1a79abb252f25bc94243b8b84c1ea730a",
+    "packages/subagent/subagent-dsh-sdk/lib/managed.js": "dbdfc0a4e29ef05e174875d38fc1e4d88f1b29f3a685bdf0a3bf8753866eaa72"
+  },
+  "behavior": {
+    "B380": "Child model closures retain their original ids until parent acknowledgement. Later model/process admission and provider withdrawal retry retained closures; persistent failures remain visible and refuse replacement admission. Concurrent attempts share one pending report.",
+    "B381": "Completion messages advertise the ordered registration attempts already settled in the child. The parent retires obsolete early cancellations while preserving registered models, queued resource grants and future cancellation ids.",
+    "wireChange": "Private /model/close and /resource/finish accept optional settledRegistration. Parent and child CLI builds must match; byte limits include this metadata.",
+    "unchangedData": "No new public SDK arguments, Session events, Session generation changes or database schema versions."
+  },
+  "negativeEvidence": {
+    "source": [
+      "sdk-model-close-recovery-before-fix",
+      "sdk-cancelled-prefix-before-fix"
+    ],
+    "builtAttempts": [
+      "sdk-model-close-built-causal-before-fix",
+      "sdk-cancelled-prefix-built-before-fix"
+    ],
+    "interpretation": "Source negatives directly show exhausted model-span and early-cancellation capacities. Old compiled assembly attempts also fail; their adapter-removal/startup diagnostics are indirect and are not used as independent causal proofs. The first model-shutdown attempt timed out because fixture rollback did not abort its own consumer; the fixture was corrected before final validation."
+  },
+  "verification": {
+    "uniqueCases": 239,
+    "sdkPackageCases": 234,
+    "typescriptProjectionCases": 4,
+    "pythonProjectionCases": 1,
+    "coverage": {
+      "managed.ts": {
+        "statements": [
+          112,
+          112
+        ],
+        "branches": [
+          46,
+          46
+        ],
+        "functions": [
+          20,
+          20
+        ],
+        "lines": [
+          87,
+          87
+        ]
+      },
+      "managed-client.ts": {
+        "statements": [
+          82,
+          82
+        ],
+        "branches": [
+          34,
+          34
+        ],
+        "functions": [
+          18,
+          18
+        ],
+        "lines": [
+          61,
+          61
+        ]
+      },
+      "managed-budget.ts": {
+        "statements": [
+          104,
+          104
+        ],
+        "branches": [
+          54,
+          54
+        ],
+        "functions": [
+          22,
+          22
+        ],
+        "lines": [
+          81,
+          81
+        ]
+      },
+      "bridge.ts": {
+        "statements": [
+          237,
+          237
+        ],
+        "branches": [
+          154,
+          154
+        ],
+        "functions": [
+          41,
+          41
+        ],
+        "lines": [
+          177,
+          177
+        ]
+      }
+    },
+    "buildGates": 8,
+    "documentationGates": 20,
+    "engines": [
+      "macOS source SDK examples",
+      "macOS Node22 compiled SDK examples",
+      "macOS Node24 compiled SDK examples"
+    ],
+    "modelShutdown": {
+      "allocations": 5,
+      "occupied": 0,
+      "modelClosureRecoveredBeforeNextModel": true
+    },
+    "resourceCompletion": {
+      "allocations": 6,
+      "acknowledgements": 6,
+      "releaseAttempts": 9,
+      "occupied": 0,
+      "consecutiveCancelledRegistrations": 4
+    },
+    "checks": {
+      "sdk-model-cancellation-package-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:19:02.061005+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T003545Z/coverage-package"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:19:36.308415+00:00"
+      },
+      "sdk-model-cancellation-build-final": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:17:17.407138+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:18:53.328420+00:00"
+      },
+      "sdk-model-cancellation-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:19:37.762555+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:19:42.482680+00:00"
+      },
+      "sdk-model-cancellation-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:20:24.295534+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:20:29.171605+00:00"
+      },
+      "sdk-model-cancellation-projection-snapshots": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:20:01.236722+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/scoped-sdk-model-admission.snapshot.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:20:06.424275+00:00"
+      },
+      "sdk-model-cancellation-python-sdk": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:20:48.655402+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_memory_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:20:50.661971+00:00"
+      },
+      "sdk-model-cancellation-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:17:24.887478+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:19:31.447603+00:00"
+      },
+      "sdk-model-cancellation-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:17:18.569746+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:17:28.264958+00:00"
+      },
+      "sdk-model-cancellation-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:16:54.759798+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:18:06.579579+00:00"
+      },
+      "sdk-model-cancellation-export-jsdoc": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:19:38.925011+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:19:43.978142+00:00"
+      },
+      "sdk-model-cancellation-entrypoints": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:19:38.923673+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-application-entrypoints.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:19:39.591915+00:00"
+      },
+      "sdk-model-cancellation-doc-pairing": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:16:54.759766+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "packages/subagent/subagent-dsh-sdk/README.md",
+          ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:16:55.308248+00:00"
+      },
+      "sdk-completion-guide": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:18:12.806905+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T003545Z/verify-sdk-guide.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:18:12.874467+00:00"
+      },
+      "latest-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:18:12.805393+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:18:17.537258+00:00"
+      }
+    },
+    "paidProviderCalls": "None. All model fixtures use owned local inference; actual Responses validation remains deferred."
+  },
+  "noteReview": {
+    "updatedOwningNote": ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    "newNotes": 0,
+    "archivedOrDeleted": 0,
+    "retainedActive": [
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+      ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md"
+    ],
+    "reason": "The existing managed SDK note owns completion identities and registration ordering. Native process and external model control notes retain independent ownership; frozen archives were untouched.",
+    "upgradeGuide": "Updated the SDK README, owning note and current guide bilingual triplets; guide is 469 English words. The guide explicitly requires matching builds for the private completion metadata."
+  },
+  "baseline": {
+    "at": "2026-10-31T01:18:17.537258+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "peerThread": "multi-computer architecture chat",
+    "peerReportedRelease": "R6 on mac-mini and Ubuntu; auth-only incremental deployment, schema102 and epoch83.",
+    "peerReportedVerification": "19 real PostgreSQL auth cases and 8-concurrent token performance 7932.94ms to 963.68ms; page performance remains REAL-001 open.",
+    "independentlyVerifiedByThisBatch": false,
+    "rootReleaseStatus": "B379 and B380/B381 are outside R6. Root did not deploy or operate production databases or Docker.",
+    "reservedPeerPaths": [
+      "gateway/src/postgres/auth-service.ts",
+      "gateway/tests/auth-postgres.spec.ts",
+      "Gateway HTML and real Web assembly fixtures",
+      "topology/node access, CUA and migration101/102",
+      "the three resource-budget files and late UI authorization hydration"
+    ],
+    "handoff": "One receipt and source-hash handoff after verification; no repeated progress messages."
+  },
+  "remaining": [
+    "All 12 business domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Private transport concurrency, resource-only governance of external runtimes and remaining cross-computer permissions require further review.",
+    "No fresh PostgreSQL acceptance in this batch. The previously observed owned port was unreachable; current container ownership and mapping have not been revalidated.",
+    "No new physical Linux or Windows acceptance by this batch; peer deployment claims remain attributed to the peer.",
+    "Full doc-sync and actual Responses validation are not claimed passing."
+  ]
+}

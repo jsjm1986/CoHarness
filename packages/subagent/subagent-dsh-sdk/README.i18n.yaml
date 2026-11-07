@@ -3,32 +3,32 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-dsh-sdk/README.md
 document:
-  en: e6cd82e6bcb9b291f36bf43e5c73fdc481f14a5a
-  zh: 269edf72a03954ad3b58ba8b459684ff6a7927f5
+  en: d72df27f4a959060f9336e0159d42db0e0c078d7
+  zh: eefe6c6983dcfddb8e124cfe9a966fe9010b3dd1
 /:
   en: a0d1fdffa7b1e4b4
   zh: 61495d48365178df
 /deepseek-ai-dsh-subagent-dsh-sdk:
-  en: 64694f591b65408b
-  zh: 8203b6f2e47699d6
+  en: 5099a616b82ec3ca
+  zh: 573efeecfcfb07c6
 /deepseek-ai-dsh-subagent-dsh-sdk/summary:
-  en: 0b7768cbc0d34ed5
-  zh: 89af162c917e4ec0
+  en: 5692d51818c25219
+  zh: fb1cdc2c10570275
 /deepseek-ai-dsh-subagent-dsh-sdk/table-of-contents:
   en: 108a1f0ffcf96dd5
   zh: 254051d51e62e04f
 /deepseek-ai-dsh-subagent-dsh-sdk/start-and-ownership:
-  en: 336f79c20fffdfb8
-  zh: 39f3ff327753530a
+  en: 63d6086cf4669572
+  zh: 53f803e9061005a8
 /deepseek-ai-dsh-subagent-dsh-sdk/stop-reason-mapping:
   en: 511fbcc375d05958
   zh: fcea675389c9f245
 /deepseek-ai-dsh-subagent-dsh-sdk/capabilities-and-context:
-  en: 98dd5d592b1b3c4e
+  en: d22550ccbd2f8962
   zh: 88845b202986b95f
 /deepseek-ai-dsh-subagent-dsh-sdk/configuration:
-  en: 06ae2972e9025705
-  zh: da56c3a84bb3f908
+  en: 117a3e469d3fecc5
+  zh: a0b06996deccce47
 /deepseek-ai-dsh-subagent-dsh-sdk/process-boundary:
   en: 1499d87a9c8b336e
   zh: 99f49bb5d2757ce3
@@ -60,8 +60,8 @@ document:
   en: f5d5f97a153f7c70
   zh: afc7da8783b348c6
 /deepseek-ai-dsh-subagent-dsh-sdk/known-limitations-and-deferred-work:
-  en: 24af783e8af0c7c6
-  zh: 440d8ea43b07d07a
+  en: d2053477c7415e32
+  zh: e64ab286ebc76f74
 /deepseek-ai-dsh-subagent-dsh-sdk/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

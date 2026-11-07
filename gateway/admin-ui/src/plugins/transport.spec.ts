@@ -5,10 +5,64 @@ import { AdminRequestError, pluginManagementInvoke } from '../api.ts'
 import type { PluginInstallFrame, PluginInstallRequestId } from '../../../../packages/boot/plugin-manager/src/types.ts'
 
 vi.mock('../api.ts', async importOriginal => ({ ...await importOriginal<typeof import('../api.ts')>(), pluginManagementInvoke: vi.fn() }))
-afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
+afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); window.history.replaceState({}, '', '/admin/') })
 const target = { nodeId: 'node', target: { kind: 'user' as const, id: 4 }, generation: 2 }
 const requestId = '00000000-0000-4000-8000-000000000002' as PluginInstallRequestId
 const complete: PluginInstallFrame = { type: 'result', value: { changed: true, application: 'applied', stage: 'install', target: 'bundle', bundle: 'bundle' } }
+
+it('validates one catalog response through the generated codec and exact target', async () => {
+  const remote = pluginManagementRemote(target, new AbortController().signal, () => {}, () => {})
+  const catalog = { managementAvailable: true, manage: false, bundles: [], plugins: [] }
+  vi.mocked(pluginManagementInvoke).mockImplementation(async input => ({ rpcId: (input as { rpcId: string }).rpcId, result: { ok: true, value: catalog } }))
+  expect(await remote.pluginManager.catalog()).toEqual({ ok: true, value: catalog })
+  expect(pluginManagementInvoke).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ...target, endpoint: 'pluginManager/catalog', args: {} }), expect.any(AbortSignal))
+  vi.mocked(pluginManagementInvoke).mockImplementation(async input => ({ rpcId: (input as { rpcId: string }).rpcId, result: { ok: true, value: { ...catalog, manage: 'yes' } } }))
+  expect(await remote.pluginManager.catalog()).toMatchObject({ ok: false })
+})
+
+it.each([true, false])('forwards metadata selection %s to both read endpoints', async (selection) => {
+  const remote = pluginManagementRemote(target, new AbortController().signal, () => {}, () => {})
+  vi.mocked(pluginManagementInvoke).mockImplementation(async input => ({
+    rpcId: (input as { rpcId: string }).rpcId,
+    result: { ok: true, value: (input as { endpoint: string }).endpoint === 'pluginManager/listPlugins'
+      ? [] : { managementAvailable: true, manage: false, bundles: [], plugins: [] } },
+  }))
+  expect(await remote.pluginManager.catalog(selection)).toMatchObject({ ok: true })
+  expect(pluginManagementInvoke).toHaveBeenLastCalledWith(expect.objectContaining({
+    endpoint: 'pluginManager/catalog', args: { includeEntryMetadata: selection },
+  }), expect.any(AbortSignal))
+  expect(await remote.pluginManager.listPlugins(selection)).toEqual({ ok: true, value: [] })
+  expect(pluginManagementInvoke).toHaveBeenLastCalledWith(expect.objectContaining({
+    endpoint: 'pluginManager/listPlugins', args: { includeMetadata: selection },
+  }), expect.any(AbortSignal))
+})
+
+it.each(['request', 'target'] as const)('rejects a late catalog after its %s is cancelled', async owner => {
+  const targetAbort = new AbortController(), requestAbort = new AbortController(), invalidate = vi.fn()
+  const pending = Promise.withResolvers<unknown>()
+  vi.mocked(pluginManagementInvoke).mockReturnValue(pending.promise)
+  const remote = pluginManagementRemote(target, targetAbort.signal, () => {}, invalidate)
+  const operation = remote.pluginManager.catalog(undefined, requestAbort.signal)
+  const signal = vi.mocked(pluginManagementInvoke).mock.calls[0]![1]!
+  const input = vi.mocked(pluginManagementInvoke).mock.calls[0]![0] as { rpcId: string }
+  try {
+    const cancellation = owner === 'request' ? requestAbort : targetAbort
+    cancellation.abort()
+    expect(signal.aborted).toBe(true)
+  } finally {
+    pending.resolve({ rpcId: input.rpcId, result: { ok: true, value: { managementAvailable: true, manage: true, bundles: [], plugins: [] } } })
+    await operation
+  }
+  expect(await operation).toMatchObject({ ok: false })
+  expect(invalidate).not.toHaveBeenCalled()
+})
+
+it('does not open a catalog transport for a cancelled target', async () => {
+  const abort = new AbortController(); abort.abort()
+  const remote = pluginManagementRemote(target, abort.signal, () => {}, () => {})
+  expect(await remote.pluginManager.catalog()).toMatchObject({ ok: false })
+  expect(pluginManagementInvoke).not.toHaveBeenCalled()
+})
 
 it('validates correlation and the generated result while preserving exact target arguments', async () => {
   const remote = pluginManagementRemote(target, new AbortController().signal, () => {}, () => {})
@@ -22,6 +76,8 @@ it('validates correlation and the generated result while preserving exact target
 })
 
 it('delivers installation progress then resolves only after the correlated clean end', async () => {
+  const node = '61f22202-1c02-4a3c-8d34-f11222333444'
+  window.history.replaceState({}, '', `/admin/computers/${node}/plugins`)
   const frames: PluginInstallFrame[] = []
   const send = vi.fn(async (_url: string, init: RequestInit) => {
     const input = JSON.parse(String(init.body))
@@ -34,6 +90,18 @@ it('delivers installation progress then resolves only after the correlated clean
   expect(await remote.pluginManager.installBundle('bundle', { requestId, enabled: false })).toEqual({ ok: true, value: complete.value })
   expect(frames).toEqual([{ type: 'progress', progress: { requestId, phase: 'installing' } }])
   expect(send).toHaveBeenCalledOnce()
+  expect(send.mock.calls[0]![0]).toBe(`/admin/api/plugins/invoke?dshNode=${node}`)
+})
+
+it('reports a disconnected installation target without replaying or invalidating the browser identity', async () => {
+  const send = vi.fn(async () => Response.json({ error: 'node-service/unavailable' }, { status: 503 }))
+  vi.stubGlobal('fetch', send)
+  const invalidate = vi.fn()
+  const remote = pluginManagementRemote(target, new AbortController().signal, () => {}, invalidate)
+  expect(await remote.pluginManager.installBundle('bundle', { requestId })).toMatchObject({ ok: false,
+    error: { message: '无法连接所选电脑，请检查连接后重试' } })
+  expect(send).toHaveBeenCalledTimes(1)
+  expect(invalidate).not.toHaveBeenCalled()
 })
 
 it('refuses truncated or extra results instead of retrying a possibly completed install', async () => {

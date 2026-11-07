@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-sdk-ready-emit",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/llm/llm/tsconfig.json packages/llm/llm-pi-ai/tsconfig.json packages/llm/llm-deepseek/tsconfig.json packages/subagent/subagent-codex/tsconfig.json packages/core/session/tsconfig.json",
+  "startedAt": "2026-10-25T02:36:45.950528+00:00",
+  "seconds": 2.757,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d5548d346ea9dfd2a0105aed14c206da3bb4a08ca5cc1433115d6a587bae7d76",
+  "inputsAfter": "d5548d346ea9dfd2a0105aed14c206da3bb4a08ca5cc1433115d6a587bae7d76",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

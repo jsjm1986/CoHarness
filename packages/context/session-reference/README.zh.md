@@ -49,6 +49,8 @@ kind: "package-reference"
 
 保留会对每个源独立应用 `maxReferenceBytes`，保留 compact 检查点与最新消息，再丢弃较旧的非检查点单元，并使用 `dsh-output-retention` 头部／尾部截断和精确 UTF-8 省略通知。如果某个源的固定序列化字段本身就超出限额，准备会以 `SESSION_REFERENCE_BUDGET_EXCEEDED` 失败，而不返回部分上下文。
 
+候选会话发现和引用准备在提供方替换期间保留[应用授权要求](../collaboration/README.zh.md#application-authorization)。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -70,7 +72,7 @@ kind: "package-reference"
 ## 已知限制与暂缓事项
 
 - **不支持消息正文检索**：候选查询只检查 projection 标题（或兼容性的日志回退），不搜索消息主体。没有 projection 的会话在首次打开前仍可按 id/cwd 查找；专用标题索引未来可以替换这条发现路径，而不改变 URI、快照或持久化约定。
-- **协作过滤**：组合 `ctx.collaboration` 时，候选发现与快照准备只保留 readable-session authority 放行的会话。未组合该服务的组合仍遵循可信调用方约定；此能力不是面向模型的搜索工具。
+- **协作过滤** — 组合了 `ctx.collaboration` 时，候选发现和快照准备使用其当前可读会话权限。准备在读取前、保存完整快照前和发布上下文前检查全部来源；撤权或提供方消失会拒绝整次准备。最终检查按批执行，不逐来源调用。完成的授权响应是发布检查点，不是与后续 ACL 变更原子提交的事务。没有协作授权要求的独立组合保留信任调用方的行为；这不是面向模型的搜索工具。
 - **只投影文本**：不会在会话间传播非文本 user 与 assistant 块。
 - **没有实时链接**：引用是快照，不是 fork、恢复、订阅或源会话变更。
 - **`zod` 是生成的 Typert 契约面的运行时依赖，不是 `src` 的依赖。** 发布的 `./typert` 与 `./remote` 出口解析到不经打包的 `lib/typert.*.js` 文件，其中包含裸 `zod` 导入。manifest 必须保留 `zod`；只有当两份生成 JavaScript 契约面都不存在时，`knip.config.ts` 才注入 workspace 级例外，已构建 checkout 则由 Knip 直接观察该导入。

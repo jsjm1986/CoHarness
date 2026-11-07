@@ -1,0 +1,14 @@
+{
+  "name": "hmr-ownership-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/boot/hmr/src/watch-config.ts packages/boot/hmr/tests/watch-config.spec.ts",
+  "startedAt": "2026-10-24T02:07:56.812052+00:00",
+  "seconds": 4.352,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "84c6531ba1d4db184ba941dd1a5a514577ab6eb508aabb5e7273674ee59ef36f",
+  "inputsAfter": "84c6531ba1d4db184ba941dd1a5a514577ab6eb508aabb5e7273674ee59ef36f",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

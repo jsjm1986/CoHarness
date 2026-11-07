@@ -1,0 +1,14 @@
+{
+  "name": "document-protected-storage-and-fifo-cases",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/identity-storage.spec.ts packages/attachment/userdoc-local/tests/identity.spec.ts packages/attachment/userdoc-local/tests/file-object.spec.ts packages/attachment/userdoc-local/tests/mutation.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts packages/attachment/userdoc-local/tests/projection.spec.ts packages/attachment/userdoc-local/tests/document-io.spec.ts packages/attachment/userdoc-local/tests/parts-loader.spec.ts",
+  "startedAt": "2026-10-26T00:09:46.951842+00:00",
+  "seconds": 5.13,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "931ab196a6a59277da4225ec4fe92c8a1c959d99d18fa1d47eba2ca94d3199a9",
+  "inputsAfter": "931ab196a6a59277da4225ec4fe92c8a1c959d99d18fa1d47eba2ca94d3199a9",
+  "postgresToolDirectory": null,
+  "outputSha256": "5c2ffcb211fcb7d51c8064f99fea61d02c37e0cd07f88a566a0c41b146d24c29",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  8 passed (8)\n      Tests  164 passed (164)\n   Start at  08:09:50\n   Duration  1.60s (transform 2.13s, setup 359ms, import 2.46s, tests 2.69s, environment 1ms)\n\n"
+}

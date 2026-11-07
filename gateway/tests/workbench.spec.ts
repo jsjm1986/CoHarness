@@ -8,6 +8,28 @@ import type { UserRow } from '../src/auth.ts'
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('workbench account catalog', () => {
+  it('joins cached roots from exact personal Runtimes without starting either computer', async () => {
+    const ensureRunning = vi.fn()
+    const runtime = (id: string, name: string) => ({ kind: 'personal' as const,
+      runtimeId: id as import('../src/runtime-catalog.ts').RuntimeId,
+      nodeId: id as import('../src/runtime-catalog.ts').RuntimeNodeId, nodeName: name })
+    const a = runtime('11111111-1111-4111-8111-111111111111', 'Mac')
+    const b = runtime('22222222-2222-4222-8222-222222222222', 'Ubuntu')
+    const personal = vi.fn(async () => [a, b].map(target => ({ runtime: target, status: 'active', observedState: 'stopped',
+      syncedAt: '2026-11-02T00:00:00.000Z', items: [], conversations: [{ sessionId: 'same-id',
+        title: target.nodeName, updatedAt: 1, blank: false, cwd: '/home/me' }] })))
+    const handler = createGatewayWorkbenchCatalogHandler({ instances: { ensureRunning } as unknown as GatewayInstanceService,
+      collaboration: { listAccountConversations: async () => [] } as unknown as GatewayCollaborationService,
+      principals: new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'test', 30_000),
+      workspaceCatalog: { personal }, maxResponseBytes: 1024 * 1024, upstreamTimeoutMs: 30_000 })
+    const user: UserRow = { id: 1, username: 'me', displayName: 'Me', role: 'user', status: 'active',
+      homePath: '/home/me', mustChangePassword: false, autoReviewEligible: false }
+    const result = await handler(user, new AbortController().signal)
+    expect(result.items.map(item => item.runtime)).toEqual([a, b])
+    expect(result.items.every(item => item.creatorUserId === user.id && item.canWrite)).toBe(true)
+    expect(result.personalComplete).toBe(false)
+    expect(ensureRunning).not.toHaveBeenCalled()
+  })
   it('combines personal runtime roots with project metadata and releases its lease', async () => {
     const operationRef = vi.fn(async () => {})
     const instances = {

@@ -35,18 +35,18 @@ The integration uses only the latest `request/header.config` provider/model and 
 | Partition | Retained input |
 | --- | --- |
 | `REVIEW_POLICY` | Fixed classification, source authority, and strict result rules; allow executes immediately with Full access and no later confirmation |
-| `ENVIRONMENT` | Existing Session header `cwd` only |
+| `ENVIRONMENT` | Current Session working directory resolved by the working-directory service |
 | `PROJECT_INSTRUCTIONS` | Visible project instructions with their original sources and constraint role |
 | `FILTERED_HISTORY` | Current compaction surface's sourced human/direct-parent messages, checkpoints, image/attachment facts, and historical call names with logged arguments |
 | `PENDING_ACTION` | Tool name, description, parameter schema, and parsed arguments |
 
 The reviewer builds those two action sections from the Session's complete action history: an authorization is the earlier call the `REVIEW_POLICY` source rules make eligible, and a duplicate or conflicting identity has to be visible anywhere in the log rather than inside a recent window, so neither the Session projections nor a bounded read serves the decision. The read is the deprecated synchronous `snapshotEvents()` under a line-scoped `typescript/no-deprecated` waiver.
 
-The main agent's V3 `system/message` nodes, assistant text/reasoning, and tool results are excluded. The current call must belong to the open step recorded by `step/start`; missing step ownership fails closed. It appears only in `PENDING_ACTION`; an unstarted sibling has no historical call fact. Native schema comes from the latest request header. PTC captures a frozen schema at binding construction and passes it through the scheduler into `ToolExecution`; descriptions and parameter schemas never enter start/settle events or the Session/SDK wire. Missing, inconsistent, or ambiguous action facts reject the call without consulting the live registry. An oversized request fails closed without summarization, truncation, another compaction pass, or a small output-token budget.
+The main agent's V3 `system/message` nodes, assistant text/reasoning, and tool results are excluded. The current call must belong to the open step recorded by `step/start`; missing step ownership fails closed. It appears only in `PENDING_ACTION`; an unstarted sibling has no historical call fact. Native schema comes from the latest request header. PTC captures a frozen schema at binding construction and passes it through the scheduler into `ToolExecution`; descriptions and parameter schemas stay outside start/settle events. The [durable reviewer-input decision](../bug-fix/2026-10-24-auto-review-request-records.md) retains their model-facing text in a separate required request event. Missing, inconsistent, or ambiguous action facts reject the call without consulting the live registry. An oversized request fails closed without summarization, truncation, another compaction pass, or a small output-token budget.
 
 ### Result and cancellation
 
-The reviewer may emit reasoning blocks followed by exactly one JSON text block and terminal `stop`. The closed object admits only `low + allow`, `medium + allow/deny`, and `high + deny`; only deny may carry a string `reason`. Extra fields, duplicate members, invalid combinations, other blocks or termination, and provider failures share the ordinary Auto denial outcome. Risk and reviewer traces are not durable state.
+The reviewer may emit reasoning blocks followed by exactly one JSON text block and terminal `stop`. The closed object admits only `low + allow`, `medium + allow/deny`, and `high + deny`; only deny may carry a string `reason`. Extra fields, duplicate members, invalid combinations, other blocks or termination, and provider failures share the ordinary Auto denial outcome. Risk, reviewer reasoning and raw response are not durable state; exact requests follow the [reviewer-input decision](../bug-fix/2026-10-24-auto-review-request-records.md).
 
 Native results and PTC settle events carry the same structured `AutoReviewDeniedError` / `AUTO_REVIEW_DENIED` and optional raw reason. For reviewer rejection, the main agent receives `Auto review rejected tool "<name>"; its body was not executed` through ordinary failure rendering. PTC retains the existing program exception/catch behavior; catching a denial does not elevate it to an outer failure. The generic Web tool card supplies the denial identity for the collapsed row and one not-executed output line for the expanded row, with no input body. Only that display trims and collapses line separators or supplies the localized empty-reason fallback; persistence and both SDKs preserve the complete raw reason, without a new length or redaction rule.
 
@@ -70,7 +70,7 @@ The [delegation-time policy capture](2026-07-25-subagent-policy-inheritance.md) 
 
 **A new sandbox or approval-policy value** would couple review to enforcement and create combinations without a current consumer. An explicit preset identity preserves the unchanged Full access execution behavior.
 
-**Persisting PTC schemas or rereading the registry** would either enlarge the durable wire for a transient input or review a different definition from the binding that the program received. The binding already owns the needed immutable snapshot.
+**Rereading the registry** would review a different definition from the binding that the program received. The binding owns the immutable schema, and the reviewer records the exact request text it consumes.
 
 **Session events for catalog changes** would assign process availability to a Session and require same-sequence republishing. A complete Remote read plus invalidation keeps each fact with its owner.
 

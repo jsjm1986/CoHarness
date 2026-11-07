@@ -1,0 +1,14 @@
+{
+  "name": "python-model-access-built-imports",
+  "cwd": "python/sdk-runtime",
+  "command": "node --input-type=module -e 'import assert from \"node:assert/strict\"; import ModelAccessPolicy from \"@deepseek-ai/dsh-model-access\"; import { LlmAdapter } from \"@deepseek-ai/dsh-llm\"; import { DeepSeekAdapter } from \"@deepseek-ai/dsh-llm-deepseek\"; import { resourceBudgetOf } from \"@deepseek-ai/dsh-resource-budget\"; assert.equal(typeof ModelAccessPolicy, \"function\"); assert.equal(typeof resourceBudgetOf, \"function\"); assert(DeepSeekAdapter.prototype instanceof LlmAdapter); console.log(\"Built Python carrier dependency imports and shared adapter identity passed.\")'",
+  "startedAt": "2026-10-25T05:37:51.595038+00:00",
+  "seconds": 0.34,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a3324bd73594140e4fa54f4b967539b8e20b2df337fae97d4be2f4246cf56e05",
+  "inputsAfter": "a3324bd73594140e4fa54f4b967539b8e20b2df337fae97d4be2f4246cf56e05",
+  "postgresToolDirectory": null,
+  "outputSha256": "3a7854ef6d6f3434ed6beda8b3e2b5e0966dee0266c5264cc754c60c12878bc3",
+  "outputTail": "Built Python carrier dependency imports and shared adapter identity passed.\n"
+}

@@ -7,6 +7,16 @@
     "noUncheckedIndexedAccess": true,
     "allowImportingTsExtensions": true,
     "paths": {
+      "@deepseek-ai/cordis-plugin-loader": ["../vendor/loader/lib/types/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-include": ["../vendor/include/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-snapshot": ["../packages/test-support/session-snapshot/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-persistence": ["../packages/session/session-persistence/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-persistence-jsonl": ["../packages/session/session-persistence-jsonl/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-app-boot": ["../packages/boot/app-boot/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-host-webserver": ["../packages/host/webserver/lib/types/index.d.ts"],
+      "@deepseek-ai/node-addon-system/flock": [
+        "../native/system/packages/entry/lib/flock.d.ts"
+      ],
       "@deepseek-ai/cordis": [
         "../vendor/cordis/lib/types/index.d.ts"
       ],
@@ -17,13 +27,13 @@
         "../packages/typert/protocol/lib/types/index.d.ts"
       ],
       "@deepseek-ai/dsh-brand": [
-        "../packages/util/brand/src/index.ts"
+        "../packages/util/brand/lib/types/index.d.ts"
       ],
       "@deepseek-ai/dsh-llm": [
         "../packages/llm/llm/lib/types/index.d.ts"
       ],
       "@deepseek-ai/dsh-llm/discovery": [
-        "../packages/llm/llm/src/discovery.ts"
+        "../packages/llm/llm/lib/types/discovery.d.ts"
       ],
       "@deepseek-ai/dsh-session-format": [
         "../packages/session/session-format/lib/types/index.d.ts"
@@ -35,10 +45,10 @@
         "../packages/session/session-format/lib/types/surface.d.ts"
       ],
       "@deepseek-ai/dsh-util-crypto": [
-        "../packages/util/crypto/src/index.ts"
+        "../packages/util/crypto/lib/types/index.d.ts"
       ],
       "@deepseek-ai/dsh-util-values": [
-        "../packages/util/values/src/index.ts"
+        "../packages/util/values/lib/types/index.d.ts"
       ],
       "@deepseek-ai/dsh-managed-data": [
         "../packages/util/managed-data/lib/types/index.d.ts"
@@ -49,6 +59,12 @@
       "@deepseek-ai/dsh-userdoc": [
         "../packages/attachment/userdoc/lib/types/index.d.ts"
       ],
+      "@deepseek-ai/dsh-userdoc-gateway/protocol": [
+        "../packages/attachment/userdoc-gateway/lib/types/protocol.d.ts"
+      ],
+      "@deepseek-ai/dsh-userdoc-gateway/server": [
+        "../packages/attachment/userdoc-gateway/lib/types/server.d.ts"
+      ],
       "@deepseek-ai/dsh-userdoc-local": [
         "../packages/attachment/userdoc-local/lib/types/index.d.ts"
       ],
@@ -58,8 +74,32 @@
       "@deepseek-ai/dsh-home-paths": [
         "../packages/util/home-paths/lib/types/index.d.ts"
       ],
+      "@deepseek-ai/dsh-loader-smoke": [
+        "../packages/test-support/loader-smoke/lib/types/index.d.ts"
+      ],
       "@deepseek-ai/schemastery": [
         "../vendor/schemastery/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-resource-budget": [
+        "../packages/context/resource-budget/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-resource-budget/types": [
+        "../packages/context/resource-budget/lib/types/types.d.ts"
+      ],
+      "@deepseek-ai/dsh-resource-budget/wire": [
+        "../packages/context/resource-budget/lib/types/wire.d.ts"
+      ],
+      "@deepseek-ai/dsh-subprocess": [
+        "../packages/subprocess/subprocess/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-subprocess-local": [
+        "../packages/subprocess/subprocess-local/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-session": [
+        "../packages/core/session/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-native-command": [
+        "../packages/util/native-command/lib/types/index.d.ts"
       ]
     },
     "noEmit": true,

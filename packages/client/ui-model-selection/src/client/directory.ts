@@ -11,6 +11,7 @@ import type {
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { modelInputCapability, type ModelInputCapability } from './capabilities.ts'
+import { en } from './locales.ts'
 
 /** Directory snapshot both entries render from. */
 export interface ModelDirectoryState {
@@ -30,7 +31,7 @@ export interface ModelDirectoryState {
   failures: readonly ModelCatalogFailure[]
   /** Lifecycle of the in-flight operation. */
   status: 'idle' | 'loading' | 'ready' | 'selecting' | 'error'
-  /** Selection submitted by the latest `select` until it settles; null otherwise. */
+  /** Current selection attempt; null after settlement or a directory read takes ownership. */
   pending: ModelSelection | null
   /** Whole-request or selection failure text; null when none. */
   error: string | null
@@ -59,24 +60,34 @@ export class ModelDirectory {
    * @param sessionId - the owning session.
    * @param available - whether this session may use Agent-bound model RPCs.
    * @param formatSelectionError - optional product copy for a rejected model selection.
+   * @param formatTransportError - localized recovery copy; standalone directories default to English.
    */
   constructor(
     private readonly sessions: Pick<IApiClient['sessions'], 'models' | 'selectModel'>,
     private readonly sessionId: SessionId,
     private readonly available: () => boolean,
     private readonly formatSelectionError?: SelectionErrorFormatter,
+    private readonly formatTransportError: (operation: 'load' | 'select') => string = operation =>
+      en[operation === 'load' ? 'error.loadTransport' : 'error.selectionUnconfirmed'],
   ) {}
 
   /**
    * Refresh the advisory directory (both entries call this on open).
    * Failure preserves the last good groups and current selection.
    * @returns the fresh directory value.
+   * @throws The original transport error; the current operation also publishes retryable error state.
    */
   async load(): Promise<SessionModels> {
     this.assertAvailable()
     const generation = ++this.generation
-    this.store.update((s) => { s.status = 'loading'; s.error = null })
-    const { result } = await this.sessions.models({ sessionId: this.sessionId })
+    this.store.update((s) => { s.status = 'loading'; s.pending = null; s.error = null })
+    let response: Awaited<ReturnType<IApiClient['sessions']['models']>>
+    try {
+      response = await this.sessions.models({ sessionId: this.sessionId })
+    } catch (error: unknown) {
+      this.rejectTransport(generation, 'load', error)
+    }
+    const { result } = response
     if (this.disposed || generation !== this.generation) {
       if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
       return result.value
@@ -102,19 +113,26 @@ export class ModelDirectory {
    * updates the shared current; failure surfaces on the store and throws so
    * each entry's own retry surface engages.
    * @param selection - provider, provider-owned model id, and optional adapter-owned effort.
- */
+   * @throws The original transport error without retrying an unconfirmed Host write.
+   */
   async select(selection: ModelSelection): Promise<void> {
     this.assertAvailable()
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'selecting'; s.pending = selection; s.error = null })
-    const { result } = await this.sessions.selectModel({
-      sessionId: this.sessionId,
-      provider: selection.provider,
-      model: selection.model,
-      ...selection.reasoningEffort === undefined
-        ? {}
-        : { reasoningEffort: selection.reasoningEffort },
-    })
+    let response: Awaited<ReturnType<IApiClient['sessions']['selectModel']>>
+    try {
+      response = await this.sessions.selectModel({
+        sessionId: this.sessionId,
+        provider: selection.provider,
+        model: selection.model,
+        ...selection.reasoningEffort === undefined
+          ? {}
+          : { reasoningEffort: selection.reasoningEffort },
+      })
+    } catch (error: unknown) {
+      this.rejectTransport(generation, 'select', error)
+    }
+    const { result } = response
     if (this.disposed || generation !== this.generation) {
       if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
       return
@@ -161,6 +179,14 @@ export class ModelDirectory {
   /** Scope teardown: late settlements lose write access to the store. */
   dispose(): void {
     this.disposed = true
+  }
+
+  private rejectTransport(generation: number, operation: 'load' | 'select', error: unknown): never {
+    if (!this.disposed && generation === this.generation) {
+      const message = this.formatTransportError(operation)
+      this.store.update((s) => { s.status = 'error'; s.pending = null; s.error = message })
+    }
+    throw error
   }
 
   private assertAvailable(): void {

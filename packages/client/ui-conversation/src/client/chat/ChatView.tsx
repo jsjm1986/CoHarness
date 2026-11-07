@@ -570,6 +570,8 @@ export function ChatView({
   /** Paging anchor: semantic row/position at click, updated by reader scrolls
    * while the request is pending and restored after the prepend lands. */
   const anchorRef = useRef<PagingAnchor | null>(null)
+  /** A remounted reader position survives reflow until the reader moves again. */
+  const restoredAnchorRef = useRef<PagingAnchor | null>(null)
   /** Head identity already requested by the automatic top sentinel. */
   const autoLoadHeadRef = useRef<string | undefined>(undefined)
   const firstSeqRef = useRef<number | null>(null)
@@ -623,6 +625,7 @@ export function ChatView({
 
   const toBottom = (el: HTMLElement): void => {
     anchorRef.current = null
+    restoredAnchorRef.current = null
     el.scrollTop = el.scrollHeight
     observedTopRef.current = el.scrollTop
     atBottomRef.current = true
@@ -663,6 +666,9 @@ export function ChatView({
         const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
         atBottomRef.current = isAtBottom
         setAtBottom(isAtBottom)
+        if (!isAtBottom && row !== null) {
+          restoredAnchorRef.current = { key: saved.anchorKey, top: flowTop(row, el) }
+        }
         const normalized = isAtBottom ? null : scrollPosition(local, el)
         if (isAtBottom) chatScroll.save(null)
         else if (normalized !== null) chatScroll.save(normalized)
@@ -785,6 +791,7 @@ export function ChatView({
     // the current ownership state.
     const floor = Math.max(0, el.scrollHeight - el.clientHeight)
     const movedByReader = Math.abs(el.scrollTop - Math.min(observedTopRef.current, floor)) > 0.5
+    if (movedByReader) restoredAnchorRef.current = null
     // Geometry decides at-bottom, not the ledger: browser writes (shrink
     // clamps, scroll anchoring) never reach observedTop, so inheriting a stale
     // `false` ref would strand a floor-landed reader unpinned with the
@@ -833,26 +840,44 @@ export function ChatView({
 
   // The ref starts null and is assigned every render, so the placeholder
   // initializer a function initial value would need never exists.
-  const followRef = useRef<(() => void) | null>(null)
-  followRef.current = () => {
+  const resizeScrollRef = useRef<(() => void) | null>(null)
+  resizeScrollRef.current = () => {
     const local = listRef.current
-    if (local !== null && atBottomRef.current) {
-      const el = scrollerOf(local)
+    if (local === null) return
+    const el = scrollerOf(local)
+    if (atBottomRef.current) {
       el.scrollTop = el.scrollHeight
       observedTopRef.current = el.scrollTop
       chatScroll.save(null)
+      return
     }
+    const anchor = restoredAnchorRef.current
+    if (anchor === null) return
+    const row = anchorElement(local, anchor.key)
+    if (row === null) {
+      restoredAnchorRef.current = null
+      return
+    }
+    const delta = flowTop(row, el) - anchor.top
+    if (Math.abs(delta) <= 0.5) return
+    el.scrollTop += delta
+    observedTopRef.current = el.scrollTop
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1) {
+      toBottom(el)
+      return
+    }
+    chatScroll.save({ anchorKey: anchor.key, anchorTop: flowTop(row, el), scrollTop: el.scrollTop })
   }
   // Streaming, tool disclosures, and other flow changes resize the column;
-  // the sticky composer resizes outside it. This observer owns ChatView's
-  // dynamic-height follow decisions and writes only while the reader is pinned.
+  // the sticky composer resizes outside it. A restored reader also keeps its
+  // row through late width reflow, including an in-flight sidebar transition.
   useEffect(() => {
     const column = columnRef.current
     const local = listRef.current
     if (column === null || local === null || typeof ResizeObserver === 'undefined') return
     const scrollport = scrollerOf(local)
     const composer = scrollport.querySelector<HTMLElement>('[data-composer-seat]')
-    const observer = new ResizeObserver(() => { followRef.current?.() })
+    const observer = new ResizeObserver(() => { resizeScrollRef.current?.() })
     observer.observe(column)
     if (composer !== null) observer.observe(composer)
     return () => { observer.disconnect() }
@@ -884,6 +909,7 @@ export function ChatView({
         const el = scrollerOf(local)
         const row = anchorElement(local, target.anchorKey)
         if (row === null) return
+        restoredAnchorRef.current = null
         el.scrollTop = Math.max(0, el.scrollTop + flowTop(row, el) - 24)
         observedTopRef.current = el.scrollTop
         atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1

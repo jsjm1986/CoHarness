@@ -11,6 +11,7 @@
 
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { connect } from 'node:net'
+import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -26,12 +27,31 @@ import type { OpenInAppLauncher } from '../src/resolver.ts'
 
 let root: string | undefined
 let context: Context | undefined
+let withdrawConnection: (() => void | Promise<void>) | undefined
+let observeAuthentication: (() => void) | undefined
+const statGate = vi.hoisted(() => ({
+  path: undefined as string | undefined,
+  entered: undefined as (() => void) | undefined,
+  resume: undefined as Promise<void> | undefined,
+}))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...actual, stat: async (...args: Parameters<typeof actual.stat>) => {
+    if (args[0] === statGate.path) { statGate.entered?.(); await statGate.resume }
+    return actual.stat(...args)
+  } }
+})
 /** Answer the connection stub gives every route until a test changes it. */
 const trust: { rejection: 401 | 403 | undefined } = { rejection: undefined }
 
 afterEach(async () => {
   await context?.fiber.dispose()
   context = undefined
+  withdrawConnection = undefined
+  observeAuthentication = undefined
+  statGate.path = undefined
+  statGate.entered = undefined
+  statGate.resume = undefined
   if (root !== undefined) await rm(root, { recursive: true, force: true })
   root = undefined
   internals.catalog = {}
@@ -62,7 +82,10 @@ async function boot(): Promise<string> {
 
   context = new Context()
   context.baseUrl = pathToFileURL(root).href + '/'
-  context.provide('connection', { requestRejection: () => trust.rejection } as never)
+  withdrawConnection = context.provide('connection', { requestRejection: () => {
+    observeAuthentication?.()
+    return trust.rejection
+  } } as never)
   // The plugin resolves PATH names through the composition's subprocess
   // capability; the not-found rejection is the provider's real signal.
   context.provide('subprocess', {
@@ -125,6 +148,188 @@ async function cursorBundle(home: string): Promise<void> {
 }
 
 describe('open-in-app host routes (real Loader composition)', () => {
+  it.each(['apps', 'icon', 'open'].flatMap(route =>
+    ['authentication', 'plugin', 'qualification'].map(withdrawal => ({ route, withdrawal })),
+  ))('refuses $route after $withdrawal withdrawal during catalog resolution', async ({ route, withdrawal }) => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-open-in-app-withdrawal-'))
+    const launches: string[][] = []
+    let resume!: () => void, entered!: () => void
+    const held = new Promise<void>((resolve) => { resume = resolve })
+    const observed = new Promise<void>((resolve) => { entered = resolve })
+    let pending: Promise<Response> | undefined
+    try {
+      await cursorBundle(home)
+      darwinFixture(home, launches)
+      const run = internals.catalog.run!
+      internals.catalog.run = async (...args) => { entered(); await held; return run(...args) }
+      const base = await boot()
+      const path = route === 'apps' ? 'apps' : route === 'icon' ? 'icon/cursor' : 'open'
+      pending = fetch(`${base}/open-in-app/${path}`, { signal: AbortSignal.timeout(5_000),
+        ...route === 'open' ? { method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ app: 'cursor', path: home }) } : {},
+      })
+      void pending.catch(() => {})
+      await observed
+      if (withdrawal === 'authentication') await withdrawConnection?.()
+      else if (withdrawal === 'qualification') trust.rejection = 403
+      else {
+        const desktop = [...context!.loader.entries()].find(entry => entry.options.name === '@deepseek-ai/dsh-host-open-in-app')
+        await desktop!.fiber!.dispose()
+      }
+      resume()
+      const response = await pending
+      await response.arrayBuffer()
+      expect({ status: response.status, launches }).toEqual({
+        status: withdrawal === 'qualification' ? 403 : 503, launches: [],
+      })
+    } finally {
+      resume()
+      if (pending !== undefined) await Promise.allSettled([pending])
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it.each(['authentication', 'plugin', 'qualification'].flatMap(withdrawal =>
+    ['initial', 'refreshed'].map(phase => ({ withdrawal, phase })),
+  ))('refuses the $phase fallback after $withdrawal withdrawal', async ({ withdrawal, phase }) => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-open-in-app-fallback-'))
+    const developer = join(home, 'Xcode.app', 'Contents', 'Developer'), launches: string[] = []
+    let resume!: () => void, entered!: () => void
+    const held = new Promise<void>((resolve) => { resume = resolve })
+    const observed = new Promise<void>((resolve) => { entered = resolve })
+    let pending: Promise<Response> | undefined
+    try {
+      await mkdir(developer, { recursive: true })
+      internals.catalog = { platform: 'darwin', applicationRoots: [], resolveExecutable: pathTable(),
+        run: async () => ({ stdout: developer, stderr: '' }),
+        launch: async (command) => {
+          launches.push(command)
+          if (phase === 'refreshed' && launches.length <= 2) throw Object.assign(new Error('launcher removed'), { code: 'ENOENT' })
+          entered(); await held; throw new Error('primary launcher failed')
+        },
+      }
+      const base = await boot()
+      pending = fetch(`${base}/open-in-app/open`, { method: 'POST', signal: AbortSignal.timeout(5_000),
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: 'xcode', path: home }),
+      })
+      void pending.catch(() => {})
+      await observed
+      if (withdrawal === 'authentication') await withdrawConnection?.()
+      else if (withdrawal === 'qualification') trust.rejection = 403
+      else {
+        const desktop = [...context!.loader.entries()].find(entry => entry.options.name === '@deepseek-ai/dsh-host-open-in-app')
+        await desktop!.fiber!.dispose()
+      }
+      resume()
+      const response = await pending
+      await response.arrayBuffer()
+      expect({ status: response.status, launches }).toEqual({
+        status: withdrawal === 'qualification' ? 403 : 503, launches: phase === 'initial' ? ['xed'] : ['xed', 'open', 'xed'],
+      })
+    } finally {
+      resume()
+      if (pending !== undefined) await Promise.allSettled([pending])
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it.each(['path', 'refresh'])('refuses launch after qualification withdrawal during the %s read', async (phase) => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-open-in-app-stat-withdrawal-'))
+    const launches: string[][] = []
+    let resume!: () => void, entered!: () => void
+    const held = new Promise<void>((resolve) => { resume = resolve })
+    const observed = new Promise<void>((resolve) => { entered = resolve })
+    let pending: Promise<Response> | undefined
+    try {
+      await cursorBundle(home)
+      darwinFixture(home, launches)
+      statGate.entered = entered; statGate.resume = held
+      if (phase === 'path') statGate.path = home
+      else internals.catalog.launch = async (command, args) => {
+        launches.push([command, ...args]); statGate.path = join(home, 'Applications', 'Cursor.app')
+        throw Object.assign(new Error('launcher removed'), { code: 'ENOENT' })
+      }
+      const base = await boot()
+      pending = fetch(`${base}/open-in-app/open`, { method: 'POST', signal: AbortSignal.timeout(5_000),
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: 'cursor', path: home }),
+      })
+      void pending.catch(() => {})
+      await observed
+      trust.rejection = 403
+      resume()
+      const response = await pending
+      await response.arrayBuffer()
+      expect(response.status).toBe(403)
+      expect(launches).toHaveLength(phase === 'path' ? 0 : 1)
+    } finally {
+      resume()
+      if (pending !== undefined) await Promise.allSettled([pending])
+      statGate.path = undefined
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a request whose qualification is withdrawn while its body is arriving', async () => {
+    const base = await boot()
+    let entered!: () => void
+    const observed = new Promise<void>((resolve) => { entered = resolve })
+    observeAuthentication = entered
+    const incoming = request(`${base}/open-in-app/open`, { method: 'POST',
+      headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(5_000),
+    })
+    const received = new Promise<number | undefined>((resolve, reject) => {
+      incoming.once('error', reject)
+      incoming.once('response', (response) => { response.resume(); response.once('end', () => { resolve(response.statusCode) }) })
+    })
+    void received.catch(() => {})
+    try {
+      incoming.write('{')
+      await observed
+      trust.rejection = 403
+      incoming.end('}')
+      expect(await received).toBe(403)
+    } finally {
+      incoming.destroy()
+      await Promise.allSettled([received])
+    }
+  })
+
+  it.each(['authentication', 'plugin', 'qualification'])('withholds extracted icon bytes after %s withdrawal', async (withdrawal) => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-open-in-app-icon-withdrawal-'))
+    let resume!: () => void, entered!: () => void
+    const held = new Promise<void>((resolve) => { resume = resolve })
+    const observed = new Promise<void>((resolve) => { entered = resolve })
+    let pending: Promise<Response> | undefined
+    try {
+      await cursorBundle(home)
+      darwinFixture(home, [])
+      const run = internals.catalog.run!
+      internals.catalog.run = async (...args) => {
+        if (args[0] === 'plutil') { entered(); await held }
+        return run(...args)
+      }
+      const base = await boot()
+      await (await fetch(`${base}/open-in-app/apps`)).arrayBuffer()
+      pending = fetch(`${base}/open-in-app/icon/cursor`, { signal: AbortSignal.timeout(5_000) })
+      void pending.catch(() => {})
+      await observed
+      if (withdrawal === 'authentication') await withdrawConnection?.()
+      else if (withdrawal === 'qualification') trust.rejection = 403
+      else {
+        const desktop = [...context!.loader.entries()].find(entry => entry.options.name === '@deepseek-ai/dsh-host-open-in-app')
+        await desktop!.fiber!.dispose()
+      }
+      resume()
+      const response = await pending, text = await response.text()
+      expect(response.status).toBe(withdrawal === 'qualification' ? 403 : 503)
+      expect(text).not.toContain('png-bytes')
+    } finally {
+      resume()
+      if (pending !== undefined) await Promise.allSettled([pending])
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it('keeps the function-plugin runtime surface to Loader exports', () => {
     expect(Object.keys(OpenInApp).sort()).toEqual(['Config', 'apply', 'inject', 'name'])
   })

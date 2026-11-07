@@ -2,13 +2,13 @@ import { Capacitor, registerPlugin, type Plugin } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
 
 const DEVICE_ID_KEY = 'hgw.push.device-id'
-const SESSION_SELECTION_KEY = 'dsh.sessions.current'
 const CHANNEL_ID = 'ai-replies'
 
 type PushProvider = 'fcm' | 'jpush'
 
 interface NativeNotificationAction {
   sessionId?: string
+  runtimeId?: string
   eventSeq?: string
 }
 
@@ -45,9 +45,11 @@ async function registerToken(token: string, provider: PushProvider): Promise<voi
 function openNotificationSession(data: unknown): void {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) return
   const sessionId = stringValue((data as { sessionId?: unknown }).sessionId)
-  if (sessionId === undefined) return
-  localStorage.setItem(SESSION_SELECTION_KEY, JSON.stringify({ sessionId }))
-  window.location.assign('/')
+  const runtimeId = stringValue((data as { runtimeId?: unknown }).runtimeId)
+  if (sessionId === undefined || runtimeId === undefined
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(runtimeId)) return
+  sessionStorage.setItem(`dsh.sessions.current.v2.${runtimeId}`, JSON.stringify({ sessionId }))
+  window.location.assign(`/?dshRuntime=${encodeURIComponent(runtimeId)}`)
 }
 
 function wait(milliseconds: number): Promise<void> {

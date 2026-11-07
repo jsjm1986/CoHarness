@@ -1,0 +1,14 @@
+{
+  "name": "auth-admission-postgres-final",
+  "cwd": "gateway",
+  "command": "npm run test:postgres",
+  "startedAt": "2026-10-24T02:00:14.241127+00:00",
+  "seconds": 94.787,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "def7c4a3f0225c64cf742988f6fd40ed341facba68277c4c7df2bf14be2d21af",
+  "inputsAfter": "81b2d1574e9d05b29fa612f1a49491f7fed8ea7dcb7a2b8bccb35b3cd6961528",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "30504647ba711e11dbeb429cf8dec1d0bebe0441c9c2355afa4aef693409f282",
+  "outputTail": "\n> test:postgres\n> node -e \"if (!process.env.HGW_TEST_DATABASE_URL || !/(_test|_accept|_acceptance)(\\?|$)/.test(process.env.HGW_TEST_DATABASE_URL)) throw new Error('HGW_TEST_DATABASE_URL must select a disposable test database ending in _test, _accept, or _acceptance')\" && vitest run tests/postgres.spec.ts tests/auth-postgres.spec.ts tests/project-activity-postgres.spec.ts tests/project-service-postgres.spec.ts tests/plugin-state.spec.ts tests/steward.spec.ts tests/access-invalidation.spec.ts tests/execution.spec.ts tests/execution-scopes.spec.ts tests/ssh.spec.ts tests/webhook.spec.ts tests/maintenance.spec.ts tests/deployment-restore.spec.ts tests/deployment-backups.spec.ts tests/node-config-process.spec.ts tests/startup-generation.spec.ts tests/admin-business-postgres.spec.ts tests/instance-capacity-postgres.spec.ts tests/node-resource-budget-postgres.spec.ts tests/project-progress-postgres.spec.ts tests/runtime-resource-api.spec.ts tests/runtime-resource-provider.spec.ts --no-file-parallelism\n\n\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  22 passed (22)\n      Tests  381 passed (381)\n   Start at  10:00:15\n   Duration  93.54s (transform 2.78s, setup 0ms, import 6.41s, tests 85.32s, environment 1ms)\n\n"
+}

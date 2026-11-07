@@ -1,5 +1,6 @@
 /** Interactive desktop confirmation, separate from model approval and execution witnesses. */
 import { z } from 'zod'
+import { discardGatewayRead } from './response.ts'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { DesktopConfirmationController } from '@deepseek-ai/dsh-computer-use'
@@ -37,7 +38,7 @@ export function desktopConfirmationController(runtime: Pick<GatewayRuntime, 'int
         body: JSON.stringify({ sessionId: owner.id, desktop }), principal: user, signal,
       })
       if (!response.ok) {
-        await response.body?.cancel()
+        discardGatewayRead(response.body)
         throw new Error('Desktop confirmation is unavailable for this account.')
       }
       const value = status.parse(await readGatewayResponseJson(response, undefined, signal))
@@ -57,7 +58,7 @@ export function desktopConfirmationController(runtime: Pick<GatewayRuntime, 'int
         body: JSON.stringify({ sessionId: owner.id, desktop, expectedNodeId: expected.nodeId, confirmed }), principal: user, signal,
       })
       if (!response.ok) {
-        await response.body?.cancel()
+        discardGatewayRead(response.body)
         throw new Error('Desktop confirmation was not saved; refresh its current status.')
       }
       z.object({ saved: z.literal(true) }).parse(await readGatewayResponseJson(response, undefined, signal))

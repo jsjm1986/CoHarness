@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-memory-recall-addresses.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.md
+document:
+  en: de08eff6aab5b06f9bd492204b7691322aaec742
+  zh: 38a54ae39a4693e11d730b4b8fb9b4ae7e6ad68b
+/agent-note-recall-addresses-describe-admitted-content:
+  en: 3ce0cad18b2b8693
+  zh: 21154fef27b830c9
+/agent-note-recall-addresses-describe-admitted-content/problem:
+  en: 9ca68f8e25bc1c1a
+  zh: d75d9a3421428c08
+/agent-note-recall-addresses-describe-admitted-content/decision:
+  en: 46028310f40dd5af
+  zh: 309ad6cfebc11a44
+/agent-note-recall-addresses-describe-admitted-content/alternatives-considered:
+  en: 652a578ebbdcd3f0
+  zh: 20c9e0cef00c751c
+/agent-note-recall-addresses-describe-admitted-content/consequences:
+  en: c0a4f6712cc0022f
+  zh: aeeff95cb0ad4bad
+/agent-note-recall-addresses-describe-admitted-content/verification:
+  en: f9df3d54da012344
+  zh: ce0bf07809908111

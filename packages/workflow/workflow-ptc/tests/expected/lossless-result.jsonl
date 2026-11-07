@@ -1,0 +1,9 @@
+{"key":null,"status":"completed","value":[10,20]}
+{"key":"00","status":"error","value":null}
+{"key":"01","status":"error","value":null}
+{"key":"1.0","status":"error","value":null}
+{"key":"1e0","status":"error","value":null}
+{"key":"0x1","status":"error","value":null}
+{"key":" 1","status":"error","value":null}
+{"key":"-0","status":"error","value":null}
+{"key":"","status":"error","value":null}

@@ -1,3 +1,5 @@
+import { DeploymentContextRuntime } from './deployment-context.ts'
+export type { ClientDeploymentContext, DeploymentContextSnapshot } from './deployment-context.ts'
 /** Browser runtime services for slots, sessions, workspaces, and connection-stream delivery. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
@@ -13,6 +15,8 @@ import { SessionRuntime } from './sessions/service.ts'
 import { SessionRuntimePool } from './sessions/pool.ts'
 import type { SessionListState } from './sessions/service.ts'
 import { WorkspaceRuntime } from './workspaces/service.ts'
+import { installPersonalDirectory } from './personal-directory.ts'
+import { createRuntimeEnvironments } from './runtime-environments.ts'
 import type { ConversationSnapshot } from './sessions/conversation.ts'
 import type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/session-create.ts'
 import type { UseProjection } from './sessions/projection-store.ts'
@@ -24,8 +28,9 @@ import { WorkspaceResourceRegistry } from './workspace-resources.ts'
 
 export { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 
-export { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+export { clientSessionKey, parseClientSessionKey, runtimeTargetKey, addressRuntimeUrl } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+export type { RuntimeEnvironment,RuntimeEnvironments } from './runtime-environments.ts'
 
 export { NavigationController, commitSessionNavigation } from './navigation.ts'
 export { SlotRegistry } from './slots.ts'
@@ -65,7 +70,7 @@ export type {
   SettingsControlState, SettingsOwner, SettingsScope, SettingsScopeSnapshot, SettingsScopeSource, SettingsScopeSpec,
   SettingsWritableReason, SettingsWriteState,
 } from './contract/settings-scope.ts'
-export { settingsControlState } from './contract/settings-scope.ts'
+export { settingsControlState, settingsFieldControlState } from './contract/settings-scope.ts'
 export { onSettingsNavigation, requestSettingsSection } from './contract/settings-navigation.ts'
 export type { SettingsNavigationRequest } from './contract/settings-navigation.ts'
 export { sessionPersistenceKey } from './session-persistence.ts'
@@ -253,12 +258,20 @@ declare module '@deepseek-ai/cordis' {
      */
     'slots/changed'(key: string): void
     /**
+     * A ready connection generation is about to publish its Host description.
+     * Listeners synchronously withdraw prior-generation client state before description consumers run.
+     * @mode emit
+     * @param initialConnection - true only before this runtime's first connected callback.
+     */
+    'connection/will-reset'(initialConnection: boolean): void
+    /**
      * A connection generation was (re-)established. Wire-derived caches must
      * treat their state as stale and repull (commands directory; the queue
      * mirrors reset themselves through the session resync path).
      * @mode emit
+     * @param initialConnection - true only for this runtime's first handshake; omitted resets require revalidation.
      */
-    'connection/reset'(): void
+    'connection/reset'(initialConnection?: boolean): void
     /**
      * Open one Session-relative Workspace file in the browser.
      * @param request - owning Session and relative resource address.
@@ -300,8 +313,12 @@ declare module '@deepseek-ai/cordis' {
     workspaces: import('./contract/workspaces.ts').IWorkspaces
     /** Active project UI policy shared by theme and project settings surfaces. */
     projectUiPolicy: import('./project-policy.ts').ProjectUiPolicyRuntime
+    /** Browser-ingress deployment policy; independent of the selected Runtime. */
+    deploymentContext: DeploymentContextRuntime
     /** Per-runtime permission preset catalog directory; one mirror per pooled connection. */
     permissionCatalog: import('./permission-catalog.ts').PermissionCatalogDirectory
+    /** Passive authorized management destinations; subscribing never starts a Runtime. */
+    runtimeEnvironments: import('@deepseek-ai/dsh-client-ui-slots').HostObservable<import('./runtime-environments.ts').RuntimeEnvironments>
     /** Metadata-only Workspace resource registry; providers bind one runtime target. */
     workspaceResources: WorkspaceResourceRegistry
     /** Optional provider for the multi-session conversation viewport. */
@@ -321,13 +338,21 @@ export function apply(ctx: Context): void {
   const workspaceResources = new WorkspaceResourceRegistry()
   ctx.provide('workspaceResources', workspaceResources)
   const connection = ctx.get('connection') as ConnectionHandle
+  const deploymentContext = new DeploymentContextRuntime(connection.metadataTiming)
+  ctx.provide('deploymentContext', deploymentContext)
+  ctx.effect(() => deploymentContext.start(connection, ctx.projectUiPolicy), 'runtime: entry deployment context')
   const conversation = {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),
   }
+  const identity = connection.documentIdentity
+  const selectionPersistenceKey = identity === undefined ? undefined
+    : `dsh.sessions.current.v2.${String(identity.principalId)}.${identity.runtimeTarget.kind === 'personal'
+      ? 'personal' : `project-${String(identity.runtimeTarget.projectId)}`}`
   const baseSessions = new SessionRuntime(ctx, connection.wireApi ?? connection.api, ctx.remote, conversation, {
     provideService: false,
     hostDescription: connection.hostDescription,
+    ...(selectionPersistenceKey === undefined ? {} : { selectionPersistenceKey }),
   })
   const sessions = new SessionRuntimePool(ctx, baseSessions, connection, ctx.remote, conversation)
   ctx.effect(() => {
@@ -356,10 +381,13 @@ export function apply(ctx: Context): void {
     },
   })
   const workspaces = new WorkspaceRuntime(ctx, connection.api, sessions)
+  const personalDirectory = installPersonalDirectory(ctx, connection, sessions, workspaces)
+  ctx.provide('runtimeEnvironments', createRuntimeEnvironments(ctx, connection, sessions, workspaces, deploymentContext, personalDirectory))
   ctx.effect(
     () => workspaces.startInitialSelection(),
     'runtime: initial Workspace selection',
   )
+  let initialConnection = true
   const loop = connection.start({
     onMuxEnvelope: (envelope) => {
       sessions.handleMuxEnvelope(envelope)
@@ -377,10 +405,15 @@ export function apply(ctx: Context): void {
         if (frame.event === 'permission-presets/catalog-changed') permissionCatalog.invalidateFor(connection)
       }
     },
+    onBeforeConnected: () => { ctx.emit('connection/will-reset', initialConnection) },
     onConnected: (description) => {
-      sessions.handleConnected(description)
-      workspaces.handleConnected()
-      ctx.emit('connection/reset')
+      // Authority withdrawal can cancel pending navigation, including an
+      // unshown saved-history window. Finish it before preparing fresh reads.
+      const initial = initialConnection
+      initialConnection = false
+      ctx.emit('connection/reset', initial)
+      const workspaceBaseline = workspaces.handleConnected()
+      sessions.handleConnected(description, workspaceBaseline)
     },
     onFailure: (failure) => { sessions.handleConnectionFailure(failure) },
     onStateChange: (state) => {
@@ -389,11 +422,12 @@ export function apply(ctx: Context): void {
       // onConnected, so this is the safe moment to drop generation-scoped
       // interaction state.
       if (state === 'reconnecting') {
+        workspaces.handleDisconnected()
         sessions.handleDisconnected()
       }
     },
   })
-  ctx.effect(() => () => { loop.stop() }, 'runtime: connection stream loop')
+  ctx.effect(() => () => { workspaces.handleDisconnected(); loop.stop() }, 'runtime: connection stream loop')
 }
 
 /** Local Session owners; plugins extend this map for independent consumers. */

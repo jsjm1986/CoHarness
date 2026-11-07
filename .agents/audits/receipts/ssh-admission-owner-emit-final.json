@@ -1,0 +1,13 @@
+{
+  "name": "ssh-admission-owner-emit-final",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T15:25:02.860709+00:00",
+  "seconds": 19.525,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e4bc6a61c7886a244e409d33f4d9bc1b8576789cdcec91a738cda77bb4ddf7ad",
+  "inputsAfter": "e4bc6a61c7886a244e409d33f4d9bc1b8576789cdcec91a738cda77bb4ddf7ad",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

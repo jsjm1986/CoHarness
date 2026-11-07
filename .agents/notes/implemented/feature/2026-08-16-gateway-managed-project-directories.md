@@ -18,6 +18,10 @@ The JSON and project-service inputs retain an optional absolute `path` for impor
 
 Linux deployment pre-creates `HGW_PROJECTS_ROOT` as `root:harness-project` with mode `2770`. The setgid parent gives Gateway-created `0770` children the shared runtime group without making them world-writable. Local macOS deployments configure a writable root owned by the launchd account.
 
+The persisted creation origin controls Linux path revalidation for Runtime startup and document access. Only user-origin projects may use children of `HGW_USER_PROJECTS_ROOT`; its root itself remains reserved. Startup obtains that origin from the assigned database owner, so request fields cannot relax the directory policy. Canonical paths, final-component symbolic links and other reserved roots retain the same checks.
+
+Before writing a Linux project's profile or credentials, the Gateway resolves its configured execution account and prepares only the fixed private directory chain, managed inventory and Gateway-generated policy files under that project's Runtime root. Retained descriptors anchor each ownership change; links, replaced components and foreign owners refuse preparation. Directories retain 0700 and managed files retain 0600. Atomic default-model patch updates preserve the Runtime home’s execution owner, including policy changes while the process is running. Other files are untouched. Unix accounts remain deployment prerequisites, and the driver still drops to the configured account inside its mount namespace.
+
 ## Verification
 
 SQLite service tests cover automatic directory creation, Unicode names, `0770` group permissions, traversal rejection, and the existing explicit-path diagnostics. Admin API tests prove that `{ "name": "产品文档" }` creates and returns the canonical directory. Admin UI tests prove that managed mode submits only the trimmed name; the [host-directory browser note](2026-08-17-gateway-admin-host-directory-browser.md) owns existing-directory coverage. PostgreSQL integration coverage exercises the same managed-directory helper when `HGW_TEST_DATABASE_URL` is configured.

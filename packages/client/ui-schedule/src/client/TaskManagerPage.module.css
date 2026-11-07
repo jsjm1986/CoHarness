@@ -84,13 +84,29 @@
   gap: 16px;
 }
 
-/* The Plugins toolbar's Add-plugin step: a 32px capsule with the 13px label. */
-.newButton {
-  height: 32px;
-  font-size: 13px;
-  line-height: 20px;
-  padding: 0 12px;
-  border-radius: 16px;
+.environmentRow {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-block-end: 16px;
+}
+
+.environmentTrigger {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.environmentName {
+  max-inline-size: min(32ch, 60vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.environmentNotice {
+  margin-block: 0 16px;
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* The mock's `.list-tools`: the one row of filter tabs, 8px between chips and

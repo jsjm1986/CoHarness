@@ -75,9 +75,9 @@ describe('workspace-changes in a repository', () => {
     await settle(ctx, session)
     await writeFile(join(cwd, 'a.txt'), 'file change already happened\n')
     toolCall(session, 1, 'bash', { command: 'change file' })
-    await expect(ctx.serial('agent/turn-stopping', { agent: actor, turn: 1, signal } as never)).rejects.toThrow('storage failed')
+    await expect(ctx.serial('agent/turn-stopping', { agent: actor, turn: 1, signal } as never)).rejects.toThrow('Historical review did not complete')
     expect(await readFile(join(cwd, 'a.txt'), 'utf8')).toBe('file change already happened\n')
-    await expect(preStep(1)).rejects.toThrow('storage failed')
+    await expect(preStep(1)).rejects.toThrow('Historical review did not complete')
     expect(next).not.toHaveBeenCalled()
     endTurn(session, 1, 'blocked')
     startTurn(session, 2)
@@ -140,8 +140,8 @@ describe('workspace-changes in a repository', () => {
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
     const session = ctx.sessions.create(SessionId('overlapping-storage'), { meta: { cwd } })
     startTurn(session, 1)
-    await expect(settle(ctx, session)).rejects.toThrow('storage failed')
-    await expect(ctx.serial('agent/turn-stopping', { agent: { id: session.id, session }, turn: 1, signal } as never)).rejects.toThrow('storage failed')
+    await expect(settle(ctx, session)).rejects.toThrow('Historical review did not complete')
+    await expect(ctx.serial('agent/turn-stopping', { agent: { id: session.id, session }, turn: 1, signal } as never)).rejects.toThrow('Historical review did not complete')
     expect(warn.mock.calls.flat().join(' ')).toContain('cannot contain the Session workspace')
   })
 
@@ -260,12 +260,12 @@ describe('workspace-changes in a repository', () => {
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
     const session = ctx.sessions.create(SessionId('gone'), { meta: { cwd } })
     startTurn(session, 1)
-    await expect(settle(ctx, session)).rejects.toThrow('Historical review storage failed')
+    await expect(settle(ctx, session)).rejects.toThrow('Historical review did not complete')
     const effect = vi.fn(() => Promise.resolve())
-    await expect(mutate(ctx, session, 1, 'write', { file_path: 'w.txt', content: 'w\n' }, effect)).rejects.toThrow('Historical review storage failed')
+    await expect(mutate(ctx, session, 1, 'write', { file_path: 'w.txt', content: 'w\n' }, effect)).rejects.toThrow('Historical review did not complete')
     expect(effect).not.toHaveBeenCalled()
     endTurn(session, 1)
-    await expect(settle(ctx, session)).rejects.toThrow('Historical review storage failed')
+    await expect(settle(ctx, session)).rejects.toThrow('Historical review did not complete')
     expect((await changes(ctx, session))).toMatchObject([{ turn: 1, incomplete: true }])
     expect(warn.mock.calls.filter(call => String(call[0]).startsWith('workspace-changes:'))).toHaveLength(1)
   })
@@ -377,13 +377,13 @@ describe('workspace-changes in a repository', () => {
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
     const session = ctx.sessions.create(SessionId('warn'), { meta: { cwd } })
     startTurn(session, 1)
-    await expect(settle(ctx, session)).rejects.toThrow('Historical review storage failed')
+    await expect(settle(ctx, session)).rejects.toThrow('Historical review did not complete')
     // A repository whose snapshot failed is not summarized from captures as if it had no repository.
     const effect = vi.fn(() => writeFile(join(cwd, 'y.txt'), 'y\n'))
-    await expect(mutate(ctx, session, 1, 'write', { file_path: 'y.txt', content: 'y\n' }, effect)).rejects.toThrow('Historical review storage failed')
+    await expect(mutate(ctx, session, 1, 'write', { file_path: 'y.txt', content: 'y\n' }, effect)).rejects.toThrow('Historical review did not complete')
     expect(effect).not.toHaveBeenCalled()
     endTurn(session, 1)
-    await expect(settle(ctx, session)).rejects.toThrow('Historical review storage failed')
+    await expect(settle(ctx, session)).rejects.toThrow('Historical review did not complete')
     expect((await changes(ctx, session))).toMatchObject([{ turn: 1, incomplete: true }])
     const own = warn.mock.calls.map(call => String(call[0])).filter(message => message.startsWith('workspace-changes:'))
     expect(own).toHaveLength(1)
@@ -576,6 +576,46 @@ describe('workspace-changes without a repository', () => {
 })
 
 describe('workspace-changes without git', () => {
+  it.each([true, false])('retries a failed developer-tools probe on an explicit later request, same Session: %s', async (sameSession) => {
+    const cwd = await scratchDir('dsh-review-probe-recovery-', cleanups)
+    const { ctx } = await boot()
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    cleanups.push(async () => { Object.defineProperty(process, 'platform', platform) })
+    vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
+    vi.spyOn(ctx.subprocess, 'resolveExecutable').mockResolvedValue('/usr/bin/git')
+    let probes = 0
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async (spec) => {
+      const probe = spec.argv[0] === '/usr/bin/xcode-select'
+      if (probe && ++probes === 1) throw new Error('Temporary process admission failure')
+      return {
+        done: Promise.resolve({ exitCode: probe ? 0 : 128, signal: null }),
+        collected: {
+          stdout: { readFrom: () => ({ text: '', lossy: false }) },
+          stderr: { readFrom: () => ({ text: 'not a git repository', lossy: false }) },
+        },
+      } as never
+    })
+    const first = ctx.sessions.create(SessionId('probe-failure'), { meta: { cwd } })
+    const next = vi.fn(() => Promise.resolve({ kind: 'enter', messages: [] }))
+    const preStep = (session: Session, turn: number) => ctx.waterfall('agent/pre-step', {
+      agent: { id: session.id, session }, turn, step: 1, messages: [], signal,
+    } as never, next as never)
+    startTurn(first, 1)
+    await expect(preStep(first, 1)).rejects.toThrow('Historical review did not complete')
+    expect(next).not.toHaveBeenCalled()
+    endTurn(first, 1, 'blocked')
+    const second = sameSession ? first : ctx.sessions.create(SessionId('probe-retry'), { meta: { cwd } })
+    const turn = sameSession ? 2 : 1
+    startTurn(second, turn)
+    await expect(preStep(second, turn)).resolves.toMatchObject({ kind: 'enter' })
+    expect(probes).toBe(2)
+    const later = ctx.sessions.create(SessionId('probe-success-reused'), { meta: { cwd } })
+    startTurn(later, 1)
+    await expect(preStep(later, 1)).resolves.toMatchObject({ kind: 'enter' })
+    expect(probes).toBe(2)
+  })
+
   it('summarizes file-tool edits only, even inside a repository, and reports the absence once', async () => {
     const cwd = await repository()
     const { ctx } = await boot()
@@ -612,7 +652,7 @@ describe('workspace-changes without git', () => {
       const cwd = await scratchDir('dsh-workspace-changes-stub-', cleanups)
       const { ctx } = await boot()
       vi.spyOn(ctx.subprocess, 'resolveExecutable').mockResolvedValue(probe.executable ?? '/usr/bin/git')
-      const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(spec =>
+      const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async spec =>
         spec.argv[0] === '/usr/bin/xcode-select' ? { done: probe.done } as never : {
           done: Promise.resolve({ exitCode: 128, signal: null }),
           collected: {

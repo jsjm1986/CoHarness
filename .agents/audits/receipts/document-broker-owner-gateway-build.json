@@ -1,0 +1,14 @@
+{
+  "name": "document-broker-owner-gateway-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-26T11:15:57.336028+00:00",
+  "seconds": 5.937,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "376a06e779edc63500ee9d480fef01cbc5f19b82667bf27aa275607fca766864",
+  "inputsAfter": "376a06e779edc63500ee9d480fef01cbc5f19b82667bf27aa275607fca766864",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

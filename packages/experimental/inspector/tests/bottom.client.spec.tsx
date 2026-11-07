@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 /** Bottom Inspector lifetime and shortcuts through the production slot renderer. */
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { act } from '@testing-library/react'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import ShortcutsService from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { registerInspectorPage } from '../src/client/bottom/page.tsx'
+import { apply as applyInspector } from '../src/client/plugin.ts'
+import { ClientRealmSource } from '../src/client/inspection/realm.ts'
+import { CordisTreeCollector } from '../src/shared/cordis/collector.ts'
+import { bootstrap } from './fixtures/client-bootstrap.client.ts'
 import { inspectorId } from '../src/shared/identity.ts'
 
 const ID = 'inspector.toggle' as ShortcutCommandId
@@ -15,10 +19,14 @@ const runtimes: SlotTestRuntime[] = []
 
 afterEach(async () => {
   for (const runtime of runtimes.splice(0)) await runtime.dispose()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  delete globalThis.__DSH_INSPECTOR__
   localStorage.clear()
+  sessionStorage.clear()
 })
 
-async function setup() {
+async function setup(hostOnly = false) {
   const runtime = await SlotTestRuntime.create()
   runtimes.push(runtime)
   const locale = new LocaleRuntime(runtime.ctx)
@@ -28,11 +36,36 @@ async function setup() {
   await runtime.ctx.plugin(ShortcutsService).await()
   await expect.poll(() => runtime.ctx.shortcuts.config.getSnapshot().status).toBe('ready')
   await runtime.declare({ 'shell.bottom': { kind: 'single', scope: 'root' } })
-  const plugin = { inject: ['locale', 'shortcuts', 'slots'], apply: (ctx: typeof runtime.ctx) => { registerInspectorPage(ctx, sourceId) } }
+  const plugin = hostOnly ? { apply: applyInspector }
+    : { inject: ['locale', 'shortcuts', 'slots'], apply: (ctx: typeof runtime.ctx) => { registerInspectorPage(ctx, sourceId) } }
   const provider = await runtime.mount(plugin)
+  await expect.poll(() => runtime.ctx.shortcuts.catalog.getSnapshot().find(row => row.id === ID)).toBeDefined()
   const body = runtime.renderSlot('shell.bottom', {})
   return { runtime, locale, provider, body, plugin }
 }
+
+it('opens a Host-only panel on unsupported origins without starting Client inspection', async () => {
+  vi.stubGlobal('location', new URL('https://harness.example'))
+  const socket = vi.fn(() => { throw new Error('unsupported origins must not open an ingest socket') })
+  vi.stubGlobal('WebSocket', socket)
+  globalThis.__DSH_INSPECTOR__ = bootstrap
+  const claimed = vi.spyOn(ClientRealmSource, 'claim')
+  const collected = vi.spyOn(CordisTreeCollector.prototype, 'snapshot')
+  const { runtime, locale, provider, body } = await setup(true)
+  expect(runtime.ctx.get('inspector')).toBeUndefined()
+  press()
+  const frame = body.view.getByTitle('NodeJS Inspector · Host only')
+  expect(frame.getAttribute('src')).toBe('inspector/devtools/devtools_app.html?disableLocaleInfoBar=true&sourceScope=host')
+  expect(runtime.ctx.shortcuts.catalog.getSnapshot().find(row => row.id === ID)?.label).toBe('Toggle NodeJS Inspector (Host only)')
+  expect(socket).not.toHaveBeenCalled()
+  expect(claimed).not.toHaveBeenCalled()
+  expect(collected).not.toHaveBeenCalled()
+  act(() => { locale.setLocale('zh') })
+  expect(body.view.getByTitle('NodeJS 诊断 · 仅 Host')).toBe(frame)
+  await provider.dispose()
+  expect(frame.isConnected).toBe(false)
+  expect(runtime.ctx.shortcuts.catalog.getSnapshot().find(row => row.id === ID)).toBeUndefined()
+})
 
 function press(target: EventTarget = window, options: KeyboardEventInit = {}) {
   const event = new KeyboardEvent('keydown', {

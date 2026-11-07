@@ -545,4 +545,14 @@ export interface SessionsApi {
    */
   cancel(request: RpcRequest<{ sessionId: SessionId }>): Promise<RpcResponse<{ accepted: true }>>
 
+  /**
+   * Publish the session's live Agent because the client now presents it.
+   * Presentation is the open-intent boundary: ambient scopes, startup
+   * prefetch, and read-only catalog loads stay cold, while a rendered
+   * conversation resolves the Agent so opened sessions meet the
+   * open-publishes-Agent contract. Session-backed subagents reject with
+   * `agent-busy`; archived sessions reject like other mutating entry points.
+   */
+  activate(request: RpcRequest<{ sessionId: SessionId }>): Promise<RpcResponse<{ accepted: true }>>
+
 }

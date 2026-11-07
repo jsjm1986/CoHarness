@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Remote desktop VNC",
+    "description": "VNC/RFB provider for ctx.remoteDesktop"
+  }
+}

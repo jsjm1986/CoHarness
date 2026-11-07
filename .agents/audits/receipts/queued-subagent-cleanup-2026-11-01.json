@@ -1,0 +1,227 @@
+{
+  "finding": "B441",
+  "status": "fixed_verified_named_queued_cleanup_admission_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T12:01:14.739677+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-origin-final.json",
+    "fetchCompletedAt": "2026-11-01T11:59:08.051113+00:00"
+  },
+  "problem": "Admission snapshots retained failures before waiting. Another failed run handed back during that wait is bypassed, so a new child can be dispatched while the later resource remains unconfirmed.",
+  "fix": "Re-read the exact-parent recovery set after every awaited batch. The final empty-set decision, cancellation/registration checks and provider dispatch share the same synchronous continuation. Holder-owned background work remains excluded; unconfirmed cleanup refuses the new admission.",
+  "verification": {
+    "distinctBusinessCases": 732,
+    "relatedPackageCases": 728,
+    "newUnitCases": 2,
+    "typescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "versionRepeatsAndSubsetsNotAdded": true,
+    "checks": [
+      {
+        "name": "queued-cleanup-regression",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-regression.json"
+      },
+      {
+        "name": "queued-cleanup-final-cases",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-final-cases.json"
+      },
+      {
+        "name": "queued-cleanup-source-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-source-sdk.json"
+      },
+      {
+        "name": "queued-cleanup-built-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-built-node22.json"
+      },
+      {
+        "name": "queued-cleanup-built-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-built-node24.json"
+      },
+      {
+        "name": "queued-cleanup-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-python-sdk.json"
+      },
+      {
+        "name": "queued-cleanup-normal-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-normal-build.json"
+      },
+      {
+        "name": "queued-cleanup-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-host-types.json"
+      },
+      {
+        "name": "queued-cleanup-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-export-docs.json"
+      },
+      {
+        "name": "queued-cleanup-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-config.json"
+      },
+      {
+        "name": "queued-cleanup-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-python-lint.json"
+      },
+      {
+        "name": "queued-cleanup-final-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-final-lint.json"
+      },
+      {
+        "name": "queued-cleanup-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-pairing.json"
+      },
+      {
+        "name": "queued-cleanup-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-docs.json"
+      },
+      {
+        "name": "queued-cleanup-origin-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-origin-final.json"
+      },
+      {
+        "name": "queued-cleanup-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-final-repository-references.json"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 21,
+          "covered": 21,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 27,
+          "covered": 27,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/run-lease.ts": {
+        "lines": {
+          "total": 21,
+          "covered": 21,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 27,
+          "covered": 27,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Only run-lease.ts is100% in all4 per-file metrics. Existing Core index baseline/thresholds remain unchanged; no whole-project coverage claim.",
+    "physicalProof": "The actual SDK profile and SubagentRuntime own2 native HTTP responses. First cleanup is suspended at an explicit barrier; a second failure is handed back during that wait. Current code refuses if it stays unconfirmed or closes it before dispatch if recovered. The repaired refusal subsequently admits a fresh child without task replay.",
+    "counterfactual": "Complete unchanged192-file original Core reproduces2 intended QUEUED_CLEANUP_FAILED assertions in both source and Node22 built SDK. The late response has only its initial failed cleanup attempt, remains open after the wait and is bypassed before new provider dispatch. No timeout/module error is counted.",
+    "originalTestPreservation": {
+      "status": "passed",
+      "originalRunCleanupFileUnchangedExceptNewCases": true,
+      "otherOriginalTestFilesUnchanged": 32,
+      "addedCases": 2
+    },
+    "fixtureSyntaxAndOriginalHashes": {
+      "status": "passed",
+      "originalPackageFilesPreserved": 192,
+      "paths": [
+        "examples/headless-agent/tests/fixtures/queued-subagent-cleanup/model.mjs",
+        "examples/headless-agent/tests/fixtures/queued-subagent-cleanup/prepare.mjs",
+        "examples/headless-agent/tests/fixtures/queued-subagent-cleanup/runtime.mjs"
+      ],
+      "command": "NODE_DISABLE_COMPILE_CACHE=1 node --check <each fixture>"
+    },
+    "verificationCorrections": "A focused15-case coverage check exposed the now-unused undefined fallback. Actual caller inspection removed that internal unused input and kept concrete-set typing. Final728 cases cover all helper branches. One unnecessary assertion in the new test was removed; final2 cases and4-file lint pass. Failed intermediate receipts are retained.",
+    "docsQuick": "20 passed,0 failed",
+    "bilingualPairs": 3,
+    "cordisConfigs": 443,
+    "productionAcceptanceClaimed": false,
+    "officialResponsesDeferred": true
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/queued-cleanup-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.zh.md",
+    "apps/cli/tests/profiles/sdk/queued-subagent-cleanup.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/queued-subagent-cleanup/expected.json",
+    "examples/headless-agent/tests/fixtures/queued-subagent-cleanup/model.mjs",
+    "examples/headless-agent/tests/fixtures/queued-subagent-cleanup/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/queued-subagent-cleanup/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/queued-subagent-cleanup/runtime.mjs",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent/src/index.ts",
+    "packages/subagent/subagent/src/run-lease.ts",
+    "packages/subagent/subagent/tests/run-cleanup.spec.ts",
+    "python/sdk/tests/test_queued_subagent_cleanup_expected.py"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 161,
+  "artifactReferences": 7,
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/note-review.json",
+  "remaining": [
+    "All12 domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue service withdrawal/lifetime and hand-back after disposal, remaining Workflow/Ralph failures, queued continuation and permission transitions. The admission repair does not prove service teardown is complete; use deterministic ownership evidence before changing it.",
+    "Continue remaining resource/model/tool/Inspector authorization, account/computer isolation, document/runtime business rules and full file/platform coverage outside peer-reserved surfaces.",
+    "The B416-to-current integration index contains verified batch deltas, not an assembled production release. Preserve B417 matching required-event writers/readers/SDKs and committed generation immutability; no old-reader downgrade.",
+    "Latest trusted peer report remains live R26/schema103, R27 tests only and frozen R28 HTML resource-refusal candidate not deployed. Gateway html/server plus corresponding tests/browser/docs remain peer-owned; root makes no independent production acceptance claim.",
+    "Official paid Responses remains deferred. No root production deployment/restart/dependency synchronization/reset/stash/commit/push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T113946Z/B416-B441-integration-index.json"
+}

@@ -2,17 +2,52 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createRuntimeContext } from './setup.ts'
+import type { SubprocessHandle, SubprocessOutcome, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 
 /**
  * Mocked subprocess pipes control synchronous write failures and backpressure
  * transitions independently of kernel buffering. The real-subprocess suite
  * remains in runtime.spec.ts.
  */
-const { execFileSyncMock, spawnMock } = vi.hoisted(() => ({ execFileSyncMock: vi.fn(), spawnMock: vi.fn() }))
-vi.mock('node:child_process', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:child_process')>()
-  execFileSyncMock.mockImplementation(original.execFileSync)
-  return { ...original, execFileSync: execFileSyncMock, spawn: spawnMock }
+const { probeSpawn, spawnMock, failures } = vi.hoisted(() => ({
+  probeSpawn: vi.fn(), spawnMock: vi.fn(),
+  failures: { probeOutput: false, probeExit: false, missingPipe: false, rangeExit: false, rangeError: undefined as Error | undefined },
+}))
+vi.mock('@deepseek-ai/dsh-subprocess-local', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@deepseek-ai/dsh-subprocess-local')>()
+  class ControlledLocalRuntime extends original.LocalSubprocessRuntime {
+    protected override spawnProcess(spec: SubprocessSpawnSpec): SubprocessHandle {
+      if (spec.resourceOrigin === 'infrastructure') {
+        probeSpawn(spec)
+        const handle = super.spawnProcess(spec)
+        return {
+          ...handle, collected: failures.probeOutput ? {} : handle.collected,
+          waitForExit: async signal => failures.probeExit ? false : handle.waitForExit(signal),
+        }
+      }
+      const child = spawnMock(spec.argv[0], spec.argv.slice(1), spec) as EventEmitter & {
+        pid?: number
+        stdin: PassThrough
+        stdout: PassThrough
+        stderr: PassThrough
+        stdio: PassThrough[]
+      }
+      const closed = Promise.withResolvers<SubprocessOutcome>()
+      void closed.promise.catch(() => {})
+      child.on('close', (exitCode: number | null, signal: NodeJS.Signals | null) => { closed.resolve({ exitCode, signal }) })
+      child.on('error', (error: Error) => { closed.reject(error) })
+      return {
+        stdin: child.stdin, stdout: child.stdout, stderr: child.stderr,
+        control: failures.missingPipe ? undefined : child.stdio[3], collected: {},
+        done: closed.promise, waitForExit: async () => {
+          if (failures.rangeError !== undefined) throw failures.rangeError
+          return !failures.rangeExit
+        },
+        terminate: () => { if (child.pid === undefined) closed.resolve({ exitCode: null, signal: 'SIGTERM' }) },
+      }
+    }
+  }
+  return { ...original, LocalSubprocessRuntime: ControlledLocalRuntime }
 })
 
 const { PythonPtcRuntime } = await import('../src/index.ts')
@@ -39,8 +74,9 @@ function fakeChildWithThrowingFd3(): EventEmitter {
 }
 
 afterEach(() => {
-  execFileSyncMock.mockClear()
+  probeSpawn.mockClear()
   spawnMock.mockReset()
+  Object.assign(failures, { probeOutput: false, probeExit: false, missingPipe: false, rangeExit: false, rangeError: undefined })
 })
 
 /** A child that emits an async `error` (an ENOENT-style spawn failure). */
@@ -126,6 +162,35 @@ function fakeChildBackpressuredThenDestroyed(): { child: EventEmitter; proto: Pa
 }
 
 describe('PythonPtcRuntime — controlled subprocess pipes', () => {
+  it.each(['probeOutput', 'probeExit'] as const)('refuses an unconfirmed interpreter probe: %s', async (failure) => {
+    failures[failure] = true
+    const ctx = await createRuntimeContext()
+    await expect(ctx.plugin(PythonPtcRuntime)).rejects.toThrow(failure === 'probeOutput'
+      ? 'did not supply collected stdout' : 'probe cleanup was not confirmed')
+  })
+
+  it.each(['missingPipe', 'rangeExit', 'rangeError', 'cancel'] as const)('retains execution failure after managed allocation: %s', async (failure) => {
+    const controller = new AbortController()
+    const stdin = new PassThrough(), stdout = new PassThrough(), stderr = new PassThrough(), proto = new PassThrough()
+    onTestFinished(() => { for (const stream of [stdin, stdout, stderr, proto]) stream.destroy() })
+    const child = Object.assign(new EventEmitter(), { stdin, stdout, stderr, stdio: [stdin, stdout, stderr, proto] })
+    const ctx = await createRuntimeContext()
+    await ctx.plugin(PythonPtcRuntime)
+    if (failure === 'rangeError') failures.rangeError = new Error('range observation failed')
+    else if (failure !== 'cancel') failures[failure] = true
+    spawnMock.mockImplementation(() => {
+      if (failure === 'cancel') controller.abort(new Error('cancel at allocation'))
+      else setImmediate(() => proto.emit('data', Buffer.from('{"type":"boot-ack"}\n{"type":"done","value":42}\n')))
+      return child
+    })
+    const result = await ctx.ptcRuntime.run(ctx.ptcRuntime.resolve({ program: 'return 42', bindings: [], signal: controller.signal }))
+    expect(result.value).toBeUndefined()
+    expect(result.error?.kind).toBe(failure === 'cancel' ? 'abort' : 'worker-exit')
+    expect(result.error?.message).toContain(failure === 'missingPipe' ? 'requested protocol pipes'
+      : failure === 'rangeExit' ? 'cleanup was not confirmed'
+        : failure === 'rangeError' ? 'range observation failed' : 'cancel at allocation')
+  })
+
   it.each([
     { asynchronous: false, runnerEvidence: false },
     { asynchronous: false, runnerEvidence: true },
@@ -222,12 +287,13 @@ describe('PythonPtcRuntime — controlled subprocess pipes', () => {
     const child = Object.assign(new EventEmitter(), { stdin, stdout, stderr, stdio: [stdin, stdout, stderr, proto] })
     proto.write = (chunk: unknown) => {
       const frame = JSON.parse(String(chunk)) as { type: string }
+      if (frame.type === 'boot') { spawned.resolve(undefined); return true }
       if (frame.type !== 'reply') return true
       replies.push(frame)
       written.resolve(undefined)
       return false
     }
-    spawnMock.mockImplementation(() => { spawned.resolve(undefined); return child })
+    spawnMock.mockImplementation(() => child)
     const ctx = await createRuntimeContext()
     const fiber = await ctx.plugin(PythonPtcRuntime)
     const runtime = ctx.ptcRuntime as InstanceType<typeof PythonPtcRuntime>
@@ -271,15 +337,13 @@ describe('PythonPtcRuntime — controlled subprocess pipes', () => {
     expect(proto.listenerCount('drain')).toBe(0)
   })
 
-  it('force-kills a version probe that exceeds its load-time deadline', async () => {
+  it('bounds the managed interpreter probe at load', async () => {
     const ctx = await createRuntimeContext()
     const fiber = await ctx.plugin(PythonPtcRuntime)
 
-    expect(execFileSyncMock).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['-I', '-c']),
-      expect.objectContaining({ timeout: 5_000, killSignal: 'SIGKILL' }),
-    )
+    expect(probeSpawn).toHaveBeenCalledWith(expect.objectContaining({
+      argv: expect.arrayContaining(['-I', '-c']) as string[], resourceOrigin: 'infrastructure', signal: expect.any(AbortSignal) as AbortSignal,
+    }))
     await fiber.dispose()
   })
 

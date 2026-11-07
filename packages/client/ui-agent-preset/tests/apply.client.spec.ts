@@ -220,6 +220,7 @@ function workspacesDouble() {
 /** A sessions double whose list can be moved and whose changes are pushed. */
 function sessionsDouble(state: {
   current?: string
+  navigationBlockedSessionId?: string | undefined
   byId: Record<string, { id: string; blank: boolean; agentPreset?: string }>
 }) {
   const listeners = new Set<() => void>()
@@ -554,6 +555,35 @@ describe('ui-agent-preset apply', () => {
     expect(calls).toContain('select:minimal')
   })
 
+  it('keeps a staged bootstrap choice until a blank conversation on that Runtime opens', async () => {
+    const { ctx, slots, calls } = await bench()
+    declareRoot(slots)
+    declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    const state: { current?: string; byId: Record<string, { id: string; blank: boolean; agentPreset?: string }> } = { byId: {} }
+    const sessions = sessionsDouble(state)
+    ctx.provide('sessions', { ...sessions,
+      runtimeTargetFor: (id: string) => id === 'on-b' ? { kind: 'personal', runtimeId: 'runtime-b' } : undefined,
+    } as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    try {
+      await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+      const chip = (slots.entries('conversation.hero.agentPreset')[0]!
+        .inject as unknown as () => AgentPresetSeatInjected)()
+      await chip.load()
+      await chip.select('minimal')
+      state.byId['on-b'] = { id: 'on-b', blank: true, agentPreset: 'standard' }
+      state.current = 'on-b'
+      sessions.notify()
+      await Promise.resolve()
+      expect(calls.filter(call => call.startsWith('select:'))).toEqual([])
+      state.byId['on-a'] = { id: 'on-a', blank: true, agentPreset: 'standard' }
+      state.current = 'on-a'
+      sessions.notify()
+      await vi.waitFor(() => { expect(calls.filter(call => call.startsWith('select:'))).toEqual(['select:minimal']) })
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('forgets the stage once it has been spent', async () => {
     const { ctx, slots, calls } = await bench()
     declareRoot(slots)
@@ -676,6 +706,35 @@ describe('ui-agent-preset apply', () => {
     expect(workspaces.starts).toHaveLength(1)
     conversation()
     page()
+  })
+
+  it('keeps a creator choice for the destination while the originating blank Session is held', async () => {
+    const { ctx, slots, calls } = await bench()
+    declareRoot(slots)
+    const conversation = declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    const state = { current: 'old', navigationBlockedSessionId: undefined as string | undefined,
+      byId: { old: { id: 'old', blank: true, agentPreset: 'standard' },
+        destination: { id: 'destination', blank: true, agentPreset: 'standard' } } }
+    const sessions = sessionsDouble(state)
+    ctx.provide('sessions', sessions as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+    const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
+    await section.load()
+    section.startCreatorDraft?.()
+    state.navigationBlockedSessionId = 'old'
+    sessions.notify()
+    expect(calls).not.toContain('select:cordis')
+    state.navigationBlockedSessionId = undefined
+    sessions.notify()
+    expect(calls).not.toContain('select:cordis')
+    expect(state.byId.old.agentPreset).toBe('standard')
+    state.current = 'destination'
+    sessions.notify()
+    await vi.waitFor(() => { expect(state.byId.destination.agentPreset).toBe('cordis') })
+    expect(state.byId.old.agentPreset).toBe('standard')
+    conversation()
   })
 
   it('keeps the applied composition when the roster load lands late', async () => {

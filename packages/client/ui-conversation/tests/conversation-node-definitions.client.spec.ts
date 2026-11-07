@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type {
   ChatConversationViewNode, ChatSnapshot, ConversationEventInput,
   ConversationMatch, ConversationNodeDefinition, ConversationViewDefinition,
@@ -133,6 +133,60 @@ function toolResult(callId: string, text: string) {
 }
 
 describe('built-in conversation node Definitions', () => {
+  it('updates live navigation without reading completed turns', () => {
+    const history: ConversationEventInput[] = []
+    for (let turn = 1; turn <= 240; turn++) {
+      const seq = history.length + 1
+      history.push(
+        at(seq, 'turn/start', { turn }),
+        at(seq + 1, 'step/start', { turn, step: 1 }),
+        at(seq + 2, 'user/message', textMessage(`user-${String(turn)}`, `Question ${String(turn)}`), { surfaceOp: 'append' }),
+        at(seq + 3, 'assistant/message', {
+          stream: [], turn, step: 1,
+          message: assistantMessage(`assistant-${String(turn)}`, `Answer ${String(turn)}`),
+        }, { surfaceOp: 'append' }),
+        at(seq + 4, 'step/end', { turn, step: 1 }),
+        at(seq + 5, 'turn/end', { turn, reason: { kind: 'completed' } }),
+      )
+    }
+    const seq = history.length + 1
+    const value = assembler([
+      ...history,
+      at(seq, 'turn/start', { turn: 241 }),
+      at(seq + 1, 'step/start', { turn: 241, step: 1 }),
+      at(seq + 2, 'assistant/live-chunk', {
+        attemptId: 'live', turn: 241, step: 1,
+        chunk: { type: 'text-delta', index: 0, text: 'Reply' },
+      }),
+    ])
+    const before = snapshot(value)
+    const markers = before.navigation.items().slice(0, 240)
+    const historicalKeys = new Set(before.order.filter((key) => {
+      const location = before.nodes.get(key)?.location
+      return (location?.kind === 'turn' || location?.kind === 'step') && location.turn.turn <= 240
+    }))
+    const readTurn = vi.spyOn(before.locations, 'getTurn')
+    const readNode = vi.spyOn(before.nodes, 'get')
+    try {
+      for (let chunk = 0; chunk < 20; chunk++) {
+        value.append(at(seq + 3 + chunk, 'assistant/live-chunk', {
+          attemptId: 'live', turn: 241, step: 1,
+          chunk: { type: 'text-delta', index: 0, text: ' more' },
+        }))
+        value.flush()
+      }
+      const after = snapshot(value)
+      expect(after.navigation.items().at(-1)?.response).toBe(`Reply${' more'.repeat(20)}`)
+      expect(readTurn.mock.calls.filter(([turn]) => turn <= 240)).toHaveLength(0)
+      expect(readNode.mock.calls.filter(([key]) => historicalKeys.has(key))).toHaveLength(0)
+      expect(after.navigation.items().slice(0, 240).every((item, index) => item === markers[index])).toBe(true)
+      expect(after.order).toBe(before.order)
+    } finally {
+      readTurn.mockRestore()
+      readNode.mockRestore()
+    }
+  })
+
   it('frame-batches every assistant chunk while structural updates publish immediately', () => {
     for (const [seq, chunkType] of [
       [1, 'text-delta'],

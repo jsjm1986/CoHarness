@@ -1,0 +1,7 @@
+{"operation":"source-substitution","status":409,"foreignSourcePreserved":true,"targetAbsent":true}
+{"operation":"restart","controlDocumentImported":false,"originalCreator":"user:7"}
+{"operation":"other-account","status":403,"sourcePreserved":true}
+{"operation":"fresh-retry","status":200,"identityPreserved":true,"creatorPreserved":true,"foreignBytesPreserved":true}
+{"operation":"late-editor-save","status":200,"editedBytesPreserved":true,"previousIdentityRetired":true,"replacementCreatorUnknown":true}
+{"operation":"external-address-exchange","identitiesPreserved":true,"creatorsPreserved":true,"otherAccountStatus":403,"ownerRenameStatus":200}
+{"operation":"external-address-reuse","identityPreserved":true,"creatorPreserved":true,"replacementCreatorUnknown":true,"bothContentsPreserved":true}

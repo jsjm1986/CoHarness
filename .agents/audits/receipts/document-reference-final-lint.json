@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-final-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc/src/identity.ts packages/attachment/userdoc/src/index.ts packages/attachment/userdoc/tests/identity.spec.ts packages/attachment/userdoc-local/src/upload.ts packages/attachment/userdoc-local/tests/upload.spec.ts packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts packages/client/userdoc-upload/src/index.ts packages/client/userdoc-upload/tests/uploader.client.spec.ts packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/acl.spec.ts gateway/src/document-transfer.ts gateway/tests/document-transfer.spec.ts examples/headless-agent/tests/fixtures/userdoc-migration-driver.ts examples/headless-agent/tests/userdoc-migration.snapshot.ts",
+  "startedAt": "2026-10-26T22:40:00.173242+00:00",
+  "seconds": 13.244,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3a12509d182a8ca8af15e9c58ec5e68d2d7993243a817b393ddfb67d44d46955",
+  "inputsAfter": "3a12509d182a8ca8af15e9c58ec5e68d2d7993243a817b393ddfb67d44d46955",
+  "postgresToolDirectory": null,
+  "outputSha256": "859cd3a6f7251cad7b12d2584a3a31296496209f72c392863939fc1089cfe76b",
+  "outputTail": "packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts:63:1: error @stylistic(max-len): This line has a length of 143. Maximum allowed is 140.\n"
+}

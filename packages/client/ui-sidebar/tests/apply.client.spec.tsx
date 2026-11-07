@@ -1,11 +1,20 @@
+// @vitest-environment jsdom
 /** Sidebar shell slot registration and its plain runtime/layout callbacks. */
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotRegistry, createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { fireEvent, render } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { apply as nodeApply } from '../src/index.ts'
+import { SidebarRoot } from '../src/client/SidebarRoot.tsx'
+import type { SidebarRootComponentProps } from '../src/client/contract/slots.ts'
+import { en } from '../src/client/locales.ts'
+import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 
 async function bench(declare = true) {
   const ctx = new Context()
@@ -16,7 +25,11 @@ async function bench(declare = true) {
   ctx.provide('layout', layout)
   ctx.provide('sessions', sessions as never)
   ctx.provide('workspaces', workspaces as never)
-  ctx.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }), subscribe: () => () => {} } } as never)
+  const viewport = {
+    snapshot: createSnapshotStore<ConversationViewportSnapshot>({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }),
+    setMode: vi.fn(),
+  }
+  ctx.provide('conversationViewport', viewport as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   const slots = ctx.get('slots') as SlotRegistry
   if (declare) {
@@ -25,10 +38,66 @@ async function bench(declare = true) {
       () => null,
     )
   }
-  return { ctx, slots, layout, workspaces, sessions }
+  return { ctx, slots, layout, workspaces, sessions, viewport }
+}
+
+/** Render the shell with the registered business callbacks and their framework-bound view sources. */
+function mountSidebar(b: Awaited<ReturnType<typeof bench>>) {
+  const { hooks, ...actions } = (b.slots.entries('sidebar')[0]!.inject as () => SidebarRootInjected)()
+  const neverHook = (() => { throw new Error('Sidebar shell must not read global model hooks') }) as never
+  const t: SidebarRootComponentProps['t'] = key => (en as Record<string, string>)[key]
+    ?? (commonEn as Record<string, string>)[key] ?? key
+  return render(<SidebarRoot
+    {...actions} collapsed={false} width={300}
+    useViewport={bindSnapshotSelector(hooks.viewport)} usePanels={bindSnapshotSelector(hooks.panels)}
+    useSessions={neverHook} useWorkspaces={neverHook} usePanelInfo={neverHook} t={t}
+    renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
+      options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
+  />)
 }
 
 describe('ui-sidebar apply', () => {
+  it('explicit Conversation navigation reveals the existing single view through the shell exit action', async () => {
+    const b = await bench()
+    try {
+      await b.ctx.plugin({ inject: [...inject], apply }).await()
+      b.viewport.snapshot.set({ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] })
+      const injected = (b.slots.entries('sidebar')[0]!.inject as () => SidebarRootInjected)()
+      injected.exitWorkbench?.()
+      expect(b.viewport.setMode).toHaveBeenCalledExactlyOnceWith('single')
+      expect(b.layout.selectPanel).toHaveBeenCalledExactlyOnceWith(null)
+      expect(b.workspaces.startSession).not.toHaveBeenCalled()
+      expect(b.sessions.open).not.toHaveBeenCalled()
+      expect(b.sessions.clear).not.toHaveBeenCalled()
+    } finally { await b.ctx.fiber.dispose() }
+  })
+
+  it.each(['workbench', 'single'] as const)(
+    'explicit Conversation navigation preserves the global New action in %s mode', async (mode) => {
+      const b = await bench()
+      let mounted: ReturnType<typeof mountSidebar> | undefined
+      try {
+        await b.ctx.plugin({ inject: [...inject], apply }).await()
+        b.viewport.snapshot.set({ mode, paneIds: [], paneRatios: [], collapsedIds: [] })
+        mounted = mountSidebar(b)
+        fireEvent.click(mounted.getAllByRole('button', { name: 'New session' })[0]!)
+        expect(b.layout.selectPanel).toHaveBeenCalledExactlyOnceWith(null)
+        if (mode === 'workbench') {
+          expect(b.viewport.setMode).toHaveBeenCalledExactlyOnceWith('single')
+          expect(b.workspaces.startSession).not.toHaveBeenCalled()
+        } else {
+          expect(b.viewport.setMode).not.toHaveBeenCalled()
+          expect(b.workspaces.startSession).toHaveBeenCalledExactlyOnceWith(undefined)
+        }
+        expect(b.sessions.open).not.toHaveBeenCalled()
+        expect(b.sessions.clear).not.toHaveBeenCalled()
+      } finally {
+        mounted?.unmount()
+        await b.ctx.fiber.dispose()
+      }
+    },
+  )
+
   it('declares only the services it uses', () => {
     expect(inject).toEqual(['slots', 'layout', 'sessions', 'workspaces', 'locale', 'conversationViewport'])
   })

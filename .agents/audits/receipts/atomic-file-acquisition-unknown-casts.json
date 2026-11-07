@@ -1,0 +1,14 @@
+{
+  "name": "atomic-file-acquisition-unknown-casts",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-no-unknown-casts.ts",
+  "startedAt": "2026-10-25T23:18:29.693296+00:00",
+  "seconds": 8.603,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "inputsAfter": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "postgresToolDirectory": null,
+  "outputSha256": "bc7457c8d61bfbd9735e51dddc878982c1d426da87f9f7e851966b627fa44c89",
+  "outputTail": "verify-no-unknown-casts: no new assertions; 1865 existing assertions remain.\n"
+}

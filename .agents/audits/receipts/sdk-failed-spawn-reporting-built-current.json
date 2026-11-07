@@ -1,0 +1,14 @@
+{
+  "name": "sdk-failed-spawn-reporting-built-current",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-sdk-unsettled-spawn.py",
+  "startedAt": "2026-10-24T11:24:19.252680+00:00",
+  "seconds": 0.598,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2ea1d6a8b382cb39cf8cf1f3e6d90861c0603b24153dee24557d962d9f37d9c7",
+  "inputsAfter": "2ea1d6a8b382cb39cf8cf1f3e6d90861c0603b24153dee24557d962d9f37d9c7",
+  "postgresToolDirectory": null,
+  "outputSha256": "90976b0be86df8a8645278df9f0ecc652491d79fd8d752aac25740f0692a6b2a",
+  "outputTail": "{\"actualSpawnFailure\": true, \"exitCode\": 0, \"reportedFailure\": true, \"unsettledTopLevelAwait\": false}\n"
+}

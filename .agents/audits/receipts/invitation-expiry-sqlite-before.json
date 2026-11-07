@@ -1,0 +1,14 @@
+{
+  "name": "invitation-expiry-sqlite-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/projects.spec.ts -t 'omits expired'",
+  "startedAt": "2026-10-24T00:13:25.399601+00:00",
+  "seconds": 2.424,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "965badf7bc796070e0432704ed2085b810527f512b460d2e58ed728fe17aa1d0",
+  "inputsAfter": "965badf7bc796070e0432704ed2085b810527f512b460d2e58ed728fe17aa1d0",
+  "postgresToolDirectory": null,
+  "outputSha256": "7b3024b00dec89f892b77eb3834e0783c4201d972a95f553d0dbb40613d06454",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/projects.spec.ts (17 tests | 1 failed | 16 skipped) 111ms\n     × omits expired invitations from pending counts and permits a fresh invitation 110ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/projects.spec.ts > ProjectService > omits expired invitations from pending counts and permits a fresh invitation\nAssertionError: expected 1 to be +0 // Object.is equality\n\n- Expected\n+ Received\n\n- 0\n+ 1\n\n ❯ tests/projects.spec.ts:216:56\n    214|       const old = projects.createInvitation(input)\n    215|       db.prepare('UPDATE project_invitations SET expires_at=? WHERE id…\n    216|       expect(projects.countPendingInvitations(bob.id)).toBe(0)\n       |                                                        ^\n    217|       expect(projects.listInvitations(bob.id).find(item => item.id ===…\n    218|       const fresh = projects.createInvitation({ ...input, mode: 'rw' })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 16 skipped (17)\n   Start at  08:13:26\n   Duration  954ms (transform 589ms, setup 0ms, import 716ms, tests 111ms, environment 0ms)\n\n"
+}

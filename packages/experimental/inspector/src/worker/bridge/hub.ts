@@ -64,8 +64,8 @@ export type InspectorSourceEvent =
 
 /** Read-only diagnostic for `DSHInspector.getSources`. */
 export interface InspectorSourceView {
-  readonly sourceId: string
-  readonly generation: string
+  readonly sourceId: InspectorSourceDescriptor['sourceId']
+  readonly generation: InspectorSourceDescriptor['generation']
   readonly kind: InspectorSourceKind
   readonly label: string
   readonly capabilities: readonly string[]

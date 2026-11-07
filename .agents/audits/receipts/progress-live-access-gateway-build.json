@@ -1,0 +1,14 @@
+{
+  "name": "progress-live-access-gateway-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-23T23:10:16.857309+00:00",
+  "seconds": 4.325,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "81dc2893e63bc7e9c1068b1a89b6d5a533d3ec5306a36bfb444c3861e80e11a6",
+  "inputsAfter": "81dc2893e63bc7e9c1068b1a89b6d5a533d3ec5306a36bfb444c3861e80e11a6",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

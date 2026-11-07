@@ -1,0 +1,5 @@
+{"scenario":"before-existing","code":"ABORT_ERR","stdout":"","stderr":""}
+{"scenario":"before-missing","code":"ABORT_ERR","stdout":"","stderr":""}
+{"scenario":"during-missing","code":"ABORT_ERR","stdout":"","stderr":""}
+{"scenario":"missing-active","code":"ENOENT","stdout":"","stderr":""}
+{"scenario":"during-live","code":"ABORT_ERR","stdout":"","stderr":"","helperRunningAfterReturn":false}

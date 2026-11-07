@@ -34,6 +34,8 @@ kind: "package-reference"
 
 本包没有 Cordis 配置字段。`Blob` 在专用 Worker 内通过 XMLHttpRequest 发送，因此服务可以报告浏览器上传进度，并在浏览器提供总量时一并报告。`ReadableStream` 会转移给该 Worker，再增量传入 Fetch；进度只报告已消费字节，不包含总量。`AbortSignal` 会终止专用 Worker，或传递给页面自己提供的载体。精确字节使用生成的 Remote。
 
+受管上传捕获原始协作参与者，在冷会话解析和存储前要求会话写权限，并在签发凭据前再次检查。原始 HTTP 与编码 Remote 上传对私有会话和只读访问遵循相同规则。必需的授权、确切 Agent、上传服务失效或调用方取消后，均不发布凭据；已经提交的不可变字节可能保留。活跃存储阻止 Agent 自动空闲回收和永久删除。服务卸载会取消 Node HTTP 输入，等待已接纳的存储结束，再移除空闲保护（[归属决策](../../../.agents/notes/implemented/bug-fix/2026-11-03-file-upload-authorization.zh.md)）。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -85,6 +87,7 @@ Host 插件提供 `ctx.fileUploads`。它拥有经过认证的流式路由、编
 以下限制适用于传输操作本身。
 
 - **上传不能断点续传**：失败或取消后的重试会从第一个字节开始。
+- **程序化源读取有独立的所属方**——自定义异步可迭代对象的生产者必须结束其待定读取；卸载会等待已接纳的存储结束。上传取消时，Node HTTP 输入会主动关闭。
 - **stream 请求体只能使用一次**：转移 `ReadableStream` 会锁定调用方的对象，因此重试必须重新创建 stream。
 - **stream 进度没有总量**：stream API 不携带字节长度，因此调用方只能收到已消费字节数。
 - **浏览器 Worker 必须自包含**：其源代码由函数字符串生成。如果实现需要运行时 import，就必须迁移为由 tsdown 打包的独立 Worker 入口。

@@ -1,0 +1,14 @@
+{
+  "name": "document-private-read-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local packages/host/userdoc-http",
+  "startedAt": "2026-10-25T20:23:48.315913+00:00",
+  "seconds": 4.917,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "82944dfb94d08104a7d8a1f0415348c005b8d511739869e7c70d63bc9d73804a",
+  "inputsAfter": "82944dfb94d08104a7d8a1f0415348c005b8d511739869e7c70d63bc9d73804a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

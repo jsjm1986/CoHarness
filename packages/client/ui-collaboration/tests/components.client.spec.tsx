@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -8,6 +8,8 @@ import { LogoutButton, type LogoutButtonProps } from '../src/client/LogoutButton
 import logoutCss from '../src/client/LogoutButton.module.css'
 import { ReadOnlyComposer, type ReadOnlyComposerProps } from '../src/client/ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlProps } from '../src/client/ScopeControl.tsx'
+import { ComputerControl } from '../src/client/ComputerControl.tsx'
+import { SessionComputerLabel, type SessionComputerLabelProps } from '../src/client/SessionComputerLabel.tsx'
 import { StewardChip, type StewardChipProps } from '../src/client/StewardChip.tsx'
 import css from '../src/client/ScopeControl.module.css'
 import type {
@@ -65,6 +67,7 @@ function snapshot(partial: Partial<CollaborationSnapshot> = {}): CollaborationSn
 function scopeProps(state: CollaborationSnapshot, overrides: Partial<ScopeControlProps> = {}): ScopeControlProps {
   return {
     wide: true,
+    useDeployment: selector => selector({ phase: 'ready', showComputer: true, aggregateComputers: true }),
     useCollaboration: selector => selector(state),
     switchScope: vi.fn().mockResolvedValue(undefined),
     stageVisibility: vi.fn(),
@@ -134,7 +137,114 @@ describe('LogoutButton', () => {
   })
 })
 
+describe('ComputerControl', () => {
+  it('shows only the current Runtime computer as passive header metadata', () => {
+    const environment = { id: '10000000-0000-4000-8000-000000000001', nodeId: '10000000-0000-4000-8000-000000000002', nodeName: 'Computer B' } as NonNullable<CollaborationContext['environment']>
+    render(<ComputerControl {...scopeProps(snapshot({ context: { ...projectContext, environment } }))} compact />)
+    expect(screen.getByRole('group', { name: t('computer.label') }).textContent).toBe('Computer B')
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByText(environment.id)).toBeNull()
+  })
+
+  it('follows a selected conversation Runtime instead of the page bootstrap computer', () => {
+    const environment = { id: '10000000-0000-4000-8000-000000000002', nodeId: '10000000-0000-4000-8000-000000000012', nodeName: 'Computer B' } as NonNullable<CollaborationContext['environment']>
+    const props = scopeProps(snapshot({ context: { ...projectContext, environment } }), {
+      useSessions: selector => selector({ current: 's1', byId: { s1: { runtime: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001', nodeName: 'Computer A' } } } } as never),
+    })
+    render(<ComputerControl {...props} compact />)
+    expect(screen.getByRole('group', { name: t('computer.label') }).textContent).toBe('Computer A')
+    expect(screen.queryByText('Computer B')).toBeNull()
+  })
+})
+
+describe('SessionComputerLabel', () => {
+  it('uses the rendered Session’s computer instead of another environment selected in this tab', () => {
+    const environment = { id: '10000000-0000-4000-8000-000000000002', nodeId: '10000000-0000-4000-8000-000000000012', nodeName: 'Computer B' } as NonNullable<CollaborationContext['environment']>
+    let runtime = { runtimeId: '10000000-0000-4000-8000-000000000001', nodeName: 'Computer A' } as { runtimeId: string; nodeName?: string }
+    const state = snapshot({ context: { ...projectContext, environment } })
+    const props = { ...scopeProps(state), sessionId: 'session',
+      useSessions: (selector: (value: unknown) => unknown) => selector({ byId: { session: { runtime } } }),
+    } as unknown as SessionComputerLabelProps
+    const view = render(<SessionComputerLabel {...props} />)
+    expect(screen.getByText('Computer A', { exact: true })).toBeTruthy()
+    expect(screen.queryByText('Computer B', { exact: true })).toBeNull()
+    runtime = { runtimeId: runtime.runtimeId }
+    view.rerender(<SessionComputerLabel {...props} />)
+    expect(view.container.textContent).toBe('')
+    state.environments = { items: [{ target: { kind: 'personal', runtimeId: runtime.runtimeId as never },
+      name: 'lin', nodeName: 'Directory computer A', observedState: 'ready' }], nextCursor: null }
+    view.rerender(<SessionComputerLabel {...props} />)
+    expect(screen.getByText('Directory computer A', { exact: true })).toBeTruthy()
+    state.contextVerified = false
+    view.rerender(<SessionComputerLabel {...props} />)
+    expect(view.container.textContent).toBe('')
+  })
+})
+
 describe('ScopeControl', () => {
+  it('enters personal space through an available computer when the recent bootstrap computer is offline', () => {
+    const offline = '10000000-0000-4000-8000-000000000011' as never
+    const available = '10000000-0000-4000-8000-000000000012' as never
+    const switchScope = vi.fn().mockResolvedValue(undefined)
+    const state = snapshot({ recentRuntimeIds: [offline], context: { ...projectContext,
+      environment: { id: '10000000-0000-4000-8000-000000000013' as never,
+        nodeId: '20000000-0000-4000-8000-000000000013' as never, nodeName: 'Project computer' } },
+    environments: { items: [
+      { target: { kind: 'personal', runtimeId: offline }, name: 'lin', nodeName: 'Computer A', observedState: 'stopped', nodeStatus: 'offline' },
+      { target: { kind: 'personal', runtimeId: available }, name: 'lin', nodeName: 'Computer B', observedState: 'stopped', nodeStatus: 'active' },
+    ], nextCursor: null } })
+    render(<ScopeControl {...scopeProps(state, { switchScope })} />)
+    fireEvent.click(screen.getByRole('button', { name: t('scope.aria') }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: t('scope.aria') })).getByRole('button', { name: '个人空间' }))
+    expect(switchScope).toHaveBeenCalledExactlyOnceWith({ kind: 'personal', runtimeId: available })
+  })
+  it('keeps one personal entry and exact fixed-computer project destinations', () => {
+    const firstId = '10000000-0000-4000-8000-000000000011' as never
+    const secondId = '10000000-0000-4000-8000-000000000012' as never
+    const projectId = '10000000-0000-4000-8000-000000000013' as never
+    const switchScope = vi.fn().mockResolvedValue(undefined)
+    const loadEnvironments = vi.fn().mockResolvedValue(undefined)
+    const state = snapshot({ context: { ...projectContext, scope: { kind: 'personal' },
+      environment: { id: firstId, nodeId: '10000000-0000-4000-8000-000000000001' as never, nodeName: 'Computer A' } },
+    environments: { items: [
+      { target: { kind: 'personal', runtimeId: firstId }, name: 'lin', nodeName: 'Computer A', observedState: 'ready' },
+      { target: { kind: 'personal', runtimeId: secondId }, name: 'lin', nodeName: 'Computer B', observedState: 'stopped' },
+      { target: { kind: 'project', projectId: 9, runtimeId: projectId }, name: '支付重构', nodeName: 'Computer B', observedState: 'ready' },
+    ], nextCursor: 'more' } })
+    render(<ScopeControl {...scopeProps(state, { switchScope, loadEnvironments })} />)
+    const trigger = screen.getByRole('button', { name: t('scope.aria') })
+    fireEvent.click(trigger)
+    const page = () => within(screen.getByRole('dialog', { name: t('scope.aria') }))
+    expect(page().queryByRole('button', { name: /审计平台/ })).toBeNull()
+    expect(page().getAllByRole('button', { name: '个人空间' })).toHaveLength(1)
+    expect(page().queryByRole('button', { name: /个人空间.*Computer/ })).toBeNull()
+    fireEvent.click(page().getByRole('button', { name: '个人空间' }))
+    expect(switchScope).not.toHaveBeenCalled()
+    fireEvent.click(trigger)
+    fireEvent.click(page().getByRole('button', { name: /支付重构.*Computer B/ }))
+    expect(switchScope).toHaveBeenLastCalledWith({ kind: 'project', projectId: 9, runtimeId: projectId })
+    fireEvent.click(trigger)
+    fireEvent.change(screen.getByRole('searchbox', { name: t('scope.searchAria') }), { target: { value: 'Computer B' } })
+    expect(page().queryByRole('button', { name: /个人空间.*Computer A/ })).toBeNull()
+    expect(page().queryByRole('button', { name: '个人空间' })).toBeNull()
+    fireEvent.click(page().getByRole('button', { name: t('scope.more') }))
+    expect(loadEnvironments).toHaveBeenLastCalledWith('more')
+    fireEvent.click(page().getByRole('button', { name: t('scope.refresh') }))
+    expect(loadEnvironments).toHaveBeenLastCalledWith()
+  })
+
+  it('keeps transient input in this tab and offers the prepared environment in a new tab', () => {
+    const openEnvironmentTab = vi.fn()
+    const dismissScopeOffer = vi.fn()
+    render(<ScopeControl {...scopeProps(snapshot({ scopeOffer: {
+      runtimeId: '10000000-0000-4000-8000-000000000012', target: { kind: 'personal' },
+    } }), { openEnvironmentTab, dismissScopeOffer })} />)
+    const dialog = within(screen.getByRole('dialog', { name: t('scope.draftTitle') }))
+    fireEvent.click(dialog.getByRole('button', { name: t('computer.newTab') }))
+    expect(openEnvironmentTab).toHaveBeenCalledWith('10000000-0000-4000-8000-000000000012')
+    expect(dismissScopeOffer).toHaveBeenCalledOnce()
+  })
+
   it('hides before collaboration is ready and for personal users without projects', () => {
     const loading = render(<ScopeControl {...scopeProps(snapshot({ status: 'loading' }))} />)
     expect(loading.container.textContent).toBe('')
@@ -161,10 +271,10 @@ describe('ScopeControl', () => {
     fireEvent.click(trigger)
     // Visibility staging lives one level down; the root row shows the value.
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
-    fireEvent.click(screen.getByRole('button', { name: /仅自己/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /仅自己/ }))
     expect(stageVisibility).toHaveBeenCalledWith('private')
     // Staging keeps the picker open; Escape pops back to the root view.
-    expect(screen.getByRole('button', { name: /项目公开/ })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /项目公开/ })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
 
@@ -224,10 +334,10 @@ describe('ScopeControl', () => {
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
 
     // The wide surface is the push page, not the rail's floating menu.
-    const page = screen.getByRole('group', { name: '切换个人或项目空间' })
+    const page = screen.getByRole('dialog', { name: '切换个人或项目空间' })
     expect(page.className.split(/\s+/)).toContain(css.scopePage)
-    const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' })
-    expect(search.placeholder).toBe('搜索项目空间')
+    const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索空间或电脑' })
+    expect(search.placeholder).toBe('搜索空间或电脑')
     expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /新建项目空间/ })).toBeTruthy()
 
@@ -236,15 +346,15 @@ describe('ScopeControl', () => {
     expect(screen.queryByRole('button', { name: '项目 1' })).toBeNull()
 
     fireEvent.change(search, { target: { value: '不存在' } })
-    expect(screen.getByText('没有匹配的项目空间')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '清除项目空间搜索' }))
+    expect(screen.getByText(t('scope.searchEmpty'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '清除空间搜索' }))
     expect(search.value).toBe('')
     expect(screen.getByRole('button', { name: '项目 1' })).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('group', { name: '切换个人或项目空间' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '切换个人或项目空间' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    expect(screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' }).value).toBe('')
+    expect(screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索空间或电脑' }).value).toBe('')
     view.unmount()
   })
 
@@ -353,7 +463,7 @@ describe('ScopeControl', () => {
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
     expect(screen.getByText('只有创建者可以查看')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '新建项目空间' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    fireEvent.click(screen.getByRole('button', { name: '返回空间管理' }))
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
     // Tapping a scope row selects it and dismisses the page.
     fireEvent.click(screen.getByRole('button', { name: /审计平台/ }))
@@ -398,10 +508,10 @@ describe('ScopeControl', () => {
     try {
       render(<ScopeControl {...scopeProps(snapshot({
         scopeBusy: true,
-        scopeTarget: { kind: 'project', projectId: 10, projectName: '审计平台' },
+        scopeTarget: { kind: 'project', projectId: 10, projectName: '审计平台', nodeName: 'Computer B' },
       }))} />)
       expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true')
-      expect(screen.getByText('正在进入「审计平台」')).toBeTruthy()
+      expect(screen.getByText('正在进入「审计平台 · Computer B」')).toBeTruthy()
       expect(screen.getByText('正在提交空间切换请求')).toBeTruthy()
 
       act(() => { vi.advanceTimersByTime(3_500) })

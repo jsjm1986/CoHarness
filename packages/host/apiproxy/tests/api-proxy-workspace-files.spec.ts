@@ -22,6 +22,7 @@ import { collaborationCapabilities, CollaborationError } from '@deepseek-ai/dsh-
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { environmentForAgent } from '@deepseek-ai/dsh-agent-preset-registry'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+import { workspaceFilesReadBytesRequestSchema } from '../src/api/workspace-files.schema.ts'
 
 const realmEnvironment = vi.hoisted(() => ({ real: undefined as unknown }))
 vi.mock('@deepseek-ai/dsh-agent-preset-registry', async (importOriginal) => {
@@ -36,6 +37,29 @@ afterEach(async () => { for (const dispose of cleanups.splice(0).reverse()) awai
 afterEach(() => { realmFsFor.mockImplementation(realmEnvironment.real as never) })
 
 const request = <P>(payload: P): RpcRequest<P> => ({ rpcId: RpcId('workspace-files-test'), payload })
+
+it('rejects an oversized complete file before reading a byte window and admits the exact cap', async () => {
+  const { api, ctx, root, session } = await harness({ maxBytes: 4 })
+  writeFileSync(join(root, 'bounded.bin'), 'abcdefgh')
+  const read = vi.spyOn(ctx.fs, 'readByteRange')
+  const payload = { sessionId: session.id, path: 'bounded.bin', maxFileBytes: 7 }
+  const rejected = await api.workspaceFiles.readBytes(request(payload), new AbortController().signal)
+  expect(rejected.result).toMatchObject({ ok: false, error: { code: 'workspace-file/too-large' } })
+  expect(read).not.toHaveBeenCalled()
+  const accepted = expectOk(await api.workspaceFiles.readBytes(request({ ...payload, maxFileBytes: 8 }), new AbortController().signal))
+  expect(Buffer.from(accepted.bytes, 'base64').toString()).toBe('abcd')
+  expect(accepted.eof).toBe(false)
+  expect(read).toHaveBeenCalledOnce()
+})
+
+it('validates the optional complete-file byte cap at the wire parser', () => {
+  const payload = { sessionId: 'workspace-files-session', path: 'bounded.bin' }
+  for (const maxFileBytes of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, '8']) {
+    expect(workspaceFilesReadBytesRequestSchema.safeParse({ ...payload, maxFileBytes }).success).toBe(false)
+  }
+  expect(workspaceFilesReadBytesRequestSchema.parse({ ...payload, maxFileBytes: 0 })).toMatchObject({ maxFileBytes: 0 })
+  expect(workspaceFilesReadBytesRequestSchema.parse(payload)).toEqual(payload)
+})
 
 function expectOk<T>(response: { result: { ok: true; value: T } | { ok: false; error: unknown } }): T {
   expect(response.result.ok).toBe(true)
@@ -111,6 +135,91 @@ describe('workspaceFiles RPC', () => {
     const limited = expectOk(await api.workspaceFiles.list(request({ sessionId: session.id, maxEntries: 1 })))
     expect(limited.entries).toHaveLength(1)
     expect(limited.truncated).toBe(true)
+  })
+
+  it.each([
+    { name: 'terminated final line', chunks: ['first\nsecond\n'], eof: true, consumed: 1 },
+    { name: 'unterminated final line', chunks: ['first\nsecond'], eof: true, consumed: 1 },
+    { name: 'split final newline and empty chunks', chunks: ['first\nsec', '', 'ond', '\n', ''], eof: true, consumed: 5 },
+    { name: 'following line in the same chunk', chunks: ['first\nsecond\nthird\n', 'unread'], eof: false, consumed: 1 },
+    { name: 'following line after empty chunks', chunks: ['first\nsecond\n', '', 'third\n', 'unread'], eof: false, consumed: 3 },
+    { name: 'following empty line', chunks: ['first\nsecond\n', '\n', 'unread'], eof: false, consumed: 2 },
+  ])('reports text-page EOF for $name without including the next line', async ({ chunks, eof, consumed }) => {
+    const { api, ctx, root, session } = await harness({ maxLines: 2 })
+    writeFileSync(join(root, 'lines.txt'), chunks.join(''))
+    let reads = 0
+    const closed = vi.fn()
+    vi.spyOn(ctx.fs, 'streamText').mockImplementation(async () => (async function* () {
+      try {
+        for (const chunk of chunks) { reads += 1; yield chunk }
+      } finally { closed() }
+    })())
+    const page = expectOk(await api.workspaceFiles.read(
+      request({ sessionId: session.id, path: 'lines.txt' }), new AbortController().signal))
+    expect(page).toMatchObject({ offset: 1, limit: 2, eof })
+    expect(page.text).toBe(chunks.join('').endsWith('second') ? 'first\nsecond' : 'first\nsecond\n')
+    expect(reads).toBeLessThanOrEqual(consumed)
+    expect(closed).toHaveBeenCalledOnce()
+  })
+
+  it('reports EOF for an exact terminal text page starting after line one', async () => {
+    const { api, root, session } = await harness({ maxLines: 2 })
+    writeFileSync(join(root, 'lines.txt'), 'first\nsecond\nthird\nfourth\n')
+    const page = expectOk(await api.workspaceFiles.read(
+      request({ sessionId: session.id, path: 'lines.txt', offset: 3 }), new AbortController().signal))
+    expect(page).toMatchObject({ offset: 3, limit: 2, text: 'third\nfourth\n', eof: true })
+  })
+
+  it('does not count or validate the unrequested line used to detect text-page continuation', async () => {
+    const { api, ctx, root, session } = await harness({ maxBytes: 2, maxLines: 1 })
+    writeFileSync(join(root, 'lines.txt'), 'a\n\0outside')
+    vi.spyOn(ctx.fs, 'streamText').mockImplementation(async () => (async function* () {
+      yield 'a\n'
+      yield '\0outside'
+      throw new Error('the remaining unrequested file must not be read')
+    })())
+    const page = expectOk(await api.workspaceFiles.read(
+      request({ sessionId: session.id, path: 'lines.txt' }), new AbortController().signal))
+    expect(page).toMatchObject({ text: 'a\n', limit: 1, eof: false })
+  })
+
+  it('cancels text-page continuation detection and closes the provider iterator', async () => {
+    const { api, ctx, root, session } = await harness({ maxLines: 2 })
+    writeFileSync(join(root, 'lines.txt'), 'first\nsecond\nthird\n')
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const controller = new AbortController()
+    const closed = vi.fn()
+    vi.spyOn(ctx.fs, 'streamText').mockImplementation(async () => (async function* () {
+      try {
+        yield 'first\nsecond\n'
+        entered.resolve(undefined)
+        await release.promise
+        yield 'third\n'
+      } finally { closed() }
+    })())
+    const pending = api.workspaceFiles.read(request({ sessionId: session.id, path: 'lines.txt' }), controller.signal)
+    cleanups.push(async () => { controller.abort(); release.resolve(undefined); await pending })
+    await entered.promise
+    controller.abort()
+    release.resolve(undefined)
+    expect((await pending).result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+    expect(closed).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a version change observed during text-page continuation detection', async () => {
+    const { api, ctx, root, session } = await harness({ maxLines: 2 })
+    const path = join(root, 'lines.txt')
+    writeFileSync(path, 'first\nsecond\nthird\n')
+    const payload = { sessionId: session.id, path: 'lines.txt' }
+    const metadata = expectOk(await api.workspaceFiles.stat(request(payload)))
+    vi.spyOn(ctx.fs, 'streamText').mockImplementation(async () => (async function* () {
+      yield 'first\nsecond\n'
+      writeFileSync(path, 'changed\n')
+      yield 'third\n'
+    })())
+    const result = await api.workspaceFiles.read(request({ ...payload, version: metadata.version }), new AbortController().signal)
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'workspace-file/stale-version' } })
   })
 
   it('authorizes and reads a project in provider coordinates without resolving its path on the Host', async () => {

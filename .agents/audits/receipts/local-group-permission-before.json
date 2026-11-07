@@ -1,0 +1,14 @@
+{
+  "name": "local-group-permission-before",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/local-runtime-launcher.spec.ts --retry=0 -t 'permission-denied group observations'",
+  "startedAt": "2026-10-25T00:35:48.199580+00:00",
+  "seconds": 2.758,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bb942c72f1e55d0367d221bb6ecb4016fcb4998aef732c87a10a826714feb550",
+  "inputsAfter": "bb942c72f1e55d0367d221bb6ecb4016fcb4998aef732c87a10a826714feb550",
+  "postgresToolDirectory": null,
+  "outputSha256": "1df961804686b222275590525b19bec57ee4a0c01f4b838dbcf28bc316dc6d0d",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/local-runtime-launcher.spec.ts (18 tests | 2 failed | 16 skipped) 457ms\n     × retains occupancy through transient permission-denied group observations 237ms\n     × retains occupancy through persistent permission-denied group observations 219ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/local-runtime-launcher.spec.ts > recoverable LocalLauncher > retains occupancy through transient permission-denied group observations\nError: Group observation denied\n ❯ process.<anonymous> tests/local-runtime-launcher.spec.ts:178:29\n    176|       if (pid === -record.groupPid! && signal === 0 && (mode === 'pers…\n    177|         denied += 1\n    178|         throw Object.assign(new Error('Group observation denied'), { c…\n       |                             ^\n    179|       }\n    180|       return original(pid, signal)\n ❯ LocalRuntimeControl.groupExists src/local-runtime-control.ts:86:19\n ❯ LocalRuntimeControl.confirmStopped src/local-runtime-control.ts:73:110\n ❯ LocalRuntimeControl.stop src/local-runtime-control.ts:53:11\n ❯ tests/local-runtime-launcher.spec.ts:184:9\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  tests/local-runtime-launcher.spec.ts > recoverable LocalLauncher > retains occupancy through persistent permission-denied group observations\nAssertionError: expected [Function] to throw error including 'capacity remains occupied' but got 'Group observation denied'\n\nExpected: \"capacity remains occupied\"\nReceived: \"Group observation denied\"\n\n ❯ tests/local-runtime-launcher.spec.ts:187:45\n    185|         expect(recovered.hasExited()).toBe(true)\n    186|       } else {\n    187|         await expect(recovered.terminate(0)).rejects.toThrow('capacity…\n       |                                             ^\n    188|         expect(recovered.hasExited()).toBe(false)\n    189|         await expect(recovered.isAlive()).rejects.toThrow('stop eviden…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 16 skipped (18)\n   Start at  08:35:49\n   Duration  943ms (transform 324ms, setup 0ms, import 417ms, tests 457ms, environment 0ms)\n\n"
+}

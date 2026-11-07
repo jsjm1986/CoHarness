@@ -108,6 +108,8 @@ export class ClientModuleSystem implements ClientModuleLoader {
   private readonly bootstrapIds = new Set<string>()
   /** In-flight script transport per URL; every row in one batch shares it. */
   private readonly pendingArrival = new Map<string, Promise<void>>()
+  /** One settlement per chunk prevents old-generation waiters from deleting a replacement factory. */
+  private readonly pendingChunks = new Map<string, Promise<void>>()
   /** Owner generation captured by in-flight chunk requests and advanced on invalidation. */
   private readonly generations = new Map<string, number>()
   /** Single-resource combo URL selected by HMR after invalidating one row. */
@@ -333,6 +335,11 @@ export class ClientModuleSystem implements ClientModuleLoader {
   /** Load, register, and materialize one package-local dynamic chunk. */
   private async importChunk(ownerId: string, fileName: string): Promise<unknown> {
     const id = chunkId(ownerId, fileName)
+    const pending = this.pendingChunks.get(id)
+    if (pending !== undefined) {
+      await pending
+      return await this.importChunk(ownerId, fileName)
+    }
     const existing = this.loadCache.get(id)
     if (existing !== undefined) return existing.exports
     if (!this.factories.has(id)) {
@@ -341,21 +348,31 @@ export class ClientModuleSystem implements ClientModuleLoader {
       if (row === undefined) throw new Error(`client-modules: chunk owner "${ownerId}" is not a boot graph entry`)
       /* v8 ignore next -- the final fallback needs an impossible graph-owned factory with no recorded revision. */
       const revision = this.factories.get(ownerId)?.rev ?? this.reloadTargets.get(ownerId)?.rev ?? row.rev
-      const url = chunkUrl(row, fileName, revision)
+      const published = revision === row.rev ? row.chunks : undefined
+      const chunkRevision = published?.[fileName]
+      if (published !== undefined && chunkRevision === undefined) {
+        throw new Error(`client-modules: chunk "${id}" is absent from its owner's published chunk table`)
+      }
+      const url = chunkUrl(row, fileName, chunkRevision ?? revision)
       let transport = this.pendingArrival.get(url)
       if (transport === undefined) {
         transport = this.loadBundle(url).finally(() => { this.pendingArrival.delete(url) })
         this.pendingArrival.set(url, transport)
       }
-      await transport
-      if ((this.generations.get(ownerId) ?? 0) !== generation) {
-        this.factories.delete(id)
-        this.loadCache.delete(id)
-        return await this.importChunk(ownerId, fileName)
-      }
-      if (!this.factories.has(id)) {
-        throw new Error(`client-modules: bundle ${url} loaded without registering "${id}" via __ModuleLoader__.load`)
-      }
+      const arrival = transport.then(() => {
+        if ((this.generations.get(ownerId) ?? 0) === generation && !this.factories.has(id)) {
+          throw new Error(`client-modules: bundle ${url} loaded without registering "${id}" via __ModuleLoader__.load`)
+        }
+      }).finally(() => {
+        if ((this.generations.get(ownerId) ?? 0) !== generation) {
+          this.factories.delete(id)
+          this.loadCache.delete(id)
+        }
+        this.pendingChunks.delete(id)
+      })
+      this.pendingChunks.set(id, arrival)
+      await arrival
+      return await this.importChunk(ownerId, fileName)
     }
     return this.materialize(id, ownerId).exports
   }

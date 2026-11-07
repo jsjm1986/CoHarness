@@ -1,5 +1,7 @@
 /** Opt-in acceptance against an explicitly configured, disposable POSIX SSH workspace. */
 import { randomUUID } from 'node:crypto'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { readFileSync } from 'node:fs'
 import { once } from 'node:events'
 import type { ChildProcess } from 'node:child_process'
@@ -55,7 +57,7 @@ async function processResult(handle: SubprocessHandle) {
 
 async function removeOwned(test: Awaited<ReturnType<typeof setup>>) {
   try {
-    const handle = test.ctx.subprocess.spawn({
+    const handle = await test.ctx.subprocess.spawn({
       argv: [test.hello.executable, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', test.root],
       cwd: test.hello.workspace, stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 500,
     })
@@ -64,6 +66,35 @@ async function removeOwned(test: Awaited<ReturnType<typeof setup>>) {
 }
 
 describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
+  it('forwards a local service and confirms remote listener removal while SSH remains usable', async () => {
+    const test = await setup()
+    const server = createServer((_request, response) => { response.end('owned-local-model-service') })
+    let forward: Awaited<ReturnType<SshConnection['forwardLoopback']>> | undefined
+    try {
+      await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+      forward = await test.ctx.ssh.forwardLoopback((server.address() as AddressInfo).port, () => {
+        server.closeAllConnections()
+        return new Promise<void>((resolve, reject) => {
+          server.close((error) => { if (error === undefined) resolve(); else reject(error) })
+        })
+      })
+      const remoteProbe = async () => processResult(await test.ctx.subprocess.spawn({
+        argv: [test.hello.executable, '-e', 'const r=require("node:http").get({hostname:"127.0.0.1",port:Number(process.argv[1]),agent:false},s=>{let b="";s.on("data",c=>b+=c);s.on("end",()=>process.stdout.write(b))});r.on("error",e=>process.stdout.write(e.code))', String(forward!.port)],
+        cwd: test.root, graceMs: 500, stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } },
+      }))
+      expect(await remoteProbe()).toMatchObject({ exitCode: 0, stdout: 'owned-local-model-service' })
+      await forward.close()
+      expect(await remoteProbe()).toMatchObject({ exitCode: 0, stdout: 'ECONNREFUSED' })
+    } finally {
+      try { await forward?.close() }
+      finally {
+        server.closeAllConnections()
+        await new Promise<void>((resolve) => { server.close(() => { resolve() }) })
+        await removeOwned(test)
+      }
+    }
+  })
+
   it('refuses same-user sandboxed connectors before granting a process stream', async () => {
     const test = await setup()
     try {
@@ -73,7 +104,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       }, preparedSchema)
       const endpoint = prepared.streams.control!
       const attack = "let connected=false,secure=false;const s=require('node:tls').connect({path:process.argv[1],ciphers:'PSK-AES256-GCM-SHA384',minVersion:'TLSv1.2',maxVersion:'TLSv1.2',pskCallback:()=>({identity:'dsh-stream',psk:Buffer.alloc(32)}),checkServerIdentity:()=>undefined});s.on('connect',()=>{connected=true});s.on('secureConnect',()=>{secure=true});s.on('error',()=>{});s.on('close',()=>process.stdout.write(JSON.stringify({connected,secure})));"
-      const attacker = test.ctx.subprocess.spawn({
+      const attacker = await test.ctx.subprocess.spawn({
         argv: (await test.ctx.sandbox.confine([test.hello.executable, '-e', attack, endpoint.path], {
           mode: 'read-only', workspaceRoot: test.root,
         })).argv,
@@ -122,7 +153,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       expect(chunks.join('')).toBe('beta\n')
       const policy: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: root }
       const argv = (await ctx.sandbox.confine(['/bin/bash', '-c', 'cat text.txt; printf "shell\n" > text.txt'], policy)).argv
-      const result = await processResult(ctx.subprocess.spawn({
+      const result = await processResult(await ctx.subprocess.spawn({
         argv, cwd: root, stdio: { stdin: 'ignore', stdout: { maxBytes: 4096 }, stderr: { maxBytes: 4096 } }, graceMs: 500,
       }))
       expect(result).toMatchObject({ exitCode: 0, stdout: 'beta\n', stderr: '' })
@@ -130,7 +161,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       await expect(ctx.fs.writeText(target, 'denied', undefined, undefined, { ...policy, mode: 'read-only' }))
         .rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
       const createLink = 'const fs=require(\'node:fs\');const root=process.argv[1];fs.mkdirSync(root+\'/physical/child\',{recursive:true});fs.mkdirSync(root+\'/lexical\');fs.symlinkSync(root+\'/physical/child\',root+\'/lexical/link\');'
-      await processResult(ctx.subprocess.spawn({
+      await processResult(await ctx.subprocess.spawn({
         argv: [hello.executable, '-e', createLink, root], cwd: root,
         stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 500,
       }))
@@ -147,7 +178,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
     try {
       const code = 'const fs=require(\'node:fs\');const s=new(require(\'node:net\').Socket)({fd:7,readable:true,writable:true,allowHalfOpen:true});let a=[];s.on(\'data\',b=>a.push(b));s.on(\'end\',()=>{let denied;try{fs.writeFileSync(\'forbidden\',\'bad\')}catch(e){denied=e.code}process.stdout.write(JSON.stringify({pid:process.pid,denied,cgroup:process.platform===\'linux\'?fs.readFileSync(\'/proc/self/cgroup\',\'utf8\'):\'\'}));process.stderr.write(\'stderr\');s.end(Buffer.concat(a))});'
       const argv = (await test.ctx.sandbox.confine([test.hello.executable, '-e', code], { mode: 'read-only', workspaceRoot: test.root })).argv
-      const handle = test.ctx.subprocess.spawn({
+      const handle = await test.ctx.subprocess.spawn({
         argv, cwd: test.root,
         stdio: { stdin: 'ignore', stdout: { maxBytes: 4096 }, stderr: { maxBytes: 4096 }, control: 'pipe' }, graceMs: 1000,
       })
@@ -173,7 +204,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
     let handle: SubprocessHandle | undefined
     try {
       const code = 'const s=new(require(\'node:net\').Socket)({fd:7,readable:true,writable:true});const b=Buffer.alloc(65536,120);let n=0;function pump(){while(n<10000){n++;if(!process.stdout.write(b))return}}process.stdout.on(\'drain\',pump);s.on(\'data\',v=>s.write(v));pump();setInterval(()=>{},1000);'
-      handle = test.ctx.subprocess.spawn({
+      handle = await test.ctx.subprocess.spawn({
         argv: (await test.ctx.sandbox.confine([test.hello.executable, '-e', code], { mode: 'workspace-write', workspaceRoot: test.root })).argv,
         cwd: test.root, stdio: { stdin: 'ignore', stdout: 'pipe', stderr: { maxBytes: 1024 }, control: 'pipe' }, graceMs: 500,
       })
@@ -221,7 +252,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
     const victimConnection = victim.ctx.ssh
     try {
       const code = 'const fs=require(\'node:fs\');require(\'node:child_process\').spawn(process.execPath,[\'-e\',\'setInterval(()=>{},1000)\'],{detached:true,stdio:\'ignore\'}).unref();fs.appendFileSync(\'launches\',\'one\\n\');process.stdout.write(fs.readFileSync(\'/proc/self/cgroup\',\'utf8\'));setInterval(()=>{},1000);'
-      const handle = victim.ctx.subprocess.spawn({
+      const handle = await victim.ctx.subprocess.spawn({
         argv: [victim.hello.executable, '-e', code], cwd: victim.root,
         stdio: { stdin: 'ignore', stdout: 'pipe', stderr: { maxBytes: 4096 } }, graceMs: 500,
       })
@@ -244,7 +275,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       await victim.dispose().catch(() => {})
       await victimConnection.dispose()
       try {
-        await processResult(observer.ctx.subprocess.spawn({
+        await processResult(await observer.ctx.subprocess.spawn({
           argv: [observer.hello.executable, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', victim.root],
           cwd: observer.root, stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 500,
         }))

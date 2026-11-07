@@ -59,6 +59,7 @@ const sessionList: SessionList = {
   archivedById: {},
   current: SID,
   phase: 'ready',
+  state: 'idle', error: null,
   subagentsByParent: {},
   jobsBySession: {},
   observedJobs: {},
@@ -226,7 +227,7 @@ describe('PlanReviewPanel', () => {
     expect(screen.getByText('read the store')).toBeTruthy()
     expect(screen.getAllByRole('button')).toHaveLength(2)
     expect(screen.queryByText('render the rows')).toBeNull()
-    expect(document.querySelector('[data-plan-review-scroll]')).toBeNull()
+    expect(screen.getByRole('group', { name: zh['plan.header'] }).tabIndex).toBe(0)
     // The question text stays as the card's accessible name rather than a title
     // that reads like a test item.
     expect(screen.getByLabelText('Approve this plan and leave plan mode?')).toBeTruthy()

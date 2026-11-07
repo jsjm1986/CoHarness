@@ -12,16 +12,21 @@ English | [中文](2026-10-08-atomic-fixture-runtime-ports.zh.md)
 
 Fixture children bind `listen(0)` and publish the kernel-assigned port to `$DSH_HOME/child-port`; the launcher already injects `DSH_HOME` per runtime identity, so every child owns a private publication file. Each durable instance port — the `instances` row for users, the repository stub for project runtimes — is an OS-assigned [runtimeRelay](../../../../gateway/tests/runtime-relay.ts) port that forwards each accepted connection to the child's currently published listener. `setup()` wraps `users.create` so every created identity claims its own relay and port file, and tests constructing stub repositories claim a relay for the project runtime home. Literal bases remain only as allocator inputs, and literal-port assertions became relational assertions on the row or returned port. Stub repositories whose managers never spawn keep literal ports because those values are data, not bound resources.
 
+Port-file publication writes an exclusive temporary file in the same directory and renames it over the prior publication. Relays therefore read the previous complete port or the new complete port, never the empty interval created by truncating the public file. The shared publisher expression is embedded in the plain-Node instance, proxy and grant fixtures. Missing publications remain a readiness retry; malformed or unreadable publications are retained as fixture failures and reported by the awaited disposer, after its listener and owned sockets close. Network callbacks never throw those failures into a later test.
+
 ## Alternatives considered
 
 - **Probe for a free literal, then have the child bind it.** The probe and the bind are separated by process spawn, so a kernel assignment between them reproduces the same collision class.
 - **Disjoint literal ranges per test or file.** Literals stay inside the ephemeral range; the kernel can assign any of them to an unrelated socket, and ranges do not protect against other processes or runner traffic.
 - **Serialize the Gateway suite.** File-level serialization cannot protect a host port from other spec files, independent Vitest processes, or jobs sharing the runner, and it taxes every run for one fixture's defect.
 - **Retry or extend readiness waits.** The child has already crashed; waiting longer reports the crash later without fixing ownership.
+- **Overwrite the private port file directly.** A private filename prevents cross-fixture collisions but does not make truncate-and-write atomic for its own relay reader. Publication uses rename rather than retries that hide malformed records.
 
 ## Testing
 
 Binding `127.0.0.1:43410` before the run reproduces the CI signature under the previous fixture (`listen EADDRINUSE`, reported as `instance for alice failed to become ready on port 43410`); the same held port does not affect the new fixture. Two independent `vitest run tests/instances.spec.ts` processes execute concurrently and both pass, and `tests/apply-grants.spec.ts` passes. `npm run typecheck --prefix gateway` and `npm run build:check --prefix gateway` pass.
+
+A child-process publication barrier exposes the direct-write control's empty file and preserves the old complete port until atomic publication commits. Invalid-port regressions verify an awaited cleanup failure without uncaught network errors; real instance, proxy and grant suites exercise the shared publisher.
 
 ## Consequences
 

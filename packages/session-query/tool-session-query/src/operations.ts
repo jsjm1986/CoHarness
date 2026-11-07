@@ -116,6 +116,10 @@ async function executeSessionSearch(
     exec.signal,
     workspaceIds,
   )
+  await workspaceAccess.assertReadableSessions(ctx, caller, [
+    ...collected.items.map(hit => hit.header.id),
+    ...parentIds.filter(id => authorizedParents.has(id)),
+  ], exec.signal)
   return presentation.formatSessionSearch(collected, titles, authorizedParents)
 }
 
@@ -144,6 +148,7 @@ async function executeEventSearch(
   }
   const title = await workspaceAccess.readTitle(ctx, caller, sessionId, exec.signal, authorized)
   if (range.from !== undefined && range.to !== undefined && range.from > range.to) {
+    await workspaceAccess.assertReadableSessions(ctx, caller, [sessionId], exec.signal)
     return presentation.formatEventSearch(sessionId, title, { items: [], capped: false })
   }
   const filters = toolInput.buildEventFilters({
@@ -170,6 +175,7 @@ async function executeEventSearch(
     },
     () => true,
   )
+  await workspaceAccess.assertReadableSessions(ctx, caller, [sessionId], exec.signal)
   return presentation.formatEventSearch(sessionId, title, collected)
 }
 
@@ -207,6 +213,7 @@ async function executeSessionTrace(
     ...workspaceAccess.descendantIds(descendants),
   ]
   const titles = await workspaceAccess.readTitles(ctx, caller, visibleIds, exec.signal, authorized)
+  await workspaceAccess.assertReadableSessions(ctx, caller, visibleIds, exec.signal)
   return presentation.formatSessionTrace(trace, ancestors, ancestorBoundary, descendants, titles)
 }
 
@@ -224,6 +231,7 @@ async function executeEventTrace(
     ctx.sessionQuery.traceEvent({ sessionId, seq }, exec.signal))
   workspaceAccess.assertObservedTargetAuthorized(caller, sessionId, trace.session, authorized)
   const title = await workspaceAccess.readTitle(ctx, caller, sessionId, exec.signal, authorized)
+  await workspaceAccess.assertReadableSessions(ctx, caller, [sessionId], exec.signal)
   return presentation.formatEventTrace(sessionId, title, trace)
 }
 
@@ -241,7 +249,9 @@ async function executeSessionHandoff(
   workspaceAccess.assertObservedTargetAuthorized(caller, sessionId, snapshot.session, authorized)
   const title = await workspaceAccess.readTitle(ctx, caller, sessionId, exec.signal, authorized)
   const projected = projectHandoff(snapshot)
-  const capsule = await extractHandoff(ctx, caller.agent, projected, config, exec.signal)
+  await workspaceAccess.assertReadableSessions(ctx, caller, [sessionId], exec.signal)
+  const capsule = await extractHandoff(ctx, caller.agent, sessionId, projected, config, exec.signal)
+  await workspaceAccess.assertReadableSessions(ctx, caller, [sessionId], exec.signal)
   return presentation.formatSessionHandoff(sessionId, title, capsule ?? formatLocalHandoff(projected, config.chars), capsule !== undefined)
 }
 
@@ -266,6 +276,7 @@ async function executeEventRead(
     }, exec.signal))
   workspaceAccess.assertObservedTargetAuthorized(caller, sessionId, window.session, authorized)
   const title = await workspaceAccess.readTitle(ctx, caller, sessionId, exec.signal, authorized)
+  await workspaceAccess.assertReadableSessions(ctx, caller, [sessionId], exec.signal)
   return presentation.formatEventRead(sessionId, title, window)
 }
 
@@ -304,7 +315,7 @@ async function collectPages<T>(
   }
 }
 
-/** Five model-facing session-query operation implementations. */
+/** Model-facing session-query operations over authorized observations. */
 export const operations = {
   executeSessionHandoff,
   executeSessionSearch,

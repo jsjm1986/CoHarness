@@ -1,0 +1,13 @@
+{
+  "name": "progress-durable-usage-unit-types",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/progress-service.spec.ts tests/config.spec.ts",
+  "startedAt": "2026-10-23T21:06:17.654948+00:00",
+  "seconds": 2.898,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ac4a5c0bee610b7dff680ad457d7d1707fc9ed41f1298605816239f01acabb73",
+  "inputsAfter": "ac4a5c0bee610b7dff680ad457d7d1707fc9ed41f1298605816239f01acabb73",
+  "outputSha256": "a7aa8b94798d7b7d80dd69be1034aecaa1430e4bd82882fff6f331620dc7d832",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  45 passed (45)\n   Start at  05:06:20\n   Duration  344ms (transform 127ms, setup 0ms, import 223ms, tests 190ms, environment 0ms)\n\n"
+}

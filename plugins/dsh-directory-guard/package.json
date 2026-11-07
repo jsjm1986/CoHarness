@@ -35,6 +35,7 @@
     "vitest": "^4.1.8"
   },
   "files": [
+    "locale/*.json",
     "lib",
     "cordis.admin.patch.yml",
     "cordis.patch.yml",

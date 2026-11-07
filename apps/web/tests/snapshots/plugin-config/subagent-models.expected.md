@@ -1,4 +1,5 @@
 - button "返回插件": 插件
+- switch "启用组件 模型选择" [checked]
 - heading "模型选择" [level=3]
 - paragraph: 允许 Agent 为子智能体选择模型
 - text: 允许 Agent 为子智能体选择模型

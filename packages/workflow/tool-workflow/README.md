@@ -35,11 +35,15 @@ A foreground success returns the envelope `{ kind: 'foreground', runId, agentsSt
 
 ### What to expect during a run
 
-While the script runs, the parent turn waits: the tool starts the run, awaits its result, and always disposes it, so the script and its children reach quiescence on every path — including cancellation, which is bridged from the parent step's abort signal. The model sees one final outcome, never intermediate child messages; the children's own work stays out of the parent conversation.
+The foreground call enters the original engine’s `withForeground()` before startup and retains collection, disposal and failure transfer through engine or PTC subagent-runtime withdrawal. Its combined cancellation signal is bridged to the run. A cleanup rejection returns an error and transfers unfinished child cleanup to its original runtime. A later child start for the exact parent retries it before allocation; the original durable run ending follows confirmed cleanup. Recovery never replays the script or prompt. The model sees one final outcome, never intermediate child messages; the children's own work stays out of the parent conversation.
 
 ### Background runs
 
 `run_in_background: true` returns `{ kind: 'background', jobId, runId }` immediately: the run is registered on `ctx.jobs` as an owned `workflow` job, so the session-header job list streams its `phase()`, `log()`, and member lifecycle lines live from the job's output ring, and the row's progress line tracks the current phase. No tool-step signal reaches the run — `job_kill`, the list's stop control, and owner teardown are what cancel it. Settlement is the job's settlement: a completed run carries the same rendered return value as the job's result (the completion notice announces it, the model's first `job_output` after settlement carries it once), a cancelled run settles `killed` with the kill reason, and a failed run settles `failed` with the script's failure message. Without a live job registry and a controller serving the caller the call fails, naming the missing composition pieces.
+
+The job registry retains the creating tool call and its root in the owning Session, including nested workflow calls.
+
+Unconfirmed cleanup keeps the Job live with a cleanup notice. Request termination again to retry; confirmed recovery settles the Job as failed and withholds the script value.
 
 ### Config
 
@@ -71,11 +75,13 @@ The consumer owns the model-facing schema, the `tool:<toolName>` system-prompt g
 
 ### Background lifecycle
 
-A background call registers the run through `jobs.start` inside the job starter, so a synchronous engine rejection registers nothing and admission preflight runs before the engine spawns. The job's `done` chains from `run.result`: dispose (a disposal failure is warned, never rejected into the registry), stop the mirrors, then map the stop reason onto the job outcome. The ring mirror (`src/record.ts`) subscribes `workflow/phase`, `workflow/log`, and member events once per plugin and routes them into the tracked runs' `JobHandle` faces (`append` for lines, `updateProgress` for the phase); a straggling event after settlement finds no tracked run, and an append against a settled job drops inside the registry.
+A background call registers the run through `jobs.start` inside the job starter, so a synchronous engine rejection registers nothing and admission preflight runs before the engine spawns. The job remains live until disposal confirms cleanup. A failure stops the progress mirror, publishes an unconfirmed-cleanup notice and waits for another termination request to retry; its owner remains busy. After cleanup succeeds, a run with any cleanup failure settles as a failed job without publishing its partial value. Run-end and job settlement remain pending until then. Each ring mirror (`src/record.ts`) routes only its run’s `workflow/phase`, `workflow/log` and member events into the original `JobHandle`. Its subscriptions belong to the original parent scope and survive tool replacement. Parent teardown retains them until cleanup or its failure notice stops the mirror; stop immediately rejects later events and releases the subscriptions without cancelling the Job.
 
 ### Durable session records
 
 For a root transport execution (`exec.parent` absent), the tool projects the run into the calling Agent's Session with four log-only events: run-start after `start()` returns, member starts and endings filtered by `run.id`, then run-end only after the result is available and disposal reaches quiescence. Nested transport calls execute normally but write no record. The first failed Session append disables later recording for that run with one warning, leaving either no record or a legal continuous prefix without changing the tool result or cleanup.
+
+Each accepted record owns its event subscriptions in the exact parent Agent’s scope. Tool definition withdrawal preserves those subscriptions and their idle-release veto until the record finishes or is abandoned. Parent scope teardown waits for a background Job’s final record without taking over its cancellation controls; an ended foreground parent scope drops its unfinished record, so late callbacks cannot write through that retired owner.
 
 The engine's `workflow/phase` and `workflow/log` events have no per-line durable surface from this tool: the session log deliberately records run and member lifecycle only, and the Web transcript derives from those records. A background run's lines reach a human through the job observation record instead, which is transient by design.
 
@@ -105,7 +111,7 @@ Read these pages when the tool-level contract is not enough. They move from the 
 - [PTC workflow engine](../workflow-ptc/README.md) — the engine that executes the scripts.
 - [subagent tool](../../subagent/tool-subagent/README.md) — the plain-delegation alternative for one or two children.
 - [Group map](../README.md) — the workflow capability family and its packages.
-- [Dynamic workflows Agent Note](../../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.md) — the seam design and its decisions.
+- [historical Dynamic workflows Agent Note](../../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.md) — the seam design and its decisions.
 
 -----
 
@@ -169,6 +175,7 @@ These limits define what the tool does not yet support. They are current constra
 - **A background run reports no intermediate value to the model** — `job_output` before settlement returns status only; the return value arrives whole at completion, and cancellation still discards partial output.
 - **`args` must be an object and Native result text is bounded** — callers wrap top-level arrays and scalars in a field; the canonical workflow result stays complete, while JSON beyond `maxResultChars` is truncated in the model-facing projection rather than stored behind a retrieval handle.
 - **Workflow policy is fixed per tool registration** — provider selection, caps, and tool name are deployment config, not model-call arguments.
+- **Unconfirmed cleanup retains the owner** — persistent cleanup failure can keep owner or service teardown waiting until a termination retry succeeds.
 - **Durable records are top-level and observational** — nested PTC mode dispatches are not recorded, and a recording failure intentionally degrades to an incomplete prefix rather than changing execution.
 - **No recorded-session scenario replays a background run yet** — unit and real-engine composition suites cover the path; the snapshot tree pins only the schema and prompt text.
 

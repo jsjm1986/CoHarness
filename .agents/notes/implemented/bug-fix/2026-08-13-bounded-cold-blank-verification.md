@@ -18,6 +18,8 @@ A cold summary trusts cached `blank: false`, because a checkpoint prefix contain
 
 `updatedAt` is the later of `createdAt` and `lastPromptAt`. An eligible artifact read supplies exact `lastPromptAt` at no additional I/O cost; other cache misses or stale checkpoints order the Session too old rather than promoting it from an unrelated file write. After each asynchronous cold read, the gateway checks the live store again and replaces the cold result with an attached summary when another request resumed that Session meanwhile.
 
+Successful bounded reads may retain scalar summaries under a freshly confirmed source revision through [verified cold list metadata](../architecture/2026-10-26-verified-cold-list-metadata.md). This does not make a stale blank hint authoritative: each later list still discovers current headers and revisions, and changed sources use the verification rules above.
+
 ## Alternatives considered
 
 **Trust cached `blank: true`.** Rejected because the projection cache deliberately permits a persisted log to advance beyond its checkpoint. A crash or fail-soft write failure after the first `turn/start` would hide a real conversation and could make the client reuse it as New Session.

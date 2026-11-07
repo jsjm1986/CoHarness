@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import inspect
 import os
+import queue
 import sys
 import threading
 import time
@@ -11,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from deepseek_harness import DeepSeekHarness, HarnessClient, HarnessConfig, Notification, RunResult, SdkProtocolError
-from deepseek_harness.errors import JsonRpcError
+from deepseek_harness.errors import JsonRpcError, TransportClosedError
 
 
 def test_high_level_sdk_runs_turn_and_collects_final_response(tmp_path: Path) -> None:
@@ -780,6 +781,56 @@ for line in sys.stdin:
             assert healthy.next().payload == {"source": "emit-second"}
 
 
+def test_full_subscription_filter_failure_keeps_rpc_and_other_subscriptions_live(tmp_path: Path) -> None:
+    script = tmp_path / "fake_runtime.py"
+    script.write_text(
+        """
+import json
+import sys
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg["method"] == "session/prompt":
+        for index in (1, 2):
+            print(json.dumps({"jsonrpc": "2.0", "method": "tick", "params": {"index": index}}), flush=True)
+        result = {"messageId": "message-1"}
+    else:
+        result = {}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+    if msg["method"] == "shutdown":
+        break
+""".strip()
+    )
+    calls = 0
+
+    def broken_filter(_notification: Notification) -> bool:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("filter failed with a full queue")
+        return True
+
+    with HarnessClient(
+        HarnessConfig(max_notification_queue=1, request_timeout_seconds=5),
+        _launch_args=(sys.executable, str(script)),
+    ) as client:
+        with (
+            client.subscribe_notifications(broken_filter) as broken,
+            client.subscribe_notifications(lambda notification: notification.payload.get("index") == 2) as healthy,
+        ):
+            try:
+                assert client.session_prompt("main", [{"type": "text", "text": "emit notifications"}]) == "message-1"
+                with pytest.raises(RuntimeError, match="filter failed with a full queue"):
+                    broken.next()
+                assert healthy.next().payload == {"index": 2}
+            finally:
+                # A blocking reader regression still needs queue space during teardown.
+                try:
+                    broken._notifications.get_nowait()
+                except queue.Empty:
+                    pass
+
+
 def test_client_rejects_unaccepted_session_prompt_response(tmp_path: Path) -> None:
     script = tmp_path / "fake_bridge.py"
     script.write_text(
@@ -916,6 +967,7 @@ time.sleep(60)
 
             initialize_timeout_seconds=0.1,
             request_timeout_seconds=0.1,
+            shutdown_timeout_seconds=0.1,
         )
     , _launch_args=(sys.executable, str(script))) as client:
         start = time.monotonic()
@@ -965,14 +1017,6 @@ for line in sys.stdin:
     assert client._proc is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "upstream dsh-v0.2.0-rc.1 close() waits shutdown_timeout_seconds for EOF "
-        "quiescence after a completed shutdown response; this SDK terminates the "
-        "runtime immediately, so the post-shutdown marker is never written"
-    ),
-)
 def test_client_close_allows_eof_quiescence_after_shutdown_response(tmp_path: Path) -> None:
     script = tmp_path / "fake_runtime.py"
     marker = tmp_path / "quiesced.txt"
@@ -1005,9 +1049,12 @@ Path(os.environ["QUIESCED_MARKER"]).write_text("quiesced")
     )
     client.start()
     client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
+    proc = client._proc
+    assert proc is not None
     client.close()
 
     assert marker.read_text() == "quiesced"
+    assert proc.returncode == 0
 
 
 def test_initialize_failure_reaps_started_runtime(tmp_path: Path) -> None:
@@ -1311,3 +1358,90 @@ def test_client_reports_missing_bundled_runtime_dependency(monkeypatch: pytest.M
 
     with pytest.raises(FileNotFoundError, match="Install deepseek-harness-runtime-bin"):
         HarnessClient(HarnessConfig(dsh_home="/explicit/home")).start()
+
+
+@pytest.mark.parametrize('raise_after_close', [False, True])
+def test_filter_cannot_publish_after_closing_its_subscription(raise_after_close: bool) -> None:
+    client = HarnessClient(HarnessConfig())
+
+    def close_subscription(_notification: Notification) -> bool:
+        subscription.close()
+        if raise_after_close:
+            raise RuntimeError('closed filter failure')
+        return True
+
+    subscription = client.subscribe_notifications(close_subscription)
+    try:
+        client._handle_message({'method': 'owned-frame', 'params': {}})
+        received: list[Notification] = []
+        subscription.drain(received.append)
+        assert received == []
+    finally:
+        client.close()
+
+
+def test_filter_does_not_run_for_a_subscription_closed_by_an_earlier_filter() -> None:
+    client = HarnessClient(HarnessConfig())
+    calls: list[Notification] = []
+
+    def close_sibling(_notification: Notification) -> bool:
+        sibling.close()
+        return False
+
+    first = client.subscribe_notifications(close_sibling)
+    sibling = client.subscribe_notifications(lambda notification: not calls.append(notification))
+    try:
+        client._handle_message({'method': 'owned-frame', 'params': {}})
+        assert calls == []
+    finally:
+        first.close()
+        sibling.close()
+        client.close()
+
+
+def test_session_ancestry_is_independent_of_one_frame_notification_queue() -> None:
+    client = HarnessClient(HarnessConfig(max_notification_queue=1))
+    subscription = client.subscribe_session_notifications('root')
+    try:
+        client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'root', 'childSessionId': 'child'}})
+        assert subscription.next().payload['childSessionId'] == 'child'
+        client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'child', 'childSessionId': 'grandchild'}})
+        received: list[Notification] = []
+        subscription.drain(received.append)
+        assert [item.payload['childSessionId'] for item in received] == ['grandchild']
+    finally:
+        subscription.close()
+        client.close()
+
+
+@pytest.mark.parametrize('limit', [0, -1, 1.5, True])
+def test_rejects_invalid_session_relationship_capacity(limit: object) -> None:
+    with pytest.raises(ValueError, match='max_session_relationships'):
+        HarnessClient(HarnessConfig(max_session_relationships=limit))  # type: ignore[arg-type]
+
+
+def test_session_relationship_overflow_fails_instead_of_silently_evicting_ancestry() -> None:
+    client = HarnessClient(HarnessConfig(max_session_relationships=1))
+    subscription = client.subscribe_session_notifications('root')
+    try:
+        client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'root', 'childSessionId': 'first'}})
+        assert subscription.next().payload['childSessionId'] == 'first'
+        client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'root', 'childSessionId': 'second'}})
+        with pytest.raises(TransportClosedError, match='Session relationship limit exceeded'):
+            subscription.next()
+        assert client._session_parents == {}
+        with pytest.raises(TransportClosedError, match='Session relationship limit exceeded'):
+            client.subscribe_session_notifications('root').next()
+        with pytest.raises(TransportClosedError, match='Session relationship limit exceeded'):
+            client.start()
+    finally:
+        subscription.close()
+        client.close()
+
+
+def test_high_level_sdk_forwards_session_relationship_capacity() -> None:
+    harness = DeepSeekHarness(max_session_relationships=7)
+    try:
+        assert harness.client.config.max_session_relationships == 7
+    finally:
+        harness.close()

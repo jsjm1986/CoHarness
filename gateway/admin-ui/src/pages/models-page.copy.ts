@@ -81,6 +81,12 @@ export const zh = {
   columnActionsAria: '操作',
   statusEnabled: '已启用',
   statusDisabled: '已停用',
+  digestTitle: '进展梳理',
+  digestModelLabel: '梳理模型',
+  digestModelHint: '项目动态「梳理」使用的大模型；不选择时按路由顺序自动挑选。',
+  digestModelAuto: '自动（按路由顺序）',
+  digestModelSave: '保存',
+  digestModelSaved: '已保存',
 } satisfies Record<string, string>
 
 /** Models page locale key union. */
@@ -168,4 +174,10 @@ export const en = {
   columnActionsAria: 'Actions',
   statusEnabled: 'Enabled',
   statusDisabled: 'Disabled',
+  digestTitle: 'Progress digest',
+  digestModelLabel: 'Digest model',
+  digestModelHint: 'The model behind the project activity digest; automatic follows route order.',
+  digestModelAuto: 'Automatic (route order)',
+  digestModelSave: 'Save',
+  digestModelSaved: 'Saved',
 } satisfies Record<ModelsPageCopyKey, string>

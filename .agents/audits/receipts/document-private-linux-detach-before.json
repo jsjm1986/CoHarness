@@ -1,0 +1,14 @@
+{
+  "name": "document-private-linux-detach-before",
+  "cwd": ".",
+  "command": "limactl shell redroid -- sudo -n -- /tmp/coharness-document-audit.xhw1BMPE/node-v24.19.0-linux-arm64/bin/node /tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs --uid --case detach",
+  "startedAt": "2026-10-26T23:19:14.962241+00:00",
+  "seconds": 1.859,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "469ca847ae7e12a9db49d8569ba3e3b5bdff3d50ecfd2f45b8d76b1376da6813",
+  "inputsAfter": "469ca847ae7e12a9db49d8569ba3e3b5bdff3d50ecfd2f45b8d76b1376da6813",
+  "postgresToolDirectory": null,
+  "outputSha256": "504c3a43c27c5c276f8cb78b00cf729913a6d03cdd1891baaaa354ab9c9e1b3a",
+  "outputTail": "{\"operation\":\"legacy-cross-uid\",\"ordinary\":\"EACCES\",\"actor\":\"EACCES\"}\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: detach changed or retained an unrelated outside object\n\ntrue !== false\n\n    at file:///tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs:963:10 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v24.19.0\n"
+}

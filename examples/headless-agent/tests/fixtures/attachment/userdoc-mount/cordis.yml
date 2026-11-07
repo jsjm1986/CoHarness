@@ -1,0 +1,14 @@
+- name: '@deepseek-ai/dsh-host-webserver'
+  config: { host: '127.0.0.1', port: 0, compression: 'none' }
+- name: '@deepseek-ai/dsh-credentials-local'
+  config:
+    path: !!js "process.cwd() + '/credentials.yml'"
+    watch: false
+- name: '@deepseek-ai/dsh-client-connection'
+- name: '@deepseek-ai/dsh-gateway-runtime'
+- name: './authority.mjs'
+- name: '@deepseek-ai/dsh-userdoc-gateway'
+  config:
+    documentRoot: !!js "process.cwd() + '/domain/documents'"
+    requestTimeoutMs: 10000
+- name: '@deepseek-ai/dsh-host-userdoc-http'

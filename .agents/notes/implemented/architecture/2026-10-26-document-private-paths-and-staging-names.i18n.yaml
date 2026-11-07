@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-26-document-private-paths-and-staging-names.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-26-document-private-paths-and-staging-names.md
+document:
+  en: 595b6a3d96687f66dd5201cf12024c0f89e68695
+  zh: 29b659038bc1a172d554bbfde2426c07d8ab6617
+/agent-note-document-private-paths-and-staging-names:
+  en: 7fc6e139152f824d
+  zh: 85d719fbe8fda733
+/agent-note-document-private-paths-and-staging-names/problem:
+  en: 115f0761ce587087
+  zh: 07683e6dfe8fda9a
+/agent-note-document-private-paths-and-staging-names/decision:
+  en: 5b9c2657fc1a011c
+  zh: 1e4d37b0c94a638e
+/agent-note-document-private-paths-and-staging-names/alternatives-considered:
+  en: 52fa26a80186f767
+  zh: 3ce08cd62416a236
+/agent-note-document-private-paths-and-staging-names/consequences:
+  en: e7aec99e2b528325
+  zh: 403d6ed3a7716a1c

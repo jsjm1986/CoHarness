@@ -20,11 +20,53 @@ import { saveFailureShot } from './support.ts'
 
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workspace-history-entry', import.meta.url))
+const GEOMETRY_DIR = fileURLToPath(new URL('./expected/workspace-history-entry/', import.meta.url))
 const DESKTOP_EXPECTED = join(SNAPSHOT_DIR, 'desktop.expected.md')
 const COMPACT_EXPECTED = join(SNAPSHOT_DIR, 'compact.expected.md')
+const PREPARING_EXPECTED = join(SNAPSHOT_DIR, 'preparing.expected.md')
 const MODE = webSnapshotMode()
 const HISTORY_ID = 'workspace-history-entry-history'
 const BLANK_ID = 'workspace-history-entry-blank'
+
+/**
+ * Observe conversation geometry from the expansion commit through four frames.
+ * @param page - private browser page with a collapsed auxiliary panel.
+ * @returns ordered content-column widths, including the commit's first layout.
+ */
+async function expandWithWidthSamples(page: Page): Promise<number[]> {
+  const probe = await page.locator('[data-viewport][data-details-collapsed]').first().evaluateHandle((element) => {
+    const column = element.querySelector('[class*="centerCol"]')
+    if (column === null) throw new Error('Conversation column is absent')
+    const widths: number[] = []
+    let started = false
+    let complete = false
+    let frame: number | undefined
+    const sample = (): void => {
+      widths.push(column.getBoundingClientRect().width)
+      if (widths.length === 5) { frame = undefined; complete = true }
+      else frame = requestAnimationFrame(sample)
+    }
+    const observer = new MutationObserver(() => {
+      if (started || element.hasAttribute('data-details-collapsed')) return
+      started = true
+      observer.disconnect()
+      sample()
+    })
+    observer.observe(element, { attributes: true, attributeFilter: ['style', 'data-details-collapsed'] })
+    return {
+      complete: () => complete,
+      widths: () => widths,
+      stop: () => { observer.disconnect(); if (frame !== undefined) cancelAnimationFrame(frame) },
+    }
+  })
+  try {
+    await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+    await expect.poll(() => probe.evaluate(value => value.complete())).toBe(true)
+    return await probe.evaluate(value => value.widths())
+  } finally {
+    try { await probe.evaluate((value) => { value.stop() }) } finally { await probe.dispose() }
+  }
+}
 
 describe('web e2e: Workspace history-first entry', () => {
   let scaffold: WebScaffold
@@ -113,7 +155,13 @@ describe('web e2e: Workspace history-first entry', () => {
       await input.fill('Keep this history draft after delayed navigation')
       await page.getByRole('button', { name: /New session in /i }).first().click()
       await requestStarted.promise
+      await expect.poll(() => input.isDisabled()).toBe(true)
+      expect(await input.getAttribute('placeholder')).toBe('Opening the new conversation…')
+      expect(await input.inputValue()).toBe('Keep this history draft after delayed navigation')
+      const pendingSnapshot = await captureStableAria(page, '[data-phase]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(PREPARING_EXPECTED, pendingSnapshot, MODE)
       await page.locator('[role="treeitem"][aria-selected="true"]').click()
+      await expect.poll(() => input.isDisabled()).toBe(false)
       const finished = page.waitForEvent('requestfinished', request => new URL(request.url()).pathname === '/api/session.create')
       release.resolve(undefined)
       await responseDelivered.promise
@@ -198,7 +246,15 @@ describe('web e2e: Workspace history-first entry', () => {
     const { page, tripwire } = await openPage({ width: 1440, height: 900 })
     onTestFailed(() => saveFailureShot(page, 'web-e2e-auxiliary-sidebar'))
     try {
-      await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
+      const beforeWidth = await page.locator('[class*="centerCol"]').first().evaluate(element => element.getBoundingClientRect().width)
+      const widths = await expandWithWidthSamples(page)
+      const distinctWidths = new Set(widths).size
+      expect(widths).toHaveLength(5)
+      expect(widths[0]).toBeLessThan(beforeWidth)
+      expect(distinctWidths).toBe(1)
+      await compareOrRefreshGolden(join(GEOMETRY_DIR, 'geometry.expected.md'),
+        `Distinct conversation widths while expanding: ${String(distinctWidths)}`, MODE)
       const panel = page.locator('[data-sidebar-right-panel]')
       // Guide descriptions hide once entries outgrow MAX_DESCRIBED_ENTRIES, so the
       // accessible name is the entry title alone in that state.
@@ -228,6 +284,7 @@ describe('web e2e: Workspace history-first entry', () => {
   }, 60_000)
 
   it('keeps the workspace-entry snapshot inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['auxiliary.expected.md', 'compact.expected.md', 'desktop.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['auxiliary.expected.md', 'compact.expected.md', 'desktop.expected.md', 'preparing.expected.md'])
+    await assertFixtureInventory(GEOMETRY_DIR, ['geometry.expected.md'])
   })
 })

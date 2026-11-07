@@ -253,11 +253,6 @@ function directoryEntries(
       ...error === undefined ? {} : { error },
     })
   }
-  // A provider whose only native method is OAuth leaves this adapter nothing
-  // to authenticate with, so offering it would put a card on the settings page
-  // whose own posture — no key, credentials discovered by the provider — fails
-  // every request. Catalog *membership* is unaffected, so `declare` above still
-  // answers what pi-ai ships.
   for (const provider of catalog) declare(provider, provider)
   for (const [provider, profile] of profiles) {
     if (!provider.startsWith(ORGANIZATION_PROVIDER_PREFIX)) {

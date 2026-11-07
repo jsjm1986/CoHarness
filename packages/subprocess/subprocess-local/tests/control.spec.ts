@@ -31,7 +31,7 @@ describe('managed subprocess control pipe', () => {
   it('joins an exited range and disposes its paused control endpoint without draining it', async () => {
     ctx = new Context()
     await ctx.plugin(LocalSubprocessRuntime)
-    handle = ctx.subprocess.spawn({
+    handle = await ctx.subprocess.spawn({
       argv: [process.execPath, '--input-type=module', '-e',
         'import { Socket } from "node:net"; const c = new Socket({fd:7,readable:true,writable:true}); c.write(Buffer.alloc(4096),()=>c.destroy())'],
       cwd: process.cwd(),
@@ -52,7 +52,7 @@ describe('managed subprocess control pipe', () => {
   it('closes the caller endpoint when service disposal terminates an active program', async () => {
     ctx = new Context()
     await ctx.plugin(LocalSubprocessRuntime)
-    handle = ctx.subprocess.spawn({
+    handle = await ctx.subprocess.spawn({
       argv: [process.execPath, '--input-type=module', '-e',
         'import { Socket } from "node:net"; const c = new Socket({fd:7,readable:true,writable:true}); c.write("ready"); setInterval(()=>{},60000)'],
       cwd: process.cwd(),
@@ -70,7 +70,7 @@ describe('managed subprocess control pipe', () => {
   it('leaves the channel absent on an ordinary spawn', async () => {
     ctx = new Context()
     await ctx.plugin(LocalSubprocessRuntime)
-    handle = ctx.subprocess.spawn({
+    handle = await ctx.subprocess.spawn({
       argv: [process.execPath, '-e', 'process.stdout.write("plain")'],
       cwd: process.cwd(),
       stdio: { stdin: 'ignore', stdout: { maxBytes: 32 }, stderr: { maxBytes: 32 } },
@@ -94,7 +94,7 @@ describe('managed subprocess control pipe', () => {
       stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 }, control: 'pipe' },
       graceMs: 1000,
     }
-    handle = backend === 'managed' ? ctx.subprocess.spawn(request) : spawnSubprocess(request)
+    handle = backend === 'managed' ? await ctx.subprocess.spawn(request) : spawnSubprocess(request)
     const channel = handle.control
     if (channel === undefined) throw new Error('requested control pipe is absent')
     const received = (async () => {
@@ -113,12 +113,12 @@ describe('managed subprocess control pipe', () => {
   it('rejects a caller-authored control marker before starting a child', async () => {
     ctx = new Context()
     await ctx.plugin(LocalSubprocessRuntime)
-    expect(() => ctx?.subprocess.spawn({
+    await expect(ctx.subprocess.spawn({
       argv: [process.execPath, '-e', 'throw new Error("must not execute")'],
       cwd: process.cwd(),
       env: { [SUBPROCESS_CONTROL_ENV]: 'pipe' },
       stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
       graceMs: 1000,
-    })).toThrow('reserved')
+    })).rejects.toThrow('reserved')
   })
 })

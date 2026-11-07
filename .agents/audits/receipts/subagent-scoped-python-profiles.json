@@ -1,0 +1,14 @@
+{
+  "name": "subagent-scoped-python-profiles",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest -q python/sdk/tests/test_scoped_sdk_model_admission.py python/sdk/tests/test_sdk_child_process_admission.py python/sdk/tests/test_external_model_admission.py",
+  "startedAt": "2026-10-24T17:34:07.795977+00:00",
+  "seconds": 13.597,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "07d25e9486f13510ebfaa2f74459661e04819c1bcde05ae46018c3e4e899fc1d",
+  "inputsAfter": "07d25e9486f13510ebfaa2f74459661e04819c1bcde05ae46018c3e4e899fc1d",
+  "postgresToolDirectory": null,
+  "outputSha256": "06955fb47f16312e5d13266c774a2aa4648c46e423cbe6564a92e25b68e39131",
+  "outputTail": "........                                                                 [100%]\n"
+}

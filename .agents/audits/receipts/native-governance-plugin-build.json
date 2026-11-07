@@ -1,0 +1,14 @@
+{
+  "name": "native-governance-plugin-build",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p plugins/dsh-model-governance/tsconfig.build.json",
+  "startedAt": "2026-10-24T07:13:53.615658+00:00",
+  "seconds": 1.751,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9eef0dcdf3980a09c9a38ba82cd5d864811af74ac18840a703cd102477725ce3",
+  "inputsAfter": "ab9ae91b7fa70aee5237f3dc4fbf02cec1533dc84a292115283781d18161c378",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

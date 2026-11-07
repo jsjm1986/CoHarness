@@ -2,14 +2,30 @@
  * @module @deepseek-ai/dsh-remote-desktop-vnc/grants
  */
 
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteDesktopError, RemoteDesktopGrantId } from '@deepseek-ai/dsh-remote-desktop'
 import type {
   RemoteDesktopGrant,
   RemoteDesktopTarget,
 } from '@deepseek-ai/dsh-remote-desktop'
+
+/**
+ * Identify an endpoint or grant file replacement even when its modification time is preserved.
+ * @param file - local provider state file.
+ * @returns device, inode, byte count and nanosecond modification/change timestamps; undefined only when absent.
+ */
+export async function remoteDesktopFileRevision(file: string): Promise<string | undefined> {
+  try {
+    const info = await stat(file, { bigint: true })
+    return `${info.dev}:${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
+  }
+}
 
 /**
  * Live grants authorizing `{principal, target, sessionId?}` at `at`:
@@ -55,7 +71,8 @@ interface StoredGrant {
  * surface) changes the file. */
 export class VncGrantStore {
   private readonly grants = new Map<string, RemoteDesktopGrant>()
-  private seenMtimeMs = 0
+  private seenRevision: string | undefined
+  private pending: Promise<void> = Promise.resolve()
 
   private constructor(private readonly file: string) {}
 
@@ -73,20 +90,21 @@ export class VncGrantStore {
   }
 
   /**
-   * Re-read the file when its mtime advanced past the last committed revision.
-   * A failed reload keeps the last good rows and leaves the mtime unconsumed,
+   * Re-read when the file identity or metadata changes.
+   * A failed reload keeps the last good rows and leaves the revision unconsumed,
    * so every call retries until the file parses again.
    */
   async refresh(): Promise<void> {
-    if (this.file === ':memory:') return
-    const info = await stat(this.file).catch(() => undefined)
-    const mtimeMs = info?.mtimeMs ?? 0
-    if (mtimeMs === this.seenMtimeMs) return
-    await this.reload()
-    this.seenMtimeMs = mtimeMs
+    await this.serialize(async () => {
+      if (this.file === ':memory:') return
+      const revision = await remoteDesktopFileRevision(this.file)
+      if (revision === this.seenRevision) return
+      await this.reload()
+      this.seenRevision = revision
+    })
   }
 
-  private async reload(): Promise<void> {
+  private async read(): Promise<Map<string, RemoteDesktopGrant>> {
     let text: string
     try {
       text = await readFile(this.file, 'utf8')
@@ -110,8 +128,16 @@ export class VncGrantStore {
       }
       next.set(row.id, { ...row, id: RemoteDesktopGrantId(row.id) } as RemoteDesktopGrant)
     }
+    return next
+  }
+
+  private publish(next: ReadonlyMap<string, RemoteDesktopGrant>): void {
     this.grants.clear()
     for (const [id, grant] of next) this.grants.set(id, grant)
+  }
+
+  private async reload(): Promise<void> {
+    this.publish(await this.read())
   }
 
   /**
@@ -127,8 +153,9 @@ export class VncGrantStore {
    * @param grant - the committed row to append.
    */
   async insert(grant: RemoteDesktopGrant): Promise<void> {
-    this.grants.set(grant.id, grant)
-    await this.persist()
+    await this.mutate((next) => {
+      next.set(grant.id, grant)
+    })
   }
 
   /**
@@ -138,24 +165,44 @@ export class VncGrantStore {
    * @returns the updated row.
    */
   async update(id: RemoteDesktopGrantId, patch: Partial<Omit<StoredGrant, 'id'>>): Promise<RemoteDesktopGrant> {
-    const existing = this.grants.get(id)
-    if (!existing) {
-      throw new RemoteDesktopError('remote-desktop grant not found', 'REMOTE_DESKTOP_GRANT_NOT_FOUND')
-    }
-    const updated = { ...existing, ...patch }
-    this.grants.set(id, updated)
-    await this.persist()
-    return updated
+    return this.mutate((next) => {
+      const existing = next.get(id)
+      if (!existing) {
+        throw new RemoteDesktopError('remote-desktop grant not found', 'REMOTE_DESKTOP_GRANT_NOT_FOUND')
+      }
+      const updated = { ...existing, ...patch }
+      next.set(id, updated)
+      return updated
+    })
   }
 
-  private async persist(): Promise<void> {
+  private mutate<T>(operation: (next: Map<string, RemoteDesktopGrant>) => T): Promise<T> {
+    return this.serialize(async () => {
+      const commit = async (): Promise<T> => {
+        const next = this.file === ':memory:' ? new Map(this.grants) : await this.read()
+        const result = operation(next)
+        await this.persist(next)
+        this.publish(next)
+        return result
+      }
+      if (this.file === ':memory:') return commit()
+      await mkdir(dirname(this.file), { recursive: true, mode: 0o700 })
+      return withFileLock(this.file, commit)
+    })
+  }
+
+  /** Serialize reloads and writes; a rejected write does not block the next operation. */
+  private serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.pending.then(operation)
+    this.pending = result.then(() => {}, () => {})
+    return result
+  }
+
+  private async persist(grants: ReadonlyMap<string, RemoteDesktopGrant>): Promise<void> {
     if (this.file === ':memory:') return
-    const body = [...this.grants.values()].map(g => JSON.stringify(g)).join('\n') + '\n'
-    await mkdir(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.tmp`
-    await writeFile(tmp, body, 'utf8')
-    await rename(tmp, this.file)
-    // Seen mtime is not advanced: an external writer landing between the
+    const body = [...grants.values()].map(g => JSON.stringify(g)).join('\n') + '\n'
+    await writeFileAtomic(this.file, body, { dirMode: 0o700, mode: 0o600 })
+    // Seen revision is not advanced: an external writer landing between the
     // rename and the next refresh must still be picked up.
   }
 }

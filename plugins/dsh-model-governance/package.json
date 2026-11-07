@@ -39,9 +39,17 @@
     "@types/node": "22.20.0",
     "typescript": "5.9.2",
     "vitest": "4.1.8",
-    "@deepseek-ai/dsh-execution-authority": "workspace:*"
+    "@deepseek-ai/dsh-execution-authority": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-stagehand-native": "workspace:*",
+    "@deepseek-ai/dsh-web": "workspace:*",
+    "@deepseek-ai/dsh-web-search-deepseek": "workspace:*",
+    "@deepseek-ai/dsh-llm-deepseek-api-key": "workspace:*",
+    "@deepseek-ai/dsh-credentials-local": "workspace:*",
+    "@deepseek-ai/dsh-llm-pi-ai": "workspace:*",
+    "@deepseek-ai/dsh-web-search-perplexity": "workspace:*"
   },
   "files": [
+    "locale/*.json",
     "lib",
     "cordis.patch.yml",
     "README.md",

@@ -1,8 +1,45 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import { BrowserIdentityChanged, createBrowserIdentityFence } from '../src/client/identity-fence.ts'
+import { ApiTransportError } from '../src/client/api.ts'
 
 const ORIGIN = 'https://gateway.example'
+
+it('pins two personal Runtime tabs independently and keeps document locations independent of execution', async () => {
+  const first = '10000000-0000-4000-8000-000000000001' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']>
+  const second = '10000000-0000-4000-8000-000000000002' as typeof first
+  const node = '20000000-0000-4000-8000-000000000001'
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async input => Response.json({ address: requestedUrl(input).search }, {
+    headers: { 'x-dsh-principal-id': '7' },
+  }))
+  const a = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn(), `?dshRuntime=${first}`)
+  const b = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn(), `?dshRuntime=${second}`)
+  a.confirm(7); b.confirm(7)
+  a.setRuntimeTarget({ kind: 'personal', runtimeId: first }); b.setRuntimeTarget({ kind: 'personal', runtimeId: second })
+  try {
+    await a.fetch(`${ORIGIN}/api/session.list`)
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('dshRuntime')).toBe(first)
+    await b.fetch(`${ORIGIN}/api/session.list`)
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('dshRuntime')).toBe(second)
+    await a.fetch(`${ORIGIN}/api/documents/scope/content?scope=personal&dshNode=${node}&id=same.txt`)
+    const document = requestedUrl(fetcher.mock.calls.at(-1)?.[0])
+    expect(document.searchParams.get('dshNode')).toBe(node)
+    expect(document.searchParams.has('dshRuntime')).toBe(false)
+    await a.fetch(`${ORIGIN}/api/session.list`)
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('dshRuntime')).toBe(first)
+    const socket = await b.socketUrl(new URL('/api/events.mux', ORIGIN), new AbortController().signal)
+    expect(socket.searchParams.get('dshRuntime')).toBe(second)
+  } finally { a.dispose(); b.dispose() }
+})
+
+it('rejects a handshake for another Runtime before exposing account-owned state', () => {
+  const runtime = '10000000-0000-4000-8000-000000000001'
+  const fence = createBrowserIdentityFence(vi.fn(), ORIGIN, vi.fn(), `?dshRuntime=${runtime}`)
+  try {
+    expect(() => { fence.setRuntimeTarget({ kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000002' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']> }) })
+      .toThrow(BrowserIdentityChanged)
+  } finally { fence.dispose() }
+})
 
 function requestedUrl(input: RequestInfo | URL | undefined): URL {
   if (input === undefined) throw new Error('Expected an emitted request')
@@ -10,6 +47,45 @@ function requestedUrl(input: RequestInfo | URL | undefined): URL {
 }
 
 describe('browser account identity fence', () => {
+  it('identifies a native request failure without treating an unreadable response or external error as a network outage', async () => {
+    const cause = new TypeError('Native fetch failed')
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(cause)
+      .mockResolvedValueOnce(new Response('invalid JSON'))
+      .mockRejectedValueOnce(cause)
+    const reload = vi.fn()
+    const fence = createBrowserIdentityFence(fetcher, ORIGIN, reload)
+    fence.setRuntimeTarget(undefined)
+    fence.confirm(7)
+    try {
+      await expect(fence.fetch(`${ORIGIN}/api/workspaceFiles.stat`)).rejects.toMatchObject({
+        name: 'ApiTransportError', status: 0, code: 'request-unavailable', cause,
+      })
+      const response = await fence.fetch(`${ORIGIN}/api/workspaceFiles.read`)
+      await expect(response.json()).rejects.toBeInstanceOf(SyntaxError)
+      await expect(fence.fetch('https://other.example/api/data')).rejects.toBe(cause)
+      expect(reload).not.toHaveBeenCalled()
+      expect(new ApiTransportError(403, '/api/workspaceFiles.stat').code).toBe('access-revoked')
+      expect(new ApiTransportError(503, '/api/workspaceFiles.stat').code).toBeUndefined()
+    } finally { fence.dispose() }
+  })
+
+  it('preserves a request abort reason when native fetch rejects during cancellation', async () => {
+    const stopped = new AbortController()
+    const pending = Promise.withResolvers<Response>()
+    const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
+    const fence = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn())
+    fence.setRuntimeTarget(undefined)
+    try {
+      const request = fence.fetch(`${ORIGIN}/api/workspaceFiles.stat`, { signal: stopped.signal })
+      const reason = new Error('Preview closed')
+      const observed = expect(request).rejects.toBe(reason)
+      await vi.waitFor(() => { expect(fetcher).toHaveBeenCalledOnce() })
+      stopped.abort(reason)
+      pending.reject(new TypeError('Native fetch aborted'))
+      await observed
+    } finally { fence.dispose(); pending.resolve(new Response('{}')) }
+  })
+
   it('withdraws an explicitly revoked document once even when its principal has not changed', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}'))
     const reload = vi.fn()
@@ -211,5 +287,25 @@ it('keeps Request bodies and cancellation while fixing a personal runtime indepe
     expect(init?.signal?.aborted).toBe(false)
     abort.abort()
     expect(init?.signal?.aborted).toBe(true)
+  } finally { fence.dispose() }
+})
+
+it('keeps activity pages on the document runtime when another tab changes its scope cookie', async () => {
+  let cookieTarget = 'project:9'
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    const url = requestedUrl(input)
+    return Response.json({ target: url.searchParams.get('dshTarget') ?? cookieTarget }, {
+      headers: { 'x-dsh-principal-id': '7' },
+    })
+  })
+  const fence = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn())
+  fence.confirm(7)
+  fence.setRuntimeTarget({ kind: 'project', projectId: 9 })
+  try {
+    expect(await (await fence.fetch(`${ORIGIN}/account/api/activity?limit=50`)).json()).toEqual({ target: 'project:9' })
+    cookieTarget = 'project:10'
+    const response = await fence.fetch(`${ORIGIN}/account/api/activity?limit=50&before=cursor`)
+    expect(await response.json()).toEqual({ target: 'project:9' })
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('before')).toBe('cursor')
   } finally { fence.dispose() }
 })

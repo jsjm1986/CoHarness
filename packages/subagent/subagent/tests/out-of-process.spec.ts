@@ -157,6 +157,18 @@ describe('settleRunResult', () => {
 })
 
 describe('subprocessRunHandle', () => {
+  it('retries failed cleanup and shares the recovered completion', async () => {
+    const failure = new Error('Resource completion unavailable'), controller = new AbortController()
+    const teardown = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(undefined)
+    const run = subprocessRunHandle({ id: SessionId('retry-run'), result: Promise.resolve({ output: [], stopReason: 'completed' }),
+      signal: controller.signal, onAbort: () => {}, requestCancel: () => { controller.abort() }, teardown })
+    await expect(run.dispose()).rejects.toBe(failure)
+    const retry = run.dispose()
+    expect(run.dispose()).toBe(retry)
+    await retry; await run.dispose()
+    expect(teardown).toHaveBeenCalledTimes(2)
+  })
+
   it('publishes an idempotent dispose that cancels locally and awaits teardown', async () => {
     const controller = new AbortController()
     const onAbort = vi.fn()

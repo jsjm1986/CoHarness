@@ -1,0 +1,14 @@
+{
+  "name": "shared-model-search-paths",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-tsconfig-paths.ts",
+  "startedAt": "2026-10-24T08:24:31.728467+00:00",
+  "seconds": 1.892,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "85aba2d39c048fcda5052fa91f71c36f75de0e4a3c0b00e618dc31af33e55c25",
+  "inputsAfter": "85aba2d39c048fcda5052fa91f71c36f75de0e4a3c0b00e618dc31af33e55c25",
+  "postgresToolDirectory": null,
+  "outputSha256": "d838669978839b012bf3e7c13da610b814c062ecea2188dd251b67359eb4a478",
+  "outputTail": "gen-tsconfig-paths: tsconfig.base.json package aliases are current.\n"
+}

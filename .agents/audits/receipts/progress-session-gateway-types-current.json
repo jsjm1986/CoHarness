@@ -1,0 +1,14 @@
+{
+  "name": "progress-session-gateway-types-current",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-23T22:56:51.659737+00:00",
+  "seconds": 6.085,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0ab0b78774fd9e7f822601272d72a2140fbb772a48b0c318830be3eb170ac3a5",
+  "inputsAfter": "0ab0b78774fd9e7f822601272d72a2140fbb772a48b0c318830be3eb170ac3a5",
+  "postgresToolDirectory": null,
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

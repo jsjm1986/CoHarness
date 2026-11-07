@@ -91,9 +91,16 @@ interface SessionRecord {
 
 interface PendingSpawn {
   readonly owner: Agent
+  readonly registration: BackendRegistration
   readonly controller: AbortController
   readonly settled: Promise<void>
   cleanupFailure: { error: unknown } | undefined
+}
+
+interface BackendRegistration {
+  readonly backend: TerminalBackend
+  readonly controller: AbortController
+  readonly pending: Set<PendingSpawn>
 }
 
 interface SpawnReservation {
@@ -103,7 +110,7 @@ interface SpawnReservation {
 
 /** In-process registry for replaceable PTY backends and exact-Agent sessions. */
 export class TerminalSessionService extends Service {
-  private readonly backends = new Map<string, TerminalBackend>()
+  private readonly backends = new Map<string, BackendRegistration>()
   private readonly sessions = new Map<TerminalSessionId, SessionRecord>()
   private readonly reservedNames = new Map<Agent, Set<string>>()
   private readonly pendingSpawns = new Map<Agent, Set<PendingSpawn>>()
@@ -121,20 +128,28 @@ export class TerminalSessionService extends Service {
   /**
    * Register one backend type for this effect scope.
    * @param backend - provider with a non-empty unique type.
-   * @returns disposer that removes exactly this contribution.
+   * @returns disposer that withdraws this contribution and joins its unpublished setup and rollback.
    */
-  registerBackend(backend: TerminalBackend): () => void {
+  registerBackend(backend: TerminalBackend): () => Promise<void> {
+    this.assertActive()
     if (backend.type.length === 0) throw new Error('pty backend type must be non-empty')
     if (this.backends.has(backend.type)) {
       throw new TerminalError(`a PTY backend named "${backend.type}" is already registered`, 'DUPLICATE_BACKEND')
     }
+    const registration: BackendRegistration = { backend, controller: new AbortController(), pending: new Set() }
+    let withdrawal: Promise<void> | undefined
     const dispose = this.ctx.effect(() => {
-      this.backends.set(backend.type, backend)
-      return () => {
-        if (this.backends.get(backend.type) === backend) this.backends.delete(backend.type)
-      }
+      this.backends.set(backend.type, registration)
+      return () => withdrawal = (async () => {
+        if (this.backends.get(backend.type) === registration) this.backends.delete(backend.type)
+        const pending = [...registration.pending]
+        registration.controller.abort(new TerminalError(`PTY backend "${backend.type}" was withdrawn`, 'NO_BACKEND'))
+        await Promise.all(pending.map(spawn => spawn.settled))
+        const failures = pending.flatMap(spawn => spawn.cleanupFailure === undefined ? [] : [spawn.cleanupFailure.error])
+        if (failures.length > 0) throw new AggregateError(failures, 'failed to roll back withdrawn PTY backend setup')
+      })()
     }, 'pty.registerBackend()')
-    return () => void dispose()
+    return async () => { await dispose(); await withdrawal }
   }
 
   /**
@@ -156,19 +171,18 @@ export class TerminalSessionService extends Service {
     this.assertActive()
     signal?.throwIfAborted()
     this.ensureOwnerCleanup(owner)
-    const backend = this.backends.get(request.type)
-    if (backend === undefined) throw new TerminalError(`no PTY backend registered for "${request.type}"`, 'NO_BACKEND')
+    const registration = this.backends.get(request.type)
+    if (registration === undefined) throw new TerminalError(`no PTY backend registered for "${request.type}"`, 'NO_BACKEND')
     if (request.name !== undefined && request.name.length === 0) throw new Error('PTY session name must be non-empty')
     const releaseName = this.reserveName(owner, request.name)
-    const spawnReservation = this.reserveSpawn(owner)
-    const backendSignal = signal === undefined
-      ? spawnReservation.signal
-      : AbortSignal.any([signal, spawnReservation.signal])
+    const spawnReservation = this.reserveSpawn(owner, registration)
+    const backendSignal = AbortSignal.any([spawnReservation.signal, registration.controller.signal,
+      ...signal === undefined ? [] : [signal]])
     const sessionId = TerminalSessionId(`pty-${++this.nextId}`)
     let session: TerminalBackendSession | undefined
     let cleanupFailure: { error: unknown } | undefined
     try {
-      session = await backend.spawn({
+      session = await registration.backend.spawn({
         sessionId,
         owner,
         type: request.type,
@@ -177,9 +191,7 @@ export class TerminalSessionService extends Service {
         signal: backendSignal,
       })
       signal?.throwIfAborted()
-      if (this.disposing) {
-        throw new TerminalError('PTY service is disposing', 'SERVICE_DISPOSING')
-      }
+      backendSignal.throwIfAborted()
       if (!this.isLiveOwner(owner)) {
         throw new TerminalError('PTY owner is no longer live', 'OWNER_NOT_LIVE')
       }
@@ -211,6 +223,7 @@ export class TerminalSessionService extends Service {
       try {
         signal?.throwIfAborted()
         spawnReservation.signal.throwIfAborted()
+        registration.controller.signal.throwIfAborted()
       } catch (cancellation: unknown) {
         failure = cancellation
       }
@@ -349,10 +362,11 @@ export class TerminalSessionService extends Service {
     }
   }
 
-  private reserveSpawn(owner: Agent): SpawnReservation {
+  private reserveSpawn(owner: Agent, registration: BackendRegistration): SpawnReservation {
     const controller = new AbortController()
     const settlement = Promise.withResolvers<undefined>()
-    const pending: PendingSpawn = { owner, controller, settled: settlement.promise, cleanupFailure: undefined }
+    const pending: PendingSpawn = { owner, registration, controller, settled: settlement.promise, cleanupFailure: undefined }
+    registration.pending.add(pending)
     const owned = this.pendingSpawns.get(owner) ?? new Set<PendingSpawn>()
     owned.add(pending)
     this.pendingSpawns.set(owner, owned)
@@ -367,6 +381,7 @@ export class TerminalSessionService extends Service {
   }
 
   private removePendingSpawn(pending: PendingSpawn): void {
+    pending.registration.pending.delete(pending)
     const owned = this.pendingSpawns.get(pending.owner)
     if (owned === undefined) return
     owned.delete(pending)

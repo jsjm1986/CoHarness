@@ -20,8 +20,17 @@ const ALICE: SystemdUser = {
 }
 
 describe('unitName', () => {
-  it('derives a per-user unit name', () => {
+  it('distinguishes legacy units from individual generations without username collisions', () => {
     expect(unitName('alice')).toBe('harness-alice.service')
+    const fingerprint = 'a'.repeat(64)
+    expect(unitName('alice', 2, fingerprint)).toBe(`harness-alice@2-${fingerprint}.service`)
+    expect(unitName('alice-2')).not.toBe(unitName('alice', 2, fingerprint))
+    for (const generation of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => unitName('alice', generation, fingerprint)).toThrow('invalid runtime generation')
+    }
+    expect(() => unitName('alice', 2)).toThrow('invalid runtime credential fingerprint')
+    expect(() => unitName('alice', undefined, fingerprint)).toThrow('invalid runtime credential fingerprint')
+    expect(() => unitName('alice', 2, 'bad')).toThrow('invalid runtime credential fingerprint')
   })
 })
 

@@ -1,6 +1,9 @@
 /** Per-owner plugin management: one friendly plugin list over the shared composition, with the entry-level matrix folded below. */
+import { usePendingEdits, useProtectedNavigation } from '../pending-edits.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { AdminRequestError, getPluginPolicy, listProjects, listUsers, pluginManagementTarget, setPluginPolicy, type AdminResourcePolicy, type PluginManagementTarget } from '../api.ts'
+import { RuntimePicker } from '../components/RuntimePicker.tsx'
+import type { RuntimeCatalogEntry } from '../api.ts'
+import { AdminRequestError, getPluginPolicy, listProjects, listUsers, pluginManagementOverview, pluginManagementTarget, setPluginPolicy, type AdminResourcePolicy, type PluginManagementOverviewRow, type PluginManagementTarget } from '../api.ts'
 import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section, StatusBadge, Switch } from '../components/ui.tsx'
 import { adminLanguage } from '../language.ts'
 import { PluginManagerPage } from '../plugins/PluginManagerPage.tsx'
@@ -21,13 +24,14 @@ function Manager({ target, invalidate, composition, t }: { target: PluginManagem
       if (frame.type === 'log') controller.appendLog(frame.chunk)
       else if (frame.type === 'progress') controller.installProgress(frame.progress)
     }, invalidate)
-    const controller = new PluginManagerController({ remote })
+    const controller = new PluginManagerController({ remote, onCatalog: composition.acceptCatalog, onWriteSettled: composition.refresh })
+    const unbindLiveRefresh = composition.bindLiveRefresh(() => controller.load())
     const settings = new ProfileSettingsController(remote.settings)
     setOwner({ controller, settings, abort })
     const refresh = () => { void controller.load() }
     window.addEventListener('focus', refresh)
-    return () => { controller.dispose(); settings.dispose(); abort.abort(); window.removeEventListener('focus', refresh) }
-  }, [target, invalidate])
+    return () => { unbindLiveRefresh(); controller.dispose(); settings.dispose(); abort.abort(); window.removeEventListener('focus', refresh) }
+  }, [target, invalidate, composition.acceptCatalog, composition.bindLiveRefresh, composition.refresh])
   return owner === null ? <LoadingState label={t('pageConnecting')} /> : <ManagerView controller={owner.controller} settings={owner.settings} composition={composition} t={t} />
 }
 function ManagerView({ controller, settings, composition, t }: { controller: PluginManagerController; settings: ProfileSettingsController; composition: PluginComposition; t: Translate }) {
@@ -37,10 +41,6 @@ function ManagerView({ controller, settings, composition, t }: { controller: Plu
   const configuration = useSyncExternalStore(settings.state.subscribe, settings.state.getSnapshot, settings.state.getSnapshot)
   const ledger = useSyncExternalStore(settings.ledger.subscribe, settings.ledger.getSnapshot, settings.ledger.getSnapshot)
   useEffect(() => { if (state.status !== 'idle' && state.status !== 'loading') void settings.load() }, [state.packages, state.status, settings])
-  // A manager-side write moves the same composition the matrix and row controls display.
-  const compositionRef = useRef(composition)
-  useEffect(() => { compositionRef.current = composition })
-  useEffect(() => { if (state.busy.length === 0) compositionRef.current.refresh() }, [state.busy])
   return <><ErrorBanner message={configuration.error} />
     {configuration.error ? <Button onClick={() => { void settings.load() }}>{t('configReload')}</Button> : null}
     {configuration.loading ? <LoadingState label={t('configLoading')} /> : null}
@@ -63,6 +63,7 @@ function TargetPolicy({ kind, id, t }: { kind: 'user' | 'project'; id: number; t
   const [error, setError] = useState('')
   const [unavailable, setUnavailable] = useState(false)
   const [saving, setSaving] = useState(false)
+  usePendingEdits(saving || policy !== null && enabled !== policy.enabled)
   useEffect(() => {
     const abort = new AbortController()
     setPolicy(null); setError(''); setUnavailable(false)
@@ -107,6 +108,7 @@ function TargetPolicy({ kind, id, t }: { kind: 'user' | 'project'; id: number; t
 
 /** The startup draft shared by every control on the page, with its save and discard actions. */
 function DraftBar({ composition, t }: { readonly composition: PluginComposition; readonly t: Translate }) {
+  usePendingEdits(composition.persist && (composition.dirty || composition.busy))
   if (!composition.persist || !composition.dirty) return null
   return <div className="draftBar" role="status">
     <span className="draftBarText">{t('draftPending', { count: `${composition.pending}` })}</span>
@@ -120,6 +122,41 @@ function DraftBar({ composition, t }: { readonly composition: PluginComposition;
 /** The plugin lifecycle as the page teaches it: install code, join the composition, run, then configure. */
 function LifecycleLine({ t }: { t: Translate }) {
   return <p className="muted pluginLifecycle">{t('lifecycleLine')}</p>
+}
+
+/**
+ * The cross-space map: every user or project carrying a saved plugin
+ * composition, its row and disabled counts, and whether its instance is
+ * live. Picking a row binds the target picker below to that space.
+ */
+function SpacesOverview({ t, onPick }: { readonly t: Translate; readonly onPick: (key: string) => void }) {
+  const [rows, setRows] = useState<PluginManagementOverviewRow[] | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let alive = true
+    void pluginManagementOverview().then(value => { if (alive) setRows(value) })
+      .catch((cause: unknown) => { if (alive) setError(cause instanceof Error ? cause.message : String(cause)) })
+    return () => { alive = false }
+  }, [])
+  if (error !== '') return <Section title={t('spacesTitle')}><ErrorBanner message={error} /></Section>
+  if (rows === null) return null
+  return <Section title={t('spacesTitle')}>
+    <p className="muted">{t('spacesHint')}</p>
+    {rows.length === 0
+      ? <p className="muted">{t('spacesEmpty')}</p>
+      : <div className="tableWrap"><table className="dataTable">
+          <thead><tr>
+            <th>{t('targetField')}</th><th>{t('spacesEntries')}</th><th>{t('spacesState')}</th><th>{t('spacesUpdated')}</th><th aria-label="actions" />
+          </tr></thead>
+          <tbody>{rows.map(row => <tr key={`${row.target.kind}:${String(row.target.id)}`}>
+            <td><strong>{row.target.label}</strong> <small className="muted">{row.target.kind === 'user' ? t('spacesKindUser') : t('spacesKindProject')}</small></td>
+            <td>{row.entries}{row.disabled === 0 ? '' : ` · ${t('spacesDisabledCount', { count: `${row.disabled}` })}`}</td>
+            <td>{row.live ? t('spaceRunning') : t('spaceStopped')}</td>
+            <td><time dateTime={row.updatedAt}>{new Date(row.updatedAt).toLocaleString()}</time></td>
+            <td><button type="button" className="tableLink" onClick={() => { onPick(`${row.target.kind}:${String(row.target.id)}`) }}><strong>{t('spacesManage')}</strong></button></td>
+          </tr>)}</tbody>
+        </table></div>}
+  </Section>
 }
 
 /** The entry-level matrix the friendly list folds away, open by default while the instance is stopped. */
@@ -136,7 +173,13 @@ function CompositionView({ composition, open, t }: { readonly composition: Plugi
 export function PluginsPage() {
   const t = useMemo(() => translatePlugin(adminLanguage()), [])
   const [targets, setTargets] = useState<Array<{ key: string; kind: 'user' | 'project'; id: number; label: string }>>([])
+  const [projects, setProjects] = useState<ReadonlyArray<{ id: number; name: string }>>([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [projectsError, setProjectsError] = useState('')
   const [selected, setSelected] = useState('')
+  const navigation = useProtectedNavigation()
+  const [runtime, setRuntime] = useState<RuntimeCatalogEntry>()
+  const [runtimeAvailable, setRuntimeAvailable] = useState(false)
   const [binding, setBinding] = useState<PluginManagementTarget | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -145,46 +188,60 @@ export function PluginsPage() {
   const invalidate = useCallback((message: string) => {
     generation.current++; setBinding(null); setLoading(false); setError(message)
   }, [])
+  const reloadOwners = () => { setBinding(null); setReload(value => value + 1) }
   useEffect(() => {
     let disposed = false
-    void Promise.all([listUsers(), listProjects()]).then(([users, projects]) => {
+    setLoadingProjects(true); setProjectsError('')
+    const projectRead = listProjects().then(rows => {
+      if (!disposed) setProjects(rows)
+      return rows
+    }).catch((cause: unknown) => {
+      if (!disposed) setProjectsError(String(cause))
+      throw cause
+    }).finally(() => { if (!disposed) setLoadingProjects(false) })
+    void Promise.all([listUsers(), projectRead]).then(([users, projects]) => {
       if (disposed) return
       setTargets([...users.map(user => ({ key: `user:${user.id}`, kind: 'user' as const, id: user.id, label: t('targetUser', { name: user.displayName }) })),
         ...projects.map(project => ({ key: `project:${project.id}`, kind: 'project' as const, id: project.id, label: t('targetProject', { name: project.name }) }))])
+      setError('')
     }).catch(cause => { if (!disposed) setError(String(cause)) })
     return () => { disposed = true }
   }, [reload, t])
   useEffect(() => {
     const target = targets.find(item => item.key === selected)
-    if (target === undefined) return
+    if (target === undefined || runtime === undefined || runtime.owner.id !== target.id || runtime.owner.kind !== (target.kind === 'user' ? 'personal' : 'project')) return
     const attempt = ++generation.current, abort = new AbortController()
     setLoading(true); setBinding(null); setError('')
-    void pluginManagementTarget(target.kind, target.id, abort.signal).then(value => {
+    void pluginManagementTarget(target.kind, target.id, abort.signal, runtime.id).then(value => {
       if (attempt !== generation.current) return
-      if (value.target.kind !== target.kind || value.target.id !== target.id) throw new Error(t('targetMismatch'))
+      if (value.target.kind !== target.kind || value.target.id !== target.id || value.target.runtimeId !== runtime.id) throw new Error(t('targetMismatch'))
       setBinding(value)
     }).catch(cause => { if (attempt === generation.current) setError(String(cause)) })
       .finally(() => { if (attempt === generation.current) setLoading(false) })
     return () => { generation.current++; abort.abort() }
-  }, [selected, targets, t])
+  }, [selected, targets, runtime, t])
   return <div className="page">
     <PageHeader title={t('title')} description={t('pageDescription')} />
+    <SpacesOverview t={t} onPick={key => { if (!navigation.canReplace()) return; generation.current++; setBinding(null); setRuntime(undefined); setSelected(key) }} />
     <Section title={t('targetSection')}>
       <ErrorBanner message={error} />
       <div className="targetPicker">
         <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
-          generation.current++; setBinding(null); setSelected(event.target.value)
+          if (!navigation.canReplace()) return
+          generation.current++; setBinding(null); setRuntime(undefined); setSelected(event.target.value)
         }}><option value="">{t('targetPlaceholder')}</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
-        <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
+        <Button onClick={() => { if (!navigation.canReplace()) return; setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
       </div>
+      {targets.find(item => item.key === selected) === undefined ? null : <RuntimePicker key={selected} owner={targets.find(item => item.key === selected)!} value={runtime} onAvailabilityChange={setRuntimeAvailable}
+        onSelect={value => { generation.current++; setBinding(null); setRuntime(value) }} />}
       {loading ? <LoadingState label={t('targetLoading')} /> : null}
       {binding === null ? null : <p className="muted">
         {binding.generation === null ? t('instanceStopped') : t('instanceRunning', { generation: `${binding.generation}` })}
       </p>}
       {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} t={t} />}
     </Section>
-    {binding === null ? null : <BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} />}
-    <PluginPermissions />
+    {binding === null ? null : <div className="adminRouteContent" inert={!runtimeAvailable || undefined} aria-disabled={!runtimeAvailable || undefined}><BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} /></div>}
+    <PluginPermissions projects={{ items: projects, loading: loadingProjects, error: projectsError, reload: reloadOwners }} />
   </div>
 }
 

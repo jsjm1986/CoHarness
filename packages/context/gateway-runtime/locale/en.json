@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Gateway runtime",
+    "description": "Authenticated Gateway request context and internal runtime transport"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "atomic-file-owner-coverage-complete",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/atomic-file-owner-coverage.config.mts --coverage packages/util/atomic-write/tests",
+  "startedAt": "2026-10-25T23:07:40.401098+00:00",
+  "seconds": 18.295,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "725b24acdcd1f034e8614e8e7052ccd10a42a1d091794ae3bceca751c742f58d",
+  "inputsAfter": "725b24acdcd1f034e8614e8e7052ccd10a42a1d091794ae3bceca751c742f58d",
+  "postgresToolDirectory": null,
+  "outputSha256": "c821a40d493a91a1762f0eee2c2e0822388a22c4b8a899a85a0c7149b61498e0",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  2 passed (2)\n      Tests  51 passed (51)\n   Start at  07:07:55\n   Duration  3.54s (transform 116ms, setup 89ms, import 67ms, tests 3.27s, environment 0ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|-------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n----------|---------|----------|---------|---------|-------------------\n----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 127/127 )\nBranches     : 100% ( 57/57 )\nFunctions    : 100% ( 13/13 )\nLines        : 100% ( 103/103 )\n================================================================================\n"
+}

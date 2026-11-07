@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "ACP server",
+    "description": "Automation-only Agent Client Protocol server for driving agents over JSON-RPC stdio."
+  }
+}

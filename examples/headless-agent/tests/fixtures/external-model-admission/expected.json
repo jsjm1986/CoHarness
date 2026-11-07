@@ -1,0 +1,21 @@
+{
+  "providers": [
+    "codex",
+    "claude-code",
+    "acp"
+  ],
+  "admissions": [
+    "model",
+    "model"
+  ],
+  "released": [
+    "model",
+    "model"
+  ],
+  "uncertain": [],
+  "refusals": [
+    "Error: Managed Codex requires a parent model route with the Responses protocol. Choose a compatible model route or an SDK subagent provider.",
+    "Error: This subagent provider cannot enforce the required model permissions, per-request limits and usage attribution. Choose an in-process or SDK subagent provider.",
+    "Error: This subagent provider cannot enforce the required model permissions, per-request limits and usage attribution. Choose an in-process or SDK subagent provider."
+  ]
+}

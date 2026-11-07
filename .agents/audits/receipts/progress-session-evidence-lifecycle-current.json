@@ -1,0 +1,14 @@
+{
+  "name": "progress-session-evidence-lifecycle-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-progress-postgres.spec.ts -t 'durable current-format Session' --no-file-parallelism",
+  "startedAt": "2026-10-23T22:54:25.251502+00:00",
+  "seconds": 6.132,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5d2194a224fc5fd13d86f8aa49f5770557656dd2e087f9746e4ea9cad5210596",
+  "inputsAfter": "5d2194a224fc5fd13d86f8aa49f5770557656dd2e087f9746e4ea9cad5210596",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "3e516c842fb307e2a7938f200a3b96832c04cc10d54ec7ba81c361b3a5af6dea",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  1 passed | 19 skipped (20)\n   Start at  06:54:28\n   Duration  3.13s (transform 1.86s, setup 0ms, import 2.26s, tests 741ms, environment 0ms)\n\n"
+}

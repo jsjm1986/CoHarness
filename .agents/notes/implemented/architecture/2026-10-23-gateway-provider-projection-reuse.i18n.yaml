@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-gateway-provider-projection-reuse.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-gateway-provider-projection-reuse.md
+document:
+  en: cd4cfe4def2b0d748a5122d90a49d0f0fa782bf0
+  zh: d594c48c081d17023fdc2d927aba6b111e32ff8d
+/agent-note-query-local-gateway-provider-projection-reuse:
+  en: 5c2a641e4b8b4a28
+  zh: 80c0b2d17135b393
+/agent-note-query-local-gateway-provider-projection-reuse/problem:
+  en: bf7dfa25a32ad0b4
+  zh: 88ea99d3aa7745dc
+/agent-note-query-local-gateway-provider-projection-reuse/decision:
+  en: c44e9a8398ed5a2e
+  zh: d832dec0c9430f74
+/agent-note-query-local-gateway-provider-projection-reuse/alternatives-considered:
+  en: 98896b0aa40b4709
+  zh: 703cf39b16e4962c
+/agent-note-query-local-gateway-provider-projection-reuse/consequences:
+  en: 26590d6c88dcf769
+  zh: fa6c6434cda81682
+/agent-note-query-local-gateway-provider-projection-reuse/verification:
+  en: 130ba08ed5fc0713
+  zh: d5b094111bbb3127

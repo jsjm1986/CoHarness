@@ -1,0 +1,73 @@
+{
+  "reply": "COMMAND_REGISTRATION_OK",
+  "proof": {
+    "originalRuns": 0,
+    "replacementRuns": 0,
+    "acceptedRuns": 1,
+    "outcomes": [
+      {
+        "mode": "removed",
+        "result": {
+          "kind": "error",
+          "text": "/owner-removed changed while preparing the command. Try it again."
+        }
+      },
+      {
+        "mode": "replaced",
+        "result": {
+          "kind": "error",
+          "text": "/owner-replaced changed while preparing the command. Try it again."
+        }
+      },
+      {
+        "mode": "cancelled",
+        "result": {
+          "kind": "aborted",
+          "text": "fixture cancelled before handler entry"
+        }
+      },
+      {
+        "mode": "accepted",
+        "result": {
+          "kind": "success",
+          "text": "AVAILABLE_COMMAND_OK"
+        }
+      }
+    ],
+    "lifecycle": [
+      {
+        "type": "command/run",
+        "name": "owner-removed"
+      },
+      {
+        "type": "command/done",
+        "kind": "error"
+      },
+      {
+        "type": "command/run",
+        "name": "owner-replaced"
+      },
+      {
+        "type": "command/done",
+        "kind": "error"
+      },
+      {
+        "type": "command/run",
+        "name": "owner-cancelled"
+      },
+      {
+        "type": "command/done",
+        "kind": "error"
+      },
+      {
+        "type": "command/run",
+        "name": "owner-accepted"
+      },
+      {
+        "type": "command/done",
+        "kind": "success"
+      }
+    ],
+    "cancelledRuns": 0
+  }
+}

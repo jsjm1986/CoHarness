@@ -1,0 +1,14 @@
+{
+  "name": "native-search-policy-native-before",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/reproduce-native-search-policy.mjs",
+  "startedAt": "2026-10-24T04:56:20.415974+00:00",
+  "seconds": 0.452,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8043e602d71a4c5aa95c3bd908531c9b38489f4194b610d95b414669d00fcbf7",
+  "inputsAfter": "8043e602d71a4c5aa95c3bd908531c9b38489f4194b610d95b414669d00fcbf7",
+  "postgresToolDirectory": null,
+  "outputSha256": "e31f18a5c6c46bb629540c077559919bca7b4022ca2400b764705eca8289250e",
+  "outputTail": "node:internal/modules/package_json_reader:301\n  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);\n        ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-execution-authority' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/plugins/dsh-model-governance/lib/index.js\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)\n    at packageResolve (node:internal/modules/esm/resolve:764:81)\n    at moduleResolve (node:internal/modules/esm/resolve:855:18)\n    at defaultResolve (node:internal/modules/esm/resolve:988:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)\n    at #resolve (node:internal/modules/esm/loader:679:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:160:33) {\n  code: 'ERR_MODULE_NOT_FOUND'\n}\n\nNode.js v25.8.1\n"
+}

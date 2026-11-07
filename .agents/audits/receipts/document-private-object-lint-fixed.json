@@ -1,0 +1,14 @@
+{
+  "name": "document-private-object-lint-fixed",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/file-object.ts packages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts packages/attachment/userdoc-local/tests/linux-object-paths.spec.ts",
+  "startedAt": "2026-10-26T23:26:22.731000+00:00",
+  "seconds": 4.583,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "42010334d8cf05874d4a6ea4913760fd0506a4edc3f1462a2b817ae2a860e7ad",
+  "inputsAfter": "42010334d8cf05874d4a6ea4913760fd0506a4edc3f1462a2b817ae2a860e7ad",
+  "postgresToolDirectory": null,
+  "outputSha256": "29761b47cae417996b1f189b5f2bc6d57bbd4dd6fe76462af9be2d9d2f268929",
+  "outputTail": "packages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts:133:1: error @stylistic(max-len): This line has a length of 144. Maximum allowed is 140.\n"
+}

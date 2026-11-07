@@ -1,0 +1,14 @@
+{
+  "name": "steward-waited-authority-negative-clean",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts -t 'rechecks steward' --no-file-parallelism",
+  "startedAt": "2026-10-24T00:38:15.755671+00:00",
+  "seconds": 3.362,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "42f311b8e2353d7cbae0d18460224b5caea40850d27125b493b5da74b7dfcbeb",
+  "inputsAfter": "42f311b8e2353d7cbae0d18460224b5caea40850d27125b493b5da74b7dfcbeb",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "ae945146ba2fc50aebc47650016b221dc1e75fe05cb1283054639a0facfc2aea",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-service-postgres.spec.ts (30 tests | 2 failed | 28 skipped) 268ms\n     × rechecks steward qualification after waiting to claim an interaction 135ms\n     × rechecks steward role after waiting to claim an interaction 99ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks steward qualification after waiting to claim an interaction\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks steward role after waiting to claim an interaction\nAssertionError: expected true to match object { code: 'forbidden' }\n\n- Expected:\n{\n  \"code\": \"forbidden\",\n}\n\n+ Received:\ntrue\n\n ❯ tests/project-service-postgres.spec.ts:284:27\n    282|       await claimed\n    283|     }\n    284|     expect(await claimed).toMatchObject({ code: 'forbidden' })\n       |                           ^\n    285|     expect((await pool.query(`SELECT 1 FROM harness.conversation_inter…\n    286|       WHERE organization_id=$1 AND interaction_id=$2`, [f.context.orga…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 28 skipped (30)\n   Start at  08:38:16\n   Duration  2.12s (transform 1.44s, setup 0ms, import 1.76s, tests 268ms, environment 0ms)\n\n"
+}

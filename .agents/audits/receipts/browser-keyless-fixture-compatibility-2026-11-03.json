@@ -1,0 +1,77 @@
+{
+  "finding": "B495",
+  "title": "Browser fixture preserves normal CommonJS loading on Node22",
+  "status": "fixed_test_harness_supported_engines_and_artifacts_verified_global_review_open",
+  "updatedAt": "2026-11-03T00:46:13.860881+00:00",
+  "testHarnessFixed": true,
+  "productionCodeChanged": false,
+  "delivery": {
+    "findings": [
+      "B494",
+      "B495"
+    ],
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "at": "2026-11-03T00:45:18.837621+00:00",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T234814Z/B494-B495-browser-allocation-accounting.delta.tar.gz",
+    "archiveSha256": "8551d1b0dee362ef3b6584fdc0350dbb58c5eff639ed57cba1fc83770e0cb18e",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T234814Z/B494-B495-browser-allocation-accounting",
+    "manifestSha256": "2e36d8c772e3ce27f77b88e6225d80ef28d2532d9c654b2e95250b6c892f5585",
+    "ownedChanges": 16,
+    "normalPassedRegisteredInstances": 208,
+    "normalDistinctFileAndDisplayTitleKeys": 206,
+    "keylessDifferentScenarios": 3,
+    "wholeProjectComplete": false
+  },
+  "counterproof": "browser-allocation-ownership-loader-before.json",
+  "controlledFixtures": [
+    "Stagehand",
+    "Chromium allocation",
+    "CDP"
+  ],
+  "globalLoadHookRemoved": true,
+  "defaultCommonJsLoaderPreserved": true,
+  "exactDiagnosticsPreserved": true,
+  "stderrNormalizationAdded": false,
+  "rootDeclaredTestCodec": {
+    "name": "punycode",
+    "version": "2.3.1",
+    "alreadyLocked": true,
+    "newLockResolutions": 0
+  },
+  "allOtherManifestAndLockDataPreserved": true,
+  "normalWholeWorkspaceInstallPerformed": false,
+  "rootIgnoredDependencyLinkAddedToExistingExactLockedVersion": true,
+  "normalKeylessApplicationMatrix": [
+    {
+      "check": "browser-headless-sdk-declared-codec-node22",
+      "passedRegisteredTests": 2
+    },
+    {
+      "check": "browser-startup-final-lib-node22",
+      "passedRegisteredTests": 1
+    },
+    {
+      "check": "browser-startup-final-src-node24",
+      "passedRegisteredTests": 1
+    },
+    {
+      "check": "browser-headless-sdk-final-lib-node24",
+      "passedRegisteredTests": 2
+    },
+    {
+      "check": "browser-startup-final-lib-node25",
+      "passedRegisteredTests": 1
+    }
+  ],
+  "keylessDifferentScenarios": 3,
+  "relatedProductionReceipt": "receipts/browser-worker-allocation-accounting-2026-11-03.json",
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T234814Z",
+  "limitations": [
+    "Native allocation witness uses actual LinuxARM64/Node22 thread exhaustion; accounting transport failure is controlled.",
+    "Snapshot replays use real Loader/Agents/Budget/Tools/Workers with external Stagehand and CDP fixtures; no physical browser or paid model execution.",
+    "Native witness runtime source matches final source; one @throws documentation line differs.",
+    "Keyless engine/artifact repeats are not counted as additional distinct business cases.",
+    "Other browser/resource paths and all 12 project review domains remain open; official Responses verification remains deferred."
+  ],
+  "wholeProjectComplete": false
+}

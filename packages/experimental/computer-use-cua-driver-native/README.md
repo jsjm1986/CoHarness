@@ -34,7 +34,9 @@ Mount the provider in a composition that already supplies the tool registry and 
 - name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native'
 ```
 
-The provider has no configuration fields. It loads the exact Cua Driver npm version declared in [package.json](package.json) and uses its same-process defaults. Native import, runtime initialization, malformed catalog, duplicate tool name, or occupied computer-use registration failures reject activation and roll back owned resources. The registered provider name is `cua-driver-native`.
+`desktopMode` defaults to `auto`: the provider reads local desktop-session evidence before loading the SDK. Without a detected graphical session it publishes an explicit unavailable status and model guidance, with no native runtime or desktop tools. `disabled` also publishes no desktop tools. `enabled` permits an explicitly configured desktop outside session discovery; it does not grant OS permissions or bypass managed authorization. File, terminal and separately configured headless-browser tools remain independent.
+
+The provider loads the exact Cua Driver npm version declared in [package.json](package.json) and uses its same-process defaults. Native import, runtime initialization, malformed catalog, duplicate tool name, or occupied computer-use registration failures reject activation and roll back owned resources. The registered provider name is `cua-driver-native`.
 
 Use an attachment store and a model route that explicitly declares image input to receive screenshots. The [MCP result adapter](../../mcp/mcp-client/README.md) owns image admission and diagnostic behavior; programmatic callers retain the canonical raw result when a model cannot receive its images. Calls use Cua Driver's upstream tool parameters and results.
 

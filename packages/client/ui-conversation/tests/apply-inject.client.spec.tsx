@@ -51,7 +51,10 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
     api: { settings: {} }, isLoopback: desktop,
-    hostDescription: { getSnapshot: () => desktop ? { canOpenPath: true, executionAuthorityRequired: false } : undefined },
+    hostDescription: {
+      getSnapshot: () => desktop ? { canOpenPath: true, executionAuthorityRequired: false } : undefined,
+      subscribe: () => () => {},
+    },
   })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
@@ -321,7 +324,7 @@ describe('conversation slot inject API', () => {
     b.settingsScopeStub.publish({
       status: 'ready', writable: true,
       value: {
-        busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+        busyEnter: 'queue', chatContentWidth: 700,
         performanceUsage: 'detailed', linkOpening: 'new-tab',
       },
     })

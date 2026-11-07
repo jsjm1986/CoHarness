@@ -70,8 +70,10 @@ describe('web e2e: explicit root desktop confirmation', () => {
     // Landing restores the seeded Session; its transcript marker proves the
     // session view (and with it the session header) is mounted.
     await page.getByText('DONE', { exact: true }).waitFor({ timeout: 30_000 })
-    // The confirmation RPC resolves the Session's live Agent, which the open
-    // resume publishes asynchronously — wait for it before reading status.
+    // The confirmation RPC resolves the Session's live Agent. Presentation
+    // alone keeps the restored Session cold — the sidebar row click is the
+    // explicit open that publishes the Agent asynchronously.
+    await page.getByRole('treeitem', { name: 'Use the read tool twice' }).click()
     await expect.poll(() => scaffold?.ctx.agents.get(ROOT) !== undefined, { timeout: 15_000 }).toBe(true)
     const turnStarts = () => scaffold?.ctx.sessions.get(ROOT)?.snapshotEvents()
       .filter(event => event.type === 'turn/start').length

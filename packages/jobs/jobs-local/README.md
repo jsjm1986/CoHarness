@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-jobs-local` runs background jobs inside the harness process while the agent continues. The owning agent can read, wait on, list, and cancel its jobs; mounting `dsh-tool-jobs` also delivers completion notices in-session. Configurable concurrency and output-retention limits bound resource use. Producers can supply output for periodic reading or append it directly; users can observe retained output without consuming the agent's unread output. Jobs end when their owner or the harness shuts down.
+`dsh-jobs-local` runs background jobs inside the harness process while the agent continues. The owning agent reads, waits on, lists, and cancels its jobs; `dsh-tool-jobs` delivers completion notices in-session. Configurable concurrency and output-retention limits bound resource use. Producers append or periodically supply output that users observe without consuming the agent's unread tail. Jobs end with their owner or the harness. Automatic idle release tracks producer resource acknowledgments separately from terminal records; a throwing teardown cancellation may force-fail the record, while an unconfirmed release blocks idle collection.
 
 ## Table of Contents
 
@@ -45,24 +45,31 @@ Managed jobs capture execution identity before producer startup. A later request
 
 | Field | Default | Meaning |
 |---|---|---|
-| `maxConcurrentJobsPerOwner` | `10` | Maximum `running` plus `stopping` jobs per exact owner, or in the shared unowned bucket |
+| `maxConcurrentJobsPerOwner` | `10` | Maximum starting, `running` and `stopping` jobs per exact owner, or in the shared unowned bucket |
 | `retainBytes` | `262144` | Live ring retention per job, in UTF-8 bytes |
 | `settledRetainBytes` | `16384` | Ring retention kept after a job settles, in UTF-8 bytes; bytes the model has not read stay until its first terminal read |
-| `pumpPollMs` | `150` | Poll interval for a job's pull sources, in milliseconds |
+| `pumpPollMs` | `150` | Poll interval in milliseconds, from `1` through `2147483647`; larger delays are rejected because Node clamps them to one millisecond |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-jobs-local) is the exhaustive source for the accepted fields.
 
 ### What each owner gets
 
-The limit counts the exact owner's `running` and `stopping` records; all unowned jobs share one separate service-level bucket. Terminal history does not occupy capacity, and only a producer's `done` settlement releases a stopping job's place. At capacity, `start()` fails before the producer runs, with an error that names the limit and tells the agent to kill an unneeded job, wait for it to finish, and retry — the registry neither queues nor preempts.
+The limit counts the exact owner's synchronous producer starts and `running` or `stopping` records; all unowned jobs share one separate service-level bucket. A start reserves capacity before capturing execution identity and invoking its producer, so reentrant authority and producer callbacks cannot exceed the limit. A capture failure releases the reservation without starting work. The reservation is released when the callback returns or throws; successful registration then owns the slot. Terminal history does not occupy capacity, and only a producer's `done` settlement releases a stopping job's place. At capacity, `start()` fails before the producer runs, with an error that names the limit and tells the agent to kill an unneeded job, wait for it to finish, and retry — the registry neither queues nor preempts.
 
+<a id="lifecycle"></a>
 ### Lifecycle
 
-Jobs belong to their owner and backend, not to the producer tool, so producer or controller reloads do not stop them. When an agent that owns jobs is disposed, its jobs are cancelled, their producers awaited, and their snapshots removed; service disposal does the same for every remaining job. A cancellation that throws during teardown force-fails the record and warns that the work may be orphaned, so teardown never deadlocks.
+The registry closes admission before cancelling or awaiting jobs during service disposal. A captured service reference cannot start work during or after shutdown; accepted jobs retain their cleanup path.
+
+Jobs belong to their owner and backend, not to the producer tool, so producer or controller reloads do not stop them. When an agent that owns jobs is disposed, its jobs are cancelled, their producers awaited, and their snapshots removed; service disposal does the same for every remaining job. A cancellation that throws during teardown force-fails the record and warns that the work may be orphaned, so teardown never deadlocks. Failure-text conversion is contained as well: an unrenderable producer, source, cancellation, or observer exception cannot interrupt settlement or starve other listeners.
+
+Owned jobs write log-only registration and settlement records before observers and waiters react. Both retain their original owner, timestamps and creating tool ids; `producerReported` distinguishes fulfilled results from rejected promises or forced failure. These records survive Session persistence without restoring live work. Recording failure is logged and can leave history incomplete while cleanup and result collection continue. The [lifecycle-record decision](../../../.agents/notes/implemented/bug-fix/2026-10-26-owned-job-lifecycle-records.md) owns this tradeoff.
+
+Events preserve publication order across synchronous observer callbacks: every matching subscriber receives the current event before notifications triggered by an observer. Once a terminal state commits, a waiting caller receives that state even if a journal observer aborts its wait before the waiter callback runs; cancellation still rejects a wait on live work.
 
 ### What can go wrong
 
-Starting work fails without a controller that serves the owner — loading `dsh-tool-jobs` attaches one, and `start()` otherwise refuses with a message naming it. A producer cancel that returns without settling `done` stays indistinguishable from a slow stop and can stall teardown while holding one capacity slot. Every record disappears when the harness process exits.
+Starting work fails without a controller that serves the owner — loading `dsh-tool-jobs` attaches one, and `start()` otherwise refuses with a message naming it. A producer cancel that returns without settling `done` stays indistinguishable from a slow stop and can stall teardown while holding one capacity slot. Live controls and retained output disappear when the harness process exits.
 
 -----
 

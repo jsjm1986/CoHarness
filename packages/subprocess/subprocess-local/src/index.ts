@@ -34,12 +34,17 @@ import {
 import { logSpillFailure, prepareManagedProcessBinding } from './output.ts'
 import type { LocalSubprocessHandle, SpawnInternals } from './spawn.ts'
 import {
+  confirmLinuxManager,
+  LinuxScopeNotStartedError,
   launchLinuxScope,
+  linuxManagerListener,
   prepareLinuxTerminalScope,
-  probeLinuxManager,
   probeLinuxNative,
   signalLinuxDirectProcess,
+  systemdRunIdentity,
 } from './linux-scope.ts'
+import { LinuxScopeSelector } from './linux-scope-selector.ts'
+import type { LinuxScopeDecision } from './linux-scope-selector.ts'
 import { launchWindowsJob, probeWindowsJob } from './windows-job.ts'
 import { targetEnvironment } from './runner-launch.ts'
 import { createProcessInspector } from './process-inspector.ts'
@@ -63,12 +68,25 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
   private terminals = new Set<LocalTerminalHandle>()
   /** Caller endpoints retained until close, independently of managed process lifetime. */
   private controlChannels = new Set<Duplex>()
+  /** Unload's exit-listener disposer remains available until retained native owners and control endpoints are gone. */
+  private retireHostExit: (() => void) | undefined
+  private hostExitListener: (() => void) | undefined
   /** Test hook: process, spill, and platform operations forwarded to spawnSubprocess. */
   internals: SpawnInternals = {}
   /** Provider-lifetime latch suppressing repeated weaker-containment warnings. */
   private fallbackWarningIssued = false
-  /** Positive-only cache for the expensive Linux bootstrap and scope probe. */
-  private linuxDeepProbePassed = false
+  /**
+   * Linux native containment decisions. Each probe is a spawnSync that blocks the event loop and forks the
+   * host, so the selector reruns it only after an event invalidates the previous verdict.
+   */
+  private readonly linuxScope = new LinuxScopeSelector({
+    probe: () => probeLinuxNative(),
+    managerListener: () => linuxManagerListener(),
+    confirmManager: () => confirmLinuxManager(),
+    launcherIdentity: () => systemdRunIdentity(),
+  })
+  /** Scope decision of the launch in progress; selectContainmentMode sets it immediately before the launch reads it. */
+  private linuxScopeDecision: Extract<LinuxScopeDecision, { kind: 'scope' }> | undefined
   /** Test hook for platform process inspection; production resolves lazily on terminal spawn. */
   terminalInspector: ProcessInspector | undefined
 
@@ -76,16 +94,35 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     super(ctx)
     ctx.effect(() => {
       const onHostExit = (): void => { this.terminateForHostExit() }
-      process.prependListener('exit', onHostExit)
+      this.hostExitListener = onHostExit
+      this.armHostExit()
       return async () => {
-        await this.disposeManagedProcesses()
-        process.off('exit', onHostExit)
+        try { await this.disposeManagedProcesses() }
+        finally { this.retireHostExitIfQuiescent() }
       }
     }, 'local subprocess teardown')
   }
 
   /** Spill failures reach the plugin logger; the log line is the only trace of why a result has no spill path. */
   private readonly reportSpillFailure = logSpillFailure(this.ctx.logger, 'subprocess-local')
+
+  /**
+   * Register the host-exit cleanup while a tracked target exists. Retirement
+   * releases the listener when every set empties; the next spawn re-arms it so
+   * an idle gap cannot leave a later launch without exit protection.
+   */
+  private armHostExit(): void {
+    if (this.retireHostExit !== undefined || this.hostExitListener === undefined) return
+    const listener = this.hostExitListener
+    process.prependListener('exit', listener)
+    this.retireHostExit = () => { process.off('exit', listener) }
+  }
+
+  private retireHostExitIfQuiescent(): void {
+    if (this.live.size > 0 || this.terminals.size > 0 || this.controlChannels.size > 0) return
+    this.retireHostExit?.()
+    this.retireHostExit = undefined
+  }
 
   private terminateForHostExit(): void {
     for (const handle of this.live) {
@@ -117,10 +154,10 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       pending.push(Promise.all([
         handle.done.catch(() => {}),
         handle.waitForExit(),
-      ]).then(() => { this.live.delete(handle) }))
+      ]).then(() => { this.live.delete(handle); this.retireHostExitIfQuiescent() }))
     }
     for (const terminal of this.terminals) {
-      pending.push(terminal.terminate().then(() => { this.terminals.delete(terminal) }))
+      pending.push(terminal.terminate().then(() => { this.terminals.delete(terminal); this.retireHostExitIfQuiescent() }))
     }
     const outcomes = await Promise.allSettled(pending)
     await Promise.all([...this.controlChannels].map(control => new Promise<void>((resolveClose) => {
@@ -179,9 +216,12 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       extensions.map(extension => resolve(process.cwd(), directory, command + extension)))
   }
 
-  spawn(spec: SubprocessSpawnSpec): SubprocessHandle {
-    validateSubprocessSpec(spec)
-    const env = targetEnvironment(spec)
+  protected override spawnProcess(spec: SubprocessSpawnSpec): SubprocessHandle {
+    let env: Record<string, string>
+    try {
+      validateSubprocessSpec(spec)
+      env = targetEnvironment(spec)
+    } catch (error) { this.rejectAfterCleanup(error) }
     const containmentMode = this.selectContainmentMode('ordinary')
     let handle: LocalSubprocessHandle
     const internals: SpawnInternals = { ...this.internals, onSpillFailure: this.reportSpillFailure }
@@ -189,25 +229,36 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       handle = spawnSubprocess(spec, internals)
     } else {
       const binding = prepareManagedProcessBinding(internals)
-      const launch = containmentMode === 'linux-scope'
-        ? launchLinuxScope(spec, env)
-        : launchWindowsJob(spec, env)
+      const linuxScope = containmentMode === 'linux-scope' ? this.linuxScopeDecision : undefined
+      const launch = linuxScope === undefined
+        ? launchWindowsJob(spec, env)
+        : launchLinuxScope(spec, env, linuxScope.literalArgv)
       handle = bindManagedProcess(spec, launch, binding)
+      if (linuxScope !== undefined) this.watchLinuxScopeStart(handle.done, linuxScope.generation)
     }
     this.live.add(handle)
+    this.armHostExit()
     const control = handle.control
     if (control !== undefined) {
       this.controlChannels.add(control)
-      control.once('close', () => { this.controlChannels.delete(control) })
+      this.armHostExit()
+      control.once('close', () => { this.controlChannels.delete(control); this.retireHostExitIfQuiescent() })
     }
     // Release ownership only once the whole managed range is gone, not at direct-child
     // settlement — a TERM-trapping helper that outlives the leader must stay
     // owned so teardown can still escalate it. For the common no-survivor
     // case waitForExit resolves immediately after settlement.
     const release = (): Promise<void> =>
-      handle.waitForExit().then(() => { this.live.delete(handle) })
+      handle.waitForExit().then(() => { this.live.delete(handle); this.retireHostExitIfQuiescent() })
     void handle.done.then(release, release).catch(() => {})
     return handle
+  }
+
+  /** Probe again before the next launch when a scope launched under generation never started its target. */
+  private watchLinuxScopeStart(done: Promise<unknown>, generation: number): void {
+    void done.catch((error: unknown) => {
+      if (error instanceof LinuxScopeNotStartedError) this.linuxScope.scopeNotStarted(generation)
+    })
   }
 
   private selectContainmentMode(
@@ -216,11 +267,13 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     const platform = this.internals.platform ?? process.platform
     let fallbackReason: string | undefined
     if (platform === 'linux') {
-      const available = this.linuxDeepProbePassed
-        ? probeLinuxManager()
-        : probeLinuxNative()
-      if (available) this.linuxDeepProbePassed = true
-      if (available) return 'linux-scope'
+      const decision = this.linuxScope.select()
+      const probe = decision.probe === undefined ? '' : `, probed after ${decision.probe}`
+      this.ctx.logger.debug(`linux native containment: ${decision.kind} (${decision.reason}${probe})`)
+      if (decision.kind === 'scope') {
+        this.linuxScopeDecision = decision
+        return 'linux-scope'
+      }
       fallbackReason = 'the current user-systemd scope or private bootstrap is unavailable'
     }
     if (kind === 'ordinary' && platform === 'win32') {
@@ -261,15 +314,16 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
 
   // Local PTY allocation is synchronous, but the provider contract permits remote asynchronous allocation.
   // oxlint-disable-next-line typescript/require-await -- Preserve promise rejection semantics at the async provider contract.
-  async spawnTerminal(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle> {
+  protected override async spawnTerminalProcess(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle> {
     const file = spec.argv[0]
     if (file === undefined || file.length === 0) {
-      throw new Error('subprocess-local: terminal argv must contain a program')
+      this.rejectAfterCleanup(new Error('subprocess-local: terminal argv must contain a program'))
     }
     spec.signal?.throwIfAborted()
-    const inspector = this.terminalInspector ?? createProcessInspector()
+    const inspector = this.terminalInspector ?? createProcessInspector(spec.graceMs)
     const containmentMode = this.selectContainmentMode('terminal')
-    const env = targetEnvironment(spec)
+    let env: Record<string, string>
+    try { env = targetEnvironment(spec) } catch (error) { this.rejectAfterCleanup(error) }
     const platform = this.internals.platform ?? process.platform
     const activity = prepareShellActivity(spec, env, platform)
     const launch = activity === undefined ? spec : { ...spec, argv: activity.argv, env: activity.env }
@@ -287,13 +341,15 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       // ships emits the tail verbatim; the desktop runtime file policy already
       // keeps its conpty assets.
       ...(platform === 'win32' ? { useConptyDll: true } : {}),
+
     }
+    const linuxScope = containmentMode === 'linux-scope' ? this.linuxScopeDecision : undefined
     let scope: ReturnType<typeof prepareLinuxTerminalScope> | undefined
     let terminal: NodePty.IPty
     try {
-      scope = containmentMode === 'linux-scope'
-        ? prepareLinuxTerminalScope(launch, { ...activity?.env ?? env, PWD: spec.cwd, TERM: spec.terminalType })
-        : undefined
+      scope = linuxScope === undefined
+        ? undefined
+        : prepareLinuxTerminalScope(launch, { ...activity?.env ?? env, PWD: spec.cwd, TERM: spec.terminalType }, linuxScope.literalArgv)
       if (scope !== undefined) { options.cwd = scope.cwd; options.env = scope.env }
       terminal = requireNodePty().spawn(
         scope?.command ?? file,
@@ -318,20 +374,23 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       terminal,
       inspector,
       spec.graceMs,
-      this.internals.platform ?? process.platform,
+      platform,
       owner,
       scope?.resolveOutcome,
       activity,
-      () => { this.terminals.delete(handle as LocalTerminalHandle) },
+      () => { this.terminals.delete(handle as LocalTerminalHandle); this.retireHostExitIfQuiescent() },
       spec.shellActivity === true,
     )
     this.terminals.add(handle)
+    this.armHostExit()
+    if (linuxScope !== undefined) this.watchLinuxScopeStart(handle.done, linuxScope.generation)
     const release = async (): Promise<void> => {
       // terminate() can wait on this direct-exit promise.
       directSettlement.resolve(undefined)
       if (spec.shellActivity === true) return
       await handle.terminate()
       this.terminals.delete(handle)
+      this.retireHostExitIfQuiescent()
     }
     void handle.done.then(release, release).catch(() => {})
     return handle

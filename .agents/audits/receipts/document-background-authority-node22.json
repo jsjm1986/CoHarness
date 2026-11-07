@@ -1,0 +1,14 @@
+{
+  "name": "document-background-authority-node22",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 /Users/a1234/.nvm/versions/node/v22.22.1/bin/node gateway/tests/fixtures/document-stream-built.mjs",
+  "startedAt": "2026-10-26T20:30:49.532298+00:00",
+  "seconds": 8.652,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fbec6ea9dd9b0ee9b79d49edb425d713ec15a3ea1e3eb95c3b0179c2796fee80",
+  "inputsAfter": "fbec6ea9dd9b0ee9b79d49edb425d713ec15a3ea1e3eb95c3b0179c2796fee80",
+  "postgresToolDirectory": null,
+  "outputSha256": "b1b987790b09291c3577607053af9dfbf91803da16455fbac269d7e0014c8b06",
+  "outputTail": "{\"operation\":\"compiled-document-authority\",\"actor\":7,\"unrelatedRoute\":\"untouched\"}\n"
+}

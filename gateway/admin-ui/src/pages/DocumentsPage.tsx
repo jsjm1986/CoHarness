@@ -37,7 +37,7 @@ import { zh as documentsZh, en as documentsEn, type DocumentsCopyKey } from './d
 
 const documentsCopy = () => translateCopy(adminLanguage(), { zh: documentsZh, en: documentsEn })
 
-type Draft = { query: string; scope: '' | 'personal' | 'project'; projectId: string; ownerUserId: string; state: 'active' | 'trash' | 'purged' | 'deleted' | 'all' }
+type Draft = { query: string; scope: '' | 'personal' | 'project'; projectId: string; ownerUserId: string; state: 'active' | 'trash' | 'purged' | 'missing' | 'deleted' | 'all' }
 const EMPTY: Draft = { query: '', scope: '', projectId: '', ownerUserId: '', state: 'active' }
 const PAGE_SIZE = 50
 
@@ -245,7 +245,7 @@ export function DocumentsPage() {
       <ErrorBanner message={error} />
       <div className="metricGrid" aria-label={t('metricsAria')}>
         <Metric label={t('metricActive')} value={metrics?.active.toLocaleString() ?? '—'} />
-        <Metric label={t('stateTrash')} value={(metrics?.trash ?? metrics?.deleted ?? 0).toLocaleString()} tone={(metrics?.trash ?? 0) > 0 ? 'warning' : undefined} />
+        <Metric label={t('stateTrash')} value={metrics === null ? '—' : (metrics.trash ?? metrics.deleted ?? 0).toLocaleString()} tone={(metrics?.trash ?? 0) > 0 ? 'warning' : undefined} />
         <Metric label={t('scopePersonal')} value={metrics?.personal.toLocaleString() ?? '—'} />
         <Metric label={t('scopeProject')} value={metrics?.project.toLocaleString() ?? '—'} />
         <Metric label={t('metricFailures24h')} value={metrics?.failures24h.toLocaleString() ?? '—'} tone={metrics !== null && metrics.failures24h > 0 ? 'warning' : undefined} />
@@ -257,16 +257,16 @@ export function DocumentsPage() {
             <Field label={t('labelScope')}><select className="select" value={draft.scope} onChange={event => setDraft({ ...draft, scope: event.target.value as Draft['scope'] })}><option value="">{t('scopeAll')}</option><option value="personal">{t('scopePersonal')}</option><option value="project">{t('scopeProject')}</option></select></Field>
             <Field label={t('labelProject')}><select className="select" value={draft.projectId} onChange={event => setDraft({ ...draft, projectId: event.target.value })}><option value="">{t('projectAll')}</option>{projects.map(project => <option key={project.id} value={project.id}>{t('entryWithId', { name: project.name, id: String(project.id) })}</option>)}</select></Field>
             <Field label={t('labelOwner')}><select className="select" value={draft.ownerUserId} onChange={event => setDraft({ ...draft, ownerUserId: event.target.value })}><option value="">{t('ownerAll')}</option>{users.map(user => <option key={user.id} value={user.id}>{t('entryWithId', { name: user.displayName, id: String(user.id) })}</option>)}</select></Field>
-          <Field label={t('labelState')}><select className="select" value={draft.state} onChange={event => setDraft({ ...draft, state: event.target.value as Draft['state'] })}><option value="active">{t('stateActive')}</option><option value="trash">{t('stateTrash')}</option><option value="purged">{t('statePurged')}</option><option value="all">{t('stateAll')}</option></select></Field>
+          <Field label={t('labelState')}><select className="select" value={draft.state} onChange={event => setDraft({ ...draft, state: event.target.value as Draft['state'] })}><option value="active">{t('stateActive')}</option><option value="trash">{t('stateTrash')}</option><option value="purged">{t('statePurged')}</option><option value="missing">{t('stateMissing')}</option><option value="all">{t('stateAll')}</option></select></Field>
           </div>
           <div className="filterActions"><Button type="button" onClick={reset}>{t('reset')}</Button><Button type="submit" variant="primary" icon={Filter}>{t('applyFilters')}</Button></div>
         </form>
       </Section>
-      <Section flush className="responsiveSection" title={t('catalogSection')} meta={loading ? undefined : t('recordCount', { count: String(rows.length) })}>
+      <Section flush className="responsiveSection" title={t('catalogSection')} meta={loading || (rows.length === 0 && error !== '') ? undefined : t('recordCount', { count: String(rows.length) })}>
         {selectedIds.size > 0 && <div className="sectionBody filterActions" role="toolbar" aria-label={t('batchAria')}><span className="muted">{t('selectedCount', { count: String(selectedIds.size) })}</span><Button type="button" variant="danger" loading={batchAction} onClick={() => void changeSelectedState('trash')}>{t('trash')}</Button><Button type="button" loading={batchAction} onClick={() => void changeSelectedState('restore')}>{t('restore')}</Button><Button type="button" variant="danger" loading={batchAction} onClick={requestBatchPurge}>{t('purge')}</Button><Button type="button" disabled={batchAction} onClick={() => setSelectedIds(new Set())}>{t('clearSelection')}</Button></div>}
-        {loading ? <LoadingState label={t('loadingCatalog')} /> : rows.length === 0 ? <EmptyState icon={Archive} title={t('emptyTitle')} detail={t('emptyDetail')} /> : <>
+        {loading ? <LoadingState label={t('loadingCatalog')} /> : rows.length === 0 && error !== '' ? null : rows.length === 0 ? <EmptyState icon={Archive} title={t('emptyTitle')} detail={t('emptyDetail')} /> : <>
           <div className="tableWrap desktopOnly"><table className="dataTable documentsTable"><thead><tr><th><span className="visuallyHidden">{t('columnSelect')}</span></th><th>{t('columnDocument')}</th><th>{t('labelScope')}</th><th>{t('labelOwner')}</th><th>{t('labelSize')}</th><th>{t('labelState')}</th><th>{t('labelSource')}</th><th>{t('columnUpdated')}</th><th /></tr></thead><tbody>{rows.map(row => <DocumentTableRow key={row.catalogId} row={row} selected={selectedIds.has(row.catalogId)} onSelect={() => setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next })} onOpen={() => void openDetail(row)} />)}</tbody></table></div>
-          <div className="mobileList">{rows.map(row => <article className="mobileItem" key={row.catalogId} onClick={() => void openDetail(row)}><div className="mobileItemHeader"><input type="checkbox" aria-label={t('selectRow', { name: row.name })} checked={selectedIds.has(row.catalogId)} onChange={event => { event.stopPropagation(); setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next }) }} onClick={event => event.stopPropagation()} /><strong>{row.name}</strong><StatusBadge tone={row.scope.kind === 'project' ? 'info' : 'neutral'}>{row.scope.label}</StatusBadge></div><div className="mobileItemBody"><span className="muted">{row.owner?.displayName ?? t('unassigned')} · {formatBytes(row.bytes)}</span><span className="codeText">{row.catalogId}</span></div></article>)}</div>
+          <div className="mobileList">{rows.map(row => <article className="mobileItem" key={row.catalogId} onClick={() => void openDetail(row)}><div className="mobileItemHeader"><input type="checkbox" aria-label={t('selectRow', { name: row.name })} checked={selectedIds.has(row.catalogId)} onChange={event => { event.stopPropagation(); setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next }) }} onClick={event => event.stopPropagation()} /><strong>{row.name}</strong><StatusBadge tone={row.scope.kind === 'project' ? 'info' : 'neutral'}>{row.scope.label}</StatusBadge></div><div className="mobileItemBody"><span className="muted">{row.owner?.displayName ?? t('unassigned')} · {formatBytes(row.bytes)}</span><span className="codeText">{row.catalogId}</span><Button aria-label={`${t('viewDetails')} ${row.name}`} onClick={event => { event.stopPropagation(); void openDetail(row) }}>{t('viewDetails')}</Button></div></article>)}</div>
         </>}
         {!loading && (nextCursor !== undefined || page > 0) && (
           <div className="sectionBody filterActions" aria-label={t('paginationAria')}>
@@ -319,11 +319,12 @@ function documentOwnerSourceLabel(document: AdminDocument): string {
   return documentsCopy()(document.legacy ? 'sourceLegacy' : DOCUMENT_OWNER_SOURCE_LABEL_KEYS[document.ownerSource])
 }
 
+const DOCUMENT_STATE_LABEL_KEYS: Record<AdminDocument['state'], DocumentsCopyKey> = {
+  active: 'stateActive', trash: 'stateTrash', deleted: 'stateTrash', purged: 'statePurged', missing: 'stateMissing',
+}
+
 function documentStateLabel(state: AdminDocument['state']): string {
-  const t = documentsCopy()
-  if (state === 'active') return t('stateActive')
-  if (state === 'trash' || state === 'deleted') return t('stateTrash')
-  return t('statePurged')
+  return documentsCopy()(DOCUMENT_STATE_LABEL_KEYS[state])
 }
 
 function Definition({ label, children }: { label: string; children: React.ReactNode }) { return <div className="definitionRow"><dt>{label}</dt><dd>{children}</dd></div> }

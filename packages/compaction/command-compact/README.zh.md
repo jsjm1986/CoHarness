@@ -49,6 +49,8 @@ kind: "package-reference"
 
 取消命令会停止等待：后端完成必需的清理，命令以 `Compaction cancelled.` 结算，UI 停止等待。除这些预期情形外的失败会以错误形式呈现，而不会被静默转换。
 
+在托管部署中，`/compact` 会在进入引擎前登记当前命令调用者。执行权限、资源准入和摘要用量归属该调用者，同时保留历史参与者的限制。缺失必需的授权服务、授权期间取消或提供者替换都会阻止进入引擎。独立本地组合可以省略执行授权服务。
+
 ### 组合命令
 
 挂载命令注册表、一个压缩后端与本插件：
@@ -109,7 +111,7 @@ kind: "package-reference"
 - [压缩基础后端](../compaction-basic/README.zh.md)——自动与按需压缩的随附后端。
 - [命令包](../../interaction/commands/README.zh.md)——聊天命令背后的注册表与分发约定。
 - [压缩子系统参考](../../../docs/subsystems/compaction.zh.md)——压缩词汇、结果与服务行为。
-- [排队手动压缩 Agent Note](../../../.agents/notes/implemented/feature/2026-07-30-queued-manual-compaction.zh.md)——按需压缩如何与运行中的轮次串行化。
+- [排队手动压缩参考](../compaction/README.zh.md)——按需压缩如何与运行中的轮次串行化。
 
 -----
 

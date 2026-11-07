@@ -1,0 +1,14 @@
+{
+  "name": "runtime-web-owner-node25",
+  "cwd": "gateway",
+  "command": "node tests/run-built-local-supervision.mjs",
+  "startedAt": "2026-10-24T21:30:23.207928+00:00",
+  "seconds": 0.878,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "inputsAfter": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "postgresToolDirectory": null,
+  "outputSha256": "25a1f0fe8de83d284b7dce3c3f907d6c2104aa767db242ae80e6e4dac38bdef0",
+  "outputTail": "Compiled Runtime starts with its private credential.\nGateway database and credential variables stay outside the Runtime environment.\nApplication backups refuse roots that overlap node execution control.\nGateway SIGKILL leaves the independently owned Runtime available.\nA replacement Gateway authenticates the exact runtime generation.\nA different credential cannot stop the active generation.\nConfirmed stop joins the owned process range and retained runtime output.\nA stopped credential generation cannot allocate again.\nA fresh credential survives a repeated stop from the older handle.\nCancellation after preparation prevents independent runtime allocation.\n"
+}

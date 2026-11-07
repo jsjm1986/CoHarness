@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/compaction/compaction/README.md
 document:
-  en: d207652423eb3a5812b22e394d8cabd3963dd408
-  zh: a1679bea3c0f85f6891dc982c01033d3a94c2b8c
+  en: 2167cd23221410333c00f991c4b9dab9fd19c050
+  zh: 1bf727d9c0d509ecc873d20db86deade92f44657
 /:
   en: 5c47c9629036f119
   zh: 7730d7468a38b38d
@@ -39,8 +39,8 @@ document:
   en: 321c3dc665ea03ff
   zh: f0fa408cde7b0454
 /deepseek-ai-dsh-compaction/understand-the-implementation/design-philosophy:
-  en: e5fbf17d09f10215
-  zh: 9825d15307f81d36
+  en: 226e05fde1f7ad54
+  zh: 4b0f671d68aee872
 /deepseek-ai-dsh-compaction/understand-the-implementation/service-api:
   en: d742d41c7eb5d406
   zh: 6ff26c23eba5dd59
@@ -63,8 +63,8 @@ document:
   en: dc5faf71b27cc340
   zh: 065f8339009c1a3a
 /deepseek-ai-dsh-compaction/further-exploration:
-  en: 9dfd5ebbf0677558
-  zh: 7149787518d1ed3b
+  en: b12341c6424d7960
+  zh: 09fe5b30a599146f
 /deepseek-ai-dsh-compaction/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

@@ -98,6 +98,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
       try {
         const next = await status(target, controller.signal)
         if (controller.signal.aborted) return
+        if (!next.available) { setPhase({ kind: 'denied', code: 'unavailable', message: '' }); return }
         if (next.consented) await attachNow(next)
         else setPhase({ kind: 'consent', status: next })
       } catch (error) {

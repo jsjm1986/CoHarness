@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-timed-user-questions-mux-port.md
 document:
-  en: 2febe3cf07a129aab815ceb18eac5912dab2ccae
-  zh: 6d65575129b1475504c69dffd5640a4347d544d9
+  en: ae7306c5d4a8062476db659924d018d20dcf8556
+  zh: abc6e44a4694ceae9333ee057cade9fc261a1be7
 /agent-note-timed-user-questions-ported-onto-the-mux-question-transport:
   en: da90c6dd831daf88
   zh: 4af1eceaf0e2fb83
@@ -12,8 +12,8 @@ document:
   en: c99dff4bf7f16d98
   zh: 6e85d9296281cf29
 /agent-note-timed-user-questions-ported-onto-the-mux-question-transport/decision:
-  en: b7484c98d24b73ef
-  zh: 6a5dd6be96215c19
+  en: a962db360e4ef11f
+  zh: e171a7de34274213
 /agent-note-timed-user-questions-ported-onto-the-mux-question-transport/alternatives-considered:
   en: bf0b93c3a2fea686
   zh: 7b63283d061c0635
@@ -21,5 +21,5 @@ document:
   en: 09245e1f1a24a711
   zh: 9bceb1cc1a86858b
 /agent-note-timed-user-questions-ported-onto-the-mux-question-transport/testing:
-  en: 64da4e4495be32d6
-  zh: 3ac7f9790474f377
+  en: f62723f88ef48966
+  zh: 2b2d92b20f0c811a

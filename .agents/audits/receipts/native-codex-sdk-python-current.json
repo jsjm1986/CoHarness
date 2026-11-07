@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-sdk-python-current",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_managed_codex_model_snapshot.py -q",
+  "startedAt": "2026-10-25T02:44:59.671825+00:00",
+  "seconds": 3.254,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0670752fbfcf411d8647e9ce013be3f4a0ed22026df021575bb3eed7bb132a15",
+  "inputsAfter": "0670752fbfcf411d8647e9ce013be3f4a0ed22026df021575bb3eed7bb132a15",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

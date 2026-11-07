@@ -66,6 +66,8 @@ kind 闭集为 `profile`（用户或团队是谁：角色、专长、偏好）�
 
 ## Write authorization
 
+已经实现的[成员授权有效期](../../implemented/bug-fix/2026-10-23-memory-member-authority.zh.md)和[持久修改结果](../../implemented/bug-fix/2026-10-23-memory-mutation-outcomes.zh.md)记录负责请求过期、提供方失效及游标与条目的提交顺序。
+
 `ctx.memory.save()` 与 `ctx.memory.delete()` 在修改之前执行全部规则，因为模型工具、整理和浏览器都只经由这两个操作写入记忆：
 
 - **个人与工作区作用域。** agent 写入方只能指向自己会话的工作区。除已授权的执行外不需要额外授权。
@@ -89,7 +91,7 @@ kind 闭集为 `profile`（用户或团队是谁：角色、专长、偏好）�
 
 ## Earlier-session lookup
 
-ZCode 的 `ReadSessionContext` 对应已有的 `tool-session-query` 工具。它们按工作目录相等授权目标会话，这在项目 runtime 中会暴露其他成员的私有对话，因此要在项目空间启用，除目录检查外还必须让每个目标都经过 `CollaborationAuthority.readableSessionIds()` 过滤。
+ZCode 的 `ReadSessionContext` 对应现有 `tool-session-query` 工具。项目运行时中的工具结合工作目录相等性与参与方可读 ACL 检查，并包含最终撤权复核；[参与方可读 ACL 决策](../../implemented/bug-fix/2026-10-17-session-query-participant-acl.zh.md)负责这项行为。
 
 ## Browser surface
 

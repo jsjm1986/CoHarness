@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.md
 document:
-  en: a92300663bac3bfe04768cf2a4f0c354c4c0c66f
-  zh: 5bd55558708f8e949ed3700f145c0725554f4d4b
+  en: 968c53ae2bc9ef522dd67ecc40e389b6d8772472
+  zh: d56ea558e0ea218cec1efe6d1def143aa91ff397
 /agent-note-client-shell-layering-and-dynamic-package-boundaries:
   en: c8976de4e5547fdd
   zh: 3d1bcb3273993af4
@@ -17,6 +17,9 @@ document:
 /agent-note-client-shell-layering-and-dynamic-package-boundaries/decision/layers-and-build-forms:
   en: 963f3a544849fd0d
   zh: dd2d97803c5e87b4
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/decision/dynamic-output-formatting:
+  en: e1d73633c6eadb00
+  zh: f58f9779a556193d
 /agent-note-client-shell-layering-and-dynamic-package-boundaries/decision/shared-module-requests:
   en: d40e7621b6ac2738
   zh: 80efbbab03f9c791
@@ -27,8 +30,8 @@ document:
   en: 59c092a0e8b5e697
   zh: 0ed5dd2dd6614610
 /agent-note-client-shell-layering-and-dynamic-package-boundaries/alternatives-considered:
-  en: 3b89e5c7e8cd881a
-  zh: 9e4b5f379220e92b
+  en: 3eb4343918b89397
+  zh: 5953923d80e69d11
 /agent-note-client-shell-layering-and-dynamic-package-boundaries/consequences:
-  en: 961e4a410d3efbed
-  zh: 40af74d1e1322048
+  en: 132a5b291a941d59
+  zh: 2688167c71559d63

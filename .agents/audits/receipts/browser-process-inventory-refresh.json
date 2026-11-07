@@ -1,0 +1,13 @@
+{
+  "name": "browser-process-inventory-refresh",
+  "cwd": ".",
+  "command": "node --input-type=module -",
+  "startedAt": "2026-10-23T17:29:36.184446+00:00",
+  "seconds": 2.869,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "894e29536be55f973177c7344eed99c774e523510c3f3f8d3a0a4134426961e6",
+  "inputsAfter": "894e29536be55f973177c7344eed99c774e523510c3f3f8d3a0a4134426961e6",
+  "outputSha256": "9eb36dd0197941877e9844a84bdc60128ca544f083f991dbc72b09e14b13676a",
+  "outputTail": "{\"sourceFilesParsed\":2709,\"importingFiles\":41,\"directCalls\":29,\"coverage\":\"candidate inventory only\"}\n"
+}

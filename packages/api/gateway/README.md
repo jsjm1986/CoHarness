@@ -42,12 +42,14 @@ A cancellation-aware Remote method declares `signal: AbortSignal` as its final H
 <a id="media-references"></a>
 ## Media references
 
-The Host entry also mounts `GET|HEAD /api/file?path=<absolute path>` through `connection.http.handlePrefix` with trusted-host authority when `connection`, `fs`, and `attachments` are composed. It reads ordinary files through `ctx.fs`, including temporary paths outside registered workspaces and files in remote providers. Neither directory containment nor MIME categories restrict access; `mime-types` supplies the response type from the resolved display path, with `application/octet-stream` for unknown extensions. GET reuses `readBytes` for preflight and ongoing byte limits; HEAD reads metadata only. All files use `ctx.attachments.imageLimits.maxImageBytes`; exceeding this limit returns 413. Responses contain the complete file, ignore Range, and carry `private, no-store`, `nosniff`, and a `sandbox; default-src 'none'` CSP so directly opened HTML/SVG cannot execute with the API origin. A closing client socket aborts an in-flight read; provider failures that are not `FsError` propagate to the Connection layer. The Markdown rewrite lives in `ui-conversation` (`AssistantMarkdown`); audio/video responses are available, while Markdown audio/video player nodes remain separate work.
+The Host entry also mounts `GET|HEAD /api/file?path=<absolute path>` through `connection.http.handlePrefix` with trusted-host authority when `connection`, `fs`, and `attachments` are composed. It reads ordinary files through `ctx.fs`, including temporary paths outside registered workspaces and files in remote providers. Neither directory containment nor MIME categories restrict access; `mime-types` supplies the response type from the resolved display path, with `application/octet-stream` for unknown extensions. GET reuses `readBytes` for preflight and ongoing byte limits; HEAD reads metadata only. All files use `ctx.attachments.imageLimits.maxImageBytes`; exceeding this limit returns 413. Responses contain the complete file, ignore Range, and carry `private, no-store`, `nosniff`, and a `sandbox; default-src 'none'` CSP so directly opened HTML/SVG cannot execute with the API origin. A closing client socket aborts an in-flight read; each read releases its cancellation listener when it settles, including on failure. Provider failures that are not `FsError` propagate to the Connection layer. The Markdown rewrite lives in `ui-conversation` (`AssistantMarkdown`); audio/video responses are available, while Markdown audio/video player nodes remain separate work.
 
 <a id="client-service-clientremote-ctx-key-remote"></a>
 ## Client service: `ClientRemote` (ctx key: `remote`)
 
 `ctx.remote.$mount()` validates and registers a generated Host-for-Client contribution, then installs concrete direct and scoped methods for the calling Cordis fiber. Each namespace is a traced `remote.<namespace>` child Service and unloads after its last method is withdrawn. A newly created namespace remains unavailable to injecting fibers until every method in that mounted contribution is installed; a failed batch rolls back without activating dependents. Duplicate endpoints, namespace collisions, and descriptors without strict generated codecs fail before methods become callable.
+
+`ctx.remote.$forTarget(target)` captures a Runtime for address-free calls, streams and forwarded events; omission retains the current captured connection, or the bootstrap connection for an unbound service. Capture makes no request and starts no Runtime. Session-addressed calls must agree with that transport. Each facade retains its creator’s lookup context and fiber lifetime. Unbound subscriptions retain their global event delivery.
 
 Each call validates positional inputs, constructs the descriptor's exact named `args`, and sends it through `ctx.connection.rpc.call('/api', endpoint, ...)`. Generated cancellation-aware methods accept a final optional `AbortSignal`; the Client combines it with the contribution mount lifetime before calling Connection. The returned value is validated before reaching application code. Withdrawing a contribution removes its descriptors and methods together, aborts in-flight calls, and makes retained method handles reject.
 
@@ -57,6 +59,8 @@ Generated declaration merges provide the TypeScript API through the shared `Type
 
 The invocation waterfall surrounds only the resolved business method. Authorization and Agent lookups finish first, so a request identity wrapper cannot lend the caller’s authority to cold lookup work.
 
+Account project directories include only computers permitted by the browser entry and the current user’s computer grants and project membership. An empty project retains its fixed computer and owner metadata. Reading the directory starts no Runtime; local project execution checks remain local to the addressed computer.
+
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -65,6 +69,7 @@ None, as the package dispatches application calls and registers no prompt, tool,
 #### KV Cache effect
 
 No direct effect; invoked business Services own any model-visible result.
+
 
 ## Known Limitations and Deferred Work
 

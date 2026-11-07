@@ -1,0 +1,312 @@
+{
+  "finding": "B449",
+  "status": "fixed_verified_local_contention_and_permission_races_matching_production_and_global_review_open",
+  "updatedAt": "2026-11-01T17:52:45.138020+00:00",
+  "baseline": {
+    "status": "passed",
+    "startedAt": "2026-11-01T17:43:44.722404+00:00",
+    "finishedAt": "2026-11-01T17:43:48.820894+00:00",
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/final-latest-origin-fetch.json"
+  },
+  "problem": "One resource request holds both node accounting and instance generation locks through its transaction. Expected serial lease/observation work exhausted the generic five-second lock timeout and escaped as500. An activity UPDATE waiting for a writer could also qualify computer or membership permissions from its pre-wait SQL snapshot.",
+  "fix": "Expected serialization uses transaction-local statement-bounded lock waiting, restoring pool settings after commit or rollback. An unlimited statement retains the configured pool lock bound. Lease admission takes the assignment writer lock before a fresh eligibility UPDATE. Bounded database contention becomes typed503; integrity/network failures retain their original errors, and unknown commit acknowledgements never trigger replay or reservation release.",
+  "compatibility": {
+    "fourSourceBeforeImagesExactlyMatchFrozenR28": true,
+    "gatewayOnlyTargetedIntegrationPossible": true,
+    "newDatabaseMigration": false,
+    "wireOrSessionFormatChange": false,
+    "existingGenerationOwnerMembershipComputerConnectionOperationFencesPreserved": true,
+    "automaticOperationReplay": false,
+    "productionChangedByRoot": false
+  },
+  "verification": {
+    "distinctPassingNamedCases": 249,
+    "caseReports": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/coverage-cases.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/acknowledgement-cases.json"
+    ],
+    "versionRepeatsAddedToCount": false,
+    "node22NewCases": 10,
+    "node24RelatedCases": 76,
+    "httpSnapshot": "real authenticated Runtime HTTP: register, bounded503, same operation active, idempotent replay active, exact completion; no leaked reservation",
+    "defaultTimeoutComparisons": {
+      "originalSource22AndBuilt": "same actual resource transaction blocks lease and observation; both55P03 at approximately5seconds",
+      "repairedSource22Source24AndBuilt": "two same-holder waits exceed5.5seconds; release admits both, no stale generation/revoked lease and no retained request"
+    },
+    "authorityRaceSourceAndBuilt": "computer and membership withdrawal while exact instance writer is held: original admits, repaired refuses",
+    "unknownCommit": "actual committed request loses acknowledgement; no automatic replay, one active row retained, exact repeat deduplicates and completion clears it",
+    "changedCoverage": {
+      "gateway/src/postgres/database.ts": {
+        "changedExecutableStatements": 5,
+        "coveredStatements": 5,
+        "changedBranchArms": 6,
+        "coveredBranchArms": 6,
+        "uncoveredStatementLines": [],
+        "uncoveredBranchLines": []
+      },
+      "gateway/src/postgres/instance-repository.ts": {
+        "changedExecutableStatements": 10,
+        "coveredStatements": 10,
+        "changedBranchArms": 10,
+        "coveredBranchArms": 10,
+        "uncoveredStatementLines": [],
+        "uncoveredBranchLines": []
+      },
+      "gateway/src/node-resource-budget.ts": {
+        "changedExecutableStatements": 13,
+        "coveredStatements": 13,
+        "changedBranchArms": 2,
+        "coveredBranchArms": 2,
+        "uncoveredStatementLines": [],
+        "uncoveredBranchLines": []
+      },
+      "gateway/src/instances.ts": {
+        "changedExecutableStatements": 2,
+        "coveredStatements": 2,
+        "changedBranchArms": 6,
+        "coveredBranchArms": 6,
+        "uncoveredStatementLines": [],
+        "uncoveredBranchLines": []
+      }
+    },
+    "fullFourFileCoverage": {
+      "lines": {
+        "total": 1328,
+        "covered": 1193,
+        "skipped": 0,
+        "pct": 89.83
+      },
+      "statements": {
+        "total": 1605,
+        "covered": 1371,
+        "skipped": 0,
+        "pct": 85.42
+      },
+      "functions": {
+        "total": 287,
+        "covered": 257,
+        "skipped": 0,
+        "pct": 89.54
+      },
+      "branches": {
+        "total": 1156,
+        "covered": 875,
+        "skipped": 0,
+        "pct": 75.69
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "checks": [
+      {
+        "name": "requalified-pg-behavior",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/requalified-pg-behavior.json"
+      },
+      {
+        "name": "repaired-http-snapshot",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/repaired-http-snapshot.json"
+      },
+      {
+        "name": "gateway-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/gateway-types.json"
+      },
+      {
+        "name": "gateway-normal-private-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/gateway-normal-private-build.json"
+      },
+      {
+        "name": "original-gateway-build-matching-esm",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/original-gateway-build-matching-esm.json"
+      },
+      {
+        "name": "contention-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/contention-lint.json"
+      },
+      {
+        "name": "contention-related-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/contention-related-coverage.json"
+      },
+      {
+        "name": "contention-acknowledgement-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/contention-acknowledgement-coverage.json"
+      },
+      {
+        "name": "own-pairing-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/own-pairing-final.json"
+      },
+      {
+        "name": "default-lock-built-current",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/default-lock-built-current.json"
+      },
+      {
+        "name": "default-lock-built-original",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/default-lock-built-original.json"
+      },
+      {
+        "name": "default-lock-source-current22-declared-launch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/default-lock-source-current22-declared-launch.json"
+      },
+      {
+        "name": "default-lock-source-original22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/default-lock-source-original22.json"
+      },
+      {
+        "name": "current-source24-default-lock",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/current-source24-default-lock.json"
+      },
+      {
+        "name": "revocation-src-original",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/revocation-src-original.json"
+      },
+      {
+        "name": "revocation-src-repaired",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/revocation-src-repaired.json"
+      },
+      {
+        "name": "revocation-lib-original",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/revocation-lib-original.json"
+      },
+      {
+        "name": "revocation-lib-repaired",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/revocation-lib-repaired.json"
+      },
+      {
+        "name": "contention-node24-pg",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/contention-node24-pg.json"
+      },
+      {
+        "name": "final-added-pg-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/final-added-pg-node22.json"
+      },
+      {
+        "name": "final-ack-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/final-ack-node24.json"
+      },
+      {
+        "name": "final-test-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/final-test-types.json"
+      },
+      {
+        "name": "final-additional-test-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/final-additional-test-lint.json"
+      },
+      {
+        "name": "final-latest-origin-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/final-latest-origin-fetch.json"
+      },
+      {
+        "name": "contention-doc-quick",
+        "status": "failed_peer_owned_translation_pairs_in_progress_19_other_leaves_passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/contention-doc-quick.json"
+      },
+      {
+        "name": "final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/final-repository-references.json"
+      }
+    ],
+    "intermediateFailuresRetained": [
+      "Initial owned-container historical port refused connections; its current inspected loopback binding was used without changing the container.",
+      "Node22 mixed suite encountered96 host SQLite ABI mismatches and one new fixture registration mismatch; all249 final distinct cases pass under the matching host ABI, and new cases pass Node22/24.",
+      "Initial permission wait regressions reproduced two actual authorization failures before the fresh-statement fix.",
+      "Old private carrier needed its declared Node type roots and ESM package metadata; setup failures are not business regression evidence.",
+      "One direct source attempt used an undeclared tsx config and refused a workspace export; the declared Gateway run config source comparisons pass.",
+      "Coverage merge required resolving the maintained Istanbul library through its coverage-provider dependency; no packages were installed."
+    ],
+    "postflight": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/postflight.json"
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/contention-authority-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.md",
+    ".agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/personal-runtime-authority/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/personal-runtime-authority/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/personal-runtime-authority/guide.zh.md",
+    "gateway/README.i18n.yaml",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/src/instances.ts",
+    "gateway/src/node-resource-budget.ts",
+    "gateway/src/postgres/database.ts",
+    "gateway/src/postgres/instance-repository.ts",
+    "gateway/tests/database-startup.spec.ts",
+    "gateway/tests/node-resource-budget-postgres.spec.ts",
+    "gateway/tests/runtime-resource-api.spec.ts"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 1157,
+  "artifactReferences": {
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/gateway-artifact/postgres/database.js": "42fd34454330de57faa462ca53c6a0fa041e725d6db1f49bf96062eac1a181b9",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/gateway-artifact/postgres/instance-repository.js": "48630cfeeadb961ec8c05a53f08c6fda9619889f47a4768d8c92c06e9384b9b3",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/gateway-artifact/node-resource-budget.js": "62d818a0d0a856d31cf3b89c8ded72786fa91685215aec3817e6d9fd5def2df7",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/gateway-artifact/instances.js": "93e2b9303595b7efec88a8b1a28c68ac08e529c5e84bbc53149f4d380c9453cc",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/gateway-artifact-manifest.json": "d79e048118552bc8da045d030d12a6714c1d665e36ced385c17c57042e782c6f",
+    "packages/context/resource-budget/lib/types/wire.js": "e57d8c8529206203d68435a4246395c9cd4da64602676e3da290ae1f480666a6"
+  },
+  "noteReview": {
+    "action": "updated existing Gateway Runtime admission note and its pair",
+    "newNotes": 0,
+    "archivedNotesChanged": false
+  },
+  "remaining": [
+    "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Peer REAL-048 matching production verification remains open. Local R28-equivalent source and built comparisons prove the lock mechanism and this fix, not the identity of a historical production blocker or a completed production rollout.",
+    "Peer independently owns REAL-049 host.describe optional headless-reason schema preservation and its client/built-node-service checks. Do not overlap its API/schema/Desktop changes.",
+    "B448 complete Core entry coverage remains open:92.30%statements,87.90%branches,96.82%functions,92.10%lines; unchanged100%measurement failed. No baseline or exclusion was weakened.",
+    "The four complete Gateway files have85.42%statements/75.69%branches/89.54%functions/89.83%lines in this focused union. Only the changed30 statements and24 branch arms are fully exercised. This is not repository coverage acceptance.",
+    "Continue remaining resource/model/tool authorization, queued continuation and permission withdrawal, background Workflow/Job cleanup and hard parent/session writer shutdown.",
+    "Global translation pairing failed on three peer-owned REAL-049 pairs while they were being edited;19 other doc-quick leaves and the three B449 pairs pass. Do not edit or silently confirm the peer pairs.",
+    "Official paid Responses validation remains deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": {
+    "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T171828Z/B416-B449-integration-index.json",
+    "findings": 34,
+    "capsules": 27,
+    "frozenDeltaVersions": 603,
+    "presentPaths": 361,
+    "currentSourceDriftPaths": [
+      "packages/context/gateway-runtime/src/index.ts"
+    ]
+  },
+  "handoff": {
+    "sentAt": "2026-11-01T17:52:45.138020+00:00",
+    "status": "single_concrete_packet_sent_to_existing_peer",
+    "scope": "Matching R28 plus four Gateway source patches, standalone Gateway build and production REAL-048 validation; no further Root edits to these frozen four while peer builds.",
+    "rootProductionAcceptance": false
+  }
+}

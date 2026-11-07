@@ -1,0 +1,14 @@
+{
+  "name": "invitation-expiry-postgres-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts tests/instance-capacity-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-24T00:14:35.251925+00:00",
+  "seconds": 8.958,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "69bdf803b982bd54e913035f16b9b7691bd722432fbcfca02eebf600c0ce426e",
+  "inputsAfter": "69bdf803b982bd54e913035f16b9b7691bd722432fbcfca02eebf600c0ce426e",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "9ede0d36bdc0cd5606d8870595b0bd2346631a2d71c0385fe94e1b411d4dacbd",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  27 passed (27)\n   Start at  08:14:36\n   Duration  7.27s (transform 2.11s, setup 0ms, import 2.66s, tests 4.30s, environment 0ms)\n\n"
+}

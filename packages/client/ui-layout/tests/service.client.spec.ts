@@ -13,7 +13,7 @@ import type { PanelActions, PanelInfo } from '@deepseek-ai/dsh-client-ui-layout/
 function fakePanels(): PanelActions {
   return {
     setSidebar: vi.fn(),
-    focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn(),
+    focusRightbar: vi.fn(), releaseRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn(),
     setDetails: vi.fn(),
     toggleSidebar: vi.fn(),
     setViewportWidth: vi.fn(),

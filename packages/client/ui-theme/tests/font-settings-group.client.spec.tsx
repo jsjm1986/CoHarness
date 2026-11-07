@@ -3,7 +3,7 @@
  * disclosure button toggles the font and size rows, and each row routes its
  * write to its own role. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { FontSettingsGroup } from '../src/client/FontSettingsGroup.tsx'
@@ -20,12 +20,14 @@ const COPY: Record<string, string> = {
   'fontFamily.terminal.title': 'Terminal font',
   'fontSize.code.increase': 'Increase code font size',
   'fontSize.terminal.decrease': 'Decrease terminal font size',
+  'appearance.projectReadOnly': 'Project settings are read-only',
 }
 
 /** Empty global standard-kit hooks (the row reads neither). */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
+    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+      state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 function emptyPanelInfo() {
@@ -56,7 +58,7 @@ function mount() {
     setFontSize,
   }
   render(<FontSettingsGroup {...props} />)
-  return { setFontFamily, setFontSize, header: screen.getByRole('button', { name: 'More font settings' }) }
+  return { store, setFontFamily, setFontSize, header: screen.getByRole('button', { name: 'More font settings' }) }
 }
 
 describe('FontSettingsGroup', () => {
@@ -85,5 +87,31 @@ describe('FontSettingsGroup', () => {
     expect(g.setFontSize).toHaveBeenCalledWith('code', 12)
     fireEvent.click(screen.getByRole('button', { name: 'Decrease terminal font size' }))
     expect(g.setFontSize).toHaveBeenCalledWith('terminal', 12)
+  })
+
+  it('updates read-only controls without a value revision and preserves an unsubmitted font list', () => {
+    const g = mount()
+    fireEvent.click(g.header)
+    const field = screen.getByRole<HTMLInputElement>('textbox', { name: 'Code font' })
+    fireEvent.change(field, { target: { value: 'Unsaved font' } })
+    act(() => {
+      g.store.actions.sync({ text: 14, code: 11, terminal: 13 }, { text: '', code: '"Iosevka"', terminal: '' }, 0,
+        { status: 'ready', writable: false, writableReason: 'project', write: { status: 'idle' } })
+    })
+    expect(field.disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Increase code font size' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('status').textContent).toContain('Project settings are read-only')
+    fireEvent.blur(field)
+    fireEvent.click(screen.getByRole('button', { name: 'Increase code font size' }))
+    expect(g.setFontFamily).not.toHaveBeenCalled()
+    expect(g.setFontSize).not.toHaveBeenCalled()
+    expect(field.value).toBe('Unsaved font')
+    act(() => {
+      g.store.actions.sync({ text: 14, code: 11, terminal: 13 }, { text: '', code: '"Iosevka"', terminal: '' }, 0,
+        { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } })
+    })
+    expect(field.disabled).toBe(false)
+    fireEvent.blur(field)
+    expect(g.setFontFamily).toHaveBeenCalledWith('code', '"Unsaved font"')
   })
 })

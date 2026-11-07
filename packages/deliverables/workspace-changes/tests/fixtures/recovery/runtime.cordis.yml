@@ -1,0 +1,11 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, workspaceReviewRecoveryReady]
+- insert:
+    - id: review-recovery-fixture
+      name: './model.mjs'
+    - id: review-recovery-recorder
+      name: './workspace.mjs'
+      config:
+        storageRoot: !!js process.cwd() + '/.reviews'

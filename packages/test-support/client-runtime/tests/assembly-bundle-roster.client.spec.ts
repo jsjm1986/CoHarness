@@ -74,6 +74,27 @@ describe('bundleRoster on a scratch installation', () => {
   const scratch = new Scratch()
   afterAll(() => { rmSync(scratch.root, { recursive: true, force: true }) })
 
+  it('resolves a linked bundle self reference through its own manifest', () => {
+    const linked = new Scratch()
+    onTestFinished(() => { rmSync(linked.root, { recursive: true, force: true }) })
+    const bundle = join(linked.root, 'workspace', 'self')
+    mkdirSync(bundle, { recursive: true })
+    writeFileSync(join(bundle, 'package.json'), JSON.stringify({
+      name: '@t/self',
+      dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } },
+    }))
+    writeFileSync(join(bundle, 'cordis.patch.yml'), "- insert:\n    - id: self\n      name: '@t/self'\n")
+    mkdirSync(join(linked.root, 'app', 'node_modules', '@t'), { recursive: true })
+    symlinkSync(bundle, join(linked.root, 'app', 'node_modules', '@t', 'self'), 'junction')
+    expect(linked.roster(['@t/self'])).toEqual(['@t/self'])
+  })
+  it('reads a bundle own Host entry without requiring a dependency on itself', () => {
+    const own = new Scratch()
+    onTestFinished(() => { rmSync(own.root, { recursive: true, force: true }) })
+    own.bundle('@t/own', "- insert:\n    - id: own-host\n      name: '@t/own'\n")
+    expect(own.roster(['@t/own'])).toEqual([])
+  })
+
   it('resolves a linked bundle dependency before an unrelated ancestor package', () => {
     const linked = new Scratch()
     onTestFinished(() => { rmSync(linked.root, { recursive: true, force: true }) })
@@ -304,17 +325,17 @@ describe('bundleRoster on a scratch installation', () => {
 `)
     expect(() => scratch.roster(['@t/misnamed'])).toThrow('names "@t/real", expected @t/alias')
   })
-})
 
 
-it('exhausts uneven linked-bundle search paths before reporting a missing plugin', () => {
-  const scratch = new Scratch()
-  onTestFinished(() => { rmSync(scratch.root, { recursive: true, force: true }) })
-  const bundle = join(scratch.root, 'workspace', 'nested', 'deeper', 'bundle')
-  mkdirSync(bundle, { recursive: true })
-  writeFileSync(join(bundle, 'package.json'), JSON.stringify({ name: '@t/deep', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
-  writeFileSync(join(bundle, 'cordis.patch.yml'), "- insert:\n    - id: missing\n      name: '@t/absent'\n")
-  scratch.bundle('@t/base', '- insert: []\n')
-  symlinkSync(bundle, join(scratch.root, 'app', 'node_modules', '@t', 'deep'), 'junction')
-  expect(() => scratch.roster(['@t/base', '@t/deep'])).toThrow('cannot resolve plugin package @t/absent')
+  it('exhausts uneven linked-bundle search paths before reporting a missing plugin', () => {
+    const scratch = new Scratch()
+    onTestFinished(() => { rmSync(scratch.root, { recursive: true, force: true }) })
+    const bundle = join(scratch.root, 'workspace', 'nested', 'deeper', 'bundle')
+    mkdirSync(bundle, { recursive: true })
+    writeFileSync(join(bundle, 'package.json'), JSON.stringify({ name: '@t/deep', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
+    writeFileSync(join(bundle, 'cordis.patch.yml'), "- insert:\n    - id: missing\n      name: '@t/absent'\n")
+    scratch.bundle('@t/base', '- insert: []\n')
+    symlinkSync(bundle, join(scratch.root, 'app', 'node_modules', '@t', 'deep'), 'junction')
+    expect(() => scratch.roster(['@t/base', '@t/deep'])).toThrow('cannot resolve plugin package @t/absent')
+  })
 })

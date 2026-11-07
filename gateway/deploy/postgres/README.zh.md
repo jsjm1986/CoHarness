@@ -37,13 +37,15 @@ npm run pg:check
 
 图片、归档、生成文件和超大工具输出继续留在本机文件系统。`content_files` 记录用户或项目归属、本机路径、SHA-256、字节数和媒体类型。SQLite 导入器只迁移 Gateway 控制面，绝不导入既有 JSONL 会话日志。个人运行时保留其配置的本地持久化；新的共享项目运行时使用经过认证的 Gateway `SessionPersistence` 提供方，并把完整 Session header/事件存入这些 PostgreSQL 对话表。
 
-文档目录迁移文件编号为 `012_document_catalog.sql`，因为基线分支已经使用 migration 011。`017_document_trash_lifecycle.sql` 增加可恢复的 `trash` 和终态 `purged` 状态、保留时间、组织范围内的操作者引用及清理索引；旧的 `deleted` 行会在迁移时进入 30 天恢复窗口。`018_document_catalog_tenant_fks.sql` 为目录中的用户和项目引用增加企业范围限定，并为活跃文档的更新时间与名称搜索增加索引。`019_conversation_archive_file_cleanup.sql` 记录带租约和退避时间的本机归档文件清理任务，因此归档数据库清理在文件系统暂时不可用时仍然可靠。
+`012_document_catalog.sql` 创建文档目录索引。`017_document_trash_lifecycle.sql` 增加可恢复回收、终态清除及保留时间；`018_document_catalog_tenant_fks.sql` 按组织限定目录索引引用。`075_document_incarnations.sql` 分别保留运行时实例和回收操作标识，允许保留版本与活动替代文件共存，并记录绑定单个根及作用域的有序投递检查点。`019_conversation_archive_file_cleanup.sql` 保留带租约的归档清理重试。
 
 迁移 `016_session_content_and_drafts.sql` 增加事务内可见内容水位、按 scope 限定的一小时浏览器草稿 reservation，以及仅维护视图使用的 `empty-draft` 归档记录类型。既有行会从事件 JSON 回填；含转义 NUL 的历史事件 JSON 会在不对该值使用 JSON 运算符的情况下采用保守归类。任何行进入回收站前都必须先由管理员审查维护预览。
 
 迁移 `023_user_conversation_display_preferences.sql` 增加可空的账户级对话宽度和字号列。NULL 保留现有默认值，因此该迁移不会重写对话事件，也不会改变已有的设置选择。
 
 迁移 [030](migrations/030_execution_identity.sql) 保存运行时作用域内的 Session 谱系、不可变的已认证输入记录和只增不减的执行发起人集合。输入消费只标记首次准入，不能改变创建者、内容哈希或继承的发起人。初始继承哈希与按接收消息保存的转送记录使重试保留后续归因。这些记录在运行时重启后仍然存在，并在账户访问被撤销后保留历史用量归因。它们必须与 Session 元数据和账务一起备份；个人 JSONL 正文仍在 PostgreSQL 之外。这些记录只包含标识与哈希，不包含消息正文或运行时凭据。
+
+迁移 [096](migrations/096_execution_runtime_namespace.sql) 将持久 Runtime 纳入会话与凭据的唯一性和外键。独立 Runtime 可以保留相同的原始 Host Session ID。输入、执行范围、转发与桌面确认只继承会话已记录的 Runtime；未归属历史保持未归属。迁移保留现有输入 ID、参与人集合、哈希、时间戳与 Session JSONL 代际。共享该数据库的所有 Gateway 必须一同升级；旧写入者无法理解含 Runtime 的键。参见[升级指南](../../../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.zh.md)。
 
 ## 导入 Gateway SQLite 快照
 
@@ -62,7 +64,9 @@ npm run pg:check
 
 导入器在一个事务内运行，并可对同一企业重复执行。它保留密码哈希、用户、项目来源/所有者元数据、挂载、停止状态的个人实例分配、成员、待处理和已完成的项目邀请、模型策略、价格、额度、用量、告警与审计记录。导入的邀请 UUID 由企业和 SQLite 旧邀请 ID 稳定派生，重复导入会更新同一行。Migration 3 会在需要时让每个既有项目创建者成为 `rw` 成员；除非 SQLite 行明确带有用户所有者，否则既有项目保持管理员发起来源。Gateway 启动时会用节点范围的 PostgreSQL advisory lock 串行化第一个空闲端口的分配，并从 `HGW_INSTANCE_PORT_BASE` 开始为已挂载的活跃项目创建缺失的运行时记录；删除的运行时实例行会释放其节点本地端口，schema SQL 不嵌入部署端口号。登录会话、锁定尝试、运行时/intake token 和既有 JSONL/Zstd 对话明确不迁移；用户需要重新登录，凭据会重新签发，个人 transcript 继续留在原会话目录，协作 PostgreSQL 历史从切换后新建的项目 scope 对话开始。
 
-SQLite 导入接受 schema v7 与 v8，且不修改源文件。v7 源中的所有用户都以未授予 Auto 审查资格导入；v8 源保留显式资格值，字段缺失或无效会被拒绝。PostgreSQL 迁移 [031](migrations/031_auto_review_eligibility.sql) 增加默认 false 的用户授权，并将资格变更纳入既有访问失效触发器。
+账号额度采用与 SQLite 读取相同的规范十进制账号键。未生效的数字别名计入导入报告的 `skippedQuotaAliases`，不会成为有效额度。每次重复导入会恢复源库账号的额度覆盖，没有规范行时恢复继承，并保留仅在 PostgreSQL 中存在的账号。无效额度 ID 或缺失账号会回滚导入。[额度升级指南](../../../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-administration-authority/guide.zh.md)说明如何配置确实需要的替代额度。
+
+SQLite 导入接受 schema v7 与 v9，且不修改源文件。v7 源中的所有用户都以未授予 Auto 审查资格导入；v9 源保留显式资格值，字段缺失或无效会被拒绝。PostgreSQL 迁移 [031](migrations/031_auto_review_eligibility.sql) 增加默认 false 的用户授权，并将资格变更纳入既有访问失效触发器。
 
 迁移 [032](migrations/032_desktop_qualification.sql)–[042](migrations/042_webhook_repository_filter.sql) 覆盖受管执行面：桌面资格策略与逐会话确认（032/033）、按用户终端资格策略与可撤销的终端会话授权（034/035）、Webhook 投递回执与受理窗口（036）、把每个已见 Provider 投递 ID 绑定到同一回执的正文防重放别名（037）、SSH 目标登记与按用户资格策略及项目共享（038）、管理员管理的 Webhook 端点——保存结构化 Provider 规则、执行账号与运行时目标、受理限值、防重放窗口和只写 AES-256-GCM 签名密钥（039；同时向 `webhook_delivery_receipts` 增加供管理员重跑的已验证事件载荷）、让恢复的会话停留在已登记主机并阻止草稿预留跨目标落盘的会话级 SSH 目标绑定（040）、保存维护窗口、写者收敛纪元、操作台账与备份登记表的部署控制面（041），以及端点的结构化 `owner/repo` 仓库筛选（042）。资格策略变更经既有访问失效外发通知已连接运行时重新解析，无需重启；Webhook 密钥仅在网关内部解密，不出现在任何管理视图。
 

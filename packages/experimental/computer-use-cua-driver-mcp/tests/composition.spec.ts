@@ -78,6 +78,7 @@ async function load(mode?: string): Promise<{ ctx: Context; root: string; model:
     name,
     config: name === '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'
       ? {
+        desktopMode: 'enabled',
         command: process.execPath,
         args: [fixture, root, ...(mode === undefined ? [] : [mode])],
         reconnect: { initialDelayMs: 20, maxDelayMs: 40, maxAttempts: 2 },

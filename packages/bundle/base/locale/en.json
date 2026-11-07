@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "dsh base",
+    "description": "The shared dsh core bundle: every profile's first patch layer of base plugin rows."
+  }
+}

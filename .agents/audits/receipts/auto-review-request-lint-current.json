@@ -1,0 +1,14 @@
+{
+  "name": "auto-review-request-lint-current",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/experimental/auto-review/src/index.ts packages/experimental/auto-review/tests/auto-review.spec.ts packages/core/tools/src/index.ts snapshots/sdk/auxiliary-model-fixture.ts snapshots/sdk/memory-auxiliary.snapshot.ts snapshots/sdk/auto-review-model.snapshot.ts examples/headless-agent/tests/fixtures/auto-review-model.mjs snapshots/sdk/auto-review-model/prepare.mjs",
+  "startedAt": "2026-10-24T03:06:51.193788+00:00",
+  "seconds": 6.767,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "afee19e97f5e41e4359386a3ae64852841f418f3eeb02f762990a78c29b6d284",
+  "inputsAfter": "afee19e97f5e41e4359386a3ae64852841f418f3eeb02f762990a78c29b6d284",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

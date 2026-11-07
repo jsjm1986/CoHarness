@@ -1,0 +1,14 @@
+- id: llm-deepseek
+  disabled: true
+- id: compaction-basic
+  config:
+    thresholdRatio: 0.1
+    retainTokens: 1
+    headroomTokens: 1024
+    maxTokens: 1024
+    compactionRetries: 0
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, modelAccess, governanceExecutionReady]
+- insert:
+    - id: governance-execution
+      name: './model.mjs'

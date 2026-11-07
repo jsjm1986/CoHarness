@@ -301,6 +301,11 @@
       "source": "packages/context/gateway-runtime/src/index.ts"
     },
     {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "StreamPrincipalRenewalConfig",
+      "source": "packages/context/gateway-runtime/src/stream-principal-leases.ts"
+    },
+    {
       "doc": "docs/subsystems/commands.md",
       "symbol": "CommandDefinition",
       "source": "packages/interaction/commands/src/index.ts"
@@ -487,129 +492,29 @@
       "source": "packages/deliverables/workspace-changes/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/session.md",
       "symbol": "FeedbackCategory",
-      "source": "packages/feedback/command-feedback/src/types.ts"
+      "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/session.md",
       "symbol": "FeedbackRecord",
-      "source": "packages/feedback/command-feedback/src/types.ts"
+      "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackDeleteRequest",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackDeleteResult",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackDeleteValue",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackFailure",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/session.md",
       "symbol": "MessageFeedbackItem",
-      "source": "packages/feedback/message-feedback/src/types.ts"
+      "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackListRequest",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackListResult",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackListValue",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackNoteBlank",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackNoteTooLarge",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackPutRequest",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackPutResult",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/session.md",
       "symbol": "MessageFeedbackRating",
-      "source": "packages/feedback/message-feedback/src/types.ts"
+      "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackRejected",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackSessionNotFound",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackSuccess",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackTargetNotFound",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/session.md",
       "symbol": "MessageFeedbackVersion",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackVersionConflict",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "SessionFeedbackRecordRequest",
-      "source": "packages/feedback/command-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "SessionFeedbackRecordResult",
-      "source": "packages/feedback/command-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "SessionFeedbackRecordValue",
-      "source": "packages/feedback/command-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "SessionFeedbackSessionNotFound",
-      "source": "packages/feedback/command-feedback/src/types.ts"
+      "source": "packages/core/session/src/types.ts"
     },
     {
       "doc": "docs/subsystems/filesystem.md",
@@ -990,6 +895,11 @@
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "PreparedLlmCallGuard",
+      "source": "packages/llm/llm/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "PreparedLlmCall",
       "source": "packages/llm/llm/src/index.ts"
     },
@@ -1067,6 +977,11 @@
       "doc": "docs/subsystems/lsp.md",
       "symbol": "LspService",
       "source": "packages/lsp/lsp/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "McpClientHandle",
+      "source": "packages/mcp/mcp-client/src/index.ts"
     },
     {
       "doc": "docs/subsystems/mcp.md",
@@ -2007,6 +1922,11 @@
     },
     {
       "doc": "docs/subsystems/ssh.md",
+      "symbol": "SshLoopbackForward",
+      "source": "packages/ssh/ssh/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/ssh.md",
       "symbol": "SshConnection",
       "source": "packages/ssh/ssh/src/index.ts",
       "projection": "public-api"
@@ -2735,6 +2655,51 @@
       "doc": "docs/subsystems/remote-desktop.md",
       "symbol": "RemoteDesktopGrantInput",
       "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "LlmCallKind",
+      "source": "packages/llm/llm/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/subagent.md",
+      "symbol": "ExternalModelSelection",
+      "source": "packages/subagent/subagent/src/external.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocUploadOwnerId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocRootId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocIncarnationId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocTrashId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocIdentity",
+      "source": "packages/attachment/userdoc/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocSelection",
+      "source": "packages/attachment/userdoc/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocTrashSelection",
+      "source": "packages/attachment/userdoc/src/types.ts"
     }
   ]
 }

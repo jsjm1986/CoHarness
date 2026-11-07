@@ -25,6 +25,8 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
+Cancellation or deadline expiry while waiting for process admission returns the corresponding aborted or timed-out result without starting a process. Allocation failures unrelated to cancellation retain their original failure.
+
 Mount this executor when a composition needs PowerShell command execution — typically on Windows — without confinement. It registers as `ctx.shell`, and the model-facing `pwsh` tool works over it immediately: an agent calls the tool, and the command runs as a fresh `pwsh -Command` process with the budgets below.
 
 ### When to choose it

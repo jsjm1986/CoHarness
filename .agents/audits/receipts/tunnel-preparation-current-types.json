@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-current-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T23:26:08.035857+00:00",
+  "seconds": 4.233,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a384d943bd4656e9451fffcaeae2addc734782aac46f0fed79da20f8a1572157",
+  "inputsAfter": "a384d943bd4656e9451fffcaeae2addc734782aac46f0fed79da20f8a1572157",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

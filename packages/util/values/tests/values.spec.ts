@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { assertNever, deepEqualJson, deepFreeze } from '../src/index.ts'
+import { assertNever, deepEqualJson, deepFreeze, formatThrownValue } from '../src/index.ts'
 
 describe('shared value primitives', () => {
+  it('renders ordinary thrown values and contains failures from string conversion', () => {
+    expect(formatThrownValue(new Error('provider failed'))).toBe('Error: provider failed')
+    expect(formatThrownValue('message')).toBe('message')
+    expect(formatThrownValue(undefined)).toBe('undefined')
+    expect(formatThrownValue(Object.create(null))).toBe('[unrenderable thrown value]')
+    expect(formatThrownValue({ toString() { throw new Error('render failed') } })).toBe('[unrenderable thrown value]')
+  })
+
   it('reports an unexpected variant with or without JSON text and context', () => {
     expect(() => assertNever('unexpected' as never, 'parser')).toThrow('in parser: "unexpected"')
     expect(() => assertNever(undefined as never)).toThrow('unreachable variant: undefined')
@@ -15,6 +23,7 @@ describe('shared value primitives', () => {
     expect(deepEqualJson([1], { 0: 1 })).toBe(false)
     expect(deepEqualJson({ 0: 1 }, [1])).toBe(false)
     expect(deepEqualJson([1], [1, 2])).toBe(false)
+    expect(deepEqualJson([1], [2])).toBe(false)
     expect(deepEqualJson({ value: 1 }, { value: 2 })).toBe(false)
   })
 

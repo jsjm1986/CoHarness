@@ -1,0 +1,7 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, speechSettingsOwnerReady]
+- insert:
+    - id: speech-settings-owner
+      name: './model.mjs'

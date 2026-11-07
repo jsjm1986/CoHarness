@@ -1,5 +1,6 @@
 /** Managed execution identity, replay, and authorization. @module @deepseek-ai/dsh-gateway-execution */
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { addAbortListener } from 'node:events'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
 import ExecutionAuthority from '@deepseek-ai/dsh-execution-authority'
@@ -17,13 +18,14 @@ import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { executionInputOf, executionScope, executionState, hasUnverifiedExecutionInput, inputDigest } from './input.ts'
 import { EXECUTION_PROJECTION, type ExecutionProjectionState } from './projection.ts'
+import { discardGatewayRead } from './response.ts'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import { desktopConfirmationController } from './desktop-confirmation.ts'
 import { GatewayDesktopPolicy } from './desktop.ts'
 import { GatewaySshAuthorization } from './ssh.ts'
 import { GatewayUserTerminalAuthorization } from './user-terminal.ts'
 import { registerWebhookDispatch } from './webhook.ts'
-import { gatewayPluginManagementAuthorization } from './plugin-management.ts'
+import { gatewayPluginManagementAuthorization, parseInstallSourcePolicy } from './plugin-management.ts'
 import type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
 
 export type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
@@ -60,6 +62,12 @@ interface RequiredScope {
   capabilities: Set<ExecutionCapability>
 }
 
+/** Watch updates observed during one permission request, including an idle owner. */
+interface PendingAuthorization {
+  readonly users: Set<number>
+  invalidated: boolean
+}
+
 /** Gateway-only provider; standalone profiles deliberately do not compose it. */
 export class GatewayExecution extends ExecutionAuthority {
   static inject = ['gatewayRuntime', 'agents', 'sessions', 'sessionQuery', 'permissionPresets', 'sandboxPolicy', 'sessionProjections']
@@ -87,6 +95,7 @@ export class GatewayExecution extends ExecutionAuthority {
   private readonly checks = new Set<Promise<unknown>>()
   private readonly desktops = new WeakMap<Agent, Set<string>>()
   private readonly invalidations = new WeakMap<Agent, Map<string, number>>()
+  private readonly pendingAuthorizations = new Set<PendingAuthorization>()
   private readonly jobStopTimeoutMs: number
   private readonly dependencies: { readonly ctx: Context }
   private readonly userTerminals: GatewayUserTerminalAuthorization
@@ -114,11 +123,12 @@ export class GatewayExecution extends ExecutionAuthority {
     const policy = gatewayPluginManagementAuthorization({
       current: () => ctx.gatewayRuntime.interactive(),
       request: (path, options) => ctx.gatewayRuntime.request(path, options),
-    }, this.lifetime.signal)
+    }, this.lifetime.signal, parseInstallSourcePolicy(process.env.HGW_PLUGIN_INSTALL_SOURCES))
     ctx.provide('pluginManagementAuthorization', {
       protectedModules: policy.protectedModules,
-      authorize: async (capability = 'manage') => {
-        if (capability === 'read') return
+      // The deployment policy gates reads and writes alike: an unqualified
+      // account must not even enumerate the managed profile.
+      authorize: async () => {
         const agent = ctx.agents.currentInitiator()
         if (agent === undefined) await policy.authorize()
         else await this.authorize('plugin-management', agent)
@@ -127,6 +137,8 @@ export class GatewayExecution extends ExecutionAuthority {
       // composition is shared, so publish and read ride the runtime credential.
       readDesiredState: policy.readDesiredState?.bind(policy),
       publishDesiredState: policy.publishDesiredState?.bind(policy),
+      // Install sources are deployment policy, uniform for every caller.
+      authorizeInstall: policy.authorizeInstall?.bind(policy),
     })
     ctx.provide('permissionPresetAuthorization', {
       canSelect: (preset: string) => {
@@ -162,7 +174,7 @@ export class GatewayExecution extends ExecutionAuthority {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: agent.id, desktop, ownerSessionIds: owners, ...(cleanup ? {} : { scopeId: this.currentScope(agent).scopeId }), ...body }), signal,
           })
           if (!response.ok) {
-            await response.body?.cancel()
+            discardGatewayRead(response.body)
             throw this.denied('desktop', `Desktop coordination failed (${String(response.status)}).`)
           }
           return readGatewayResponseJson(response, undefined, signal)
@@ -222,7 +234,7 @@ export class GatewayExecution extends ExecutionAuthority {
       return decision
     }, { prepend: true })
     ctx.on('agent/message-entered', async ({ agent, event, turn, signal }) => {
-      await this.restoreInheritance(agent.session)
+      await this.restoreInheritance(agent.session, signal)
       if (this.admittedTurns.get(agent) !== turn) {
         this.admittedTurns.set(agent, turn)
         this.currentStep.delete(agent)
@@ -368,7 +380,7 @@ export class GatewayExecution extends ExecutionAuthority {
       signal: operationSignal,
     })
     if (!response.ok) {
-      await response.body?.cancel()
+      discardGatewayRead(response.body)
       throw this.denied('execute', 'The Gateway refused execution authorization. Use a verified account and an ordinary permission mode.')
     }
     return response.status === 204 ? undefined : readGatewayResponseJson(response, undefined, operationSignal)
@@ -411,6 +423,22 @@ export class GatewayExecution extends ExecutionAuthority {
     return this.registerHeader(session.header, session)
   }
 
+  /** Cancel one caller's wait without cancelling the provider-owned shared registration. */
+  private async registerForOperation(session: Session, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    const registration = this.register(session)
+    if (signal === undefined) return registration
+    const aborted = Promise.withResolvers<never>()
+    const listener = addAbortListener(signal, () => {
+      const reason: unknown = signal.reason
+      aborted.reject(reason)
+    })
+    try {
+      await Promise.race([registration, aborted.promise])
+      signal.throwIfAborted()
+    } finally { listener[Symbol.dispose]() }
+  }
+
   private registerHeader(header: SessionHeader, live?: Session, ancestors: ReadonlySet<SessionId> = new Set()): Promise<void> {
     if (ancestors.has(header.id)) return Promise.reject(new Error('Gateway execution lineage contains a cycle'))
     const lineage = new Set([...ancestors, header.id])
@@ -440,10 +468,12 @@ export class GatewayExecution extends ExecutionAuthority {
     return task
   }
 
-  private async restoreInheritance(session: Session): Promise<void> {
+  private async restoreInheritance(session: Session, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
     const scope = this.mirror(session).inheritance
     if (scope !== null && this.inherited.get(session) !== scope) {
-      const state = await this.post('/inherit', { sessionId: session.id, ...scope, scoped: true })
+      const state = await this.post('/inherit', { sessionId: session.id, ...scope, scoped: true }, undefined, signal)
+      signal?.throwIfAborted()
       if (this.mirror(session).state.scopeId === undefined) this.record(session, executionState(state))
       this.inherited.set(session, scope)
     }
@@ -453,8 +483,8 @@ export class GatewayExecution extends ExecutionAuthority {
    * Attest a new or edited human message using its live HTTP caller; managed
    * webhook dispatch attests through its purpose-bound Gateway assertion instead.
    * @param session - actual target Session, never a caller-supplied actor.
-   * @param message - admitted content and display attribution.
-   * @returns a frozen message carrying the opaque immutable input reference.
+   * @param message - admitted content; project human-source attribution is replaced by the live caller snapshot.
+   * @returns a frozen message carrying the immutable input reference and project human attribution when applicable.
    */
   async stamp(session: Session, message: UserMessage): Promise<UserMessage> {
     const principal = this.admissionPrincipal()
@@ -468,7 +498,14 @@ export class GatewayExecution extends ExecutionAuthority {
     if (typeof value !== 'object' || value === null || !('inputId' in value) || typeof value.inputId !== 'string') {
       throw new TypeError('invalid Gateway input registration')
     }
-    const stamped = freezeMessage({ ...message, source: { ...message.source, gatewayExecutionInput: value.inputId } })
+    const claims = principal.claims
+    const participant = claims.scope.kind === 'project' && ['user', 'user-question-reply'].includes(message.source.kind)
+      ? { userId: claims.user.id, username: claims.user.username, displayName: claims.user.displayName,
+        role: claims.user.role, scope: { kind: 'project' as const, projectId: claims.scope.projectId,
+          projectName: claims.scope.projectName, mode: claims.scope.mode } }
+      : undefined
+    const stamped = freezeMessage({ ...message, source: { ...message.source, gatewayExecutionInput: value.inputId,
+      ...(participant === undefined ? {} : { participant }) } })
     executionInputOf(stamped)
     return stamped
   }
@@ -642,6 +679,11 @@ export class GatewayExecution extends ExecutionAuthority {
     return executionScope(scope)
   }
 
+  current(): ExecutionInheritance | undefined {
+    const captured = this.execution.getStore()
+    return captured === undefined ? undefined : this.capture(captured.agent)
+  }
+
   /**
    * Read current authority without starting an Agent or restricting it to a fork prefix.
    * @param sessionId - source whose write ACL the fork transport has checked.
@@ -697,7 +739,7 @@ export class GatewayExecution extends ExecutionAuthority {
    * @returns recipient scope retaining this delivery's primary actor.
    */
   async relay(session: Session, scope: ExecutionInheritance, messageId: MessageId, signal?: AbortSignal): Promise<ExecutionInheritance> {
-    await this.register(session)
+    await this.registerForOperation(session, signal)
     const state = scope.parentSessionId === session.id
       ? executionState(await this.post(scope.scopeId === undefined ? '/combine' : '/capture', scope.scopeId === undefined
         ? { sessionId: session.id, scopeIds: [], unverified: true } : { sessionId: session.id, scopeId: scope.scopeId }, undefined, signal))
@@ -725,43 +767,50 @@ export class GatewayExecution extends ExecutionAuthority {
    * @param agent - exact executing Agent, including Host-owned PTC calls.
    * @param signal - cancellation owned by that operation.
    * @param execution - original tool token for checks that precede other execution wrappers.
-   * @returns Gateway-confirmed participants for auditing and single-charge attribution.
+   * @returns Gateway-confirmed participants for auditing and attribution; permission checks do not bill model requests.
    */
   async authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal, execution?: ToolExecution): Promise<ExecutionState> {
     if (!this.available(agent)) throw this.denied(capability, 'Gateway execution authorization is unavailable.')
     const scope = execution === undefined ? this.currentScope(agent) : this.resolvedScope(this.toolScope(execution, agent))
     const generation = this.watchGeneration
     const invalidation = this.invalidationOf(agent, scope)
-    await this.register(agent.session)
-    await this.restoreInheritance(agent.session)
-    if (capability !== 'execute' && (scope.scopeId === undefined ? this.mirror(agent.session).unverified : scope.unverifiedHistory)) {
-      throw this.denied(capability, 'This execution includes input without verified human identity. Use an ordinary permission mode.')
+    const pending: PendingAuthorization = { users: new Set(), invalidated: false }
+    this.pendingAuthorizations.add(pending)
+    try {
+      await this.registerForOperation(agent.session, signal)
+      await this.restoreInheritance(agent.session, signal)
+      if (capability !== 'execute' && (scope.scopeId === undefined ? this.mirror(agent.session).unverified : scope.unverifiedHistory)) {
+        throw this.denied(capability, 'This execution includes input without verified human identity. Use an ordinary permission mode.')
+      }
+      const state = executionState(await this.post('/authorize', {
+        sessionId: agent.id, capability, scopeId: scope.scopeId, unverifiedHistory: scope.unverifiedHistory,
+      }, undefined, signal))
+      if (!this.available(agent) || generation !== this.watchGeneration || invalidation !== this.invalidationOf(agent, scope)
+        || pending.invalidated || state.actors.some(actor => pending.users.has(actor.userId))
+        || signal?.aborted
+        || this.dependencies.ctx.agents.get(agent.id) !== agent
+        || (scope.scopeId === undefined && BigInt(state.revision) < BigInt(this.mirror(agent.session).state.revision))
+        || (scope.scopeId !== undefined
+          && (state.scopeId !== scope.scopeId || this.resolvedScope(scope).scopeId !== scope.scopeId))) {
+        throw this.denied(capability, 'Execution authorization changed while the operation was being checked.')
+      }
+      if (state.scopeId === undefined) this.record(agent.session, state)
+      let required = this.required.get(agent)
+      if (required === undefined) this.required.set(agent, required = new Set())
+      required.add(capability)
+      let scopes = this.scopeRequirements.get(agent)
+      if (scopes === undefined) this.scopeRequirements.set(agent, scopes = new Map<string, RequiredScope>())
+      const key = scope.scopeId ?? 'legacy'
+      let entry = scopes.get(key)
+      if (entry === undefined) scopes.set(key, entry = { scope, state, capabilities: new Set() })
+      entry.capabilities.add(capability)
+      let grants = this.grants.get(agent)
+      if (grants === undefined) this.grants.set(agent, grants = new Map<ExecutionCapability, string>())
+      grants.set(capability, state.revision)
+      return state
+    } finally {
+      this.pendingAuthorizations.delete(pending)
     }
-    const state = executionState(await this.post('/authorize', {
-      sessionId: agent.id, capability, scopeId: scope.scopeId, unverifiedHistory: scope.unverifiedHistory,
-    }, undefined, signal))
-    if (!this.available(agent) || generation !== this.watchGeneration || invalidation !== this.invalidationOf(agent, scope)
-      || signal?.aborted
-      || this.dependencies.ctx.agents.get(agent.id) !== agent
-      || (scope.scopeId === undefined && BigInt(state.revision) < BigInt(this.mirror(agent.session).state.revision))
-      || (scope.scopeId !== undefined
-        && (state.scopeId !== scope.scopeId || this.resolvedScope(scope).scopeId !== scope.scopeId))) {
-      throw this.denied(capability, 'Execution authorization changed while the operation was being checked.')
-    }
-    if (state.scopeId === undefined) this.record(agent.session, state)
-    let required = this.required.get(agent)
-    if (required === undefined) this.required.set(agent, required = new Set())
-    required.add(capability)
-    let scopes = this.scopeRequirements.get(agent)
-    if (scopes === undefined) this.scopeRequirements.set(agent, scopes = new Map<string, RequiredScope>())
-    const key = scope.scopeId ?? 'legacy'
-    let entry = scopes.get(key)
-    if (entry === undefined) scopes.set(key, entry = { scope, state, capabilities: new Set() })
-    entry.capabilities.add(capability)
-    let grants = this.grants.get(agent)
-    if (grants === undefined) this.grants.set(agent, grants = new Map<ExecutionCapability, string>())
-    grants.set(capability, state.revision)
-    return state
   }
 
   /**
@@ -842,6 +891,10 @@ export class GatewayExecution extends ExecutionAuthority {
   private invalidate(subject?: { userId?: number; projectId?: number }): void {
     const runtime = this.dependencies.ctx.gatewayRuntime.identity
     if (subject?.projectId !== undefined && (runtime.kind !== 'project' || runtime.id !== subject.projectId)) return
+    for (const pending of this.pendingAuthorizations) {
+      if (subject?.userId === undefined) pending.invalidated = true
+      else pending.users.add(subject.userId)
+    }
     const terminals = this.userTerminals.invalidate(subject).then(async () => {
       await this.dependencies.ctx.get('terminalController')?.drainRevoked()
     })
@@ -942,7 +995,7 @@ export class GatewayExecution extends ExecutionAuthority {
       try {
         const response = await this.dependencies.ctx.gatewayRuntime.request('/internal/runtime/execution/watch', { signal })
         if (!response.ok || response.body === null) {
-          await response.body?.cancel()
+          discardGatewayRead(response.body)
           throw new Error('Gateway execution updates unavailable')
         }
         const reader = response.body.getReader()
@@ -972,7 +1025,7 @@ export class GatewayExecution extends ExecutionAuthority {
             if (pending.length > MAX_UPDATE_CHARS) throw new Error('Gateway execution update exceeds its limit')
           }
         } finally {
-          await reader.cancel().catch(() => { /* the aborted transport may already have errored */ })
+          discardGatewayRead(reader)
           reader.releaseLock()
         }
       } catch {

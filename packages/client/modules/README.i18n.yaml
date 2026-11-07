@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/modules/README.md
 document:
-  en: 54c55358245631416e3ef6a17ef74e8b5f01ce6b
-  zh: 3ea8331e6f95b093f3f6121d3f037f658b2bb69d
+  en: 6a016250758beeeecdaf79f5d52e98e2fa008895
+  zh: 385f397d23b53286ef990b82e84ef1adc7398f58
 /:
   en: 97d39db1617684ea
   zh: de11ba354583a044
@@ -24,20 +24,20 @@ document:
   en: d4a7f865f4593724
   zh: 4313eb8fe9cd5c98
 /deepseek-ai-dsh-client-modules/use-this-package/what-the-browser-loads:
-  en: a89a648d052a8c24
-  zh: 7a74d21bdc3646a6
+  en: 28b60cba52c199a8
+  zh: 1112945d50f078b5
 /deepseek-ai-dsh-client-modules/use-this-package/live-plugin-composition:
   en: 8daffc3080c64df6
   zh: d5168fd9cd2909ae
 /deepseek-ai-dsh-client-modules/use-this-package/host-release-changes:
-  en: ebd9a30ad42a6758
-  zh: ae82070296f49a32
+  en: f6dd70362766d914
+  zh: a81713d6f087065a
 /deepseek-ai-dsh-client-modules/use-this-package/sharing-modules:
   en: 0aaf0693db8bb203
   zh: 9f4738cdc6b55c26
 /deepseek-ai-dsh-client-modules/use-this-package/build-requirements:
-  en: b6a4d3b901c89efe
-  zh: 615b5f3eec41f281
+  en: c12785c6c80f8bba
+  zh: 5ef721868e6f72a4
 /deepseek-ai-dsh-client-modules/understand-the-implementation:
   en: 7ab11d2c2bdc6eaa
   zh: 54c3c9091cf59711
@@ -45,11 +45,11 @@ document:
   en: 49dcadc166c2d06e
   zh: bbf67c6dc47f4ead
 /deepseek-ai-dsh-client-modules/understand-the-implementation/lazy-cjs-model:
-  en: 6d16b74acb333e3b
-  zh: fcb3a20cc8c39e4a
+  en: 7e8c63fb4fd0f4ec
+  zh: 3a9fcb8695e4df89
 /deepseek-ai-dsh-client-modules/understand-the-implementation/incremental-composition:
-  en: 20f1d66449924c84
-  zh: 4786a97eb9c06370
+  en: e5d4c74d8cff1f60
+  zh: d24533816a0ce5f8
 /deepseek-ai-dsh-client-modules/understand-the-implementation/boot-manifest-injection:
   en: 253d9f265cd83ed0
   zh: 9d0f8df84d9d3ac9
@@ -69,8 +69,8 @@ document:
   en: ca75c51c89c2c9b0
   zh: 2026c1566df4f78c
 /deepseek-ai-dsh-client-modules/known-limitations-and-deferred-work:
-  en: bbeb76146cd93994
-  zh: 4c56b71c0a5517ad
+  en: 1e1463cfb144be3c
+  zh: 6b1e19ca6c57112e
 /deepseek-ai-dsh-client-modules/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

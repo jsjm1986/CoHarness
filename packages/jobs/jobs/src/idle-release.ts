@@ -7,19 +7,29 @@
  * @module @deepseek-ai/dsh-jobs
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import { FiberState, type Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { runningJobs } from './archive-admission.ts'
 import type { JobRegistry } from './index.ts'
 
 /**
  * Answer `agent/idle-release-check` with `busy` while the asked Agent owns a
- * running or stopping job. The listener lives as long as `ctx`'s fiber — the
- * registry's own.
+ * running or stopping job. Root-owned listeners remain available while the
+ * provider unloads and are removed after its cleanup finishes.
  * @param ctx - the registry's registration context.
  * @param registry - the registry whose `list` answers.
  */
 export function installJobIdleVeto(ctx: Context, registry: JobRegistry): void {
-  ctx.on('agent/idle-release-check', ({ agent }: { agent: Agent }) =>
+  const fiber = ctx.fiber
+  const releaseRuntime = ctx.root.on('runtime/idle-release-check', () =>
+    fiber.state !== FiberState.ACTIVE || registry.list().some(job => job.status === 'running' || job.status === 'stopping')
+      ? 'busy' : undefined, { global: true })
+  const releaseAgent = ctx.root.on('agent/idle-release-check', ({ agent }: { agent: Agent }) =>
     runningJobs(registry, agent.id).length > 0 ? 'busy' : undefined, { global: true })
+  const releaseStatus = ctx.root.on('internal/status', (changed, previous) => {
+    if (changed !== fiber || previous !== FiberState.UNLOADING) return
+    releaseAgent()
+    releaseRuntime()
+    releaseStatus()
+  }, { global: true })
 }

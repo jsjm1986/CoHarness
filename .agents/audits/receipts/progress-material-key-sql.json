@@ -1,0 +1,14 @@
+{
+  "name": "progress-material-key-sql",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/check-material-sql.mjs",
+  "startedAt": "2026-10-23T21:59:17.938396+00:00",
+  "seconds": 0.467,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6f4d30f2c092b8da9e3967b9e33095106a0290bf4c3476c56c730c2699ce4ea0",
+  "inputsAfter": "6f4d30f2c092b8da9e3967b9e33095106a0290bf4c3476c56c730c2699ce4ea0",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "cb794a75eadca04a672b43e446dad8db56ac07ae9da0e6d697636baf0104d898",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45\n    Error.captureStackTrace(err)\n          ^\n\nerror: generation expression is not immutable\n    at /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/check-material-sql.mjs:4:2 {\n  length: 93,\n  severity: 'ERROR',\n  code: '42P17',\n  detail: undefined,\n  hint: undefined,\n  position: undefined,\n  internalPosition: undefined,\n  internalQuery: undefined,\n  where: undefined,\n  schema: undefined,\n  table: undefined,\n  column: undefined,\n  dataType: undefined,\n  constraint: undefined,\n  file: 'heap.c',\n  line: '2829',\n  routine: 'cookDefault'\n}\n\nNode.js v25.8.1\n"
+}

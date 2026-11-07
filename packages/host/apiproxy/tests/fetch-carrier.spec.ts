@@ -171,6 +171,9 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async cancel(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { accepted: true as const } } }
       },
+      async activate(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { accepted: true as const } } }
+      },
     },
     subagents: {
       async history(request) {
@@ -346,6 +349,110 @@ async function collect<F>(stream: AsyncIterable<RpcRequest<F>>): Promise<RpcRequ
   for await (const envelope of stream) out.push(envelope)
   return out
 }
+
+describe('optional unary server timing', () => {
+  it('reports only elapsed time while preserving the response body and default headers', async () => {
+    const request = (): Request => new Request('http://x/api/session.list', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: 'timed-list', method: 'session.list', payload: {} }),
+    })
+    const ordinary = await toFetchHandler(fakeApi()).fetch(request())
+    const timed = await toFetchHandler(fakeApi(), { serverTiming: true }).fetch(request())
+    expect(ordinary.headers.get('server-timing')).toBeNull()
+    expect(timed.headers.get('server-timing')).toMatch(/^dsh_rpc;dur=\d+\.\d{2}$/)
+    expect(timed.status).toBe(ordinary.status)
+    expect(await timed.text()).toBe(await ordinary.text())
+  })
+
+  it('measures the awaited unary operation without including response consumption', async () => {
+    let now = 100
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+    try {
+      const api = fakeApi()
+      const list = api.sessions.list.bind(api.sessions)
+      api.sessions.list = async (request) => { now = 350; return list(request) }
+      const handler = toFetchHandler(api, { serverTiming: true })
+      const response = await handler.fetch(new Request('http://x/api/session.list', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: 'timed-list', method: 'session.list', payload: {} }),
+      }))
+      now = 900
+      await response.text()
+      expect(response.headers.get('server-timing')).toBe('dsh_rpc;dur=250.00')
+    } finally { clock.mockRestore() }
+  })
+
+  it('keeps overlapping unary clocks independent', async () => {
+    let now = 100
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+    let enteredFirst!: () => void
+    let enteredSecond!: () => void
+    let releaseFirst!: () => void
+    let releaseSecond!: () => void
+    const firstEntered = new Promise<void>((resolve) => { enteredFirst = resolve })
+    const secondEntered = new Promise<void>((resolve) => { enteredSecond = resolve })
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const secondGate = new Promise<void>((resolve) => { releaseSecond = resolve })
+    const pending: Array<Promise<Response>> = []
+    try {
+      const api = fakeApi()
+      const list = api.sessions.list.bind(api.sessions)
+      api.sessions.list = async (request) => {
+        if (request.rpcId === RpcId('first')) { enteredFirst(); await firstGate }
+        else { enteredSecond(); await secondGate }
+        return list(request)
+      }
+      const handler = toFetchHandler(api, { serverTiming: true })
+      const request = (rpcId: string): Request => new Request('http://x/api/session.list', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId, method: 'session.list', payload: {} }),
+      })
+      pending.push(handler.fetch(request('first')))
+      await firstEntered
+      now = 200
+      pending.push(handler.fetch(request('second')))
+      await secondEntered
+      now = 250
+      releaseSecond()
+      const second = await pending[1]!
+      now = 500
+      releaseFirst()
+      const first = await pending[0]!
+      expect(second.headers.get('server-timing')).toBe('dsh_rpc;dur=50.00')
+      expect(first.headers.get('server-timing')).toBe('dsh_rpc;dur=400.00')
+    } finally {
+      releaseFirst()
+      releaseSecond()
+      await Promise.allSettled(pending)
+      clock.mockRestore()
+    }
+  })
+
+  it('keeps crash status and text while reporting unary processing time', async () => {
+    const response = await toFetchHandler(fakeApi({ crashOn: 'session.list' }), { serverTiming: true }).fetch(
+      new Request('http://x/api/session.list', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: 'crash', method: 'session.list', payload: {} }),
+      }),
+    )
+    expect(response.status).toBe(500)
+    expect(await response.text()).toBe('handler failure: Error: impl crashed')
+    expect(response.headers.get('server-timing')).toMatch(/^dsh_rpc;dur=\d+\.\d{2}$/)
+  })
+
+  it('does not label streams or rejected carrier input as unary execution', async () => {
+    const handler = toFetchHandler(fakeApi(), { serverTiming: true })
+    const invalid = await handler.fetch(new Request('http://x/api/session.list', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: 'not-json',
+    }))
+    expect(invalid.status).toBe(400)
+    expect(invalid.headers.get('server-timing')).toBeNull()
+    const stream = await handler.fetch(new Request('http://x/api/events.mux'))
+    try {
+      expect(stream.headers.get('server-timing')).toBeNull()
+    } finally { await stream.body?.cancel() }
+  })
+})
 
 describe('unary round trip (handler ⇄ client, no network)', () => {
   it('carries a success result and echoes the minted rpcId', async () => {

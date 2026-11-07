@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-03-inspector-fetch-retirement.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-03-inspector-fetch-retirement.md
+document:
+  en: 8dd604808c88f5efef07604a993afce807bfd40a
+  zh: 6848f4d419ee73ecefce9824d9163c3ae6fdbf52
+/agent-note-inspector-fetch-capture-follows-its-owning-lifetime:
+  en: d2fdded8b188966a
+  zh: bb8d019f154bde14
+/agent-note-inspector-fetch-capture-follows-its-owning-lifetime/problem:
+  en: 13a3d05a37515501
+  zh: 65ea042d87b68aed
+/agent-note-inspector-fetch-capture-follows-its-owning-lifetime/decision:
+  en: 4406196e48bcf06f
+  zh: d6d891d091bc26b0
+/agent-note-inspector-fetch-capture-follows-its-owning-lifetime/alternatives-considered:
+  en: 746473c840e43ea0
+  zh: 5ba4c391e0bc6a57
+/agent-note-inspector-fetch-capture-follows-its-owning-lifetime/consequences:
+  en: ec21b47c67782439
+  zh: 0c5fc747ed56669a
+/agent-note-inspector-fetch-capture-follows-its-owning-lifetime/verification:
+  en: e6e8fdef0bede2ba
+  zh: cb6b16b86ec9e3ea

@@ -442,34 +442,44 @@ export function apply(ctx: Context, config: Config): void {
       const maxRounds = resolveMaxRounds(args.maxRounds, resolved.maxRounds)
       void requireFreshProvider(ctx, resolved.subagentProvider)
 
-      const run: WorkflowRun = ctx.workflowEngine.start({
-        script: RALPH_SCRIPT,
-        meta: RALPH_META,
-        args: { objective, maxRounds, maxHandoffChars: resolved.maxHandoffChars },
-        subagentProvider: resolved.subagentProvider,
-        maxTotalAgents: maxRounds,
-        parent,
-        signal: exec.signal,
-      })
-      const onAbort = (): void => { run.cancel('parent step aborted') }
-      exec.signal.addEventListener('abort', onAbort, { once: true })
-      if (exec.signal.aborted) run.cancel('parent step aborted')
+      const engine = ctx.workflowEngine
+      return engine.withForeground(parent, exec.signal, async (signal) => {
+        const run: WorkflowRun = engine.start({
+          script: RALPH_SCRIPT,
+          meta: RALPH_META,
+          args: { objective, maxRounds, maxHandoffChars: resolved.maxHandoffChars },
+          subagentProvider: resolved.subagentProvider,
+          maxTotalAgents: maxRounds,
+          parent,
+          signal: signal,
+        })
+        const onAbort = (): void => { run.cancel('parent step aborted') }
+        signal.addEventListener('abort', onAbort, { once: true })
+        if (signal.aborted) run.cancel('parent step aborted')
 
-      try {
-        const settled = await run.result
-        const error = stopReasonError(settled)
-        if (error !== undefined) throw new Error(error)
-        const value = readRunResult(settled.value, maxRounds, resolved.maxHandoffChars)
-        if (value.status === 'round-failed') throw new Error(renderRoundFailure(value, resolved.maxResultChars))
-        return {
-          runId: run.id,
-          agentsStarted: settled.agentsStarted,
-          result: value as unknown as JsonValue,
+        try {
+          const settled = await run.result
+          const error = stopReasonError(settled)
+          if (error !== undefined) throw new Error(error)
+          const value = readRunResult(settled.value, maxRounds, resolved.maxHandoffChars)
+          if (value.status === 'round-failed') throw new Error(renderRoundFailure(value, resolved.maxResultChars))
+          return {
+            runId: run.id,
+            agentsStarted: settled.agentsStarted,
+            result: value as unknown as JsonValue,
+          }
+        } finally {
+          signal.removeEventListener('abort', onAbort)
+          try {
+            await run.dispose()
+          } catch (error: unknown) {
+            void run.retainFailedCleanup().catch((failure: unknown) => {
+              ctx.logger.warn('ralph: retained workflow cleanup failed', failure)
+            })
+            throw error
+          }
         }
-      } finally {
-        exec.signal.removeEventListener('abort', onAbort)
-        await run.dispose()
-      }
+      })
     },
     presentCall,
     presentResult,

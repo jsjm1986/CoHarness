@@ -8,7 +8,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Collaboration, CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
+import { isCollaborationRequired, type Collaboration, type CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import {
@@ -29,6 +29,8 @@ interface Caller {
   readonly id: SessionIdValue
   readonly agent: Agent
   readonly header: SessionHeader
+  /** Whether this operation started with a participant ACL provider. */
+  readonly requiresParticipantAcl: boolean
   /** The caller's own-session boundary fold (the `turnBoundary` projection). */
   readonly boundary: TurnBoundaryProjection | undefined
 }
@@ -71,6 +73,7 @@ function callerOf(exec: ToolRunContext, ctx: Context): Caller {
     id: agent.session.id,
     agent,
     header: agent.session.header,
+    requiresParticipantAcl: isCollaborationRequired(ctx),
     boundary: ctx.sessionProjections.stateOf(agent.session, 'turnBoundary'),
   }
 }
@@ -113,8 +116,26 @@ async function readableSessions(
   signal: AbortSignal,
 ): Promise<ReadonlySet<SessionIdValue> | undefined> {
   const collaboration = ctx.get('collaboration')
-  if (collaboration === undefined) return undefined
+  if (collaboration === undefined) {
+    if (isCollaborationRequired(ctx)) throw serviceBoundary.unauthorizedTarget()
+    return undefined
+  }
   return captureReadableSet(ctx, collaboration, ids, signal)
+}
+
+/** Recheck every cross-session id disclosed by a result after its asynchronous reads. */
+async function assertReadableSessions(
+  ctx: Context,
+  caller: Caller,
+  ids: readonly SessionIdValue[],
+  signal: AbortSignal,
+): Promise<void> {
+  const other = [...new Set(ids)].filter(id => id !== caller.id)
+  if (other.length === 0) return
+  const readable = await readableSessions(ctx, other, signal)
+  if (readable === undefined ? caller.requiresParticipantAcl : other.some(id => !readable.has(id))) {
+    throw serviceBoundary.unauthorizedTarget()
+  }
 }
 
 /**
@@ -151,9 +172,9 @@ async function authorizeTarget(
  * Every authorized session id in the caller workspace, or `undefined` when no
  * collaboration service is composed. The caller stays authorized even when the
  * bound principal is absent, matching {@link authorizeSessionIds}. Search
- * resolves this once per call — one corpus enumeration plus one batched
- * readability request — so streamed hits, hit parents, and title revalidation
- * share a single authorization decision.
+ * resolves this once before reading provider pages. Streamed hits, hit parents,
+ * and title observations share this admission set; final result publication
+ * separately rechecks the disclosed ids against current readability.
  */
 async function authorizedWorkspaceIds(
   ctx: Context,
@@ -162,7 +183,10 @@ async function authorizedWorkspaceIds(
   signal: AbortSignal,
 ): Promise<ReadonlySet<SessionIdValue> | undefined> {
   const collaboration = ctx.get('collaboration')
-  if (collaboration === undefined) return undefined
+  if (collaboration === undefined) {
+    if (isCollaborationRequired(ctx)) throw serviceBoundary.unauthorizedTarget()
+    return undefined
+  }
   const authorized = new Set<SessionIdValue>([caller.id])
   const records = await serviceBoundary.call(ctx, signal, 'workspace authorization', () =>
     ctx.sessionQuery.filterSessions([{ kind: 'cwd', values: [cwd] }], signal))
@@ -366,6 +390,7 @@ export const workspaceAccess = {
   authorizeTarget,
   authorizedWorkspaceIds,
   readableSessions,
+  assertReadableSessions,
   recordAuthorized,
   assertObservedTargetAuthorized,
   authorizeSessionIds,

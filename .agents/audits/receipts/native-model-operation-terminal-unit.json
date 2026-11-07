@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-terminal-unit",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm/tests/operations.spec.ts packages/llm/llm-pi-ai/tests/native-stream.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T02:11:06.311443+00:00",
+  "seconds": 3.412,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "29f1ce8594e7ffd55a7e1235cbc9b6fd0a622851aa0e56e12200eb7a7b5fc6ef",
+  "inputsAfter": "29f1ce8594e7ffd55a7e1235cbc9b6fd0a622851aa0e56e12200eb7a7b5fc6ef",
+  "postgresToolDirectory": null,
+  "outputSha256": "3cbb107146a17e323641fcd44c24f5044d5bdbe705fac9dcce2d3d5f5360172f",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  23 passed (23)\n   Start at  10:11:08\n   Duration  886ms (transform 417ms, setup 47ms, import 558ms, tests 100ms, environment 0ms)\n\n"
+}

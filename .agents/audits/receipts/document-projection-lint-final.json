@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-lint-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local",
+  "startedAt": "2026-10-25T22:29:39.990564+00:00",
+  "seconds": 13.654,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a8473ddd6fe77d7cc2e060cae41e29fb93815cad514ad96a86bcc4f4aebb64fa",
+  "inputsAfter": "a8473ddd6fe77d7cc2e060cae41e29fb93815cad514ad96a86bcc4f4aebb64fa",
+  "postgresToolDirectory": null,
+  "outputSha256": "6228b00591299140e0486f8884ddfa20a0a66cb7acc84c6b9340ae5f7f3e0360",
+  "outputTail": "packages/attachment/userdoc-local/tests/identity-fs.spec.ts:81:7: error eslint(prefer-const): `restored` is never reassigned. help: Use `const` instead.\n"
+}

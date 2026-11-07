@@ -70,7 +70,7 @@ kind: "package-reference"
 
 ### 生命周期与取消
 
-调用方 agent 是每个全新子 agent 的父级，因此会保留 cwd 与谱系，但不会复制其对话。`exec.signal` 进入工作流引擎，同时也桥接到 `run.cancel()`，以便不依赖具体实现。工具等待 `run.result` 并在 `finally` 中调用 `run.dispose()`，因此被取消的父级步骤会等到进程与子 agent 清理完成后才返回。PTC 引擎不设整体工作流经过时间截止；调用方取消仍然生效。
+调用方 agent 是每个全新子 agent 的父级，因此会保留 cwd 与谱系，但不会复制其对话。调用在启动前进入原引擎的 `withForeground()`。合并信号传入运行，并桥接到 `run.cancel()`；引擎与 PTC subagent 运行时撤下会等待结果收集、资源释放与失败移交。工具等待 `run.result` 并在 `finally` 中调用 `run.dispose()`。释放成功表示进程与子 agent 清理已经确认。尝试被拒绝时返回错误，并把失败的子 agent 清理移交给原运行时；后续确切父级的子 agent 准入会重试清理，不会重放 Ralph Round。PTC 引擎不设整体工作流经过时间截止；调用方取消仍然生效。
 
 ### 渲染意图
 

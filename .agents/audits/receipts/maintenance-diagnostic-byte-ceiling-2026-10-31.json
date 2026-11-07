@@ -1,0 +1,230 @@
+{
+  "finding": "B363",
+  "status": "fixed_named_maintenance_stderr_byte_scope",
+  "updatedAt": "2026-10-30T18:42:57.774955+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z",
+  "sourcePaths": [
+    "gateway/src/deployment-commands.ts",
+    "gateway/tests/deployment-command-diagnostics.spec.ts",
+    "gateway/tests/fixtures/deployment-command-diagnostics.mjs",
+    "gateway/tests/expected/deployment-command-diagnostics.jsonl",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-maintenance-diagnostic-byte-ceiling.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-maintenance-diagnostic-byte-ceiling.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-maintenance-diagnostic-byte-ceiling.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "gateway/src/deployment-commands.ts": "17e34666b29365f34736f57c826c32ac1c6ff1a193a03debae3aa5efce99c834",
+    "gateway/tests/deployment-command-diagnostics.spec.ts": "85cb83859e2c060b0f729a3ecf453fb97a150143fffa4157186b13b7b971602d",
+    "gateway/tests/fixtures/deployment-command-diagnostics.mjs": "71a2b9d6a83a36e045e1b30f242c44f62ea6fa20e840f4c8f149a35cf4bf4292",
+    "gateway/tests/expected/deployment-command-diagnostics.jsonl": "92a5a5a8d220fd5f1b579dcbf979d135d7b41d2c93dae361250b46d78c25166f",
+    "gateway/README.md": "eb6e0a824e97408bbc176d835f5f69b556bcc520ec7815ebd318961c9896602d",
+    "gateway/README.zh.md": "62ac1bd34181ff5c1ffb5606ad60a1b09510f12856215bdf475617b4c7519352",
+    "gateway/README.i18n.yaml": "dcb71c88a223ab261c4f28af743b696cae2a99a69df2892f88a1aa8faf04a18b",
+    ".agents/notes/implemented/bug-fix/2026-10-31-maintenance-diagnostic-byte-ceiling.md": "7b0d882a94b8defd232a6b12185bc4dd58067fe9b06c8424cb6fabccd89d2060",
+    ".agents/notes/implemented/bug-fix/2026-10-31-maintenance-diagnostic-byte-ceiling.zh.md": "d642b79b6e430f59f01ec3c7f8b8166eff97ed09abac75506281b7e3cf726875",
+    ".agents/notes/implemented/bug-fix/2026-10-31-maintenance-diagnostic-byte-ceiling.i18n.yaml": "a60e8011fbf7933b7f43545bf5a0a78e7f252b05003bc7a9fbed520a69ee5b54",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.md": "084ad3a8912fb9234004da37118db41facdb58ff1c41d376fe8c691d095c91e2",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.zh.md": "ad64a8220dd2e6839fd7af33120e51681856515ae8828ab557c832848bcee456",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.i18n.yaml": "98ad9c134b52d4d65adac7ca9ba147148eed0f42e38057b4b504e080cae549e1"
+  },
+  "privateCompiledArtifact": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/deployment-diagnostic-gateway-artifact/lib/deployment-commands.js",
+  "compiledHash": "dae63898396fc4105b31102099136147d10b1f66bd293090fabc73b2f63ce9e6",
+  "repair": "Retained UTF-8 stderr is clipped per arriving chunk to the existing8192-byte buffer ceiling. StringDecoder emits only complete code points at the clipped edge; the existing error-line selection and command/exit context remain separate. Exact-limit input is preserved.",
+  "causalEvidence": {
+    "status": "failed",
+    "startedAt": "2026-10-30T18:32:16.815480+00:00",
+    "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+    "command": [
+      "node",
+      "../node_modules/vitest/vitest.mjs",
+      "run",
+      "tests/deployment-command-diagnostics.spec.ts",
+      "--maxWorkers=2"
+    ],
+    "exitCode": 1,
+    "finishedAt": "2026-10-30T18:32:17.430820+00:00"
+  },
+  "negativeWitnessBytes": {
+    "cjk": 30007,
+    "emoji": 40007,
+    "ceiling": 8192
+  },
+  "verification": {
+    "sourceAndAdjacentCases": 11,
+    "sourceFiles": 4,
+    "commandAndEnvironmentCases": 7,
+    "realPostgresRestoreCases": 4,
+    "keylessRunnablePrograms": 1,
+    "goldenStages": 4,
+    "cases": [
+      "oversized-single-ASCII-write",
+      "CJK-at-byte-cut",
+      "emoji-at-byte-cut",
+      "exact-limit-CJK-control"
+    ],
+    "currentRetainedBytes": [
+      8192,
+      8191,
+      8191,
+      8192
+    ],
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "repeatedExecutionsAreNotNewCases": true,
+    "docQuickGates": 20,
+    "checks": {
+      "deployment-diagnostic-source": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:32:44.129150+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-command-diagnostics.spec.ts",
+          "tests/deployment-command-environment.spec.ts",
+          "tests/deployment-commands.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:32:45.094073+00:00"
+      },
+      "deployment-diagnostic-artifact-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:32:45.132311+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/deployment-diagnostic-gateway-artifact/lib",
+          "--incremental",
+          "false"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:32:47.452862+00:00"
+      },
+      "deployment-diagnostic-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:34:46.109004+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "HGW_TEST_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/deployment-diagnostic-gateway-artifact/lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-command-diagnostics.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:34:47.022539+00:00"
+      },
+      "deployment-diagnostic-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:36:16.096649+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "HGW_TEST_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/deployment-diagnostic-gateway-artifact/lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-command-diagnostics.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:36:16.754793+00:00"
+      },
+      "deployment-diagnostic-real-restore": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:34:46.101979+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "HGW_TEST_PG_DUMP_COMMAND=[\"/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_dump\"]",
+          "HGW_TEST_PG_RESTORE_COMMAND=[\"/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_restore\"]",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-restore.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:34:57.408142+00:00"
+      },
+      "deployment-diagnostic-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:34:46.106495+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.ci.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:34:49.080159+00:00"
+      },
+      "deployment-diagnostic-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:34:46.101887+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/deployment-commands.ts",
+          "gateway/tests/deployment-command-diagnostics.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:34:47.285750+00:00"
+      },
+      "deployment-diagnostic-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:36:16.791396+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:36:45.009464+00:00"
+      }
+    }
+  },
+  "coverageScope": "Named real-child UTF-8 diagnostic and real database restore behavior is verified; no whole-module or Gateway100percent coverage claim. Limits were not raised or exempted.",
+  "documentation": {
+    "pairedStems": 3,
+    "existingUnreleasedPostgresGuideUpdated": true,
+    "newActiveDecision": ".agents/notes/implemented/bug-fix/2026-10-31-maintenance-diagnostic-byte-ceiling.md",
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false
+  },
+  "limits": [
+    "The ceiling bounds retained stderr, not the separate command filename and exit-status context.",
+    "Native diagnostic producers are real Node children standing in for failing PostgreSQL tools. Separate4cases use actual PostgreSQL restoration.",
+    "The private artifact was not deployed; peer project preparation/client timing ownership is unchanged. Database argument privacy remains a separate candidate under compatibility review.",
+    "Real paid model success and public push remain human-deferred. All12original domains and B04/B25stay in progress."
+  ]
+}

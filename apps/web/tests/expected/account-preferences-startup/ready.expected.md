@@ -1,0 +1,83 @@
+- dialog "Settings":
+  - navigation:
+    - text: Settings
+    - button "General":
+      - img
+      - text: General
+    - button "Models":
+      - img
+      - text: Models
+    - button "Built-in plugins":
+      - img
+      - text: Built-in plugins
+    - button "Agent presets":
+      - img
+      - text: Agent presets
+    - button "Archived sessions":
+      - img
+      - text: Archived sessions
+  - button "Open configuration file"
+  - button "Close":
+    - img
+    - text: Close
+  - text: Agent preset Applies to sessions you start from now on. Running sessions keep the preset they began with.
+  - button "Standard mode":
+    - text: Standard mode
+    - img
+  - text: Permission Choose the default permission mode for new sessions
+  - button "Workspace Write":
+    - text: Workspace Write
+    - img
+  - text: Language
+  - button "English":
+    - text: English
+    - img
+  - text: Appearance
+  - button "Light":
+    - img
+    - text: Light
+  - button "Dark" [pressed]:
+    - img
+    - text: Dark
+  - button "System":
+    - img
+    - text: System
+  - group "More font settings":
+    - text: Font size Only affects conversation content 14
+    - button "Decrease font size":
+      - img
+    - button "Increase font size":
+      - img
+    - text: px
+    - button "More font settings":
+      - img
+  - text: Work details Choose how much detail to show for tool calls
+  - button "Detailed":
+    - text: Detailed
+    - img
+  - text: When to Collapse Work Details Choose when to automatically collapse work details
+  - button "On completion":
+    - text: On completion
+    - img
+  - text: Show coding view Shows trajectory and this turn’s code diff, and enables switching among the full Agent presets
+  - switch "Show coding view" [checked]
+  - text: Open links in Choose where http(s) links in conversations open
+  - button "Built-in browser":
+    - text: Built-in browser
+    - img
+  - text: Keyboard shortcuts
+  - paragraph: View and edit available shortcuts and input actions
+  - button "Edit shortcuts"
+  - text: Send behavior while busy What Enter and the Send button do while the agent is running; Cmd/Ctrl+Enter uses the other behavior
+  - button "Queue":
+    - text: Queue
+    - img
+  - text: Conversation display Adjust the transcript content width Content width
+  - slider "Content width": "748"
+  - status: 748px
+  - checkbox "Fill"
+  - text: Fill Performance & usage Choose how much performance and usage detail to show
+  - button "Detailed":
+    - text: Detailed
+    - img
+  - text: "Current version: {{version}}"

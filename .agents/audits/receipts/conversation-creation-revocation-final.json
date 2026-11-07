@@ -1,0 +1,14 @@
+{
+  "name": "conversation-creation-revocation-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts tests/postgres.spec.ts tests/admin-business-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-24T00:32:46.926354+00:00",
+  "seconds": 15.745,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "64e7145468f1e8eea14aa41f645b6dc2edb35da859ead343e94d0439392e068d",
+  "inputsAfter": "64e7145468f1e8eea14aa41f645b6dc2edb35da859ead343e94d0439392e068d",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "d6023ad9d8d03e71c0587e278584b0740f81004d6e8b02eff5686e94d8acd355",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  100 passed (100)\n   Start at  08:32:48\n   Duration  14.59s (transform 1.49s, setup 0ms, import 2.25s, tests 12.07s, environment 0ms)\n\n"
+}

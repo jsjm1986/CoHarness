@@ -1,5 +1,29 @@
-import { parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
+import { addressRuntimeUrl, parseClientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore, readApiResponseJson } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
+import { readSpaceNavigationPreferences, recordSpaceVisit, savedSpaceRuntimeIds, toggleSpaceFavorite } from './space-navigation-preferences.ts'
+
+/** Authorized computer identity retained by project creation. */
+export type CollaborationComputerId = NonNullable<SessionRuntimeTarget['nodeId']>
+/** One metadata-only computer choice; discovery starts no Runtime. */
+export interface CollaborationComputer { nodeId: CollaborationComputerId; name: string; status: string }
+
+/** One complete work destination from the authenticated, bounded Gateway directory. */
+export interface CollaborationEnvironment {
+  target: SessionRuntimeTarget
+  name: string
+  nodeName: string
+  observedState: string
+  nodeStatus?: 'active' | 'draining' | 'offline'
+  provisioning?: 'preparing' | 'ready'
+  routing?: 'local' | 'unavailable'
+}
+
+/** A page of authorized environments; browsing starts no Runtime. */
+export interface CollaborationEnvironmentPage {
+  items: CollaborationEnvironment[]
+  nextCursor: string | null
+}
 import type {
   ProjectModelSettingsTransport,
   ProjectModelSettingsView,
@@ -17,6 +41,9 @@ export interface ProjectMembership {
   name: string
   path: string
   mode: 'ro' | 'rw'
+  /** Fixed project computer, retained even before its first conversation exists. */
+  nodeId?: CollaborationComputerId
+  nodeName?: string
   /** Whether the account may invite members or rename this project. */
   canManage?: boolean
   /** Whether this is a server-admin or user-created project. */
@@ -74,8 +101,8 @@ export type CollaborationScope =
 
 /** Target scope shown while the Gateway prepares the next runtime. */
 export type CollaborationScopeTarget =
-  | { kind: 'personal' }
-  | { kind: 'project'; projectId: number; projectName: string }
+  ({ kind: 'personal' } | { kind: 'project'; projectId: number; projectName: string })
+  & { nodeName?: string }
 
 /** Gateway account context used by the scope selector and create policy. */
 export interface CollaborationContext {
@@ -86,6 +113,8 @@ export interface CollaborationContext {
   fullAccess?: boolean
   /** Whether this account may use automatic approval review. */
   autoReviewEligible?: boolean
+  /** Exact environment verified by this page's authenticated Gateway request. */
+  environment?: { id: NonNullable<SessionRuntimeTarget['runtimeId']>; nodeId: NonNullable<SessionRuntimeTarget['nodeId']>; nodeName?: string }
 }
 
 /** Project configuration facts consumed by the user-facing project panel. */
@@ -172,13 +201,31 @@ export interface CollaborationSnapshot {
   /** Scope currently being prepared; present only during a switch request. */
   scopeTarget?: CollaborationScopeTarget
   scopeError?: string
+  /** Exact attempted destination, retained for an explicit retry in this document. */
+  scopeFailedTarget?: SessionRuntimeTarget
+  /** Prepared target offered in a separate tab while this tab retains transient input. */
+  scopeOffer?: { runtimeId: string; target: CollaborationScopeTarget }
   conversations: Record<string, ConversationDetailState>
+  /** Metadata resolved only for saved shortcut IDs, through current Gateway authorization. */
+  preferredEnvironments?: CollaborationEnvironment[]
+  environments?: CollaborationEnvironmentPage
+  environmentsLoading?: boolean
+  environmentsError?: boolean
+  favoriteRuntimeIds?: string[]
+  recentRuntimeIds?: string[]
+  spacePreferencesError?: boolean
+  /** Cursor of the last appended page. An explicit first-page refresh replaces loaded metadata. */
+  environmentsCursor?: string
 }
 
 /** HTTP operations required by the collaboration state owner. */
 export interface CollaborationTransport {
   loadContext: (signal: AbortSignal) => Promise<CollaborationContext>
-  switchScope: (scope: { kind: 'personal' } | { kind: 'project'; projectId: number }, signal: AbortSignal) => Promise<void>
+  switchScope: (scope: SessionRuntimeTarget, signal: AbortSignal) => Promise<void | string>
+  /** Read one center-owned directory page without connecting to its computers. */
+  loadEnvironments?: (cursor: string | undefined, signal: AbortSignal) => Promise<CollaborationEnvironmentPage>
+  /** Resolve saved identities without enumerating nodes or starting Runtimes. */
+  loadPreferredEnvironments?: (ids: readonly string[], signal: AbortSignal) => Promise<CollaborationEnvironment[]>
   loadConversation: (sessionId: string, signal: AbortSignal) => Promise<ConversationDetail>
   setVisibility: (sessionId: string, visibility: CollaborationVisibility, signal: AbortSignal) => Promise<void>
   /** Load the logical project configuration without exposing host paths. */
@@ -197,15 +244,19 @@ export interface CollaborationTransport {
     signal: AbortSignal,
   ) => Promise<{ publicId: number; name: string; shared: boolean }>
   /** Optional account project-management operations. */
-  createProject?: (name: string, signal: AbortSignal) => Promise<{ projectId: number }>
+  createProject?: (name: string, signal: AbortSignal, nodeId?: CollaborationComputerId) => Promise<{ projectId: number }>
+  /** Read authorized computers without contacting their Runtimes. */
+  listComputers?: (signal: AbortSignal) => Promise<CollaborationComputer[]>
   listInvitations?: (projectId: number | undefined, signal: AbortSignal) => Promise<ProjectInvitation[]>
   inviteMember?: (projectId: number, username: string, mode: 'ro' | 'rw', signal: AbortSignal) => Promise<ProjectInvitation>
   acceptInvitation?: (invitationId: string, signal: AbortSignal) => Promise<void>
   /** List active users for the invitation member picker. */
-  listUsers?: (signal: AbortSignal) => Promise<UserSummary[]>
+  listUsers?: (signal: AbortSignal, projectId?: number) => Promise<UserSummary[]>
   /** Count pending invitations where the current user is the invitee. */
   getInvitationCount?: (signal: AbortSignal) => Promise<{ pending: number }>
-  reload: () => void
+  reload: (destination?: string) => void
+  /** False retains transient input in this tab and offers the prepared environment in a new tab. */
+  canNavigate?: () => boolean
 }
 
 /** HTTP error retaining the Gateway's machine-readable collaboration code. */
@@ -217,6 +268,23 @@ export class CollaborationRequestError extends Error {
   constructor(readonly status: number, readonly code?: string) {
     super(code ?? `collaboration request failed with status ${status}`)
     this.name = 'CollaborationRequestError'
+  }
+}
+
+function scopeFailure(cause: unknown): string {
+  if (!(cause instanceof CollaborationRequestError)) return 'switch-failed'
+  if (cause.status === 401) return 'auth'
+  if (cause.status === 403) return 'forbidden'
+  if (cause.status === 404) return 'retired'
+  switch (cause.code) {
+    case 'runtime-management/quota-exceeded': return 'quota'
+    case 'runtime-management/provisioning-pending': return 'preparing'
+    case 'node-service/busy': return 'busy'
+    case 'node-service/unavailable':
+    case 'node-service/closed':
+    case 'runtime-catalog/remote-unavailable': return 'offline'
+    case 'node-service/timeout': return 'timeout'
+    default: return 'switch-failed'
   }
 }
 
@@ -277,11 +345,14 @@ function visibility(value: unknown): CollaborationVisibility {
 
 function project(value: unknown): ProjectMembership {
   const row = object(value)
+  if (row.nodeId !== undefined && !uuid(row.nodeId)) throw new Error('invalid collaboration project computer')
   return {
     projectId: integer(row.projectId),
     name: string(row.name),
     path: string(row.path),
     mode: mode(row.mode),
+    ...(row.nodeId === undefined ? {} : { nodeId: row.nodeId as CollaborationComputerId }),
+    ...(row.nodeName === undefined ? {} : { nodeName: string(row.nodeName) }),
     ...(row.canManage === true ? { canManage: true } : {}),
     ...(row.origin === 'admin' || row.origin === 'user' ? { origin: row.origin } : {}),
     ...(row.owner === null ? { owner: null } : row.owner === undefined ? {} : { owner: actor(row.owner) }),
@@ -320,6 +391,9 @@ export function parseCollaborationContext(value: unknown): CollaborationContext 
   const root = object(value)
   const user = object(root.user)
   const scope = object(root.scope)
+  const environment = root.environment === undefined ? undefined : object(root.environment)
+  if (environment !== undefined && (!uuid(environment.id) || !uuid(environment.nodeId)
+    || environment.nodeName !== undefined && typeof environment.nodeName !== 'string')) throw new Error('invalid collaboration environment')
   if (!Array.isArray(root.projects)) throw new Error('invalid collaboration response')
   const parsedScope: CollaborationScope = scope.kind === 'personal'
     ? { kind: 'personal' }
@@ -343,9 +417,40 @@ export function parseCollaborationContext(value: unknown): CollaborationContext 
     },
     scope: parsedScope,
     projects: root.projects.map(project),
+    ...(environment === undefined ? {} : { environment: {
+      id: environment.id as NonNullable<SessionRuntimeTarget['runtimeId']>,
+      nodeId: environment.nodeId as NonNullable<SessionRuntimeTarget['nodeId']>,
+      ...(typeof environment.nodeName === 'string' ? { nodeName: environment.nodeName } : {}),
+    } }),
     ...(root.fullAccess === undefined ? {} : { fullAccess: boolean(root.fullAccess) }),
     ...(root.autoReviewEligible === undefined ? {} : { autoReviewEligible: boolean(root.autoReviewEligible) }),
   }
+}
+
+function uuid(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value)
+}
+
+function environmentPage(value: unknown): CollaborationEnvironmentPage {
+  const root = object(value)
+  if (!Array.isArray(root.items) || root.nextCursor !== null && typeof root.nextCursor !== 'string') throw new Error('invalid environment directory')
+  const items = root.items.map((value): CollaborationEnvironment => {
+    const row = object(value), owner = object(row.owner), node = object(row.node)
+    if (!uuid(row.id) || !uuid(node.id) || typeof node.name !== 'string'
+      || owner.kind !== 'personal' && owner.kind !== 'project') throw new Error('invalid environment directory')
+    const location = { runtimeId: row.id as NonNullable<SessionRuntimeTarget['runtimeId']>,
+      nodeId: node.id as NonNullable<SessionRuntimeTarget['nodeId']>, nodeName: node.name }
+    const target: SessionRuntimeTarget = owner.kind === 'personal' ? { kind: 'personal', ...location }
+      : { kind: 'project', projectId: integer(owner.id), projectName: string(owner.name), ...location }
+    if (node.status !== undefined && node.status !== 'active' && node.status !== 'draining' && node.status !== 'offline'
+      || row.provisioning !== undefined && row.provisioning !== 'ready' && row.provisioning !== 'preparing'
+      || row.routing !== undefined && row.routing !== 'local' && row.routing !== 'unavailable') throw new Error('invalid environment state')
+    return { target, name: string(owner.name), nodeName: node.name, observedState: string(row.observedState),
+      ...(node.status === undefined ? {} : { nodeStatus: node.status }),
+      ...(row.provisioning === undefined ? {} : { provisioning: row.provisioning }),
+      ...(row.routing === undefined ? {} : { routing: row.routing }) }
+  })
+  return { items, nextCursor: root.nextCursor }
 }
 
 /** Decode a project configuration response at the browser trust boundary.
@@ -499,28 +604,75 @@ function conversationUrl(sessionId: string): string {
   const address = parseClientSessionKey(sessionId)
   const path = `/account/api/conversations/${encodeURIComponent(address?.sessionId ?? sessionId)}`
   if (address?.runtime.kind === 'personal') throw new Error('Personal Sessions have no project sharing policy')
-  return address?.runtime.kind === 'project' ? `${path}?projectId=${String(address.runtime.projectId)}` : path
+  const url = new URL(path, 'http://gateway')
+  if (address !== undefined) {
+    url.searchParams.set('projectId', String(address.runtime.projectId))
+    addressRuntimeUrl(url, address.runtime)
+  } else {
+    const runtimeId = new URLSearchParams((globalThis as { location?: Pick<Location, 'search'> }).location?.search).get('dshRuntime')
+    if (runtimeId !== null) url.searchParams.set('dshRuntime', runtimeId)
+  }
+  return `${url.pathname}${url.search}`
 }
 
 /**
  * Create the browser transport for Gateway account collaboration endpoints.
- * @param options - browser fetch and reload overrides.
+ * @param options - browser transport overrides and the current input recovery check.
  * @returns fetch-backed collaboration operations and full-page scope reload.
  */
 export function createBrowserCollaborationTransport(options: {
   fetch?: typeof fetch
-  reload?: () => void
+  reload?: (destination?: string) => void
+  canNavigate?: () => boolean
   projectModels?: ProjectModelSettingsTransport
 } = {}): CollaborationTransport {
   const fetcher = options.fetch ?? globalThis.fetch
-  const reload = options.reload ?? window.location.reload.bind(window.location)
+  const reload = options.reload ?? ((destination?: string) => {
+    if (destination === undefined) window.location.reload()
+    else window.location.assign(destination)
+  })
   const jsonHeaders = { 'content-type': 'application/json' }
   const projectModels = options.projectModels
   return {
-    loadContext: signal => jsonRequest(fetcher, '/account/api/context', { signal }, parseCollaborationContext),
-    switchScope: (scope, signal) => emptyRequest(fetcher, '/account/api/scope', {
-      method: 'POST', signal, headers: jsonHeaders, body: JSON.stringify(scope),
-    }),
+    canNavigate: options.canNavigate ?? (() => true),
+    loadContext: (signal) => {
+      const runtime = new URLSearchParams((globalThis as { location?: Pick<Location, 'search'> }).location?.search).get('dshRuntime')
+      const path = `/account/api/context${runtime === null ? '' : `?dshRuntime=${encodeURIComponent(runtime)}`}`
+      return jsonRequest(fetcher, path, { signal }, parseCollaborationContext)
+    },
+    switchScope: async (scope, signal) => {
+      const suffix = scope.runtimeId === undefined ? '' : `?dshRuntime=${encodeURIComponent(scope.runtimeId)}`
+      const response = await fetcher(`/account/api/scope${suffix}`, {
+        method: 'POST', signal, credentials: 'same-origin', headers: jsonHeaders,
+        body: JSON.stringify(scope.kind === 'personal' ? { kind: 'personal' } : { kind: 'project', projectId: scope.projectId }),
+      })
+      if (!response.ok) throw new CollaborationRequestError(response.status, await errorCode(response))
+      const destination = response.headers.get('location')
+      if (destination === null) return
+      if (!/^\/\?dshRuntime=[0-9a-f-]{36}$/u.test(destination)) throw new Error('invalid scope destination')
+      return destination
+    },
+    loadEnvironments: async (cursor, signal) => {
+      const response = await fetcher(`/account/api/runtimes${cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`}`, { signal, credentials: 'same-origin' })
+      if (response.status === 404 || response.status === 501) return { items: [], nextCursor: null }
+      if (!response.ok) throw new CollaborationRequestError(response.status, await errorCode(response))
+      return environmentPage(await readApiResponseJson(response))
+    },
+    loadPreferredEnvironments: async (ids, signal) => {
+      const items: CollaborationEnvironment[] = []
+      for (let offset = 0; offset < ids.length; offset += 32) {
+        const selected = ids.slice(offset, offset + 32)
+        let cursor: string | null = null
+        do {
+          const query = new URLSearchParams({ ids: selected.join(',') })
+          if (cursor !== null) query.set('cursor', cursor)
+          const page = await jsonRequest(fetcher, `/account/api/runtimes?${query}`, { signal }, environmentPage)
+          items.push(...page.items)
+          cursor = page.nextCursor
+        } while (cursor !== null && !signal.aborted)
+      }
+      return items
+    },
     loadConversation: (sessionId, signal) => jsonRequest(
       fetcher,
       conversationUrl(sessionId),
@@ -569,8 +721,8 @@ export function createBrowserCollaborationTransport(options: {
         return { publicId: integer(target.publicId), name: string(target.name), shared: target.shared === true }
       },
     ),
-    createProject: (name, signal) => jsonRequest(
-      fetcher, '/account/api/projects', {
+    createProject: (name, signal, nodeId) => jsonRequest(
+      fetcher, `/account/api/projects${nodeId === undefined ? '' : `?dshNode=${encodeURIComponent(nodeId)}`}`, {
         method: 'POST', signal, headers: jsonHeaders, body: JSON.stringify({ name }),
       }, createdProject,
     ),
@@ -596,16 +748,51 @@ export function createBrowserCollaborationTransport(options: {
         method: 'POST', signal, headers: jsonHeaders,
       },
     ),
-    listUsers: signal => jsonRequest(
-      fetcher, '/account/api/users', { signal },
-      (value) => {
+    listComputers: async (signal) => {
+      const items: CollaborationComputer[] = []
+      const seen = new Set<string>()
+      let cursor: string | null = null
+      do {
+        const page: { items: CollaborationComputer[]; nextCursor: string | null } = await jsonRequest(
+          fetcher, `/account/api/computers${cursor === null ? '' : `?cursor=${encodeURIComponent(cursor)}`}`, { signal }, (value) => {
+            const row = object(value)
+            if (!Array.isArray(row.items) || row.nextCursor !== null && typeof row.nextCursor !== 'string') throw new Error('invalid collaboration response')
+            return { items: row.items.map((candidate) => { const entry = object(candidate)
+              const id = string(entry.nodeId)
+              if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(id)) throw new Error('invalid computer identity')
+              return { nodeId: id as CollaborationComputerId, name: string(entry.name), status: string(entry.status) }
+            }), nextCursor: row.nextCursor }
+          })
+        items.push(...page.items); cursor = page.nextCursor
+        if (cursor !== null && seen.has(cursor)) throw new Error('Computer directory repeated a cursor')
+        if (cursor !== null) seen.add(cursor)
+      } while (cursor !== null && !signal.aborted)
+      return items
+    },
+    listUsers: async (signal, projectId) => {
+      const parseUsers = (value: unknown): UserSummary[] => {
         if (!Array.isArray(value)) throw new Error('invalid collaboration response')
         return value.map((row: unknown) => {
           const u = object(row)
           return { id: integer(u.id), username: string(u.username), displayName: string(u.displayName) }
         })
-      },
-    ),
+      }
+      if (projectId === undefined) return jsonRequest(fetcher, '/account/api/users', { signal }, parseUsers)
+      const items: UserSummary[] = []
+      const seen = new Set<number>()
+      let cursor: number | null = null
+      do {
+        const page: { items: UserSummary[]; nextCursor: number | null } = await jsonRequest(fetcher,
+          `/account/api/projects/${String(projectId)}/invitable-users${cursor === null ? '' : `?cursor=${String(cursor)}`}`, { signal }, (value) => {
+            const row = object(value)
+            return { items: parseUsers(row.items), nextCursor: row.nextCursor === null ? null : integer(row.nextCursor) }
+          })
+        items.push(...page.items); cursor = page.nextCursor
+        if (cursor !== null && seen.has(cursor)) throw new Error('Invitation directory repeated a cursor')
+        if (cursor !== null) seen.add(cursor)
+      } while (cursor !== null && !signal.aborted)
+      return items
+    },
     getInvitationCount: signal => jsonRequest(
       fetcher, '/account/api/invitations/count', { signal },
       (value) => {
@@ -635,11 +822,119 @@ export class CollaborationClient {
   private readonly conversationRefreshPending = new Set<string>()
   private contextLoad: { promise: Promise<void>; controller: AbortController } | undefined
   private disposed = false
+  private environmentLoad: { promise: Promise<void>; controller: AbortController; userId: number } | undefined
+  private preferredLoad: AbortController | undefined
+  private scopeSwitch: AbortController | undefined
+  private lastVisitedSpace: string | undefined
 
   /**
    * @param transport - Gateway account transport.
    */
   constructor(private readonly transport: CollaborationTransport) {}
+
+  /**
+   * Replace or append center directory metadata without connecting to a target computer.
+   * @param cursor - continuation to append; omitted to replace loaded metadata from the first page.
+   * @returns after the owned read settles; failures retain displayed entries.
+   */
+  loadEnvironments(cursor?: string): Promise<void> {
+    const loadDirectory = this.transport.loadEnvironments
+    if (this.disposed || loadDirectory === undefined) return Promise.resolve()
+    const snapshot = this.getSnapshot()
+    const userId = snapshot.context?.user.id
+    if (!snapshot.contextVerified || userId === undefined) return Promise.resolve()
+    if (this.environmentLoad !== undefined && this.environmentLoad.userId === userId) return this.environmentLoad.promise
+    this.environmentLoad?.controller.abort()
+    const controller = new AbortController()
+    this.store.update((draft) => { draft.environmentsLoading = true })
+    const pending = Promise.resolve().then(() => loadDirectory(cursor, controller.signal)).then((page) => {
+      if (this.disposed || controller.signal.aborted || this.getSnapshot().context?.user.id !== userId) return
+      this.store.update((draft) => {
+        const previous = cursor === undefined ? [] : draft.environments?.items ?? []
+        const items = new Map(previous.map(item => [runtimeTargetKey(item.target), item]))
+        for (const item of page.items) items.set(runtimeTargetKey(item.target), item)
+        draft.environments = { items: [...items.values()], nextCursor: page.nextCursor }
+        draft.environmentsError = false
+        if (cursor === undefined) delete draft.environmentsCursor
+        else draft.environmentsCursor = cursor
+      })
+      this.refreshSpacePreferences()
+    }, () => {
+      if (!this.disposed && !controller.signal.aborted) this.store.update((draft) => { draft.environmentsError = true })
+    }).finally(() => {
+      if (this.environmentLoad?.controller !== controller) return
+      this.environmentLoad = undefined
+      if (!this.disposed) this.store.update((draft) => { draft.environmentsLoading = false })
+    })
+    this.environmentLoad = { promise: pending, controller, userId }
+    return cursor === undefined ? Promise.all([pending, this.loadPreferredEnvironments(userId)]).then(() => {}) : pending
+  }
+
+  private async loadPreferredEnvironments(userId: number): Promise<void> {
+    if (this.transport.loadPreferredEnvironments === undefined) return
+    this.preferredLoad?.abort()
+    const controller = new AbortController()
+    this.preferredLoad = controller
+    const ids = savedSpaceRuntimeIds(userId)
+    try {
+      const items = ids.length === 0 ? [] : await this.transport.loadPreferredEnvironments(ids, controller.signal)
+      if (this.disposed || controller.signal.aborted || !this.getSnapshot().contextVerified
+        || this.getSnapshot().context?.user.id !== userId) return
+      this.store.update((draft) => { draft.preferredEnvironments = items; draft.spacePreferencesError = false })
+      this.refreshSpacePreferences()
+    } catch (cause) {
+      if (!controller.signal.aborted && !this.disposed) this.store.update((draft) => {
+        draft.spacePreferencesError = true
+        if (cause instanceof CollaborationRequestError && (cause.status === 401 || cause.status === 403)) delete draft.preferredEnvironments
+      })
+    } finally { if (this.preferredLoad === controller) this.preferredLoad = undefined }
+  }
+
+  private clearEnvironments(): void {
+    this.preferredLoad?.abort()
+    this.preferredLoad = undefined
+    this.environmentLoad?.controller.abort()
+    this.environmentLoad = undefined
+    this.scopeSwitch?.abort()
+    this.scopeSwitch = undefined
+    this.store.update((draft) => {
+      delete draft.environments
+      delete draft.preferredEnvironments
+      delete draft.environmentsCursor
+      delete draft.environmentsError
+      delete draft.scopeOffer
+      delete draft.scopeFailedTarget
+      delete draft.scopeTarget
+      draft.scopeBusy = false
+      delete draft.favoriteRuntimeIds
+      delete draft.recentRuntimeIds
+      delete draft.spacePreferencesError
+      draft.environmentsLoading = false
+    })
+  }
+
+  private refreshSpacePreferences(): void {
+    const snapshot = this.getSnapshot()
+    if (!snapshot.contextVerified || snapshot.context === undefined) return
+    const ids = [...(snapshot.environments?.items ?? []), ...(snapshot.preferredEnvironments ?? [])]
+      .flatMap(item => item.target.runtimeId === undefined ? [] : [item.target.runtimeId])
+    if (snapshot.context.environment !== undefined) ids.push(snapshot.context.environment.id)
+    const preferences = readSpaceNavigationPreferences(snapshot.context.user.id, ids)
+    this.store.update((draft) => {
+      draft.favoriteRuntimeIds = preferences.favorites
+      draft.recentRuntimeIds = preferences.recent
+    })
+  }
+
+  /** Toggle the verified current environment's bookmark without changing its routing or permissions. */
+  toggleCurrentSpaceFavorite(): void {
+    const snapshot = this.getSnapshot()
+    const context = snapshot.context
+    if (!snapshot.contextVerified || context?.environment === undefined || this.disposed) return
+    const saved = toggleSpaceFavorite(context.user.id, context.environment.id)
+    this.store.update((draft) => { draft.spacePreferencesError = !saved })
+    if (saved) this.refreshSpacePreferences()
+  }
 
   /** Load one project's redacted Provider settings.
    * @param projectId - public project id.
@@ -695,6 +990,7 @@ export class CollaborationClient {
       .then(() => this.transport.loadContext(controller.signal))
       .then((context) => {
         if (this.disposed || controller.signal.aborted || this.contextLoad?.controller !== controller) return
+        if (this.getSnapshot().context?.user.id !== context.user.id) this.clearEnvironments()
         this.store.update((draft) => {
           draft.status = 'ready'
           draft.contextVerified = true
@@ -704,6 +1000,14 @@ export class CollaborationClient {
           draft.conversations = Object.fromEntries(Object.entries(draft.conversations)
             .filter(([id]) => conversationProject(draft, id) !== undefined))
         })
+        if (context.environment !== undefined && this.getSnapshot().contextVerified) {
+          const visit = `${context.user.id}:${context.environment.id}`
+          if (this.lastVisitedSpace !== visit) {
+            this.lastVisitedSpace = visit
+            recordSpaceVisit(context.user.id, context.environment.id)
+          }
+          this.refreshSpacePreferences()
+        }
       })
       .catch((_contextLoadFailure: unknown) => {
         if (this.disposed || controller.signal.aborted || this.contextLoad?.controller !== controller) return
@@ -727,6 +1031,7 @@ export class CollaborationClient {
   invalidateContext(): void {
     this.contextLoad?.controller.abort()
     this.contextLoad = undefined
+    this.clearEnvironments()
     this.store.update((draft) => { draft.contextVerified = false })
   }
 
@@ -750,13 +1055,16 @@ export class CollaborationClient {
   }
 
   /**
-   * Persist a new page scope and reload so the Gateway runtime target changes.
+   * Prepare an exact environment and navigate when browser-owned input is recoverable.
    * @param scope - personal runtime or one accessible project runtime.
-   * @returns settlement after the HTTP mutation; successful requests reload.
+   * @returns after preparation settles; protected input keeps the source tab and offers a new tab.
    */
-  async switchScope(scope: { kind: 'personal' } | { kind: 'project'; projectId: number }): Promise<void> {
+  async switchScope(scope: SessionRuntimeTarget): Promise<void> {
     const snapshot = this.getSnapshot()
-    if (this.disposed || snapshot.scopeBusy) return
+    if (this.disposed || snapshot.scopeBusy || !snapshot.contextVerified) return
+    const controller = new AbortController()
+    this.scopeSwitch = controller
+    const isCurrentSwitch = (): boolean => !controller.signal.aborted && this.scopeSwitch === controller
     const target: CollaborationScopeTarget = scope.kind === 'personal'
       ? { kind: 'personal' }
       : {
@@ -764,39 +1072,91 @@ export class CollaborationClient {
         projectId: scope.projectId,
         projectName: snapshot.context?.projects.find(project => project.projectId === scope.projectId)?.name ?? '',
       }
+    const environment = scope.runtimeId === undefined ? undefined
+      : [...(snapshot.environments?.items ?? []), ...(snapshot.preferredEnvironments ?? [])]
+        .find(item => item.target.runtimeId === scope.runtimeId)
+    if (environment?.nodeName !== undefined) target.nodeName = environment.nodeName
     this.store.update((draft) => {
       draft.scopeBusy = true
       draft.scopeTarget = target
       delete draft.scopeError
+      delete draft.scopeFailedTarget
+      delete draft.scopeOffer
     })
     try {
-      await this.transport.switchScope(scope, this.abortController.signal)
-      if (this.abortController.signal.aborted) return
+      let resolved = scope
+      if (scope.kind === 'personal' && scope.runtimeId === undefined && snapshot.context?.environment !== undefined
+        && this.transport.loadEnvironments !== undefined) {
+        let cursor: string | undefined
+        let fallback: SessionRuntimeTarget | undefined
+        const seen = new Set<string>()
+        do {
+          const page = await this.transport.loadEnvironments(cursor, controller.signal)
+          fallback ??= page.items.find(item => item.target.kind === 'personal')?.target
+          const personal = page.items.find(item => item.target.kind === 'personal' && item.nodeStatus !== 'offline'
+            && item.nodeStatus !== 'draining' && item.routing !== 'unavailable' && item.provisioning !== 'preparing')
+          if (personal !== undefined) { resolved = personal.target; break }
+          if (page.nextCursor === null) {
+            if (fallback === undefined) throw new CollaborationRequestError(403, 'runtime-catalog/forbidden')
+            resolved = fallback; break
+          }
+          if (seen.has(page.nextCursor)) throw new Error('Runtime directory repeated a cursor')
+          seen.add(page.nextCursor); cursor = page.nextCursor
+        } while (isCurrentSwitch())
+      }
+      const destination = await this.transport.switchScope(resolved, controller.signal)
+      if (!isCurrentSwitch()) return
       this.store.update((draft) => {
         draft.scopeBusy = false
         delete draft.scopeTarget
       })
-      this.transport.reload()
-    } catch (_scopeSwitchFailure) {
-      if (this.abortController.signal.aborted) return
+      if (!isCurrentSwitch()) return
+      if (!this.getSnapshot().contextVerified) return
+      if (this.transport.canNavigate?.() === false) {
+        const runtimeId = typeof destination === 'string' ? new URL(destination, 'http://gateway').searchParams.get('dshRuntime') : null
+        this.store.update((draft) => {
+          if (runtimeId === null) draft.scopeError = 'draft-unsaved'
+          else draft.scopeOffer = { runtimeId, target }
+        })
+        return
+      }
+      this.transport.reload(typeof destination === 'string' ? destination : undefined)
+    } catch (cause) {
+      if (!isCurrentSwitch()) return
       this.store.update((draft) => {
         draft.scopeBusy = false
         delete draft.scopeTarget
-        draft.scopeError = 'switch-failed'
+        draft.scopeError = scopeFailure(cause)
+        draft.scopeFailedTarget = scope
       })
+    } finally {
+      if (this.scopeSwitch === controller) this.scopeSwitch = undefined
     }
+  }
+
+  /** Acknowledge a failed switch without changing this tab's environment or draft. */
+  dismissScopeError(): void {
+    if (this.disposed) return
+    this.store.update((draft) => { delete draft.scopeError; delete draft.scopeFailedTarget })
+  }
+
+  /** Close the navigation offer without unloading input or stopping either Runtime. */
+  dismissScopeOffer(): void {
+    if (this.disposed) return
+    this.store.update((draft) => { delete draft.scopeOffer })
   }
 
   /**
    * Create a user-owned project and refresh the account context.
    * @param name - project display name.
+   * @param nodeId - explicitly chosen project computer; omission retains the current entry.
    * @returns the newly allocated public project id.
    */
-  async createProject(name: string): Promise<number> {
+  async createProject(name: string, nodeId?: CollaborationComputerId): Promise<number> {
     if (this.disposed) throw new CollaborationRequestError(499, 'client-disposed')
     const operation = this.transport.createProject
     if (operation === undefined) throw new CollaborationRequestError(503, 'managed-projects-unavailable')
-    const result = await operation(name, this.abortController.signal)
+    const result = await operation(name, this.abortController.signal, nodeId)
     if (this.abortController.signal.aborted) throw new CollaborationRequestError(499, 'client-disposed')
     await this.load(true)
     return result.projectId
@@ -843,13 +1203,24 @@ export class CollaborationClient {
   }
 
   /**
-   * List all active users for the invitation member picker.
+   * List eligible users for the invitation member picker.
+   * @param projectId - project whose fixed computer and membership determine eligibility.
    * @returns active user summaries.
    */
-  listUsers(): Promise<UserSummary[]> {
+  listUsers(projectId?: number): Promise<UserSummary[]> {
     if (this.disposed) return Promise.resolve([])
     const operation = this.transport.listUsers
     if (operation === undefined) return Promise.reject(new CollaborationRequestError(503, 'users-unavailable'))
+    return operation(this.abortController.signal, projectId)
+  }
+
+  /** List this account's authorized computer metadata without starting a Runtime.
+   * @returns one bounded authorized computer page.
+   */
+  listComputers(): Promise<CollaborationComputer[]> {
+    if (this.disposed) return Promise.resolve([])
+    const operation = this.transport.listComputers
+    if (operation === undefined) return Promise.reject(new CollaborationRequestError(503, 'computer-access/unavailable'))
     return operation(this.abortController.signal)
   }
 
@@ -1040,7 +1411,10 @@ export class CollaborationClient {
 
   /** Abort in-flight HTTP operations and suppress later publications. */
   dispose(): void {
+    this.preferredLoad?.abort()
     this.contextLoad?.controller.abort()
+    this.environmentLoad?.controller.abort()
+    this.scopeSwitch?.abort()
     if (this.disposed) return
     this.disposed = true
     this.abortController.abort()

@@ -1,15 +1,24 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Button, ConnectionBanner, Input, Menu, MobileSheetBackdrop, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, ConnectionBanner, Input, Menu, MobileSheetBackdrop, Modal, Pill, SegmentedTabs } from '@deepseek-ai/dsh-client-ui-primitives'
 import { POINTER_GRACE_MS } from '../src/pointer-grace.ts'
 
 afterEach(cleanup)
 
 describe('Button', () => {
-  it('renders children, icon, and forwards clicks', () => {
+  it('keeps an icon-only toolbar action named and clickable', () => {
     const onClick = vi.fn()
-    render(<Button variant="primary" icon={<svg data-testid="ic" />} onClick={onClick}>Go</Button>)
+    render(<Button variant="soft" size="toolbar" aria-label="Refresh" icon={<svg />} onClick={onClick} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(onClick).toHaveBeenCalledOnce()
+  })
+  it.each([
+    { variant: 'primary' as const, size: 'md' as const },
+    { variant: 'soft' as const, size: 'toolbar' as const },
+  ])('renders children, icon, and forwards clicks: $variant / $size', ({ variant, size }) => {
+    const onClick = vi.fn()
+    render(<Button variant={variant} size={size} icon={<svg data-testid="ic" />} onClick={onClick}>Go</Button>)
     const button = screen.getByRole('button', { name: 'Go' })
     expect(screen.getByTestId('ic')).toBeDefined()
     fireEvent.click(button)
@@ -488,6 +497,18 @@ describe('Menu', () => {
 })
 
 describe('Modal', () => {
+  it.each(['sheet', 'page'] as const)('uses pull-down dismissal only for a phone sheet: %s', (mobilePresentation) => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+    try {
+      const onClose = vi.fn()
+      render(<Modal open title="Project" closeLabel="Close" mobilePresentation={mobilePresentation} onClose={onClose}>Content</Modal>)
+      const dialog = screen.getByRole('dialog')
+      fireEvent.touchStart(dialog, { touches: [{ clientX: 100, clientY: 100 }] })
+      fireEvent.touchMove(dialog, { touches: [{ clientX: 100, clientY: 260 }] })
+      fireEvent.touchEnd(dialog)
+      expect(onClose).toHaveBeenCalledTimes(mobilePresentation === 'sheet' ? 1 : 0)
+    } finally { cleanup(); vi.unstubAllGlobals() }
+  })
   it('is absent while closed; Escape and mask click call onClose', () => {
     const onClose = vi.fn()
     const { rerender } = render(
@@ -513,6 +534,27 @@ describe('Modal', () => {
     const mask = document.querySelector('[aria-hidden="true"]') as HTMLElement
     fireEvent.click(mask)
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('SegmentedTabs', () => {
+  it.each(['segmented', 'underline'] as const)('preserves keyboard selection and panel links: %s', (variant) => {
+    const onChange = vi.fn()
+    render(<SegmentedTabs variant={variant} value="switch" onChange={onChange} label="Space center" items={[
+      { value: 'switch', label: 'Switch', id: 'switch-tab', panelId: 'switch-panel' },
+      { value: 'manage', label: 'Manage', id: 'manage-tab', panelId: 'manage-panel' },
+    ]} />)
+    const first = screen.getByRole('tab', { name: 'Switch' })
+    const second = screen.getByRole('tab', { name: 'Manage' })
+    expect(first.tabIndex).toBe(0)
+    expect(second.tabIndex).toBe(-1)
+    expect(first.getAttribute('aria-controls')).toBe('switch-panel')
+    fireEvent.keyDown(first, { key: 'ArrowRight' })
+    expect(onChange).toHaveBeenLastCalledWith('manage')
+    expect(document.activeElement).toBe(second)
+    fireEvent.keyDown(second, { key: 'Home' })
+    expect(document.activeElement).toBe(first)
+    expect(onChange).toHaveBeenLastCalledWith('switch')
   })
 })
 

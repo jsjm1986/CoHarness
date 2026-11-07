@@ -16,7 +16,10 @@ import type {
 /** Namespace defaults the Host resolves under user overrides. */
 const ACCOUNT_BASE: AccountPreferencesView['values'] = {
   locale: {},
-  'ui-theme': { preference: 'system' },
+  'ui-theme': {
+    preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+    textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+  },
   'ui-conversation': {
     busyEnter: 'queue',
     chatContentWidth: 748,

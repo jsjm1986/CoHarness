@@ -1,0 +1,14 @@
+{
+  "name": "ssh-declared-realm-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/preset/agent-preset-registry/tests/realm.spec.ts -t 'declared preset realm'",
+  "startedAt": "2026-10-25T12:06:02.726382+00:00",
+  "seconds": 5.742,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5b05b8fe7a1b64a03a4e5913be1c2d411cd8f8db18ea4e160853a7a51b47c172",
+  "inputsAfter": "5b05b8fe7a1b64a03a4e5913be1c2d411cd8f8db18ea4e160853a7a51b47c172",
+  "postgresToolDirectory": null,
+  "outputSha256": "70a720413c53b6ebeae89614192dba4bf3e0e3b8cb85fa3073e63aee40763e62",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/preset/agent-preset-registry/tests/realm.spec.ts (14 tests | 1 failed | 13 skipped) 32ms\n     × addresses a declared preset realm through the fiber that installed its environment 31ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/preset/agent-preset-registry/tests/realm.spec.ts > standing realms > addresses a declared preset realm through the fiber that installed its environment\nAssertionError: expected undefined to deeply equal { marker: 'declared-remote' }\n\n- Expected:\n{\n  \"marker\": \"declared-remote\",\n}\n\n+ Received:\nundefined\n\n ❯ packages/preset/agent-preset-registry/tests/realm.spec.ts:268:52\n    266|     ctx.agentPresets.registerRealm('declared-ssh', scope => { shadowFs…\n    267|     const remote = await agentOn(ctx, 'declared-session', 'declared-re…\n    268|     expect(environmentForAgent(ctx, remote, 'fs')).toEqual({ marker: '…\n       |                                                    ^\n    269|     expect(environmentForAgent(ctx, remote, 'subprocess')).toBeUndefin…\n    270|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 13 skipped (14)\n   Start at  20:06:06\n   Duration  1.91s (transform 1.42s, setup 44ms, import 1.72s, tests 32ms, environment 0ms)\n\n"
+}

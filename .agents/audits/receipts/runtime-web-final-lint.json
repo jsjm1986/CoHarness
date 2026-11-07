@@ -1,0 +1,14 @@
+{
+  "name": "runtime-web-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/launcher.ts gateway/src/local-runtime-control.ts gateway/src/instances.ts gateway/tests/launcher.spec.ts gateway/tests/local-runtime-launcher.spec.ts gateway/tests/proxy.spec.ts gateway/tests/fixtures/local-runtime-server.mjs gateway/tests/fixtures/local-runtime-web-gateway.mjs gateway/tests/run-local-web-assembly.mjs gateway/tests/run-built-local-supervision.mjs scripts/ci-workflow.spec.ts",
+  "startedAt": "2026-10-24T21:27:50.617713+00:00",
+  "seconds": 2.855,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "inputsAfter": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

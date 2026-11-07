@@ -144,6 +144,7 @@ export function apply(ctx: ClientContext): void {
     formatSelectionError: (error, selection, modelName, capability) => (
       formatSelectionError(error, selection, modelName, capability, t)
     ),
+    formatTransportError: operation => t(operation === 'load' ? 'error.loadTransport' : 'error.selectionUnconfirmed'),
   })
 
   // Entry 1: the /model popupSelect over the shared directory. Row copy is

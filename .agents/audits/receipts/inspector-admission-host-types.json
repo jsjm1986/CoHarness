@@ -1,0 +1,13 @@
+{
+  "name": "inspector-admission-host-types",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc --noEmit -p tsconfig.host.json",
+  "startedAt": "2026-10-23T14:38:25.627102+00:00",
+  "seconds": 5.021,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "69a3a478c1db1dd5cb062eff619d444f1d56596f70e499b793238a3e98c42156",
+  "inputsAfter": "69a3a478c1db1dd5cb062eff619d444f1d56596f70e499b793238a3e98c42156",
+  "outputSha256": "76aa8b752962801288bb5a2af989aa37520fb72dd0765561eee39e9b0f6cf173",
+  "outputTail": "packages/experimental/inspector/tests/resource-admission.host.spec.ts(36,68): error TS2554: Expected 0-1 arguments, but got 2.\npackages/experimental/inspector/tests/resource-admission.host.spec.ts(47,68): error TS2554: Expected 0-1 arguments, but got 2.\npackages/experimental/inspector/tests/resource-admission.host.spec.ts(64,76): error TS2554: Expected 0-1 arguments, but got 2.\npackages/experimental/inspector/tests/resource-admission.host.spec.ts(77,76): error TS2554: Expected 0-1 arguments, but got 2.\n"
+}

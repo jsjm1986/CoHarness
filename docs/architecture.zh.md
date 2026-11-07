@@ -99,6 +99,8 @@ turn/end
 
 `turn/*`、`step/*`、`user/message`、`assistant/*` 和 `tool/*` 是持久会话事件；其余是分属三个事件域的实时扩展点。`agent/pre-step`、`agent/request`、`llm/stream` 和三个 `tools/*` 事件是 waterfall（瀑布式事件），其监听器必须调用 `next()` 才能委托下去；`agent/turn-stopping` 是 serial 事件，没有 `next()`。
 
+每个 LLM 服务持有自己的[循环请求归属](../packages/llm/llm/README.zh.md#understand-the-implementation)。外部编排适配器对外层步骤使用 `llm/orchestration`。轮次内的每个实际模型请求分别经过模型 waterfall、授权、容量准入与用量归属；[LLM 流式子系统](subsystems/llm-streaming.zh.md)定义注册类型。
+
 输入通过同一个 inbox 到达驱动器。有些消息会立即唤醒它；注入的上下文会留在 inbox 中，直到另一条消息将其唤醒。
 
 `agent/pre-step` 决定模型看到什么。监听器可以改写已领取的消息，也可以直接拒绝它们；首次领取被拒绝或被改写为空时，仍会关闭一个不含步骤的持久轮次，因此日志会记录这次尝试。每个步骤读取插件注册的提示词片段和工具 schema，且每次请求准入尝试都会刷新已注册的运行时上下文——已接纳组装的片段、schema 与变量保持绑定，而 provider 提供的上下文文本会被重新求值并作为新快照提交。

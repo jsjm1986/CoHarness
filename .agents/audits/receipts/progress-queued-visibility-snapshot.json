@@ -1,0 +1,13 @@
+{
+  "name": "progress-queued-visibility-snapshot",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/project-progress-postgres.spec.ts -- -t source-private --update --no-file-parallelism",
+  "startedAt": "2026-10-23T21:19:36.005214+00:00",
+  "seconds": 4.025,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3412f9400b94cd6007798be3a4517d76a17401367814cfe106c9eeae33c163bb",
+  "inputsAfter": "3412f9400b94cd6007798be3a4517d76a17401367814cfe106c9eeae33c163bb",
+  "outputSha256": "b0b4a629fbcc29f60340855ea5918c599a5fffd4f61372881676f469c621f0a1",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n  Snapshots  1 updated \n Test Files  1 passed (1)\n      Tests  1 passed | 11 skipped (12)\n   Start at  05:19:38\n   Duration  1.25s (transform 432ms, setup 0ms, import 643ms, tests 508ms, environment 0ms)\n\n"
+}

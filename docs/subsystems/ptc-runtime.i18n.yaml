@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/ptc-runtime.md
 document:
-  en: afcf5237a9a213566756d90d2e39259926f3b341
-  zh: 64134149d293d3975cebd7b481feeeeb4b5c40cd
+  en: d9ad8138a098b7deb8ef75597e9b1331486bdca7
+  zh: ba747b53693b597829272a9b560f640c9c70c97a
 /ptc-runtime:
   en: 337a6580d7571274
   zh: f4ae98899120d122
@@ -15,8 +15,8 @@ document:
   en: 182147ddf388c600
   zh: c0a7d77602c78bcd
 /ptc-runtime/captured-output-and-the-failure-taxonomy:
-  en: e5431173436c00c2
-  zh: 4ba58e259bbadbc8
+  en: 8eb1607888ab6efc
+  zh: 580c852d17b9413f
 /ptc-runtime/the-service:
   en: a82f828fa006c7e9
   zh: 2279d36867335b57

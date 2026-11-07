@@ -10,17 +10,19 @@ Gateway 认证与运行时分配原本把一个已登录用户视为每个 Harne
 
 ## 决策
 
-Gateway 为个人 scope 的每个用户分配一个运行时，并为每个项目分配一个共享运行时。认证账户通过 Gateway 选择当前 scope，Gateway 再把浏览器代理到对应运行时。每次代理的 HTTP 和 WebSocket 操作都携带一份短期 Ed25519 签名 principal，其中包含组织、用户、所选 scope、运行时 identity 和运行时 generation。`dsh-gateway-runtime` 在目标进程内验证该断言，并且只通过请求局部存储暴露它；私有 loopback 凭据提供运行时 bearer token 和验证密钥，不把任一秘密放入浏览器可见配置。
+Gateway 为账户分配独立的个人 Runtime，并为每个项目分配一个共享 Runtime。认证账户通过 Gateway 选择当前 scope，Gateway 再把浏览器代理到对应运行时。每次代理的 HTTP 和 WebSocket 操作都携带一份短期 Ed25519 签名 principal，其中包含组织、用户、所选 scope、运行时 identity 和运行时 generation。`dsh-gateway-runtime` 在目标进程内验证该断言，并且只通过请求局部存储暴露它；私有 loopback 凭据提供运行时 bearer token 和验证密钥，不把任一秘密放入浏览器可见配置。
 
 授权新鲜度按资源类型划分。根对话授权与可读会话筛选每次检查都会查询 PostgreSQL 中的当前组织角色与项目成员身份，因此移除成员、模式降级或管理员降级会影响下一次此类操作。不带 Session ACL 的 Host 操作使用签名 principal 中捕获的模式；旧模式最多可使用到该 principal 过期。Gateway 的交付默认有效期为 30 秒，每个被代理的 HTTP 请求都会获得新 principal，长连接 Host 与 Typert stream 会在 `expiresAt` 时关闭，以便重连取得当前权限。项目 scope 下的 Typert Remote 采用失败关闭：`goals/*` 需要对话写权限，`messageFeedback/list` 需要读权限，`messageFeedback/put` 与 `messageFeedback/delete` 需要写权限，所有未分类或进程级 Remote 都会被拒绝。
 
+按 Runtime 限定的存储遵循[会话身份决策](../architecture/2026-10-30-postgres-session-runtime-namespace.zh.md)。事务中的写入权限新鲜度遵循[会话锁决策](../bug-fix/2026-10-24-conversation-writer-locks.zh.md)。
+
 普通项目成员身份分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目拥有隐式 `rw` 权限。项目根对话可以是每位当前成员都可读的 `project`，也可以是只有创建者和当前管理员可读的 `private`。后代会话继承根的项目、创建者和可见性，不能定义更弱的 ACL。Gateway 会经根记录解析每次读取、写入、管理、审批和批量列表决定。具有 `rw` 成员身份的创建者或管理员可以改变可见性；其他用户参与过的项目公开对话不能再改为私密。仍拥有私密项目对话的成员不能被移除，直到该对话被共享或以其他方式删除。
 
-项目 identity 明确记录 `origin` 与 `owner`：管理员发起的项目登记既有宿主机目录，用户发起的项目在 `HGW_USER_PROJECTS_ROOT` 下分配空目录。两种来源共用一个工作空间、一个共享运行时、一套成员表和一套对话模型；Admin API 通过来源筛选提供统一列表，并返回所有者/创建者元数据。用户所有者获得 `rw` 成员身份，可邀请活跃用户以 `ro` 或 `rw` 加入。邀请对发送者、接收者、项目所有者和管理员可见；接受操作是事务化的，过期状态会持久化，所有者不能被移除或降级到 `rw` 以下。SQLite→PostgreSQL 导入会根据企业与旧邀请 ID 派生稳定邀请 UUID，因此重复切库不会丢失待处理邀请。
+项目 identity 明确记录 `origin` 与 `owner`：管理员发起的项目登记既有宿主机目录，用户发起的项目在 `HGW_USER_PROJECTS_ROOT` 下分配空目录。两种来源共用一个工作空间、一个共享运行时、一套成员表和一套对话模型；Admin API 通过来源筛选提供统一列表，并返回所有者/创建者元数据。用户所有者获得 `rw` 成员身份，可邀请活跃用户以 `ro` 或 `rw` 加入。邀请对发送者、接收者、项目所有者和管理员可见；接受操作是事务化的，所有者不能被移除或降级到 `rw` 以下。已过期的待处理邀请读取为 `expired`，不计入待处理数量；向同一接收者重新发出邀请时，会在事务中将旧邀请持久化为过期。PostgreSQL 在取得邀请行锁后使用数据库时钟判断接受期限；SQLite 使用本地时钟。SQLite→PostgreSQL 导入会根据企业与旧邀请 ID 派生稳定邀请 UUID，因此重复切库不会丢失待处理邀请。 显式修改成员身份会在同一事务中撤销待处理邀请，包括尚未加入时的移除。PostgreSQL 创建邀请、接受邀请和修改成员身份时，先锁定未删除账户行，再获取项目行锁，最后获取邀请行或成员行锁；接受邀请保留任何已有的成员权限。
 
 管理员专用的 `danger-full-access` 预设只有在请求 principal 证明管理员身份后，才会在个人和项目 scope 中可用。`/permission` 命令与新会话默认路径共享同一个授权检查，普通成员不能通过设置获得该预设。在共享项目会话中，权限事件属于整个会话：管理员的选择会改变所有参与者看到的应用内预设，直到下一次获得授权的选择。项目 systemd 单元仍受项目路径约束，因此该预设不会授予项目目录之外的宿主机访问权。
 
-协作是一项能力 seam：`dsh-collaboration` 定义请求捕获的 authority，`dsh-collaboration-gateway` 从经过认证的 Gateway 内部端点取得权威 ACL 决策，Host/会话消费方负责强制。Host 的列表和搜索会过滤不可读会话 id；打开、提示、恢复、fork、删除、导出、流、审批和问题操作都在观察或改变会话状态前授权。即使绕过浏览器 UI，Host 仍会强制 `ro` 成员身份。审批与问题响应在 PostgreSQL 中以组织、交互类型和交互 id 组成唯一键，因此只有一位参与者能提交共享响应。
+协作是一项能力 seam：`dsh-collaboration` 定义请求捕获的 authority，`dsh-collaboration-gateway` 从经过认证的 Gateway 内部端点取得权威 ACL 决策，Host/会话消费方负责强制。Host 的列表和搜索会过滤不可读会话 id；打开、提示、恢复、fork、删除、导出、流、审批和问题操作都在观察或改变会话状态前授权。即使绕过浏览器 UI，Host 仍会强制 `ro` 成员身份。审批与问题响应在 PostgreSQL 中以组织、Runtime、交互类型和交互 id 组成唯一键，因此只有一位参与者能提交共享响应。
 
 项目运行时用 `dsh-session-persistence-gateway` 取代本地 JSONL 提供方。它保留标准 [`SessionPersistence`](../architecture/2026-06-14-session-persistence.zh.md) coordinator 语义，同时通过私有 Gateway API 把 header 和完整事件存入 [JSONB 基线](../architecture/2026-08-14-postgresql-jsonb-gateway-baseline.zh.md)引入的 PostgreSQL 对话 repository。写入 API 与提供方响应解码器只接受事件字段 `type`、`seq`、`time`、`data`、`surfaceOp`、`sourceEventSeqs` 和 `ignorable`；消息事件必须带有效 append 或精确 replace 操作，纯日志事件拒绝 surface 元数据。提供方只保留 coordinator 明确支持的 pre-react-loop `steering/message` 读取例外。创建根时记录已认证创建者和请求的可见性；注册子会话时复制已锁定的根 ACL。幂等 append 批次保持事件序列连续、崩溃修复和重试语义。个人运行时保留其配置的本地持久化和[按项目分组的会话目录](../architecture/2026-07-24-project-session-directories.zh.md)行为。
 
@@ -36,9 +38,15 @@ Linux systemd 单元会先用只读临时文件系统遮蔽用户根、项目运
 
 仓库生产入口 `pnpm run build:production` 会构建 Harness 库与 Web 应用、两个必需的树外插件和 Admin SPA，对 Gateway 做类型检查，并在发布树缺少任何必需的 CLI、Web、Admin、插件、管理员覆盖层或协作 migration 产物时拒绝发布。
 
+提供方替换遵循[保留的应用授权要求](../bug-fix/2026-10-23-retained-collaboration-requirement.zh.md)。
+
+PostgreSQL 项目邀请使用项目分配的电脑，而不是处理请求的 Gateway 所在电脑。发出邀请时保留双方已启用的电脑使用授权；接受邀请时，在取得项目锁后保留收件人的授权。组织成员身份及其他电脑的权限不能替代此授权。临时拒绝保留待处理邀请，参与项目也不要求在该电脑上分配个人 Runtime。
+
 ## 验证
 
 包测试覆盖 principal 与启动凭据验证、提供方 dispose、严格事件响应解码、根继承 ACL、参与者归属与 invariant、Gateway 持久化行为、包括 scope 目标进度与结束清理在内的 Client 状态和组件行为、空白会话可见性兼容性、只读欢迎确认回退，以及 `ro` composer 替换。Gateway 测试覆盖 systemd 遮蔽与回绑、项目根校验、运行时写入 envelope 拒绝、配置端口解析、管理员访问尚未物化的私密根对话、持久化 scope 前启动目标运行时、启动失败时保留 scope，以及包含忙碌状态标记的禁止缓存 HTML 重试响应。Host/API Proxy 测试覆盖各类会话操作拒绝、可读列表过滤、参与者传播、根创建可见性，以及审批/问题原子抢占。真实 PostgreSQL 测试覆盖直到版本 5 的 migration、包含项目邀请的可重复 SQLite 导入、完整 JSON 事件往返、从空节点配置端口基准分配共享运行时、创建者/私密可见性、无项目成员记录时基于当前角色的管理员覆盖、子会话继承、贡献投影、成员移除保护、交互竞态、项目凭据、项目用量和显式项目额度模式。Gateway 与 permission 测试覆盖按来源筛选的 Admin 视图、用户项目与邀请生命周期、管理员在个人和项目 scope 中的 `fullAccess`，以及拒绝管理员专用的新会话默认值。无密钥组装态 Web 浏览器场景通过交付的 Client 组合覆盖项目 scope、可见性控件、参与者展示、拒绝不匹配空白会话与复用匹配空白会话、`ro` 体验、进程内欢迎确认，以及 Chat 发送者标签。生产构建入口会在每个组件构建后验证完整运行时载荷。
+
+[电脑权限回归测试](../../../../gateway/tests/computer-access-postgres.spec.ts)覆盖独立的电脑与能力授权、项目创建、跨 Gateway 处理邀请，以及等待项目锁期间的撤权。[真实 Gateway 邀请回放](../../../../gateway/tests/project-invitation-admission-transcript.spec.ts)检查撤销电脑使用权后发出和接受邀请被拒、拒绝时不加入成员或记录成功操作审计，以及恢复授权后接受邀请。
 
 ## 曾考虑的替代方案
 
@@ -47,6 +55,8 @@ Linux systemd 单元会先用只读临时文件系统遮蔽用户根、项目运
 **保留一个项目运行时，但把当前用户存入进程全局变量。** 否决，因为并发 HTTP、WebSocket、stream 和后台操作会发生竞态，并可能把一位参与者的 authority 或归属应用到另一位参与者的请求。
 
 **只在 Web UI 中强制协作规则。** 否决，因为直接 RPC 调用、陈旧客户端、重连和非可视消费方都能绕过它。UI 解释并阻止不可用操作，而 Host 与 Gateway 授权负责裁决。
+
+**把组织成员身份当作加入所有电脑上项目的权限。** 电脑使用授权独立管理，因此邀请事务检查项目固定所在电脑，既不新建授权，也不要求收件人在那里拥有个人 Runtime。
 
 **让每个后代会话拥有独立可见性。** 否决，因为共享根下的私密子会话或私密根下的共享子会话会让列表、fork、恢复和文本记录授权产生歧义。一份根 ACL 让整个对话树保持原子一致。
 

@@ -1,0 +1,13 @@
+{
+  "name": "browser-cleanup-final-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/browser-use-runtime/src/index.ts packages/experimental/browser-use-runtime/tests/resources.spec.ts packages/experimental/browser-use-runtime/tests/mcp.spec.ts packages/experimental/browser-use-stagehand-native/src/launch.ts packages/experimental/browser-use-stagehand-native/src/index.ts packages/experimental/browser-use-stagehand-native/src/worker-client.ts packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts",
+  "startedAt": "2026-10-23T17:28:23.067234+00:00",
+  "seconds": 3.478,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d13047249cf0270891e43e29addb08cf1f0cdaea4ed9beb38140efe6d80ad9d2",
+  "inputsAfter": "d13047249cf0270891e43e29addb08cf1f0cdaea4ed9beb38140efe6d80ad9d2",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

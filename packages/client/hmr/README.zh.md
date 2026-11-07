@@ -41,6 +41,9 @@ kind: "package-reference"
 |---|---|---|
 | `watchArtifacts` | `true` | 轮询产物文件以发现重建；false 时清单传输仍保持启用 |
 | `pollIntervalMs` | `500` | bundle stat 轮询间隔，单位为毫秒 |
+| `keepAliveIntervalMs` | `15000` | 图流注释间隔，单位毫秒；1 至 2147483647 的整数 |
+
+图流的保活注释独立于产物监视。注释不发布图变化或触发重载；响应需要排空时跳过注释。全部已打开响应共用一个不阻止进程退出的计时器，最后一个响应关闭后停止；插件清理先清除计时器，再等待响应关闭。
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-client-hmr)是所有受支持字段及其 JSDoc 的完整真源。
 
@@ -60,7 +63,7 @@ kind: "package-reference"
 
 ### 设计理念
 
-Host 半侧监听每个包带完成标记的入口产物，并提供 `/plugins/events`。它转发现有的图变化与重建通知；每个新连接都会收到当前完整图。图描述浏览器的目标条目，不保证 Host 清理已经完成。Host 的激活与清理仍由 Host 生命周期管理。入口的 mtime、ctime 和大小共同标识 revision，无需对其内容求哈希；元数据未变时无需读取内容。Host 重启时若产物未变，revision 保持不变，因此图流重连不会替换浏览器插件。浏览器半侧将两种帧都交给 Client Modules，由它串行处理条目变更并等待浏览器资源清理。
+Host 半侧监听每个包带完成标记的入口产物，并提供 `/plugins/events`。它转发现有的图变化与重建通知；每个新连接都会收到当前完整图。图描述浏览器的目标条目，不保证 Host 清理已经完成。Host 的激活与清理仍由 Host 生命周期管理。入口元数据检测候选变化，不读取未变文件。[Client Modules](../modules/README.zh.md#incremental-composition) 仅在带标记可执行内容改变时发布新 revision；未带标记产物保留文件系统 revision。相同编译内容跨复制、重建与 Host 重启保持 revision，因此图流重连不会替换这些插件。浏览器半侧将两种帧都交给 Client Modules，由它串行处理条目变更并等待浏览器资源清理。
 
 ### 浏览器侧替换
 

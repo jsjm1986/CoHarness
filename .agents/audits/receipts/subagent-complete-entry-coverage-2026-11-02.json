@@ -1,0 +1,429 @@
+{
+  "finding": "B436",
+  "relatedFindings": [
+    "B438",
+    "B444",
+    "B450",
+    "B456"
+  ],
+  "kind": "verification_followup",
+  "status": "verified_retained_cleanup_and_normal_core_coverage_754_cases_global_review_open",
+  "updatedAt": "2026-11-02T05:19:40.067032+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T04:53:43.484242+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-latest-fetch.json",
+    "workingTreePreserved": true
+  },
+  "scope": "Complete the original exact-parent cleanup regression evidence and include the SubagentCore entry in normal per-file coverage policy. This followup does not claim a new product defect.",
+  "change": "Two reentrant retry-collection cases prove that failed original cleanup blocks provider allocation and confirmed cleanup precedes new dispatch. Remove the runtime-local recovery cache and its release callback: existing parent-owned listeners already accept repeat transfers across runtime replacement. Keep the original runtime lease sets and cleanup ownership.",
+  "simplification": {
+    "removed": "One redundant runtime-local recovery map, lookup/conditional and map-release callback.",
+    "retained": "Parent-scoped recovery registrations, exact-parent identity matching, original lease retry authority, release confirmation, late transfer drainage and idle protection.",
+    "strongestAlternative": "A runtime-local cache cannot locate retired-runtime recovery; the existing identity-matched offer already reaches that parent-owned registration.",
+    "consumersUpdated": 3,
+    "publicServiceApiChanged": false,
+    "sessionOrWireFormatChanged": false,
+    "newAgentNotes": 0,
+    "owningAgentNotesUpdated": 1
+  },
+  "verification": {
+    "differentNamedCases": 754,
+    "unitAndCoverageSelectionCases": 728,
+    "typeScriptSdkCases": 13,
+    "pythonSdkCases": 13,
+    "sourceBuiltRepetitionsNotAdditionalCases": true,
+    "skipped": 0,
+    "newReentrantCases": 2,
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 327,
+          "covered": 327,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 379,
+          "covered": 379,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 98,
+          "covered": 98,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 198,
+          "covered": 198,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/control.ts": {
+        "lines": {
+          "total": 32,
+          "covered": 32,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 9,
+          "covered": 9,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 35,
+          "covered": 35,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 41,
+          "covered": 41,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/index.ts": {
+        "lines": {
+          "total": 245,
+          "covered": 245,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 64,
+          "covered": 64,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 277,
+          "covered": 277,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 124,
+          "covered": 124,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/retained-cleanup.ts": {
+        "lines": {
+          "total": 29,
+          "covered": 29,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 14,
+          "covered": 14,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 40,
+          "covered": 40,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 23,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/run-lease.ts": {
+        "lines": {
+          "total": 21,
+          "covered": 21,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 27,
+          "covered": 27,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "normalEntryCoverageExemptionRemoved": true,
+    "coverageThresholdWeakened": false,
+    "platformPolicyCases": "Linux, macOS and Windows selections with both PowerShell capability values; actual execution here is macOS.",
+    "allChecks": [
+      {
+        "name": "retained-cleanup-normal-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-normal-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent/tests",
+          "packages/subagent/tool-subagent/tests",
+          "packages/context/collaboration/tests",
+          "packages/context/collaboration-gateway/tests",
+          "scripts/coverage-selection.spec.ts",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent/src/index.ts",
+          "--coverage.include=packages/subagent/subagent/src/control.ts",
+          "--coverage.include=packages/subagent/subagent/src/run-lease.ts",
+          "--coverage.include=packages/subagent/subagent/src/retained-cleanup.ts",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/normal-final-coverage",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-normal-final-cases.json"
+        ]
+      },
+      {
+        "name": "retained-cleanup-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-types.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-b",
+          "packages/subagent/subagent",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "retained-cleanup-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-bundle.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "RAYON_NUM_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/tsdown/dist/run.mjs",
+          "--filter",
+          "@deepseek-ai/dsh-subagent"
+        ]
+      },
+      {
+        "name": "retained-cleanup-sdk-src",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-sdk-src.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=src",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.expected.config.ts",
+          "apps/cli/tests/profiles/sdk/subagent-retry-admission.expected.e2e.ts",
+          "apps/cli/tests/profiles/sdk/queued-subagent-cleanup.expected.e2e.ts",
+          "apps/cli/tests/profiles/sdk/draining-subagent-cleanup.expected.e2e.ts",
+          "apps/cli/tests/profiles/sdk/parent-subagent-cleanup.expected.e2e.ts",
+          "apps/cli/tests/profiles/sdk/retired-subagent-cleanup.expected.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-sdk-src-cases.json"
+        ]
+      },
+      {
+        "name": "retained-cleanup-sdk-lib",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-sdk-lib.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.expected.config.ts",
+          "apps/cli/tests/profiles/sdk/subagent-retry-admission.expected.e2e.ts",
+          "apps/cli/tests/profiles/sdk/queued-subagent-cleanup.expected.e2e.ts",
+          "apps/cli/tests/profiles/sdk/draining-subagent-cleanup.expected.e2e.ts",
+          "apps/cli/tests/profiles/sdk/parent-subagent-cleanup.expected.e2e.ts",
+          "apps/cli/tests/profiles/sdk/retired-subagent-cleanup.expected.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-sdk-lib-cases.json"
+        ]
+      },
+      {
+        "name": "retained-cleanup-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-python.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "python/sdk/.venv/bin/python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_subagent_retry_admission_expected.py",
+          "python/sdk/tests/test_queued_subagent_cleanup_expected.py",
+          "python/sdk/tests/test_draining_subagent_cleanup_expected.py",
+          "python/sdk/tests/test_parent_subagent_cleanup_expected.py",
+          "python/sdk/tests/test_retired_subagent_cleanup_expected.py",
+          "--junitxml=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-python-cases.xml"
+        ]
+      },
+      {
+        "name": "retained-cleanup-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-lint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent/src/index.ts",
+          "packages/subagent/subagent/src/retained-cleanup.ts",
+          "packages/subagent/subagent/tests/run-cleanup.spec.ts",
+          "scripts/coverage-baseline.ts",
+          "scripts/coverage-selection.spec.ts"
+        ]
+      },
+      {
+        "name": "retained-cleanup-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-doc-quick.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_GATE_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/run-docs.mjs"
+        ]
+      },
+      {
+        "name": "retained-cleanup-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-host-types.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/host-types.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "retained-cleanup-catalog",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-catalog.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/gen-cordis-catalog.ts",
+          "--check"
+        ]
+      },
+      {
+        "name": "retained-cleanup-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-export-jsdoc.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ]
+      },
+      {
+        "name": "retained-cleanup-node-next",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-node-next.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-node-next-types.ts"
+        ]
+      },
+      {
+        "name": "retained-cleanup-publint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/retained-cleanup-publint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/publint-all.ts",
+          "--packages-root",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/publish-view"
+        ]
+      }
+    ]
+  },
+  "capsule": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/subagent-core-coverage-capsule.json",
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T045708Z/B416-B470-core-coverage-integration-index.json",
+  "remaining": [
+    "Verify continued-question origin references through durable persistence and restoration; distinguish current verified receipts from historical unverified replies.",
+    "Independently verify the peer historical schema61 upgrade against the current migration set on an owned disposable database.",
+    "Complete B04/B25 requirement and allocation classification, then remaining business domains and feature inventory.",
+    "Independently accept peer Runtime control and R41 topology on the assembled matching release.",
+    "Official paid Responses validation stays deferred by the user."
+  ],
+  "wholeProjectComplete": false,
+  "productionAcceptanceClaimed": false,
+  "officialResponsesDeferredByUser": true
+}

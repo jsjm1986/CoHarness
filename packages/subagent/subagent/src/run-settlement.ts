@@ -9,6 +9,7 @@
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
 import type { SubagentResult, SubagentRun } from './types.ts'
+import { renderSubagentFailure } from './error.ts'
 
 /** Flatten a child's final output blocks to the task's final text. */
 function finalText(blocks: readonly ContentBlock[]): string {
@@ -63,13 +64,13 @@ export async function settleRun(run: SubagentRun): Promise<JobOutcome> {
   try {
     outcome = runOutcome(await run.result)
   } catch (error: unknown) {
-    outcome = { status: 'failed', detail: String(error) }
+    outcome = { status: 'failed', detail: renderSubagentFailure(error) }
   }
   try {
     await run.dispose()
   } catch (error: unknown) {
     const prefix = outcome.detail === undefined ? '' : `${outcome.detail}; `
-    return { status: 'failed', detail: `${prefix}dispose failed: ${String(error)}` }
+    return { status: 'failed', detail: `${prefix}dispose failed: ${renderSubagentFailure(error)}` }
   }
   return outcome
 }

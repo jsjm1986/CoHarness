@@ -12,6 +12,8 @@ JSONL lookup selects a physical log from the requested session id across project
 
 `loadStored(id)` is the coordinator's single stored-prefix lookup. The JSONL backend scans every project directory, requires at most one matching encoded session directory with a transcript, parses that file, then validates `header.id === id` and that the selected path either equals `logPath(root, header.cwd, header.id)` or filesystem canonicalization resolves both spellings to the same transcript. `list()` applies the same path validation and rejects duplicate ids across project directories.
 
+Single-session metadata reads use the provider's `stat(id)` discovery rather than the generic snapshot-list fallback. This preserves pending creations, target identity and encoding checks, highest-generation selection, and cancellation while avoiding header reads for unrelated sessions. Target refusal propagates instead of becoming a listing omission; absence remains `undefined`. Historical source revisions retain the root-wide corpus identity because child membership can change the logical view without changing the parent's bytes.
+
 The coordinator independently asserts the returned id and compares the stored cwd with a live session's cwd before repair, state publication, or suffix persistence. It keeps a detached copy of validated metadata; JSONL append and repair derive their path from that copy. The `PersistenceBackend<TornMarker>` interface therefore needs neither a scope-specific live lookup nor a storage-locator type.
 
 An existing configured JSONL root must be a readable directory when the plugin loads. An absent root remains valid and is created on first materialization. The backend supports one live writer per session; another backend instance or process must not mutate that session until the owner finishes disposal and all writes stop.
@@ -24,6 +26,10 @@ An existing configured JSONL root must be a readable directory when the plugin l
 
 **Coordinate multiple live writers.** A dedicated coordination service, process-global registry, or cross-process lock would define a new deployment topology rather than repair identity validation. The supported topology has one live writer; no-overwrite hard-link publication still arbitrates an initial same-id creation race.
 
+**Cache headers across requests.** A retained header would need to invalidate on external replacement, removal, and successor publication. Targeted `stat` already supplies fresh identity validation without introducing another cache owner or permitting a stale generation to bypass refusal.
+
 ## Consequences
 
 Mismatched, misplaced, and duplicate JSONL logs fail before repair or coordinator state mutation. Lookup remains proportional to the number of project directories, and one-live-writer ownership remains an explicit limitation. Coordinator and JSONL tests pin rejection before repair, unchanged bytes for both affected logs, path validation during listing, duplicate-id rejection, normalized-project collisions and case aliases, and load-time root validation.
+
+The metadata regression compares the generic list fallback with targeted reads on a private four-session catalog in both encodings: four physical header reads become one for each metadata entry point. It also pins absence, pending creation, successor publication, removal during lookup, target refusal, unrelated malformed headers, historical corpus identity, and joined cancellation. These are work-count assertions, not end-to-end latency measurements; full session listing still enumerates all sessions.

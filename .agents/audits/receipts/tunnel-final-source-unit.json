@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-final-source-unit",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/cloudflare-api.spec.ts tests/tunnel-access.spec.ts tests/tunnel-supervisor.spec.ts tests/local-runtime-launcher.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T21:47:14.601030+00:00",
+  "seconds": 12.346,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "926d4a4e141875d5586f4dc8f1fb3d2a38a40f7838b147a699a1d74e7b53c650",
+  "inputsAfter": "926d4a4e141875d5586f4dc8f1fb3d2a38a40f7838b147a699a1d74e7b53c650",
+  "postgresToolDirectory": null,
+  "outputSha256": "d5aca3935621bcb39cb0acb1a536917f771a6a086d7e9c891fa39889bd5f2762",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  4 passed (4)\n      Tests  50 passed (50)\n   Start at  05:47:17\n   Duration  9.51s (transform 778ms, setup 0ms, import 1.06s, tests 14.62s, environment 0ms)\n\n"
+}

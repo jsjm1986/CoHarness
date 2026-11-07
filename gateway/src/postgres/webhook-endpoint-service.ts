@@ -5,6 +5,8 @@ import { transaction } from './database.ts'
 import type { PoolClient } from 'pg'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 import { REPLAY_WINDOW_LIMIT_MS } from './webhook-delivery-service.ts'
+import { lockAdministrator } from './administrator-authority.ts'
+import type { RuntimeId, RuntimeNodeId } from '../runtime-catalog.ts'
 
 /** Dispatch POST read limit enforced by the managed runtime; bounds intake bodies and pre-send payloads. */
 export const DISPATCH_BODY_LIMIT = 1_048_576
@@ -29,6 +31,8 @@ export interface WebhookEndpointView {
   executionUserId: number
   runtimeKind: 'user' | 'project'
   runtimePublicId: number
+  runtimeId?: RuntimeId | null
+  nodeId?: RuntimeNodeId | null
   /** Visibility of project roots; personal targets remain personal. */
   projectVisibility: 'project' | 'private'
   intakeLimit: number
@@ -60,6 +64,8 @@ export interface WebhookIntakeConfig {
   executionUserId: number
   runtimeKind: 'user' | 'project'
   runtimePublicId: number
+  runtimeId?: RuntimeId
+  nodeId?: RuntimeNodeId
   /** Visibility of project roots; personal targets remain personal. */
   projectVisibility: 'project' | 'private'
   intakeLimit: number
@@ -137,6 +143,7 @@ const fields = z.object({
   executionUserId: z.number().int().positive(),
   runtimeKind: z.enum(['user', 'project']),
   runtimePublicId: z.number().int().positive(),
+  runtimeId: z.uuid().transform(value => value as RuntimeId).optional(),
   projectVisibility: z.enum(['project', 'private']).default('project'),
   intakeLimit: z.number().int().min(1).max(1_000_000),
   intakeWindowMs: z.number().int().min(1).max(86_400_000),
@@ -172,6 +179,8 @@ interface EndpointRow {
   execution_user_public_id: string
   runtime_kind: 'user' | 'project'
   runtime_public_id: string
+  runtime_id: RuntimeId | null
+  node_id: RuntimeNodeId | null
   project_visibility: 'project' | 'private'
   intake_limit: number
   intake_window_ms: string
@@ -188,7 +197,7 @@ interface EndpointRow {
 const columns = `e.id,e.public_id::text,e.name,e.provider,e.source,e.events,e.actions,e.repositories,
   e.title_template,e.prompt_template,e.workspace_path,e.agent_preset,e.permission_preset,
   e.model_provider,e.model_id,e.model_max_tokens,e.execution_user_id,u.public_id::text execution_user_public_id,
-  e.runtime_kind,e.runtime_public_id::text,e.project_visibility,e.intake_limit,e.intake_window_ms::text,e.replay_window_ms::text,
+  e.runtime_kind,e.runtime_public_id::text,e.runtime_id,e.node_id,e.project_visibility,e.intake_limit,e.intake_window_ms::text,e.replay_window_ms::text,
   e.max_body_bytes,e.key_version,e.nonce,e.ciphertext,e.auth_tag,e.enabled,e.revision::text`
 const from = `FROM harness.webhook_endpoints e
   JOIN harness.users u ON u.organization_id=e.organization_id AND u.id=e.execution_user_id`
@@ -203,6 +212,7 @@ function view(row: EndpointRow): WebhookEndpointView {
     modelProvider: row.model_provider, modelId: row.model_id, modelMaxTokens: row.model_max_tokens,
     executionUserId: Number(row.execution_user_public_id),
     runtimeKind: row.runtime_kind, runtimePublicId: Number(row.runtime_public_id),
+    runtimeId: row.runtime_id, nodeId: row.node_id,
     projectVisibility: row.project_visibility,
     intakeLimit: row.intake_limit, intakeWindowMs: Number(row.intake_window_ms),
     replayWindowMs: Number(row.replay_window_ms), maxBodyBytes: row.max_body_bytes,
@@ -219,6 +229,7 @@ function intake(row: EndpointRow, secret: string): WebhookIntakeConfig {
     modelProvider: row.model_provider, modelId: row.model_id, modelMaxTokens: row.model_max_tokens,
     executionUserUuid: row.execution_user_id, executionUserId: Number(row.execution_user_public_id),
     runtimeKind: row.runtime_kind, runtimePublicId: Number(row.runtime_public_id),
+    ...(row.runtime_id === null ? {} : { runtimeId: row.runtime_id }), ...(row.node_id === null ? {} : { nodeId: row.node_id }),
     projectVisibility: row.project_visibility,
     intakeLimit: row.intake_limit, intakeWindowMs: Number(row.intake_window_ms),
     replayWindowMs: Number(row.replay_window_ms), maxBodyBytes: row.max_body_bytes,
@@ -230,10 +241,13 @@ function intake(row: EndpointRow, secret: string): WebhookIntakeConfig {
 export class PostgresWebhookEndpointService {
   constructor(private readonly context: PostgresRuntimeContext, private readonly cipher: WebhookSecretCipher) {}
 
-  /** Run one transaction, translating a raced name uniqueness violation into a conflict. */
-  private async run<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+  /** Retain current administrator authority, translating raced name uniqueness into a conflict. */
+  private async run<T>(actorUserId: number, work: (client: PoolClient) => Promise<T>): Promise<T> {
     try {
-      return await transaction(this.context.pool, work)
+      return await transaction(this.context.pool, async client => {
+        await lockAdministrator(client, this.context, actorUserId)
+        return work(client)
+      })
     } catch (error) {
       if (isCodedError(error) && error.code === '23505') {
         throw new WebhookEndpointError(409, 'webhook endpoint name is already registered')
@@ -242,11 +256,17 @@ export class PostgresWebhookEndpointService {
     }
   }
 
-  /** @returns every registered endpoint without secret material, ordered by name. */
-  async list(): Promise<WebhookEndpointView[]> {
-    const rows = await this.context.pool.query<EndpointRow>(
-      `SELECT ${columns} ${from} WHERE e.organization_id=$1 ORDER BY e.name,e.public_id`, [this.context.organizationId])
-    return rows.rows.map(view)
+  /**
+   * Read endpoint metadata while retaining the current administrator.
+   * @param actorUserId - server-authenticated public administrator id.
+   * @returns every registered endpoint without secret material, ordered by name.
+   */
+  async list(actorUserId: number): Promise<WebhookEndpointView[]> {
+    return this.run(actorUserId, async client => {
+      const rows = await client.query<EndpointRow>(
+        `SELECT ${columns} ${from} WHERE e.organization_id=$1 ORDER BY e.name,e.public_id`, [this.context.organizationId])
+      return rows.rows.map(view)
+    })
   }
 
   /**
@@ -260,8 +280,8 @@ export class PostgresWebhookEndpointService {
     const parsed = createInput.safeParse(input)
     if (!parsed.success) throw new WebhookEndpointError(400, 'invalid webhook endpoint')
     const value = parsed.data
-    return this.run(async client => {
-      await this.requireRuntimeTarget(client, value.runtimeKind, value.runtimePublicId, value.executionUserId)
+    return this.run(adminPublicId, async client => {
+      const runtimeId = await this.requireRuntimeTarget(client, value.runtimeKind, value.runtimePublicId, value.executionUserId, value.runtimeId)
       const user = await client.query<{ id: string }>(
         `SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2 AND status='active' AND deleted_at IS NULL`,
         [this.context.organizationId, value.executionUserId])
@@ -279,8 +299,8 @@ export class PostgresWebhookEndpointService {
         (id,organization_id,name,provider,source,events,actions,repositories,title_template,prompt_template,workspace_path,
           agent_preset,permission_preset,model_provider,model_id,model_max_tokens,execution_user_id,
           runtime_kind,runtime_public_id,intake_limit,intake_window_ms,replay_window_ms,max_body_bytes,
-          key_version,nonce,ciphertext,auth_tag,created_by,project_visibility)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
+          key_version,nonce,ciphertext,auth_tag,created_by,project_visibility,runtime_id,node_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
         RETURNING public_id::text`,
       [id, this.context.organizationId, value.name, value.provider, value.source, value.events, value.actions,
         value.repositories, value.titleTemplate, value.promptTemplate, value.workspacePath, value.agentPreset,
@@ -288,7 +308,7 @@ export class PostgresWebhookEndpointService {
         value.modelProvider ?? null, value.modelId ?? null, value.modelMaxTokens ?? null, user.rows[0].id,
         value.runtimeKind, value.runtimePublicId, value.intakeLimit, value.intakeWindowMs, value.replayWindowMs,
         value.maxBodyBytes, secret.keyVersion, secret.nonce, secret.ciphertext, secret.authTag,
-        admin.rows[0]?.id ?? null, value.projectVisibility])
+        admin.rows[0]!.id, value.projectVisibility, runtimeId, this.context.nodeId])
       const created = await client.query<EndpointRow>(
         `SELECT ${columns} ${from} WHERE e.organization_id=$1 AND e.public_id=$2`,
         [this.context.organizationId, inserted.rows[0]!.public_id])
@@ -300,24 +320,27 @@ export class PostgresWebhookEndpointService {
    * Replace an endpoint's configuration only when the submitted revision is current.
    * A present `secret` rotates the signing key; receipts keep their identity across rotation.
    * @param input - public endpoint id, observed revision, new fields, and optional new secret.
+   * @param actorUserId - server-authenticated public administrator id, retained through commit.
    * @returns the updated endpoint view.
    */
-  async update(input: unknown): Promise<WebhookEndpointView> {
+  async update(input: unknown, actorUserId: number): Promise<WebhookEndpointView> {
     const parsed = updateInput.safeParse(input)
     if (!parsed.success) throw new WebhookEndpointError(400, 'invalid webhook endpoint update')
     const { targetId, revision, fields: value, secret } = parsed.data
-    return this.run(async client => {
-      const current = await client.query<{ id: string; revision: string }>(
-        `SELECT id,revision::text FROM harness.webhook_endpoints WHERE organization_id=$1 AND public_id=$2 FOR UPDATE`,
+    return this.run(actorUserId, async client => {
+      const current = await client.query<{ id: string; revision: string; runtime_id: RuntimeId | null; runtime_kind: string; runtime_public_id: string; node_id: string | null }>(
+        `SELECT id,revision::text,runtime_id,runtime_kind,runtime_public_id::text,node_id FROM harness.webhook_endpoints WHERE organization_id=$1 AND public_id=$2 FOR UPDATE`,
         [this.context.organizationId, targetId])
       const row = current.rows[0]
       if (row === undefined) throw new WebhookEndpointError(404, 'webhook endpoint not found')
       if (row.revision !== revision) throw new WebhookEndpointError(409, 'webhook endpoint changed; reload before saving')
+      if (row.node_id !== null && row.node_id !== this.context.nodeId) throw new WebhookEndpointError(409, 'webhook belongs to another computer')
       const renamed = await client.query(
         'SELECT 1 FROM harness.webhook_endpoints WHERE organization_id=$1 AND name=$2 AND public_id<>$3',
         [this.context.organizationId, value.name, targetId])
       if (renamed.rowCount !== 0) throw new WebhookEndpointError(409, 'webhook endpoint name is already registered')
-      await this.requireRuntimeTarget(client, value.runtimeKind, value.runtimePublicId, value.executionUserId)
+      const retained = row.runtime_kind === value.runtimeKind && Number(row.runtime_public_id) === value.runtimePublicId ? row.runtime_id ?? undefined : undefined
+      const runtimeId = await this.requireRuntimeTarget(client, value.runtimeKind, value.runtimePublicId, value.executionUserId, value.runtimeId ?? retained)
       const user = await client.query<{ id: string }>(
         `SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2 AND status='active' AND deleted_at IS NULL`,
         [this.context.organizationId, value.executionUserId])
@@ -331,7 +354,7 @@ export class PostgresWebhookEndpointService {
         replay_window_ms=$22,max_body_bytes=$23,
         key_version=COALESCE($24,key_version),nonce=COALESCE($25,nonce),
         ciphertext=COALESCE($26,ciphertext),auth_tag=COALESCE($27,auth_tag),
-        project_visibility=$28,revision=revision+1,updated_at=clock_timestamp()
+        project_visibility=$28,runtime_id=$29,node_id=$30,revision=revision+1,updated_at=clock_timestamp()
         WHERE organization_id=$1 AND public_id=$2`,
       [this.context.organizationId, targetId, value.name, value.provider, value.source, value.events,
         value.actions, value.repositories, value.titleTemplate, value.promptTemplate, value.workspacePath,
@@ -339,7 +362,7 @@ export class PostgresWebhookEndpointService {
         value.permissionPreset, value.modelProvider ?? null, value.modelId ?? null, value.modelMaxTokens ?? null,
         user.rows[0].id, value.runtimeKind, value.runtimePublicId, value.intakeLimit, value.intakeWindowMs,
         value.replayWindowMs, value.maxBodyBytes,
-        rotated?.keyVersion ?? null, rotated?.nonce ?? null, rotated?.ciphertext ?? null, rotated?.authTag ?? null, value.projectVisibility])
+        rotated?.keyVersion ?? null, rotated?.nonce ?? null, rotated?.ciphertext ?? null, rotated?.authTag ?? null, value.projectVisibility, runtimeId, this.context.nodeId])
       const updated = await client.query<EndpointRow>(
         `SELECT ${columns} ${from} WHERE e.organization_id=$1 AND e.public_id=$2`,
         [this.context.organizationId, targetId])
@@ -350,13 +373,14 @@ export class PostgresWebhookEndpointService {
   /**
    * Enable, disable, or remove one endpoint under its observed revision.
    * @param input - public endpoint id, observed revision, and the requested mutation.
+   * @param actorUserId - server-authenticated public administrator id, retained through commit.
    * @returns the updated view, or null after removal.
    */
-  async mutate(input: unknown): Promise<WebhookEndpointView | null> {
+  async mutate(input: unknown, actorUserId: number): Promise<WebhookEndpointView | null> {
     const parsed = mutateInput.safeParse(input)
     if (!parsed.success) throw new WebhookEndpointError(400, 'invalid webhook endpoint mutation')
     const { targetId, revision, action } = parsed.data
-    return this.run(async client => {
+    return this.run(actorUserId, async client => {
       const current = await client.query<{ revision: string }>(
         'SELECT revision::text FROM harness.webhook_endpoints WHERE organization_id=$1 AND public_id=$2 FOR UPDATE',
         [this.context.organizationId, targetId])
@@ -390,35 +414,55 @@ export class PostgresWebhookEndpointService {
       `SELECT ${columns} ${from} WHERE e.organization_id=$1 AND e.public_id=$2`,
       [this.context.organizationId, parsed.data])
     const row = rows.rows[0]
-    if (row === undefined || !row.enabled) throw new WebhookEndpointError(404, 'webhook endpoint not found')
+    if (row === undefined || !row.enabled || row.node_id !== this.context.nodeId || row.runtime_id === null) throw new WebhookEndpointError(404, 'webhook endpoint not found')
     return intake(row, this.cipher.decrypt(this.context.organizationId, row.id, {
       keyVersion: row.key_version, nonce: row.nonce, ciphertext: row.ciphertext, authTag: row.auth_tag,
     }))
   }
 
   /**
+   * Read public ingress placement without decrypting credentials or reserving work.
+   * @param publicId - provider URL's positive endpoint identifier.
+   * @returns the exact assigned computer; that computer still verifies the original HMAC and current configuration.
+   */
+  async placement(publicId: number): Promise<RuntimeNodeId> {
+    const result = await this.context.pool.query<{ node_id: RuntimeNodeId }>(`SELECT endpoint.node_id FROM harness.webhook_endpoints endpoint
+      JOIN harness.organizations organization ON organization.id=endpoint.organization_id AND organization.status='active'
+      JOIN harness.runtime_environments environment ON environment.organization_id=endpoint.organization_id AND environment.id=endpoint.runtime_id
+        AND environment.node_id=endpoint.node_id AND environment.retired_at IS NULL
+      JOIN harness.instances instance ON instance.organization_id=environment.organization_id AND instance.runtime_id=environment.id
+        AND instance.assigned_node_id=endpoint.node_id
+      WHERE endpoint.organization_id=$1 AND endpoint.public_id=$2 AND endpoint.enabled`, [this.context.organizationId, publicId])
+    if (result.rows[0] === undefined) throw new WebhookEndpointError(404, 'webhook endpoint not found')
+    return result.rows[0].node_id
+  }
+
+  /**
    * Resolve an endpoint by its durable id for administrator redispatch; the
    * signing secret is irrelevant when replaying a stored verified event.
    * @param endpointId - receipt-owned endpoint UUID.
+   * @param actorUserId - server-authenticated public administrator id.
    * @returns the current dispatch configuration.
    */
-  async dispatchConfig(endpointId: unknown): Promise<Omit<WebhookIntakeConfig, 'secret'>> {
+  async dispatchConfig(endpointId: unknown, actorUserId: number): Promise<Omit<WebhookIntakeConfig, 'secret'>> {
     const parsed = z.uuid().safeParse(endpointId)
     if (!parsed.success) throw new WebhookEndpointError(400, 'invalid webhook endpoint id')
-    const rows = await this.context.pool.query<EndpointRow>(
-      `SELECT ${columns} ${from} WHERE e.organization_id=$1 AND e.id=$2`,
-      [this.context.organizationId, parsed.data])
-    const row = rows.rows[0]
-    if (row === undefined) throw new WebhookEndpointError(404, 'webhook endpoint not found')
-    const { secret: _secret, ...config } = intake(row, '')
-    return config
+    return this.run(actorUserId, async client => {
+      const rows = await client.query<EndpointRow>(
+        `SELECT ${columns} ${from} WHERE e.organization_id=$1 AND e.id=$2`,
+        [this.context.organizationId, parsed.data])
+      const row = rows.rows[0]
+      if (row === undefined || row.node_id !== this.context.nodeId || row.runtime_id === null) throw new WebhookEndpointError(404, 'webhook endpoint not found')
+      const { secret: _secret, ...config } = intake(row, '')
+      return config
+    })
   }
 
   /** Validate that the runtime target owner exists inside this organization and matches its executor. */
   private async requireRuntimeTarget(
-    client: { query: (text: string, values: unknown[]) => Promise<{ rowCount: number | null }> },
-    kind: 'user' | 'project', publicId: number, executionUserId: number,
-  ): Promise<void> {
+    client: PoolClient,
+    kind: 'user' | 'project', publicId: number, executionUserId: number, runtimeId?: RuntimeId,
+  ): Promise<RuntimeId> {
     if (kind === 'user' && publicId !== executionUserId) {
       throw new WebhookEndpointError(400, 'webhook user runtime target must be the execution account')
     }
@@ -430,5 +474,13 @@ export class PostgresWebhookEndpointService {
         `SELECT 1 FROM harness.projects WHERE organization_id=$1 AND public_id=$2 AND status='active'`,
         [this.context.organizationId, publicId])
     if (found.rowCount !== 1) throw new WebhookEndpointError(400, 'webhook runtime target not found')
+    const assigned = await client.query<{ runtime_id: RuntimeId }>(`SELECT instance.runtime_id FROM harness.instances instance
+      JOIN harness.${kind === 'user' ? 'users' : 'projects'} owner ON owner.organization_id=instance.organization_id
+        AND owner.id=instance.${kind === 'user' ? 'user_id' : 'project_id'}
+      WHERE instance.organization_id=$1 AND instance.assigned_node_id=$2 AND owner.public_id=$3
+        AND ($4::uuid IS NULL OR instance.runtime_id=$4) ORDER BY instance.runtime_id LIMIT 2 FOR SHARE OF instance`,
+    [this.context.organizationId, this.context.nodeId, publicId, runtimeId ?? null])
+    if (assigned.rows.length !== 1) throw new WebhookEndpointError(409, 'webhook requires an exact Runtime on the selected computer')
+    return assigned.rows[0]!.runtime_id
   }
 }

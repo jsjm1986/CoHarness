@@ -60,7 +60,7 @@ kind: "package-reference"
 
 agent 完成计划后，会以 markdown 形式、从标题开头书写计划并调用 `exit_plan_mode`。你评审该计划的原文，选择 `Approve` 离开计划模式，或选择 `Keep planning` 带反馈把 agent 送回去。
 
-选择 `Keep planning`（可附自由文本反馈）会让 agent 回去修订计划；关闭评审改为发言，则告知 agent 等待你的下一条消息。若没有可用的交互评审，`exit_plan_mode` 无法运行，你仍可用 `/plan off` 离开计划模式。
+选择 `Keep planning`（可附自由文本反馈）会让 agent 回去修订计划；关闭评审改为发言，则结束 agent 的当前轮次，你的下一条消息会开启新的请求。若没有可用的交互评审，`exit_plan_mode` 无法运行，你仍可用 `/plan off` 离开计划模式。
 
 ### 观察计划状态
 
@@ -88,13 +88,15 @@ agent 完成计划后，会以 markdown 形式、从标题开头书写计划并�
 
 命令子插件只在组合了命令服务时激活。它把不带参数的 `/plan` 映射为激活，把恰好为 `off` 的参数映射为未激活且不发送模型输入，把其他非空参数映射为激活并把去除首尾空白的文本通过 `agent.steer()` 作为下一步骤的普通已记录用户消息提交。已准入的图片块与文件块按选择顺序进入这条消息；带附件的 `/plan off` 会在模式变更前失败。命令以外的入口可以直接驱动 `ctx.planMode`；确切的分支处理见 [`src/index.ts`](src/index.ts)。
 
+托管命令的文本和附件会在模式选择或投递之前取得执行授权提供方的输入凭证。缺少必需提供方、登记被拒、取消、服务重载、提供方更换或原活动 Agent 失效时，模式与投递状态均保持不变。独立组合可以不接入提供方；不带参数的 `/plan` 和 `/plan off` 不产生模型输入。
+
 ### 退出工具
 
-`exit_plan_mode` 在计划模式未激活时仍保持注册，因此进入或离开只改变提示词段落，绝不改变请求的工具目录。经批准的评审会记录一个静默的待生效退出，由下一个被接受的轮内 pre-step 追加，当前这批工具调用剩余部分仍保留计划引导。缺少用户交互通道，或评审等待期间服务重载，调用都会以拒绝方式失败，`/plan off` 仍是手动退路。
+`exit_plan_mode` 在计划模式未激活时仍保持注册，因此进入或离开只改变提示词段落，绝不改变请求的工具目录。经批准的评审会记录一个静默的待生效退出，由下一个被接受的轮内 pre-step 追加，当前这批工具调用剩余部分仍保留计划引导。选择退出前，工具会重新检查执行取消状态及原 Agent 是否仍是存活实例，即使提问服务已经返回答案也如此。缺少用户交互通道，或评审等待期间服务重载、调用方失效，调用都会以拒绝方式失败，`/plan off` 仍是手动退路。
 
 ### 会话投影单元
 
-组合了 `ctx.sessionProjections` 时，本包通过可选注入注册 `plan` 单元。该单元把已记录的 `/plan` 命令运行转为候选目标，在 `plan/mode` 上提交已记录状态，并为 `view` 推导 `{ active, pending }`，其中 `pending` 仅在未结算或已成功的选择与已记录状态不同时为 true——这是仅凭日志即可恢复的纯回放量。key 由 [`src/types.ts`](src/types.ts) 的声明合并加入 `SessionProjectionMap`；框架负责驱动该单元，卸载插件 fiber 会注销该 key。plan-mode 读取要求该单元与 `turnBoundary` 单元存在；注册表或任一 key 缺失时都会显式失败。
+组合了 `ctx.sessionProjections` 时，本包通过可选注入注册 `plan` 单元。该单元把已记录的 `/plan` 命令运行转为候选目标，在 `plan/mode` 上提交已记录状态，并为 `view` 推导 `{ active, pending }`，其中 `pending` 仅在未结算或已成功的选择与已记录状态不同时为 true——这是仅凭日志即可恢复的纯回放量。失败命令只丢弃自身的候选目标；较早成功的待生效选择会继续显示，直到生效或被另一成功选择替代。key 由 [`src/types.ts`](src/types.ts) 的声明合并加入 `SessionProjectionMap`；框架负责驱动该单元，卸载插件 fiber 会注销该 key。plan-mode 读取要求该单元与 `turnBoundary` 单元存在；注册表或任一 key 缺失时都会显式失败。
 
 ### 源码地图
 
@@ -119,7 +121,7 @@ agent 完成计划后，会以 markdown 形式、从标题开头书写计划并�
 - [plan/ 包映射](../README.zh.md)——本组及其唯一的包。
 - [`exit_plan_mode` 工具目录条目](../../../docs/tool-catalog.zh.md#deepseek-aidsh-plan-mode)——模型收到的确切 schema。
 - [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-plan-mode)——每个受支持配置字段及其含义。
-- [plan 专用协作状态](../../../.agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md)——计划模式背后的设计决策。
+- [已归档 plan 专用协作状态](../../../.agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md)——计划模式背后的设计决策。
 
 -----
 

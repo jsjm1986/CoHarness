@@ -196,7 +196,7 @@ jobs:
       # Pull requests consume the default-branch cache but do not put cache
       # compression and upload on the paid latency-critical path. Skipped
       # under failover — see the coverage lane's identical rationale.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
@@ -297,7 +297,7 @@ jobs:
       # Skipped under failover: the self-hosted VM's persistent pnpm store
       # already serves warm installs, while restoring the hosted archive
       # would spend ~52 s pulling ~180 MB into that populated store.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
@@ -328,7 +328,7 @@ jobs:
 
       - name: Restore compatible scheduling weights
         if: needs.pr-scope.outputs.coverage_mode == 'full'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6.1.0
         with:
           path: .coverage-times.json
           key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -349,7 +349,7 @@ jobs:
         run: pnpm run check:ci:coverage
       - name: Save successful scheduling weights
         if: success() && needs.pr-scope.outputs.coverage_mode == 'full' && hashFiles('.coverage-times.json') != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6.1.0
         with:
           path: .coverage-times.json
           key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -368,7 +368,7 @@ jobs:
       DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-bench-${{ github.run_attempt }}
     # Wall-clock budgets need an otherwise idle runner, so this job runs the
     # benchmark lane alone instead of joining a concurrent gate aggregate.
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -390,7 +390,7 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -434,11 +434,11 @@ jobs:
         env:
           POSTGRES_USER: hgw
           POSTGRES_PASSWORD: hgw
-          POSTGRES_DB: hgw_execution
+          POSTGRES_DB: hgw_execution_test
         ports:
           - 5432/tcp
         options: >-
-          --health-cmd "pg_isready -U hgw -d hgw_execution"
+          --health-cmd "pg_isready -U hgw -d hgw_execution_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -500,7 +500,7 @@ jobs:
 
       # Pull requests read the store produced by the master release-pack job.
       # The persistent failover VM already owns a warm store.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
@@ -531,11 +531,26 @@ jobs:
       - name: Install Gateway dependencies
         run: npm ci --prefix gateway
 
+      # The built resource-admission lane compiles gateway source through the
+      # tsconfig paths, which point at emitted workspace declarations, and then
+      # executes the compiled graph, which imports the workspace runtime
+      # entries. The host library build emits declarations and runtime bundles
+      # for the full graph the gateway typecheck lane compiles, and the runtime
+      # package step recreates the gateway/node_modules links exactly as
+      # build-production does for a standalone release.
+      - name: Build the workspace libraries and native addon the compiled Gateway consumes
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: pnpm run build:native-system && pnpm run build:lib:host
+
+      - name: Link the compiled Gateway's runtime packages
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: pnpm exec tsx scripts/gateway-runtime-packages.ts
+
       - name: Test Gateway execution through Loader and PostgreSQL
         id: gateway-execution
         if: needs.pr-scope.outputs.gateway_mode == 'full'
         env:
-          HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution
+          HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution_test
         run: pnpm run test:gateway:execution
 
       - name: Record Gateway execution evidence
@@ -554,6 +569,30 @@ jobs:
       # below owns skip/focused/full browser verification.
       - name: Run keyless compatibility, snapshot, and artifact gates
         run: pnpm run check:ci:consumers:scoped
+
+      # The lifecycle tests materialize the policy bundles into staged
+      # instance homes; the ci face emits transpile-only because this lane has
+      # no workspace lib/types for them. model-governance's lib is committed.
+      - name: Build the policy bundles used by Gateway lifecycle tests
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: |
+          gateway/node_modules/.bin/tsc -p plugins/dsh-directory-guard/tsconfig.ci.json
+          gateway/node_modules/.bin/tsc -p plugins/dsh-steward-tools/tsconfig.ci.json
+      - name: Test compiled Gateway and Web lifecycle
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        env:
+          HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution_test
+        run: |
+          npm --prefix gateway run test:built-web-assembly
+          node gateway/tests/run-built-node-agent.mjs
+      - name: Test compiled Gateway control ownership
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: |
+          node gateway/tests/run-built-local-supervision.mjs
+          node gateway/tests/run-built-systemd-control.mjs
+          node gateway/tests/fixtures/node-configuration-health.mjs lib
+          node gateway/tests/fixtures/local-boot-identity.mjs lib
+          node gateway/tests/fixtures/runtime-readiness-lifecycle.mjs lib
       - name: Summarize golden changes and replay status
         if: always()
         env:
@@ -639,7 +678,7 @@ jobs:
 
       # Skipped under failover — the self-hosted VM's persistent store is
       # already warm (same rationale as the consumer job's restore).
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
           && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
@@ -652,7 +691,7 @@ jobs:
             ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
 
       # Skipped under failover: the VM's persistent browser cache is already warm.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
           && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
@@ -805,8 +844,13 @@ jobs:
       # installs it immutably instead of hand-linking node_modules rows.
       - name: Install workspace dependencies for declaration emit
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Emit type declarations the Gateway paths consume
-        run: node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/llm/llm packages/attachment/userdoc packages/attachment/userdoc-local packages/host/userdoc-http
+      # The emitted lib/types graph feeds the tsconfig paths and vitest
+      # aliases, while the emitted modules' own workspace imports resolve
+      # through real package exports to the bundled lib entries, and spawned
+      # fixtures exercise the flock and directory bindings; the library build
+      # and host addon produce both artifact planes.
+      - name: Build the workspace libraries and native addon the Gateway graph consumes
+        run: pnpm run build:native-system && pnpm run build:lib:host
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their
@@ -1089,14 +1133,14 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         id: browser-cache
         with:
           path: ~/.cache/ms-playwright
@@ -1131,7 +1175,7 @@ jobs:
 
       - name: Populate the PR browser cache from master
         if: github.event_name == 'push' && github.ref == 'refs/heads/master' && steps.browser-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ steps.browser-cache.outputs.cache-primary-key }}
@@ -1312,7 +1356,7 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1326,7 +1370,7 @@ jobs:
         id: wine-cache-key
         run: echo "key=wine-debs-${ImageOS:-linux}-${ImageVersion:-v0}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6.1.0
         with:
           path: ~/wine-debs
           key: ${{ steps.wine-cache-key.outputs.key }}
@@ -1385,9 +1429,14 @@ jobs:
   # DSH_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
   # and the all-checks-passed verdict above.
   windows-native:
-    needs: pr-scope
+    # The static lane is the cheap supersede fence: a stale run is cancelled
+    # before this two-hour job starts, so it cannot become an unkillable job
+    # holding the concurrency slot. On push/schedule node-24 does not exist and
+    # its empty result lets the always() conditions decide.
+    needs: [pr-scope, node-24]
     if: >-
-      always() && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
+      always() && (needs.node-24.result != 'failure' && needs.node-24.result != 'cancelled')
+      && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
       || github.event_name == 'schedule'
       || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_native_windows == 'true'))
@@ -1462,6 +1511,9 @@ jobs:
 
       - name: Run complete native Windows gate inventory
         shell: pwsh
+        # Below the job budget so a wedged gate cannot occupy the slot for the
+        # full 120 minutes before GitHub's own cancellation lands.
+        timeout-minutes: 90
         run: pnpm run check:ci:windows-complete
       - name: Preserve gate evidence
         if: always()

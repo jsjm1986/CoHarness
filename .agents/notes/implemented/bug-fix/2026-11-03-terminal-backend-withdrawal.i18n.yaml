@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-03-terminal-backend-withdrawal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-03-terminal-backend-withdrawal.md
+document:
+  en: 54261492efd8101ec7261937db68d90459351ce7
+  zh: 31c2adb9fe9f00a372594088461064cf0dceb7c3
+/agent-note-join-unpublished-terminal-setup-when-its-backend-leaves:
+  en: 1016bf4660416521
+  zh: ef312b5e43ba5a0f
+/agent-note-join-unpublished-terminal-setup-when-its-backend-leaves/problem:
+  en: 5d18a748caf72379
+  zh: f53d5dea59e9ddc1
+/agent-note-join-unpublished-terminal-setup-when-its-backend-leaves/decision:
+  en: 19634918df48a3e6
+  zh: dd5b293b307f6777
+/agent-note-join-unpublished-terminal-setup-when-its-backend-leaves/alternatives-considered:
+  en: 161a52129bb16614
+  zh: 18ac2208c8d293a5
+/agent-note-join-unpublished-terminal-setup-when-its-backend-leaves/consequences:
+  en: 04a35f2c608d884c
+  zh: 654f573db0c6502b
+/agent-note-join-unpublished-terminal-setup-when-its-backend-leaves/verification:
+  en: 8355b2284a58f71a
+  zh: 6c142db26955303a

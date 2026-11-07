@@ -1,0 +1,14 @@
+{
+  "name": "goal-lowered-cap-checkpoint-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/goal/goal/tests/projection.spec.ts -t 'lowering the round cap'",
+  "startedAt": "2026-10-26T03:36:40.813127+00:00",
+  "seconds": 4.667,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9694c89908538692f1d0e59fc7b50be444d99996d188dd754893411f27f45864",
+  "inputsAfter": "9694c89908538692f1d0e59fc7b50be444d99996d188dd754893411f27f45864",
+  "postgresToolDirectory": null,
+  "outputSha256": "6add24928344b282309b6d45a809b085f41662320872eb062d3f19ec0fef6c5c",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/goal/goal/tests/projection.spec.ts (9 tests | 1 failed | 8 skipped) 16ms\n     × restores a checkpoint after lowering the round cap below already admitted rounds 15ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/goal/goal/tests/projection.spec.ts > goal projection unit > restores a checkpoint after lowering the round cap below already admitted rounds\nZodError: [\n  {\n    \"code\": \"custom\",\n    \"message\": \"current goal rounds cannot exceed its configured limit\",\n    \"path\": []\n  }\n]\n ❯ Proxy.restore packages/session/session-projection/src/index.ts:506:27\n    504|       }\n    505|       let state = usable\n    506|         ? def.stateSchema.parse(row.val)\n       |                           ^\n    507|         : def.init(header, inheritedEventCount)\n    508|       const from = usable ? row.seq : beforeBase\n ❯ Object.apply vendor/cordis/src/utils.ts:160:40\n ❯ packages/goal/goal/tests/projection.spec.ts:156:45\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 8 skipped (9)\n   Start at  11:36:44\n   Duration  701ms (transform 468ms, setup 44ms, import 540ms, tests 16ms, environment 0ms)\n\n"
+}

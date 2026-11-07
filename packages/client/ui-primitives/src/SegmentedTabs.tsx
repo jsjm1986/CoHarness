@@ -19,14 +19,16 @@ export interface SegmentedTab<Value extends string = string> {
  * Keyboard selection also moves focus; only the selected tab is a tab stop.
  * @param props.label - localized accessible name for the tab list.
  * @param props.className - layout placement; panels remain caller-owned.
+ * @param props.variant - filled segments or an underline for page navigation.
  * @returns the tab list, without its panels.
  */
-export function SegmentedTabs<Value extends string>({ items, value, onChange, label, className }: {
+export function SegmentedTabs<Value extends string>({ items, value, onChange, label, className, variant = 'segmented' }: {
   items: readonly [SegmentedTab<Value>, ...SegmentedTab<Value>[]]
   value: Value
   onChange: (value: Value) => void
   label: string
   className?: string | undefined
+  variant?: 'segmented' | 'underline'
 }): ReactNode {
   const selectedIndex = items.findIndex(item => item.value === value)
 
@@ -53,7 +55,7 @@ export function SegmentedTabs<Value extends string>({ items, value, onChange, la
     <div
       role="tablist"
       aria-label={label}
-      className={clsx(css.tabs, className)}
+      className={clsx(css.tabs, variant === 'underline' && css.underline, className)}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       <span

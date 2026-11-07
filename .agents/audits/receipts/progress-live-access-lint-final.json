@@ -1,0 +1,14 @@
+{
+  "name": "progress-live-access-lint-final",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts gateway/src/index.ts gateway/src/postgres/progress-service.ts gateway/src/postgres/progress-usage.ts gateway/tests/project-progress-postgres.spec.ts gateway/tests/fixtures/project-progress-built.mjs gateway/tests/macos-release-control.spec.ts",
+  "startedAt": "2026-10-23T23:13:04.780665+00:00",
+  "seconds": 3.249,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2ea960427861b38ad162c38d11ee5badb98b02cc8b0aae56a21be6f7deed2623",
+  "inputsAfter": "c81afa7d008411cfe45025aef554e331395178e387ae27705a28530b3b0c552a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

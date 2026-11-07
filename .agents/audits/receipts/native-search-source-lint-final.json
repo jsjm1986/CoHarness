@@ -1,0 +1,14 @@
+{
+  "name": "native-search-source-lint-final",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/web/web-search-deepseek/src/admission.ts packages/web/web-search-deepseek/src/index.ts packages/web/web-search-deepseek/tests/admission.spec.ts scripts/coverage-baseline.ts snapshots/session/web-search-endpoint-guidance/web-search-error-fixture.mjs",
+  "startedAt": "2026-10-24T03:55:37.869691+00:00",
+  "seconds": 4.769,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f58009fff83faeee5d67436c99b4eea250cd025d65ad66547044014610e1e7f0",
+  "inputsAfter": "f58009fff83faeee5d67436c99b4eea250cd025d65ad66547044014610e1e7f0",
+  "postgresToolDirectory": null,
+  "outputSha256": "356455740f6e77098e73cfe6d4ef87b100f454bc4c2066b6940eb5f935fc760a",
+  "outputTail": "packages/web/web-search-deepseek/tests/admission.spec.ts:226:50: error typescript(prefer-promise-reject-errors): Expected the Promise rejection reason to be an Error.\n"
+}

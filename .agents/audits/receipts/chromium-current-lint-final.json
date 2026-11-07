@@ -1,0 +1,13 @@
+{
+  "name": "chromium-current-lint-final",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/browser-use-stagehand-native/src/launch.ts packages/experimental/browser-use-stagehand-native/src/index.ts packages/experimental/browser-use-stagehand-native/tests/launch.spec.ts packages/experimental/browser-use-stagehand-native/tests/launch-process.spec.ts packages/experimental/browser-use-stagehand-native/tests/provider.spec.ts packages/experimental/browser-use-stagehand-native/tests/loader-composition.spec.ts packages/experimental/browser-use-stagehand-native/tests/fixtures/chromium.ts packages/experimental/browser-use-stagehand-native/tests/native.e2e.ts",
+  "startedAt": "2026-10-23T17:18:54.985784+00:00",
+  "seconds": 3.402,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6119d6131594153d607d564616b634391625559630c34644d3796c18243a26a3",
+  "inputsAfter": "6119d6131594153d607d564616b634391625559630c34644d3796c18243a26a3",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

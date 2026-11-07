@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-model-search-dispatch-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-model-search-dispatch-ownership.md
+document:
+  en: 959b3ba0c3f62fbb90cea16d9691d2caa79b32b1
+  zh: a4d169f00198e0e24fe7b6fae3df423f62ff1eec
+/agent-note-independent-model-search-retains-admission-until-http-dispatch:
+  en: 57d5aa45487e2019
+  zh: 761e9c248ebd0a54
+/agent-note-independent-model-search-retains-admission-until-http-dispatch/problem:
+  en: c1b75c3d875065db
+  zh: 3d9d41b01714bc02
+/agent-note-independent-model-search-retains-admission-until-http-dispatch/decision:
+  en: 63a93538f5dc140b
+  zh: 51cbb38e38665900
+/agent-note-independent-model-search-retains-admission-until-http-dispatch/alternatives-considered:
+  en: f5571f1333854442
+  zh: 26af80736e394d5c
+/agent-note-independent-model-search-retains-admission-until-http-dispatch/consequences:
+  en: 2da77588296e3cac
+  zh: 19a9849887fd9aed
+/agent-note-independent-model-search-retains-admission-until-http-dispatch/verification:
+  en: 45a6cc70f7b56471
+  zh: ade6ec02ce06021d

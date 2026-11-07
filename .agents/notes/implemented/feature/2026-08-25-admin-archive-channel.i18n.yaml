@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-admin-archive-channel.md
 document:
-  en: 2b52c07461a1d405c9e44af1785bc7f147492ac6
-  zh: 0d6d9887135af11c5550a6d1d179b3770af60629
+  en: 3bd48b8e21e30fd6e57cf0b258c458ca84881525
+  zh: e74c245fc633806e4c4b4a7fc9c7810f24ed9899
 /agent-note-admin-archive-channel-and-gateway-lifecycle-index:
   en: 929d4ecda790d490
   zh: bf8ae8391670e8c8
@@ -12,8 +12,8 @@ document:
   en: 2be9d81c51ffd296
   zh: 413c2d6e18aa82b0
 /agent-note-admin-archive-channel-and-gateway-lifecycle-index/decision:
-  en: bd1e390724b19cbf
-  zh: 020d3ed98569b9da
+  en: 52c8f73bfce48681
+  zh: d5e6d8c0671fa920
 /agent-note-admin-archive-channel-and-gateway-lifecycle-index/alternatives-considered:
   en: 1d8fc918b2001c5b
   zh: 1d17a91e185a7795

@@ -1,0 +1,81 @@
+{
+  "reply": "PARENT_CLEANUP_READY",
+  "cases": {
+    "workflow-live": {
+      "before": {
+        "mode": "workflow",
+        "phase": "live",
+        "toolError": true,
+        "responseOpen": true,
+        "starts": 1,
+        "attemptsBeforeShutdown": 3
+      },
+      "after": {
+        "mode": "workflow",
+        "phase": "live",
+        "parentExiting": true,
+        "hostStillLive": true,
+        "starts": 1,
+        "attempts": 4,
+        "responseClosed": true
+      }
+    },
+    "workflow-retired": {
+      "before": {
+        "mode": "workflow",
+        "phase": "retired",
+        "toolError": true,
+        "responseOpen": true,
+        "starts": 1,
+        "attemptsBeforeShutdown": 4
+      },
+      "after": {
+        "mode": "workflow",
+        "phase": "retired",
+        "parentExiting": true,
+        "hostStillLive": true,
+        "starts": 1,
+        "attempts": 5,
+        "responseClosed": true
+      }
+    },
+    "ralph-live": {
+      "before": {
+        "mode": "ralph",
+        "phase": "live",
+        "toolError": true,
+        "responseOpen": true,
+        "starts": 1,
+        "attemptsBeforeShutdown": 3
+      },
+      "after": {
+        "mode": "ralph",
+        "phase": "live",
+        "parentExiting": true,
+        "hostStillLive": true,
+        "starts": 1,
+        "attempts": 4,
+        "responseClosed": true
+      }
+    },
+    "ralph-retired": {
+      "before": {
+        "mode": "ralph",
+        "phase": "retired",
+        "toolError": true,
+        "responseOpen": true,
+        "starts": 1,
+        "attemptsBeforeShutdown": 4
+      },
+      "after": {
+        "mode": "ralph",
+        "phase": "retired",
+        "parentExiting": true,
+        "hostStillLive": true,
+        "starts": 1,
+        "attempts": 5,
+        "responseClosed": true
+      }
+    }
+  }
+}

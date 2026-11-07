@@ -28,7 +28,7 @@ Status: implemented
 
 **已打开步骤是重建边界。** 进入步骤的 `user/message` 批次与任何新写入的 `request/header` 都位于请求分派之前。原子领取后发生的注入加入后续请求；必须影响本次请求的监听器则通过 `agent/pre-step` 返回消息。header 重建选择该步骤的 `request/header`，或在无新 header 写入时沿用前一个快照。
 
-**强制执行。** 循环通过 `dsh-llm` 的 `markAgentLoopRequest()` 记录精确的冻结请求；这一进程内标识让请求观察者识别对话工作，而直接的一次性调用无论其冻结形状或会话 id 如何都保持排除。带密钥的 e2e 要求首次请求之后有正值的 cache-read token；逐步骤用量是生产信号，header 变更或压缩表现为下一步骤的 cache-read 下降。
+**强制执行。** 循环通过派发请求的 `LlmRuntime.markAgentLoopRequest()` 记录精确的冻结请求；这一[服务持有的标识](../bug-fix/2026-11-02-scoped-model-request-origin.zh.md)让请求观察者识别对话工作，而直接的一次性调用无论其冻结形状或会话 id 如何都保持排除。带密钥的 e2e 要求首次请求之后有正值的 cache-read token；逐步骤用量是生产信号，header 变更或压缩表现为下一步骤的 cache-read 下降。
 
 ### MiniCode 形态：采纳，以事件日志为真源
 

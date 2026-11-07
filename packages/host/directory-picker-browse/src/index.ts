@@ -1,26 +1,29 @@
 /**
  * Browse backend of the directory-picker seam: registers `ctx.directoryPicker`
  * with the `browse` capability — one-level directory listing and child-directory
- * creation over the host filesystem via Node's stdlib (which already carries
- * the per-OS adaptation). Nothing renders on the host display, so this backend
- * serves remote clients the dialog backend cannot. Policy decisions (hidden
- * entries flagged but returned, symlinks followed, whole-filesystem scope) are
- * recorded in the directory-picker seam Agent Note.
+ * creation over the host filesystem. Granted operations retain directory
+ * objects through platform calls; independent launches without grants use
+ * Node's filesystem primitives. Nothing renders on the host display. Grant,
+ * link and listing policies are recorded in the directory-picker seam Note.
  * @module @deepseek-ai/dsh-host-directory-picker-browse
  */
 
-import { readFileSync, realpathSync } from 'node:fs'
+import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { mkdir, opendir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, posix, resolve, sep, win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { launchedByGateway, launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
+import type { LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import {
   DirectoryPicker, DirectoryPickerError,
 } from '@deepseek-ai/dsh-host-directory-picker'
 import type {
   DirectoryEntry, DirectoryListing, DirectoryPickerCapability,
 } from '@deepseek-ai/dsh-host-directory-picker'
+import { openPinnedDirectory } from './pinned-directory.ts'
+import type { DirectoryRoot } from './pinned-directory.ts'
 
 /**
  * Ancestor chain from the filesystem root to `target` inclusive — the
@@ -55,10 +58,10 @@ export function fullyQualified(path: string, platform: NodeJS.Platform = process
 }
 
 /** One authorized browse root from the gateway grants file. */
-interface GrantRoot {
+interface GrantRoot extends DirectoryRoot {
   /** realpath-normalized grant path. */
   path: string
-  /** Access mode; browse fences on presence, not on ro vs rw. */
+  /** Listing requires a grant; directory creation additionally requires rw. */
   mode: 'ro' | 'rw'
   /** Listing row name: JSON `label` when a non-empty string, otherwise basename. */
   name: string
@@ -72,49 +75,70 @@ function contains(root: string, target: string): boolean {
 }
 
 /**
- * Mode of the first containing grant, or `none` when no grant contains `target`.
+ * The most specific containing grant, or undefined when no grant contains target.
  * @param grants - grant roots loaded at plugin construction.
  * @param target - absolute path to classify.
  */
-function classify(grants: readonly GrantRoot[], target: string): GrantRoot['mode'] | 'none' {
+function classify(grants: readonly GrantRoot[], target: string): GrantRoot | undefined {
+  let match: GrantRoot | undefined
   for (const grant of grants) {
-    if (contains(grant.path, target)) return grant.mode
+    if (contains(grant.path, target) && (match === undefined || grant.path.length > match.path.length)) match = grant
   }
-  return 'none'
+  return match
 }
 
-/** Grants file path: `DSH_DIRECTORY_GRANTS`, else `$DSH_HOME/directory-grants.json`. */
-function grantsFilePath(): string {
-  return process.env.DSH_DIRECTORY_GRANTS
+/** Managed grant locations come only from the inherited launch environment. */
+function grantsFilePath(environment: LaunchEnvironmentSnapshot, managed: boolean): string {
+  if (!managed) return process.env.DSH_DIRECTORY_GRANTS
     ?? join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'directory-grants.json')
+  const explicit = environment.getFrom('DSH_DIRECTORY_GRANTS', ['process'])?.value
+  if (explicit !== undefined) return explicit
+  const home = environment.getFrom('DSH_HOME', ['process'])?.value
+  if (home === undefined || !fullyQualified(home)) throw new Error('managed directory grants require an inherited absolute DSH_HOME')
+  return join(home, 'directory-grants.json')
 }
 
 /**
  * Load grant roots from the gateway grants file. Unknown fields other than
  * `label` are ignored; `realpath` failures skip that entry. A missing file,
- * unreadable JSON, or empty valid list yields no roots (OS-home listing).
+ * unreadable JSON, or empty valid list yields no roots for an independent
+ * launch. Managed launches refuse unreadable or invalid files; an empty valid
+ * list retains an empty authorization set.
  */
-function loadGrantRoots(): GrantRoot[] {
+function loadGrantRoots(path: string, required: boolean): GrantRoot[] {
   let raw: unknown
   try {
-    raw = JSON.parse(readFileSync(grantsFilePath(), 'utf8'))
-  } catch {
+    raw = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    if (required) throw new Error('managed directory grants cannot be read', { cause: error })
     // Missing or unreadable file: standalone dsh web keeps OS-home listing.
     return []
   }
-  if (!Array.isArray(raw)) return []
+  if (!Array.isArray(raw)) {
+    if (required) throw new Error('managed directory grants must be an array')
+    return []
+  }
   const roots: GrantRoot[] = []
   for (const entry of raw) {
-    if (typeof entry !== 'object' || entry === null) continue
+    if (typeof entry !== 'object' || entry === null) {
+      if (required) throw new Error('managed directory grants contain an invalid entry')
+      continue
+    }
     const record = entry as { path?: unknown; mode?: unknown; label?: unknown }
-    if (typeof record.path !== 'string' || (record.mode !== 'ro' && record.mode !== 'rw')) continue
+    if (typeof record.path !== 'string' || (record.mode !== 'ro' && record.mode !== 'rw')) {
+      if (required) throw new Error('managed directory grants contain an invalid entry')
+      continue
+    }
+    if (required && !fullyQualified(record.path)) throw new Error('managed directory grants require fully qualified paths')
     try {
-      const path = realpathSync(record.path)
+      const path = resolve(realpathSync(record.path)), info = lstatSync(path, { bigint: true })
+      if (!info.isDirectory() || info.ino === 0n) throw new Error('directory grant must name a real directory with a filesystem identity')
       const name = typeof record.label === 'string' && record.label !== ''
         ? record.label
         : basename(path)
-      roots.push({ path, mode: record.mode, name })
-    } catch {
+      roots.push({ path, mode: record.mode, name, identity: { device: String(info.dev), inode: String(info.ino) } })
+    } catch (error) {
+      if (required) throw new Error('managed directory grants contain an unavailable directory', { cause: error })
       // Granted directory no longer exists on disk; skip it.
     }
   }
@@ -188,9 +212,8 @@ export function boundedInsert(window: ListingCandidate[], candidate: ListingCand
 /**
  * Await `operation`, but reject with the signal's reason the moment it
  * aborts. Node's filesystem reads are not retractable, so the operation
- * itself keeps running against a handle the caller then closes — its late
- * settlement is swallowed here so an abandoned read cannot surface as an
- * unhandled rejection.
+ * itself keeps running. The owner queues cleanup after its consumers finish;
+ * an abandoned rejection is observed here rather than reported as unhandled.
  * @param operation - the in-flight filesystem step.
  * @param signal - caller lifetime; absent means plain awaiting.
  * @returns the operation's value.
@@ -239,6 +262,25 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** Keep ownership of a filesystem handle that can arrive after the caller leaves. */
+async function openForCaller<T extends { close(): Promise<void> }>(opening: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  try { return await raceAbort(opening, signal) }
+  catch (error) {
+    void opening.then(handle => handle.close().catch(swallowCloseFailure), () => {
+      // Opening already failed; no handle was returned to release.
+    })
+    throw error
+  }
+}
+
+/** Queue cleanup behind the handle's pending consumers while allowing the caller to leave. */
+async function closeForCaller(handle: { close(): Promise<void> }, signal: AbortSignal | undefined): Promise<void> {
+  const closing = handle.close()
+  /* v8 ignore next -- an abort landing exactly between close start and check is pinned by the POSIX race suite. */
+  if (signal?.aborted) { closing.catch(swallowCloseFailure); return }
+  await raceAbort(closing, signal)
+}
+
 /**
  * One listing row for a dirent, following symlinks to directories; null for
  * non-directories and broken/cyclic links (skipped silently — the browser
@@ -246,6 +288,7 @@ function messageOf(error: unknown): string {
  */
 async function directoryRow(
   parent: string, name: string, isDirectory: boolean, isSymbolicLink: boolean, signal: AbortSignal | undefined,
+  grants: readonly GrantRoot[] | undefined, batchEntries: number,
 ): Promise<DirectoryEntry | null> {
   const path = join(parent, name)
   let enterable = isDirectory
@@ -253,10 +296,19 @@ async function directoryRow(
     try {
       // The probe races the caller too: a symlink target on a stalled
       // network filesystem must not keep a departed caller's request alive.
-      enterable = (await raceAbort(stat(path), signal)).isDirectory()
-    } catch {
-      /* v8 ignore next 2 -- an abort landing mid-probe needs a stalled stat; the per-candidate check in list covers the settled path. */
+      if (grants === undefined) enterable = (await raceAbort(stat(path), signal)).isDirectory()
+      else {
+        const canonical = canonicalize(path), grant = classify(grants, canonical)
+        if (grant === undefined) return null
+        const opened = await openForCaller(openPinnedDirectory(grant, canonical, batchEntries, signal), signal)
+        try { await raceAbort(opened.verify(), signal); enterable = true }
+        finally { await closeForCaller(opened, signal) }
+      }
+    } catch (error) {
+      /* v8 ignore start -- mid-probe aborts and probe+abort aggregates are pinned by the POSIX race suite. */
       if (signal?.aborted) throw asError(signal.reason)
+      if (error instanceof AggregateError) throw error
+      /* v8 ignore stop */
       // Broken or cyclic symlink: stat is the probe, failure means "not enterable".
       return null
     }
@@ -271,6 +323,8 @@ async function directoryRow(
 export interface Config {
   /** Complete-result bound of one listing level; see {@link BrowseDirectoryPicker.Config}. */
   maxEntries: number
+  /** Entries per stdlib or granted POSIX read; Windows granted reads use a protocol-bounded buffer. */
+  readBatchEntries: number
 }
 
 /** The `ctx.directoryPicker` browse implementation (stable capability object per service life). */
@@ -284,6 +338,7 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
    */
   static Config: z<Config> = z.object({
     maxEntries: z.natural().min(1).default(1000),
+    readBatchEntries: z.natural().min(1).max(65536).default(32),
   })
 
   private readonly browseCapability: DirectoryPickerCapability = {
@@ -294,9 +349,13 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
 
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx)
+    const environment = launchEnvironmentOf(ctx), managed = launchedByGateway(environment)
+    this.grantRoots = loadGrantRoots(grantsFilePath(environment, managed), managed)
+    this.restricted = managed || this.grantRoots.length > 0
   }
 
-  private readonly grantRoots: GrantRoot[] = loadGrantRoots()
+  private readonly grantRoots: GrantRoot[]
+  private readonly restricted: boolean
 
   /**
    * The browse interaction capability.
@@ -309,6 +368,9 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
   private async list(path?: string, signal?: AbortSignal): Promise<DirectoryListing> {
     const roots = this.grantRoots
     const first = roots[0]
+    if (this.restricted && first === undefined) {
+      throw new DirectoryPickerError('directory-unreadable', path ?? '', 'no authorized directories are available')
+    }
     if (path === undefined && first !== undefined) {
       return {
         path: first.path,
@@ -326,7 +388,9 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
       throw new DirectoryPickerError('directory-unreadable', path, `cannot list "${path}": not a fully qualified path`)
     }
     const target = resolve(path ?? home)
-    if (roots.length > 0 && classify(roots, canonicalize(target)) === 'none') {
+    const canonical = this.restricted ? canonicalize(target) : target
+    const selected = classify(roots, canonical)
+    if (this.restricted && selected === undefined) {
       throw new DirectoryPickerError('directory-unreadable', target, `cannot list ${target}: outside authorized directories`)
     }
     // Stream the level (opendir, one dirent at a time) into a name-sorted
@@ -344,64 +408,50 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
       // opendir/read on a network filesystem must not keep a departed
       // caller's scan alive, and an already-aborted request rejects even
       // when the level is empty.
-      const opening = opendir(target)
-      const level = await raceAbort(opening, signal).catch((error: unknown) => {
-        // The abandoned open can still mint a handle after the abort won;
-        // close it so a departed caller cannot leak a descriptor. (A lost
-        // race against opendir's own rejection has nothing to close, and
-        // the close's own failure is swallowed — the request already
-        // returned, so a cleanup error has no consumer.)
-        void opening.then(dir => dir.close().catch(swallowCloseFailure), () => {
-          // Already rejected: raceAbort surfaced or swallowed it.
-        })
-        throw error
-      })
+      const opening = selected === undefined ? opendir(target, { bufferSize: this.config.readBatchEntries }).then(level => ({
+        read: async () => {
+          const entry = await level.read()
+          return entry === null ? null : { name: entry.name, isDirectory: entry.isDirectory(), isSymbolicLink: entry.isSymbolicLink() }
+        },
+        close: () => level.close(),
+        verify: () => Promise.resolve(),
+      })) : openPinnedDirectory(selected, canonical, this.config.readBatchEntries, signal)
+      const level = await openForCaller(opening, signal)
       try {
         for (;;) {
           const dirent = await raceAbort(level.read(), signal)
           if (dirent === null) break
           // Only rows a browser could enter contend for the window; dirent
           // says "directory" outright, a symlink needs the later stat probe.
-          if (!dirent.isDirectory() && !dirent.isSymbolicLink()) continue
-          const candidate = { name: dirent.name, isDirectory: dirent.isDirectory(), isSymbolicLink: dirent.isSymbolicLink() }
-          if (boundedInsert(window, candidate, keep)) evicted = true
+          if (!dirent.isDirectory && !dirent.isSymbolicLink) continue
+          if (boundedInsert(window, dirent, keep)) evicted = true
         }
+        const entries: DirectoryEntry[] = []
+        let truncated = evicted
+        for (const candidate of window) {
+          signal?.throwIfAborted()
+          const row = await directoryRow(target, candidate.name, candidate.isDirectory, candidate.isSymbolicLink, signal,
+            this.restricted ? roots : undefined, this.config.readBatchEntries)
+          if (row === null) continue
+          if (entries.length === this.config.maxEntries) { truncated = true; break }
+          entries.push(row)
+        }
+        await raceAbort(level.verify(), signal)
+        const crumbs = selected === undefined ? ancestryCrumbs(target) : crumbsFromGrantRoot(target, selected.path)
+        return { path: target, home, crumbs, entries, truncated }
       } finally {
         // Manual read() never auto-closes; close on every exit. The aborted
         // exit must not await it — Node queues close behind any in-flight
         // read, so awaiting would chain the departed caller back onto the
         // very stall the abort escaped (the abandoned read's settlement is
         // already swallowed by raceAbort).
-        const closing = level.close()
-        /* v8 ignore next 3 -- an abort between open and close needs a stalled read; the abandoned-close arm has no observable outcome. */
-        if (signal?.aborted) {
-          closing.catch(swallowCloseFailure)
-        } else {
-          await closing
-        }
+        await closeForCaller(level, signal)
       }
     } catch (error: unknown) {
       // An abort is the caller's own reason, not an unreadable directory.
       signal?.throwIfAborted()
       throw new DirectoryPickerError('directory-unreadable', target, `cannot list ${target}: ${messageOf(error)}`)
     }
-    const entries: DirectoryEntry[] = []
-    let truncated = evicted
-    for (const candidate of window) {
-      // A caller that departed between reads and probes stops before the
-      // next probe (each probe's own await is raced inside directoryRow).
-      signal?.throwIfAborted()
-      const row = await directoryRow(target, candidate.name, candidate.isDirectory, candidate.isSymbolicLink, signal)
-      if (row === null) continue
-      if (entries.length === this.config.maxEntries) {
-        truncated = true
-        break
-      }
-      entries.push(row)
-    }
-    const containing = roots.find(root => contains(root.path, canonicalize(target)))
-    const crumbs = containing === undefined ? ancestryCrumbs(target) : crumbsFromGrantRoot(target, containing.path)
-    return { path: target, home, crumbs, entries, truncated }
   }
 
   private async createDirectory(path: string, name: string): Promise<string> {
@@ -411,19 +461,27 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
       throw new DirectoryPickerError('directory-create-failed', path, `cannot create under "${path}": not a fully qualified parent path`)
     }
     const parent = resolve(path)
-    if (this.grantRoots.length > 0 && classify(this.grantRoots, canonicalize(parent)) === 'none') {
+    const canonical = this.restricted ? canonicalize(parent) : parent
+    const selected = classify(this.grantRoots, canonical)
+    if (this.restricted && selected === undefined) {
       throw new DirectoryPickerError('directory-create-failed', parent, `cannot create under ${parent}: outside authorized directories`)
     }
+    if (selected?.mode === 'ro') throw new DirectoryPickerError('directory-create-failed', parent, `cannot create under ${parent}: read-only directory`)
     // The backend owns segment validation (the wire schema also refuses these,
     // but direct service consumers must hit the same fence).
-    if (name.trim() === '' || name === '.' || name === '..' || /[/\\]/.test(name)) {
+    if (name.trim() === '' || name === '.' || name === '..' || /[/\\]/.test(name) || name.includes('\0')) {
       throw new DirectoryPickerError('directory-create-failed', join(parent, name), `"${name}" is not a single path segment`)
     }
     const target = join(parent, name)
     try {
       // Non-recursive: the parent is the directory the browser is showing, so
       // a missing parent is a real failure, not a level to invent.
-      await mkdir(target)
+      if (selected === undefined) await mkdir(target)
+      else {
+        const directory = await openPinnedDirectory(selected, canonical, this.config.readBatchEntries)
+        try { await directory.verify(); await directory.createDirectory(name); await directory.verify() }
+        finally { await directory.close() }
+      }
       return target
     } catch (error: unknown) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'EEXIST') {

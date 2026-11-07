@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-managed-snapshot-path-index.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-managed-snapshot-path-index.md
+document:
+  en: 0eb9709070d064fdd2c4f7e07e721ebc181b4cf3
+  zh: e9401b1ebf500bb793a3619aee1c977033430b9a
+/agent-note-indexed-validation-of-managed-backup-paths:
+  en: 47f0009b74164ec6
+  zh: 0aa607ccff9cbb16
+/agent-note-indexed-validation-of-managed-backup-paths/problem:
+  en: 020c19d0a0b16638
+  zh: b942d0f9b7149f65
+/agent-note-indexed-validation-of-managed-backup-paths/decision:
+  en: 857697a3369fd568
+  zh: 692507e682918068
+/agent-note-indexed-validation-of-managed-backup-paths/alternatives-considered:
+  en: 949cea55497e866f
+  zh: 97c01cb53b943a26
+/agent-note-indexed-validation-of-managed-backup-paths/consequences:
+  en: 01206825bcb0b68e
+  zh: 19887c78ad9b498e

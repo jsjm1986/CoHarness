@@ -1,0 +1,6 @@
+{"case":"normal","exactPath":true,"directoryExists":true}
+{"case":"lf","exactPath":true,"directoryExists":true}
+{"case":"cr","exactPath":true,"directoryExists":true}
+{"case":"crlf","exactPath":true,"directoryExists":true}
+{"case":"two-lf","exactPath":true,"directoryExists":true}
+{"case":"cancel","selected":null}

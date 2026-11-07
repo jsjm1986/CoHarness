@@ -11,7 +11,6 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { gunzipSync } from 'node:zlib'
 import { boot, resolveConfigPath } from '@deepseek-ai/dsh-app-boot'
-import { recordFeedback } from '@deepseek-ai/dsh-command-feedback'
 import { runFixtureTurn } from '@deepseek-ai/dsh-loader-smoke'
 import { agentEvents } from '@deepseek-ai/dsh-agent'
 
@@ -43,7 +42,7 @@ try {
   const [agent] = ctx.get('agents')?.roots() ?? []
   if (agent === undefined) throw new Error('session-telemetry-otel driver requires one root agent')
   if (process.env.DSH_TELEMETRY_E2E_FEEDBACK !== 'none') {
-    recordFeedback(agent.session, { text: 'fixture feedback' })
+    agent.session.append('feedback/record', { text: 'fixture feedback' })
   }
   await runFixtureTurn(ctx, { task: 'post-feedback private suffix' })
   agentEvents(ctx, agent).emit('agent/error', { turn: 2, step: 1, error: new Error('private operational error') })

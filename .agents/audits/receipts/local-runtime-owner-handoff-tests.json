@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-owner-handoff-tests",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/local-runtime-owner.spec.ts --retry=0",
+  "startedAt": "2026-10-24T18:43:13.190575+00:00",
+  "seconds": 3.047,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "abfb8e91669ed3219093422f00adaf849ad9881a6ddfbf38e72862711e345151",
+  "inputsAfter": "abfb8e91669ed3219093422f00adaf849ad9881a6ddfbf38e72862711e345151",
+  "postgresToolDirectory": null,
+  "outputSha256": "1ccec5f815922c80af1436156d49da9f840774b2821a1d39538738edc21bbb84",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  10 passed (10)\n   Start at  02:43:15\n   Duration  457ms (transform 32ms, setup 0ms, import 98ms, tests 242ms, environment 0ms)\n\n"
+}

@@ -18,6 +18,7 @@ import {
 import PluginManager, { type Config, type PluginChange, type PluginDesiredState, type PluginInstallFrame, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
+import type { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
 import Hmr from '@deepseek-ai/dsh-hmr'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -310,6 +311,17 @@ it('lists bundle versions and current-profile plugin targets', async () => {
   ])
 })
 
+it('lists current-profile targets independently of preset composition reads', async () => {
+  const { manager, ctx } = await fixture('startup')
+  const compositionInventory = vi.fn(async () => { throw new Error('preset composition unavailable') })
+  ctx.provide('agentPresets', { compositionInventory } as Partial<AgentPresetRegistry> as never)
+
+  await expect(manager.listPlugins()).resolves.toEqual(expect.arrayContaining([
+    expect.objectContaining({ entryId: 'include:managed', patchId: 'managed', enabled: true }),
+  ]))
+  expect(compositionInventory).not.toHaveBeenCalled()
+})
+
 it('describes a bundle by its manifest and patch: one-liner, rows without a live entry, and the built-in rows it changes', async () => {
   const { manager, dir, bundle } = await fixture()
   bundle('described', [{ id: 'described-row', name: './plugin.mjs' }])
@@ -366,6 +378,20 @@ it('names where each installed bundle comes from as a spec pnpm installs', async
     relative: `file:${resolve(dir, '../plugins/relative')}`, linked: `link:${resolve(dir, '/plugins/linked')}`,
     home: `file:${resolve(homedir(), 'plugins/home')}`, aliasLocal: `aliasLocal@file:${resolve(dir, '../plugins/original')}`, shadowed: undefined,
   })
+})
+
+it('lists current controls without reading entry metadata when it is omitted', async () => {
+  const { ctx, manager } = await fixture('startup')
+  await ctx.plugin(PluginPackages)
+  const metadata = vi.spyOn(ctx.pluginPackages, 'metaOf')
+  onTestFinished(() => { metadata.mockRestore() })
+  const controls = await manager.listPlugins(false)
+  expect(controls.length).toBeGreaterThan(0)
+  expect(controls.every(entry => !Object.hasOwn(entry, 'meta'))).toBe(true)
+  expect(metadata).not.toHaveBeenCalled()
+  const full = await manager.listPlugins()
+  expect(metadata).toHaveBeenCalled()
+  expect(full.map(({ meta: _meta, ...entry }) => entry)).toEqual(controls)
 })
 
 it.each(['native', 'runtime'] as const)('reads a disabled bundle and its independent exported plugins without running them with %s resolution', async (mode) => {
@@ -1500,20 +1526,20 @@ it('requires deployment authorization before mutating a managed profile', async 
   expect(authorize).toHaveBeenCalledOnce()
 })
 
-it('reads the managed profile for every caller and reports the manage grant through access', async () => {
+it('denies reads to an unqualified caller and reports the manage grant through access', async () => {
   const authorize = vi.fn(async (): Promise<void> => { throw new RemoteError('plugin-management/forbidden', 'administrator required', {}) })
   const { manager } = await fixture('startup', false, (ctx) => {
     ctx.provide('pluginManagementAuthorization', { authorize, protectedModules: new Set<string>() })
   }, { authorization: 'required' })
-  await expect(manager.listPlugins()).resolves.toBeInstanceOf(Array)
-  await expect(manager.listBundles()).resolves.toBeInstanceOf(Array)
-  await expect(manager.registries()).resolves.toMatchObject({ resolved: 'https://registry.npmjs.org/' })
-  await expect(manager.listVersionExemptions()).resolves.toMatchObject({ exemptions: {} })
-  await expect(manager.waitForInstall('missing' as PluginInstallRequestId)).resolves.toBeNull()
-  expect(authorize).not.toHaveBeenCalled()
+  await expect(manager.listPlugins()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+  await expect(manager.listBundles()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+  await expect(manager.registries()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+  await expect(manager.listVersionExemptions()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+  await expect(manager.waitForInstall('missing' as PluginInstallRequestId)).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
   await expect(manager.access()).resolves.toEqual({ manage: false })
   authorize.mockImplementation(async () => {})
   await expect(manager.access()).resolves.toEqual({ manage: true })
+  await expect(manager.listPlugins()).resolves.toBeInstanceOf(Array)
 })
 
 it('fails closed on writes when a required deployment authority is unavailable', async () => {
@@ -1523,7 +1549,7 @@ it('fails closed on writes when a required deployment authority is unavailable',
   await expect(manager.access()).resolves.toEqual({ manage: false })
 })
 
-it('rejects every mutation while reads stay open when deployment authority denies', async () => {
+it('rejects reads and mutations alike when deployment authority denies', async () => {
   const { manager, dir } = await fixture('startup', false, (ctx) => {
     ctx.provide('pluginManagementAuthorization', {
       protectedModules: new Set<string>(), authorize: async () => { throw new Error('administrator required') },
@@ -1544,11 +1570,11 @@ it('rejects every mutation while reads stay open when deployment authority denie
     () => manager.installBundleStream('bundle', { requestId }, new AbortController().signal)[Symbol.asyncIterator]().next(),
   ]
   for (const operation of operations) await expect(operation()).rejects.toThrow('administrator required')
-  await expect(manager.listPlugins()).resolves.toBeInstanceOf(Array)
-  await expect(manager.listBundles()).resolves.toBeInstanceOf(Array)
-  await expect(manager.registries()).resolves.toBeInstanceOf(Object)
-  await expect(manager.listVersionExemptions()).resolves.toBeInstanceOf(Object)
-  await expect(manager.waitForInstall(requestId)).resolves.toBeNull()
+  await expect(manager.listPlugins()).rejects.toThrow('administrator required')
+  await expect(manager.listBundles()).rejects.toThrow('administrator required')
+  await expect(manager.registries()).rejects.toThrow('administrator required')
+  await expect(manager.listVersionExemptions()).rejects.toThrow('administrator required')
+  await expect(manager.waitForInstall(requestId)).rejects.toThrow('administrator required')
   expect(profileFiles()).toEqual(before)
 })
 

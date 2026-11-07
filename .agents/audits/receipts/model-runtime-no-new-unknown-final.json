@@ -1,0 +1,14 @@
+{
+  "name": "model-runtime-no-new-unknown-final",
+  "cwd": ".",
+  "command": "pnpm run verify-no-unknown-casts",
+  "startedAt": "2026-10-25T05:37:34.026814+00:00",
+  "seconds": 7.675,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a3324bd73594140e4fa54f4b967539b8e20b2df337fae97d4be2f4246cf56e05",
+  "inputsAfter": "a3324bd73594140e4fa54f4b967539b8e20b2df337fae97d4be2f4246cf56e05",
+  "postgresToolDirectory": null,
+  "outputSha256": "18a29cdda20aeb13e90329602849493ddd8781679d137f425a6d2c9652d304bf",
+  "outputTail": "$ tsx scripts/verify-no-unknown-casts.ts\nverify-no-unknown-casts: no new assertions; 1872 existing assertions remain.\n"
+}

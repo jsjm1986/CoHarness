@@ -9,6 +9,7 @@ import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-cli
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { FontRole } from '../theme-settings.ts'
 import type { createFontRowStore } from './settings-store.ts'
+import { settingsFeedback } from './settings-feedback.ts'
 import { FontFamilyRow } from './FontFamilyRow.tsx'
 import { FontSizeRow, type FontSizeRowExpander } from './FontSizeRow.tsx'
 import css from './FontSettingsGroup.module.css'
@@ -34,6 +35,7 @@ export type FontSettingsGroupProps =
 export function FontSettingsGroup({ setFontFamily, setFontSize, ...shared }: FontSettingsGroupProps) {
   const [open, setOpen] = useState(false)
   const regionId = useId()
+  const { notice, role: noticeRole } = settingsFeedback(shared.useStore(state => state.settings))
   const family = (role: FontRole) => (
     <FontFamilyRow {...shared} role={role} setFontFamily={(value) => { setFontFamily(role, value) }} />
   )
@@ -41,8 +43,9 @@ export function FontSettingsGroup({ setFontFamily, setFontSize, ...shared }: Fon
     <FontSizeRow {...shared} role={role} expander={expander} setFontSize={(px) => { setFontSize(role, px) }} />
   )
   return (
-    <div className={css.group}>
+    <div className={css.group} role="group" aria-label={shared.t('fontSize.more')}>
       {size('text', { open, controls: regionId, onToggle: () => { setOpen(value => !value) } })}
+      {notice !== undefined && <p className={css.notice} role={noticeRole}>{shared.t(notice)}</p>}
       {open && (
         <div id={regionId}>
           {family('text')}

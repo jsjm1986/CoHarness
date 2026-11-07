@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-supervisor-types-latest",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T19:16:21.470933+00:00",
+  "seconds": 5.89,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9c004ca6e6d6a3932c22ea86a163c6d19c772ab233f2ac34c05ed541493e425c",
+  "inputsAfter": "9c004ca6e6d6a3932c22ea86a163c6d19c772ab233f2ac34c05ed541493e425c",
+  "postgresToolDirectory": null,
+  "outputSha256": "2068954c916f76845a21bf175fa032e574b5292dd5444e60232e7bb4d6ecf517",
+  "outputTail": "packages/llm/llm/src/index.ts(67,5): error TS2717: Subsequent property declarations must have the same type.  Property 'llm' must be of type 'LlmRuntime', but here has type 'LlmRuntime'.\n"
+}

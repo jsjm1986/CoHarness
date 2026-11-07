@@ -20,7 +20,7 @@ Web UI 在已认证用户授予通知权限后注册 Android FCM Token，并通�
 
 Gateway 只通知会话创建者的已注册设备。会话追加返回 `inserted` 且追加事件包含 `turn/end` 与 `data.reason.kind === 'completed'` 时，才异步安排通知；重复追加和非 completed 结束不会再次安排通知。通知 payload 只包含会话 id 和事件序号，因此应用会打开已有的认证 Web UI，而不会把回复文本放入通知。
 
-`push_deliveries` 为每个企业、会话、事件序号和设备记录一条投递键。已发送记录不会再次 claim；某个 provider 指示注册无效时会删除该注册。首版在持久化成功后异步发送并记录失败，不增加后台 outbox worker，因此进程可能在追加成功与发送开始之间退出而丢失通知，但不会丢失会话。
+`push_deliveries` 为每个企业、会话、事件序号和设备记录一条投递键。当前收件人资格、领取租期和有条件的无效注册清理遵循[推送投递归属](../bug-fix/2026-10-29-push-delivery-authority.zh.md)。首版在持久化成功后异步发送并记录失败，不增加后台 outbox worker，因此进程可能在追加成功与发送开始之间退出而丢失通知，但不会丢失会话。
 
 ## Alternatives considered
 

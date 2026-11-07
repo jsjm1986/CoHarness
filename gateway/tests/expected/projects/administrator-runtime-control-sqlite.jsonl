@@ -1,0 +1,7 @@
+{"backend":"sqlite","scenario":"user-start-role","status":403,"code":"forbidden","state":"stopped","runtimeReachable":false,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"sqlite","scenario":"user-start-current","status":204,"code":null,"state":"ready","runtimeReachable":true,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"sqlite","scenario":"user-stop-role","status":403,"code":"forbidden","state":"ready","runtimeReachable":true,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"sqlite","scenario":"user-stop-current","status":204,"code":null,"state":"stopped","runtimeReachable":false,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"sqlite","scenario":"user-restart-role","status":403,"code":"forbidden","state":"ready","runtimeReachable":true,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"sqlite","scenario":"user-restart-current","status":204,"code":null,"state":"ready","runtimeReachable":true,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"sqlite","scenario":"user-restart-late-role","status":403,"code":"forbidden","state":"stopped","runtimeReachable":false,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}

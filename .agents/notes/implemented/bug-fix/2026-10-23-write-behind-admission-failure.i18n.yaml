@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-write-behind-admission-failure.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-write-behind-admission-failure.md
+document:
+  en: 8c7ddcf382864cd4b2ad3119f9d21d81c4828a7f
+  zh: 953847252d5b7f8cbfa7a728cc0c5c7a77897bf4
+/agent-note-sustain-write-behind-admission-failures-through-durability-barriers:
+  en: abb2c2accc1e8b8d
+  zh: 464d4134c7061f80
+/agent-note-sustain-write-behind-admission-failures-through-durability-barriers/problem:
+  en: b4f442c3d3587508
+  zh: 988de3d72f9385f6
+/agent-note-sustain-write-behind-admission-failures-through-durability-barriers/decision:
+  en: 3ae9c7ae804fc364
+  zh: 29f56e4ea0696a52
+/agent-note-sustain-write-behind-admission-failures-through-durability-barriers/alternatives-considered:
+  en: df1dbfd39ad26d40
+  zh: 7307b446c22682fa
+/agent-note-sustain-write-behind-admission-failures-through-durability-barriers/consequences:
+  en: 0b2a2a2b85875332
+  zh: e60add4e411ef0dc
+/agent-note-sustain-write-behind-admission-failures-through-durability-barriers/verification:
+  en: 5ca8c07b6aad973f
+  zh: 058edf2d0f542e77

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-human-goal-command.md
 document:
-  en: 7ed104eef1a48879a6e93af707c6ea9d8f97190c
-  zh: 523ac0b6956a7ad7a2428e187b2d0f8f99bd1120
+  en: b83cc938f940984bef905f401167211a1f670714
+  zh: af56aed4d47d7755c0b830375f7a2c46cc1002df
 /agent-note-human-goal-command:
   en: 11637ac913d1fd7b
   zh: 4168c3c2ac4f481b
@@ -18,8 +18,8 @@ document:
   en: ca8d2bc3da430a18
   zh: bed3a900011d68f9
 /agent-note-human-goal-command/decision/output-and-failure-boundary:
-  en: 8a3907cd50be73d5
-  zh: 2361247a4d592bcc
+  en: 9967ca9cc7b0a1d0
+  zh: 1c37e2f73b0db197
 /agent-note-human-goal-command/decision/app-composition:
   en: e874b0a369261c6d
   zh: 434d2a0ec5c88494

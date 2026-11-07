@@ -9,6 +9,7 @@ import { withFileLock, writeFileAtomic } from '../src/index.ts'
 
 const state = vi.hoisted(() => ({
   afterClaim: undefined as ((claim: string) => Promise<void>) | undefined,
+  afterTempWrite: undefined as (() => void) | undefined,
   claimFailure: undefined as string | undefined,
   claimRemovalFails: false,
   lockRemovalFails: false,
@@ -40,22 +41,33 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       }
       return actual.rm(...args)
     }),
-    writeFile: (async (path: unknown, ...rest: never[]) => {
-      if (String(path).includes('.lock.takeover-')) {
-        if (state.claimFailure !== undefined) {
-          throw Object.assign(new Error(`${state.claimFailure}: injected claim failure`), { code: state.claimFailure })
-        }
-        await (actual.writeFile as (path: unknown, ...args: never[]) => Promise<void>)(path, ...rest)
-        await state.afterClaim?.(String(path))
-        return
+    open: async (...args: Parameters<typeof actual.open>) => {
+      const path = String(args[0])
+      if (path.includes('.lock.takeover-') && state.claimFailure !== undefined) {
+        throw Object.assign(new Error(`${state.claimFailure}: injected claim failure`), { code: state.claimFailure })
       }
-      if (state.lockPermissionFailures > 0 && String(path).endsWith('.lock')) {
+      if (state.lockPermissionFailures > 0 && path.endsWith('.lock')) {
         state.lockPermissionFailures -= 1
-        if (state.releaseLockBeforeProbe) await actual.rm(String(path))
+        if (state.releaseLockBeforeProbe) await actual.rm(path)
         throw Object.assign(new Error('EPERM: injected exclusive-create failure'), { code: 'EPERM' })
       }
-      return (actual.writeFile as (path: unknown, ...args: never[]) => Promise<void>)(path, ...rest)
-    }) as typeof actual.writeFile,
+      const handle = await actual.open(...args)
+      if (path.endsWith('.tmp')) {
+        const write = handle.writeFile.bind(handle)
+        vi.spyOn(handle, 'writeFile').mockImplementation(async (...input) => {
+          await write(...input)
+          state.afterTempWrite?.()
+        })
+      }
+      if (path.includes('.lock.takeover-')) {
+        const write = handle.writeFile.bind(handle)
+        vi.spyOn(handle, 'writeFile').mockImplementation(async (...input) => {
+          await write(...input)
+          await state.afterClaim?.(path)
+        })
+      }
+      return handle
+    },
   }
 })
 
@@ -65,6 +77,7 @@ afterEach(async () => {
   vi.useRealTimers()
   vi.restoreAllMocks()
   state.afterClaim = undefined
+  state.afterTempWrite = undefined
   state.claimFailure = undefined
   state.claimRemovalFails = false
   state.lockRemovalFails = false
@@ -122,6 +135,28 @@ async function waitForLock(lockPath: string): Promise<void> {
 }
 
 describe('writeFileAtomic', () => {
+  it('preserves the committed target when its publication signal is already aborted', async () => {
+    const dir = await scratch(), target = join(dir, 'doc.yaml'), lifetime = new AbortController()
+    await writeFile(target, 'committed')
+    const reason = new Error('retained authority ended')
+    lifetime.abort(reason)
+    await expect(writeFileAtomic(target, 'unavailable authority', { mode: 0o600, signal: lifetime.signal })).rejects.toBe(reason)
+    expect(await readFile(target, 'utf8')).toBe('committed')
+    expect(await readdir(dir)).toEqual(['doc.yaml'])
+  })
+
+  it('removes the acquired temp without publishing when authority ends after its bytes are written', async () => {
+    const dir = await scratch(), target = join(dir, 'doc.yaml'), lifetime = new AbortController()
+    await writeFile(target, 'committed')
+    const reason = new Error('retained authority ended')
+    state.afterTempWrite = () => { lifetime.abort(reason) }
+    try {
+      await expect(writeFileAtomic(target, 'unavailable authority', { mode: 0o600, signal: lifetime.signal })).rejects.toBe(reason)
+    } finally { state.afterTempWrite = undefined }
+    expect(await readFile(target, 'utf8')).toBe('committed')
+    expect(await readdir(dir)).toEqual(['doc.yaml'])
+  })
+
   it('creates the file and its parents with exactly the stated mode', async () => {
     const dir = await scratch()
     const target = join(dir, 'nested', 'deep', 'doc.yaml')
@@ -311,6 +346,36 @@ describe('withFileLock', () => {
     expect(await readdir(dir)).toEqual([])
   })
 
+  it('recovers an exited claimant before taking over the original lock', async () => {
+    const claimant = EXITED_PID - 1
+    probeExited([EXITED_PID, claimant])
+    const dir = await scratch()
+    const target = join(dir, 'document')
+    const held = record(EXITED_PID)
+    const claim = `${target}.lock.takeover-${createHash('sha256').update(held).digest('hex').slice(0, 16)}`
+    await writeFile(`${target}.lock`, held)
+    await writeFile(claim, record(claimant))
+
+    await expect(withFileLock(target, async () => 'acquired', { waitMs: 0 })).resolves.toBe('acquired')
+    expect(await readdir(dir)).toEqual([])
+  })
+
+  it('recovers a chain of exited claimants', async () => {
+    const claimants = [EXITED_PID, EXITED_PID - 1, EXITED_PID - 2]
+    probeExited(claimants)
+    const dir = await scratch()
+    const target = join(dir, 'document')
+    let lock = `${target}.lock`
+    for (const pid of claimants) {
+      const held = record(pid)
+      await writeFile(lock, held)
+      lock = `${lock}.takeover-${createHash('sha256').update(held).digest('hex').slice(0, 16)}`
+    }
+
+    await expect(withFileLock(target, async () => 'acquired', { waitMs: 0 })).resolves.toBe('acquired')
+    expect(await readdir(dir)).toEqual([])
+  })
+
   // Windows reissues an exited PID almost at once, so the real probe runs on POSIX only.
   it.skipIf(process.platform === 'win32')('takes over the lock of a process that really exited', async () => {
     const dir = await scratch()
@@ -322,11 +387,17 @@ describe('withFileLock', () => {
     await expect(withFileLock(target, async () => 'acquired', { waitMs: 0 })).resolves.toBe('acquired')
   })
 
-  it('admits one contender at a time when several take over the same exited holder', async () => {
-    probeExited()
+  it.each([false, true])('admits one contender at a time with an exited claim: %s', async (exitedClaim) => {
+    const claimant = EXITED_PID - 1
+    probeExited([EXITED_PID, claimant])
     const dir = await scratch()
     const target = join(dir, 'document')
-    await writeFile(`${target}.lock`, record(EXITED_PID))
+    const held = record(EXITED_PID)
+    await writeFile(`${target}.lock`, held)
+    if (exitedClaim) {
+      const claim = `${target}.lock.takeover-${createHash('sha256').update(held).digest('hex').slice(0, 16)}`
+      await writeFile(claim, record(claimant))
+    }
     let active = 0
     let overlapped = false
 
@@ -431,10 +502,30 @@ describe('withFileLock', () => {
     const held = record(EXITED_PID)
     await writeFile(`${target}.lock`, held)
     const claim = `${target}.lock.takeover-${createHash('sha256').update(held).digest('hex').slice(0, 16)}`
-    await writeFile(claim, '1\n')
+    await writeFile(claim, record(process.pid))
 
     await expect(withFileLock(target, async () => {}, { waitMs: 50 })).rejects.toThrow(/timed out waiting for the writer lock/)
     expect(await readFile(`${target}.lock`, 'utf8')).toBe(held)
+  })
+
+  it('keeps a claim replaced by a live owner during claimant recovery', async () => {
+    const claimant = EXITED_PID - 1
+    probeExited([EXITED_PID, claimant])
+    const dir = await scratch()
+    const target = join(dir, 'document')
+    const held = record(EXITED_PID)
+    const claim = `${target}.lock.takeover-${createHash('sha256').update(held).digest('hex').slice(0, 16)}`
+    await writeFile(`${target}.lock`, held)
+    await writeFile(claim, record(claimant))
+    state.afterClaim = async (acquired) => {
+      if (acquired === claim) return
+      state.afterClaim = undefined
+      await writeFile(claim, record(process.pid))
+    }
+
+    await expect(withFileLock(target, async () => {}, { waitMs: 0 })).rejects.toThrow(/timed out/)
+    expect(await readFile(`${target}.lock`, 'utf8')).toBe(held)
+    expect(await readFile(claim, 'utf8')).toBe(record(process.pid))
   })
 
   it('keeps a lock that another contender acquired while this one claimed the exited record', async () => {

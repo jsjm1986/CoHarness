@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-original-owner-postgres-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts -t 'retains native Codex Session and actor ownership' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T03:38:47.516814+00:00",
+  "seconds": 8.455,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3915166ecd7a16e79402e71568e5c0b510ae0a366e8c6a3d58daf74ef27b2450",
+  "inputsAfter": "3915166ecd7a16e79402e71568e5c0b510ae0a366e8c6a3d58daf74ef27b2450",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "d958f7c8e749e8f3c1c71e18b20c28ecad899c8a0fa2dd945835fb8dbd3bfeac",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n{\"timestamp\":\"2026-10-25T03:38:53.845806Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model codex-fixture is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-10-25T03:38:54.017865Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model codex-fixture is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-10-25T03:38:54.903693Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model codex-fixture is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-10-25T03:38:54.914944Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model codex-fixture is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-10-25T03:38:55.713676Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model codex-fixture is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-10-25T03:38:55.725508Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model codex-fixture is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n\n Test Files  1 passed (1)\n      Tests  3 passed | 18 skipped (21)\n   Start at  11:38:49\n   Duration  6.55s (transform 2.39s, setup 29ms, import 2.74s, tests 3.69s, environment 0ms)\n\n"
+}

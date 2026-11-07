@@ -1,0 +1,164 @@
+{
+  "finding": "B465",
+  "status": "fixed_verified_offline_metadata_and_dual_release_layout_global_review_open",
+  "updatedAt": "2026-11-02T02:36:15.582805+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T02:31:25.874176+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-metadata-latest-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problem": "The offline registry used only physically installed external versions. pnpm overrides leave valid exact or older major requirements unsatisfied in that fixture, so the release layout check reports ETARGET even though the required version exists on official npm.",
+  "fix": "Record seven exact official published manifests and read them as additional offline versions. Preserve every nonempty dependency range; reject malformed, duplicate, workspace-shadowing or installed-conflicting records. Empty dependency records and absent records are equivalent. No installed package or lockfile is changed.",
+  "verification": {
+    "differentNamedCases": 31,
+    "unitFiles": 2,
+    "skipped": 0,
+    "originalCounterexamples": 4,
+    "tinyRealNpmLayout": "Selects the declared child1.0.0 even when installed child2.0.0 is present; archive requests0.",
+    "actualReleaseLayout": {
+      "dshPackagesPerRelease": 288,
+      "internalEdges": 998,
+      "sourcePeerEdges": 1687,
+      "syntheticPeerEdges": 3374,
+      "sharedCordisInstallations": 1,
+      "workUnits": 287424,
+      "unchangedWorkBudget": 875000,
+      "unavailableOptionalNamesIgnoredByNpm": 73,
+      "archivesRequested": 0,
+      "sourceNode22": "passed",
+      "sourceNode24": "passed"
+    },
+    "officialMetadata": {
+      "records": 7,
+      "names": [
+        "commander",
+        "esbuild",
+        "fflate",
+        "katex",
+        "uuid",
+        "vite"
+      ],
+      "source": "https://registry.npmjs.org",
+      "evidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/official-metadata-queries.json",
+      "fixtureExactlyMatchesFetchedProjection": true,
+      "packagesInstalled": false
+    },
+    "checks": [
+      {
+        "name": "npm-metadata-unit-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-metadata-unit-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "scripts/benchmark-npm-resolution.spec.ts",
+          "scripts/verify-npm-install-layout.spec.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-metadata-unit-final-cases.json"
+        ]
+      },
+      {
+        "name": "npm-layout-real",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-layout-real.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-npm-install-layout.ts"
+        ]
+      },
+      {
+        "name": "npm-layout-current-source",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-layout-current-source.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-npm-install-layout.ts"
+        ]
+      },
+      {
+        "name": "npm-metadata-host-types-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-metadata-host-types-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/host-types.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "npm-metadata-lint-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-metadata-lint-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "scripts/benchmark-npm-resolution.ts",
+          "scripts/benchmark-npm-resolution.spec.ts"
+        ]
+      },
+      {
+        "name": "npm-metadata-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-metadata-doc-quick.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_GATE_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/run-docs.mjs"
+        ]
+      }
+    ],
+    "noPaidModelApi": true
+  },
+  "scope": {
+    "ownedDeltas": 6,
+    "readOnlyPrerequisites": 593,
+    "frozenSources": 599,
+    "capsule": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/npm-metadata-capsule.json",
+    "wholeProjectComplete": false
+  },
+  "nextConfirmedBug": {
+    "finding": "B468",
+    "observation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/command-caller-observation.json",
+    "problem": "An actual disposed Agent still receives a queued command handler after real attachment saving resumes.",
+    "idleReleaseObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/command-idle-release-observation.json",
+    "additionalProblem": "tryDisposeIdle retires the actual Agent while its command is still admitting an attachment."
+  },
+  "remaining": [
+    "B468 needs exact-owner admission and idle-release lifetime repair with real application coverage.",
+    "All12 business domains remain in_progress; B04/B25 and Root/peer assembled acceptance remain open.",
+    "Official paid Responses verification remains deferred."
+  ]
+}

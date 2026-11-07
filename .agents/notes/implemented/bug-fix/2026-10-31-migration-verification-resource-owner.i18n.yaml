@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-migration-verification-resource-owner.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-migration-verification-resource-owner.md
+document:
+  en: b5e28f309e2553b2d0b532288d56606eb41304a2
+  zh: e9ec54ec2089e9e5b11a40ab0a5cd383e01729b9
+/agent-note-retain-migration-verification-admission-through-queue-waits:
+  en: 3f61c972df1b2c0a
+  zh: 32698267153e285b
+/agent-note-retain-migration-verification-admission-through-queue-waits/problem:
+  en: d730f39608f660b7
+  zh: 489ce9d12f5f2002
+/agent-note-retain-migration-verification-admission-through-queue-waits/decision:
+  en: 30e473bb25dbbd61
+  zh: d3fca2e36708291f
+/agent-note-retain-migration-verification-admission-through-queue-waits/alternatives-considered:
+  en: 3c0e95dc0c2c01a2
+  zh: f7e6df3ff92ab2af
+/agent-note-retain-migration-verification-admission-through-queue-waits/consequences:
+  en: 162d3cb07d40ade7
+  zh: 406f0d0dc3008ff5
+/agent-note-retain-migration-verification-admission-through-queue-waits/verification:
+  en: 6dc977f596fdc366
+  zh: 342c4d0c739ad78d

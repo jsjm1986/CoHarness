@@ -1,0 +1,13 @@
+{
+  "name": "progress-durable-usage-types",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-23T21:06:21.021801+00:00",
+  "seconds": 4.998,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ac4a5c0bee610b7dff680ad457d7d1707fc9ed41f1298605816239f01acabb73",
+  "inputsAfter": "ac4a5c0bee610b7dff680ad457d7d1707fc9ed41f1298605816239f01acabb73",
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/workflow/workflow-ptc/README.md
 document:
-  en: 662558991e1a482b30ec6744ed6a3cf4475d302a
-  zh: da6357cfec0977513a37f70b31e47d3e6237e0d8
+  en: fd92e91377271cdc35b324dde6f63ec0921f4c88
+  zh: 9202f2f2678632e9b773eabbd6b447a7900bb631
 /:
   en: c38b437e7e319d4b
   zh: 2da5213a6120586c
 /deepseek-ai-dsh-workflow-ptc:
-  en: 9f43ea90b0eb3f34
-  zh: dc0afea0b135f671
+  en: 80811c7edfe337ee
+  zh: dabc57e7c82f32fc
 /deepseek-ai-dsh-workflow-ptc/summary:
   en: 9b6df6defa779ce7
   zh: 43db3d8918707117
@@ -24,8 +24,8 @@ document:
   en: 9c31c6e17ba018ed
   zh: 85ffe20ce8a5a371
 /deepseek-ai-dsh-workflow-ptc/use-this-package/results-and-failures:
-  en: 483134c11525910a
-  zh: d2ad48023e4a4be9
+  en: 514ebfa708770893
+  zh: 189b255fc24e998d
 /deepseek-ai-dsh-workflow-ptc/use-this-package/file-policy-and-cancellation:
   en: fb471dec664175bb
   zh: 5a14f31abcdab2c5
@@ -39,8 +39,8 @@ document:
   en: d94db278c7b67278
   zh: 054d0cf46a8f6f07
 /deepseek-ai-dsh-workflow-ptc/understand-the-implementation/values-and-child-ownership:
-  en: 4e866f00a49d76e7
-  zh: 15a02d9ccc33d08f
+  en: c1a20ea1db174572
+  zh: cc7145c9d4bbee90
 /deepseek-ai-dsh-workflow-ptc/understand-the-implementation/cancellation-and-outcomes:
   en: 3cb26d8490ff3b9f
   zh: 871b6c0e8f102ce3

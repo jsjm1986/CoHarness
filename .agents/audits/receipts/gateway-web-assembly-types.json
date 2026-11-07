@@ -1,0 +1,14 @@
+{
+  "name": "gateway-web-assembly-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T21:09:49.361100+00:00",
+  "seconds": 6.166,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bfe710089207c973107dc6242e5846d6b0b190a4f3e70e4183922c5b4f97eedb",
+  "inputsAfter": "bfe710089207c973107dc6242e5846d6b0b190a4f3e70e4183922c5b4f97eedb",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

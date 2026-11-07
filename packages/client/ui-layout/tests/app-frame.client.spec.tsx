@@ -417,6 +417,25 @@ describe('AppFrame — medium-viewport auto-collapse', () => {
 })
 
 describe('AppFrame — compact drawer and overlay details', () => {
+  it('keeps tab identity in the center while the sidebar is a rail before Session selection', () => {
+    frameWidth = 900
+    selectedSession.current = undefined
+    const { frame, instance, slotCalls } = mountFrame()
+    expect(frame.querySelector('[class*="railEnvironment"]')?.closest('[class*="centerCol"]')).toBeTruthy()
+    expect(slotCalls.some(call => call.key === 'shell.mobile.header.context')).toBe(true)
+    expect(slotCalls.some(call => call.key === 'shell.mobile.header.actions')).toBe(false)
+    act(() => { instance.actions.toggleSidebar() })
+    expect(frame.querySelector('[class*="railEnvironment"]')).toBeNull()
+  })
+
+  it('keeps tab identity outside the Session provider before a conversation is selected', () => {
+    frameWidth = 390
+    selectedSession.current = undefined
+    const { slotCalls } = mountFrame()
+    expect(slotCalls.some(call => call.key === 'shell.mobile.header.context')).toBe(true)
+    expect(slotCalls.some(call => call.key === 'shell.mobile.header.actions')).toBe(false)
+  })
+
   it('renders the topbar toggle, no columns template, and no drag handles', () => {
     frameWidth = 390
     const { frame, slotCalls } = mountFrame()

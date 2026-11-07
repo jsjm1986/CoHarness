@@ -11,6 +11,8 @@ The browser Cordis plugin that owns the React rendering layer. [`dsh-client-web`
 
 The client entry also owns the React implementation of slot outlets, session providers, and observable-to-uSES binding. Business plugins pass bare observable sources through typed slot `hooks`; the renderer binds them at the outlet. `SessionProvider` follows the current selection when no id is supplied and can bind one explicit listed Session for a multi-pane surface. The plugin activates after `slots`, `sessions`, and `connection`, projects the selected session title, and performs the sole context-level `renderSlot('root')` call. React, React DOM, Cordis, ui-slots, and ui-primitives retain one browser identity through the web shell's static module table; this package arrives as a dynamic client bundle.
 
+An explicit Session binding updates when its retained generation or provider roster changes, even while current selection stays fixed. A late binding replaces the empty branch without requiring focus; retirement withdraws the body. Unchanged bundles keep their identity, so another pane's lifecycle does not replace the current bundle.
+
 An authenticated account change immediately unmounts all owned application roots before the Connection reloads the document. Failed component cleanup still clears private DOM content; it cannot leave another account’s view displayed while teardown continues.
 
 ## Summary

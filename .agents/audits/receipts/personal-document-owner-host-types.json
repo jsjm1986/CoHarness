@@ -1,0 +1,14 @@
+{
+  "name": "personal-document-owner-host-types",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-26T14:02:00.707278+00:00",
+  "seconds": 17.367,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6bd2f84f1de6367766d794077df9a0df5dccf46da71bb6c4f7c75fdb8e9812f4",
+  "inputsAfter": "6bd2f84f1de6367766d794077df9a0df5dccf46da71bb6c4f7c75fdb8e9812f4",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

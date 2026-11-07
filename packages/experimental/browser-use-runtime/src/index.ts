@@ -15,6 +15,17 @@ export interface OwnedSessionResource<T> {
   close: () => Promise<void>
 }
 
+/** Failed resource acquisition whose owner must retain its remaining cleanup. */
+export class ResourceAcquisitionCleanupError extends Error {
+  /**
+   * @param cleanup - stop and drain resources left by the failed acquisition.
+   * @param cause - acquisition and cleanup failures.
+   */
+  constructor(readonly cleanup: () => Promise<void>, cause: unknown) {
+    super('Browser acquisition cleanup could not be confirmed', { cause })
+  }
+}
+
 /** Resource creation and attachment ownership selected by one provider. */
 export interface SessionResourceOptions<T> {
   /** Provider name included in lifecycle diagnostics. */
@@ -22,7 +33,7 @@ export interface SessionResourceOptions<T> {
   /** Reserve one existing browser for at most one live Session. */
   exclusive: boolean
   /**
-   * Acquire one resource; reject only after rolling back partial acquisition.
+   * Acquire one resource; reject after rollback, or retain cleanup in ResourceAcquisitionCleanupError.
    * @param agent - exact live owner of this acquisition.
    * @param signal - aborts when that owner or the provider is disposed.
    * @returns the acquired resource and its cleanup.
@@ -35,6 +46,7 @@ interface Entry<T> {
   ready: Promise<OwnedSessionResource<T>>
   tail: Promise<void>
   closing?: Promise<void>
+  rollback?: () => Promise<void>
 }
 
 /** Stop a caller's wait while retaining handlers on the resource owner's work. */
@@ -61,6 +73,7 @@ export class SessionResources<T> {
   private readonly entries = new Map<Agent, Entry<T>>()
   private readonly ownerCleanups = new Map<Agent, () => Promise<void>>()
   private readonly disposedOwners = new WeakSet<Agent>()
+  private stopped = false
   private disposing: Promise<void> | undefined
 
   /**
@@ -75,7 +88,7 @@ export class SessionResources<T> {
    * @returns whether this owner can use or acquire the configured browser.
    */
   available(agent: Agent): boolean {
-    return this.disposing === undefined && !this.disposedOwners.has(agent)
+    return !this.stopped && !this.disposedOwners.has(agent)
       && this.ctx.get('agents')?.get(agent.id) === agent
       && (this.entries.has(agent) || !this.options.exclusive || this.entries.size === 0)
   }
@@ -134,19 +147,21 @@ export class SessionResources<T> {
   /**
    * Stop new acquisitions and await every acquired resource and owned operation.
    * A failed close retains its entry and rejects disposal, preserving exclusive ownership.
-   * @returns the shared quiescent disposal promise.
+   * Failed attempts may be retried; new acquisitions remain stopped.
+   * @returns the shared cleanup attempt, settling after quiescence or cleanup failure.
    */
   dispose(): Promise<void> {
+    this.stopped = true
     return this.disposing ??= Promise.resolve().then(async () => {
       const settled = await Promise.allSettled([...this.entries].map(([agent, entry]) => this.closeEntry(agent, entry)))
       const errors = settled.flatMap(result => result.status === 'rejected' ? [result.reason as unknown] : [])
       if (errors.length > 0) throw new AggregateError(errors, `${this.options.label}: browser cleanup failed`)
       await Promise.all([...this.ownerCleanups.values()].map(close => close()))
-    })
+    }).catch((error: unknown) => { this.disposing = undefined; throw error })
   }
 
   private entry(agent: Agent): Entry<T> {
-    if (this.disposing !== undefined || this.disposedOwners.has(agent) || this.ctx.get('agents')?.get(agent.id) !== agent) {
+    if (this.stopped || this.disposedOwners.has(agent) || this.ctx.get('agents')?.get(agent.id) !== agent) {
       throw new Error(`${this.options.label}: Session is not a live browser owner`)
     }
     const current = this.entries.get(agent)
@@ -155,13 +170,20 @@ export class SessionResources<T> {
       throw new Error(`${this.options.label}: attached browser is already reserved by another Session`)
     }
     if (!this.ownerCleanups.has(agent)) {
-      const cleanup = agent.ctx.effect(() => async () => {
+      const cleanup = async (): Promise<void> => {
         this.disposedOwners.add(agent)
         const owned = this.entries.get(agent)
         if (owned !== undefined) await this.closeEntry(agent, owned)
         this.ownerCleanups.delete(agent)
-      }, `${this.options.label}.session`)
-      this.ownerCleanups.set(agent, cleanup)
+      }
+      const detach = agent.ctx.effect(() => cleanup, `${this.options.label}.session`)
+      this.ownerCleanups.set(agent, async () => {
+        await cleanup()
+        try { await detach() } catch (_previousOwnerCleanupFailure) {
+          // This single-callback Cordis effect retains its earlier rejection;
+          // explicit cleanup has already confirmed resource shutdown.
+        }
+      })
     }
     const controller = new AbortController()
     const entry: Entry<T> = {
@@ -170,8 +192,8 @@ export class SessionResources<T> {
         controller.signal.throwIfAborted()
         return this.options.open(agent, controller.signal)
       }).catch((error: unknown) => {
-        // open() owns rollback; a failed acquisition has no remaining resource.
-        this.entries.delete(agent)
+        if (error instanceof ResourceAcquisitionCleanupError) entry.rollback = error.cleanup
+        else this.entries.delete(agent)
         throw error
       }),
       tail: Promise.resolve(),
@@ -188,10 +210,11 @@ export class SessionResources<T> {
       const resource = await entry.ready.catch(() => undefined)
       try {
         await resource?.close()
+        await entry.rollback?.()
       } finally {
         await entry.tail
       }
       this.entries.delete(agent)
-    })
+    }).catch((error: unknown) => { delete entry.closing; throw error })
   }
 }

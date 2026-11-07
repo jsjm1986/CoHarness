@@ -1,6 +1,7 @@
 /** API-key authentication and credential-gated discovery for the official DeepSeek route. */
 import type { Context } from '@deepseek-ai/cordis'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
+import type { ResolvedCredential } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
@@ -42,17 +43,19 @@ export function apply(ctx: Context, config: Config): void {
     }
   }
   options()
-  const resolveApiKey = async (connection: ResolvedDeepSeekOptions): Promise<string> => {
+  const resolveApiKey = async (connection: ResolvedDeepSeekOptions): Promise<ResolvedCredential> => {
     // Every credential fact comes from the caller's snapshot, so a rejected
     // settings generation cannot leak its key onto the previous endpoint.
     const ref = connection.apiKeyEnv
     const credentials = ctx.get('credentials')
     if (credentials !== undefined) {
       const hit = await credentials.resolve(ref)
-      if (hit !== undefined) return assertUsableApiKey(hit.value, 'llm-deepseek', ref)
+      if (hit !== undefined) return { value: assertUsableApiKey(hit.value, 'llm-deepseek', ref), source: hit.source }
     } else {
       const ambient = launchEnvironmentOf(ctx).get(ref)
-      if (ambient !== undefined && ambient.value.length > 0) return assertUsableApiKey(ambient.value, 'llm-deepseek', ref)
+      if (ambient !== undefined && ambient.value.length > 0) return {
+        value: assertUsableApiKey(ambient.value, 'llm-deepseek', ref), source: ambient.source,
+      }
     }
     throw new LlmError(
       `llm-deepseek: no API key for provider route "${PROVIDER}"; store ${ref} through the credentials`
@@ -66,7 +69,10 @@ export function apply(ctx: Context, config: Config): void {
   const registration = registerDeepSeekProvider(ctx, PROVIDER, {
     options,
     providerName: 'DeepSeek',
-    resolveAuth: async connection => ({ headers: { 'x-api-key': await resolveApiKey(connection) } }),
+    resolveAuth: async (connection) => {
+      const credential = await resolveApiKey(connection)
+      return { headers: { 'x-api-key': credential.value }, credentialSource: credential.source }
+    },
     discoverModels: async (provider) => {
       const connection = options()
       try { await resolveApiKey(connection) }

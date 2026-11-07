@@ -1,0 +1,13 @@
+{
+  "name": "ssh-built-range-close-current",
+  "cwd": ".",
+  "command": "pnpm run test:e2e packages/ssh/ssh/tests/resource-admission.e2e.ts --retry=0",
+  "startedAt": "2026-10-23T15:44:52.766146+00:00",
+  "seconds": 3.606,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "30bf20471782318b215c764c95d50a8bddc94a3585a947efcb989f365b7149a3",
+  "inputsAfter": "30bf20471782318b215c764c95d50a8bddc94a3585a947efcb989f365b7149a3",
+  "outputSha256": "c78c8aef0d70fdb51ae83895271ede7f7247648edb46ee700c69303b89ec29c9",
+  "outputTail": "$ vitest run --config vitest.e2e.config.ts packages/ssh/ssh/tests/resource-admission.e2e.ts --retry=0\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  23:44:54\n   Duration  2.04s (transform 196ms, setup 26ms, import 244ms, tests 1.68s, environment 0ms)\n\n"
+}

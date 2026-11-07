@@ -7,6 +7,7 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
 >
   <div
     class="root collapsed railIn quietBars"
+    data-sidebar-root=""
     style="--dsh-sidebar-region-top: 0px; --dsh-sidebar-region-height: 0px;"
   >
     <div
@@ -72,6 +73,7 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
     </button>
     <div
       class="regionArea"
+      data-sidebar-browsing=""
     >
       <div
         data-slot="sidebar.workspaces"
@@ -125,6 +127,7 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
 >
   <div
     class="root quietBars"
+    data-sidebar-root=""
     style="width: 300px; --dsh-sidebar-region-top: 0px; --dsh-sidebar-region-height: 0px;"
   >
     <div
@@ -224,6 +227,7 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
     </button>
     <div
       class="regionArea"
+      data-sidebar-browsing=""
     >
       <div
         data-slot="sidebar.workspaces"
@@ -277,6 +281,7 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
 >
   <div
     class="root quietBars"
+    data-sidebar-root=""
     style="width: 300px; --dsh-sidebar-region-top: 0px; --dsh-sidebar-region-height: 0px;"
   >
     <div
@@ -376,6 +381,7 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
     </button>
     <div
       class="regionArea"
+      data-sidebar-browsing=""
     >
       <div
         data-slot="sidebar.workspaces"

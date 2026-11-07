@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent/README.md
 document:
-  en: cb7bbe59de867e70f13c427a3451f998bb6a1055
-  zh: a70c6f131ed3abeef06dbbf34815da1c1a5939e0
+  en: 210ec78d92a6e978aebeb73c5df98085a0780175
+  zh: b58d2be10db50cbfb9bfae8939b56516d26b75c1
 /:
   en: 935b897e90e232e9
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: cb2346e239532669
   zh: 96be653e1482895a
 /deepseek-ai-dsh-subagent/service-api:
-  en: fb847c698ea8e753
-  zh: fc61f14f28e59288
+  en: f02f814a8d46acd7
+  zh: 743633932cb48b87
 /deepseek-ai-dsh-subagent/configuration:
   en: 5111984e43d3217f
   zh: f88f26215b72548c
@@ -39,29 +39,29 @@ document:
   en: d1faff40fbf03204
   zh: 097c2d8f51ef955c
 /deepseek-ai-dsh-subagent/delegated-policy:
-  en: ab835dcb8c89bdea
-  zh: b642e3b23ae6b9c6
+  en: ae363485d9b7527f
+  zh: 84b19c2c8c88e18c
 /deepseek-ai-dsh-subagent/one-shot-ownership-and-lifecycle:
-  en: 4751f849aa7a3715
-  zh: 41f7ac59420431d3
+  en: e8b46ffba9cf84f0
+  zh: 75afebffd92152e3
 /deepseek-ai-dsh-subagent/continuable-children-and-activations:
   en: 722d771240a83590
   zh: 091a2a6252ec8efd
 /deepseek-ai-dsh-subagent/continuable-children-and-activations/external-runtime-members:
-  en: d17a330c02fc2405
-  zh: ac9a2253194b8946
+  en: ad9e9a8880cafc01
+  zh: 658dfd8b4352498b
 /deepseek-ai-dsh-subagent/continuable-children-and-activations/settlement-delivery:
-  en: 0a18c095bf085ce8
-  zh: fd562e258b925a8e
+  en: dfeec9d098e19c26
+  zh: daa35c1dbba92e29
 /deepseek-ai-dsh-subagent/parent-owned-catalog:
-  en: d3d6c26f5001962f
-  zh: 1d7a133055c86daa
+  en: 54b36a93446c569a
+  zh: 402fd8d6b9d5b808
 /deepseek-ai-dsh-subagent/lifecycle-events:
   en: 02890a917bc67c97
   zh: f216ab9e92000c3f
 /deepseek-ai-dsh-subagent/collection-model:
-  en: b36d3fd33a5eda20
-  zh: 1d5582a023161292
+  en: f401e949a04c51f1
+  zh: 05e7ffbaba9992eb
 /deepseek-ai-dsh-subagent/model-experience:
   en: 215e7ba838619b7b
   zh: 739af62540d76c1a

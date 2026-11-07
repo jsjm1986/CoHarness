@@ -1,0 +1,338 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-28T19:51:13.130822+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B265"
+  ],
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchedBeforeAndAfterWork": true,
+    "dirtyEditsPreserved": true,
+    "exactRevisionEvidence": "External legacy-quota-final-baseline-20261029.json; no resolved commit references stored here."
+  },
+  "behavior": {
+    "legacyMutation": "Quota writes canonicalize accepted account ids and retire only that account's historical numeric aliases inside their write transaction. Restoring inheritance and logical account deletion retire those aliases as well; another account's quota stays intact.",
+    "import": "Canonical decimal keys preserve the SQLite effective account policy independent of row insertion order. Dormant aliases increment skippedQuotaAliases without becoming active. Each replay replaces overrides only for current source accounts, restoring role inheritance if no canonical row exists. PostgreSQL-only accounts retain limits. Invalid ids/missing account references roll back all imported changes.",
+    "sourceOwnership": "Frozen SQLite input is read-only; actual CLI and emitted-library replays preserve source bytes."
+  },
+  "negativeEvidence": {
+    "cleanup": "Actual rewrite/inherit/remove cases retain five distinct numeric aliases in old code.",
+    "canonicalFirst": "Real SQLite-to-PostgreSQL import changes effective200tokens/300cost-micros to0tokens/unlimited when an alias row follows a canonical row.",
+    "aliasOnly": "Real import activates an inert alias and changes inherited50tokens/90cost-micros to0/unlimited.",
+    "excludedAsCausalEvidence": "Alias-first case has correct canonical policy in old code and fails only because the new report field does not exist; it is a positive ordering case after repair."
+  },
+  "verification": {
+    "source": {
+      "cohortPassed": 90,
+      "cohortFiles": 5,
+      "cohortSkipped": 0,
+      "latestOwnerScopeReplayPassed": 10,
+      "lastReplaySameCasesWithAddedPostgresOnlyAccountPreservationAssertions": true,
+      "existingImportCasesPassed": 3,
+      "existingBaselineFilteredOut": 38,
+      "notAFullRepositorySuite": true
+    },
+    "cli": {
+      "actualSourceImportCommand": true,
+      "maintainedGoldens": 2,
+      "scenarios": [
+        "canonical-first",
+        "alias-only"
+      ],
+      "replaysPerScenario": 2,
+      "frozenBytesPreserved": true
+    },
+    "compiled": {
+      "privateOutput": true,
+      "sharedGatewayLibWritten": false,
+      "host": "25.8.1; emitted SQLite services, alias rewrite/removal and PostgreSQL importer match the two maintained CLI goldens.",
+      "currentAdministrationRegression": "Fresh emitted artifact:Node22.22.1 PostgreSQL32HTTP observations against current081schema; hostSQLite11HTTP observations match maintained goldens.",
+      "priorNode24Evidence": "The preceding administrator batch independently passed32PostgreSQL observations on24.19.0; no new Node24run is claimed for this artifact.",
+      "ownedSourceDriftSinceBuild": [],
+      "peerNodeFeaturesAcceptedByThisReceipt": false
+    },
+    "coverage": {
+      "newAliasCleanupHelper": "100percent lines/statements/functions/branches",
+      "sqliteUsersLines": 98.83,
+      "sqliteGovernanceLines": 80.08,
+      "sqliteImporterLines": 66.94,
+      "wholeFileCoverageComplete": false,
+      "thresholdsLowered": false,
+      "exclusionsAdded": false
+    },
+    "types": "Full standalone Gateway checking face passed with new test/CLI driver types.",
+    "lint": "Changed Gateway source and tests passed scoped lint.",
+    "documentation": {
+      "quickPassed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "ownedPairsUpdated": 3,
+      "guideFormat": "Manual checks pass for triplet filenames, metadata, headings, terminal newline and500word budget. The named verify-upgrade-guides command from the skill is absent in this checkout; that attempted command failed and is not reported as passing."
+    },
+    "commands": [
+      {
+        "name": "legacy-quota-alias-causal-before",
+        "status": "failed",
+        "startedAt": "2026-10-28T19:36:59.211493+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:64505/hgw_model_acceptance_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/sqlite-quota-import.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T19:37:00.675782+00:00"
+      },
+      {
+        "name": "legacy-quota-final-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:42:39.164278+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:64505/hgw_model_acceptance_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/sqlite-quota-import.spec.ts",
+          "tests/users.spec.ts",
+          "tests/model-governance.spec.ts",
+          "tests/model-governance-integration.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/sqlite-user-quota.ts",
+          "--coverage.include=src/postgres/sqlite-import.ts",
+          "--coverage.include=src/users.ts",
+          "--coverage.include=src/model-governance.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/legacy-quota-final-source-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:42:43.544031+00:00"
+      },
+      {
+        "name": "legacy-quota-final-import-scope",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:45:15.948237+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:64505/hgw_model_acceptance_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/sqlite-quota-import.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:45:18.728796+00:00"
+      },
+      {
+        "name": "legacy-quota-cli-transcripts-record",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:42:06.935968+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:64505/hgw_model_acceptance_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/sqlite-quota-import.spec.ts",
+          "--maxWorkers=2",
+          "--update"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:42:09.358071+00:00"
+      },
+      {
+        "name": "legacy-quota-existing-import-compatibility",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:46:46.276936+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:64505/hgw_model_authority_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/postgres.spec.ts",
+          "-t",
+          "imports every SQLite control-plane domain|rejects a current SQLite source|rejects a versioned SQLite source",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:46:48.831930+00:00"
+      },
+      {
+        "name": "legacy-quota-private-build",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:45:42.283525+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-legacy-quota-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:45:44.559238+00:00"
+      },
+      {
+        "name": "legacy-quota-built-host-acceptance",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:46:45.777535+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:64505/hgw_model_acceptance_test",
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-built-legacy-quota.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/legacy-quota-artifact-20261029/lib",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:46:46.239739+00:00"
+      },
+      {
+        "name": "legacy-quota-administration-regression-current-built",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:47:59.059141+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:64505/hgw_model_acceptance_test",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-model-administration-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "postgres",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/legacy-quota-artifact-20261029/lib",
+          "all"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:48:07.564479+00:00"
+      },
+      {
+        "name": "legacy-quota-built-http-sqlite-regression",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:48:18.636796+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-model-administration-replay.py",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "sqlite",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/legacy-quota-artifact-20261029/lib",
+          "all"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:48:20.070483+00:00"
+      },
+      {
+        "name": "legacy-quota-final-current-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:44:47.366518+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/model-administration-final-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:44:50.826444+00:00"
+      },
+      {
+        "name": "legacy-quota-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:45:43.423778+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/sqlite-user-quota.ts",
+          "gateway/src/model-governance.ts",
+          "gateway/src/users.ts",
+          "gateway/src/postgres/sqlite-import.ts",
+          "gateway/tests/sqlite-quota-import.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:45:44.711142+00:00"
+      },
+      {
+        "name": "legacy-quota-final-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-28T19:47:47.497857+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T19:49:01.783280+00:00"
+      },
+      {
+        "name": "legacy-quota-upgrade-guide-format",
+        "status": "failed",
+        "startedAt": "2026-10-28T19:47:48.636038+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-upgrade-guides"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T19:47:49.597381+00:00"
+      }
+    ],
+    "finalRepositoryReferences": {
+      "name": "model-and-legacy-quota-final-repository-references",
+      "status": "passed",
+      "startedAt": "2026-10-28T19:52:16.934432+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "verify-repository-references"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T19:52:31.815085+00:00"
+    }
+  },
+  "noteReview": {
+    "updatedExisting": [
+      ".agents/notes/implemented/bug-fix/2026-10-29-model-administration-authority.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false,
+    "reason": "Historic quota key retirement and effective-policy-preserving import extend the same owning numeric-id decision; no separate duplicate note is introduced."
+  },
+  "cleanup": {
+    "ownedContainerAndVolumeRemoved": true,
+    "openConnectionsBeforeClose": 0,
+    "productionPortExcluded": 5432,
+    "otherContainersModified": false
+  },
+  "limitations": [
+    "All12 original audit domains and full-file coverage remain open.",
+    "Real model API verification remains human-deferred.",
+    "Multi-computer RuntimeId/placement work is a separate peer-owned change and requires its own later review."
+  ]
+}

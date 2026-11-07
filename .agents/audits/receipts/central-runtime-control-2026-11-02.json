@@ -1,0 +1,285 @@
+{
+  "finding": "B451",
+  "status": "fixed_verified_exact_central_runtime_controls_production_and_global_review_open",
+  "updatedAt": "2026-11-01T19:41:14.999378+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-latest-origin-fetch.json",
+    "workingTreePreserved": true,
+    "isRemoteUpToDate": true,
+    "verifiedAt": "2026-11-01T19:37:27.923515+00:00"
+  },
+  "problem": "Exact Admin Runtime stop/restart reused destructive project admission. A current administrator without Steward data qualification received403, and a qualified administrator received409 steward-reserved, while the existing authorized project instance stop succeeded. Process control was incorrectly coupled to protected project data access.",
+  "fix": "An internal RuntimeStopPurpose distinguishes control from the default destructive purpose. Exact Admin stop/restart supply control; retirement and data-changing callers retain destructive protection. PostgreSQL retains current administrator locks through stop intent and preserves generation, assigned node, Gateway process owner and durable stop-operation fences. Strict HTTP bodies cannot supply purpose.",
+  "compatibility": {
+    "newWireFields": false,
+    "newSessionOrSchemaMigration": false,
+    "destructiveDefaultPreserved": true,
+    "threeProductionBeforeImagesMatchB449": true,
+    "privateBuiltArtifactOnly": true,
+    "rootProductionMutation": false
+  },
+  "verification": {
+    "distinctPassingNamedCases": 207,
+    "fileCount": 9,
+    "sourceReports": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-source22-and-related-cases.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/control-related-host25-cases.json"
+    ],
+    "runnableTranscriptRows": 14,
+    "sourceNode22": true,
+    "normallyBuiltNode24": true,
+    "versionRepeatsAddedToCount": false,
+    "originalSourceAndBuilt": "Both matching predecessors reach the authorized exact central stop assertion and return403 instead of200; successful initial authentication, native carrier and strict-body rejection precede the failure.",
+    "qualifiedUnitBefore": "Original actual PostgreSQL cases returned steward-reserved when qualified and forbidden when unqualified. Both now confirm one owned listener close, stopped generation and no lingering operation.",
+    "permissionRace": "Role and organization withdrawals hold real PostgreSQL transactions; the stop transaction is observed blocked before withdrawal commits, then refuses without a stop operation. Role/account/membership/organization refusals are checked for both purposes.",
+    "nativeEvidence": "The HTTP carrier owns native response streams and confirms closure after stop. It is not a shipped Runtime process or native-containment claim. Stale generation and forged body do not stop; late restart withdrawal leaves generation4 stopped without a new start; reserved deletion retains bytes; personal retirement retains bytes and the default destructive purpose.",
+    "checks": [
+      {
+        "name": "central-focused-race-fixed",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-focused-race-fixed.json"
+      },
+      {
+        "name": "central-source22-and-related",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-source22-and-related.json"
+      },
+      {
+        "name": "control-related-host25",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/control-related-host25.json"
+      },
+      {
+        "name": "central-focused-source-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-focused-source-coverage.json"
+      },
+      {
+        "name": "central-final-source22-snapshot",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-final-source22-snapshot.json"
+      },
+      {
+        "name": "central-final-built24-snapshot",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-final-built24-snapshot.json"
+      },
+      {
+        "name": "gateway-typecheck",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/gateway-typecheck.json"
+      },
+      {
+        "name": "gateway-normal-private-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/gateway-normal-private-build.json"
+      },
+      {
+        "name": "gateway-prior-normal-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/gateway-prior-normal-build.json"
+      },
+      {
+        "name": "central-scoped-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-scoped-lint.json"
+      },
+      {
+        "name": "central-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-doc-quick.json"
+      },
+      {
+        "name": "central-latest-origin-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-latest-origin-fetch.json"
+      },
+      {
+        "name": "central-final-before-source",
+        "status": "expected_original_authorized_process_control_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-final-before-source.json"
+      },
+      {
+        "name": "central-final-before-built",
+        "status": "expected_original_authorized_process_control_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-final-before-built.json"
+      },
+      {
+        "name": "central-post-record-repository-refs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-post-record-repository-refs.json"
+      },
+      {
+        "name": "central-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-export-jsdoc.json"
+      }
+    ],
+    "coverage": {
+      "sourceChanged": {
+        "gateway/src/instances.ts": {
+          "changedExecutableStatements": 4,
+          "coveredStatements": 4,
+          "changedBranchArms": 3,
+          "coveredBranchArms": 2,
+          "uncoveredStatementLines": [],
+          "uncoveredBranchLines": [
+            1523
+          ]
+        },
+        "gateway/src/postgres/instance-repository.ts": {
+          "changedExecutableStatements": 8,
+          "coveredStatements": 7,
+          "changedBranchArms": 6,
+          "coveredBranchArms": 5,
+          "uncoveredStatementLines": [
+            404
+          ],
+          "uncoveredBranchLines": [
+            401
+          ]
+        },
+        "gateway/src/runtime-management-api.ts": {
+          "changedExecutableStatements": 2,
+          "coveredStatements": 0,
+          "changedBranchArms": 4,
+          "coveredBranchArms": 0,
+          "uncoveredStatementLines": [
+            101,
+            104
+          ],
+          "uncoveredBranchLines": [
+            101,
+            101,
+            109,
+            109
+          ]
+        }
+      },
+      "builtHttpPolicy": {
+        "file": "gateway/src/runtime-management-api.ts",
+        "normalBuiltFile": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/current-gateway-artifact/runtime-management-api.js",
+        "normalBuiltSha256": "8aeffe61042f71c87c34358e63124492df098053d8e709d6b287b435bfbb7eea",
+        "method": "Native V8 counters at each compiled ternary arm, using its innermost recorded range; collected from the successful actual HTTP transcript child, not the parent test runner.",
+        "requestPolicyBranchExecutionCounts": {
+          "destructive": 1,
+          "control": 6
+        },
+        "rawPrivateCoverage": [
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/built-v8-retire/coverage-45142-1793561599736-0.json"
+        ],
+        "doesNotClaimFullFileCoverage": true,
+        "sourceUnitCoverageReport": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/changed-source-coverage.json",
+        "sourceCoverageLimit": "Child HTTP execution is absent from in-process Vitest source percentages; typed impossible purpose/default assertion remains unexecuted. No threshold or exclusion changes."
+      },
+      "completeFileCoverageClaimed": false,
+      "thresholdOrExclusionChanged": false,
+      "existingCoreCoverageDebt": "unchanged; complete Core entry still below100%",
+      "frameworkNotice": "Existing shared Vitest4.1.11/coverage-v8 4.1.12 mismatch warning was preserved; shared dependencies were not changed."
+    },
+    "failedIntermediateSetup": [
+      "Qualified predecessor fixture initially omitted the required policy revision; only the corrected real permission refusals count as negative evidence.",
+      "The first readiness fixture used the whole credential JSON as an HMAC token; corrected to its token field before successful runtime startup evidence.",
+      "An artificial row-lock-then-revocation fixture inverted an existing trigger lock order and deadlocked; the final test opens the actual withdrawal transaction before observing blocked control, then commits.",
+      "The optional third start exhausted the fixture observation with two credits; final owned normal-pressure observation supplies four credits for three sequential starts and retains the existing no-credit-multiplication rule. Stale-sample assumptions were not used as a product diagnosis.",
+      "The first relocated built fixture inherited a package path relative to its private artifact; final configuration explicitly points at the actual repository package root."
+    ]
+  },
+  "peerB449ProductionAcceptance": {
+    "status": "trusted_peer_report_and_local_evidence_named_production_acceptance",
+    "rootIndependentlyRanProductionModel": false,
+    "release": "R34",
+    "schema": 103,
+    "findingsIncluded": [
+      "B449"
+    ],
+    "b450Excluded": true,
+    "actualTask": {
+      "humanMessages": 1,
+      "readCalls": 1,
+      "turnEndReason": "completed",
+      "historyReadsDuringTask": 10,
+      "http200": 10,
+      "historyReadFailures": 0,
+      "runtimeStopped": true,
+      "originalPromptNotReplayed": true
+    },
+    "headlessTypedRefusal": "peer reports actual typed Host headless and direct desktop-unavailable refusal verified; native user/Admin qualification UI matrix remains incomplete",
+    "logWindow": {
+      "since": "2026-11-01T18:13:37.476Z",
+      "through": "2026-11-01T18:52:14.945838+00:00",
+      "lockTimeouts": 0,
+      "statementTimeouts": 0,
+      "sampleFailures": 0
+    },
+    "evidence": {
+      ".artifacts/full-real-task-20261031/r34-real-task-and-history-proof.json": "bd81359ddb16850241c58ec4995e70fa7678e09b8e2ce7f640424142e6425b37",
+      ".artifacts/full-real-task-20261031/r34-linux-serving-log-summary-final.json": "0322e8c4a44e615b6712716d45ca7344099a5711613785df2b69f6ed4ac869a4",
+      ".artifacts/full-real-task-20261031/r34-deployment-and-real-acceptance.json": "f0905ccbb0c42fbf0e1109b53f421a440a547154551b1c3f41b9aa400c123357"
+    },
+    "remaining": "B451 exact central controls, peer-owned default-login and other unintegrated patches, native UI matrix and global coverage remain open; initial central admission timeout is unattributed, later exact authorized start reportedly recovered without policy changes."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/central-control-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.zh.md",
+    "gateway/README.i18n.yaml",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/src/instances.ts",
+    "gateway/src/postgres/instance-repository.ts",
+    "gateway/src/runtime-management-api.ts",
+    "gateway/tests/central-runtime-control-transcript.spec.ts",
+    "gateway/tests/expected/projects/central-runtime-control-postgres.jsonl",
+    "gateway/tests/fixtures/central-runtime-control.mjs",
+    "gateway/tests/runtime-management-postgres.spec.ts",
+    "gateway/tests/runtime-stop-lease-postgres.spec.ts"
+  ],
+  "readOnlyPrerequisiteCount": 1166,
+  "privateBuiltArtifacts": {
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/current-gateway-artifact/instances.js": "3d4e03ccfc24b2067e2ab345191e8e6f6924f6e7cec4b1a278de14ea718e0522",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/current-gateway-artifact/postgres/instance-repository.js": "923bb395cdd88a7b2e3124b8af3775e9be375767c969cfde359b2d8d69bba761",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/current-gateway-artifact/runtime-management-api.js": "8aeffe61042f71c87c34358e63124492df098053d8e709d6b287b435bfbb7eea"
+  },
+  "currentOwnedDocumentationDriftPaths": [
+    "gateway/README.md",
+    "gateway/README.zh.md"
+  ],
+  "generatedMetadataBeforeImages": "Three original pairing records were deterministically regenerated from captured original Markdown using the unchanged repository renderer; current record byte equality was checked. They are not represented as captured raw metadata.",
+  "noteReview": {
+    "action": "updated existing administrator Runtime control Agent Note and upgrade guide with bilingual pairs",
+    "newNotes": 0,
+    "archivedNotesChanged": false
+  },
+  "remaining": [
+    "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue B452 with background Job/Workflow cancellation, continuing cleanup failure, parent/service retirement and resource attribution; named parent-exit and exact Admin control repairs do not prove the remaining paths.",
+    "Full Core entry remains below the unchanged100% gate:92.61%statements,87.50%branches,96.92%functions,92.43%lines. Do not lower thresholds, normalize away failures or claim complete file coverage from named cases.",
+    "Peer owns default login/entry regression, server.ts and runtime-catalog interfaces/PG implementation and related tests/docs; Root avoids those source surfaces. Native user/Admin UI matrix remains separately incomplete.",
+    "B449 now has trusted peer R34 actual task/history evidence; B450 remains excluded from R34 and B451 targeted production validation remains pending. Full union requires matching B417 required-on-read writers/readers/SDKs and immutable Session generations.",
+    "Continue remaining account/computer/document authorization, Inspector/direct resource consumers, queued continuation and session-writer shutdown outside peer-reserved surfaces.",
+    "Official paid Responses validation remains deferred by the user. No Root production deployment, restart, dependency synchronization, reset, stash, commit or push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": {
+    "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T185643Z/B416-B451-integration-index.json",
+    "findings": 36,
+    "capsules": 29,
+    "frozenDeltaVersions": 643,
+    "presentPaths": 380,
+    "currentSourceDriftPaths": [
+      "gateway/README.md",
+      "gateway/README.zh.md",
+      "packages/context/gateway-runtime/src/index.ts"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-experimental-badge-skill-bundle",
-  "description": "Let agents add a “powered by dsh” badge to documents, pull requests, and other outputs.",
+  "description": "Let agents add a “powered by CoHarness” badge to documents, pull requests, and other outputs.",
   "version": "0.2.1-rc.1.coharness.1",
   "icon": "./icon.svg",
   "publishConfig": {
@@ -41,7 +41,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/cordis-plugin-include": "workspace:~",
-    "js-yaml": "^5.2.3"
+    "js-yaml": "^5.4.1"
   },
   "dsh": {
     "bundle": {

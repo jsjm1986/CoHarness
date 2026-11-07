@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-terminal-sdk-python",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=lib PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_managed_codex_model_snapshot.py -q",
+  "startedAt": "2026-10-25T04:28:37.435022+00:00",
+  "seconds": 4.895,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1ca8bef0159526097c6e2e90a13c55c3488ed4e638cba080ae328b4a4f738fe0",
+  "inputsAfter": "1ca8bef0159526097c6e2e90a13c55c3488ed4e638cba080ae328b4a4f738fe0",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-baseline-inclusive-measurement",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/upload-owner-measure.config.ts packages/attachment/userdoc/tests packages/attachment/userdoc-local/tests packages/host/userdoc-http/tests --retry=0 --maxWorkers=2 --coverage",
+  "startedAt": "2026-10-25T10:16:46.940050+00:00",
+  "seconds": 23.911,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c77d3fb7ae977368955039c055fa0f88320caf8ce45c58806246438123259780",
+  "inputsAfter": "c77d3fb7ae977368955039c055fa0f88320caf8ce45c58806246438123259780",
+  "postgresToolDirectory": null,
+  "outputSha256": "13d92345162945ec714d09791c929e6a5e359843ead1b82b7b6330c174e86f5c",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  18 passed (18)\n      Tests  271 passed (271)\n   Start at  18:17:00\n   Duration  9.88s (transform 1.71s, setup 226ms, import 2.49s, tests 7.34s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   72.16 |    54.24 |   77.53 |   74.97 |                   \n ...rdoc-local/src |   84.28 |    74.03 |   90.69 |   87.34 |                   \n  store.ts         |   85.75 |    67.09 |   88.63 |    87.5 | ...46-647,719,722 \n  upload.ts        |   77.09 |     73.1 |   83.33 |   82.31 | ...73-975,996-997 \n ...erdoc-http/src |   60.99 |    44.62 |   61.74 |   63.59 |                   \n  index.ts         |   60.99 |    44.62 |   61.74 |   63.59 | ...2166,2179-2184 \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 72.16% ( 1610/2231 )\nBranches     : 54.24% ( 1028/1895 )\nFunctions    : 77.53% ( 252/325 )\nLines        : 74.97% ( 1480/1974 )\n================================================================================\n"
+}

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-26-owned-job-lifecycle-records.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-26-owned-job-lifecycle-records.md
+document:
+  en: 87b299a21c6168db2581243fa5f550d6b97a1f76
+  zh: bf52ec53b6e79c4e61bcd3664f6585877631155a
+/agent-note-owned-job-lifecycle-records:
+  en: 0f33c99729ef6ef3
+  zh: 8f3d7878b0beaace
+/agent-note-owned-job-lifecycle-records/problem:
+  en: 47f8c44191048ffb
+  zh: f2e2ba44f8910d2c
+/agent-note-owned-job-lifecycle-records/decision:
+  en: 8633b722b3a21593
+  zh: 81bca77e140704e1
+/agent-note-owned-job-lifecycle-records/alternatives-considered:
+  en: 4a9ee0115b21c3b9
+  zh: dba4946506bf478f
+/agent-note-owned-job-lifecycle-records/consequences:
+  en: f583d733320c07bb
+  zh: 079f1c68926c0dad
+/agent-note-owned-job-lifecycle-records/verification:
+  en: 4d0e0821613fa0f4
+  zh: 0cc82f45c3d78b09

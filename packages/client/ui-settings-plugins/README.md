@@ -27,6 +27,8 @@ Use the sidebar's **Plugins** page to inspect and manage the plugins this deploy
 <a id="what-appears-here"></a>
 ## What appears here
 
+Credential and provider invalidations come from the bootstrap Runtime whose settings scopes this page binds. Opening another environment in a new tab leaves these unsaved forms mounted.
+
 The Plugins page's Built-in plugin settings group renders the intersection of two ledgers: the `plugins.item` entries composed clients registered, and the settings namespaces the Host serves. A served namespace no item claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and an item whose namespace this deployment does not serve is filtered out, so an uncomposed plugin leaves no empty shell. Cards follow registration order, which is stable for the items one package installs together and not stable across plugins: apply order between packages is unconstrained.
 
 The items cover the shell executor (`shell`), tool-call parallelism (`agent-loop`), delegation depth and capacity (`subagent`), exact model routes (`subagent-model-selection`), and the DeepSeek search providers (`web`, `web-search-deepseek`, `web-deepseek-api`). Delegation controls retain the upstream integer validation, reset and explanatory help. Depth zero disables tools that inherit this setting; explicit tool depth takes precedence. Capacity counts live descendants of the same root Agent across all depths, excluding the root itself.
@@ -47,7 +49,7 @@ A form stages what the user types and writes it only when they save. Each contro
 
 Saving writes each staged field through the client settings scope, which fences every write with the namespace revision it read. A refusal, lost write access or transport failure stops the remaining writes and retains unacknowledged drafts. Accepted fields clear only the draft submitted by that save; edits made while it was in flight remain unsaved. A multi-field save can partly succeed and does not claim transactional rollback.
 
-A key can also be written from another surface — the Models page addresses the same reference — which changes no settings section, so the form re-reads on the forwarded `credentials/reference-updated` event for the reference it watches.
+Web-search credential hints load when the detailed page opens; summaries and unchanged settings projections do not read credentials. Concurrent reads for the same reference share their in-flight result. A changed selected reference, a forwarded `credentials/reference-updated` event, an acknowledged credential write, or a connection reset requires a fresh read. A failed hint remains explicitly unknown and can be retried by reopening the page; the form remains editable. Plugin disposal aborts hint reads and waits for admitted reads and saves to settle.
 
 A field's presence in the raw user layer — not its value — is what marks it overridden; a reset clears that field so it re-inherits the composition layer. Secret-role fields never ride a response, so a key control starts blank, reports only whether one is configured, and writes through the credentials domain rather than the settings section; a blank draft writes nothing and keeps the stored key. A replacement requires its own successful write response: the presence of an older key cannot acknowledge it. Credential reads reject superseded responses even when the reference is unchanged.
 

@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-gateway-final-source",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/document-upload-postgres.spec.ts tests/documents-local.spec.ts tests/document-catalog-service.spec.ts tests/postgres-suite.spec.ts --retry=0 --maxWorkers=1 --no-file-parallelism",
+  "startedAt": "2026-10-25T10:21:08.783887+00:00",
+  "seconds": 8.958,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "28924c0e3e869255b87d29667732cd7f3a2a60bb1035dbaf7e46d9616c6b15bc",
+  "inputsAfter": "28924c0e3e869255b87d29667732cd7f3a2a60bb1035dbaf7e46d9616c6b15bc",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "eb1ef7585bafc397cdad37f32fc1ed29f878a9ae910e6c4c91922c5e16907a29",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  4 passed (4)\n      Tests  22 passed (22)\n   Start at  18:21:10\n   Duration  7.53s (transform 1.66s, setup 0ms, import 2.52s, tests 4.42s, environment 0ms)\n\n"
+}

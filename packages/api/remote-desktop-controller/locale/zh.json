@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "远程桌面控制器",
+    "description": "ctx.remoteDesktop 的浏览器侧 BFF 控制器。"
+  }
+}

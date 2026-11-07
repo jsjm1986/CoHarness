@@ -11,8 +11,8 @@ export { RemoteStream, type RemoteStreamOptions, type RemoteStreamItem } from '.
 export { RemoteStreamCarrierError } from './stream-error.ts'
 
 import { Service } from '@deepseek-ai/cordis'
-import type { Context, Events } from '@deepseek-ai/cordis'
-import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import type { Context, Events, Fiber } from '@deepseek-ai/cordis'
+import type { ConnectionHandle, ConnectionRuntimeTarget, SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type {
   InvocationDescriptor,
   TypertClientRemote,
@@ -59,8 +59,30 @@ interface RemoteNamespaceHandle {
   readonly dispose: TypertDisposer
 }
 
+interface BoundRemote {
+  readonly ctx: Context
+  readonly facade: ClientRemote
+}
+
+interface BoundRemoteOwner {
+  readonly remotes: Set<BoundRemote>
+}
+
+interface BoundRemoteScope {
+  readonly fiber: Fiber
+  readonly targets: Map<ConnectionHandle, BoundRemote>
+}
+
 /** Typed Remote service augmented by generated direct namespaces. */
 export interface ClientRemote extends TypertClientRemote {
+  /**
+   * Capture one Runtime for calls without a Session address and for its events.
+   * Constructing the facade performs no request and starts no Runtime. A call
+   * naming another Runtime's Session is refused rather than retargeted.
+   * @param target - authorized Runtime descriptor; omission retains the captured target, or bootstrap for an unbound service.
+   * @returns a facade whose subscriptions belong to the calling fiber.
+   */
+  $forTarget(target?: ConnectionRuntimeTarget): ClientRemote
   /**
    * Supervise a read stream using its owning Connection's readiness.
    * @param options - domain opener and terminal outcome handling.
@@ -98,6 +120,7 @@ type RemoteEventListener = (...args: never[]) => void
 interface RemoteEventSubscription {
   readonly event: string
   readonly listener: RemoteEventListener
+  readonly connection?: ConnectionHandle
 }
 
 const CORDIS_EVENT_PREFIX = 'cordis/'
@@ -129,6 +152,9 @@ function remoteEventNames(event: string): readonly string[] {
 
 class ClientRemoteService extends Service implements TypertClientRemote {
   private readonly ownerCtx: Context
+  private readonly targetTag = Symbol('client-remote-target')
+  private readonly captureTag = Symbol('client-remote-scope')
+  private readonly boundTargets = new Map<Fiber, BoundRemoteOwner>()
   private readonly namespaces = new Map<string, RemoteNamespaceHandle>()
   private readonly subscriptions: RemoteEventSubscription[] = []
   private mutations = Promise.resolve()
@@ -139,9 +165,64 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     ctx.effect(() => () => { this.subscriptions.length = 0 }, 'api-gateway.client.subscriptions')
   }
 
-  $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item> {
+  $forTarget(target?: ConnectionRuntimeTarget): ClientRemote {
     const connection = this.ownerCtx.get('connection') as ConnectionHandle
-    const target = options.sessionId === undefined ? connection : connection.forSession?.(options.sessionId) ?? connection
+    const caller = this.ctx
+    const selected = target === undefined ? this.boundConnection(caller) ?? connection : connection.forTarget?.(target)
+    if (selected === undefined) throw new Error('Remote target transport is unavailable')
+    let owner = this.boundTargets.get(caller.fiber)
+    if (owner === undefined) {
+      owner = { remotes: new Set() }
+      this.boundTargets.set(caller.fiber, owner)
+      caller.effect(() => () => { this.boundTargets.delete(caller.fiber) }, 'client Remote: captured Runtime facades')
+    }
+    const inherited = Reflect.get(caller, this.captureTag) as BoundRemoteScope | undefined
+    const scope = inherited?.fiber === caller.fiber ? inherited : { fiber: caller.fiber, targets: new Map<ConnectionHandle, BoundRemote>() }
+    const targets = scope.targets
+    const found = targets.get(selected)
+    if (found !== undefined) return found.facade
+    const ctx = caller.extend({ [this.targetTag]: selected, [this.captureTag]: scope })
+    // An ordinary facade keeps its captured context when Cordis traces a
+    // service method's return value back to the original caller.
+    const facade = Object.create(null) as ClientRemote
+    Object.assign(facade, {
+      $forTarget: (next?: ConnectionRuntimeTarget) => ctx.remote.$forTarget(next),
+      $mount: (contribution: TypertRemoteContribution) => ctx.remote.$mount(contribution),
+      $on: <Event extends TypertRemoteEvent>(event: Event, listener: Events[Event]) => ctx.remote.$on(event, listener),
+      $dispatch: (event: string, args: readonly unknown[]) => { ctx.remote.$dispatch(event, args) },
+      $stream: <Item>(options: RemoteStreamOptions<Item>) => ctx.remote.$stream(options),
+    })
+    const bound = { ctx, facade }
+    targets.set(selected, bound)
+    owner.remotes.add(bound)
+    for (const name of this.namespaces.keys()) this.bindNamespace(bound, name)
+    return facade
+  }
+
+  private bindNamespace(bound: BoundRemote, name: string): void {
+    if (Object.hasOwn(bound.facade, name)) return
+    Object.defineProperty(bound.facade, name, {
+      enumerable: true,
+      get: (): unknown => bound.ctx.get(remoteServiceKey(name)),
+    })
+  }
+
+  private boundConnection(ctx: Context): ConnectionHandle | undefined {
+    return Reflect.get(ctx, this.targetTag) as ConnectionHandle | undefined
+  }
+
+  private selectConnection(ctx: Context, sessionId?: SessionId): ConnectionHandle {
+    const connection = this.ownerCtx.get('connection') as ConnectionHandle
+    const bound = this.boundConnection(ctx)
+    const selected = sessionId === undefined ? undefined : connection.forSession?.(sessionId)
+    if (bound !== undefined && selected !== undefined && bound !== selected) {
+      throw new Error('Remote Session belongs to another Runtime')
+    }
+    return bound ?? selected ?? connection
+  }
+
+  $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item> {
+    const target = this.selectConnection(this.ctx, options.sessionId)
     return new RemoteStream({ generation: {
       getSnapshot: () => target.state.getSnapshot() === 'connected' ? target : undefined,
       subscribe: listener => target.state.subscribe(listener),
@@ -164,11 +245,15 @@ class ClientRemoteService extends Service implements TypertClientRemote {
   ): ReturnType<TypertClientRemote['$on']> {
     // A 'none' connection never receives forwarded events server-side; let the
     // subscriber learn that at subscription instead of waiting for silence.
-    const mode = (this.ownerCtx.get('connection') as ConnectionHandle | undefined)?.interactions
-    if (mode === 'none') throw interactionsUnavailableError()
     // The ordered table erases the argument list this signature pins per event;
     // `$dispatch` restores it from the frame carrying that same event family.
-    const subscription: RemoteEventSubscription = { event, listener }
+    const caller = this.ctx
+    const sessionId = this.ownerCtx.typert.contexts.getClient('agent')?.identity(caller)
+    const connection = this.boundConnection(caller)
+      ?? (typeof sessionId === 'string' ? this.selectConnection(caller, sessionId as SessionId) : undefined)
+    const mode = (connection ?? this.ownerCtx.get('connection') as ConnectionHandle | undefined)?.interactions
+    if (mode === 'none') throw interactionsUnavailableError()
+    const subscription: RemoteEventSubscription = { event, listener, ...(connection === undefined ? {} : { connection }) }
     const owned = this.ctx.effect(() => {
       this.subscriptions.push(subscription)
       return () => {
@@ -186,11 +271,13 @@ class ClientRemoteService extends Service implements TypertClientRemote {
    * {@link TypertClientRemote.$dispatch} for the caller contract.
    */
   $dispatch(event: string, args: readonly unknown[]): void {
+    const connection = this.selectConnection(this.ctx)
     const acceptedNames = new Set(remoteEventNames(event))
     const aliasCountsByListener = new Map<RemoteEventListener, Map<string, number>>()
     // Snapshot: a listener may subscribe or dispose during delivery, and this
     // round's recipients are the ones registered when the frame arrived.
-    for (const { event: subscriptionEvent, listener } of [...this.subscriptions]) {
+    for (const { event: subscriptionEvent, listener, connection: source } of [...this.subscriptions]) {
+      if (source !== undefined && source !== connection) continue
       if (!acceptedNames.has(subscriptionEvent)) continue
       if (acceptedNames.size > 1) {
         const counts = aliasCountsByListener.get(listener) ?? new Map<string, number>()
@@ -385,6 +472,9 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     if (service === undefined) throw new Error(`client api: namespace ${JSON.stringify(name)} did not start`)
     namespace = { service, dispose: fiber.dispose }
     this.namespaces.set(name, namespace)
+    for (const owner of this.boundTargets.values()) {
+      for (const bound of owner.remotes) this.bindNamespace(bound, name)
+    }
     return namespace
   }
 
@@ -477,9 +567,7 @@ class ClientRemoteService extends Service implements TypertClientRemote {
       ?? (scope?.context === 'agent' ? args[scope.wire]
         : descriptor.namespace === 'terminal' ? args.sessionId : undefined)
       ?? this.ownerCtx.typert.contexts.getClient('agent')?.identity(callerCtx)
-    const targetConnection = typeof sessionId === 'string'
-      ? connection.forSession?.(sessionId as SessionId) ?? connection
-      : connection
+    const targetConnection = this.selectConnection(callerCtx, typeof sessionId === 'string' ? sessionId as SessionId : undefined)
     const wireArgs = connection.mapRemoteArguments?.(endpoint, args, scope?.context === 'agent' ? scope.wire : undefined) ?? args
     const callerSignal = hasCallerSignal ? values[expected] as AbortSignal | undefined : undefined
     const signal = callerSignal === undefined

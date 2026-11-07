@@ -1,0 +1,22 @@
+- heading "公网访问" [level=2]
+- text: 已停止 临时链接
+- status: 隧道已停止
+- paragraph: cloudflared fixture · <fixture>/cloudflared-fixture
+- paragraph: 最近错误：tunnel-start-cancelled
+- heading "临时公网链接" [level=3]
+- paragraph: 一键开启，无需账号或域名。生成随机 *.trycloudflare.com 地址，每次启动都会变化——适合演示、试用和临时共享。
+- button "开启临时链接"
+- heading "固定域名" [level=3]
+- paragraph: 使用你自己的域名（域名需托管在 Cloudflare）。地址固定不变，适合长期团队访问。需要一枚具备 Tunnel 与 DNS 编辑权限的 API Token。
+- text: 主机名
+- textbox "主机名":
+  - /placeholder: 例如 team.example.com
+- text: 域（Zone）
+- textbox "域（Zone）":
+  - /placeholder: 默认取主机名末两段，如 example.com
+- text: Cloudflare API Token
+- textbox "Cloudflare API Token 需要的权限：Account → Cloudflare Tunnel → 编辑；Zone → DNS → 编辑。":
+  - /placeholder: 仅首次配置需要；加密存储后可留空
+- text: 需要的权限：Account → Cloudflare Tunnel → 编辑；Zone → DNS → 编辑。
+- button "开启固定域名" [disabled]
+- paragraph: 更新于 2026-10-25T00:00:00Z · 由本节点上的 cloudflared 进程承载；网关停止时隧道随之停止

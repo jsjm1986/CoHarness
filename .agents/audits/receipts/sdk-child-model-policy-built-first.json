@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-model-policy-built-first",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/verify-sdk-child-model-policy.mjs",
+  "startedAt": "2026-10-24T12:36:32.267626+00:00",
+  "seconds": 3.484,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e6c94204b0288802455cb3985035ed4818676d9db01fbab316bef89b6c78f271",
+  "inputsAfter": "e6c94204b0288802455cb3985035ed4818676d9db01fbab316bef89b6c78f271",
+  "postgresToolDirectory": null,
+  "outputSha256": "5b60bb7ac32aabb24662d1c269cd7be278b51bbe335a6018617c14fa6b6ef8fa",
+  "outputTail": "{\"actualChildProcess\":true,\"childExecutedModel\":false,\"parentModelPolicyAllows\":false,\"requiredResourceAcquisitions\":3,\"modelAcquisitionsDuringChild\":1,\"processAcquisitions\":1,\"released\":3,\"result\":\"error\"}\n"
+}

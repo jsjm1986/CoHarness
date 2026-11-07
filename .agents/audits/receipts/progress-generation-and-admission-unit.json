@@ -1,0 +1,13 @@
+{
+  "name": "progress-generation-and-admission-unit",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/progress-service.spec.ts",
+  "startedAt": "2026-10-23T20:58:41.150178+00:00",
+  "seconds": 3.267,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a640b02df48f23eae87e8c75957a5aa22092e8fe4a61594a796e495d37c2ab6a",
+  "inputsAfter": "a640b02df48f23eae87e8c75957a5aa22092e8fe4a61594a796e495d37c2ab6a",
+  "outputSha256": "bb0fb6f16d3b92ff27fb2ffb041475ed03378d78c4e865bf9f0a2fa48e3d8277",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/progress-service.spec.ts (20 tests | 1 failed) 146ms\n     × watermarks only the complete prefix when a capped stream trails the other 13ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/progress-service.spec.ts > PostgresProgressService material folding > watermarks only the complete prefix when a capped stream trails the other\nAssertionError: expected [ 'org-1', 'p-internal', …(4) ] to deeply equal [ 'org-1', 'p-internal', …(3) ]\n\n- Expected\n+ Received\n\n@@ -2,6 +2,7 @@\n    \"org-1\",\n    \"p-internal\",\n    \"2026-10-20T09:30:00.000Z\",\n    \"sess-1\",\n    2,\n+   \"facb5fd9-ab0d-4044-a99e-37b32d7c79d2\",\n  ]\n\n ❯ tests/progress-service.spec.ts:398:28\n    396|     expect(captured[0]).not.toContain('agent tail')\n    397|     const watermark = pool.query.mock.calls.find(([sql]) => String(sql…\n    398|     expect(watermark?.[1]).toEqual(['org-1', 'p-internal', '2026-10-20…\n       |                            ^\n    399|   })\n    400| })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 19 passed (20)\n   Start at  04:58:44\n   Duration  341ms (transform 55ms, setup 0ms, import 93ms, tests 146ms, environment 0ms)\n\n"
+}

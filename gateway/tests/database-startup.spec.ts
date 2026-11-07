@@ -2,11 +2,21 @@ import { setImmediate } from 'node:timers/promises'
 import { describe, expect, it } from 'vitest'
 import {
   errorCodeForDiagnostics,
+  isDatabaseContentionError,
   isTransientDatabaseError,
   withDatabaseStartupRetry,
 } from '../src/postgres/database.ts'
 
 describe('database startup retry', () => {
+  it('classifies bounded database contention without replaying connection or integrity failures', () => {
+    for (const code of ['55P03', '57014', '40P01', '40001']) {
+      expect(isDatabaseContentionError({ code })).toBe(true)
+    }
+    for (const error of [null, '55P03', { code: 55 }, { code: '23505' }, { code: '08006' }, { code: '28P01' }]) {
+      expect(isDatabaseContentionError(error)).toBe(false)
+    }
+  })
+
   it('retries transient connection failures with bounded exponential delay', async () => {
     let attempts = 0
     const delays: number[] = []
@@ -26,12 +36,19 @@ describe('database startup retry', () => {
   })
 
   it('fails immediately for non-transient migration or credential errors', async () => {
-    const failure = Object.assign(new Error('invalid password'), { code: '28P01' })
-    await expect(withDatabaseStartupRetry(async () => { throw failure }, {
-      initialDelayMs: 1,
-      maxDelayMs: 2,
-    })).rejects.toBe(failure)
-    expect(isTransientDatabaseError(failure)).toBe(false)
+    const failures = [
+      Object.assign(new Error('invalid password'), { code: '28P01' }),
+      new Error('migration checksum differs'),
+    ]
+    for (const failure of failures) {
+      let attempts = 0
+      await expect(withDatabaseStartupRetry(async () => { attempts++; throw failure }, {
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+      })).rejects.toBe(failure)
+      expect(isTransientDatabaseError(failure)).toBe(false)
+      expect(attempts).toBe(1)
+    }
   })
 
   it('recognizes wrapped network errors without exposing their message in diagnostics', () => {

@@ -10,8 +10,7 @@ import { standardDecoratorPlugin } from '../vitest.shared.ts'
 const emitted = (path: string) => fileURLToPath(new URL(`../${path}/lib/types`, import.meta.url))
 // The emitted graph's bare workspace imports resolve nowhere in the
 // standalone lane, which has no workspace node_modules; map each to the
-// emitted module it needs. dsh-llm narrows to assistant-stream.js because the
-// emitted session-format chain only loads AssistantStreamAccumulator from it;
+// emitted module it needs. The LLM entry also exercises real resource admission;
 // exact-match regexes keep subpath specifiers like dsh-llm/discovery and
 // dsh-session-format/surface on their own entries.
 const pkg = (path: string, file = 'index.js') => `${emitted(path)}/${file}`
@@ -21,7 +20,13 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
     alias: [
+      { find: '@deepseek-ai/node-addon-system/flock', replacement: fileURLToPath(new URL('../native/system/packages/entry/lib/flock.js', import.meta.url)) },
+      { find: /^@deepseek-ai\/dsh-subprocess-local$/, replacement: pkg('packages/subprocess/subprocess-local') },
+      { find: /^@deepseek-ai\/dsh-subprocess$/, replacement: pkg('packages/subprocess/subprocess') },
+      { find: /^@deepseek-ai\/dsh-resource-budget$/, replacement: pkg('packages/context/resource-budget') },
+      { find: '@deepseek-ai/dsh-resource-budget/wire', replacement: pkg('packages/context/resource-budget', 'wire.js') },
       { find: /^@deepseek-ai\/dsh-atomic-write$/, replacement: pkg('packages/util/atomic-write') },
+      { find: /^@deepseek-ai\/dsh-native-command$/, replacement: pkg('packages/util/native-command') },
       { find: /^@deepseek-ai\/dsh-managed-data$/, replacement: pkg('packages/util/managed-data') },
       { find: '@deepseek-ai/dsh-session-format-catalog', replacement: pkg('packages/session/session-format-catalog') },
       { find: '@deepseek-ai/dsh-session-format/surface', replacement: pkg('packages/session/session-format', 'surface.js') },
@@ -37,7 +42,7 @@ export default defineConfig({
       { find: '@deepseek-ai/dsh-compaction-image-offload/projection', replacement: pkg('packages/compaction/compaction-image-offload', 'projection.js') },
       { find: '@deepseek-ai/dsh-llm/discovery', replacement: pkg('packages/llm/llm', 'discovery.js') },
       { find: /^@deepseek-ai\/dsh-llm\/package\.json$/, replacement: fileURLToPath(new URL('../packages/llm/llm/package.json', import.meta.url)) },
-      { find: /^@deepseek-ai\/dsh-llm$/, replacement: pkg('packages/llm/llm', 'assistant-stream.js') },
+      { find: /^@deepseek-ai\/dsh-llm$/, replacement: pkg('packages/llm/llm') },
       { find: /^@deepseek-ai\/dsh-scope$/, replacement: pkg('packages/core/scope') },
       { find: /^@deepseek-ai\/dsh-timeout$/, replacement: pkg('packages/util/timeout') },
       { find: /^@deepseek-ai\/dsh-typert-protocol$/, replacement: pkg('packages/typert/protocol') },
@@ -46,6 +51,8 @@ export default defineConfig({
       { find: /^@deepseek-ai\/dsh-util-values$/, replacement: pkg('packages/util/values') },
       { find: /^@deepseek-ai\/dsh-home-paths$/, replacement: pkg('packages/util/home-paths') },
       { find: /^@deepseek-ai\/dsh-userdoc$/, replacement: pkg('packages/attachment/userdoc') },
+      { find: '@deepseek-ai/dsh-userdoc-gateway/protocol', replacement: pkg('packages/attachment/userdoc-gateway', 'protocol.js') },
+      { find: '@deepseek-ai/dsh-userdoc-gateway/server', replacement: pkg('packages/attachment/userdoc-gateway', 'server.js') },
       { find: /^@deepseek-ai\/dsh-userdoc-local$/, replacement: pkg('packages/attachment/userdoc-local') },
       { find: /^@deepseek-ai\/dsh-host-userdoc-http$/, replacement: pkg('packages/host/userdoc-http') },
       { find: /^@deepseek-ai\/cordis$/, replacement: pkg('vendor/cordis') },

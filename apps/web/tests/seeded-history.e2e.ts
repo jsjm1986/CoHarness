@@ -5,8 +5,8 @@
 // events — with ZERO model calls in replay (no replay fixture; a stray stream
 // fails loud on the open llm seam). The cold session also carries keyless
 // command-row surfaces: the seeded manual `/compact` lifecycle folds into its
-// checkpoint, an Access-chip pick later runs `/permission` on the host, and
-// `/feedback` pins its expandable correlation ids. The seed is a recorded
+// checkpoint, and an Access-chip pick later runs `/permission` on the host.
+// The seed is a recorded
 // fixture under the same record discipline as every other: DSH_SNAPSHOT=record drives the turn
 // live through the composer (real read tool against seeded workspace files)
 // and harvests seed.jsonl; replay/refresh seed it cold and only render.
@@ -14,7 +14,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
 import { deriveEventMessage, SessionId } from '@deepseek-ai/dsh-session'
@@ -37,7 +37,6 @@ const SEED = fileURLToPath(new URL('../../../snapshots/web/seeded-history/sessio
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/ui.expected.md', import.meta.url))
 // Command-row goldens over the same conversation after direct host commands.
 const COMMAND_ROW_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/command-row.expected.md', import.meta.url))
-const FEEDBACK_ROW_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/feedback-row.expected.md', import.meta.url))
 const FILE_OPEN_FAILURE_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/file-open-failure.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
 const SEED_ID = 'seeded-history-web-e2e'
@@ -357,6 +356,10 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(collapsedIconBox?.height).toBe(14)
 
     await disclosure.click()
+    onTestFinished(async () => {
+      if (await disclosure.getAttribute('aria-expanded') === 'true') await disclosure.click()
+      await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('false')
+    })
     await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('true')
     const body = page.locator('[data-context-injection-body]')
     await body.waitFor({ timeout: 5_000 })
@@ -397,15 +400,13 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(style).toEqual({
       backgroundColor: 'rgb(249, 250, 251)',
       borderRadius: '8px',
-      color: 'rgb(113, 117, 124)',
+      color: 'rgb(97, 102, 107)',
       fontSize: '11px',
       lineHeight: '16px',
       padding: ['10px', '16px', '12px', '12px'],
       scrolls: true,
     })
 
-    await disclosure.click()
-    await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('false')
   })
 
   it.skipIf(MODE === 'record')('file-path tool rows rebuilt from the cold log stay details-inert', async () => {
@@ -510,44 +511,6 @@ describe('web e2e: seeded history renders through cold resume', () => {
     await compareOrRefreshGolden(COMMAND_ROW_EXPECTED, snapshot, MODE)
   }, 60_000)
 
-  it.skipIf(MODE === 'record')('reports full feedback correlation ids in an expandable two-line row', async () => {
-    onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-feedback-row'))
-    const previousDshHome = process.env.DSH_HOME
-    process.env.DSH_HOME = scaffold.harnessHome
-    try {
-      const input = page.locator('textarea').first()
-      await input.fill('/feedback the diff view is unreadable')
-      await input.press('Enter')
-      const row = page.locator('[data-variant="others"]').filter({
-        hasText: `Feedback recorded for session ${SEED_ID}`,
-      })
-      await row.waitFor({ timeout: 10_000 })
-      const disclosure = row.locator('[data-expandable]')
-      expect(await disclosure.getAttribute('aria-expanded')).toBe('false')
-      await disclosure.click()
-      await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('true')
-
-      const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
-      if (agent === undefined) throw new Error('seeded session did not attach an agent')
-      const done = agent.session.snapshotEvents().filter(event => event.type === 'command/done').at(-1)
-      if (done?.type !== 'command/done') throw new Error('feedback command did not settle')
-      const [sessionLine, userLine, extraLine] = done.data.text?.split('\n') ?? []
-      expect(sessionLine).toBe(`Feedback recorded for session ${SEED_ID}`)
-      expect(userLine).toMatch(/^Anonymous user: [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\./i)
-      expect(extraLine).toBeUndefined()
-      const userId = userLine?.match(/^Anonymous user: ([0-9a-f-]+)/i)?.[1]
-      if (userId === undefined) throw new Error('feedback command omitted the user id')
-
-      const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
-        .split(SEED_ID).join('{{seededId}}')
-        .split(userId).join('{{userId}}')
-      await compareOrRefreshGolden(FEEDBACK_ROW_EXPECTED, snapshot, MODE)
-    } finally {
-      if (previousDshHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousDshHome
-    }
-  }, 60_000)
-
   it.skipIf(MODE === 'record')('fits short logged context without a scrollport', async () => {
     const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
     if (agent === undefined) throw new Error('seeded session did not attach an agent')
@@ -593,6 +556,6 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // stream would have failed the turn loudly. Cleanliness pins the wire.
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['command-row.expected.md', 'feedback-row.expected.md', 'file-open-failure.expected.md', 'literal-values.expected.md', 'seed.jsonl', 'ui.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['command-row.expected.md', 'file-open-failure.expected.md', 'literal-values.expected.md', 'seed.jsonl', 'ui.expected.md'])
   })
 })

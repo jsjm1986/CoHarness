@@ -1,0 +1,270 @@
+{
+  "findings": [
+    "B425",
+    "B426"
+  ],
+  "status": "fixed_verified_named_resource_registration_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T04:01:05.523158+00:00",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-origin-final.json",
+    "fetchedAt": "2026-11-01T03:48:22.392016+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "problem": {
+    "B425": "Origin preparation was awaited inside a serial promise chain. A known origin failure waited for an earlier HTTP response, and a ready owner could be blocked by another unresolved origin.",
+    "B426": "Cancellation before registration rejected its caller but retained the local operation and queue capacity until the serial chain advanced; another caller could be refused with a full-queue error."
+  },
+  "fix": "Bounded origin preparation starts in the original caller scope. Validated operations enter a removable ready set with one serial remote-registration drain. Origin failures and unsubmitted cancellations retire locally; submitted/unknown registrations retain their exact completion acknowledgement and uncertainty handling.",
+  "verification": {
+    "distinctRelatedCases": 82,
+    "runtimePackageCases": 41,
+    "httpPostgresIntegrationCases": 37,
+    "newIntegrationCases": 3,
+    "typescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "repeatVersionRunsNotAddedToDistinctCount": true,
+    "passedChecks": [
+      {
+        "name": "resource-retirement-fixed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-fixed.json"
+      },
+      {
+        "name": "resource-retirement-related-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-related-final.json"
+      },
+      {
+        "name": "resource-retirement-ready-owner",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-ready-owner.json"
+      },
+      {
+        "name": "resource-retirement-related-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-related-node22.json"
+      },
+      {
+        "name": "resource-retirement-runtime-package",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-runtime-package.json"
+      },
+      {
+        "name": "resource-retirement-gateway-types-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-gateway-types-final.json"
+      },
+      {
+        "name": "resource-retirement-source-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-source-types.json"
+      },
+      {
+        "name": "resource-retirement-bundle",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-bundle.json"
+      },
+      {
+        "name": "resource-retirement-sdk-source",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-sdk-source.json"
+      },
+      {
+        "name": "resource-retirement-sdk-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-sdk-node22.json"
+      },
+      {
+        "name": "resource-retirement-sdk-node24",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-sdk-node24.json"
+      },
+      {
+        "name": "resource-retirement-sdk-python",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-sdk-python.json"
+      },
+      {
+        "name": "resource-retirement-pairing",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-pairing.json"
+      },
+      {
+        "name": "resource-retirement-host-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-host-types.json"
+      },
+      {
+        "name": "resource-retirement-lint-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-lint-final.json"
+      },
+      {
+        "name": "resource-retirement-python-lint",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-python-lint.json"
+      },
+      {
+        "name": "resource-retirement-cordis-config",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-cordis-config.json"
+      },
+      {
+        "name": "resource-retirement-export-docs",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-export-docs.json"
+      },
+      {
+        "name": "resource-retirement-coverage",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-coverage.json"
+      },
+      {
+        "name": "resource-retirement-repository-references-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-repository-references-final.json"
+      },
+      {
+        "name": "resource-retirement-origin-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-origin-final.json"
+      }
+    ],
+    "negativeChecks": [
+      {
+        "name": "resource-retirement-negative",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-negative.json"
+      },
+      {
+        "name": "resource-retirement-sdk-old-source",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-sdk-old-source.json"
+      },
+      {
+        "name": "resource-retirement-sdk-old-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-sdk-old-node22.json"
+      }
+    ],
+    "counterfactual": "Complete original38-file Runtime package: source and normal built Node22 SDK providers each fail both scenarios with RESOURCE_RETIREMENT_FAILED. Original PG provider fails early-origin settlement and cancellation-capacity checks.",
+    "preservation": {
+      "prior21ProviderTestBodiesUnchanged": true,
+      "api13SourceUnchanged": true,
+      "newProviderCases": 3,
+      "completeOriginalPackageFiles": 38
+    },
+    "coverage": {
+      "newQueueFunctions": [
+        {
+          "name": "prepareRegistration",
+          "line": 171,
+          "executions": 37
+        },
+        {
+          "name": "(anonymous_27)",
+          "line": 176,
+          "executions": 0
+        },
+        {
+          "name": "drainRegistrations",
+          "line": 183,
+          "executions": 26
+        },
+        {
+          "name": "captureOrigin",
+          "line": 195,
+          "executions": 37
+        }
+      ],
+      "totals": {
+        "lines": {
+          "total": 245,
+          "covered": 218,
+          "skipped": 0,
+          "pct": 88.97
+        },
+        "statements": {
+          "total": 311,
+          "covered": 255,
+          "skipped": 0,
+          "pct": 81.99
+        },
+        "functions": {
+          "total": 55,
+          "covered": 48,
+          "skipped": 0,
+          "pct": 87.27
+        },
+        "branches": {
+          "total": 187,
+          "covered": 136,
+          "skipped": 0,
+          "pct": 72.72
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "wholeFileComplete": false,
+      "coveragePolicyChanged": false
+    },
+    "coverageScope": "Additional nongating measurement for selected real HTTP/PG suites, not aggregate CI coverage. No threshold or coverage-exclusion changes.",
+    "documentation": {
+      "originalQuickAggregate": {
+        "passed": 19,
+        "failed": 1,
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-docs-final.json",
+        "onlyFailure": ".agents/audits/full-real-task-2026-10-31/ledger.json commit reference, peer-owned"
+      },
+      "finalFailedLeafRecheck": {
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-repository-references-final.json"
+      },
+      "quickFailuresResolved": true,
+      "fullAggregateRepeated": false,
+      "execution": "Same20 repository doc-quick leaves run through direct Node commands to avoid pnpm automatic dependency synchronization; no repository gate or policy changed.",
+      "ownedBilingualPairs": 2,
+      "exportJsdoc": "passed",
+      "cordisConfigurations": 434
+    },
+    "fixtureCorrections": [
+      "SDK expectation arrow parentheses fixed without behavior change.",
+      "Private direct-doc runner supplies npm_execpath only to construct gate descriptors, then replaces every selected execution with direct Node; pnpm itself is never invoked."
+    ],
+    "resources": "Owned ephemeral loopback coordinator, controlled response/origin gates, real owned PostgreSQL test instance and SDK subprocesses. Pending responses are released before teardown and physical allocation cases remain covered. No fixed production endpoint or paid API."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T030842Z/resource-retirement-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-resource-registration-retirement.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-resource-registration-retirement.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-resource-registration-retirement.zh.md",
+    "apps/cli/tests/profiles/sdk/resource-retirement.expected.e2e.ts",
+    "examples/headless-agent/tests/fixtures/resource-retirement/expected.json",
+    "examples/headless-agent/tests/fixtures/resource-retirement/model.mjs",
+    "examples/headless-agent/tests/fixtures/resource-retirement/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/resource-retirement/runtime.cordis.yml",
+    "gateway/tests/runtime-resource-provider.spec.ts",
+    "packages/context/gateway-runtime/README.i18n.yaml",
+    "packages/context/gateway-runtime/README.md",
+    "packages/context/gateway-runtime/README.zh.md",
+    "packages/context/gateway-runtime/src/resource-budget.ts",
+    "python/sdk/tests/test_resource_retirement_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 34,
+  "artifactReferences": 6,
+  "mergeRequirement": "Apply only14 sourceDeltaPaths, preserving the existing21 provider cases and adding3 regressions. All context sources and6 normal emitted/build artifacts are read-only references. Rebuild gateway-runtime normally; no wire, configuration, Session, SQL or database migration. Current SDK fixture exercises source and normal built providers; Root R24/peer Gateway Node Agent/channel/UI source is outside this delta. Do not overlay unrelated read-only context.",
+  "notes": {
+    "reviewedActiveRecords": [
+      ".agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.md",
+      ".agents/notes/implemented/architecture/2026-11-01-atomic-runtime-activity-admission.md",
+      ".agents/notes/implemented/bug-fix/2026-11-01-resource-registration-retirement.md"
+    ],
+    "decision": "retain existing Runtime lifecycle/activity notes and new request-registration retirement note",
+    "reason": "Runtime startup and generation activity ownership remain separate obligations. The new note records the distinction between unsubmitted local work and attempted remote reservation, and why a removable ready set replaces retained promise callbacks. This is continuing concurrency/ownership rationale, not a mechanical or UI record. No archived note changed."
+  },
+  "compatibility": "No wire/configuration/public-method/Session/schema change or generation rewrite. The existing API rejects the correct error earlier and returns unsubmitted local capacity. No upgrade migration is required.",
+  "peerCoordination": {
+    "servingReleaseReported": "R23",
+    "r24Reported": "GUI634 files/10257 cases passed; Web/voice checks remain peer-owned and incomplete. No root re-verification claim.",
+    "dependencyEvent": "Peer reported a completed automatic pnpm sync triggered by verify-type-equiv after dependency restoration. Root used direct Node commands throughout this batch.",
+    "externalDocGap": "Peer replaced raw public-build commit literal with a maintained data-source reference; root recheck passes.",
+    "newReservedTests": [
+      "apps/web/tests/settings-chrome.e2e.ts",
+      "settings-compact/general.expected.md"
+    ]
+  },
+  "remaining": [
+    "Integrate only14 sourceDeltaPaths with a normal matching gateway-runtime rebuild. The34 prerequisite paths and6 build/type references are read-only. B416-B424 retain independent matching release requirements; B417 required-on-read reader acceptance remains explicit.",
+    "Continue resource-provider abnormal-response, origin-resolution, metadata/queue limit, cancellation and cleanup-deadline paths. Selected PG tests measure provider lines88.97%,statements81.99%,branches72.72%,functions87.27%; the new preparation/drain methods execute, while the unexpected-drain-error guard does not. No whole-provider or CI-coverage completion claim.",
+    "Continue filesystem/document races, per-account/computer permissions and the remaining model/tool/workflow/Inspector business rules outside peer-owned files. All12 domains and B04/B25 remain open.",
+    "Current design retains explicitly unattributed cold managed auxiliary calls and advisory token quotas; resource queue fixes do not invent execution witnesses or a new billing rule.",
+    "Peer owns R24 transport/review UI acceptance and the settings-chrome/settings-compact test updates. Root performs no production deploy, restart or dependency repair; true paid Responses verification remains deferred."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true
+}

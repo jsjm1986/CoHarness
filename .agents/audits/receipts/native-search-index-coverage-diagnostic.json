@@ -1,0 +1,14 @@
+{
+  "name": "native-search-index-coverage-diagnostic",
+  "cwd": ".",
+  "command": "pnpm exec vitest run --config .agents/audits/.local/native-search-coverage.config.mts packages/web/web-search-deepseek/tests --coverage '--coverage.include=packages/web/web-search-deepseek/src/{admission,index}.ts' --coverage.reportsDirectory=.agents/audits/.local/native-search-index-coverage-diagnostic --coverage.reporter=text --coverage.reporter=json --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T03:27:53.567370+00:00",
+  "seconds": 15.303,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "205867ea08df3a2e5b88b38138e174bd8b5aef394b3cc2d70214c74bd2438d88",
+  "inputsAfter": "205867ea08df3a2e5b88b38138e174bd8b5aef394b3cc2d70214c74bd2438d88",
+  "postgresToolDirectory": null,
+  "outputSha256": "c5aa1a5a032ff50835f0044d9a142da70e0910967ca5ee6c53783bb0f71e159e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  5 passed (5)\n      Tests  76 passed (76)\n   Start at  11:28:07\n   Duration  1.35s (transform 745ms, setup 133ms, import 1.05s, tests 289ms, environment 0ms)\n\n % Coverage report from v8\n--------------|---------|----------|---------|---------|-------------------\nFile          | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n--------------|---------|----------|---------|---------|-------------------\nAll files     |     100 |    86.48 |     100 |     100 |                   \n index.ts     |     100 |       80 |     100 |     100 | 97,114-117        \n--------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 58/58 )\nBranches     : 86.48% ( 32/37 )\nFunctions    : 100% ( 15/15 )\nLines        : 100% ( 50/50 )\n================================================================================\nERROR: Coverage for branches (80%) does not meet global threshold (100%) for packages/web/web-search-deepseek/src/index.ts\n"
+}

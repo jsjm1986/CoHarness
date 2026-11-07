@@ -69,6 +69,18 @@ it.each([null, 'refused'])('refuses a denied resolution without a live grant (%j
   await expect(f.service.resolve(1, f.signal)).rejects.toMatchObject({ code: 'ssh/forbidden' })
 })
 
+it.each(['throw', 'reject'] as const)('preserves SSH refusal when unused body cancellation fails by %s', async (kind) => {
+  const f = fixture()
+  const response = new Response('denied', { status: 403 })
+  const body = response.body!
+  vi.spyOn(body, 'cancel').mockImplementation(() => {
+    if (kind === 'throw') throw new Error('body cancellation failed')
+    return Promise.reject(new Error('body cancellation failed'))
+  })
+  f.request.mockResolvedValueOnce(response)
+  await expect(f.service.resolve(1, f.signal)).rejects.toMatchObject({ code: 'ssh/forbidden' })
+})
+
 it('narrows revocation to the invalidated subject', async () => {
   const f = fixture()
   const first = await f.service.resolve(1, f.signal)

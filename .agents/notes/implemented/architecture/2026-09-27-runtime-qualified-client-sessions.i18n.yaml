@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-runtime-qualified-client-sessions.md
 document:
-  en: 6314bdcda1ef0f2ece4604f6cc80ca296fb07e8e
-  zh: afd2e43914a6d1b034ef2d9a28ee0fbd130f4ecc
+  en: 7865cd19e769dc57c5f4936acd7c3480d2c8fe03
+  zh: b45c3e1ce6ef3cd60ee207961ac4648e45d27c02
 /agent-note-runtime-qualified-client-sessions:
   en: 3cbcd9c9cbf9b553
   zh: b84b80eb1317144a
@@ -12,8 +12,8 @@ document:
   en: 9020c46fbef16bd8
   zh: e7311dc52005af1c
 /agent-note-runtime-qualified-client-sessions/decision:
-  en: 433d22c43b63c0be
-  zh: 609be6137a71fd0c
+  en: 73aa7455a2c28d36
+  zh: 701a7c6ba78f8aa3
 /agent-note-runtime-qualified-client-sessions/alternatives-considered:
   en: e15652d2f14d530b
   zh: 37542f56c12eabae

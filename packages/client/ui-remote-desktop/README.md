@@ -27,6 +27,8 @@ Open a `remoteDesktop` tab in the right sidebar for a granted remote node. The t
 
 Compose this plugin in the Web profile; it registers the `remoteDesktop` sidebar tab kind. A caller opens a tab with `openTabIn(sessionId, 'remoteDesktop', { params: { nodeId, desktop? } })`.
 
+An unavailable endpoint stops before consent, attachment or RFB startup. The notice explains graphical-desktop and VNC prerequisites and supports an explicit status retry. A configured external VNC target remains usable when the serving node itself is headless.
+
 The tab loads the endpoint status through `ctx.remoteDesktops`. When the caller's grant set is not yet consented, a card states the exact level — **View only** or **Control** — plus the recording flag when an administrator marks the grant for recording; **Confirm and connect** records the consent and attaches. When consent already covers the grants, the tab attaches directly. Denials surface the stable capability code as a localized notice with **Retry**. A live attachment shows the effective level and offers **Disconnect**; a closed stream offers **Reconnect**, which runs the status → attach flow again under the recorded consent.
 
 <a id="understand-the-implementation"></a>

@@ -18,3 +18,7 @@
 .menuStatus {
   color: var(--dsw-alias-label-secondary);
 }
+
+.workspaceLabel { display: flex; align-items: baseline; gap: var(--dsw-space-2); min-width: 0; }
+.workspaceLabel > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspaceComputer { margin-left: auto; color: var(--dsw-alias-label-secondary); font-size: 12px; }

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/interaction/user-questions/README.md
 document:
-  en: 1ba3b8d35d3cf5b77d9dd00780b87cf161bc8a85
-  zh: 43e7e3c53bf599cab9ca06abd0ed2d9252804c65
+  en: 8ca8fee524e28b9376b6012c1f0697d58eea289d
+  zh: e9de77dd78d137ccec03a877623914f06c71fbb7
 /:
   en: 49ea5bf7d681936e
   zh: e65549bc2fc385a4
@@ -18,8 +18,8 @@ document:
   en: 382a21c0ea17b2e4
   zh: 1a4335e571de92dd
 /deepseek-ai-dsh-user-questions/ask-a-question:
-  en: 0c45d3161b0df13a
-  zh: efff84a7917a799e
+  en: f7ec706166b72e56
+  zh: 632a6de2450c7eb9
 /deepseek-ai-dsh-user-questions/role:
   en: 2acc92b6b1e8cf1c
   zh: 3347834c73df7a26

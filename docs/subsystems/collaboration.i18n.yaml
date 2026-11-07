@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/collaboration.md
 document:
-  en: ebef19b112ce505f41daff2e10564bb682c3fcaa
-  zh: 131c5660cc79ee56a43031b63e6e14e9a6e27cf5
+  en: 4fa112ceebbc4b111097fc30c35a43a9f103e5a4
+  zh: 274624eb4f68ff02dbd49c37268b345221627221
 /project-collaboration:
   en: 4d3acd672679a1d4
   zh: 25864f324572c4e1
 /project-collaboration/runtime-identity:
-  en: ef0667134d842acb
-  zh: bc54d466476d63fe
+  en: be6ec71f69d8d656
+  zh: ee510b8f6ff4a3b6
 /project-collaboration/private-runtime-channel:
   en: 543110a65c55b59e
   zh: d1269f25ec085ff4
 /project-collaboration/root-conversation-acl:
-  en: 807b12b75bb64cc4
-  zh: 7516997efdac34c3
+  en: 844c83274f005338
+  zh: 4ca1f095128aa5d3
 /project-collaboration/captured-authority:
-  en: a999b432eb85096f
-  zh: f801344ca4ab61fa
+  en: 115715241511f361
+  zh: 9fb1e623e80db2f3
 /project-collaboration/execution-participants:
   en: 5328f962e09af517
   zh: 2019ef9de232df57

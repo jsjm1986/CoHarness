@@ -1,0 +1,13 @@
+{
+  "name": "chromium-final-pairing",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/experimental/browser-use-stagehand-native/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md docs/config-catalog.md docs/module-graph.md",
+  "startedAt": "2026-10-23T17:22:10.702145+00:00",
+  "seconds": 3.21,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0971008b21bd31de634b11843bda4d3405628c9d98b8b6230344ab677e232833",
+  "inputsAfter": "0971008b21bd31de634b11843bda4d3405628c9d98b8b6230344ab677e232833",
+  "outputSha256": "f8e2658885292b633acb0d917af11ebcff031f7bae4e9c6ff730248069000c8b",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/experimental/browser-use-stagehand-native/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md docs/config-catalog.md docs/module-graph.md\nverify-translation-pairing: recorded .agents/notes/proposed/feature/2026-10-23-node-resource-admission.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

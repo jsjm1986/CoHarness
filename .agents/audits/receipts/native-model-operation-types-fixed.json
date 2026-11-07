@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-types-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/llm/llm/tsconfig.json packages/llm/llm-pi-ai/tsconfig.json packages/subagent/subagent-codex/tsconfig.json",
+  "startedAt": "2026-10-25T02:08:44.750502+00:00",
+  "seconds": 1.982,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7496149690dc67c7fff06b7c40aecd13c6a79ecd7846b782dc26a59f479c1c55",
+  "inputsAfter": "7496149690dc67c7fff06b7c40aecd13c6a79ecd7846b782dc26a59f479c1c55",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

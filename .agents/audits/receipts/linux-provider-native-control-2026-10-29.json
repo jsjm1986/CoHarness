@@ -1,0 +1,273 @@
+{
+  "recordedAt": "2026-10-29T14:26:37.611973+00:00",
+  "findings": [
+    "B320"
+  ],
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "repair": "All Linux provider native query/probe/signal/empty-unit control clients use SIGKILL for their existing five-second timeout. An uncooperative client is closed; observation failure retains unknown managed ownership. The target execution lifetime and quota are unchanged.",
+  "paths": [
+    "packages/subprocess/subprocess-local/src/linux-scope.ts",
+    "packages/subprocess/subprocess-local/tests/linux-control-native.spec.ts",
+    "packages/subprocess/subprocess-local/tests/run-linux-control-timeout.mjs",
+    "packages/subprocess/subprocess-local/tests/fixtures/linux-control-client.mjs",
+    "packages/subprocess/subprocess-local/tests/fixtures/linux-control-driver.mjs",
+    "packages/subprocess/subprocess-local/tests/fixtures/linux-control-timeout.expected.md"
+  ],
+  "negativeEvidence": [
+    {
+      "name": "linux-provider-control-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T14:17:22.574029+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "packages/subprocess/subprocess-local/tests/run-linux-control-timeout.mjs",
+        "src"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T14:17:33.975028+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-causal-before.json"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "linux-provider-control-source-fixed",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:18:26.729772+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "packages/subprocess/subprocess-local/tests/run-linux-control-timeout.mjs",
+          "src"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:18:37.021207+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-source-fixed.json"
+      },
+      {
+        "name": "linux-provider-control-unit-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:19:40.960559+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests/linux-scope.spec.ts",
+          "packages/subprocess/subprocess-local/tests/linux-control-native.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/linux-scope.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:20:02.031035+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-unit-coverage.json"
+      },
+      {
+        "name": "linux-provider-control-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:19:53.396113+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-b",
+          "packages/subprocess/subprocess-local/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:19:53.910913+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-build.json"
+      },
+      {
+        "name": "linux-provider-control-public-bundle",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:20:40.804459+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local",
+        "command": [
+          "../../../node_modules/.bin/tsdown",
+          "--config",
+          "tsdown.config.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:20:40.959639+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-public-bundle.json"
+      },
+      {
+        "name": "linux-provider-control-native-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:20:04.231994+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "packages/subprocess/subprocess-local/src/linux-scope.ts",
+          "packages/subprocess/subprocess-local/tests/linux-control-native.spec.ts",
+          "packages/subprocess/subprocess-local/tests/run-linux-control-timeout.mjs",
+          "packages/subprocess/subprocess-local/tests/fixtures/linux-control-client.mjs",
+          "packages/subprocess/subprocess-local/tests/fixtures/linux-control-driver.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:20:10.617308+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-native-lint.json"
+      },
+      {
+        "name": "linux-provider-control-emitted-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:21:05.627564+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "packages/subprocess/subprocess-local/tests/run-linux-control-timeout.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-artifact/lib/types/linux-scope.js"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:21:15.787857+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-emitted-node22.json"
+      },
+      {
+        "name": "linux-provider-control-emitted-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:21:15.827046+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "packages/subprocess/subprocess-local/tests/run-linux-control-timeout.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-artifact/lib/types/linux-scope.js"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:21:26.143465+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-emitted-node24.json"
+      },
+      {
+        "name": "linux-provider-control-package-regressions",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:21:18.106610+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests",
+          "--maxWorkers=2",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:21:32.189543+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-package-regressions.json"
+      },
+      {
+        "name": "linux-provider-control-host-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:22:25.719515+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:22:32.224831+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-host-types.json"
+      },
+      {
+        "name": "linux-provider-control-final-docs",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:23:35.383518+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:25:15.456380+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-final-docs.json"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 241,
+          "covered": 241,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 272,
+          "covered": 272,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 54,
+          "covered": 54,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 238,
+          "covered": 238,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/linux-scope.ts": {
+        "lines": {
+          "total": 241,
+          "covered": 241,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 54,
+          "covered": 54,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 272,
+          "covered": 272,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 238,
+          "covered": 238,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    }
+  },
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-final-hashes.json",
+  "limitations": [
+    "The native-client scenarios use real private CLI processes and the production scope owner. They run on the current macOS host and emitted internal owner module under Node22/24; no new actual Linux cgroup or whole Loader acceptance is claimed.",
+    "Killing a control client cannot prove a managed range empty; unknown state must still retain ownership."
+  ],
+  "pending": [],
+  "realProviderApiValidation": "human-deferred",
+  "fixtureQuiescence": {
+    "status": "passed",
+    "ownedNativeFixturePids": [],
+    "method": "Known private dsh-linux-control executable invocation paths, after joined replay closure."
+  }
+}

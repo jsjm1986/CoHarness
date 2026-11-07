@@ -12,6 +12,8 @@ Status: implemented
 
 `dsh-workflow-ptc` 通过共享的 Node `PtcRuntime` 实现 `WorkflowEngine`。每次运行在一个 PTC 进程中保留既有 VM 与工作流辅助函数。Host 绑定将 guest 连接到配置的 subagent 提供方及工作流观察器；Host 提供发起调用的 Agent，并解析其 Session 的常设文件策略与 cwd。
 
+引擎在发布运行前捕获选定的 subagent 提供方实例。每次子 agent 启动都在捕获的执行权限回调内检查该实例仍已注册。移除或替换会以 `AGENT_START` 拒绝新的子 agent 启动；已准入子 agent 保留其结果与清理句柄。新工作流可以选择替换后的提供方。仅保留提供方名称不能维持 [Ralph 消费方](../feature/2026-07-19-fresh-agent-ralph-workflow-tool.zh.md)检查的上下文策略：同名替换实例可能继承父级历史。
+
 提交的 guest 模块由本仓库源文件、共享辅助函数和固定工具链生成；其字节可能与上游生成物不同。因此，上游同步清单将该包登记为适配，并保留本地生成过程作为重放步骤。`pnpm run verify-workflow-guest` 校验生成物新鲜度，guest、schema 和真实运行时测试验证嵌入程序的行为；同步后不能用上游生成字节覆盖本地依赖的产物。
 
 VM 定义辅助 API，以及协作式并发、agent 总数和条目上限。它不是安全边界，这些计数器也不是 Host 强制的安全配额。文件强制、V8 堆限制、输出与控制限制、受管进程清理仍由 PTC 及其沙箱／子进程提供方负责。网络访问与提供方特有的约束限制保持与 PTC 相同。
@@ -24,6 +26,8 @@ VM 定义辅助 API，以及协作式并发、agent 总数和条目上限。它�
 
 Node 引导程序发送终态帧后保持控制管道打开，直到 Host 将其关闭。未被等待的绑定回复可能仍在传输，因此子进程提前关闭会让 `EPIPE` 与已经完成的程序结果发生竞争。
 
+结果序列化只接受规范索引写法的数组键。`"01"`、`"1.0"` 和 `"-0"` 等可枚举键属于普通属性，因此会被拒绝，不会在 JSON 传输时被丢弃。真实 Loader 与 PTC 进程记录验证稠密数组正常完成，每种会丢失数据的形式均返回错误且不提供部分结果。
+
 [动态工作流决策](../feature/2026-07-05-dynamic-workflows.zh.md)保留脚本、结构化输出、事件与工具语义；本文只取代其执行基底与信任实现。[沙箱化 Node PTC 决策](2026-09-11-sandboxed-node-ptc-runtime.zh.md)保留执行与控制保证；显式 null 截止扩展其服务选项。[agent 作用域运行时设计](2026-07-12-agent-scope-runtime-design.zh.md#workflow-children-are-pending-starts-or-published-records)保留待启动与子 agent 清理的归属规则。
 
 ## 曾考虑的替代方案
@@ -31,6 +35,8 @@ Node 引导程序发送终态帧后保持控制管道打开，直到 Host 将其
 **保留 worker-thread 执行。** 终止 worker 无法应用 Session 的 OS 文件策略，也无法提供直接 Node 代码所需的受管进程清理。
 
 **创建独立的工作流子进程运行时。** 另一套启动器、控制传输与沙箱适配器会重复维护相同执行职责。PTC 已经接受程序和具名异步 Host 绑定，无需了解工具或 Session。
+
+**为每个子 agent 独立解析提供方名称。** 负责运行的消费方准入工作流后，替换实例可能改变上下文继承方式或其他提供方保证。
 
 **用直接 Node 工作流 API 替换 VM。** VM 与辅助函数保留既有脚本语义、同步片段超时与 JSON 物化。实现 OS 约束不需要移除它们。
 

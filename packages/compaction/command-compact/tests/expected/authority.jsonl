@@ -1,0 +1,2 @@
+{"operation":"compact-command","summaryCaller":"current-user","result":"success","logged":true}
+{"operation":"revoked-compact-command","result":"denied","newSummaryRequests":0,"newCompactionAttempts":0}

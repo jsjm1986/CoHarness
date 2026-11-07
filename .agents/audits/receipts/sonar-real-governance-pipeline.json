@@ -1,0 +1,14 @@
+{
+  "name": "sonar-real-governance-pipeline",
+  "cwd": "plugins/dsh-model-governance",
+  "command": "../../node_modules/.bin/vitest run tests/execution-billing.spec.ts --retry=0",
+  "startedAt": "2026-10-24T08:50:16.276912+00:00",
+  "seconds": 3.895,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fac1ef897a9bbc5454edb373f3f42c4474ac6bfd815cac9e517f468e809839d6",
+  "inputsAfter": "fac1ef897a9bbc5454edb373f3f42c4474ac6bfd815cac9e517f468e809839d6",
+  "postgresToolDirectory": null,
+  "outputSha256": "4daa0ddbfd6e71545c8eb38f77657897c9c1396efc428bc21f8eac347fe5451e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/plugins/dsh-model-governance\n\n\n Test Files  1 passed (1)\n      Tests  26 passed (26)\n   Start at  16:50:18\n   Duration  1.63s (transform 805ms, setup 0ms, import 1.21s, tests 332ms, environment 0ms)\n\n"
+}

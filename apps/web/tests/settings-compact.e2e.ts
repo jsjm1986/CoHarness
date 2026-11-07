@@ -58,7 +58,8 @@ describe('web e2e: compact settings overlay', () => {
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: '打开侧边栏' }).click()
-    await page.getByRole('button', { name: '设置', exact: true }).click()
+    const trigger = page.getByRole('button', { name: '设置', exact: true })
+    await trigger.click()
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
     // The panel enters with a scale/translate animation; geometry read
@@ -95,6 +96,15 @@ describe('web e2e: compact settings overlay', () => {
     expect(cubeYs.size).toBe(1)
 
     const enterButton = dialog.getByRole('button', { name: '排队发送' })
+    for (const name of ['减小字号', '增大字号']) {
+      const step = dialog.getByRole('button', { name, exact: true })
+      await step.scrollIntoViewIfNeeded()
+      const box = await step.boundingBox()
+      if (box === null) throw new Error(`missing font control: ${name}`)
+      expect(box.width).toBeGreaterThanOrEqual(44)
+      expect(box.height).toBeGreaterThanOrEqual(44)
+      expect(await step.evaluate(element => getComputedStyle(element).opacity)).toBe('1')
+    }
     // The General section grew past the 844px viewport; .options owns the
     // scroll, so reach the row through it before checking geometry.
     await enterButton.scrollIntoViewIfNeeded()
@@ -156,6 +166,9 @@ describe('web e2e: compact settings overlay', () => {
 
     await generalTab.click()
     await expect.poll(() => generalTab.getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+    await expect.poll(() => trigger.evaluate(element => element === document.activeElement)).toBe(true)
+    expect(await page.locator('#root').getAttribute('inert')).toBeNull()
   }, 90_000)
 
   it('commits exactly the compact settings snapshot inventory', async () => {

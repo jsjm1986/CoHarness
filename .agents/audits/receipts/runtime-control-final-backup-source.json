@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-final-backup-source",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/deployment-data.spec.ts --retry=0",
+  "startedAt": "2026-10-24T19:39:18.292147+00:00",
+  "seconds": 3.956,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e72d7e6221fd442c4022ccb90c6125d9e90c2d94d605be3ac39fd11f32b3d38f",
+  "inputsAfter": "e72d7e6221fd442c4022ccb90c6125d9e90c2d94d605be3ac39fd11f32b3d38f",
+  "postgresToolDirectory": null,
+  "outputSha256": "dd6dc66679882861139eeade06234054b83e05515ae021bba1cbfadb952fc100",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  12 passed (12)\n   Start at  03:39:20\n   Duration  1.24s (transform 627ms, setup 0ms, import 765ms, tests 340ms, environment 0ms)\n\n"
+}

@@ -1,0 +1,7 @@
+- dialog "启动项目实例":
+  - heading "启动项目实例" [level=2]
+  - paragraph: 启动本节点的共享运行时。维护窗口中不允许启动。
+  - button "关闭"
+  - alert: Linux runtime account "harness-project" is not provisioned on this computer. Complete the configured runtime-account provisioning before starting this Runtime.
+  - button "取消"
+  - button "确认执行"

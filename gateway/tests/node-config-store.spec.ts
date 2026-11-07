@@ -24,33 +24,50 @@ async function fixture() {
 }
 
 it('keeps saved settings unapplied across restarts and rejects stale or wrong-node submissions', async () => {
-  const f = await fixture(), initial = await f.store.view()
+  const f = await fixture(), initial = await f.store.view(1)
   const changed = { ...initial.desired, HGW_PORT: '9301' }
-  const saved = await f.store.save(f.identity, initial.revision, changed)
+  const saved = await f.store.save(f.identity, initial.revision, changed, 1)
   expect(saved).toMatchObject({ revision: 1, runningRevision: 0, appliedRevision: 0,
     desired: { HGW_PORT: '9301' }, effective: { HGW_PORT: '8899' } })
   expect((await loadManagedNodeEnvironment(f.env)).HGW_PORT).toBe('8899')
-  await expect(f.store.save(f.identity, 0, changed)).rejects.toThrow('revision-conflict')
-  await expect(f.store.save({ ...f.identity, nodeId: 'node-b' }, 1, changed)).rejects.toThrow('identity-mismatch')
+  await expect(f.store.save(f.identity, 0, changed, 1)).rejects.toThrow('revision-conflict')
+  await expect(f.store.save({ ...f.identity, nodeId: 'node-b' }, 1, changed, 1)).rejects.toThrow('identity-mismatch')
   const second = new NodeConfigurationStore(f.identity, f.cfg, f.env, isolatedNodeConfigurationAuthority)
   await second.initialize()
-  expect((await second.view()).desired.HGW_PORT).toBe('9301')
+  expect((await second.view(1)).desired.HGW_PORT).toBe('9301')
   expect(await readFile(f.cfg.nodeConfigFile, 'utf8')).not.toContain('postgresql:')
 })
 
+it('retains validated private event renewal settings in the node configuration owner', async () => {
+  const f = await fixture(), initial = await f.store.view(1)
+  expect(initial.desired).toMatchObject({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'true',
+    HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS: '10000', HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS: '5000', HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '64' })
+  const desired = { ...initial.desired, HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'false',
+    HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS: '4000', HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS: '2000', HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '16' }
+  await f.store.save(f.identity, initial.revision, desired, 1)
+  const second = new NodeConfigurationStore(f.identity, f.cfg, f.env, isolatedNodeConfigurationAuthority)
+  await second.initialize()
+  expect((await second.view(1)).desired).toEqual(desired)
+  const legacy = { ...desired } as Record<string, unknown>
+  for (const key of ['HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED', 'HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH']) delete legacy[key]
+  expect(parseNodeSettingValues(legacy, { ...f.env, HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '8' })).toMatchObject({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'true', HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '8' })
+  expect(() => parseNodeSettingValues({ ...desired, HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'yes' }, f.env)).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED')
+  expect(() => parseNodeSettingValues({ ...desired, HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '1025' }, f.env)).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH')
+})
+
 it('queues exactly the reviewed revision and prevents edits while an apply is pending', async () => {
-  const f = await fixture(), initial = await f.store.view()
+  const f = await fixture(), initial = await f.store.view(1)
   await expect(f.store.requestApply(f.identity, 0, 1)).rejects.toThrow('already-applied')
-  await f.store.save(f.identity, 0, { ...initial.desired, HGW_PORT: '9310' })
+  await f.store.save(f.identity, 0, { ...initial.desired, HGW_PORT: '9310' }, 1)
   await expect(f.store.requestApply(f.identity, 0, 1)).rejects.toThrow('revision-conflict')
   const requested = await f.store.requestApply(f.identity, 1, 9)
   expect(requested.operation).toMatchObject({ revision: 1, actor: 9, status: 'pending' })
   await expect(f.store.requestApply(f.identity, 1, 9)).rejects.toThrow('in-progress')
-  await expect(f.store.save(f.identity, 1, initial.desired)).rejects.toThrow('in-progress')
+  await expect(f.store.save(f.identity, 1, initial.desired, 1)).rejects.toThrow('in-progress')
 })
 
 it('rejects commands, injected lines, invalid ports, origins and paths at the public input parser', async () => {
-  const f = await fixture(), { desired } = await f.store.view()
+  const f = await fixture(), { desired } = await f.store.view(1)
   for (const invalid of [
     { ...desired, HGW_DSH_COMMAND: 'anything' },
     { ...desired, HGW_PORT: '65536' }, { ...desired, HGW_PORT: '12\nVALUE=x' },
@@ -62,9 +79,9 @@ it('rejects commands, injected lines, invalid ports, origins and paths at the pu
 })
 
 it('allows one winner across concurrent stores and refuses a copied file from another node', async () => {
-  const f = await fixture(), other = new NodeConfigurationStore(f.identity, f.cfg, f.env, isolatedNodeConfigurationAuthority), initial = await f.store.view()
-  const results = await Promise.allSettled([f.store.save(f.identity, 0, { ...initial.desired, HGW_PORT: '9311' }),
-    other.save(f.identity, 0, { ...initial.desired, HGW_PORT: '9312' })])
+  const f = await fixture(), other = new NodeConfigurationStore(f.identity, f.cfg, f.env, isolatedNodeConfigurationAuthority), initial = await f.store.view(1)
+  const results = await Promise.allSettled([f.store.save(f.identity, 0, { ...initial.desired, HGW_PORT: '9311' }, 1),
+    other.save(f.identity, 0, { ...initial.desired, HGW_PORT: '9312' }, 1)])
   expect(results.map(row => row.status).sort()).toEqual(['fulfilled', 'rejected'])
   const wrong = new NodeConfigurationStore({ ...f.identity, nodeId: 'other' }, f.cfg, f.env, isolatedNodeConfigurationAuthority)
   await expect(wrong.initialize()).rejects.toThrow('identity-mismatch')
@@ -95,4 +112,20 @@ it('refuses a durable record whose applied generation exceeds its reviewed revis
   const f = await fixture(), record = (await readNodeConfiguration(f.cfg.nodeConfigFile, f.env))!
   await writeNodeConfiguration(f.cfg.nodeConfigFile, { ...record, appliedRevision: record.revision + 1 })
   await expect(loadManagedNodeEnvironment(f.env)).rejects.toThrow('inconsistent-node-configuration-revisions')
+})
+
+it('persists node admission limits and upgrades missing additive settings from the bootstrap configuration', async () => {
+  const f = await fixture(), initial = await f.store.view(1)
+  expect(initial.effective).toMatchObject({ HGW_RUNTIME_MAX_STARTING: '2', HGW_RUNTIME_MAX_RESIDENT: '0', HGW_RUNTIME_MAX_QUEUED: '32', HGW_RUNTIME_QUEUE_WAIT_MS: '30000', HGW_PERFORMANCE_ENABLED: 'true', HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS: '20', HGW_DATABASE_MAX_CONNECTIONS: '10', HGW_DATABASE_MAX_CHECKOUT_QUEUE: '256', HGW_DATABASE_CONNECTION_TIMEOUT_MS: '5000' })
+  const next = { ...initial.desired, HGW_RUNTIME_MAX_STARTING: '3', HGW_RUNTIME_MAX_RESIDENT: '10', HGW_PERFORMANCE_ENABLED: 'false' }
+  await f.store.save(f.identity, 0, next, 1)
+  expect((await readNodeConfiguration(f.cfg.nodeConfigFile, f.env))?.desired).toMatchObject(next)
+  const legacy: Record<string, unknown> = { ...initial.desired }
+  for (const key of ['HGW_RUNTIME_MAX_STARTING', 'HGW_RUNTIME_MAX_RESIDENT', 'HGW_RUNTIME_MAX_QUEUED', 'HGW_RUNTIME_QUEUE_WAIT_MS', 'HGW_PERFORMANCE_ENABLED', 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS', 'HGW_DATABASE_MAX_CONNECTIONS', 'HGW_DATABASE_MAX_CHECKOUT_QUEUE', 'HGW_DATABASE_CONNECTION_TIMEOUT_MS']) delete legacy[key]
+  expect(parseNodeSettingValues(legacy, { ...f.env, HGW_RUNTIME_MAX_RESIDENT: '12' })).toMatchObject({ HGW_RUNTIME_MAX_RESIDENT: '12', HGW_RUNTIME_MAX_STARTING: '2' })
+  expect(() => parseNodeSettingValues({ ...initial.desired, HGW_RUNTIME_MAX_RESIDENT: null }, f.env)).toThrow('HGW_RUNTIME_MAX_RESIDENT')
+  expect(parseNodeSettingValues({ ...initial.desired, HGW_RUNTIME_MAX_STARTING: '9' }, f.env))
+    .toMatchObject({ HGW_RUNTIME_MAX_STARTING: '9', HGW_RUNTIME_MAX_RESIDENT: '0' })
+  expect(() => parseNodeSettingValues({ ...initial.desired, HGW_RUNTIME_MAX_STARTING: '9', HGW_RUNTIME_MAX_RESIDENT: '8' }, f.env))
+    .toThrow('HGW_RUNTIME_MAX_STARTING')
 })

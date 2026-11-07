@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -12,7 +12,11 @@ import { UsageOutbox } from '../src/outbox.ts'
 import { loadPolicy } from '../src/policy.ts'
 
 const oldHome = process.env.DSH_HOME
-afterEach(() => { process.env.DSH_HOME = oldHome; vi.restoreAllMocks() })
+afterEach(() => {
+  if (oldHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = oldHome
+  vi.restoreAllMocks()
+})
 
 class Adapter extends LlmAdapter {
   calls = 0
@@ -44,6 +48,51 @@ function replacePolicy(home: string, allowed: boolean): void {
 }
 
 describe('instance model governance', () => {
+  it.each([false, true])('denies queued model revocation with an isolated LLM=%s', async (isolated) => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-queued-'))
+    process.env.DSH_HOME = home
+    policy(home, true)
+    const ctx = new Context()
+    let admitted!: () => void, allow!: () => void
+    const waiting = new Promise<void>(resolve => { admitted = resolve })
+    const permit = new Promise<void>(resolve => { allow = resolve })
+    let released = 0
+    ctx.provide('resourceBudget', { acquire: async () => {
+      admitted()
+      await permit
+      return { signal: new AbortController().signal, release: async () => { released += 1 }, uncertain: async () => {} }
+    } })
+    let result: Promise<StreamChunk[]> | undefined
+    try {
+      await ctx.plugin(LlmRuntime)
+      const modelContext = isolated ? ctx.isolate('llm') : ctx
+      if (isolated) await modelContext.plugin(LlmRuntime)
+      const adapter = new Adapter()
+      modelContext.llm.registerAdapter(['p'], adapter)
+      await ctx.plugin(Governance)
+      const access = ctx.get('modelAccess')
+      if (access === undefined) throw new Error('model access service missing')
+      result = drain(modelContext.llm.stream({ provider: 'p', model: 'm', messages: [] }))
+      await waiting
+      expect(access.decide({ provider: 'p', model: 'm' }).allowed).toBe(true)
+      replacePolicy(home, false)
+      expect(access.decide({ provider: 'p', model: 'm' }).allowed).toBe(true)
+      allow()
+      const chunks = await result
+      expect(adapter.calls).toBe(0)
+      expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'MODEL_FORBIDDEN' } } })
+      expect(released).toBe(1)
+      const records = readdirSync(join(home, 'model-governance-outbox')).filter(name => name.endsWith('.json'))
+      expect(records).toHaveLength(1)
+      expect(JSON.parse(readFileSync(join(home, 'model-governance-outbox', records[0]!), 'utf8'))).toMatchObject({ status: 'denied' })
+    } finally {
+      allow()
+      await result
+      await ctx.fiber.dispose()
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('fails closed on malformed policy and enforces denial before adapter dispatch', async () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home
     writeFileSync(join(home, 'model-governance.json'), '{}')
@@ -207,4 +256,27 @@ describe('instance model governance', () => {
     expect(bodies[1]).not.toHaveProperty('actorUserId')
     expect(bodies[1]).not.toHaveProperty('actorProjectId')
   })
+})
+
+it('meters a Session-isolated LLM service with the runtime governance owner', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'dsh-gov-isolated-'))
+  process.env.DSH_HOME = home
+  policy(home, true)
+  const ctx = new Context(), isolated = ctx.isolate('llm')
+  try {
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(Governance)
+    await isolated.plugin(LlmRuntime)
+    const adapter = new Adapter('file')
+    isolated.effect(() => isolated.llm.registerAdapter(['p'], adapter))
+    await drain(isolated.llm.stream({ provider: 'p', model: 'm', messages: [] }))
+    expect(adapter.calls).toBe(1)
+    await ctx.fiber.dispose()
+    const records = readdirSync(join(home, 'model-governance-outbox')).filter(name => name.endsWith('.json'))
+    expect(records).toHaveLength(1)
+    expect(JSON.parse(readFileSync(join(home, 'model-governance-outbox', records[0]!), 'utf8'))).toMatchObject({
+      provider: 'p', model: 'm', credentialSource: 'file', credentialClass: 'personal', status: 'succeeded',
+      usage: { inputTokens: 3, outputTokens: 2 },
+    })
+  } finally { await ctx.fiber.dispose(); rmSync(home, { recursive: true, force: true }) }
 })

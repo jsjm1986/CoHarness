@@ -1,0 +1,13 @@
+{
+  "name": "chromium-final-catalog",
+  "cwd": ".",
+  "command": "pnpm run gen-cordis-catalog",
+  "startedAt": "2026-10-23T17:21:31.417767+00:00",
+  "seconds": 8.468,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f0d146030ffd2b6bf8ad74c3e0683d8c4d924fc44d05eefb382a41a51f8939ed",
+  "inputsAfter": "f0d146030ffd2b6bf8ad74c3e0683d8c4d924fc44d05eefb382a41a51f8939ed",
+  "outputSha256": "903884dbb31be5c656a3e138117d7c859dedd2fe9f95cdef52de5b569aff327b",
+  "outputTail": "$ tsx scripts/gen-cordis-catalog.ts\ngen-cordis-catalog: 127 artifact(s) computed, 0 written.\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-private-plugin-tests-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/model-governance-vitest.config.mts --retry=0",
+  "startedAt": "2026-10-24T16:28:06.696488+00:00",
+  "seconds": 3.757,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cc3c736f11486699a31e3fd64f30fa353870749a1db64247b64a6a77d9ab692d",
+  "inputsAfter": "cc3c736f11486699a31e3fd64f30fa353870749a1db64247b64a6a77d9ab692d",
+  "postgresToolDirectory": null,
+  "outputSha256": "f7365cbb2258bb99c2b483f9b870e072b5fcd2814ba415744c794d8ab393a5cb",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  10 passed (10)\n      Tests  84 passed (84)\n   Start at  00:28:08\n   Duration  1.71s (transform 3.10s, setup 0ms, import 4.63s, tests 1.21s, environment 1ms)\n\n"
+}

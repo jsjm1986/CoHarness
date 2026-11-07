@@ -21,7 +21,8 @@ const list = (...items: SessionSummary[]): SessionListState => ({
   byId: Object.fromEntries(items.map(item => [item.id, item])),
   archivedById: {},
   current: undefined,
-  phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+  phase: 'ready',
+  state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
 })
 /**
  * The pooled runtime's real shape: archived summaries leave `ids`/`byId` for
@@ -32,7 +33,8 @@ const partitionedList = (live: readonly SessionSummary[], archives: readonly Ses
   byId: Object.fromEntries(live.map(item => [item.id, item])),
   archivedById: Object.fromEntries(archives.map(item => [item.id, item])),
   current: undefined,
-  phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+  phase: 'ready',
+  state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
 })
 const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView => ({
   workspaceId: wid(id), path: `/projects/${id}`, title,
@@ -43,6 +45,32 @@ const view = (expandedGroups: readonly string[] = [], ungroupedOrder?: readonly 
   ...(ungroupedOrder === undefined ? {} : { ungroupedOrder }),
 })
 const noArchive: readonly SessionId[] = []
+
+it('keeps an inactive composer-owned blank in its Workspace and flat list while hiding parked blanks', () => {
+  const current = summary('history', 3), draft = { ...summary('draft', 2), blank: true }
+  const parked = { ...summary('parked', 1), blank: true }
+  const state = { ...list(current, draft, parked), current: current.id }
+  const rows = { pinnedSessionIds: [], archivedSessionIds: [], archivedFilter: 'default' as const,
+    inputDraftSessionIds: [draft.id] }
+  const workspaces = [workspace('a', ['history']), workspace('b', ['draft', 'parked'])]
+  const grouped = deriveGroups(state, workspaces, rows, view(['a', 'b']))
+  expect(grouped.find(group => group.workspaceId === wid('b'))?.sessions.map(item => item.id)).toEqual([draft.id])
+  const members = sessionMemberIds(state, rows.inputDraftSessionIds)
+  expect(members).toEqual([current.id, draft.id])
+  expect(deriveFlat(state, members, rows).map(item => item.id)).toContain(draft.id)
+  expect(deriveFlat(state, members, rows).map(item => item.id)).not.toContain(parked.id)
+})
+
+it('keeps an inactive input blank under its local Workspace hint before Host membership arrives', () => {
+  const current = summary('history', 2), draft = { ...summary('draft', 1), blank: true, workspaceId: wid('b') }
+  const state = { ...list(current, draft), current: current.id }
+  const rows = { pinnedSessionIds: [], archivedSessionIds: [], archivedFilter: 'default' as const,
+    inputDraftSessionIds: [draft.id] }
+  const grouped = deriveGroups(state, [workspace('a', ['history']), workspace('b', [])], rows, view(['a', 'b']))
+  expect(grouped.find(group => group.workspaceId === wid('b'))?.sessions.map(item => item.id)).toEqual([draft.id])
+  expect(grouped.find(group => group.key === UNGROUPED_KEY)).toBeUndefined()
+})
+
 const archived = (...ids: string[]): readonly SessionId[] => ids.map(sid)
 const rowState = (options: {
   pinned?: readonly string[]
@@ -736,7 +764,7 @@ describe('createWorkspaceViewStore', () => {
     store.actions.setGroupBy('flat')
     store.actions.setOrderBy('updated')
     store.actions.setGroupExpanded('alpha', true)
-    store.actions.syncSessionOrderAccount('alpha', ['two', 'one'], { one: 1, two: 2 })
+    store.actions.syncSessionOrderAccounts([{ accountKey: 'alpha', order: ['two', 'one'], updatedAt: { one: 1, two: 2 } }])
     store.actions.setSessionOrder('alpha', ['one', 'two'])
     expect(store.getSnapshot().groupBy).toBe('flat')
     expect(store.getSnapshot()).toMatchObject({
@@ -752,8 +780,10 @@ describe('createWorkspaceViewStore', () => {
     store.actions.setGroupExpanded('', true)
     store.actions.setGroupExpanded('alpha', true)
     store.actions.setGroupExpanded('deleted', true)
-    store.actions.syncSessionOrderAccount('alpha', ['alpha-session'], { 'alpha-session': 2 })
-    store.actions.syncSessionOrderAccount('deleted', ['deleted-session'], { 'deleted-session': 1 })
+    store.actions.syncSessionOrderAccounts([
+      { accountKey: 'alpha', order: ['alpha-session'], updatedAt: { 'alpha-session': 2 } },
+      { accountKey: 'deleted', order: ['deleted-session'], updatedAt: { 'deleted-session': 1 } },
+    ])
 
     store.actions.retainAccountKeys(['', 'alpha'])
 
@@ -768,8 +798,10 @@ describe('createWorkspaceViewStore', () => {
     const sessions = list(
       summary('one', 1), summary('two', 2), summary('three', 3), summary('loose', 4),
     )
-    store.actions.syncSessionOrderAccount('alpha', ['two', 'one'], {})
-    store.actions.syncSessionOrderAccount(UNGROUPED_KEY, ['loose'], {})
+    store.actions.syncSessionOrderAccounts([
+      { accountKey: 'alpha', order: ['two', 'one'], updatedAt: {} },
+      { accountKey: UNGROUPED_KEY, order: ['loose'], updatedAt: {} },
+    ])
 
     store.actions.pinSessionOrder('three', ['alpha', FLAT_SESSION_ORDER_KEY], {
       members: {

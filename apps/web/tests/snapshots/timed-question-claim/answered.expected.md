@@ -1,0 +1,72 @@
+- banner:
+  - navigation "Session hierarchy":
+    - button "Ask which rollout to use," [disabled]
+  - text: 标准模式
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "Open right sidebar":
+    - img
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
+- text: Ask which rollout to use, continue after the timed wait, and accept my later answer.
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Asked questions"
+- paragraph: Work continued while the question stayed open.
+- button "Copy":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- "button \"Execution requested {{clock}}\"":
+  - text: Execution requested
+  - time: "{{clock}}"
+  - img
+- button "Analysis completed"
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- paragraph: DONE
+- button "Copy":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- textbox "Message COHARNESS"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- group "Session statistics":
+  - button "2 turns · 3 steps":
+    - img
+    - text: 2 turns · 3 steps
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

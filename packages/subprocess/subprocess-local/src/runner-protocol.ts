@@ -4,14 +4,13 @@ import {
   chmodSync,
   existsSync,
   lstatSync,
-  mkdtempSync,
   readFileSync,
   rmdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join } from 'node:path'
+import { privateTemporaryDirectory } from './tempdir.ts'
 
 /** Target state restored by the Linux bootstrap after systemd establishes the scope. */
 export interface LinuxLaunchRequest {
@@ -101,7 +100,7 @@ function parseErrorResult(value: Record<string, unknown>): LinuxStartupError {
  * @returns private paths owned by this launch.
  */
 export function createLinuxLaunchFiles(request: LinuxLaunchRequest): LinuxLaunchFiles {
-  const directory = mkdtempSync(join(tmpdir(), 'dsh-subprocess-launch-'))
+  const directory = privateTemporaryDirectory('dsh-subprocess-launch-')
   const files = {
     directory,
     requestPath: join(directory, 'launch-request.json'),

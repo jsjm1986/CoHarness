@@ -1,13 +1,16 @@
 import { createHash, randomBytes } from 'node:crypto'
+import type { PoolClient } from 'pg'
 import { decimalToMicros, microsToDecimal } from '../money.ts'
 import { verifyExecutionAttribution } from '../execution-identity.ts'
 import type { UserRow } from '../auth.ts'
+import { CollaborationDeniedError } from '../collaboration.ts'
 import type {
   CredentialClass,
   ModelProviderInput,
   ModelProviderProtocol,
   ModelProviderRow,
   ModelUsageSubject,
+  ModelIntakeSubject,
   ModelRegistrationEvent,
   ModelRegistrationFilter,
   ModelRegistrationReport,
@@ -36,7 +39,10 @@ import { OrganizationModelCredentialCipher } from '../organization-model-credent
 import { modelEndpointCandidates } from '@deepseek-ai/dsh-llm/discovery'
 import type { Queryable } from './database.ts'
 import { transaction } from './database.ts'
+import { lockProjectManagement } from './project-management-authority.ts'
+import { lockAdministrator } from './administrator-authority.ts'
 import { internalProjectId, internalUserId, type PostgresRuntimeContext } from './runtime-context.ts'
+import { RuntimeCatalogError, type RuntimeId } from '../runtime-catalog.ts'
 import {
   discoverOrganizationModels,
   organizationModelSettingsSchema,
@@ -297,6 +303,20 @@ function profileModelsOf(profile: Record<string, unknown>): Array<Record<string,
   return value.map((model, index) => jsonObject(model, `models[${index}]`))
 }
 
+/** Match profile lookup order when legacy settings contain duplicate model ids. */
+function indexedProfileModels(profile: Record<string, unknown>): Map<unknown, Record<string, unknown>> {
+  const models = new Map<unknown, Record<string, unknown>>()
+  for (const model of profileModelsOf(profile)) {
+    if (!models.has(model.id)) models.set(model.id, model)
+  }
+  return models
+}
+
+interface RuntimeProviderProjection {
+  provider: RuntimeModelProvider
+  models: Map<unknown, Record<string, unknown>>
+}
+
 interface UsageTotalsRow {
   input: string
   output: string
@@ -424,6 +444,35 @@ export class PostgresModelGovernanceService {
     new Intl.DateTimeFormat('en-US', { timeZone }).format()
   }
 
+  private async mutationUser(client: PoolClient, publicId: number): Promise<string | null> {
+    const result = await client.query<{ id: string }>(`SELECT id FROM harness.users
+      WHERE organization_id=$1 AND public_id=$2 AND deleted_at IS NULL FOR SHARE`, [this.context.organizationId, publicId])
+    return result.rows[0]?.id ?? null
+  }
+
+  /**
+   * Serialize policy writers before actor, target and Provider rows, retaining any supplied administrator.
+   * NO KEY UPDATE permits key-share foreign-key checks during target archive/deletion waits.
+   */
+  private configurationMutation<T>(operation: (client: PoolClient) => Promise<T>, actorUserId?: number): Promise<T> {
+    return transaction(this.context.pool, async client => {
+      const organization = await client.query('SELECT id FROM harness.organizations WHERE id=$1 FOR NO KEY UPDATE', [this.context.organizationId])
+      if (organization.rowCount !== 1) {
+        if (actorUserId !== undefined) throw new CollaborationDeniedError('forbidden')
+        throw new Error('organization model configuration is unavailable')
+      }
+      if (actorUserId !== undefined) await lockAdministrator(client, this.context, actorUserId)
+      return operation(client)
+    })
+  }
+
+  /** Retain an active project through administrative model and quota writes. */
+  private async mutationProject(client: PoolClient, publicId: number): Promise<string | null> {
+    const result = await client.query<{ id: string }>(`SELECT id FROM harness.projects
+      WHERE organization_id=$1 AND public_id=$2 AND status='active' FOR SHARE`, [this.context.organizationId, publicId])
+    return result.rows[0]?.id ?? null
+  }
+
   /** Read the organization policy revision without materializing every route. */
   async configurationRevision(): Promise<number> {
     const result = await this.context.pool.query<{ revision: string }>(`SELECT model_configuration_revision::text revision
@@ -480,7 +529,7 @@ export class PostgresModelGovernanceService {
     }))
   }
 
-  async upsertProvider(input: ModelProviderInput): Promise<void> {
+  async upsertProvider(input: ModelProviderInput, actorUserId?: number): Promise<void> {
     const provider = nonEmpty(input.provider, 'provider')
     if (!ORGANIZATION_PROVIDER_PATTERN.test(provider)) {
       throw new Error(`organization provider must match ${String(ORGANIZATION_PROVIDER_PATTERN)}`)
@@ -493,7 +542,7 @@ export class PostgresModelGovernanceService {
     if (input.authMode === 'none' && typeof input.credential === 'string') {
       throw new Error(`provider ${provider} does not accept an organization credential`)
     }
-    await transaction(this.context.pool, async (client) => {
+    await this.configurationMutation(async (client) => {
       const existing = await client.query<{ id: string; source: 'managed' | 'legacy-catalog'; status: string }>(`SELECT
         id,source,status FROM harness.model_providers WHERE organization_id=$1 AND provider_key=$2 FOR UPDATE`,
       [this.context.organizationId, provider])
@@ -556,7 +605,7 @@ export class PostgresModelGovernanceService {
         }
       }
       await this.bumpConfigurationRevision(client)
-    })
+    }, actorUserId)
   }
 
   /** Return the organization pi-ai namespace in the same form as settings.describe. */
@@ -572,10 +621,11 @@ export class PostgresModelGovernanceService {
   async mutateOrganizationModelSettings(
     ops: ModelSettingsPathOp[],
     expectedRevision?: number,
+    actorUserId?: number,
   ): Promise<OrganizationModelSettingsView> {
-    return transaction(this.context.pool, async (client) => {
+    return this.configurationMutation(async (client) => {
       const revisionResult = await client.query<{ revision: string }>(`SELECT model_configuration_revision::text revision
-        FROM harness.organizations WHERE id=$1 FOR UPDATE`, [this.context.organizationId])
+        FROM harness.organizations WHERE id=$1`, [this.context.organizationId])
       const revision = safeCount(revisionResult.rows[0]?.revision ?? '0', 'organization model configuration revision')
       if (expectedRevision !== undefined && expectedRevision !== revision) throw new Error('settings-conflict')
       const current = await this.organizationProfiles(client)
@@ -650,7 +700,7 @@ export class PostgresModelGovernanceService {
       await this.bumpConfigurationRevision(client)
       const nextRevision = revision + 1
       return this.organizationSettingsView(profiles, nextRevision, client)
-    })
+    }, actorUserId)
   }
 
   /** Describe organization-owned credential state without returning values. */
@@ -670,9 +720,9 @@ export class PostgresModelGovernanceService {
   }
 
   /** Store one encrypted organization credential and refresh provider readiness. */
-  async setOrganizationCredential(ref: string, value: string): Promise<void> {
+  async setOrganizationCredential(ref: string, value: string, actorUserId?: number): Promise<void> {
     const accepted = nonEmpty(value, 'credential')
-    await transaction(this.context.pool, async (client) => {
+    await this.configurationMutation(async (client) => {
       const provider = await this.providerForCredential(client, ref)
       if (provider === undefined) throw new Error(`unknown organization credential ${ref}`)
       const encrypted = this.credentialCipher.encrypt(this.context.organizationId, provider.id, accepted)
@@ -684,38 +734,38 @@ export class PostgresModelGovernanceService {
       ])
       await this.refreshProviderReadiness(client, provider.id)
       await this.bumpConfigurationRevision(client)
-    })
+    }, actorUserId)
   }
 
   /** Remove one encrypted organization credential. */
-  async unsetOrganizationCredential(ref: string): Promise<void> {
-    await transaction(this.context.pool, async (client) => {
+  async unsetOrganizationCredential(ref: string, actorUserId?: number): Promise<void> {
+    await this.configurationMutation(async (client) => {
       const provider = await this.providerForCredential(client, ref)
       if (provider === undefined) return
       await client.query(`DELETE FROM harness.organization_model_credentials WHERE organization_id=$1 AND provider_id=$2`,
         [this.context.organizationId, provider.id])
       await this.refreshProviderReadiness(client, provider.id)
       await this.bumpConfigurationRevision(client)
-    })
+    }, actorUserId)
   }
 
-  /** Reuse the pi-ai discovery implementation for the organization editor. */
+  /** Authorize draft credential preparation before dispatch; the catalog HTTP request owns no database transaction. */
   async discoverOrganizationModels(request: {
+    actorUserId?: number
     provider?: string
     baseURL?: string
     api?: string
     apiKey?: string
   }): Promise<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>> {
-    // The browser only receives a configured/missing flag. Reuse the stored
-    // value for an existing route when the editor leaves its write-only field
-    // blank; an explicitly typed key always wins in the discovery helper.
-    const stored = request.apiKey === undefined
-      ? await this.organizationCredentialForProvider(request.provider, request.baseURL, request.api)
-      : undefined
-    return discoverOrganizationModels({
-      ...request,
-      ...request.apiKey !== undefined || stored === undefined ? {} : { apiKey: stored },
+    const { actorUserId, ...draft } = request
+    const prepared = await transaction(this.context.pool, async client => {
+      if (actorUserId !== undefined) await lockAdministrator(client, this.context, actorUserId)
+      const stored = draft.apiKey === undefined
+        ? await this.organizationCredentialForProvider(client, draft.provider, draft.baseURL, draft.api)
+        : undefined
+      return { ...draft, ...draft.apiKey !== undefined || stored === undefined ? {} : { apiKey: stored } }
     })
+    return discoverOrganizationModels(prepared)
   }
 
   /** List the active project-owned Provider rows without returning key values. */
@@ -742,10 +792,10 @@ export class PostgresModelGovernanceService {
     projectId: number,
     ops: ModelSettingsPathOp[],
     expectedRevision?: number,
+    actorUserId?: number,
   ): Promise<ProjectModelSettingsView> {
-    return transaction(this.context.pool, async (client) => {
-      const project = await internalProjectId(client, this.context.organizationId, projectId)
-      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+    return this.configurationMutation(async (client) => {
+      const project = await lockProjectManagement(client, this.context, projectId, actorUserId)
       const revisionResult = await client.query<{ revision: string }>(`SELECT
         project_model_configuration_revision::text revision FROM harness.projects
         WHERE organization_id=$1 AND id=$2 FOR UPDATE`, [this.context.organizationId, project])
@@ -844,15 +894,10 @@ export class PostgresModelGovernanceService {
   }
 
   /** Store one encrypted project credential and update Provider readiness. */
-  async setProjectCredential(projectId: number, ref: string, value: string): Promise<void> {
+  async setProjectCredential(projectId: number, ref: string, value: string, actorUserId?: number): Promise<void> {
     const accepted = nonEmpty(value, 'credential')
-    await transaction(this.context.pool, async (client) => {
-      const project = await internalProjectId(client, this.context.organizationId, projectId)
-      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
-      // Settings mutations take this project lock before replacing provider
-      // rows. Keep the same order here so credential rotation cannot deadlock
-      // with a concurrent provider edit or project deletion.
-      await this.lockProjectConfiguration(client, project)
+    await this.configurationMutation(async (client) => {
+      const project = await lockProjectManagement(client, this.context, projectId, actorUserId)
       const provider = await this.projectProviderForCredential(client, project, projectId, ref)
       if (provider === undefined) throw new Error(`unknown project credential ${ref}`)
       const encrypted = this.credentialCipher.encrypt(this.context.organizationId, provider.id, accepted)
@@ -870,11 +915,9 @@ export class PostgresModelGovernanceService {
   }
 
   /** Remove one encrypted project credential. */
-  async unsetProjectCredential(projectId: number, ref: string): Promise<void> {
-    await transaction(this.context.pool, async (client) => {
-      const project = await internalProjectId(client, this.context.organizationId, projectId)
-      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
-      await this.lockProjectConfiguration(client, project)
+  async unsetProjectCredential(projectId: number, ref: string, actorUserId?: number): Promise<void> {
+    await this.configurationMutation(async (client) => {
+      const project = await lockProjectManagement(client, this.context, projectId, actorUserId)
       const provider = await this.projectProviderForCredential(client, project, projectId, ref)
       if (provider === undefined) return
       await client.query(`DELETE FROM harness.project_model_credentials
@@ -887,21 +930,21 @@ export class PostgresModelGovernanceService {
   /** Reuse the shared pi-ai endpoint interrogation for a project draft. */
   async discoverProjectModels(request: {
     projectId: number
+    actorUserId?: number
     provider?: string
     baseURL?: string
     api?: string
     apiKey?: string
   }): Promise<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>> {
-    const project = await internalProjectId(this.context.pool, this.context.organizationId, request.projectId)
-    if (project === null) throw new Error(`unknown project ${String(request.projectId)}`)
-    const stored = request.apiKey === undefined
-      ? await this.projectCredentialForProvider(project, request.provider, request.baseURL, request.api)
-      : undefined
-    const { projectId: _projectId, ...draft } = request
-    return discoverOrganizationModels({
-      ...draft,
-      ...request.apiKey !== undefined || stored === undefined ? {} : { apiKey: stored },
+    const prepared = await transaction(this.context.pool, async (client) => {
+      const project = await lockProjectManagement(client, this.context, request.projectId, request.actorUserId)
+      const stored = request.apiKey === undefined
+        ? await this.projectCredentialForProvider(client, project, request.provider, request.baseURL, request.api)
+        : undefined
+      const { projectId: _projectId, actorUserId: _actorUserId, ...draft } = request
+      return { ...draft, ...request.apiKey !== undefined || stored === undefined ? {} : { apiKey: stored } }
     })
+    return discoverOrganizationModels(prepared)
   }
 
   async listModels(): Promise<ModelRow[]> {
@@ -950,7 +993,7 @@ export class PostgresModelGovernanceService {
   async upsertModel(input: Omit<ModelRow, 'adminAllowed' | 'userAllowed'> & {
     adminAllowed?: boolean
     userAllowed?: boolean
-  }): Promise<void> {
+  }, actorUserId?: number): Promise<void> {
     const provider = nonEmpty(input.provider, 'provider')
     const model = nonEmpty(input.model, 'model')
     const prices = [
@@ -959,7 +1002,7 @@ export class PostgresModelGovernanceService {
       input.cacheReadMicrosPerMillion,
       input.cacheWriteMicrosPerMillion,
     ].map((value, index) => microsToDecimal(nonnegative(value, `price[${String(index)}]`)))
-    await transaction(this.context.pool, async (client) => {
+    await this.configurationMutation(async (client) => {
       const providerRow = await client.query<{ id: string; source: string; status: string }>(`SELECT id,source,status
         FROM harness.model_providers WHERE organization_id=$1 AND provider_key=$2 FOR UPDATE`,
       [this.context.organizationId, provider])
@@ -994,14 +1037,14 @@ export class PostgresModelGovernanceService {
       await client.query(`UPDATE harness.model_providers SET revision=revision+1,updated_at=now()
         WHERE id=$1 AND organization_id=$2`, [configuredProvider.id, this.context.organizationId])
       await this.bumpConfigurationRevision(client)
-    })
+    }, actorUserId)
   }
 
-  async setUserAccess(userId: number, provider: string, model: string, allowed: boolean | null): Promise<void> {
+  async setUserAccess(userId: number, provider: string, model: string, allowed: boolean | null, actorUserId?: number): Promise<void> {
     provider = nonEmpty(provider, 'provider')
     model = nonEmpty(model, 'model')
-    await transaction(this.context.pool, async (client) => {
-      const user = await internalUserId(client, this.context.organizationId, userId)
+    await this.configurationMutation(async (client) => {
+      const user = await this.mutationUser(client, userId)
       if (user === null) throw new Error(`unknown user ${String(userId)}`)
       const catalog = await client.query<{ id: string }>(`SELECT model.id FROM harness.model_catalog model
         JOIN harness.model_providers provider ON provider.id=model.provider_id
@@ -1019,7 +1062,7 @@ export class PostgresModelGovernanceService {
         [this.context.organizationId, user, modelId, allowed])
       }
       await this.bumpConfigurationRevision(client)
-    })
+    }, actorUserId)
   }
 
   async userOverrides(userId: number): Promise<Array<{ provider: string; model: string; allowed: boolean }>> {
@@ -1038,11 +1081,12 @@ export class PostgresModelGovernanceService {
     provider: string,
     model: string,
     allowed: boolean | null,
+    actorUserId?: number,
   ): Promise<void> {
     provider = nonEmpty(provider, 'provider')
     model = nonEmpty(model, 'model')
-    await transaction(this.context.pool, async (client) => {
-      const project = await internalProjectId(client, this.context.organizationId, projectId)
+    await this.configurationMutation(async (client) => {
+      const project = await this.mutationProject(client, projectId)
       if (project === null) throw new Error(`unknown project ${String(projectId)}`)
       const catalog = await client.query<{ id: string }>(`SELECT model.id FROM harness.model_catalog model
         JOIN harness.model_providers provider ON provider.id=model.provider_id
@@ -1062,12 +1106,12 @@ export class PostgresModelGovernanceService {
           allowed=excluded.allowed,updated_at=now()`, [this.context.organizationId, project, modelId, allowed])
       }
       await this.bumpConfigurationRevision(client)
-    })
+    }, actorUserId)
   }
 
-  async setAllProjectAccess(projectId: number, allowed: true | null): Promise<void> {
-    await transaction(this.context.pool, async (client) => {
-      const project = await internalProjectId(client, this.context.organizationId, projectId)
+  async setAllProjectAccess(projectId: number, allowed: true | null, actorUserId?: number): Promise<void> {
+    await this.configurationMutation(async (client) => {
+      const project = await this.mutationProject(client, projectId)
       if (project === null) throw new Error(`unknown project ${String(projectId)}`)
       await client.query(`UPDATE harness.projects
         SET model_access_default_allowed=$3,updated_at=now()
@@ -1079,7 +1123,7 @@ export class PostgresModelGovernanceService {
         [this.context.organizationId, project],
       )
       await this.bumpConfigurationRevision(client)
-    })
+    }, actorUserId)
   }
 
   async projectOverrides(projectId: number): Promise<Array<{ provider: string; model: string; allowed: boolean }>> {
@@ -1097,6 +1141,12 @@ export class PostgresModelGovernanceService {
   async policyFor(user: UserRow): Promise<RuntimeModelPolicy> {
     return transaction(this.context.pool, async (client) => {
       const version = await this.lockConfigurationRevision(client)
+      const account = (await client.query<{ id: string; role: 'admin' | 'member' }>(`SELECT u.id,m.role
+        FROM harness.users u JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
+        JOIN harness.organizations o ON o.id=u.organization_id
+        WHERE u.organization_id=$1 AND u.public_id=$2 AND u.status='active' AND u.deleted_at IS NULL
+          AND m.status='active' AND o.status='active' FOR SHARE OF u,m`, [this.context.organizationId, user.id])).rows[0]
+      if (account === undefined) throw new CollaborationDeniedError('forbidden')
       const result = await client.query<{
         provider: string
         model: string
@@ -1105,18 +1155,17 @@ export class PostgresModelGovernanceService {
         allowed: boolean
       }>(`SELECT model.provider_key provider,model.model_key model,
         (provider.status='enabled') provider_enabled,model.enabled model_enabled,
-        COALESCE(access.allowed,role_access.allowed,$3::boolean) allowed
+        COALESCE(access.allowed,role_access.allowed,$3='admin') allowed
         FROM harness.model_catalog model
         JOIN harness.model_providers provider ON provider.id=model.provider_id
           AND provider.organization_id=model.organization_id
         LEFT JOIN harness.model_role_access role_access ON role_access.organization_id=model.organization_id
-          AND role_access.model_id=model.id AND role_access.role=$4
-        LEFT JOIN harness.users target ON target.organization_id=model.organization_id AND target.public_id=$2
+          AND role_access.model_id=model.id AND role_access.role=$3
         LEFT JOIN harness.model_user_access access ON access.organization_id=model.organization_id
-          AND access.model_id=model.id AND access.user_id=target.id
+          AND access.model_id=model.id AND access.user_id=$2::uuid
         WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
         ORDER BY model.provider_key,model.model_key`,
-      [this.context.organizationId, user.id, user.role === 'admin', roleForPostgres(user.role)])
+      [this.context.organizationId, account.id, account.role])
       return {
         version,
         defaultAllowed: false,
@@ -1247,14 +1296,50 @@ export class PostgresModelGovernanceService {
     return this.resolveManagedCredential(subject, ref)
   }
 
-  async issueIntakeToken(subject: ModelUsageSubject): Promise<string> {
+  /**
+   * Resolve one prepared local assignment without starting it or changing billing ownership.
+   * @param subject - account/project and optional exact Runtime.
+   * @returns canonical reporting identity; ambiguous or missing assignments refuse projection.
+   */
+  async resolveIntakeSubject(subject: ModelIntakeSubject): Promise<ModelIntakeSubject> {
+    const owner = subject.kind === 'user' ? 'users' : 'projects', column = subject.kind === 'user' ? 'user_id' : 'project_id'
+    const rows = await this.context.pool.query<{ runtime_id: RuntimeId }>(`SELECT instance.runtime_id FROM harness.instances instance
+      JOIN harness.${owner} owner ON owner.organization_id=instance.organization_id AND owner.id=instance.${column}
+      WHERE instance.organization_id=$1 AND instance.assigned_node_id=$2 AND owner.public_id=$3 AND instance.provisioning_state='ready'
+        AND ($4::uuid IS NULL OR instance.runtime_id=$4) ORDER BY instance.runtime_id LIMIT 2`,
+    [this.context.organizationId, this.context.nodeId, subject.id, subject.runtimeId ?? null])
+    if (rows.rows.length > 1) throw new RuntimeCatalogError(409, 'runtime-catalog/ambiguous-target')
+    if (rows.rows[0] === undefined) throw new RuntimeCatalogError(503, 'runtime-catalog/unavailable')
+    return { kind: subject.kind, id: subject.id, runtimeId: rows.rows[0].runtime_id }
+  }
+
+  async issueIntakeToken(subject: ModelIntakeSubject): Promise<string> {
     const token = randomBytes(32).toString('base64url')
+    if (subject.runtimeId !== undefined) {
+      await transaction(this.context.pool, async client => {
+        const owner = subject.kind === 'user' ? await this.mutationUser(client, subject.id)
+          : await internalProjectId(client, this.context.organizationId, subject.id)
+        if (owner === null) throw new Error(`unknown ${subject.kind} ${String(subject.id)}`)
+        const column = subject.kind === 'user' ? 'user_id' : 'project_id'
+        const result = await client.query(`INSERT INTO harness.model_runtime_intake_tokens
+          (organization_id,runtime_id,node_id,${column},token_hash)
+          SELECT instance.organization_id,instance.runtime_id,instance.assigned_node_id,instance.${column},$5
+          FROM harness.instances instance WHERE instance.organization_id=$1 AND instance.assigned_node_id=$2
+            AND instance.runtime_id=$3 AND instance.${column}=$4 AND instance.provisioning_state='ready'
+          ON CONFLICT(organization_id,runtime_id) DO UPDATE SET token_hash=excluded.token_hash,created_at=now() RETURNING runtime_id`,
+        [this.context.organizationId, this.context.nodeId, subject.runtimeId, owner, tokenHash(token)])
+        if (result.rowCount !== 1) throw new RuntimeCatalogError(503, 'runtime-catalog/unavailable')
+      })
+      return token
+    }
     if (subject.kind === 'user') {
-      const user = await internalUserId(this.context.pool, this.context.organizationId, subject.id)
-      if (user === null) throw new Error(`unknown user ${String(subject.id)}`)
-      await this.context.pool.query(`INSERT INTO harness.model_intake_tokens(user_id,token_hash)
-        VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash,created_at=now()`,
-      [user, tokenHash(token)])
+      await transaction(this.context.pool, async client => {
+        const user = await this.mutationUser(client, subject.id)
+        if (user === null) throw new Error(`unknown user ${String(subject.id)}`)
+        await client.query(`INSERT INTO harness.model_intake_tokens(user_id,token_hash)
+          VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash,created_at=now()`,
+        [user, tokenHash(token)])
+      })
     } else {
       const project = await internalProjectId(this.context.pool, this.context.organizationId, subject.id)
       if (project === null) throw new Error(`unknown project ${String(subject.id)}`)
@@ -1265,20 +1350,27 @@ export class PostgresModelGovernanceService {
     return token
   }
 
-  async subjectForIntakeToken(token: string): Promise<ModelUsageSubject | null> {
-    const result = await this.context.pool.query<{ kind: 'user' | 'project'; public_id: string }>(`SELECT
-      'user'::text kind,u.public_id::text public_id
+  async subjectForIntakeToken(token: string): Promise<ModelIntakeSubject | null> {
+    const result = await this.context.pool.query<{ kind: 'user' | 'project'; public_id: string; runtime_id: RuntimeId | null }>(`SELECT
+      'user'::text kind,u.public_id::text public_id,NULL::uuid runtime_id
       FROM harness.model_intake_tokens t
       JOIN harness.users u ON u.id=t.user_id
       WHERE u.organization_id=$1 AND t.token_hash=$2
       UNION ALL
-      SELECT 'project'::text kind,p.public_id::text public_id
+      SELECT 'project'::text kind,p.public_id::text public_id,NULL::uuid runtime_id
       FROM harness.project_model_intake_tokens t
       JOIN harness.projects p ON p.id=t.project_id
-      WHERE p.organization_id=$1 AND t.token_hash=$2`, [this.context.organizationId, tokenHash(token)])
+      WHERE p.organization_id=$1 AND t.token_hash=$2
+      UNION ALL SELECT CASE WHEN token.user_id IS NULL THEN 'project' ELSE 'user' END kind,
+        COALESCE(account.public_id,project.public_id)::text public_id,token.runtime_id
+      FROM harness.model_runtime_intake_tokens token
+      LEFT JOIN harness.users account ON account.organization_id=token.organization_id AND account.id=token.user_id
+      LEFT JOIN harness.projects project ON project.organization_id=token.organization_id AND project.id=token.project_id
+      WHERE token.organization_id=$1 AND token.node_id=$3 AND token.token_hash=$2`, [this.context.organizationId, tokenHash(token), this.context.nodeId])
     if (result.rows.length > 1) throw new Error('model intake token resolves more than one subject')
     const row = result.rows[0]
-    return row === undefined ? null : { kind: row.kind, id: safeCount(row.public_id, `${row.kind} id`) }
+    return row === undefined ? null : { kind: row.kind, id: safeCount(row.public_id, `${row.kind} id`),
+      ...(row.runtime_id === null ? {} : { runtimeId: row.runtime_id }) }
   }
 
   async setQuota(
@@ -1286,65 +1378,64 @@ export class PostgresModelGovernanceService {
     subjectId: string,
     tokenLimit: number | null | 'inherit',
     costLimit: number | null | 'inherit',
+    actorUserId?: number,
   ): Promise<void> {
     subjectId = nonEmpty(subjectId, 'subjectId')
-    if (subjectType === 'role') {
-      if (subjectId !== 'admin' && subjectId !== 'user') throw new Error('role quota subject must be admin or user')
-      if (tokenLimit === 'inherit' || costLimit === 'inherit') throw new Error('role quotas cannot inherit')
-      await this.context.pool.query(`INSERT INTO harness.role_quotas(
-        organization_id,role,token_limit,company_cost_limit
-      ) VALUES($1,$2,$3,$4) ON CONFLICT(organization_id,role) DO UPDATE SET
-        token_limit=excluded.token_limit,company_cost_limit=excluded.company_cost_limit`, [
-        this.context.organizationId,
-        roleForPostgres(subjectId),
-        tokenLimit === null ? null : nonnegative(tokenLimit, 'tokenLimit'),
-        costLimit === null ? null : microsToDecimal(nonnegative(costLimit, 'companyCostMicrosLimit')),
-      ])
-      return
-    }
-    const publicId = Number(subjectId)
-    if (!Number.isSafeInteger(publicId) || publicId <= 0) {
-      throw new Error(`${subjectType} quota subject must be a positive ${subjectType} id`)
-    }
-    if (subjectType === 'project') {
-      const project = await internalProjectId(this.context.pool, this.context.organizationId, publicId)
-      if (project === null) throw new Error(`unknown project ${subjectId}`)
-      if (tokenLimit === 'inherit' && costLimit === 'inherit') {
-        await this.context.pool.query('DELETE FROM harness.project_quotas WHERE project_id=$1', [project])
+    await this.configurationMutation(async client => {
+      if (subjectType === 'role') {
+        if (subjectId !== 'admin' && subjectId !== 'user') throw new Error('role quota subject must be admin or user')
+        if (tokenLimit === 'inherit' || costLimit === 'inherit') throw new Error('role quotas cannot inherit')
+        await client.query(`INSERT INTO harness.role_quotas(
+          organization_id,role,token_limit,company_cost_limit
+        ) VALUES($1,$2,$3,$4) ON CONFLICT(organization_id,role) DO UPDATE SET
+          token_limit=excluded.token_limit,company_cost_limit=excluded.company_cost_limit`, [
+          this.context.organizationId, roleForPostgres(subjectId),
+          tokenLimit === null ? null : nonnegative(tokenLimit, 'tokenLimit'),
+          costLimit === null ? null : microsToDecimal(nonnegative(costLimit, 'companyCostMicrosLimit')),
+        ])
         return
       }
-      if (tokenLimit === 'inherit' || costLimit === 'inherit') {
-        throw new Error('project quota fields must both inherit or both be explicit')
+      const publicId = Number(subjectId)
+      if (!Number.isSafeInteger(publicId) || publicId <= 0) {
+        throw new Error(`${subjectType} quota subject must be a positive ${subjectType} id`)
       }
-      await this.context.pool.query(`INSERT INTO harness.project_quotas(
-        project_id,token_limit,company_cost_limit
-      ) VALUES($1,$2,$3) ON CONFLICT(project_id) DO UPDATE SET
-        token_limit=excluded.token_limit,company_cost_limit=excluded.company_cost_limit`, [
-        project,
-        tokenLimit === null ? null : nonnegative(tokenLimit, 'tokenLimit'),
-        costLimit === null ? null : microsToDecimal(nonnegative(costLimit, 'companyCostMicrosLimit')),
+      if (subjectType === 'project') {
+        const project = await this.mutationProject(client, publicId)
+        if (project === null) throw new Error(`unknown project ${subjectId}`)
+        if (tokenLimit === 'inherit' && costLimit === 'inherit') {
+          await client.query('DELETE FROM harness.project_quotas WHERE project_id=$1', [project])
+          return
+        }
+        if (tokenLimit === 'inherit' || costLimit === 'inherit') {
+          throw new Error('project quota fields must both inherit or both be explicit')
+        }
+        await client.query(`INSERT INTO harness.project_quotas(
+          project_id,token_limit,company_cost_limit
+        ) VALUES($1,$2,$3) ON CONFLICT(project_id) DO UPDATE SET
+          token_limit=excluded.token_limit,company_cost_limit=excluded.company_cost_limit`, [
+          project,
+          tokenLimit === null ? null : nonnegative(tokenLimit, 'tokenLimit'),
+          costLimit === null ? null : microsToDecimal(nonnegative(costLimit, 'companyCostMicrosLimit')),
+        ])
+        return
+      }
+      const user = await this.mutationUser(client, publicId)
+      if (user === null) throw new Error(`unknown user ${subjectId}`)
+      if (tokenLimit === 'inherit' && costLimit === 'inherit') {
+        await client.query('DELETE FROM harness.user_quotas WHERE user_id=$1', [user])
+        return
+      }
+      const tokenMode = tokenLimit === 'inherit' ? 'inherit' : tokenLimit === null ? 'unlimited' : 'custom'
+      const costMode = costLimit === 'inherit' ? 'inherit' : costLimit === null ? 'unlimited' : 'custom'
+      await client.query(`INSERT INTO harness.user_quotas(
+        user_id,token_mode,token_limit,company_cost_mode,company_cost_limit
+      ) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET
+        token_mode=excluded.token_mode,token_limit=excluded.token_limit,
+        company_cost_mode=excluded.company_cost_mode,company_cost_limit=excluded.company_cost_limit`, [
+        user, tokenMode, typeof tokenLimit === 'number' ? nonnegative(tokenLimit, 'tokenLimit') : null,
+        costMode, typeof costLimit === 'number' ? microsToDecimal(nonnegative(costLimit, 'companyCostMicrosLimit')) : null,
       ])
-      return
-    }
-    const user = await internalUserId(this.context.pool, this.context.organizationId, publicId)
-    if (user === null) throw new Error(`unknown user ${subjectId}`)
-    if (tokenLimit === 'inherit' && costLimit === 'inherit') {
-      await this.context.pool.query('DELETE FROM harness.user_quotas WHERE user_id=$1', [user])
-      return
-    }
-    const tokenMode = tokenLimit === 'inherit' ? 'inherit' : tokenLimit === null ? 'unlimited' : 'custom'
-    const costMode = costLimit === 'inherit' ? 'inherit' : costLimit === null ? 'unlimited' : 'custom'
-    await this.context.pool.query(`INSERT INTO harness.user_quotas(
-      user_id,token_mode,token_limit,company_cost_mode,company_cost_limit
-    ) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET
-      token_mode=excluded.token_mode,token_limit=excluded.token_limit,
-      company_cost_mode=excluded.company_cost_mode,company_cost_limit=excluded.company_cost_limit`, [
-      user,
-      tokenMode,
-      typeof tokenLimit === 'number' ? nonnegative(tokenLimit, 'tokenLimit') : null,
-      costMode,
-      typeof costLimit === 'number' ? microsToDecimal(nonnegative(costLimit, 'companyCostMicrosLimit')) : null,
-    ])
+    }, actorUserId)
   }
 
   async projectQuota(projectId: number): Promise<ProjectQuotaView> {
@@ -1424,7 +1515,13 @@ export class PostgresModelGovernanceService {
     }
   }
 
-  async ingest(subject: ModelUsageSubject, event: UsageEvent): Promise<{ inserted: boolean; alerts: number }> {
+  /**
+   * Record owner billing with immutable execution attribution from the authenticated reporting Runtime.
+   * @param subject - account/project and optional Runtime from its reporting credential.
+   * @param event - usage report to validate; body fields cannot replace the reporting identity.
+   * @returns whether the event was inserted and the number of resulting quota alerts.
+   */
+  async ingest(subject: ModelIntakeSubject, event: UsageEvent): Promise<{ inserted: boolean; alerts: number }> {
     if (event === null || typeof event !== 'object') throw new Error('usage event must be an object')
     nonEmpty(event.eventId, 'eventId')
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
@@ -2004,7 +2101,7 @@ export class PostgresModelGovernanceService {
 
   private async projectSummaryWith(queryable: Queryable, projectId: number, month: string): Promise<UsageSummary> {
     const project = await queryable.query<{ id: string }>(`SELECT id FROM harness.projects
-      WHERE organization_id=$1 AND public_id=$2 AND status='active'`, [this.context.organizationId, projectId])
+      WHERE organization_id=$1 AND public_id=$2`, [this.context.organizationId, projectId])
     const identity = project.rows[0]
     if (identity === undefined) throw new Error(`unknown project ${String(projectId)}`)
     const row = await this.usageTotals(queryable, { kind: 'project', id: projectId }, identity.id, month)
@@ -2366,15 +2463,6 @@ export class PostgresModelGovernanceService {
     return row
   }
 
-  /** Lock the project-wide configuration fence before provider-row locks. */
-  private async lockProjectConfiguration(queryable: Queryable, projectId: string): Promise<void> {
-    const result = await queryable.query(
-      'SELECT id FROM harness.projects WHERE organization_id=$1 AND id=$2 FOR UPDATE',
-      [this.context.organizationId, projectId],
-    )
-    if (result.rowCount !== 1) throw new Error('project configuration target disappeared')
-  }
-
   /** Recompute enabled/draft status after a project credential mutation. */
   private async refreshProjectProviderReadiness(queryable: Queryable, projectId: string, providerId: string): Promise<void> {
     const result = await queryable.query<{
@@ -2485,12 +2573,13 @@ export class PostgresModelGovernanceService {
 
   /** Resolve an existing organization route's stored key for discovery only. */
   private async organizationCredentialForProvider(
+    queryable: Queryable,
     provider: string | undefined,
     draftBaseURL: string | undefined,
     draftApi: string | undefined,
   ): Promise<string | undefined> {
     if (provider === undefined || provider.trim() === '') return undefined
-    const route = await this.context.pool.query<{
+    const route = await queryable.query<{
       id: string
       credential_ref: string | null
       base_url: string | null
@@ -2505,7 +2594,7 @@ export class PostgresModelGovernanceService {
     if (!sameProviderEndpoint(draftBaseURL, draftApi, stored.baseURL, stored.api)) return undefined
     const ref = row.credential_ref ?? apiKeyRefOf(row.profile)
     if (ref === undefined) return undefined
-    const credential = await this.context.pool.query<{
+    const credential = await queryable.query<{
       key_version: number
       nonce: Buffer
       ciphertext: Buffer
@@ -2525,13 +2614,14 @@ export class PostgresModelGovernanceService {
 
   /** Resolve an existing project route's stored key for discovery only. */
   private async projectCredentialForProvider(
+    queryable: Queryable,
     projectInternalId: string,
     provider: string | undefined,
     draftBaseURL: string | undefined,
     draftApi: string | undefined,
   ): Promise<string | undefined> {
     if (provider === undefined || provider.trim() === '') return undefined
-    const route = await this.context.pool.query<{
+    const route = await queryable.query<{
       id: string
       credential_ref: string | null
       base_url: string | null
@@ -2546,7 +2636,7 @@ export class PostgresModelGovernanceService {
     if (!sameProviderEndpoint(draftBaseURL, draftApi, stored.baseURL, stored.api)) return undefined
     const ref = row.credential_ref ?? apiKeyRefOf(row.profile)
     if (ref === undefined) return undefined
-    const credential = await this.context.pool.query<{
+    const credential = await queryable.query<{
       key_version: number
       nonce: Buffer
       ciphertext: Buffer
@@ -2614,15 +2704,15 @@ export class PostgresModelGovernanceService {
         AND model.enabled
       WHERE provider.organization_id=$1 AND provider.source='managed' AND provider.status='enabled'
       ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId])
-    const providers = new Map<string, RuntimeModelProvider>()
+    const providers = new Map<string, RuntimeProviderProjection>()
     for (const row of result.rows) {
-      const profile = runtimeManagedProfile(row.profile)
-      // Runtime validation requires an embedded profile URL to equal the
-      // canonical Provider URL; older settings may retain a trailing slash.
-      if (profile.baseURL !== undefined) profile.baseURL = row.base_url
-      let provider = providers.get(row.provider)
-      if (provider === undefined) {
-        provider = {
+      let projection = providers.get(row.provider)
+      if (projection === undefined) {
+        const profile = runtimeManagedProfile(row.profile)
+        // Runtime validation requires an embedded profile URL to equal the
+        // canonical Provider URL; older settings may retain a trailing slash.
+        if (profile.baseURL !== undefined) profile.baseURL = row.base_url
+        const provider: RuntimeModelProvider = {
           provider: row.provider,
           displayName: row.display_name,
           driver: 'pi-ai',
@@ -2633,10 +2723,10 @@ export class PostgresModelGovernanceService {
           models: [],
           scope: 'organization',
         }
-        providers.set(row.provider, provider)
+        projection = { provider, models: indexedProfileModels(profile) }
+        providers.set(row.provider, projection)
       }
-      const configured = profileModelsOf(profile)
-        .find(model => model.id === row.model_id)
+      const configured = projection.models.get(row.model_id)
       const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
       const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
       const input = Array.isArray(configured?.input)
@@ -2651,7 +2741,7 @@ export class PostgresModelGovernanceService {
       const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
         ? configured.compat as RuntimeModelProvider['models'][number]['compat']
         : undefined
-      provider.models.push({
+      projection.provider.models.push({
         id: row.model_id,
         name: row.model_name,
         ...contextWindow === undefined ? {} : { contextWindow },
@@ -2661,7 +2751,7 @@ export class PostgresModelGovernanceService {
         ...compat === undefined ? {} : { compat },
       })
     }
-    return [...providers.values()]
+    return [...providers.values()].map(projection => projection.provider)
   }
 
   /** Project-owned Provider projection, with runtime-prefixed route ids. */
@@ -2686,14 +2776,14 @@ export class PostgresModelGovernanceService {
         AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
       WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.status='enabled'
       ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId, projectInternalId])
-    const providers = new Map<string, RuntimeModelProvider>()
+    const providers = new Map<string, RuntimeProviderProjection>()
     for (const row of result.rows) {
       const runtimeProvider = projectRuntimeProviderKey(projectId, row.provider)
-      const profile = runtimeManagedProfile(row.profile)
-      if (profile.baseURL !== undefined) profile.baseURL = row.base_url
-      let provider = providers.get(runtimeProvider)
-      if (provider === undefined) {
-        provider = {
+      let projection = providers.get(runtimeProvider)
+      if (projection === undefined) {
+        const profile = runtimeManagedProfile(row.profile)
+        if (profile.baseURL !== undefined) profile.baseURL = row.base_url
+        const provider: RuntimeModelProvider = {
           provider: runtimeProvider,
           displayName: row.display_name,
           driver: 'pi-ai',
@@ -2705,9 +2795,10 @@ export class PostgresModelGovernanceService {
           scope: 'project',
           projectId,
         }
-        providers.set(runtimeProvider, provider)
+        projection = { provider, models: indexedProfileModels(profile) }
+        providers.set(runtimeProvider, projection)
       }
-      const configured = profileModelsOf(profile).find(model => model.id === row.model_id)
+      const configured = projection.models.get(row.model_id)
       const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
       const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
       const input = Array.isArray(configured?.input)
@@ -2722,7 +2813,7 @@ export class PostgresModelGovernanceService {
       const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
         ? configured.compat as RuntimeModelProvider['models'][number]['compat']
         : undefined
-      provider.models.push({
+      projection.provider.models.push({
         id: row.model_id,
         name: row.model_name,
         ...contextWindow === undefined ? {} : { contextWindow },
@@ -2732,6 +2823,6 @@ export class PostgresModelGovernanceService {
         ...compat === undefined ? {} : { compat },
       })
     }
-    return [...providers.values()]
+    return [...providers.values()].map(projection => projection.provider)
   }
 }

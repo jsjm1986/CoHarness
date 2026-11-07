@@ -1,0 +1,7 @@
+{"scenario":"unpublished","firstFailed":true}
+{"scenario":"control-body-deadline","status":400}
+{"scenario":"control-concurrency","pendingUploads":2,"status":200}
+{"scenario":"retry","firstFailed":true,"liveWhenUncertain":false,"nativeStopped":true}
+{"scenario":"uncertain","firstFailed":false,"liveWhenUncertain":true,"nativeStopped":true,"parentCancellationObserved":true}
+{"scenario":"early-cancellation","cancelled":4,"continued":true}
+{"phase":"completed","outcome":"completed","allocations":6,"occupied":0,"runtimeCompletionRetried":true,"releaseAttempts":9,"acknowledgements":6}

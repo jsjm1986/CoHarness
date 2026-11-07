@@ -1,0 +1,3 @@
+- button "Select model, current Origin Large":
+  - text: Origin Large
+  - img

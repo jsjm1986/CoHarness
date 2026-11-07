@@ -1,0 +1,14 @@
+{
+  "name": "jobs-starting-slot-and-timer-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/jobs/jobs-local/src/index.ts packages/jobs/jobs-local/src/pump.ts packages/jobs/jobs-local/tests/jobs.spec.ts packages/jobs/jobs-local/tests/pump.spec.ts packages/jobs/jobs-local/tests/loader-composition.spec.ts",
+  "startedAt": "2026-10-26T02:44:50.751763+00:00",
+  "seconds": 7.147,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9d934f6c471dbd1e9343d16161f85c3d0bb3349d456e8d93a73ffa470ae17a3e",
+  "inputsAfter": "9d934f6c471dbd1e9343d16161f85c3d0bb3349d456e8d93a73ffa470ae17a3e",
+  "postgresToolDirectory": null,
+  "outputSha256": "cf696fbc10415a793df370c8a91e99ec44bc9124dfe84b2c7898166584d962cc",
+  "outputTail": "packages/jobs/jobs-local/tests/jobs.spec.ts:333:53: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/jobs/jobs-local/tests/jobs.spec.ts:331:39: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\n"
+}

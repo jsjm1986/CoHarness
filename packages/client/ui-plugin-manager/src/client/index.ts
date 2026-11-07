@@ -71,7 +71,7 @@ export const NS = 'pluginManager'
 export const PANEL_ID = 'plugins' as MainPanelId
 
 /** Services required by the sidebar registration and the Remote methods; the inventory says whether the Host manages a profile. */
-export const inject = ['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'settingsScope', 'layout', 'modules', 'projectUiPolicy']
+export const inject = ['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginRegistryProbe', 'settingsScope', 'layout', 'modules', 'projectUiPolicy']
 
 /**
  * Contribute the Plugins entry to the sidebar with the management page it
@@ -86,14 +86,15 @@ export function apply(ctx: ClientContext): void {
   // The Host says when what is installed, enabled, or composed changed — from
   // this page, the CLI, or another browser — and streams install output.
   ctx.effect(() => {
+    const remote = ctx.remote.$forTarget()
     // A page never rendered holds no snapshot to refresh.
     const refresh = (): void => {
       if (controller.getSnapshot().status !== 'idle') void controller.load()
     }
     const disposers = [
-      ctx.remote.$on('plugin-manager/changed', refresh),
-      ctx.remote.$on('plugin-manager/install-log', (chunk) => { controller.appendLog(chunk) }),
-      ctx.remote.$on('plugin-manager/install-state', (progress) => { controller.installProgress(progress) }),
+      remote.$on('plugin-manager/changed', refresh),
+      remote.$on('plugin-manager/install-log', (chunk) => { controller.appendLog(chunk) }),
+      remote.$on('plugin-manager/install-state', (progress) => { controller.installProgress(progress) }),
       ctx.on('connection/reset', refresh),
     ]
     return () => { for (const dispose of disposers) dispose() }
@@ -122,6 +123,7 @@ export function apply(ctx: ClientContext): void {
       store,
       inject: () => face,
       children: {
+        'plugins.context': { kind: 'list', scope: 'root' },
         'plugins.add.actions': { kind: 'list', scope: 'root' },
         'plugins.tab': { kind: 'list', scope: 'root' },
         'plugins.item': { kind: 'list', scope: 'root' },

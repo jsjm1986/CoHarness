@@ -1,0 +1,232 @@
+{
+  "findings": [
+    "B424"
+  ],
+  "status": "fixed_verified_named_native_translation_classification_remaining_review_open",
+  "updatedAt": "2026-11-01T02:30:54.203841+00:00",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-origin-final.json",
+    "fetchedAt": "2026-11-01T02:27:56.560112+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "problem": "Native Flash translation omitted GenerateOptions.purpose, so actual governance usage was classified as assistant. The closed native extension type and SDK parent parser also required the new classification.",
+  "fix": "Set model-hidden translation purpose, update both public type declarations and the child parser, and preserve child authority stripping. Native dispatch keeps Session history detached. Actual owned-profile SDK composition exercises real governance outbox classification.",
+  "verification": {
+    "distinctRelatedTests": 763,
+    "packageTests": 749,
+    "typescriptSdkScenarios": 7,
+    "pythonSdkScenarios": 7,
+    "repeatVersionRunsNotAdded": true,
+    "normalPassedChecks": [
+      {
+        "name": "translation-purpose-governance-fixed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-governance-fixed.json"
+      },
+      {
+        "name": "translation-purpose-related",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-related.json"
+      },
+      {
+        "name": "translation-purpose-persistence-preview",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-persistence-preview.json"
+      },
+      {
+        "name": "translation-purpose-build-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-build-types.json"
+      },
+      {
+        "name": "translation-purpose-generate-catalog",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-generate-catalog.json"
+      },
+      {
+        "name": "translation-purpose-bundle",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-bundle.json"
+      },
+      {
+        "name": "translation-purpose-governance-suite",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-governance-suite.json"
+      },
+      {
+        "name": "translation-purpose-governance-types-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-governance-types-final.json"
+      },
+      {
+        "name": "translation-purpose-types-consumer-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-types-consumer-final.json"
+      },
+      {
+        "name": "translation-purpose-host-types-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-host-types-final.json"
+      },
+      {
+        "name": "translation-purpose-sdk-source-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-sdk-source-final.json"
+      },
+      {
+        "name": "translation-purpose-sdk-node22-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-sdk-node22-final.json"
+      },
+      {
+        "name": "translation-purpose-sdk-node24-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-sdk-node24-final.json"
+      },
+      {
+        "name": "translation-purpose-sdk-python",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-sdk-python.json"
+      },
+      {
+        "name": "translation-purpose-pairing",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-pairing.json"
+      },
+      {
+        "name": "translation-purpose-coverage",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-coverage.json"
+      },
+      {
+        "name": "translation-purpose-lint",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-lint.json"
+      },
+      {
+        "name": "translation-purpose-docs",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-docs.json"
+      },
+      {
+        "name": "translation-purpose-origin-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-origin-final.json"
+      }
+    ],
+    "negativeChecks": [
+      {
+        "name": "translation-purpose-governance-negative-exact",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-governance-negative-exact.json"
+      },
+      {
+        "name": "translation-purpose-sdk-old-source",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-sdk-old-source.json"
+      },
+      {
+        "name": "translation-purpose-sdk-old-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-sdk-old-node22.json"
+      },
+      {
+        "name": "translation-purpose-types-consumer-original",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-types-consumer-original.json"
+      }
+    ],
+    "counterfactual": "Complete frozen originals of all four packages: source and Node22 built SDK each fail7 scenarios solely on assistant versus translation purpose. Published original type declarations reject translation while current NodeNext consumer accepts it and retains negative unknown-purpose assertions.",
+    "nativeRoutes": "Real Official native provider and test-local Account provider using the shared native adapter; owned HTTP loopback only. No real paid provider verification.",
+    "commitPreservation": "309 original package files retain their initial SHA256 values. Session generations and schema history are unchanged; persistence check matches76 roots and27 history records.",
+    "coverage": {
+      "lines": {
+        "total": 119,
+        "covered": 119,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 30,
+        "covered": 30,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 157,
+        "covered": 157,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 98,
+        "covered": 98,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "coverageScope": "Only packages/experimental/translator/src/deepseek.ts; all four metrics100. Type-only union additions have no runtime coverage. Existing repository coverage exclusions remain unchanged.",
+    "documentation": {
+      "quickPassed": 20,
+      "quickFailed": 0,
+      "ownedPairs": 5,
+      "officialCatalogGenerated": true
+    },
+    "resources": "Owned ephemeral loopback native server and503 usage intake, controlled pending admission/credential work and SDK subprocesses, all joined. No fixed ports or production allocation.",
+    "verificationCorrections": [
+      "Governance test expected usage includes native totalTokens.",
+      "Explicit return typing in Account test helper supports the private NodeNext test program.",
+      "Private external type consumer has its own package links.",
+      "Built SDK fixture uses existing prepareGovernance and Loader peer resolution; initial direct private imports failed and their receipts remain preserved."
+    ]
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T020957Z/translation-purpose-capsule.json",
+  "dependsOnFinding": "B420",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.zh.md",
+    "apps/cli/tests/profiles/sdk/translation-admission.expected.e2e.ts",
+    "docs/subsystems/llm-streaming.i18n.yaml",
+    "docs/subsystems/llm-streaming.md",
+    "docs/subsystems/llm-streaming.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/translation-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/translation-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/translation-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/translation-admission/expected.json",
+    "examples/headless-agent/tests/fixtures/translation-admission/model.mjs",
+    "examples/headless-agent/tests/fixtures/translation-admission/prepare.mjs",
+    "packages/experimental/translator/README.i18n.yaml",
+    "packages/experimental/translator/README.md",
+    "packages/experimental/translator/README.zh.md",
+    "packages/experimental/translator/src/deepseek.ts",
+    "packages/experimental/translator/tests/account-adapter.ts",
+    "packages/extensions/tool-cordis/src/api-catalog.ts",
+    "packages/llm/deepseek-llm-api-extensions/README.i18n.yaml",
+    "packages/llm/deepseek-llm-api-extensions/README.md",
+    "packages/llm/deepseek-llm-api-extensions/README.zh.md",
+    "packages/llm/deepseek-llm-api-extensions/src/types.ts",
+    "packages/llm/llm/src/types.ts",
+    "packages/subagent/subagent-dsh-sdk/src/control.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts",
+    "plugins/dsh-model-governance/tests/translator-billing.spec.ts"
+  ],
+  "readOnlyPrerequisiteCount": 4252,
+  "runtimeReferences": 8,
+  "mergeRequirement": "Apply only the27 sourceDeltaPaths after B419/B420; all prerequisite paths and8 normal build/type references remain read-only. Rebuild the four changed packages and retain matching parent/child purpose parsers. The fixture loads private governance through the existing owned-profile preparation helper. No Session generation or database migration. Gateway Agent/Node channel and peer UI changes are outside this packet. Live interactive user attribution remains a separate open review.",
+  "notes": {
+    "reviewedActiveRecords": [
+      ".agents/notes/implemented/feature/2026-10-18-cot-translation-port.md",
+      ".agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.md"
+    ],
+    "decision": "retain and update existing active native-translation admission record; no new duplicate note",
+    "reason": "Model-hidden purpose labels must remain separate from Session attachment and user authority. The existing note owns independent native fragment dispatch and prepared guards. Its ownership rationale continues to guide native consumers. No archived records changed."
+  },
+  "peerReport": {
+    "status": "peer_reported_not_root_reverified_except_documentation",
+    "servingRelease": "R23",
+    "nodeAgentRecovery": "14 owned Gateway Agent/code/test/doc paths, source-only; root avoids them.",
+    "nodeChannelRetirement": {
+      "ownedSource": "gateway/src/node-channel-client.ts",
+      "ownedTest": "gateway/tests/node-service.spec.ts",
+      "reportedTests": 31,
+      "reportedNormalBuildAndTestTypes": true,
+      "reportedPlainBuiltDualGatewayPostgresWebNode22And24": true,
+      "rule": "At most one successor per cancelled physical slot joins old bridge retirement; active capacity and probe isolation remain unchanged.",
+      "productionRestart": false
+    },
+    "rootDocumentation": "Full20 doc-quick checks pass, including matching translation purpose in both LLM subsystem documents.",
+    "requiredEvent": "B417 matching Session reader/publication acceptance remains independently pending."
+  },
+  "remaining": [
+    "Integrate B424 after B419/B420 using only27 sourceDeltaPaths;4252 prerequisite paths and8 normal build/type artifacts are read-only references. B416 through B423 retain their independent matching-release requirements, particularly B417 required-on-read event acceptance.",
+    "Continue cold and interactive auxiliary model authorization, retained principal attribution and per-user quota accounting. Translation purpose classification is verified; no verified actor or quota-completion claim follows from this batch.",
+    "Continue direct resource consumers, readiness/publication, diagnostic/database argument privacy, filesystem/document races, cross-account/computer scope and native containment. All12 domains and B04/B25 remain open.",
+    "Existing Core LLM and speech index coverage debt remains recorded without baseline or global threshold changes. The native translation deepseek.ts measurement covers all four metrics at100%.",
+    "Peer owns Node Agent control-response recovery and Node channel retirement successor admission; source/build/dual-Gateway PG acceptance is peer-reported, production remains R23. Root does not edit or deploy those changes.",
+    "Official paid Responses verification remains deferred at user request. Root adds no production OS allocation or restart."
+  ],
+  "globalReviewComplete": false
+}

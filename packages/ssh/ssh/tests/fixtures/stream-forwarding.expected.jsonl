@@ -1,0 +1,2 @@
+{"phase":"caller-cancel","callerCancelled":true,"cancelCommands":1,"removedBeforeDispose":true,"reusable":true,"stoppedAfterFailure":false,"allNativePermitsCompleted":true,"uncertainties":0}
+{"phase":"cancel-failure","callerCancelled":false,"cancelCommands":1,"removedBeforeDispose":true,"reusable":false,"stoppedAfterFailure":true,"allNativePermitsCompleted":true,"uncertainties":0}

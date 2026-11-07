@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-04-doc-tiers-and-budgets.md
 document:
-  en: 3f263864b9b6ee9479d1133b908617f10073dd66
-  zh: d0745d2ac7aacea0f61ea6b699fb86fa39326881
+  en: 51528d20929cfc3deb5d0b1144e6a3374b9b4ede
+  zh: 69f14c7d061ad3ee81dfd79568ef159ed7db4c56
 /agent-note-documentation-structure-tiers-and-budgets:
   en: f2add84f6fdb18d0
   zh: 7f97fab8f9234bb9
@@ -12,8 +12,8 @@ document:
   en: 6ecec6cc312745dd
   zh: ac1244b6113b89da
 /agent-note-documentation-structure-tiers-and-budgets/decision:
-  en: 4b5de0751261dea7
-  zh: 2670b70e07ea5058
+  en: c364ed6e70e8ec53
+  zh: 314c9e11e4a3d68c
 /agent-note-documentation-structure-tiers-and-budgets/alternatives-considered:
   en: 3c7b0033100e5a71
   zh: 5b44bd4b98c9c036

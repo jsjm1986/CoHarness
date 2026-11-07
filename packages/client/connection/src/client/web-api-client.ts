@@ -5,6 +5,7 @@ import { AbstractApiClient } from './api.ts'
 import { hostFrameSchema, muxFrameSchema } from '@deepseek-ai/dsh-host-apiproxy/api/events.schema'
 import { serverRequestSchema } from '@deepseek-ai/dsh-host-apiproxy/api/rpc.schema'
 import { HOST_EVENTS_PATH, MUX_EVENTS_PATH } from '../api-path.ts'
+import { StreamTermination } from './stream-termination.ts'
 
 type Parser<F> = { parse(value: unknown): F }
 
@@ -133,10 +134,12 @@ export class WebApiClient extends AbstractApiClient {
     const inbox = new SocketQueue<F>()
     let wake: (() => void) | undefined
     let ended = false
+    let termination: StreamTermination | undefined
     const isEnded = (): boolean => ended
     const closeForOverflow = (): void => {
       if (ended) return
       ended = true
+      termination = new StreamTermination('queue-overflow')
       inbox.clear()
       socket.close()
       wake?.()
@@ -183,9 +186,10 @@ export class WebApiClient extends AbstractApiClient {
       )
       if (accepted) this.onEnvelope(full)
     }
-    const handleClose = (): void => {
+    const handleClose = (event: CloseEvent): void => {
       if (ended) return
       ended = true
+      if (!isAborted()) termination = new StreamTermination('stream-eof', { closeCode: event.code, wasClean: event.wasClean })
       wake?.()
       wake = undefined
     }
@@ -202,7 +206,10 @@ export class WebApiClient extends AbstractApiClient {
         while (inbox.length > 0) {
           yield inbox.shift() as RpcRequest<F>
         }
-        if (isEnded()) return
+        if (isEnded()) {
+          if (termination !== undefined) throw termination
+          return
+        }
         await new Promise<void>((resolve) => { wake = resolve })
       }
     } finally {

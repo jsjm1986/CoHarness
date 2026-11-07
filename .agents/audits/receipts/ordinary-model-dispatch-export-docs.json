@@ -1,0 +1,14 @@
+{
+  "name": "ordinary-model-dispatch-export-docs",
+  "cwd": ".",
+  "command": "pnpm run verify-export-jsdoc",
+  "startedAt": "2026-10-25T05:27:18.135407+00:00",
+  "seconds": 13.603,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "inputsAfter": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "postgresToolDirectory": null,
+  "outputSha256": "34c3189bb05208432b51c80e9941df04ac432c6f79279e01c6008b6c09b8526f",
+  "outputTail": "$ tsx scripts/verify-export-jsdoc.ts\nverify-export-jsdoc: every exported name in each package API is documented.\n"
+}

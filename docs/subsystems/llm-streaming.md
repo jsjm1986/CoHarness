@@ -172,7 +172,9 @@ interface MessageSourceMap {
   model: ModelMessageSource
   tool: ToolMessageSource
   'system-prompt': SystemPromptMessageSource
-  /** Browser fixture transport producer kind; exists only inside fixture-backed web sessions.
+  /** Demo-session fixture producer kind; exists only inside the browser
+   * fixture transport (`packages/client/connection/src/client/fixture.ts`)
+   * and the seeded-history web fixtures.
    * @persistenceAttribution
    */
   fixture: { kind: 'fixture' }
@@ -709,6 +711,8 @@ interface GenerateOptions {
    * one-shot may include identity-free user inputs.
    */
   messages: RequestMessage[]
+  /** Exact adapter-owned operation input; only a prepared operation may dispatch it, and `messages` is then empty. */
+  operation?: LlmOperationInput
   /**
    * System prompt text for one-shot callers; adapters map it to the provider's
    * system slot ahead of `messages`. Loop-built requests leave it undefined.
@@ -732,12 +736,14 @@ interface GenerateOptions {
    * to separate cursors; adapters may map it to model-hidden transport metadata.
    */
   sessionId?: Branded<'SessionId'>
+  /** Resource ownership for execution, live interactive work, or Runtime maintenance; never sent to the adapter. */
+  resourceOrigin?: ResourceOriginIntent
   /**
    * Provider-neutral classification for an auxiliary model call. Adapters may
    * map the purpose to model-hidden transport metadata or purpose-specific
    * generation policy. Ordinary conversation requests leave it unset.
    */
-  purpose?: 'compaction' | 'session-title' | 'auto-review' | 'memory' | 'session-handoff'
+  purpose?: 'compaction' | 'session-title' | 'auto-review' | 'memory' | 'session-handoff' | 'web-search' | 'translation'
 }
 ```
 
@@ -874,9 +880,35 @@ interface LlmCallConfigAdapterDefaults {
 }
 ```
 
+## Native model operations
+
+`LlmOperationMap` is an initially empty, merge-extensible vocabulary. Each `LlmOperationDefinition<Parameters, Request, Result>` supplies the operation's input, exact secret-free request and returned result. `LlmOperationParameters<Name>`, `LlmOperationRequest<Name>` and `LlmOperationResult<Name>` select those types; `LlmOperationInput` is the correlated name/request union exposed to model middleware.
+
+`PreparedAdapterCall.operations` contains optional `LlmOperationFactories`. Each factory receives parameters and the resolved model config and returns a `PreparedAdapterOperation<Name>`. Preparation performs no provider I/O or credential lookup. Its `request` must match the later wire input. `run(options, observer)` owns execution and transport cleanup; `LlmOperationObserver.usage()` reports actual cumulative counts and their credential source, including counts obtained before a later failure. The last report wins, and absent usage remains absent.
+
+`LlmRuntime.prepareOperation()` captures the same adapter generation and model metadata as `prepareCall()`. Its `PreparedLlmOperation<Name>` exposes frozen metadata, a detached frozen `request` and once-only `run()` instead of `stream()`. The Consumer records the request in its Session event before calling `run()`. Execution supplies empty conversation messages and `GenerateOptions.operation` through ordinary middleware, checkpoints, policy and model admission. A denied or cancelled operation fails; middleware cannot synthesize success without the actual operation result. Unsupported operations fail with `MODEL_OPERATION_UNSUPPORTED`. [Native Messages search](../../packages/web/web-search-deepseek/README.md) is one Consumer.
+
+Model streams capture their policy owner before asynchronous middleware. They refuse missing required policy, owner withdrawal or replacement across waits, then enforce that owner's route decision after final asynchronous guards. `modelAccessRequired` remains on a Gateway runtime's root lifetime, preventing provider withdrawal from restoring independent execution.
+
 ## Service and provider contracts
 
+`PreparedLlmCall.stream(options, guard?)` keeps optional consumer authorization separate from model input. `PreparedLlmCallGuard.authorize(signal?)` rechecks asynchronous eligibility after resource admission and before every provider request, with effective caller and resource-lease cancellation. `assertCurrent()` synchronously refuses a changed owner after all authorization awaits, before adapter entry or physical I/O. Guard rejection follows ordinary adapter failure reporting and releases quiescent permits.
+
 `LlmAdapter` is the provider contract: subclass, implement `stream()`, and register one adapter instance with `ctx.llm.registerAdapter(providers, adapter)`. `GenerateOptions.provider` selects the registered adapter; `GenerateOptions.model` is passed to that adapter and need not be registered at lifecycle start. Duplicate provider routes fail atomically. Optional `providerRetryPolicy()` is captured per route with normal defaults, while `providerInfo()` and asynchronous `listModels()` feed `LlmRuntime.listProviders()` / `listModels()` with detached selector metadata. That catalog is advisory rather than a request whitelist: the adapter remains authoritative and may accept unlisted model ids. One asynchronous `resolveModel()` query returns exact model identity plus optional correctness-sensitive context capacity, an adapter-configured `defaultMaxTokens`, and ordered model-owned reasoning ids with an optional deployment default; absent fields mean unavailable metadata or provider-owned behavior, not invalid catalog membership. The resolver receives optional cancellation and must settle promptly after abort. `LlmRuntime.resolveModelInfo()` validates and detaches the aggregate. At the final adapter boundary, `resolveCallConfig()` materializes the output default only when `maxTokens` is absent and validates and materializes reasoning, so direct calls cannot bypass either configured behavior; direct dispatch captures one registration before awaiting that resolution. The agent loop instead uses `prepareCall()` to keep the same registration across model resolution, durable header logging, and dispatch, retain detached context metadata from that exact lookup, and report which config fields the adapter defaulted. Adapter lookup happens at the terminal continuation of the `llm/stream` waterfall, so a listener may short-circuit the call or route a mutable one-shot request before lookup. AgentLoop observes a request attempt once the outer waterfall returns a stream handle; that limited boundary does not prove a lazy terminal adapter was constructed or began provider I/O. The `block-start` / `block-end` `index` correlation and the assembler together mean an adapter only has to emit well-formed chunks — block reassembly is not each adapter's problem. [architecture.md](../architecture.md#turn-flow) shows where `ctx.llm.stream()` and the `llm/stream` waterfall sit in one turn.
+
+```ts type-equiv
+/** Consumer-owned authorization retained by one prepared stream, outside model input. */
+interface PreparedLlmCallGuard {
+  /**
+   * Recheck asynchronous eligibility after admission and before each provider request.
+   * @param signal - effective caller and resource-lease cancellation, when supplied.
+   * @returns settlement of the consumer's live eligibility check; rejection refuses dispatch.
+   */
+  authorize(signal?: AbortSignal): Promise<void>
+  /** Refuse a changed owner synchronously after all asynchronous authorization has settled. */
+  assertCurrent(): void
+}
+```
 
 ```ts type-equiv
 /** One model call whose config and adapter registration were resolved together. */
@@ -900,10 +932,16 @@ interface PreparedLlmCall {
    * preparation. The request's call-config fields must match {@link config};
    * reuse or mismatch fails with `INVALID_PREPARED_CALL`.
    * @param options - fully assembled request carrying the prepared config.
+   * @param guard - optional consumer authorization, checked after admission and immediately before provider I/O.
    * @returns the chunk stream, including the `llm/stream` waterfall.
    */
-  stream(options: GenerateOptions): AsyncIterable<StreamChunk>
+  stream(options: GenerateOptions, guard?: PreparedLlmCallGuard): AsyncIterable<StreamChunk>
 }
+```
+
+```ts type-equiv
+/** Model inference or an orchestration that owns separate nested model requests. */
+type LlmCallKind = 'model' | 'orchestration'
 ```
 
 ```ts public-api
@@ -914,6 +952,8 @@ interface PreparedLlmCall {
  * DeepSeek and library-backed pi-ai adapters meet this contract through different internals.
  */
 declare abstract class LlmAdapter {
+  /** Registration-owned execution role, model by default; orchestrations govern each nested model request separately. */
+  readonly callKind: LlmCallKind;
   /**
      * Describe one provider route owned by this adapter.
      * @param provider - a route passed to `registerAdapter()` for this instance.
@@ -969,10 +1009,14 @@ declare abstract class LlmAdapter {
   async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall>;
   /**
      * Stream one model call as raw chunks. The only required method.
+     * Iterator completion or rejection includes owned transport cleanup; early
+     * `return()` confirms quiescence only when its result has `done: true`.
      * @param options - the fully-assembled request; implementations must honor `options.signal`.
+     * @param dispatchRequest - when present, must wrap each provider request after
+     * asynchronous preparation; absent uses direct adapter execution without runtime policy.
      * @returns the chunk stream, obeying the adapter contract documented on `StreamChunk`.
      */
-  abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;
+  abstract stream(options: GenerateOptions, dispatchRequest?: LlmOperationDispatch): AsyncIterable<StreamChunk>;
 }
 ```
 
@@ -1021,6 +1065,21 @@ Source: [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../../packages
 The abstract `llm` service: an adapter registry plus a streaming model-call API, interceptable via the `llm/stream` waterfall.
 
 ```ts cordis-catalog
+/**
+ * Mark one exact, possibly frozen request as assembled by this service's AgentLoop.
+ * @param request - loop-owned request envelope before dispatch through this service.
+ * @returns the same request object; copies and other service instances do not inherit the marker.
+ * @throws LlmError when the owning service has been withdrawn.
+ */
+markAgentLoopRequest<T extends GenerateOptions>(request: T): T
+
+/**
+ * Check whether this live service recorded the exact request as AgentLoop input.
+ * @param request - envelope observed at the service-bound LLM waterfall.
+ * @returns false for foreign, copied or unmarked objects and after service withdrawal.
+ */
+isAgentLoopRequest(request: GenerateOptions): boolean
+
 /**
  * Register an adapter for the given provider routes. Throws `LlmError` with code
  * `DUPLICATE_ADAPTER` if any provider already has an adapter (all-or-nothing).
@@ -1155,6 +1214,28 @@ async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<Ll
 async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>
 
 /**
+ * Prepare an adapter-owned operation through the same model generation as ordinary calls.
+ * @param config - provider/model route and explicit request controls.
+ * @param name - operation contributed through the model-operation vocabulary.
+ * @param parameters - operation inputs, unchanged until preparation completes.
+ * @param signal - cancellation for model resolution.
+ * @returns a frozen secret-free request and once-only governed execution.
+ * @throws LlmError when the captured generation does not implement the operation.
+ */
+async prepareOperation<Name extends keyof LlmOperationMap>( config: LlmCallConfig, name: Name, parameters: LlmOperationParameters<Name>, signal?: AbortSignal, ): Promise<PreparedLlmOperation<Name>>
+
+/**
+ * Prepare a child runtime's native request without advancing conversation replay.
+ * The Consumer records and checkpoints the returned request before execution.
+ * @param config - registered provider/model and explicit request controls.
+ * @param name - operation supported by the captured adapter generation.
+ * @param parameters - secret-free input and transport observers.
+ * @param signal - cancellation for model resolution.
+ * @returns once-only execution through delegated metering, resources and authorization.
+ */
+async prepareDelegatedOperation<Name extends keyof LlmOperationMap>( config: LlmCallConfig, name: Name, parameters: LlmOperationParameters<Name>, signal?: AbortSignal, ): Promise<PreparedLlmOperation<Name>>
+
+/**
  * Stream one model call as raw chunks (token-level deltas). Replay state is
  * retained only when the same adapter instance owns its historical provider
  * and the target provider. Final adapter selection remains fixed through
@@ -1162,8 +1243,10 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
  * dispatch, and iteration failures become terminal `error` or `aborted`
  * finish chunks; middleware, nested-call, cleanup, and consumer failures
  * remain thrown.
+ * Physical model calls retain their resource provider before middleware;
+ * provider withdrawal or replacement refuses dispatch and returns any grant.
  * @param options - the full request; `options.provider` selects the adapter.
- * @returns the chunk stream, possibly wrapped by `llm/stream` listeners.
+ * @returns the chunk stream wrapped by model or orchestration listeners for the captured registration.
  */
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
@@ -1230,19 +1313,94 @@ The provider topology changed: an adapter registered or unregistered routes, or 
 
 Source: [`packages/llm/llm/src/types.ts`](../../packages/llm/llm/src/types.ts)
 
+<a id="llmauthorize--serial"></a>
+
+#### `llm/authorize` — serial
+
+Authorize a resolved model request after delegating dispatch guards. Every listener must finish before adapter I/O; listeners cannot skip other authorization owners.
+
+```ts cordis-catalog
+/**
+ * Authorize a resolved model request after delegating dispatch guards.
+ * Every listener must finish before adapter I/O; listeners cannot skip other authorization owners.
+ * @param options - exact model input and effective resource cancellation.
+ * @mode serial
+ */
+'llm/authorize'(this: LlmRuntime, options: GenerateOptions): Promise<void>
+```
+
+Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
+
+<a id="llmdelegated-stream--waterfall"></a>
+
+#### `llm/delegated-stream` — waterfall
+
+Meter a child runtime's model stream under the initiating parent's authority. The child owns its logged input and adapter; listeners must delegate to run that adapter.
+
+```ts cordis-catalog
+/**
+ * Meter a child runtime's model stream under the initiating parent's authority.
+ * The child owns its logged input and adapter; listeners must delegate to run that adapter.
+ * @param options - child model input with parent-owned execution metadata.
+ * @param next - child stream, including its own durable checkpoint and cleanup.
+ * @mode waterfall
+ */
+'llm/delegated-stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
+```
+
+Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
+
+<a id="llmorchestration--waterfall"></a>
+
+#### `llm/orchestration` — waterfall
+
+Drive a registered orchestration without treating its outer turn as inference. Every nested model request uses its own governed model stream.
+
+```ts cordis-catalog
+/**
+ * Drive a registered orchestration without treating its outer turn as inference.
+ * Every nested model request uses its own governed model stream.
+ * @param options - logged orchestration input and initiating Session.
+ * @param next - orchestration output and owned cleanup.
+ * @mode waterfall
+ */
+'llm/orchestration'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
+```
+
+Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
+
+<a id="llmpre-dispatch--waterfall"></a>
+
+#### `llm/pre-dispatch` — waterfall
+
+Guard the resolved request after resource admission and before adapter dispatch. Listeners retain the caller's execution context and must call `next()` to delegate.
+
+```ts cordis-catalog
+/**
+ * Guard the resolved request after resource admission and before adapter dispatch.
+ * Listeners retain the caller's execution context and must call `next()` to delegate.
+ * @param options - complete request, including model-hidden resource ownership and cancellation.
+ * @param next - remaining dispatch guards; guards must not rewrite model-visible input.
+ * @mode waterfall
+ */
+'llm/pre-dispatch'(this: LlmRuntime, options: GenerateOptions, next: () => Promise<void>): Promise<void>
+```
+
+Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
+
 <a id="llmstream--waterfall"></a>
 
 #### `llm/stream` — waterfall
 
-Waterfall around every streaming model call (retry, replay, routing). Bound to the LlmRuntime; call `next()` to reach the resolved adapter's stream, or yield your own chunks to short-circuit.
+Waterfall around physical streaming model calls (retry, replay, routing). Bound to the LlmRuntime; call `next()` to reach the resolved adapter's stream, or yield your own chunks to short-circuit.
 
 ```ts cordis-catalog
 /**
- * Waterfall around every streaming model call (retry, replay, routing).
+ * Waterfall around physical streaming model calls (retry, replay, routing).
  * Bound to the {@link LlmRuntime}; call `next()` to reach the resolved
  * adapter's stream, or yield your own chunks to short-circuit.
  * @param options - the full request. A LOOP-built request carries the
- *   process-local {@link markAgentLoopRequest} identity and arrives deep-frozen
+ *   owning service's {@link LlmRuntime.markAgentLoopRequest} identity and arrives deep-frozen
  *   (mutation throws): its content is a pure function of the session log (the
  *   reconstructability Agent Note), so listeners read it, never rewrite it.
  *   Hand-built calls do not carry that marker; callers own their request

@@ -1,0 +1,14 @@
+{
+  "name": "progress-live-access-complete-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-progress-postgres.spec.ts tests/access-invalidation.spec.ts tests/node-resource-budget-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T23:11:41.545210+00:00",
+  "seconds": 27.512,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d98632e6b429efbc538073cc2e377871b36990c827b1d3840acb5eb463f518e7",
+  "inputsAfter": "5733ed29c306fcf72b8d1597597d2895468b56aa9b39f32fabb8aa1d035eb425",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "e8ab23e30716971a82c3ff3275017a7daaccd2b4f7a78e124b9315290c2b5c89",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  77 passed (77)\n   Start at  07:11:43\n   Duration  25.77s (transform 1.84s, setup 0ms, import 2.53s, tests 22.93s, environment 0ms)\n\n"
+}

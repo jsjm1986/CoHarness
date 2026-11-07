@@ -1,0 +1,13 @@
+{
+  "name": "mcp-browser-profiles-source",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts -t 'replays browser-use-(playwright|chrome-devtools)-mcp through' --retry=0",
+  "startedAt": "2026-10-23T17:09:04.922863+00:00",
+  "seconds": 4.357,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6d4091f224c469dc329539ec1b99d8e61024f528fbc8ac1a019688c550915e21",
+  "inputsAfter": "5d1bc691024b5b1de91ce12e418b55911cd03ef6e55ea48d6fee847524e8b2fb",
+  "outputSha256": "b924255967942def0e0d60a324d96055055df1e9ce3e74869d397db63616e1a2",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed | 148 skipped (150)\n   Start at  01:09:05\n   Duration  3.67s (transform 757ms, setup 19ms, import 1.54s, tests 2.05s, environment 0ms)\n\n"
+}

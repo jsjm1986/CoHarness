@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-plugin-management-catalog.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-plugin-management-catalog.md
+document:
+  en: fbd500af019db07fce2eb38bd1afefd6e036fa90
+  zh: ba6fe2d71dba19589ad07b0603509d24a02ff857
+/agent-note-one-authorized-plugin-management-catalog:
+  en: 41f4ce880cc9a4f1
+  zh: e6384e36ca345613
+/agent-note-one-authorized-plugin-management-catalog/problem:
+  en: 31ef4568de6896f9
+  zh: 3bafc655c1d56d4f
+/agent-note-one-authorized-plugin-management-catalog/decision:
+  en: 02ecef13e37a5345
+  zh: 46211d8d8befbab4
+/agent-note-one-authorized-plugin-management-catalog/alternatives-considered:
+  en: 5032b1432317651d
+  zh: 90ba3ae9109dd328
+/agent-note-one-authorized-plugin-management-catalog/verification:
+  en: c9b659be5c29da1e
+  zh: 296dbeef5d7c568f
+/agent-note-one-authorized-plugin-management-catalog/consequences:
+  en: 74ad367956da14b1
+  zh: 99587d6c264977b2

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/cordis-client-runner/README.md
 document:
-  en: fdac5fe0b8254c0b8e78534494d68248253b9543
-  zh: d08e4198e7fa1cf21b5216a8ba360f3a3d304516
+  en: 4b3201d3715824800cb5e53fc70c05a40c410a56
+  zh: fb3907ce6928b8a7a5a2b857787175323ccb443e
 /:
   en: 0d1382466301a0cb
   zh: 64ee27ce126adad2
@@ -27,8 +27,8 @@ document:
   en: 155c8371306a5cda
   zh: 8b4cd48a0fc3f545
 /deepseek-ai-dsh-cordis-client-runner/use-this-package/lifecycle-boundaries:
-  en: 8444eaa96ee05a5e
-  zh: 621bb78731bd0138
+  en: ad320741f5c071a1
+  zh: e34d08d3d220cfac
 /deepseek-ai-dsh-cordis-client-runner/understand-the-implementation:
   en: 64f24636f966aa86
   zh: a4d3bb2e541b222a

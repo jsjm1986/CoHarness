@@ -1,0 +1,14 @@
+{
+  "name": "sdk-current-process-notification-complete-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/sdk-child-coverage.config.mts --coverage",
+  "startedAt": "2026-10-24T11:17:37.169776+00:00",
+  "seconds": 19.699,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1e7a22f7fb853cd96d7e1db67af28495db0662314227d9d3392c5b55b8a8bd20",
+  "inputsAfter": "1e7a22f7fb853cd96d7e1db67af28495db0662314227d9d3392c5b55b8a8bd20",
+  "postgresToolDirectory": null,
+  "outputSha256": "3fb464a3c3081abacbbb7f8d0d238e21e281c6cdf72f8ba2525dc33e0f20c393",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  5 passed (5)\n      Tests  152 passed (152)\n   Start at  19:17:51\n   Duration  5.28s (transform 3.32s, setup 0ms, import 4.42s, tests 7.40s, environment 0ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 464/464 )\nBranches     : 100% ( 253/253 )\nFunctions    : 100% ( 98/98 )\nLines        : 100% ( 407/407 )\n================================================================================\n"
+}

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/ptc-runtime/ptc-runtime-node/README.md
 document:
-  en: c71a008813ffb4fee21e9d3b2bb98afc5979bf4e
-  zh: e2e14060302f4dda8c653cf56098683589788c23
+  en: 04638ea31e5546048fcd226460032fb1b29d32e6
+  zh: b42bb5fa29bba17a64905f6719c61d80a18f0432
 /:
   en: 0743cf05fedb8321
   zh: 7ad0cfa1b6b8a46b
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 725b47765ee8f30b
 /deepseek-ai-dsh-ptc-runtime-node/use-this-package:
-  en: 246231cf2a529550
-  zh: 5d27b8e444ecd0f7
+  en: 000e4ec73c794f79
+  zh: 4d71ac0c967cc776
 /deepseek-ai-dsh-ptc-runtime-node/use-this-package/configuration:
   en: 161f3b32c782bab4
   zh: bd923e3d31261032

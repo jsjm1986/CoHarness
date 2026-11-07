@@ -105,6 +105,21 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'connection',
+    pkg: 'client-connection',
+    title: 'Host RPC transport and request authentication',
+    mode: 'core',
+    consumers: ['api-gateway', 'host-apiproxy'],
+    note: 'Registers typed RPC handlers and request-context middleware on the Web listener, with deployment authentication before business dispatch.',
+  },
+  {
+    key: 'resourceBudget',
+    pkg: 'resource-budget',
+    title: 'Node resource permit definition',
+    mode: 'seam',
+    note: 'Declares permit requests and quiescence reporting. Provider composition and execution support are listed in the [package limitations](../packages/context/resource-budget/README.md#known-limitations-and-deferred-work).',
+  },
+  {
     key: 'cotTranslation',
     pkg: 'experimental-client-ui-cot-translation',
     title: 'Reasoning translation Remote',
@@ -160,6 +175,21 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['plugin-manager'],
     note: 'Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers.',
+  },
+  {
+    key: 'pluginManagerCatalog',
+    pkg: 'plugin-manager',
+    title: 'Authorized plugin-management catalog',
+    mode: 'service',
+    consumers: ['client-ui-plugin-manager'],
+    note: 'Projects profile availability, bundles and optional Runtime entry metadata for Web management without a second cache or mutation owner.',
+  },
+  {
+    key: 'resourceBudget',
+    pkg: 'resource-budget',
+    title: 'Execution reservation interface',
+    mode: 'service',
+    note: 'Declares acquisition and quiescent-release obligations; the abstract definition requires a concrete provider before it can admit execution.',
   },
   {
     key: 'pluginMarket',
@@ -223,6 +253,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['experimental-browser-use-playwright-mcp', 'experimental-browser-use-chrome-devtools-mcp', 'experimental-browser-use-stagehand-native'],
     consumers: ['experimental-browser-use-playwright-mcp', 'experimental-browser-use-chrome-devtools-mcp', 'experimental-browser-use-stagehand-native'],
     note: 'One provider-owned name per service instance. Providers own their tools and browser resources per live Session; the shared service has no browser operation API.',
+  },
+  {
+    key: 'computerUseEnvironment',
+    pkg: 'computer-use',
+    title: 'Desktop environment availability',
+    mode: 'core',
+    implementations: ['gateway-execution'],
+    consumers: ['computer-use', 'apiproxy'],
+    note: 'Read-only environment limitations do not reserve a driver or grant desktop authority. A registered provider determines its own availability.',
   },
   {
     key: 'computerUseAuthorization',
@@ -322,7 +361,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'session',
     title: 'In-memory session store',
     mode: 'core',
-    consumers: ['agent-loop', 'agent', 'session-persistence', 'session-query', 'session-query-sqlite', 'subagent-inprocess', 'message-feedback'],
+    consumers: ['agent-loop', 'agent', 'session-persistence', 'session-query', 'session-query-sqlite', 'subagent-inprocess'],
     note: 'Owns append-only Session instances and emits the durable session event feed.',
   },
   {
@@ -346,7 +385,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Durable session persistence seam',
     mode: 'seam',
     implementations: ['session-persistence-jsonl', 'session-persistence-sqlite', 'session-persistence-gateway'],
-    consumers: ['agent-loop', 'tool-bash', 'hooks-claude-code', 'hooks-codex', 'session-query', 'session-query-sqlite', 'message-feedback'],
+    consumers: ['agent-loop', 'tool-bash', 'hooks-claude-code', 'hooks-codex', 'session-query', 'session-query-sqlite'],
     note: 'Backends persist the same SessionEvent vocabulary; apps choose a backend at composition time.',
   },
   {
@@ -417,7 +456,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'storage-domain',
     title: 'Domain data facility',
     mode: 'core',
-    consumers: ['workspace', 'message-feedback', 'memory'],
+    consumers: ['workspace', 'memory'],
     note: 'Waits for every configured backend, then publishes the domain form as one lifecycle-bound service for typed durable state.',
   },
   {
@@ -427,13 +466,6 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['memory-context', 'tool-memory'],
     note: 'Serializes scoped creates and revision-guarded writes through storageDomain, emits memory/changed at commit, and rechecks project writes through execution authority.',
-  },
-  {
-    key: 'messageFeedback',
-    pkg: 'message-feedback',
-    title: 'Lifecycle-bound message feedback',
-    mode: 'core',
-    note: 'Owns local per-assistant-message feedback, lifecycle and target validation, per-item compare-and-set, and the Host unary Remote contract without entering Session history or telemetry.',
   },
   {
     key: 'workspaceChanges',

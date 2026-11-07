@@ -1,0 +1,115 @@
+{
+  "finding": "B349",
+  "status": "fixed_test_fixture_only_product_navigation_preserved",
+  "updatedAt": "2026-10-30T11:33:13.007066+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T112110Z",
+  "sourcePaths": [
+    "apps/web/tests/project-progress.e2e.ts",
+    "apps/web/tests/subagent-conversation.e2e.ts"
+  ],
+  "sourceHashes": {
+    "apps/web/tests/project-progress.e2e.ts": "75998b311ac4c195ad15f27ad55904230d3e2981b1a6001b0316c789d2eadb31",
+    "apps/web/tests/subagent-conversation.e2e.ts": "4a0ad2644b0767836f0bfadf0134e3003d3e201adc81471f0223c368a7c4328b"
+  },
+  "problem": "Two assembled browser tests interact with an old Session surface before asynchronous navigation commits. The one-shot correction exposes the same race in the following fork scenario.",
+  "evidence": {
+    "currentNegative": "web-business-current-reproduction.json",
+    "negativeCases": 14,
+    "failed": 2,
+    "passed": 12,
+    "eventDiagnostics": [
+      "web-business-event-diagnostics.json",
+      "subagent-catalog-event-diagnostics.json"
+    ],
+    "causalEvents": "At4604.7ms the parent row is clicked; at4613.3ms the old grandchild header opens the ancestor catalog; at4625.8ms it begins losing focus; at4642.2ms the actual parent Session replaces that old view and normally removes the old menu. Project tracing likewise shows a chip clicked in the old session before the requested new session commits.",
+    "intermediateAcceptance": "web-business-navigation-acceptance.json",
+    "intermediateRemainingFailure": "Once one-shot navigation completes, the following ordinary-fork test reaches the same unsynchronized return; all four parent returns now share the settled-header helper."
+  },
+  "repair": [
+    "Wait for a different foreground right-sidebar Session after New session and open that Session-owned journal before following an attribution.",
+    "Choose the parent by its visible title and wait for descendant switchers to leave before opening the parent catalog, including the cold-resume paths."
+  ],
+  "verification": {
+    "assembledBrowserCases": 14,
+    "assembledFiles": 2,
+    "browser": "installed Google Chrome through private executable preload",
+    "realShippedClientAndHost": true,
+    "gatewayResponseMocksInProgressFixture": true,
+    "keylessReplay": true,
+    "existingUnitControlCases": 28,
+    "unitControlIsAdditionalNotNewProductCoverage": true,
+    "snapshotGoldensRegenerated": false,
+    "timeoutIncreases": false,
+    "forceClicks": false,
+    "productSourcesChanged": false,
+    "checks": {
+      "web-business-final-fixture-acceptance": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:31:03.747562+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_SNAPSHOT=replay",
+          "NODE_OPTIONS=--import=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T094655Z/installed-chrome.mjs",
+          "./node_modules/.bin/vitest",
+          "run",
+          "--config",
+          "vitest.web.config.ts",
+          "apps/web/tests/project-progress.e2e.ts",
+          "apps/web/tests/subagent-conversation.e2e.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:31:31.903728+00:00"
+      },
+      "web-business-final-fixture-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:31:03.747218+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:31:11.377012+00:00"
+      },
+      "web-business-final-fixture-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:31:03.747214+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "--tsconfig=tsconfig.host.json",
+          "apps/web/tests/project-progress.e2e.ts",
+          "apps/web/tests/subagent-conversation.e2e.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:31:07.436575+00:00"
+      },
+      "subagent-catalog-existing-unit-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:25:44.722829+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/vitest",
+          "run",
+          "packages/client/ui-subagent/tests/conversation-ui.client.spec.tsx",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:25:47.921341+00:00"
+      }
+    }
+  },
+  "agentNote": "No new Agent Note: local test synchronization only, with unchanged product behavior and unchanged snapshot goldens. Retain existing sidebar Session-ownership and subagent navigation decisions.",
+  "limits": [
+    "This resolves the two reported browser failures and their adjacent navigation fixture race; it is not a production permission or menu-lifecycle repair.",
+    "The peer-owned public-entry truncated-combo-script defect remains separate and in progress.",
+    "All12business domains and B04/B25remain open; real paid model success remains human-deferred."
+  ]
+}

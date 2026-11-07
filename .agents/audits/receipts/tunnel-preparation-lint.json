@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/tunnel-supervisor.ts gateway/src/tunnel-access.ts gateway/tests/tunnel-install.spec.ts gateway/tests/tunnel-access.spec.ts gateway/tests/fixtures/local-runtime-web-gateway.mjs gateway/tests/run-local-web-assembly.mjs apps/web/tests/admin-form-values.e2e.ts",
+  "startedAt": "2026-10-24T23:27:23.794247+00:00",
+  "seconds": 2.215,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1cfb7b5211390d157682036b65ea8e3ad7337fbeaa8cf672daffe941c465c2a9",
+  "inputsAfter": "1cfb7b5211390d157682036b65ea8e3ad7337fbeaa8cf672daffe941c465c2a9",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

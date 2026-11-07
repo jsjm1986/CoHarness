@@ -20,11 +20,15 @@ One eagerly created root store is shared by the renderer and layout controller. 
 
 DOM focus is not navigation selection. Search and directory-picker controls can receive focus while the global panel and its selected sidebar row remain visible; opening a Session changes the main selection.
 
+Explicit Conversation destinations reveal the reserved main entry independently of Session identity changes. Workbench toolbar and sidebar pane selection return to Conversation even for the already active pane. Workbench exit and the brand's New Session action in Workbench mode return to the existing single-session view without creating a Session. Ordinary New Session keeps its runtime intent.
+
 ## Alternatives considered
 
 **Session-scoped main views.** Their lifetime and standard props bind application-wide state to whichever Session happens to be current.
 
 **A second navigation stack.** Back buttons and saved return destinations are unnecessary when New Session and workspace Session rows already provide explicit destinations.
+
+**Toggle the selected main entry inside `selectPanel`.** Rejected: panel selection is idempotent, including plugin-navigation callers. A Conversation destination explicitly selects `null`; clicking the current pane needs no new Session or synthetic selection change.
 
 **React title slots.** Navigation entries use the same plain label for visible text and accessibility; a separate title registration is outside that presentation.
 

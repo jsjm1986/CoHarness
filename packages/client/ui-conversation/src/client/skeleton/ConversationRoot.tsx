@@ -1,9 +1,9 @@
 // Root conversation viewport and its resident Session pane. The pane keeps
 // Hero/composer identity while the root owns explicit per-pane bindings.
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconLoadingOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { parseClientSessionKey, SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationContentProps, ConversationSlotProps, ConversationViewsProps, InputZone, WorkbenchLayoutPreset,
@@ -178,7 +178,7 @@ function ConversationSessionView({ renderSlot, compact = false }: ConversationVi
 export function ConversationContent({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
   useDisplaySettings, useProjectPolicy, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace,
-  t, useFactorySlot, variant = 'main', compact = false, active = true, workbench = false, headerLeading,
+  t, useFactorySlot, variant = 'main', compact = false, active = true, workbench = false, headerLeading, toolsHostId, toolsActive = active,
 }: ConversationContentOwnProps) {
   const Views = useFactorySlot('views', ConversationSessionView)
   const openState = useSession(s => s.openState)
@@ -193,7 +193,9 @@ export function ConversationContent({
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
-  const composerBlock = useComposerBlock(block => block)
+  const existingBlock = useComposerBlock(block => block)
+  const openingSession = useSessions(s => sessionId !== undefined && s.navigationBlockedSessionId === sessionId)
+  const composerBlock = openingSession ? { reason: t('placeholder.openingSession') } : existingBlock
   const displaySettings = useDisplaySettings(value => value)
   // The pane's steward marker follows the session's own runtime, not the page
   // scope: a workbench pane can hold another scope's conversation. An encoded
@@ -305,8 +307,11 @@ export function ConversationContent({
   // The exemption is deliberately open-state-wide, not loading-only: a
   // summary-blank session is the hero before its open starts (`cold`) and
   // after one fails (`error`) for the same reason — there is no history.
-  const settling = sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
-    && summaryBlank !== true
+  // Initial navigation and unread history retain the mounted composer until its layout is known.
+  // A current summary-proven blank Session keeps its Hero while history opens.
+  const initialSelectionPending = sessionId === undefined && workspaces.initialSelectionPending === true
+  const settling = initialSelectionPending || (sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
+    && summaryBlank !== true)
   const hero = sessionId === undefined
     || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))
   const zone: InputZone | undefined =
@@ -331,7 +336,7 @@ export function ConversationContent({
 
   const heroWorkspaceRow = (
     <div className={css.heroWorkspaceRow}>
-      {headerLeading}
+      {initialSelectionPending ? null : headerLeading}
       <WorkspaceChip
         buttonRef={pickerAnchor}
         label={chipTitle}
@@ -346,6 +351,7 @@ export function ConversationContent({
         onPick: chooseWorkspace,
         onClose: () => { setPickerOpen(false) },
       })}
+      {renderSlot('conversation.hero.context', { compact, ...(sessionId === undefined ? {} : { conversationId: sessionId }) })}
       {renderSlot('conversation.hero.agentPreset', {})}
     </div>
   )
@@ -413,14 +419,11 @@ export function ConversationContent({
   // on the fallback alone would leave Question/Approval panels at the content
   // end off-screen when the user is not pinned to the floor.
   const composerSeat = (
-    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer">
+    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer"
+      aria-hidden={initialSelectionPending || undefined}>
       {composer}
     </div>
   )
-
-  const widthStyle = {
-    '--dsh-chat-font-size': `${displaySettings.chatFontSize}px`,
-  } as CSSProperties
 
   // The committed content width is published imperatively as
   // --dsh-chat-user-width (the CSS axis resolves it into
@@ -505,14 +508,19 @@ export function ConversationContent({
   return (
     <div
       ref={rootResizeRef}
-      className={clsx(css.root, workbench && css.workbenchPane, variant === 'embedded' && css.embeddedBody)}
+      className={clsx(css.root, workbench && css.workbenchContent, variant === 'embedded' && css.embeddedBody)}
       data-phase={phase}
       data-chat-fill={displaySettings.chatFullWidth || undefined}
-      style={widthStyle}
     >
-      {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
+      {initialSelectionPending && headerLeading !== undefined && (
+        <header className={css.header}><div className={css.titleRow}>{headerLeading}</div></header>
+      )}
+      {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading, toolsHostId, toolsActive })}
       <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
-        <div className={css.scrollBody} data-conversation-scroll="">
+        {initialSelectionPending && <div className={css.initialLoading} role="status" aria-label={t('hero.loadingWorkspace')}>
+          <span aria-hidden="true"><IconLoadingOutline16 size={24} className={css.initialLoadingIcon} /></span>
+        </div>}
+        <div className={css.scrollBody} data-conversation-scroll="" aria-busy={initialSelectionPending || undefined}>
           {sessionId === undefined ? null : <Views compact={compact} />}
           {composerSeat}
         </div>
@@ -560,12 +568,9 @@ export function ConversationContent({
 
 /** Render the current conversation or bounded explicit Session panes. */
 export function ConversationRoot(props: ConversationRootProps) {
+  const toolsId = useId()
   const viewport = props.useStore(snapshot => snapshot)
   const available = props.useViewportAvailable(value => value)
-  useEffect(() => {
-    props.onViewportEnabled(available)
-    return () => { props.onViewportEnabled(false) }
-  }, [available, props.onViewportEnabled])
   const [maximizedId, setMaximizedId] = useState<SessionId | undefined>()
   const [width, setWidth] = useState<number | undefined>()
   /** Single-pane tab presentation chosen from the layout preset menu. */
@@ -614,6 +619,7 @@ export function ConversationRoot(props: ConversationRootProps) {
   }, [draggingSeparator, props.onViewportRatios])
   const compact = props.compact ?? false
   const tabbed = compact || (width !== undefined && width < 728) || soloTabbed
+  const toolsHostId = !tabbed && viewport.paneIds.length > 0 ? toolsId : undefined
   const activePane = viewport.activePaneId ?? viewport.paneIds[0]
   const maximized = maximizedId !== undefined && viewport.paneIds.includes(maximizedId) ? maximizedId : undefined
   // A selected tab always wins over a desktop-only maximization preference.
@@ -621,15 +627,26 @@ export function ConversationRoot(props: ConversationRootProps) {
   const paneIds = (tabbed || maximized !== undefined) && focusedPane !== undefined ? [focusedPane] : viewport.paneIds
   const collapsed = new Set(viewport.collapsedIds)
   const expandedCount = viewport.paneIds.filter(id => !collapsed.has(id)).length
-  const columns = tabbed || maximized !== undefined ? 1
-    : width === undefined || width >= viewport.paneIds.length * 364 ? Math.max(1, paneIds.length) : 2
+  const minimumPaneWidth = 280
+  const columns = Math.max(1, paneIds.length)
   const rows = Array.from({ length: Math.ceil(paneIds.length / columns) }, (_, row) => paneIds.slice(row * columns, (row + 1) * columns))
+  useEffect(() => {
+    if (!workbench || tabbed) return
+    const scroller = root.current?.querySelector<HTMLElement>('[data-workbench-grid]')
+    if (scroller === undefined || scroller === null || scroller.scrollWidth <= scroller.clientWidth) return
+    const pane = scroller.querySelector<HTMLElement>('[data-session-pane][data-active]')
+    if (pane === null) return
+    const area = scroller.getBoundingClientRect()
+    const bounds = pane.getBoundingClientRect()
+    if (bounds.left < area.left) scroller.scrollLeft += bounds.left - area.left
+    else if (bounds.right > area.right) scroller.scrollLeft += bounds.right - area.right
+  }, [activePane, tabbed, width, maximized, workbench, viewport.paneIds, viewport.collapsedIds])
   const resize = (index: number, ratios: readonly number[], delta: number, rowWidth: number, rowTotal: number): void => {
     const next = [...ratios]
     const left = next[index] ?? 0
     const right = next[index + 1] ?? 0
     const total = left + right
-    const minimum = Math.min(360 / Math.max(1, rowWidth) * rowTotal, total / 2)
+    const minimum = Math.min(minimumPaneWidth / Math.max(1, rowWidth) * rowTotal, total / 2)
     next[index] = Math.max(minimum, Math.min(total - minimum, left + delta))
     next[index + 1] = total - next[index]
     props.onViewportRatios(next)
@@ -682,7 +699,7 @@ export function ConversationRoot(props: ConversationRootProps) {
   ) : props.renderFactorySlot('conversation.content', { variant: 'main', compact })
   return (
     <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
-      {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed, layout: layoutPreset, onSelectLayout: applyLayout })}
+      {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed, layout: layoutPreset, onSelectLayout: applyLayout, toolsHostId })}
       {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', { viewport }) : (
         <div
           className={css.workbenchGrid}
@@ -693,15 +710,17 @@ export function ConversationRoot(props: ConversationRootProps) {
             const ratioStart = rowIndex * columns
             const ratios = row.map((_, index) => viewport.paneRatios[ratioStart + index] ?? 1)
             const total = ratios.reduce((sum, ratio) => sum + ratio, 0)
+            const expandedTotal = row.reduce((sum, id, index) => sum + (collapsed.has(id) ? 0 : (ratios[index] ?? 1)), 0)
             const expandedInRow = row.filter(id => !collapsed.has(id)).length
             return (
               <div
                 key={rowIndex}
                 className={css.workbenchRow}
                 data-workbench-row=""
-                style={{ gridTemplateColumns: row.map((id, column) => collapsed.has(id)
-                  ? '46px'
-                  : `minmax(${expandedInRow > 1 ? 360 : 0}px, ${ratios[column] ?? 1}fr)`).join(' ') }}
+                style={{ minWidth: expandedInRow > 1 ? row.reduce((sum, id) => sum + (collapsed.has(id) ? 46 : minimumPaneWidth), 0) : 0,
+                  gridTemplateColumns: row.map((id, column) => collapsed.has(id)
+                    ? '46px'
+                    : `minmax(${expandedInRow > 1 ? minimumPaneWidth : 0}px, ${(ratios[column] ?? 1) / expandedTotal}fr)`).join(' ') }}
               >
                 {row.map((id, column) => {
                   const index = ratioStart + column
@@ -727,6 +746,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                         {() => (
                           <>
                             {props.renderSlot('conversation.workbench.pane.header', {
+                              condensed: toolsHostId !== undefined,
                               active: id === activePane,
                               onFocus: () => { props.onViewportFocus(id) },
                               onClose: () => { if (maximized === id) setMaximizedId(undefined); props.onViewportRemove(id) },
@@ -744,7 +764,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                               onSolo: () => { props.onViewportSolo(id) },
                             })}
                             <div className={css.paneBody} hidden={isCollapsed}>
-                              {props.renderFactorySlot('conversation.content', { variant: 'main', compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true })}
+                              {props.renderFactorySlot('conversation.content', { variant: 'main', compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true, toolsHostId, toolsActive: id === focusedPane })}
                             </div>
                           </>
                         )}

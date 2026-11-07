@@ -615,6 +615,14 @@ describe('launchResolved', () => {
     rejectLate?.(new Error('late opener failure'))
   })
 
+  it.each(['argv', 'shell-open'] as const)('refuses an unauthorized %s handoff before allocating a launcher', async (kind) => {
+    const launch = vi.fn<OpenInAppLauncher>(), run = vi.fn<NativeCommandRunner>()
+    const selected: OpenInAppResolvedLaunch = kind === 'argv' ? resolved : { launch: { kind: 'shell-open' } }
+    await expect(launchResolved(selected, '/w/dir', TIMEOUT_MS, bare({ launch, run }), () => false)).resolves.toBe('refused')
+    expect(launch).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+  })
+
   it('tries the fallback when the primary fails and classifies the ways an attempt ends', async () => {
     const calls: unknown[][] = []
     await expect(launchResolved(withFallback, '/w/dir', TIMEOUT_MS, bare({

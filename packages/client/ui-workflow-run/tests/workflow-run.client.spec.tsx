@@ -296,6 +296,7 @@ const listState = (overrides: Partial<SessionListState> = {}): SessionListState 
   archivedById: {},
   current: PARENT_ID,
   phase: 'ready',
+  state: 'idle', error: null,
   subagentsByParent: {},
   jobsBySession: {}, observedJobs: {},
   currentAddress: undefined,

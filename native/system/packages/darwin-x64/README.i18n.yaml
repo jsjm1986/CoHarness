@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write native/system/packages/darwin-x64/README.md
 document:
-  en: 1740788eef943373591a895baeb7207635972a46
-  zh: 88053b85150c94048a4ffc32b506d365ff13c15f
+  en: bdd712fe63ece05fb171c1dd0fe59bb34de86cdc
+  zh: cc6da4102de3d84ae5c2eab2bcd3b92635d2ccbf
 /:
-  en: eea1ca26631fd520
-  zh: 2bfc70bdf169375d
+  en: ee1426f606c7d63b
+  zh: 249b2628bbf50f8f
 /deepseek-ai-node-addon-system-darwin-x64:
-  en: d37ab2f1ae5abccf
-  zh: 85b8c7880c1a8dc1
+  en: 68e75b695f4abff3
+  zh: 25bd06b42434eb1b

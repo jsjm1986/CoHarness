@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { PassThrough } from 'node:stream'
 import type { Options, Query, SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -62,6 +63,7 @@ function memberConfig(dir: string): ClaudeMemberConfig {
 
 /** A minimal managed-process stand-in: terminate() settles `done`, like the real seam. */
 function fakeChild(): SubprocessHandle {
+  const stdin = new PassThrough(), stdout = new PassThrough()
   let exited = false
   let resolveDone!: (outcome: { exitCode: number; signal: null }) => void
   const done = new Promise<{ exitCode: number; signal: null }>((resolve) => { resolveDone = resolve })
@@ -69,12 +71,14 @@ function fakeChild(): SubprocessHandle {
   const settle = (): void => {
     if (exited) return
     exited = true
+    stdin.end()
+    stdout.end()
     resolveDone({ exitCode: 0, signal: null })
   }
   return {
     control: undefined,
-    stdin: undefined,
-    stdout: undefined,
+    stdin,
+    stdout,
     stderr: undefined,
     collected: {},
     done,
@@ -377,6 +381,20 @@ describe('ClaudeMemberSession', () => {
     await collectTurn(session)
     expect(captured[0]!.options.model).toBe('claude-test-model')
     await session.dispose()
+  })
+
+  it('refuses a member query that never requests its managed process', async () => {
+    const spawn = vi.fn(spawnDouble())
+    const transport = new ClaudeMemberTransport(memberConfig(root()), spawn)
+    const session = await transport.open('claude-session-1', signal)
+    const query = queryFrom([success('answer')])
+    const closing = vi.spyOn(query, 'close')
+    queryMock.mockReturnValueOnce(query)
+    try {
+      await expect(collectTurn(session)).rejects.toThrow('claude member SDK did not request a managed process')
+      expect(spawn).not.toHaveBeenCalled()
+    } finally { await session.dispose() }
+    expect(closing).toHaveBeenCalledOnce()
   })
 
   it('denies an unattended tool-permission callback instead of asking a human', async () => {

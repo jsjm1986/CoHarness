@@ -1,3 +1,5 @@
+import { parseConversationSessionIdentity } from '../../../src/session-identity.ts'
+import { parseConversationArchiveId } from '../../../src/archive-identity.ts'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,7 +8,7 @@ import { ArchivesPage } from './ArchivesPage.tsx'
 
 vi.mock('../api.ts', () => ({
   applyArchiveAction: vi.fn(),
-  exportArchive: vi.fn((id: string) => `/admin/api/archives/${id}/export`),
+  exportArchive: vi.fn((id: string) => `/admin/api/archives/records/${id}/export`),
   getArchive: vi.fn(),
   getArchiveStatus: vi.fn(),
   listArchives: vi.fn(),
@@ -15,6 +17,7 @@ vi.mock('../api.ts', () => ({
 }))
 
 const row: api.ConversationArchiveRow = {
+  archiveId: parseConversationArchiveId('22000000-0000-4000-8000-000000000022')!,
   rootSessionId: 'session-1', title: '产品讨论', contentPreview: '请整理产品需求和下一步计划',
   creator: { id: 1, displayName: '管理员' }, project: { id: 2, name: '产品' },
   runtime: { kind: 'project', id: 2 }, workspace: { path: '/project', title: '产品', position: 0 },
@@ -22,9 +25,11 @@ const row: api.ConversationArchiveRow = {
   syncState: 'synced', childCount: 1, messageCount: 4, updatedAt: Date.UTC(2026, 7, 25),
 }
 
+const draftRuntimeA = parseConversationSessionIdentity({ rootSessionId: 'fixture', runtimeId: '33000000-0000-4000-8000-000000000033' })!.runtimeId
+const draftRuntimeB = parseConversationSessionIdentity({ rootSessionId: 'fixture', runtimeId: '44000000-0000-4000-8000-000000000044' })!.runtimeId
 const emptyCandidates: api.EmptyDraftCandidate[] = [
-  { rootSessionId: 'draft-project', runtime: { kind: 'project', id: 2 }, creator: { id: 1, displayName: '管理员' }, project: { id: 2, name: '产品' }, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
-  { rootSessionId: 'draft-personal', runtime: { kind: 'user', id: 1 }, creator: null, project: null, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
+  { rootSessionId: 'draft-project', runtime: { kind: 'project', id: 2, runtimeId: draftRuntimeA }, creator: { id: 1, displayName: '管理员' }, project: { id: 2, name: '产品' }, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
+  { rootSessionId: 'draft-personal', runtime: { kind: 'user', id: 1, runtimeId: draftRuntimeB }, creator: null, project: null, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
 ]
 
 describe('ArchivesPage', () => {
@@ -45,7 +50,7 @@ describe('ArchivesPage', () => {
       hasMore: false,
     })
     vi.mocked(api.getArchiveStatus).mockResolvedValue(row)
-    vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'restore', results: [{ rootSessionId: row.rootSessionId, ok: true }] })
+    vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'restore', results: [{ archiveId: row.archiveId, ok: true }] })
     vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: Date.now() - 3_600_000, candidates: [] })
     vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: [] })
   })
@@ -70,22 +75,39 @@ describe('ArchivesPage', () => {
     vi.mocked(api.previewEmptyDrafts)
       .mockResolvedValueOnce({ cutoff: 1, candidates: emptyCandidates })
       .mockResolvedValueOnce({ cutoff: 2, candidates: [] })
-    vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: ['draft-project'] })
+    vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: [{ rootSessionId: 'draft-project', runtimeId: draftRuntimeA }] })
     render(<ArchivesPage />)
     await userEvent.click(screen.getByRole('button', { name: '清理空白草稿' }))
     await screen.findAllByText('draft-project')
     expect(screen.queryByRole('button', { name: /删除选中/ })).toBeNull()
-    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
-    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-personal' })[0]!)
+    await userEvent.click(screen.getAllByRole('checkbox', { name: `选择 draft-project (${draftRuntimeA})` })[0]!)
+    await userEvent.click(screen.getAllByRole('checkbox', { name: `选择 draft-personal (${draftRuntimeB})` })[0]!)
     await userEvent.click(screen.getByRole('button', { name: '删除选中 2 项' }))
     const confirm = screen.getByRole('dialog', { name: '删除所选空白草稿？' })
     expect(within(confirm).getByText(/选中的 2 个空白草稿/)).toBeTruthy()
     expect(api.trashEmptyDrafts).not.toHaveBeenCalled()
     await userEvent.click(within(confirm).getByRole('button', { name: '删除' }))
-    expect(api.trashEmptyDrafts).toHaveBeenCalledWith(['draft-project', 'draft-personal'], 1)
+    expect(api.trashEmptyDrafts).toHaveBeenCalledWith([{ rootSessionId: 'draft-project', runtimeId: draftRuntimeA }, { rootSessionId: 'draft-personal', runtimeId: draftRuntimeB }], 1)
     await waitFor(() => expect(api.previewEmptyDrafts).toHaveBeenCalledTimes(2))
     expect(await screen.findByText('已移入回收站 1 个草稿；1 个草稿已不符合清理条件。')).toBeTruthy()
     expect(await screen.findByText('当前没有符合条件的空白草稿')).toBeTruthy()
+  })
+
+  it('selects only the reviewed Runtime when two drafts share a Host Session id', async () => {
+    const original = emptyCandidates[0]!
+    const copies = [original, { ...original, runtime: { ...original.runtime, runtimeId: draftRuntimeB } }]
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValueOnce({ cutoff: 1, candidates: copies }).mockResolvedValueOnce({ cutoff: 2, candidates: [] })
+    render(<ArchivesPage />)
+    await userEvent.click(screen.getByRole('button', { name: '清理空白草稿' }))
+    const table = await screen.findByRole('table', { name: '空白草稿列表' })
+    const first = within(table).getByRole('checkbox', { name: `选择 draft-project (${draftRuntimeA})` }) as HTMLInputElement
+    const second = within(table).getByRole('checkbox', { name: `选择 draft-project (${draftRuntimeB})` }) as HTMLInputElement
+    await userEvent.click(second)
+    expect(first.checked).toBe(false)
+    expect(second.checked).toBe(true)
+    await userEvent.click(screen.getByRole('button', { name: '删除选中 1 项' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: '删除所选空白草稿？' })).getByRole('button', { name: '删除' }))
+    expect(api.trashEmptyDrafts).toHaveBeenCalledWith([{ rootSessionId: 'draft-project', runtimeId: draftRuntimeB }], 1)
   })
 
   it('cancels the empty-draft confirmation without posting', async () => {
@@ -93,7 +115,7 @@ describe('ArchivesPage', () => {
     render(<ArchivesPage />)
     await userEvent.click(screen.getByRole('button', { name: '清理空白草稿' }))
     await screen.findAllByText('draft-project')
-    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
+    await userEvent.click(screen.getAllByRole('checkbox', { name: `选择 draft-project (${draftRuntimeA})` })[0]!)
     await userEvent.click(screen.getByRole('button', { name: '删除选中 1 项' }))
     const confirm = screen.getByRole('dialog', { name: '删除所选空白草稿？' })
     await userEvent.click(within(confirm).getByRole('button', { name: '取消' }))
@@ -112,7 +134,7 @@ describe('ArchivesPage', () => {
     vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: 1, candidates: emptyCandidates })
     await userEvent.click(screen.getByRole('button', { name: '重新扫描' }))
     await screen.findAllByText('draft-project')
-    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
+    await userEvent.click(screen.getAllByRole('checkbox', { name: `选择 draft-project (${draftRuntimeA})` })[0]!)
     vi.mocked(api.trashEmptyDrafts).mockRejectedValueOnce(new Error('清理失败'))
     await userEvent.click(screen.getByRole('button', { name: '删除选中 1 项' }))
     const confirm = screen.getByRole('dialog', { name: '删除所选空白草稿？' })
@@ -141,7 +163,7 @@ describe('ArchivesPage', () => {
     expect(screen.getByText('seq 0')).toBeTruthy()
     await userEvent.click(within(screen.getByRole('dialog', { name: '产品讨论' })).getByRole('button', { name: /^恢复$/ }))
     await userEvent.click(within(screen.getAllByRole('dialog').at(-1)!).getByRole('button', { name: /^恢复$/ }))
-    expect(api.applyArchiveAction).toHaveBeenCalledWith('restore', ['session-1'])
+    expect(api.applyArchiveAction).toHaveBeenCalledWith('restore', [row.archiveId])
   })
 
   it('summarizes configuration-only archives and keeps raw events collapsed', async () => {
@@ -176,7 +198,7 @@ describe('ArchivesPage', () => {
     const confirm = screen.getByRole('dialog', { name: '删除所选对话？' })
     expect(within(confirm).getByText(/移入回收站/)).toBeTruthy()
     await userEvent.click(within(confirm).getByRole('button', { name: /^删除$/ }))
-    expect(api.applyArchiveAction).toHaveBeenCalledWith('trash', ['session-1'])
+    expect(api.applyArchiveAction).toHaveBeenCalledWith('trash', [row.archiveId])
   })
 
   it('runs the row-level delete without opening the detail dialog', async () => {
@@ -185,7 +207,7 @@ describe('ArchivesPage', () => {
     await userEvent.click(within(screen.getByRole('table')).getByRole('button', { name: '删除' }))
     const confirm = screen.getByRole('dialog', { name: '删除所选对话？' })
     await userEvent.click(within(confirm).getByRole('button', { name: /^删除$/ }))
-    expect(api.applyArchiveAction).toHaveBeenCalledWith('trash', ['session-1'])
+    expect(api.applyArchiveAction).toHaveBeenCalledWith('trash', [row.archiveId])
     expect(api.getArchive).not.toHaveBeenCalled()
   })
 
@@ -199,7 +221,7 @@ describe('ArchivesPage', () => {
     const confirm = screen.getByRole('dialog', { name: '彻底删除所选对话？' })
     expect(within(confirm).getByText(/不能恢复/)).toBeTruthy()
     await userEvent.click(within(confirm).getByRole('button', { name: '彻底删除' }))
-    expect(api.applyArchiveAction).toHaveBeenCalledWith('purge', ['session-1'])
+    expect(api.applyArchiveAction).toHaveBeenCalledWith('purge', [row.archiveId])
   })
 
   it('settles a stale pending row from its inline action', async () => {
@@ -210,13 +232,13 @@ describe('ArchivesPage', () => {
     await userEvent.click(within(screen.getByRole('table')).getByRole('button', { name: '结束等待' }))
     const confirm = screen.getByRole('dialog', { name: '结束等待并强制收尾？' })
     await userEvent.click(within(confirm).getByRole('button', { name: '结束等待' }))
-    expect(api.applyArchiveAction).toHaveBeenCalledWith('settle', ['session-1'])
+    expect(api.applyArchiveAction).toHaveBeenCalledWith('settle', [row.archiveId])
   })
 
   it('settles a pending archive request from the detail dialog', async () => {
     vi.mocked(api.getArchive).mockResolvedValue({ record: { ...row, syncState: 'pending' }, descendants: [], events: [], hasMore: false })
     vi.mocked(api.getArchiveStatus).mockResolvedValue({ ...row, syncState: 'pending' })
-    vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'settle', results: [{ rootSessionId: row.rootSessionId, ok: true }] })
+    vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'settle', results: [{ archiveId: row.archiveId, ok: true }] })
     render(<ArchivesPage />)
     await userEvent.click(within(await screen.findByRole('table')).getByRole('button', { name: '查看 产品讨论' }))
     expect(await screen.findByText('该操作正在等待实例确认。实例长时间不可达时，可以结束等待、在服务端直接收尾。')).toBeTruthy()
@@ -224,7 +246,7 @@ describe('ArchivesPage', () => {
     const confirm = screen.getAllByRole('dialog').at(-1)!
     expect(within(confirm).getByText('结束等待并强制收尾？')).toBeTruthy()
     await userEvent.click(within(confirm).getByRole('button', { name: '结束等待' }))
-    expect(api.applyArchiveAction).toHaveBeenCalledWith('settle', ['session-1'])
+    expect(api.applyArchiveAction).toHaveBeenCalledWith('settle', [row.archiveId])
   })
 
   it('shows empty-draft records returned by the records query with a badge', async () => {
@@ -249,7 +271,7 @@ describe('ArchivesPage', () => {
     expect(within(screen.getByRole('dialog')).getByText('请先停止仍在运行的终端')).toBeTruthy()
     expect(within(screen.getByRole('dialog')).getByText('操作未完成')).toBeTruthy()
     expect(api.getArchive).toHaveBeenCalledOnce()
-    expect(api.getArchiveStatus).toHaveBeenCalledWith(row.rootSessionId)
+    expect(api.getArchiveStatus).toHaveBeenCalledWith(row.archiveId)
     await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
     expect(api.getArchiveStatus).toHaveBeenCalledOnce()
   })
@@ -263,7 +285,7 @@ describe('ArchivesPage', () => {
     expect(checkbox.checked).toBe(true)
     await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
     expect(api.listArchives).toHaveBeenCalledOnce()
-    expect(api.getArchiveStatus).toHaveBeenCalledWith(row.rootSessionId)
+    expect(api.getArchiveStatus).toHaveBeenCalledWith(row.archiveId)
     expect((within(screen.getByRole('table')).getByRole('checkbox', { name: '选择 产品讨论' }) as HTMLInputElement).checked).toBe(true)
   })
 
@@ -276,6 +298,56 @@ describe('ArchivesPage', () => {
     await act(async () => { first.resolve([row]) })
     expect(screen.queryByText('产品讨论')).toBeNull()
     expect(screen.getAllByText('回收站记录').length).toBeGreaterThan(0)
+  })
+
+  it('selects and deletes only one of two records sharing a Host Session ID', async () => {
+    const other = { ...row, archiveId: parseConversationArchiveId('22000000-0000-4000-8000-000000000023')!, title: '另一台电脑' }
+    vi.mocked(api.listArchives).mockResolvedValue([row, other])
+    vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'trash', results: [{ archiveId: other.archiveId, ok: true }] })
+    render(<ArchivesPage />)
+    const table = await screen.findByRole('table')
+    expect(within(table).getAllByText(row.rootSessionId)).toHaveLength(2)
+    await userEvent.click(within(table).getByRole('checkbox', { name: '选择 另一台电脑' }))
+    expect(screen.getByText('已选择 1 条')).toBeTruthy()
+    expect((within(table).getByRole('checkbox', { name: '选择 产品讨论' }) as HTMLInputElement).checked).toBe(false)
+    await userEvent.click(screen.getByRole('button', { name: '删除所选' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: '删除所选对话？' })).getByRole('button', { name: /^删除$/ }))
+    expect(api.applyArchiveAction).toHaveBeenCalledWith('trash', [other.archiveId])
+  })
+
+  it('polls both same-named records independently and preserves just the selected archive', async () => {
+    vi.useFakeTimers()
+    const first = { ...row, syncState: 'pending' as const }
+    const other = { ...row, archiveId: parseConversationArchiveId('22000000-0000-4000-8000-000000000023')!, title: '另一台电脑', syncState: 'pending' as const }
+    vi.mocked(api.listArchives).mockResolvedValue([first, other])
+    vi.mocked(api.getArchiveStatus).mockImplementation(async id => id === row.archiveId ? { ...row, title: '电脑 A 完成' } : { ...other, syncState: 'conflict', lastSyncError: '电脑 B 拒绝' })
+    await act(async () => { render(<ArchivesPage />) })
+    fireEvent.click(within(screen.getByRole('table')).getByRole('checkbox', { name: '选择 另一台电脑' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    const table = screen.getByRole('table')
+    expect(api.getArchiveStatus).toHaveBeenCalledWith(first.archiveId)
+    expect(api.getArchiveStatus).toHaveBeenCalledWith(other.archiveId)
+    expect(within(table).getByText('电脑 A 完成')).toBeTruthy()
+    expect(within(table).getByText('另一台电脑')).toBeTruthy()
+    expect((within(table).getByRole('checkbox', { name: '选择 另一台电脑' }) as HTMLInputElement).checked).toBe(true)
+    expect((within(table).getByRole('checkbox', { name: '选择 电脑 A 完成' }) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('keeps a late detail response out of a different archive with the same Host ID', async () => {
+    const first = Promise.withResolvers<api.ConversationArchiveDetail>()
+    const other = { ...row, archiveId: parseConversationArchiveId('22000000-0000-4000-8000-000000000023')!, title: '另一台电脑' }
+    vi.mocked(api.listArchives).mockResolvedValue([row, other])
+    vi.mocked(api.getArchive).mockReturnValueOnce(first.promise).mockResolvedValue({ record: other, descendants: [], events: [], hasMore: false })
+    render(<ArchivesPage />)
+    const table = await screen.findByRole('table')
+    fireEvent.click(within(table).getByRole('button', { name: '查看 产品讨论' }))
+    fireEvent.click(within(table).getByRole('button', { name: '查看 另一台电脑' }))
+    expect(await screen.findByRole('dialog', { name: '另一台电脑' })).toBeTruthy()
+    await act(async () => { first.resolve({ record: row, descendants: [], events: [], hasMore: false }) })
+    expect(screen.getByRole('dialog', { name: '另一台电脑' })).toBeTruthy()
+    expect(api.getArchive).toHaveBeenNthCalledWith(1, row.archiveId)
+    expect(api.getArchive).toHaveBeenNthCalledWith(2, other.archiveId)
+    expect(api.exportArchive).toHaveBeenLastCalledWith(other.archiveId)
   })
 
 })

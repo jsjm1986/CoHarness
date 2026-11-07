@@ -16,6 +16,8 @@ Status: implemented
 
 本决策取代[一次录制／确定性回放决策](2026-06-19-acp-snapshot-tests.zh.md)中 ACP 专属的放置位置与控制器所有权；后者继续负责会话日志回放、例外 override、规范化和 ACP transcript 比较。
 
+SDK 补丁物化从原始补丁位置解析相对插件文件名，从 examples 工作区的依赖清单解析裸包。隔离 profile 的链接会拒绝冲突的包目录。子级诊断场景在刷新和回放时都要求运行期失败与部分输出；构建后的 SDK 冒烟测试独立于源码覆盖，验证可选提供方的加载。
+
 录制会话仍是主要输入，并在当前代际场景中同时作为预期输出。来自用户的消息驱动所选公开接口，录制的 assistant chunk 驱动确定性模型回放，规范化后的持久化结果必须等于 fixture。父会话和子会话共享同一类型化脱敏映射。提交的 fixture 使用保留关系的身份 token，并将请求 system prompt 和工具 schema 替换为 token；每个不同 header 类仍保留一个显式 sidecar 所有者。会话 token 按父日志公告顺序绑定，由[身份绑定顺序 Agent Note](2026-09-26-snapshot-session-identity-binding-order.zh.md)负责。
 
 空的持久系统消息保持为空；只有非空内容才替换为提示词 token。脱敏不能制造模型输入，也不能把不同请求的身份合并。Web fixture 校验同时接受旧版单请求 token 与编号 RPC token，并拒绝运行时请求 ID。

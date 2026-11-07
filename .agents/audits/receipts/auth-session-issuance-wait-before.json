@@ -1,0 +1,14 @@
+{
+  "name": "auth-session-issuance-wait-before",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/auth-postgres.spec.ts -t 'rechecks issuance' --retry=0",
+  "startedAt": "2026-10-24T01:55:02.004461+00:00",
+  "seconds": 3.152,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e676de363fe067ec1ea79d05daa4bc829065af8787be3cc6610daa74fae30de8",
+  "inputsAfter": "e676de363fe067ec1ea79d05daa4bc829065af8787be3cc6610daa74fae30de8",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "86dead0b02dd9a78dee45ef6dd3be8ac8af7df298bcd40e653b475031c95262e",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/auth-postgres.spec.ts (6 tests | 1 failed | 5 skipped) 435ms\n     × rechecks issuance after browser authentication waits 387ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/auth-postgres.spec.ts > PostgreSQL login admission > rechecks issuance after browser authentication waits\nAssertionError: expected { after_wait: false, full_idle: true } to deeply equal { after_wait: true, full_idle: true }\n\n- Expected\n+ Received\n\n  {\n-   \"after_wait\": true,\n+   \"after_wait\": false,\n    \"full_idle\": true,\n  }\n\n ❯ tests/auth-postgres.spec.ts:80:24\n     78|           expires_at-created_at >= ($3::double precision * interval '1…\n     79|           FROM harness.auth_sessions WHERE organization_id=$1`, [conte…\n     80|         expect(issued).toEqual({ after_wait: true, full_idle: true })\n       |                        ^\n     81|         await expect(['# Browser login issuance after a lock wait', ''…\n     82|           `status=${String(response.status)}`, `createdAfterWait=${Str…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 5 skipped (6)\n   Start at  09:55:03\n   Duration  1.75s (transform 920ms, setup 0ms, import 1.20s, tests 435ms, environment 0ms)\n\n"
+}

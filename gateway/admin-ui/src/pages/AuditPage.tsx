@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Filter, RotateCcw, ScrollText } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { listAudit, type AuditEntry, type AuditFamily, type AuditFilter } from '../api.ts'
 import {
   Button,
@@ -58,8 +58,10 @@ export function AuditPage() {
   const [draft, setDraft] = useState<FilterDraft>(EMPTY_FILTER)
   const [activeFilter, setActiveFilter] = useState<FilterDraft>(EMPTY_FILTER)
   const [offset, setOffset] = useState(0)
+  const requestGeneration = useRef(0)
 
   const fetchPage = useCallback(async (filter: FilterDraft, nextFamily: FamilyKey, nextOffset: number, showLoading = true) => {
+    const generation = ++requestGeneration.current
     const apiFilter: AuditFilter = {
       actor: filter.actor === '' ? undefined : filter.actor,
       query: filter.actionQuery === '' ? undefined : filter.actionQuery,
@@ -73,18 +75,22 @@ export function AuditPage() {
     if (showLoading) setLoading(true)
     try {
       const page = await listAudit(apiFilter)
+      if (generation !== requestGeneration.current) return
       setRows(page.entries)
       setTotal(page.total)
       setOffset(nextOffset)
       setError('')
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (generation === requestGeneration.current) setError(messageFrom(cause))
     } finally {
-      if (showLoading) setLoading(false)
+      if (showLoading && generation === requestGeneration.current) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { void fetchPage(EMPTY_FILTER, '', 0) }, [fetchPage])
+  useEffect(() => {
+    void fetchPage(EMPTY_FILTER, '', 0)
+    return () => { requestGeneration.current += 1 }
+  }, [fetchPage])
 
   function onFilter(event: FormEvent) {
     event.preventDefault()
@@ -115,7 +121,7 @@ export function AuditPage() {
         description={t('pageDescription')}
         meta={hasFilters ? t('metaFiltered') : undefined}
         actions={(
-          <div className="pageToolbar">
+          <div className="pageToolbar auditPageToolbar">
             <div className="segmented" role="group" aria-label={t('pageTitle')}>
               {FAMILY_TABS.map(tab => (
                 <button key={tab.key} type="button" aria-pressed={family === tab.key} onClick={() => selectFamily(tab.key)}>{t(tab.label)}</button>
@@ -159,11 +165,11 @@ export function AuditPage() {
         flush
         className="responsiveSection"
         title={t('eventsTitle')}
-        meta={loading ? undefined : total === null
+        meta={loading || (rows.length === 0 && error !== '') ? undefined : total === null
           ? t('pageIndicator', { page: String(page) })
           : `${t('totalRows', { total: String(total) })} · ${t('pageIndicator', { page: String(page) })}${pageCount === null ? '' : ` / ${String(pageCount)}`}`}
       >
-        {loading ? <LoadingState label={t('loadingEvents')} /> : rows.length === 0 ? (
+        {loading ? <LoadingState label={t('loadingEvents')} /> : rows.length === 0 && error !== '' ? null : rows.length === 0 ? (
           <EmptyState icon={ScrollText} title={t('emptyTitle')} detail={hasFilters || family !== '' ? t('emptyDetailFiltered') : t('emptyDetail')} />
         ) : (
           <>

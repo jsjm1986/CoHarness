@@ -34,9 +34,6 @@
       "path": "../../extensions/cordis-host-runner"
     },
     {
-      "path": "../../feedback/command-feedback"
-    },
-    {
       "path": "../../goal/goal"
     },
     {

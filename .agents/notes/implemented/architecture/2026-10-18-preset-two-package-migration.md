@@ -19,6 +19,8 @@ Merge, don't replace. The package split is adopted wholesale (rename `agent-pres
 - **`agent-preset`** carries the upstream package verbatim-shaped: a `Service` plugin whose `Config` is the `PresetDefinition`, `EntryGroup.key` preserving child expressions until activation, plus creator skills (`agent-experience` joins the repository skill tree through the `.agents/skills` symlink).
 - **`skill-filesystem`** canonicalizes loaded skill paths through `realpath`, matching upstream so repository-level skill symlinks resolve to package targets.
 
+Declared-generation references belong to joined agents, temporary mount reservations and cold-read leases. Binding consumes no additional reservation, and releasing a read lease is idempotent. Agent cleanup follows its current binding after recomposition, including a binding first established on a file preset. The last reference to a retired generation joins scope disposal, so its providers remain usable for retained consumers and are released before their caller completes teardown.
+
 The `agent-presets` settings namespace stays unchanged — it is a durable user key, not a package identity.
 
 ## Alternatives considered
@@ -33,6 +35,6 @@ Consumers compile against the renamed package and `AgentPresetRegistry`; `Preset
 
 ## Verification
 
-- `npx vitest run packages/preset/agent-preset-registry` — 181 tests across 11 files pass, including `declared.spec.ts` lifecycle coverage (join, bind, retain, retire, scope release).
+- Declared-generation regressions cover final-agent release, repeated read-lease disposal with another reader active, repeated recomposition, switches between file and declared presets, inherited children and binding rollback. A real Loader composition keeps an SSH helper usable after declaration retirement and verifies connection closure after the final Agent leaves, before Host disposal.
 - `npx vitest run packages/preset/agent-preset` — upstream skill-loading specs pass against the `realpath`-canonicalized loader.
 - `pnpm exec tsc -b packages/host` and the preset package typecheck pass under `exactOptionalPropertyTypes` after the `FileAgentPreset` narrowing.

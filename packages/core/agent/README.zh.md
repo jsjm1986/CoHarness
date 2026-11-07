@@ -9,6 +9,8 @@ kind: "package-reference"
 
 `AgentHandle.tryDisposeIdle()` 会拒绝运行中的轮次、维护、待处理输入、活跃子级或插件持有的资源。成功的空闲释放会在清理前关闭输入。`ctx.agents.reserveRemoval(ids)` 须保持到持久删除及回执完成；`reserveUse(ids)` 保护异步生命周期查找。这些预留不会授予他人句柄的释放权限。
 
+`runtime/idle-release-check` 是同步的 Host 级否决事件，用于声明单个 Agent 之外的后台工作和未来义务。插件在工作和清理完成前返回 `busy`，等待中的定时器也属于义务。`agent/idle-release-check` 仍检查确切 Agent 的资源；即使公开状态为空闲，循环提供方也会为维护操作和待处理输入拒绝释放。这些检查用于自动进程回收，显式释放仍遵守现有规则。
+
 ## 概述
 
 使用 `dsh-agent` 创建或恢复实时 agent（智能体）、发送后续或 steering（中途引导）输入、注入面向模型的上下文、取消工作，并等待 agent 进入空闲状态。插件、UI、钩子与编排器还可以观察或拦截 agent 活动，并仅为一个 agent 应用能力而不影响其他 agent。当代码需要通过公开 `Agent` API 控制或扩展实时 agent 时，请选择本包。请将它与 `dsh-agent-loop` 等 agent 驱动器配合使用；本包本身不会创建模型请求。发起方归因仅存在于进程内，跨 worker、进程、持久队列与重启时必须显式传递。
@@ -49,14 +51,16 @@ await handle.dispose()   // stops the loop, unregisters, removes the session, un
 句柄的方法把带标识的 user 角色消息路由进 agent 的收件箱。`followup()` 排队一条普通的下一个轮次提示词并唤醒驱动器；`steer()` 提交下一步输入并唤醒它；`inject()` 添加面向模型的上下文但不唤醒驱动器，因此它落在下一个被接纳的步骤中。`cancel(cause)` 中止当前活动，并在未设置 `keepInbox` 时清除待处理工作；`whenIdle()` 会在整个 agent 达到完全停稳后完成。
 
 ```text
-handle.agent.followup({
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+
+handle.agent.followup(createUserMessage({
   content: [{ type: 'text', text: 'Summarize this workspace.' }],
   source: { kind: 'user' },
-})
-handle.agent.steer({
+}))
+handle.agent.steer(createUserMessage({
   content: [{ type: 'text', text: 'Focus on the tests.' }],
   source: { kind: 'user' },
-})
+}))
 await handle.agent.whenIdle()
 ```
 
@@ -65,6 +69,8 @@ await handle.agent.whenIdle()
 `Agent.ctx` 是该 agent 的作用域上下文：通过它进行的注册（工具、提示词段、变量、事件监听器、限制）只对该 agent 生效，并在 dispose（资源释放）时全部撤销。同一机制也是 agent preset 用来让一个会话获得不同能力集、同时不影响其邻居的方式。
 
 ### 拦截或观察进行中的工作
+
+只用于观察的 agent 通知会分别隔离每个抛出值或拒绝值，包括字符串转换本身抛错的异常。必要时警告使用 `[unrenderable thrown value]`，使后续观察者与取消操作继续进行。受等待的 `agent/created` 监听器仍可否决发布。
 
 `agent/*` 事件让插件无需依赖循环包即可作用于实时工作。`agent/pre-step` 可以拒绝拟进入的步骤或替换进入它的消息；`agent/request-error` 让监听器重试失败的模型请求；`agent/turn-stopping` 在本可完成的轮次关闭前运行，并可通过 steer 使其保持打开。`agent/assistant-stream` 携带一个进程本地 Assistant attempt 的有序 start、瞬态分片与 end frame。start 给出该 attempt 的轮次与步骤，分片索引从零开始密集递增，`end.index` 则是下一个分片位置。loop 会在 committed end frame 前把完整紧凑流提交为一个 `assistant/message` 或 `assistant/attempt`，因此实时事件仍是呈现数据而非回放来源。`agent/status`、`agent/created` 与 `agent/disposed` 驱动 UI 与协调状态，逐消息的 `agent/inbox/*` 通知则让收件箱投影保持同步。确切签名、分发 mode 与 payload 约定见 [core 子系统页](../../../docs/subsystems/core.zh.md#cordis-surface) 的生成区块。
 

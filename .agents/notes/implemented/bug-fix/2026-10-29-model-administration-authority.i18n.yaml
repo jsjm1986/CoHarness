@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-29-model-administration-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-model-administration-authority.md
+document:
+  en: 464fe19d6348f6c3a5e9ef26e66e440482098287
+  zh: a726df71bf9d79fea145676e710cae2bf392bddd
+/agent-note-model-administration-retains-current-authority-and-target-lifetime:
+  en: 1c8375354fc0acec
+  zh: 893b540ca1aed0cd
+/agent-note-model-administration-retains-current-authority-and-target-lifetime/problem:
+  en: 742156144a4668ce
+  zh: 179e6f20a70ef987
+/agent-note-model-administration-retains-current-authority-and-target-lifetime/decision:
+  en: 0278a12453a63d60
+  zh: da23178440831707
+/agent-note-model-administration-retains-current-authority-and-target-lifetime/alternatives-considered:
+  en: c4cf2c37a727e8f3
+  zh: 98e75cf077b1d126
+/agent-note-model-administration-retains-current-authority-and-target-lifetime/consequences:
+  en: 17b90f71c6ed313b
+  zh: ff72215abe3d9b10
+/agent-note-model-administration-retains-current-authority-and-target-lifetime/verification:
+  en: 002ad9dcf2d1b3af
+  zh: 7687238342b2a02c

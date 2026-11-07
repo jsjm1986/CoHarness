@@ -104,6 +104,42 @@ describe('background file upload HTTP route', () => {
     expect(service.uploadStream).not.toHaveBeenCalled()
   })
 
+  it('refuses an empty Session id before storage', async () => {
+    const service = uploads(async () => ({}))
+    expect((await exchange(service, request({ sessionId: '', contentType: 'application/octet-stream' }))).status).toBe(400)
+    expect(service.uploadStream).not.toHaveBeenCalled()
+  })
+
+  it('refuses a request without a URL before storage', async () => {
+    const service = uploads(async () => ({})), message = request({ contentType: 'application/octet-stream' })
+    delete message.url
+    expect((await exchange(service, message)).status).toBe(400)
+    expect(service.uploadStream).not.toHaveBeenCalled()
+  })
+
+  it.each(['destroyed', 'writableEnded'] as const)('leaves a %s response untouched after upload settlement', async (closed) => {
+    const service = uploads(async () => ({}))
+    const response = { destroyed: closed === 'destroyed', writableEnded: closed === 'writableEnded', writeHead: vi.fn(), end: vi.fn() }
+    await handleFileUploadHttp(service, request({ sessionId: 's1', contentType: 'application/octet-stream' }), response as never)
+    expect(response.writeHead).not.toHaveBeenCalled()
+    expect(response.end).not.toHaveBeenCalled()
+  })
+
+  it('forwards request abortion and removes its listener when upload cleanup finishes', async () => {
+    const service = uploads(async () => ({})), message = request({ sessionId: 's1', contentType: 'application/octet-stream' })
+    const started = Promise.withResolvers<undefined>()
+    service.uploadStream.mockImplementation(async input => new Promise((_resolve, reject) => {
+      input.signal?.addEventListener('abort', () => { reject(input.signal?.reason as Error) }, { once: true })
+      started.resolve(undefined)
+    }))
+    const pending = exchange(service, message)
+    await started.promise
+    message.emit('aborted')
+    const captured = await pending
+    expect(JSON.parse(captured.body)).toMatchObject({ ok: false, error: { code: 'gateway/internal', message: 'upload request aborted' } })
+    expect(message.listenerCount('aborted')).toBe(0)
+  })
+
   it('stores the request bytes and returns the staged receipt', async () => {
     const value = {
       receiptId: 'receipt-1',

@@ -1,0 +1,4 @@
+- tree "Sessions":
+  - alert:
+    - text: Could not load the list
+    - button "Retry"

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-runtime-policy-artifact-readability.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-runtime-policy-artifact-readability.md
+document:
+  en: 3eb8ba5d56c3534715d1e63adaf5b94f75f59dee
+  zh: eee65b9ce3abf1c9e2896a7dbcb44a32a1da147e
+/agent-note-runtime-policy-code-is-readable-by-its-execution-account:
+  en: fe499a5faf6e3c42
+  zh: e24474b15b211142
+/agent-note-runtime-policy-code-is-readable-by-its-execution-account/problem:
+  en: ac9d03590d51124e
+  zh: 102f2d84e2851ce6
+/agent-note-runtime-policy-code-is-readable-by-its-execution-account/decision:
+  en: 2d6e54558fe19ebf
+  zh: e685d0cd525460b1
+/agent-note-runtime-policy-code-is-readable-by-its-execution-account/alternatives-considered:
+  en: d28c1a93962b6671
+  zh: 3cbfcea1eb6a616e
+/agent-note-runtime-policy-code-is-readable-by-its-execution-account/consequences:
+  en: 0fd4911492640af5
+  zh: 5a30f2199fc5ce45
+/agent-note-runtime-policy-code-is-readable-by-its-execution-account/verification:
+  en: 5f2c6d4a6b41364b
+  zh: 493a69e6eec63bbc

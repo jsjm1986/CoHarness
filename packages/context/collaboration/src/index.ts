@@ -100,6 +100,10 @@ declare module '@deepseek-ai/cordis' {
 /** Project collaboration Service Definition consumed by host APIs and persistence providers. */
 export abstract class Collaboration extends Service {
   constructor(ctx: Context) {
+    if (ctx.root.get('collaborationRequired') !== true) {
+      ctx.root.effect(() => ctx.root.provide('collaborationRequired', true),
+        'collaboration: application authorization policy')
+    }
     super(ctx, 'collaboration')
   }
 
@@ -125,6 +129,33 @@ export abstract class Collaboration extends Service {
     creation: CollaborationSessionCreation,
     operation: () => Promise<T>,
   ): Promise<T>
+}
+
+/**
+ * Resolve collaboration without downgrading an application to owner access.
+ * Shared project runtimes and applications that compose collaboration retain
+ * that requirement while a provider is unavailable or being replaced.
+ * @param ctx - Consumer context in the owning application.
+ * @returns the provider, or absence in an independent application without collaboration.
+ * @throws CollaborationError when the required provider is unavailable.
+ */
+export function collaborationOf(ctx: Context): Collaboration | undefined {
+  const provider = ctx.get('collaboration')
+  if (provider === undefined && isCollaborationRequired(ctx)) {
+    throw new CollaborationError('gateway-unavailable', 'The required collaboration provider is unavailable.')
+  }
+  return provider
+}
+
+/**
+ * Whether application policy requires participant authorization.
+ * The requirement survives temporary provider withdrawal and replacement.
+ * @param ctx - Consumer context in the owning application.
+ * @returns true for a composed provider or retained managed-application requirement.
+ */
+export function isCollaborationRequired(ctx: Context): boolean {
+  return ctx.get('collaboration') !== undefined
+    || ctx.get('collaborationRequired') === true
 }
 
 export default Collaboration

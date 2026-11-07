@@ -152,6 +152,8 @@ describe('session export compression config', () => {
     expect(ApiProxyService.Config({})).toEqual({
       sessionExportCompressionLevel: 6,
       coldBlankProbeMaxBytes: 1024,
+      coldSummaryCacheMaxEntries: 512,
+      coldSummaryCacheMaxBytes: 1024 * 1024,
       workspaceFileMaxBytes: 2 * 1024 * 1024,
       workspaceFileMaxLines: 5000,
       workspaceFileMaxEntries: 2000,
@@ -160,12 +162,14 @@ describe('session export compression config', () => {
     expect(ApiProxyService.Config({ sessionExportCompressionLevel: 0 }))
       .toEqual({
         sessionExportCompressionLevel: 0, coldBlankProbeMaxBytes: 1024,
+        coldSummaryCacheMaxEntries: 512, coldSummaryCacheMaxBytes: 1024 * 1024,
         workspaceFileMaxBytes: 2 * 1024 * 1024, workspaceFileMaxLines: 5000,
         workspaceFileMaxEntries: 2000, workspaceFileMaxResources: 512,
       })
     expect(ApiProxyService.Config({ sessionExportCompressionLevel: 9 }))
       .toEqual({
         sessionExportCompressionLevel: 9, coldBlankProbeMaxBytes: 1024,
+        coldSummaryCacheMaxEntries: 512, coldSummaryCacheMaxBytes: 1024 * 1024,
         workspaceFileMaxBytes: 2 * 1024 * 1024, workspaceFileMaxLines: 5000,
         workspaceFileMaxEntries: 2000, workspaceFileMaxResources: 512,
       })
@@ -180,17 +184,30 @@ describe('cold blank probe config', () => {
     expect(ApiProxyService.Config({ coldBlankProbeMaxBytes: 0 }))
       .toEqual({
         sessionExportCompressionLevel: 6, coldBlankProbeMaxBytes: 0,
+        coldSummaryCacheMaxEntries: 512, coldSummaryCacheMaxBytes: 1024 * 1024,
         workspaceFileMaxBytes: 2 * 1024 * 1024, workspaceFileMaxLines: 5000,
         workspaceFileMaxEntries: 2000, workspaceFileMaxResources: 512,
       })
     expect(ApiProxyService.Config({ coldBlankProbeMaxBytes: 2048 }))
       .toEqual({
         sessionExportCompressionLevel: 6, coldBlankProbeMaxBytes: 2048,
+        coldSummaryCacheMaxEntries: 512, coldSummaryCacheMaxBytes: 1024 * 1024,
         workspaceFileMaxBytes: 2 * 1024 * 1024, workspaceFileMaxLines: 5000,
         workspaceFileMaxEntries: 2000, workspaceFileMaxResources: 512,
       })
     for (const value of [-1, 1.5]) {
       expect(() => ApiProxyService.Config({ coldBlankProbeMaxBytes: value })).toThrow()
+    }
+  })
+})
+
+describe('cold summary cache config', () => {
+  it('accepts zero to disable reuse and refuses invalid entry or byte bounds', () => {
+    expect(ApiProxyService.Config({ coldSummaryCacheMaxEntries: 0, coldSummaryCacheMaxBytes: 0 }))
+      .toMatchObject({ coldSummaryCacheMaxEntries: 0, coldSummaryCacheMaxBytes: 0 })
+    for (const value of [-1, 1.5, Number.POSITIVE_INFINITY, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => ApiProxyService.Config({ coldSummaryCacheMaxEntries: value })).toThrow()
+      expect(() => ApiProxyService.Config({ coldSummaryCacheMaxBytes: value })).toThrow()
     }
   })
 })

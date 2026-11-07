@@ -6,7 +6,9 @@ import WebSocket from 'ws'
 import { ClientInspectorSource } from '../../src/client/bridge/transport.ts'
 import { ClientSourceCatalog } from '../../src/client/cdp/sources.ts'
 import { publishCordisTree } from '../../src/client/inspection/cordis.ts'
+import { ClientRealmSource } from '../../src/client/inspection/realm.ts'
 import { inspectorId } from '../../src/shared/bridge/ids.ts'
+import type { InspectorSourceId } from '../../src/shared/bridge/ids.ts'
 import type { InspectorClientBootstrap } from '../../src/shared/bridge/messages/control.ts'
 import type { InspectorJsonValue } from '../../src/shared/json.ts'
 import { createInspectorService } from '../../src/shared/service.ts'
@@ -14,6 +16,7 @@ import { createInspectorService } from '../../src/shared/service.ts'
 interface ClientFixtureInput {
   readonly bootstrap: InspectorClientBootstrap
   readonly label: string
+  readonly sourceId?: InspectorSourceId
   readonly sourceCatalog?: {
     readonly sourceText: string
     readonly sourceMap: string
@@ -66,7 +69,8 @@ const sourceCatalog = input.sourceCatalog === undefined
     loadSource: async () => input.sourceCatalog!.sourceText,
     loadSourceMap: async () => input.sourceCatalog!.sourceMap,
   }])
-const source = new ClientInspectorSource(input.bootstrap, input.label, sourceCatalog)
+const realmSource = input.sourceId === undefined ? undefined : new ClientRealmSource(input.label, input.sourceId)
+const source = new ClientInspectorSource(input.bootstrap, input.label, sourceCatalog, realmSource)
 const disposeCordis = publishCordisTree(context, source, {
   maxNodes: input.bootstrap.maxCordisNodes,
   maxBytes: input.bootstrap.maxFrameBytes - 4_096,

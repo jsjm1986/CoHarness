@@ -18,9 +18,11 @@ Cuts use the start of each append-origin message group: a `user/message` group o
 
 `dsh-client-connection` owns `historyPageTargetBytes` (default 131,072). The value is a target, not a hard rejection limit. Persistence, `SESSION_FORMAT_VERSION`, and Conversation assembly stay unchanged.
 
+The shipped Web bundle sets this target to 262,144 bytes. A public one-turn conversation with a 157,649-byte `request/header` required three serial history responses at 131,072 bytes. A synthetic production-codec fixture with the same event classes and a 157,333-byte header takes three pages at 131,072 and one at 262,144; both reconstruct the same complete response, records, and projections. The larger target trades a larger first response and fold for fewer network round trips, without changing the library default or the 16 MiB response-body rejection limit.
+
 ### Verification
 
-Focused codec, Fetch-carrier, schema, and Host-plugin tests pin reconstruction, exact-fit / one-byte-under cuts, oversized-group progress, malformed-record rejection, and unknown-event pass-through. The keyless assembled-Web scenario `apps/web/tests/lossless-history-wire.e2e.ts` seeds fewer than 50 append-origin messages, exercises the default 131,072-byte target through the production Host bridge, and records Chat goldens on the conversation-tier page plus after Trajectory `detail: 'full'` fill. Browser Chat no longer expands every historical packed chunk on first open; that download gear is [two-tier conversation history](2026-08-18-conversation-history-tier.md).
+Focused codec, Fetch-carrier, schema, and Host-plugin tests pin reconstruction, exact-fit / one-byte-under cuts, oversized-group progress, malformed-record rejection, and unknown-event pass-through. The keyless assembled-Web scenario `apps/web/tests/lossless-history-wire.e2e.ts` seeds fewer than 50 append-origin messages, exercises the shipped Web bundle's 262,144-byte target through the production Host bridge, and records Chat goldens on the conversation-tier page plus after Trajectory `detail: 'full'` fill. Browser Chat no longer expands every historical packed chunk on first open; that download gear is [two-tier conversation history](2026-08-18-conversation-history-tier.md).
 
 ## Alternatives considered
 

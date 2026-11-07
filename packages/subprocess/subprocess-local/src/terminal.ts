@@ -1,4 +1,4 @@
-/** Local node-pty terminal-process implementation for the subprocess seam. */
+/** Local node-pty terminal ownership; partial POSIX observations retain known identities until cleanup can be verified. */
 
 import { Buffer } from 'node:buffer'
 import { constants } from 'node:os'
@@ -79,7 +79,7 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
   /**
    * @param terminal - allocated node-pty process.
    * @param inspector - platform process/session operations.
-   * @param graceMs - TERM-to-KILL and exit-wait grace.
+   * @param graceMs - process-monotonic TERM-to-KILL and exit-wait grace.
    * @param platform - host platform; defaults to the running platform, injectable for deterministic tests.
    */
   constructor(
@@ -205,8 +205,8 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
     if (this.platform === 'win32') {
       if (signal === 'SIGINT') {
         // Windows has no process-group signalling: a `\x03` input write is the
-        // Ctrl-C delivery path conhost turns into a console-wide CTRL_C event
-        // for attached processes. node-pty's signal kills throw on Windows, so
+        // Ctrl-C delivery path the console host turns into a console-wide
+        // CTRL_C event for attached processes. node-pty's signal kills throw on Windows, so
         // no signal ever reaches the inspector.
         this.terminal.write('\x03')
         return foreground.processGroupId
@@ -261,6 +261,8 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
   }
 
   private survivors(members: ProcessIdentity[], observed: ProcessSnapshot): ProcessIdentity[] {
+    // Windows reads each identity directly; POSIX absence requires a complete table.
+    if (this.platform !== 'win32' && observed.complete !== true) return members
     return members.filter(member => observed.alive(member))
   }
 
@@ -284,10 +286,10 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
 
   private async waitForMembers(members: ProcessIdentity[]): Promise<ProcessIdentity[]> {
     if (members.length === 0) return []
-    const until = Date.now() + this.graceMs
+    const until = performance.now() + this.graceMs
     let survivors = this.survivors(members, this.inspector.snapshot())
-    while (survivors.length > 0 && Date.now() < until) {
-      await delay(Math.min(25, Math.max(1, until - Date.now())))
+    while (survivors.length > 0 && performance.now() < until) {
+      await delay(Math.min(25, Math.max(1, until - performance.now())))
       survivors = this.survivors(members, this.inspector.snapshot())
     }
     return survivors
@@ -336,7 +338,14 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
     const members = this.unionMembers(capturedSurvivors, this.descendants(this.inspector.snapshot()))
     this.signalMembers(members, 'SIGKILL')
     const survivors = await this.waitForMembers(members)
-    const observed = this.inspector.snapshot()
+    const until = performance.now() + this.graceMs
+    let observed = this.inspector.snapshot()
+    while (this.platform !== 'win32' && observed.complete !== true && performance.now() < until) {
+      this.descendants(observed)
+      await delay(Math.min(25, Math.max(1, until - performance.now())))
+      observed = this.inspector.snapshot()
+    }
+    if (this.platform !== 'win32' && observed.complete !== true) throw new Error('terminal cleanup failed; process observation is incomplete')
     return this.survivors(this.unionMembers(survivors, this.descendants(observed)), observed)
   }
 
@@ -366,13 +375,14 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
 
   private async stopShellWindows(): Promise<void> {
     // node-pty's Windows kill(signal) throws ("Signals not supported on
-    // windows"), and its bare kill() delegates to a console-list agent that
-    // fails when the parent has no console. taskkill tree escalation is the
-    // teardown path, fenced on the shell's start identity like every
-    // descendant; a root identity miss falls back to the bare kill. taskkill
-    // termination also does not reliably fire node-pty's exit notification
-    // (the same console-list agent), so the tiers verify the shell's absence
-    // through the inspector instead of waiting on `done` alone.
+    // windows"), and its bare kill() reaches the console host by a per-host
+    // path: Windows' own host goes through a console-list agent that fails when
+    // the parent has no console, while the bundled OpenConsole runs a native
+    // kill plus conout teardown. taskkill tree escalation is the teardown path,
+    // fenced on the shell's start identity like every descendant; a root
+    // identity miss falls back to the bare kill. taskkill termination also does
+    // not reliably fire node-pty's exit notification, so the tiers verify the
+    // shell's absence through the inspector instead of waiting on `done` alone.
     const shellGone = (): boolean =>
       this.exited || (this.rootIdentity !== undefined && !this.inspector.isAlive(this.rootIdentity))
     if (!shellGone() && this.rootIdentity !== undefined) {
@@ -395,10 +405,10 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
   }
 
   private async waitForWindowsShellExit(): Promise<void> {
-    const until = Date.now() + this.graceMs
-    while (!this.exited && Date.now() < until) {
+    const until = performance.now() + this.graceMs
+    while (!this.exited && performance.now() < until) {
       if (this.rootIdentity !== undefined && !this.inspector.isAlive(this.rootIdentity)) return
-      await delay(Math.min(25, Math.max(1, until - Date.now())))
+      await delay(Math.min(25, Math.max(1, until - performance.now())))
     }
   }
 

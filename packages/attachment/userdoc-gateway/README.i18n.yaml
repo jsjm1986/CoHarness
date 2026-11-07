@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/attachment/userdoc-gateway/README.md
+document:
+  en: 964eed9f6ed87f98a78e5e00710928b3525b0194
+  zh: 0c02482d8782b787964757a30620ae65990b7086
+/:
+  en: c8a42faf0605bc7a
+  zh: c6f7c6a9ce0b2d9f
+/deepseek-ai-dsh-userdoc-gateway:
+  en: b079980a0213ef37
+  zh: 210336ba8059b4b4
+/deepseek-ai-dsh-userdoc-gateway/summary:
+  en: 33771983d04d8450
+  zh: e46c59d7c3b4006a
+/deepseek-ai-dsh-userdoc-gateway/table-of-contents:
+  en: 2fb827f3bf651890
+  zh: a3f721dfaf3fc7ee
+/deepseek-ai-dsh-userdoc-gateway/authority-and-transport:
+  en: ec87259101f28a27
+  zh: 6b8967f5315cba2d
+/deepseek-ai-dsh-userdoc-gateway/configuration:
+  en: 65d199632f9f180c
+  zh: abe48dc268b67b28
+/deepseek-ai-dsh-userdoc-gateway/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-userdoc-gateway/model-experience/document-references:
+  en: 664327df50c1ffe7
+  zh: 33157a2445d229bb
+/deepseek-ai-dsh-userdoc-gateway/model-experience/document-references/what-the-model-sees:
+  en: b051b57223c262b1
+  zh: f8f66e13ec5c7f59
+/deepseek-ai-dsh-userdoc-gateway/model-experience/document-references/token-effect:
+  en: e77a3bd9206fa292
+  zh: 72076198c64d01b3
+/deepseek-ai-dsh-userdoc-gateway/model-experience/document-references/kv-cache-effect:
+  en: d4ec2dc6c8b50a96
+  zh: 5b06bf1c4c2c393d
+/deepseek-ai-dsh-userdoc-gateway/known-limitations-and-deferred-work:
+  en: 97611b80c1306ed0
+  zh: 9cde32c2801a10ad
+/deepseek-ai-dsh-userdoc-gateway/known-limitations-and-deferred-work/dev-note:
+  en: e2552535d8419752
+  zh: f59b1e78b197c0f5

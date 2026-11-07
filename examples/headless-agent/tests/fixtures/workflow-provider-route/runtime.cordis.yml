@@ -1,0 +1,13 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, workflowRouteReady]
+- insert:
+    - id: route-subagents
+      name: '@deepseek-ai/dsh-subagent'
+    - id: route-ptc
+      name: '@deepseek-ai/dsh-ptc-runtime-node'
+    - id: route-workflow-runtime
+      name: './runtime.mjs'
+    - id: route-model
+      name: './model.mjs'

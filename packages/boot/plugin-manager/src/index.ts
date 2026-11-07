@@ -10,7 +10,7 @@ import type { Entry, EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import z from '@deepseek-ai/schemastery'
 import { TypertRemoteService, Remote, RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
-import { pluginEntryId, readPluginInventory } from '@deepseek-ai/dsh-host-plugin-inventory'
+import { pluginEntryId, readRuntimePluginEntries } from '@deepseek-ai/dsh-host-plugin-inventory'
 import {
   readPluginMeta, readProfileManifest, resolveBundleDir, loadOverlayPatches, composeEntries,
   readProfilePatches, OPTIONAL_BUNDLES, bundlePatchPaths,
@@ -24,7 +24,7 @@ import { installationStream } from './install-stream.ts'
 import { classifyInstallFailure } from './install-failure.ts'
 import { dependencySpec, InvalidInstallSpecError, parseInstallSpec } from './install-spec.ts'
 import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryPlan } from './registry.ts'
-import { writePluginEnabled } from './patch.ts'
+import { writePluginConfig, writePluginEnabled } from './patch.ts'
 import { applyDesiredState, readDesiredState } from './desired-state.ts'
 import { incompatiblePlugin, ManagementFailure } from './failure.ts'
 import { approveBuilds, capturePendingBuilds } from './build-approval.ts'
@@ -34,6 +34,7 @@ import type {
   PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress,
   PluginInstallRequestId, PluginInstallFrame, PluginManagementAccess, PluginManagementCapability, PluginRegistries,
   PluginSpecInspection, PluginManagementAuthorization, ParsedInstallSpec, Registry,
+  PluginConfigDescription, PluginConfigValue,
 } from './types.ts'
 export type * from './types.ts'
 export { classifyInstallFailure, type InstallFailureFacts } from './install-failure.ts'
@@ -279,22 +280,22 @@ export class PluginManager extends TypertRemoteService {
   }
 
   /** Check deployment authority independently of tool approval or sandbox mode.
-   * @param capability - 'read' permits every caller that reached the service;
-   * 'manage' enforces the deployment's authorization provider.
+   * @param capability - the deployment's authorization provider gates both
+   * 'read' and 'manage'; without a provider, reads stay open unless the
+   * profile requires authorization.
    * @returns After the current caller is permitted the operation.
    */
   async authorize(capability: PluginManagementCapability = 'manage'): Promise<void> {
     this.abort.signal.throwIfAborted()
-    if (capability === 'read') return
     const policy = this.ownerContext.get('pluginManagementAuthorization')
-    if (policy !== undefined) await policy.authorize('manage')
-    else if (this.authorizationRequired) {
+    if (policy !== undefined) await policy.authorize(capability)
+    else if (this.authorizationRequired && capability !== 'read') {
       throw new RemoteError('plugin-management/forbidden', 'Profile management authorization is unavailable.', {})
     }
   }
 
   /** Report whether the caller may change the profile, for interfaces gating controls on it.
-   * @returns `manage` after probing the deployment policy; read access is unconditional.
+   * @returns `manage` after probing the deployment policy.
    */
   @Remote
   async access(): Promise<PluginManagementAccess> {
@@ -339,14 +340,14 @@ export class PluginManager extends TypertRemoteService {
   }
 
   /** Read current plugins, including why a row cannot be changed through the profile patch.
+   * @param includeMetadata Whether to read each entry's display resources; defaults to true. False returns controls without metadata.
    * @returns Current runtime entries with persistent patch targets.
    */
   @Remote
-  async listPlugins(): Promise<PluginInfo[]> {
+  async listPlugins(includeMetadata?: boolean): Promise<PluginInfo[]> {
     await this.authorize('read')
     const rows = flatten(composeEntries([readProfilePatches('dsh', this.profile)]))
-    const snapshot = await readPluginInventory(this.ctx)
-    return snapshot.entries.map((entry) => {
+    return readRuntimePluginEntries(this.ctx, includeMetadata !== false).map((entry) => {
       const actual = [...this.ctx.loader.entries()].find(row => row.id === entry.entryId)
       const candidates = rows.filter(row => row.id === actual?.options.id)
       const candidate = candidates[0]
@@ -540,6 +541,61 @@ export class PluginManager extends TypertRemoteService {
     }), { stage: 'enable', target: id, enabled }, 'plugin')
   }
 
+  /** Read one plugin row's current config and its schema, when the module declares one.
+   * The schema serializes through schemastery `toJSON` for form rendering;
+   * modules without a `Config` schema report `schema: undefined`.
+   * @param id Loader entry identity returned by listPlugins.
+   * @returns The entry's declared config and its JSON-serialized schema.
+   */
+  @Remote
+  async describePluginConfig(id: PluginEntryId): Promise<PluginConfigDescription> {
+    await this.authorize('read')
+    const actual = [...this.ctx.loader.entries()].find(row => row.id === id)
+    if (actual === undefined) throw new ManagementFailure('unknown-plugin')
+    let schema: unknown
+    try {
+      const candidate = actual.fiber?.runtime?.Config as { toJSON?: () => unknown } | undefined
+      schema = typeof candidate?.toJSON === 'function' ? candidate.toJSON() : undefined
+    } catch {
+      schema = undefined
+    }
+    const options = actual.options as { config?: PluginConfigValue }
+    return { config: options.config ?? null, ...(schema === undefined ? {} : { schema: schema as PluginConfigValue }) }
+  }
+
+  /** Replace one plugin row's config in the profile patch, validated against its schema.
+   * `config: null` clears all matching profile config overrides so composition defaults apply. The loader
+   * rejects a failing schema at reload as well; validating here first reports a
+   * readable error instead of a broken reload.
+   * @param id Loader entry identity returned by listPlugins.
+   * @param config JSON-serializable config object, or `null` to clear the override.
+   * @returns Saved and runtime outcomes.
+   */
+  @Remote
+  async setPluginConfig(id: PluginEntryId, config: PluginConfigValue | null): Promise<ChangeResult> {
+    await this.authorize()
+    return this.change(result => this.configure(async () => {
+      const row = (await this.listPlugins()).find(item => item.entryId === id)
+      if (row === undefined) throw new ManagementFailure('unknown-plugin')
+      if (row.readOnlyReason !== undefined) throw new ManagementFailure(row.readOnlyReason)
+      if (config !== null && (typeof config !== 'object' || Array.isArray(config))) {
+        throw new ManagementFailure('invalid-config')
+      }
+      if (config !== null) {
+        const actual = [...this.ctx.loader.entries()].find(item => item.id === id)
+        const schema = actual?.fiber?.runtime?.Config as
+          { '~standard'?: { validate: (value: unknown) => { issues?: unknown[] } | Promise<{ issues?: unknown[] }> } } | undefined
+        if (schema?.['~standard'] !== undefined) {
+          const verdict = await schema['~standard'].validate(config)
+          if (verdict.issues !== undefined && verdict.issues.length > 0) throw new ManagementFailure('invalid-config')
+        }
+      }
+      await writePluginConfig(this.profile.patchPath, row.patchId, row.moduleName, config)
+      Object.assign(result, await this.reload([row.patchId]))
+      return undefined
+    }), { stage: 'configure', target: id }, 'plugin')
+  }
+
   /** Select or remove a bundle layer while retaining installed dependencies.
    * @param name Bundle package name.
    * @param enabled Whether the bundle contributes its patch layer.
@@ -590,6 +646,16 @@ export class PluginManager extends TypertRemoteService {
     const result = this.change(async (result) => {
       if (spec.trim() === '' || spec.startsWith('-')) throw new ManagementFailure('invalid-spec')
       if (stopped()) throw new InstallCancelledError()
+      const sourcePolicy = this.ownerContext.get('pluginManagementAuthorization')
+      if (sourcePolicy?.authorizeInstall !== undefined) {
+        let parsed: ParsedInstallSpec
+        try { parsed = parseInstallSpec(spec) } catch { throw new ManagementFailure('invalid-spec') }
+        try { await sourcePolicy.authorizeInstall(parsed) }
+        catch (error) {
+          if (remoteErrorOf(error)?.code === 'plugin-management/install-source') throw new ManagementFailure('install-source')
+          throw error
+        }
+      }
       const before = readProfileManifest('dsh', this.profile.dir).dependencies ?? {}
       // With HMR, an installed package is removed before another version is installed, so its plugins stop first.
       const known = specPackageName(spec, before, this.profile.dir)

@@ -11,7 +11,7 @@ import { NodePtcRuntime } from '@deepseek-ai/dsh-ptc-runtime-node'
 import * as FsObservationPolicy from '@deepseek-ai/dsh-fs-observation-policy'
 import { SandboxedFileSystem } from '@deepseek-ai/dsh-fs-sandbox'
 import {
-  createUserMessage, isAgentLoopRequest, ToolCallId,
+  createUserMessage, ToolCallId,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek-api-key'
@@ -179,7 +179,7 @@ function orchestrate(ctx: Context, real: boolean) {
       expect(options.provider === PROVIDER && options.model === mainAgent.options.model).toBe(true)
       return observe(real ? next() : stream(textChunks(JSON.stringify(expected))), observations)
     }
-    if (!isAgentLoopRequest(options) || options.sessionId !== mainAgent?.id) throw new Error('Unexpected main-model request')
+    if (!ctx.llm.isAgentLoopRequest(options) || options.sessionId !== mainAgent?.id) throw new Error('Unexpected main-model request')
     expect(options.tools?.some(tool => tool.name === offeredTool)).toBe(true)
     const chunks = script.shift()
     if (chunks === undefined) throw new Error('Main-model script exhausted')

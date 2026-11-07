@@ -1,0 +1,14 @@
+{
+  "name": "scope-cookie-subsecond-current",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/server.spec.ts --retry=0",
+  "startedAt": "2026-10-24T02:12:14.297359+00:00",
+  "seconds": 6.037,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4363c14c39bed65387ff8d07e0263f3b16c8568a39ee183acbfe1e17efa44ee8",
+  "inputsAfter": "4363c14c39bed65387ff8d07e0263f3b16c8568a39ee183acbfe1e17efa44ee8",
+  "postgresToolDirectory": null,
+  "outputSha256": "ad762ba32cbbf66cd712d77477a486c0945f3b834e9e2be804011c07060d55c2",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  39 passed (39)\n   Start at  10:12:15\n   Duration  4.92s (transform 829ms, setup 0ms, import 1.07s, tests 3.75s, environment 0ms)\n\n"
+}

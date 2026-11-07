@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Local filesystem",
+    "description": "Local-filesystem implementation of the filesystem seam (ctx.fs)."
+  }
+}

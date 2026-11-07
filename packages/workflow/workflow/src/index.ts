@@ -6,6 +6,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {
   WorkflowAgentEndInfo,
   WorkflowAgentInfo,
@@ -155,8 +156,48 @@ export function isFatalWorkflowError(error: unknown): boolean {
  * result settles.
  */
 export abstract class WorkflowEngine extends Service {
+  private readonly foreground = new Map<Promise<void>, { readonly parent: Agent; readonly controller: AbortController }>()
+  private readonly withdrawal = new AbortController()
+
   constructor(ctx: Context) {
     super(ctx, 'workflowEngine')
+    ctx.effect(() => {
+      const releaseCheck = ctx.on('agent/idle-release-check', ({ agent }) =>
+        [...this.foreground.values()].some(record => record.parent === agent) ? 'busy' : undefined, { global: true })
+      return [releaseCheck, async () => {
+        this.withdrawal.abort(new WorkflowError('Workflow engine is being withdrawn', 'CANCELLED'))
+        try {
+          for (const record of this.foreground.values()) record.controller.abort(this.withdrawal.signal.reason)
+          await Promise.all(this.foreground.keys())
+        } finally {
+          releaseCheck()
+        }
+      }]
+    }, 'workflow: foreground collection and cleanup transfer')
+  }
+
+  /**
+   * Retain a foreground Consumer through result collection, disposal and failed
+   * cleanup transfer. Withdrawal cancels and joins admitted operations; direct
+   * holder-owned starts and background Jobs retain their own control lifetime.
+   * Providers extend this method when dependencies also own admission.
+   * @param parent - exact live Agent retaining foreground occupation.
+   * @param signal - caller cancellation.
+   * @param operation - Consumer including start, collection and cleanup transfer.
+   * @returns the Consumer outcome; closed admission rejects without invoking it.
+   */
+  async withForeground<T>(parent: Agent, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    this.withdrawal.signal.throwIfAborted()
+    signal.throwIfAborted()
+    const completion = Promise.withResolvers<undefined>()
+    const controller = new AbortController()
+    this.foreground.set(completion.promise, { parent, controller })
+    try {
+      return await operation(AbortSignal.any([signal, controller.signal]))
+    } finally {
+      this.foreground.delete(completion.promise)
+      completion.resolve(undefined)
+    }
   }
 
   /**

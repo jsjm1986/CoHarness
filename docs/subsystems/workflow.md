@@ -4,7 +4,7 @@ English | [中文](workflow.zh.md)
 
 The workflow seam lets an agent run a model-written orchestration SCRIPT that starts subagents. Like [subagent](subagent.md) it is **one optional capability**, not part of the agent loop, so its types and operations live here rather than in [core.md](core.md). Like bash, it permits ONE engine implementation per context to provide `ctx.workflowEngine`; there is no named-provider registry (a second engine replaces the first through plugin configuration rather than running beside it).
 
-Service Definition: [dsh-workflow](../../packages/workflow/workflow) (`ctx.workflowEngine` + the vocabulary below). The Service Provider is [dsh-workflow-ptc](../../packages/workflow/workflow-ptc) (a `node:worker_threads` engine — one worker per run, the script's vm context inside it); the model-facing Consumer is [dsh-tool-workflow](../../packages/workflow/tool-workflow). The proposal and rationale: [the dynamic-workflows Agent Note](../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.md).
+Service Definition: [dsh-workflow](../../packages/workflow/workflow) (`ctx.workflowEngine` + the vocabulary below). The Service Provider is [dsh-workflow-ptc](../../packages/workflow/workflow-ptc) (orchestration over the shared sandboxed Node PTC process); model-facing Consumers are [dsh-tool-workflow](../../packages/workflow/tool-workflow) and [dsh-tool-ralph](../../packages/workflow/tool-ralph). The proposal and rationale: [the dynamic-workflows Agent Note](../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.md).
 
 Sources: browser-safe vocabulary in [`packages/workflow/workflow/src/types.ts`](../../packages/workflow/workflow/src/types.ts), Host request and live-run handles in [`runtime-types.ts`](../../packages/workflow/workflow/src/runtime-types.ts).
 
@@ -92,12 +92,13 @@ interface WorkflowResult {
 
 ## A live run: `WorkflowRun`
 
-The handle the consumer holds while a script executes. The consumer awaits `result`, may `cancel` mid-flight, and MUST `dispose` on every path. `result` does NOT reject — a script failure resolves with `stopReason: 'error'` — and once the run is cancelled it SETTLES within the engine's bounded grace even if the script itself never settles (the engine force-settles `cancelled`; the worker-thread engine then terminates the script's worker), so a consumer awaiting `result` is never wedged past a cancellation. `dispose()` = cancel + that bounded settle + child quiescence; it never hangs on a stuck script.
+The consumer awaits `result`, may cancel the run and must call `dispose()` on every path. Script failures resolve with `stopReason: 'error'`; result settlement does not confirm resource cleanup. Concurrent disposal calls share one attempt, and a rejected attempt retains unfinished cleanup for retry. The [PTC backend](../../packages/workflow/workflow-ptc/README.md) owns process and child cleanup, without an implicit abandonment deadline. The [tool Consumer](../../packages/workflow/tool-workflow/README.md) keeps background jobs live until cleanup is confirmed.
 
 ```ts type-equiv
 /**
  * Holder-owned live workflow. `result` never rejects; consumers may cancel
- * and must call idempotent `dispose()` to await script and child quiescence.
+ * and must call `dispose()` to await script and child quiescence. Concurrent
+ * disposal calls share an attempt; a failed attempt retains cleanup for retry.
  */
 interface WorkflowRun {
   readonly id: WorkflowRunId
@@ -106,8 +107,15 @@ interface WorkflowRun {
   readonly result: Promise<WorkflowResult>
   /** Cancel the run and its children. */
   cancel(reason?: string): void
-  /** Cancel if needed and await script and child cleanup. */
+  /** Cancel if needed and await script and child cleanup; reject while cleanup remains unconfirmed. */
   dispose(): Promise<void>
+  /**
+   * Hand rejected disposal to its original resource owner before discarding the
+   * run. Holder-owned background work keeps its own retry controls.
+   * Observe confirmation outside the failing foreground call.
+   * @returns fulfillment after retained cleanup confirms quiescence.
+   */
+  retainFailedCleanup(): Promise<void>
 }
 ```
 
@@ -143,6 +151,18 @@ Workflow Service Definition contract. Invalid requests throw before publication;
 
 ```ts cordis-catalog
 /**
+ * Retain a foreground Consumer through result collection, disposal and failed
+ * cleanup transfer. Withdrawal cancels and joins admitted operations; direct
+ * holder-owned starts and background Jobs retain their own control lifetime.
+ * Providers extend this method when dependencies also own admission.
+ * @param parent - exact live Agent retaining foreground occupation.
+ * @param signal - caller cancellation.
+ * @param operation - Consumer including start, collection and cleanup transfer.
+ * @returns the Consumer outcome; closed admission rejects without invoking it.
+ */
+async withForeground<T>(parent: Agent, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T>
+
+/**
  * Parse and execute a workflow script.
  * @param request - the script, its `args`, the parent agent, and an
  *   optional cancel signal.
@@ -150,6 +170,8 @@ Workflow Service Definition contract. Invalid requests throw before publication;
  */
 abstract start(request: WorkflowStartRequest): WorkflowRun
 ```
+
+Types: [Agent](core.md)
 
 Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 

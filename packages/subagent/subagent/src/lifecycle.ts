@@ -22,6 +22,7 @@ import { foldConsumedWork } from '@deepseek-ai/dsh-agent'
 import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionId, SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 import { finalAssistantOutput } from './assistant-output.ts'
+import { renderSubagentFailure } from './error.ts'
 import { SubagentRunId } from './types.ts'
 import type { SubagentResult, SubagentRun, SubagentRunEndInfo, SubagentRunInfo } from './types.ts'
 import type { StructuredAttachment } from './structured.ts'
@@ -130,10 +131,10 @@ export function createLifecycleEmitter(
       try {
         const returned: unknown = callback(info)
         void Promise.resolve(returned).catch((error: unknown) => {
-          ctx.logger.warn(`subagent: ${name} listener rejected: ${renderThrown(error)}`)
+          ctx.logger.warn(`subagent: ${name} listener rejected: ${renderSubagentFailure(error)}`)
         })
       } catch (error: unknown) {
-        ctx.logger.warn(`subagent: ${name} listener threw: ${renderThrown(error)}`)
+        ctx.logger.warn(`subagent: ${name} listener threw: ${renderSubagentFailure(error)}`)
       }
     }
   }
@@ -283,14 +284,5 @@ function epochStopReason(events: readonly SessionEvent[]): SubagentResult['stopR
      * success would report failed work as completed. */
     default:
       return 'error'
-  }
-}
-
-/** Render any listener-thrown value without letting coercion escape containment. */
-function renderThrown(value: unknown): string {
-  try {
-    return value instanceof Error ? `${value.name}: ${value.message}` : String(value)
-  } catch {
-    return '<unrenderable thrown value>'
   }
 }

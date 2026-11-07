@@ -15,6 +15,7 @@ import { INTERACTIONS_QUERY, interactionsUnavailableError, type ConnectionIntera
 import type { RequestPayload, ResponseValue, RpcMethodMap } from '../api/rpc-map.ts'
 import type { ClientRequest, ClientResponse, RpcError, RpcMessage, RpcReceipt, RpcRequest, RpcResponse, ServerRequest } from '../api/rpc.ts'
 import { RpcId } from '../api/rpc.ts'
+import { addressRuntimeUrl } from '../api/client-session.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import { rpcReceiptSchema, serverRequestSchema, serverResponseSchema } from '../api/rpc.schema.ts'
 import { hostFrameSchema, muxFrameSchema } from '../api/events.schema.ts'
@@ -23,8 +24,9 @@ import {
   hostFileApplicationsValueSchema, hostListDirectoryValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema,
 } from '../api/host.schema.ts'
 import {
-  sessionCancelValueSchema,
+  sessionActivateValueSchema,
   sessionAttachmentValueSchema,
+  sessionCancelValueSchema,
   sessionCreateValueSchema,
   sessionForkValueSchema,
   sessionHistoryIndexValueSchema,
@@ -98,6 +100,7 @@ export interface IApiClient {
     attachment(payload: RequestPayload<'session.attachment'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.attachment'>>>
     updateQueue(payload: RequestPayload<'session.updateQueue'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.updateQueue'>>>
     cancel(payload: RequestPayload<'session.cancel'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.cancel'>>>
+    activate(payload: RequestPayload<'session.activate'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.activate'>>>
   }
   subagents: {
     history(payload: RequestPayload<'subagent.history'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.history'>>>
@@ -199,6 +202,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.attachment': sessionAttachmentValueSchema,
   'session.updateQueue': sessionUpdateQueueValueSchema,
   'session.cancel': sessionCancelValueSchema,
+  'session.activate': sessionActivateValueSchema,
   'subagent.history': historyWireValueSchema,
   'jobs.output': jobsOutputValueSchema,
   'jobs.kill': jobsKillValueSchema,
@@ -352,11 +356,15 @@ function requestSignalLease(
 }
 
 /** URL base for in-process handler injection (fake authority, opencode precedent). */
-/** HTTP failure before an RPC envelope is received; response bodies remain unread. */
+/** Transport failure before an RPC envelope; HTTP error bodies remain unread. Status zero means no response and unknown server effects. */
 export class ApiTransportError extends Error {
-  constructor(readonly status: number, path: string) {
-    super(`transport failure for ${path}: HTTP ${String(status)}`)
+  /** Request loss and explicit HTTP authorization denial remain distinct machine-readable failures. */
+  readonly code: 'request-unavailable' | 'access-revoked' | undefined
+
+  constructor(readonly status: number, path: string, options?: ErrorOptions) {
+    super(status === 0 ? `transport failure for ${path}: no HTTP response` : `transport failure for ${path}: HTTP ${String(status)}`, options)
     this.name = 'ApiTransportError'
+    this.code = status === 0 ? 'request-unavailable' : status === 401 || status === 403 ? 'access-revoked' : undefined
   }
 }
 
@@ -530,6 +538,13 @@ export function readApiResponseText(
   return readBoundedText(response, limit, signal)
 }
 
+/** Request body release without delaying the primary HTTP or callback failure. */
+function cancelRejectedResponseBody(body: Response['body']): void {
+  void body?.cancel().catch(() => {
+    // A rejected cancellation acknowledgement cannot replace the primary failure.
+  })
+}
+
 /**
  * Abstract fetch-carrier client. Subclasses supply the transport (doFetch) and may refine the
  * per-message tap (onEnvelope) — platform aspects stay in subclasses, protocol invariants stay
@@ -616,11 +631,7 @@ export abstract class AbstractApiClient implements IApiClient {
   /** Resolve one API URL, carrying an explicit runtime target and the connection's interaction mode. */
   protected resolveUrl(path: string): URL {
     const url = new URL(path, this.resolveBase())
-    if (this.target !== undefined) {
-      url.searchParams.set('dshTarget', this.target.kind === 'personal'
-        ? 'personal'
-        : `project:${String(this.target.projectId)}`)
-    }
+    if (this.target !== undefined) addressRuntimeUrl(url, this.target)
     url.searchParams.set(INTERACTIONS_QUERY, this.interactions)
     return url
   }
@@ -652,8 +663,7 @@ export abstract class AbstractApiClient implements IApiClient {
         ...lease.signal === undefined ? {} : { signal: lease.signal },
       })
       if (!response.ok) {
-        await response.body?.cancel().catch(() => {})
-        lease.dispose()
+        cancelRejectedResponseBody(response.body)
         throw new ApiTransportError(response.status, path)
       }
       return { response, signal: lease.signal, dispose: () => { lease.dispose() } }
@@ -722,13 +732,13 @@ export abstract class AbstractApiClient implements IApiClient {
   ): AsyncGenerator<RpcRequest<F>> {
     const response = await this.doFetch(this.resolveUrl(path), { signal })
     if (!response.ok || response.body === null) {
-      await response.body?.cancel().catch(() => {})
+      cancelRejectedResponseBody(response.body)
       throw new ApiTransportError(response.status, path)
     }
     try {
       onOpen?.()
     } catch (error) {
-      await response.body.cancel().catch(() => {})
+      cancelRejectedResponseBody(response.body)
       throw error
     }
     const reader = response.body.getReader()
@@ -788,6 +798,7 @@ export abstract class AbstractApiClient implements IApiClient {
     attachment: (payload, signal) => this.callUnary('session.attachment', payload, signal),
     updateQueue: (payload, signal) => this.callUnary('session.updateQueue', payload, signal),
     cancel: (payload, signal) => this.callUnary('session.cancel', payload, signal),
+    activate: (payload, signal) => this.callUnary('session.activate', payload, signal),
   }
 
   readonly subagents: IApiClient['subagents'] = {

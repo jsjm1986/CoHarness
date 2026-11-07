@@ -34,3 +34,5 @@ Status: implemented
 ## 影响
 
 Markdown 与 HTML 预览在关键面上与上游行为一致——Markdown 增量文本、HTML 完整打包的不透明 iframe——而 ACL、版本、取消与 runtime 定向与既有文件标签完全相同。HTML 依赖图付出有界的整文件内存；不支持的遍历在包 README 中明确记录而不是静默半加载。[录制的浏览器场景](../../../../apps/web/tests/workspace-files.e2e.ts) 覆盖 Markdown 渲染、沙箱打包 frame 以及共享的变更/重载路径。
+
+独立资源调度与字节预留遵循[有界工作区预览准备](../architecture/2026-10-23-bounded-preview-preparation.zh.md)。

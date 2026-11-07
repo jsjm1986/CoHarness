@@ -41,3 +41,54 @@ export async function writePluginEnabled(filename: string, id: string, name: str
   await writeFileAtomic(filename, String(document), { mode: 0o600 })
   return true
 }
+
+/**
+ * Replace a managed row's effective `config` object. `null` clears every
+ * matching config override in this profile patch so composition defaults apply.
+ * @param filename Current profile patch file.
+ * @param id Unique composition entry id.
+ * @param name Module name used to match name-qualified overrides.
+ * @param config Plain JSON-serializable configuration, or `null` to clear it.
+ * @returns Whether the file changed.
+ */
+export async function writePluginConfig(
+  filename: string, id: string, name: string, config: unknown,
+): Promise<boolean> {
+  let text: string
+  try {
+    text = await readFile(filename, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    text = '[]\n'
+  }
+  const document = parseDocument(text, {
+    customTags: [{ tag: 'tag:yaml.org,2002:js', resolve: (value: string) => value }],
+  })
+  const error = document.errors[0]
+  if (error !== undefined) throw error
+  if (!isSeq(document.contents)) throw new Error('Profile patch must be a YAML sequence')
+  loadOptionalPatches('dsh', filename)
+  const items = document.contents.items
+  const matches = (item: unknown, index: number): boolean => {
+    if (!isMap(item) || document.getIn([index, 'id']) !== id || item.has('insert')) return false
+    const expectedName = document.getIn([index, 'name'])
+    return !expectedName || expectedName === name
+  }
+  if (config === null) {
+    let changed = false
+    for (let index = items.length - 1; index >= 0; index--) {
+      const item = items[index]
+      if (!isMap(item) || !matches(item, index) || !item.has('config')) continue
+      item.delete('config')
+      if (item.items.every(pair => String(pair.key) === 'id' || String(pair.key) === 'name')) items.splice(index, 1)
+      changed = true
+    }
+    if (!changed) return false
+  } else {
+    const target = items.findLast(matches)
+    if (isMap(target)) document.setIn([items.indexOf(target), 'config'], config)
+    else document.add({ id, name, config })
+  }
+  await writeFileAtomic(filename, String(document), { mode: 0o600 })
+  return true
+}

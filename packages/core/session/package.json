@@ -38,9 +38,11 @@
     "./chunk-rows": {
       "types": "./lib/types/chunk-rows.d.ts",
       "default": "./lib/types/chunk-rows.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts"

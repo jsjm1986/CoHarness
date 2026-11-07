@@ -1,0 +1,14 @@
+{
+  "name": "document-directory-cancellation-current",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/mutation.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts packages/attachment/userdoc-local/tests/identity.spec.ts",
+  "startedAt": "2026-10-26T15:06:31.158427+00:00",
+  "seconds": 6.115,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4cd82f845b8edf077fb56c701cde7aa21f1bd1a31ed33d321ff4726014616232",
+  "inputsAfter": "4cd82f845b8edf077fb56c701cde7aa21f1bd1a31ed33d321ff4726014616232",
+  "postgresToolDirectory": null,
+  "outputSha256": "03ddbe73a14830fabbd4c4deed56b7dce78f16c90e4c183f103d0e3764bb5531",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  3 passed (3)\n      Tests  102 passed (102)\n   Start at  23:06:35\n   Duration  2.01s (transform 596ms, setup 168ms, import 608ms, tests 2.83s, environment 0ms)\n\n"
+}

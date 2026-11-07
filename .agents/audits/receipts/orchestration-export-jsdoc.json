@@ -1,0 +1,14 @@
+{
+  "name": "orchestration-export-jsdoc",
+  "cwd": ".",
+  "command": "pnpm run verify-export-jsdoc",
+  "startedAt": "2026-10-25T07:07:17.091626+00:00",
+  "seconds": 6.755,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ce2343a15ec32f7e49529f5f1f6a8091303d72eeba912e031852e378431efdbd",
+  "inputsAfter": "ce2343a15ec32f7e49529f5f1f6a8091303d72eeba912e031852e378431efdbd",
+  "postgresToolDirectory": null,
+  "outputSha256": "34c3189bb05208432b51c80e9941df04ac432c6f79279e01c6008b6c09b8526f",
+  "outputTail": "$ tsx scripts/verify-export-jsdoc.ts\nverify-export-jsdoc: every exported name in each package API is documented.\n"
+}

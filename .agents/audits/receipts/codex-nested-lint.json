@@ -1,0 +1,14 @@
+{
+  "name": "codex-nested-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subagent/subagent-codex/src/index.ts packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts packages/subagent/subagent-codex/tests/managed-ssh-loader.spec.ts packages/subagent/subagent-codex/tests/fixtures/managed-ssh-driver.mjs",
+  "startedAt": "2026-10-25T14:06:29.898425+00:00",
+  "seconds": 7.131,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bdce112c5aff6b785cf0baabdb63b60658e042e77b26076e3e5428d50d9007ff",
+  "inputsAfter": "bdce112c5aff6b785cf0baabdb63b60658e042e77b26076e3e5428d50d9007ff",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

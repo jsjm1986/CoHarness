@@ -1,0 +1,13 @@
+{
+  "name": "gateway-model-owner-crash-postgres",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/node-resource-budget-postgres.spec.ts tests/project-progress-postgres.spec.ts -- --no-file-parallelism",
+  "startedAt": "2026-10-23T21:20:07.274282+00:00",
+  "seconds": 10.579,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bd9a15ab2ed290a82718a807ac0f28b1c39a7459fbe333ef38882e9333ec78e1",
+  "inputsAfter": "bd9a15ab2ed290a82718a807ac0f28b1c39a7459fbe333ef38882e9333ec78e1",
+  "outputSha256": "52aaa2b35753e88d0045e294d6e8e87bb78c2670657818958157f741961692c5",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  39 passed (39)\n   Start at  05:20:08\n   Duration  9.18s (transform 526ms, setup 0ms, import 839ms, tests 8.16s, environment 0ms)\n\n"
+}

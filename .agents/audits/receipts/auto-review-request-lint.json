@@ -1,0 +1,14 @@
+{
+  "name": "auto-review-request-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/experimental/auto-review/src/index.ts packages/experimental/auto-review/tests/auto-review.spec.ts packages/core/tools/src/index.ts snapshots/sdk/auxiliary-model-fixture.ts snapshots/sdk/memory-auxiliary.snapshot.ts snapshots/sdk/auto-review-model.snapshot.ts examples/headless-agent/tests/fixtures/auto-review-model.mjs snapshots/sdk/auto-review-model/prepare.mjs",
+  "startedAt": "2026-10-24T03:05:26.841138+00:00",
+  "seconds": 6.499,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "85826958f8fa9b7265efc5bb650688451123e26661c46ea3126117a654eaa632",
+  "inputsAfter": "a70398d648d57c9fb5278debab17b7375e28ad6f2687daea2c468f095545e09e",
+  "postgresToolDirectory": null,
+  "outputSha256": "0901bd52c75dd146b6f7a1784202455206b310ea4e59f717d4aef03f51950c41",
+  "outputTail": "packages/experimental/auto-review/tests/auto-review.spec.ts:284:1: error @stylistic(max-len): This line has a length of 160. Maximum allowed is 140.\n"
+}

@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { DocumentsButton } from './DocumentsButton.tsx'
 import type { DocumentsButtonInjected } from './DocumentsButton.tsx'
+import { DocumentsOverlay } from './DocumentsOverlay.tsx'
 import { DocumentsModal } from './DocumentsModal.tsx'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { NS, en, zh } from './locales.ts'
@@ -29,21 +30,30 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export const inject = ['slots', 'locale', 'sessions', 'conversation', 'connection']
+export const inject = ['slots', 'locale', 'sessions', 'conversation', 'connection', 'deploymentContext']
 
 export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-documents: dictionaries')
 
   const injected = (): DocumentsButtonInjected => ({
+    hooks: { deployment: ctx.deploymentContext },
     documentScopeFor: sessionId => ctx.sessions.runtimeIdentityFor?.(sessionId),
     privateResourceUrl: url => connection.privateResourceUrl?.(url) ?? url,
+    canAttachDocument: sessionId => ctx.get('conversation')?.canAttachDocument(sessionId) ?? false,
     attachDocument: (document, targetSessionId) => {
       const sessionId = targetSessionId ?? ctx.sessions.list.getSnapshot().current
       if (sessionId === undefined) return false
       return ctx.get('conversation')?.attachDocument(sessionId, document) ?? false
     },
   })
+
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'documents.picker',
+    locale: NS,
+    inject: injected,
+  }, DocumentsOverlay))
 
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-12-cold-history-attach-race.md
 document:
-  en: 312d89834646b48160450b52250b080790188e00
-  zh: 8801b5ba40287ba49e6a6ee018d6b28446d3f505
+  en: 0e33b9431d7a2876bbafd84002c7cf6ce0f8c652
+  zh: 8eb7e45deb9f264e1243cfc669c9e8d316690331
 /agent-note-cold-history-reads-recover-through-a-concurrent-attach:
   en: bd8de0a7ba615678
   zh: 6a9c8e33ee0d4135
@@ -12,11 +12,11 @@ document:
   en: c5a9b62a8504244e
   zh: 38b39a8fa781dd11
 /agent-note-cold-history-reads-recover-through-a-concurrent-attach/decision:
-  en: bc7b4b1d9014b8fb
-  zh: ab73b59e5803130f
+  en: c3f5685fd0728e8c
+  zh: 05059661d8b43fb8
 /agent-note-cold-history-reads-recover-through-a-concurrent-attach/alternatives-considered:
-  en: 676e2bf7d4fe5a59
-  zh: 225a9bfd484a848d
+  en: 841606b1c7b0a268
+  zh: a53ca997baf221b1
 /agent-note-cold-history-reads-recover-through-a-concurrent-attach/consequences:
-  en: da4d054fd7da3615
-  zh: 652df5ea62de0694
+  en: fc7e5af53252b868
+  zh: 9e3ae8c66bcb1dd9

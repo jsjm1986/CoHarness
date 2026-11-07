@@ -1,0 +1,353 @@
+{
+  "finding": "B230",
+  "status": "named_business_acceptance_verified_coverage_incomplete",
+  "updatedAt": "2026-10-27T21:07:37.879203+00:00",
+  "scope": "Published managed-directory recovery after ordinary atomic saves, additions, deletions and child moves; pre-existing descriptors and original creator isolation. Full document and project audit remains open.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "fetchExitCode": 0,
+    "ahead": 139,
+    "behind": 0,
+    "existingDirtyEditsPreserved": true
+  },
+  "fixes": [
+    "Private capture verifies the selected directory object and complete authorized file inventory before publication. Recovery of a recorded published directory settles that admitted snapshot using directory identity and protected marker evidence.",
+    "Ordinary later file changes reconcile independently: exact originals retain creator provenance; atomic replacements acquire distinct unattributed incarnations. The directory actor is not assigned to external saves.",
+    "Legacy directory intents without a recorded source object retain complete target-inventory verification. A substituted target carrying the old marker is rejected."
+  ],
+  "acceptance": {
+    "negativeControls": {
+      "sourceCasesFailedBeforeFix": 4,
+      "previousEmittedHttpStatus": 409,
+      "requiredHttpStatus": 200
+    },
+    "provider": {
+      "passed": 587,
+      "platformSkipped": 5,
+      "filesPassed": 29,
+      "filesSkipped": 1,
+      "strictCoverageExitCode": 1
+    },
+    "latestTargetedSource": {
+      "passed": 98,
+      "files": 2
+    },
+    "gateway": {
+      "passed": 73,
+      "files": 4,
+      "externalCatalog": "stateful test service; no new PostgreSQL acceptance claimed"
+    },
+    "httpTranscript": {
+      "sourceAndEmitted": true,
+      "observations": 5,
+      "latestEmittedDiagnosticReplay": "passed"
+    },
+    "linux": {
+      "versions": [
+        "v22.22.1",
+        "v24.19.0"
+      ],
+      "observationsPerVersion": 18,
+      "ordinaryUid": 65534,
+      "heldDirectoryDescriptorAtomicSave": true,
+      "privatePathLookupDenied": true
+    },
+    "documentation": {
+      "quickGatesPassed": 20,
+      "additionalCatalogPersistenceAndJSDocLeaves": "passed"
+    },
+    "build": {
+      "rootAggregatePassed": 7,
+      "rootAggregateFailed": 1,
+      "failure": "Client test reads checked from HTMLElement. The property assertion is repaired; its2 cases and the current complete client noEmit compiler pass. Root aggregate is not re-labelled8/8.",
+      "allProductionArtifactBuildStagesPassed": true,
+      "gatewayNoEmit": "passed"
+    },
+    "scopedLintAndWhitespace": "passed after repairing the long declaration and native test rejection type",
+    "ownedDisposableLinuxToolsRemoved": true
+  },
+  "coverage": {
+    "report": "coverage/document-directory-editor-current-20261028/coverage-final.json",
+    "metrics": {
+      "total": {
+        "statements": 90.7,
+        "branches": 87.17,
+        "functions": 98.16,
+        "lines": 93.99
+      },
+      "packages/attachment/userdoc-local/src/backup.ts": {
+        "statements": 94.52,
+        "branches": 95.74,
+        "functions": 100,
+        "lines": 96.66
+      },
+      "packages/attachment/userdoc-local/src/directory-move-win32.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "packages/attachment/userdoc-local/src/directory-move.ts": {
+        "statements": 89.65,
+        "branches": 77.04,
+        "functions": 100,
+        "lines": 96.38
+      },
+      "packages/attachment/userdoc-local/src/identity-fs.ts": {
+        "statements": 88.62,
+        "branches": 79.04,
+        "functions": 94.84,
+        "lines": 90.83
+      },
+      "packages/attachment/userdoc-local/src/identity.ts": {
+        "statements": 91.54,
+        "branches": 91.07,
+        "functions": 100,
+        "lines": 95.9
+      },
+      "packages/attachment/userdoc-local/src/mutation.ts": {
+        "statements": 88.58,
+        "branches": 85.76,
+        "functions": 100,
+        "lines": 91.77
+      }
+    },
+    "thresholdsChanged": false,
+    "exclusionsChanged": false,
+    "verdict": "FAIL: five measured production modules remain below the existing per-file100percent gate; Windows adapter tests do not establish native Win32 behavior."
+  },
+  "performance": {
+    "runtime": "Linux Node v24.19.0",
+    "dataset": "20 files of1024 bytes;2 warmup renames,25 measured renames each followed by identity listing; separate processes on the same filesystem.",
+    "results": {
+      "before": {
+        "fileCount": 20,
+        "fileBytes": 1024,
+        "warmupRenames": 2,
+        "renames": 25,
+        "durationMs": 5738.118184000001,
+        "heapBefore": 7189704,
+        "peakHeap": 10802936,
+        "heapAfter": 7613592,
+        "maxRssKiB": 100768
+      },
+      "after": {
+        "fileCount": 20,
+        "fileBytes": 1024,
+        "warmupRenames": 2,
+        "renames": 25,
+        "durationMs": 5402.610757,
+        "heapBefore": 7189040,
+        "peakHeap": 15500240,
+        "heapAfter": 7619592,
+        "maxRssKiB": 100344
+      }
+    },
+    "limit": "Single bounded observation; no general speed or memory guarantee."
+  },
+  "unsuccessfulEvidencePreserved": [
+    "Initial documentation19/20 failed the generated attachment pairing; current20/20 and all selected leaves pass.",
+    "Initial scoped lint had2 issues; repaired scoped lint passes.",
+    "Initial and latest root builds each have7/8 with different concurrent client test errors; current repaired client noEmit passes.",
+    "One emitted HTTP rerun returned507 before upload admission. The original response body was not recorded; a diagnostic assertion now retains it on failure and the following unchanged-runtime replay passes. The cause is not established.",
+    "Strict coverage exits1; functional pass counts do not imply coverage completion."
+  ],
+  "notes": {
+    "updatedExisting": [
+      ".agents/notes/implemented/feature/2026-08-19-document-workspace-folders.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": []
+  },
+  "limitations": [
+    "All12 business domains and the full function inventory remain in progress.",
+    "Native Windows is unexecuted; current evidence is macOS plus actual Linux Node22/24 and Windows adapter tests.",
+    "Further ordinary file relocation/address-reuse review continues as B231.",
+    "Real model API verification remains explicitly deferred by the user."
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "commandReceipts": [
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T21:05:37.474969+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/identity-fs.spec.ts",
+        "packages/attachment/userdoc-local/tests/mutation.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T21:05:42.069632+00:00",
+      "name": "document-directory-editor-final-source"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T20:47:02.247822+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/document-directory-capture.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T20:47:04.996786+00:00",
+      "name": "document-directory-editor-source-http"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T20:47:05.035037+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/document-directory-capture.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T20:47:05.927473+00:00",
+      "name": "document-directory-editor-built-http"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T21:05:04.976821+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/document-directory-capture.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T21:05:05.668421+00:00",
+      "name": "document-directory-editor-built-http-diagnostic"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T20:47:05.957268+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/documents-local.spec.ts",
+        "tests/document-transfer.spec.ts",
+        "tests/document-transfer-loader.spec.ts",
+        "tests/document-directory-capture.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T20:47:09.888155+00:00",
+      "name": "document-directory-editor-gateway-regression"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T20:40:19.147647+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-directory-editor-linux.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T20:40:22.269936+00:00",
+      "name": "document-directory-editor-linux-runtime"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T20:55:37.591976+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/prepare-directory-editor-docs.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T20:58:53.682626+00:00",
+      "name": "document-directory-editor-docs-current"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T21:05:17.394890+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-directory-editor-lint.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T21:05:24.318804+00:00",
+      "name": "document-directory-editor-repaired-lint"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T21:04:01.539651+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T21:04:04.656209+00:00",
+      "name": "document-directory-editor-current-gateway-types"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T21:05:42.094142+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/client/ui-documents/tests/components.client.spec.tsx",
+        "-t",
+        "copies the named document independently",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T21:05:45.161438+00:00",
+      "name": "document-editor-ui-type-regression"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T21:05:45.185463+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.client.json",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T21:06:11.098414+00:00",
+      "name": "document-directory-editor-final-client-types"
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-27T20:48:35.996012+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-directory-editor-performance.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T20:48:49.204729+00:00",
+      "name": "document-directory-editor-performance"
+    }
+  ],
+  "sourceSha256": {
+    "packages/attachment/userdoc-local/src/mutation.ts": "7443721331c5fb498c3bce7e64b6713b4af11652c103ee2bc07883665a569b82",
+    "packages/attachment/userdoc-local/src/identity-fs.ts": "ee224bc21b09e69353dd32455d4f2a24d40cd3ffb7cf2a7c127b59a060564904",
+    "packages/attachment/userdoc-local/src/local-fs.ts": "3f932e5ee8123963d80467ef441050f5ef1a3c05c55955c5bf5b7c6e5a9f7b7c",
+    "packages/attachment/userdoc/src/index.ts": "34d16e0c53fd8b89e13857d67470b87b622d02e16ac9a1ae505bec6f939d2f48",
+    "packages/attachment/userdoc-local/tests/mutation.spec.ts": "01be24176dbd51ea3e92660874e961ac9be8c21201056486af91201aafd06f3f",
+    "packages/attachment/userdoc-local/tests/identity-fs.spec.ts": "823fa73473001dbd4689713772c79ac3ffeed86afbadbf41a161d2f29fc351b7",
+    "packages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts": "90665703f6c654aecc6bf57b515235a75de145d9f23d1060c95715195ed3772d",
+    "gateway/tests/fixtures/document-directory-capture.mjs": "dbff80f047e96540018899b2baf1c4478ee86669236976903cd3e761c366bf32",
+    "gateway/tests/expected/documents/directory-capture.jsonl": "4665e3427957c755d47275b72328843675f2ac8226ba83c532eaf7fb54ef7e96",
+    "packages/attachment/userdoc-local/tests/expected/linux-object-replay.jsonl": "a52a3a87e34620f466f5901003f068b89bc9986cd966f231cabe4a7c4c6d73be"
+  }
+}

@@ -46,7 +46,7 @@ After the build, `lib/typert.host.js` and `lib/typert.host.d.ts` exist and the [
 <a id="ordinary-remote-metadata"></a>
 ### Ordinary Remote metadata
 
-The emitter writes one static `TypertRemoteMethodSpec` per endpoint and calls the pure `createTypertRemoteInfo` factory with the spec and the artifact's own imported Zod runtime. Ordinary consumer `./remote` artifacts retain their default export and `TYPERT_REMOTE`, typed as `TypertRemoteInfo` with precise `TypertRemoteMethod<Input, Output, Mode, Uplink, DecodedOutput>` entries in `TYPERT_REMOTE.methods`. Each entry is the same object as its direct descriptor in `TYPERT_REMOTE.descriptors`; Context-only receivers remain in descriptors and scoped declarations. There is no separate `REMOTE_METHODS` export, nested `metadata`, or second `output` codec. The [protocol](<../protocol/README.md>) owns the factory and method API.
+The emitter writes one static `TypertRemoteMethodSpec` per endpoint and calls the pure `createTypertRemoteInfo` factory with the spec and `{ strictObject: z.strictObject }` from the artifact's own Zod import. Ordinary consumer `./remote` artifacts retain their default export and `TYPERT_REMOTE`, typed as `TypertRemoteInfo` with precise `TypertRemoteMethod<Input, Output, Mode, Uplink, DecodedOutput>` entries in `TYPERT_REMOTE.methods`. Each entry is the same object as its direct descriptor in `TYPERT_REMOTE.descriptors`; Context-only receivers remain in descriptors and scoped declarations. There is no separate `REMOTE_METHODS` export, nested `metadata`, or second `output` codec. The [protocol](<../protocol/README.md>) owns the factory and method API.
 
 The factory returns a class instance that retains the spec until its `descriptors` or `methods` getter builds their shared index. Each consumer-selected input-policy view, parser, and projection is independently lazy and cached, and generated individual Zod factories also materialize and cache on first use. Ordinary Host `./typert` builds a private info instance whose descriptors are exposed by the `TYPERT.invocations` getter. Host and consumer artifacts share definitions, not object identity across Programs or processes.
 
@@ -75,6 +75,8 @@ In `workspace` mode it emits every explicit contributor once without blocking bu
 `writeWorkspaceArtifacts()` and `writePackageArtifacts()` are the plugin's file writers: each artifact becomes `lib/typert.<face>.{js,d.ts}`, plus `lib/typert.remote-client.{js,d.ts,d.ts.map}` when it carries Remote methods, and a Host artifact without Remote methods removes stale Remote client files. Writing the result of `WorkspaceTypertGenerator.generateContributors()` through them leaves the same bytes as the `workspace`-mode plugin, and `findWorkspaceRoot()` applies the plugin's workspace-root rule. The repository's `tsdown --env.DSH_BUILD_FACE host` bundle generates the Host face this way for the type checks that read it.
 
 With `rejectBuildOutputs: true`, analysis fails with a `TypertAnalysisError` when a face program loads a file from a workspace package's `lib/` directory, or cannot resolve an import of a workspace package, as on a tree whose packages are not yet compiled. The error names each such import specifier and the source file a `paths` alias should map it to, so a passing generation depends only on workspace source and can run before or beside package compilation. Leave it off for a face whose sources import generated outputs, such as a Client face importing `/remote`.
+
+
 
 -----
 

@@ -1,0 +1,14 @@
+{
+  "name": "persistent-codex-oxlint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm/tests/orchestration.spec.ts packages/subagent/subagent/src/external.ts packages/subagent/subagent/tests/external-member-identity.spec.ts packages/subagent/subagent-codex/src/index.ts packages/subagent/subagent-codex/src/member.ts packages/subagent/subagent-codex/tests/member.spec.ts packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts packages/subagent/subagent-codex/tests/real-product.spec.ts examples/headless-agent/tests/managed-codex-model.snapshot.ts",
+  "startedAt": "2026-10-25T06:32:37.962096+00:00",
+  "seconds": 2.382,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b2c5132baf8ba8bee0f3e74086579608e6b02dfac7450de0092105edad4ccb5a",
+  "inputsAfter": "b2c5132baf8ba8bee0f3e74086579608e6b02dfac7450de0092105edad4ccb5a",
+  "postgresToolDirectory": null,
+  "outputSha256": "14f56acac99d04e61dc1cc3449f54f3d7d6ececf5674982e9442167cae05244d",
+  "outputTail": "packages/subagent/subagent-codex/tests/real-product.spec.ts:283:1: error @stylistic(indent): Expected indentation of 6 spaces but found 8.\npackages/subagent/subagent/tests/external-member-identity.spec.ts:98:20: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/subagent/subagent/tests/external-member-identity.spec.ts:110:20: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/subagent/subagent-codex/tests/member.spec.ts:315:35: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\n"
+}

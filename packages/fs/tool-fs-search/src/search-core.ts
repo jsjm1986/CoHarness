@@ -239,7 +239,7 @@ export async function runRipgrep(
     : await ctx.workingDirectory.ensure(exec.agent, exec.signal)
   let handle: SubprocessHandle
   try {
-    handle = ctx.subprocess.spawn({
+    handle = await ctx.subprocess.spawn({
       argv: [await resolveRgPath(), '--no-config', ...argv],
       cwd: workdir,
       stdio: {

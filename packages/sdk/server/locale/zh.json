@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "JSON-RPC 服务",
+    "description": "为进程外 SDK 客户端提供 stdio JSON-RPC 服务。"
+  }
+}

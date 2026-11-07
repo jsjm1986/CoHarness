@@ -1,0 +1,14 @@
+{
+  "name": "trash-retention-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/trash.ts packages/attachment/userdoc-local/tests/trash-retention.spec.ts examples/headless-agent/tests/fixtures/userdoc-migration-driver.ts",
+  "startedAt": "2026-10-24T05:05:09.798939+00:00",
+  "seconds": 5.359,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5529f05e5350c618c46b76b63af54c5a0a862b0d5fe7a880fbe73a1212b4d6f1",
+  "inputsAfter": "f468e88eb955ffebb074803a810ce0207a20a06109883dd00744f42634710949",
+  "postgresToolDirectory": null,
+  "outputSha256": "40d20ad20ade4ebae1f4358cab36273ef660bd901b1afad00553acc8f8da853b",
+  "outputTail": "packages/attachment/userdoc-local/tests/trash-retention.spec.ts:20:7: error eslint(prefer-const): `cleanup` is never reassigned. help: Use `const` instead.\n"
+}

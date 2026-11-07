@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/remote-desktop/remote-desktop-vnc/README.md
 document:
-  en: 14e8186d9ddcd74ba7f20e4777cc94f2e101637d
-  zh: ff0d2bb63e8889f10acd76ac96c90d3f552a1fef
+  en: 9e53eb0ac17848590b0eb94435538a24abc34067
+  zh: e2831f8d633da4df47661c342d406d8d288fa50d
 /:
   en: 9835f98a6bc8c02f
   zh: 72392264908cad84
@@ -21,8 +21,8 @@ document:
   en: e0b5e24ba8300a45
   zh: feb37623c1f16455
 /deepseek-ai-dsh-remote-desktop-vnc/attachment-flow:
-  en: f220c415792f856c
-  zh: 87d9dc23aa4696ea
+  en: e1431cc05b25f88b
+  zh: a0feebe7efa63a05
 /deepseek-ai-dsh-remote-desktop-vnc/managed-credentials:
   en: 705a94c8588f8ded
   zh: 94166c42bc8cd1c7

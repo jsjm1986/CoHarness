@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-doc-types",
+  "cwd": ".",
+  "command": "env DSH_DOC_TYPECHECK_USE_BUILD_OUTPUT=1 pnpm run doc-typecheck:contracts-ready",
+  "startedAt": "2026-10-25T13:17:32.031946+00:00",
+  "seconds": 20.663,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "inputsAfter": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "postgresToolDirectory": null,
+  "outputSha256": "7fb5f36639c9b3240e9a76db3c4cca5b79fac6abdac4d97e896dcc9748c60f06",
+  "outputTail": "$ tsx scripts/doc-typecheck.ts\ndoc-typecheck: 98 block(s) compiled, 93 ignored (49% opt-out), 1011 type-equiv/catalog (checked elsewhere), 1202 paired derivative(s).\n"
+}

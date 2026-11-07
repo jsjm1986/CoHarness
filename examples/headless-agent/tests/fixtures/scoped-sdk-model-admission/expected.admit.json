@@ -1,0 +1,28 @@
+{
+  "admissions": [],
+  "released": [],
+  "uncertain": [],
+  "processRefused": false,
+  "childRan": true,
+  "childStopped": false,
+  "scoped": {
+    "admissions": [
+      "model",
+      "process",
+      "model",
+      "model"
+    ],
+    "released": [
+      "model",
+      "model",
+      "process",
+      "model"
+    ],
+    "uncertain": [],
+    "processRefused": false,
+    "childStopped": true,
+    "allParentSession": true
+  },
+  "childControlHidden": true,
+  "childReasoningEffort": "max"
+}

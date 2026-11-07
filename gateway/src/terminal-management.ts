@@ -29,14 +29,19 @@ export class GatewayTerminalManagement {
    * Read current process metadata without starting an idle runtime.
    * @param admin - authenticated administrator.
    * @param target - account or project runtime on the current node.
-   * @returns bounded inventory and the exact generation required for closing.
+   * @returns bounded inventory and the exact generation required for closing, after current administrator authority is checked again.
    */
   async list(admin: UserRow, target: RuntimeTarget): Promise<AdminTerminalInventory> {
     await this.administrator(admin)
     await this.owner(target)
-    if (!await this.deps.instances.isLive(target)) return { nodeId: this.nodeId, target, generation: null, terminals: [] }
+    if (this.deps.instances.resolveTarget !== undefined) target = await this.deps.instances.resolveTarget(target)
+    if (!await this.deps.instances.isLive(target)) {
+      await this.administrator(admin)
+      return { nodeId: this.nodeId, target, generation: null, terminals: [] }
+    }
     const generation = await this.deps.instances.generationOf(target)
     const value = await this.invoke(admin, target, generation, 'adminList', {})
+    await this.administrator(admin)
     const result = z.array(terminal).safeParse(value)
     if (!result.success) throw new TerminalManagementError(502, 'invalid terminal inventory')
     return { nodeId: this.nodeId, target, generation, terminals: result.data }
@@ -56,11 +61,13 @@ export class GatewayTerminalManagement {
     await this.administrator(admin)
     await this.owner(target)
     await this.invoke(admin, target, result.data.generation, 'adminClose', { ownerId: result.data.ownerId, id: result.data.id })
+    await this.administrator(admin)
   }
 
-  private async administrator(admin: UserRow): Promise<void> {
+  private async administrator(admin: UserRow): Promise<UserRow> {
     const current = await this.deps.users.getById(admin.id)
     if (admin.role !== 'admin' || current?.role !== 'admin' || current.status !== 'active') throw new TerminalManagementError(403, 'administrator permission required')
+    return current
   }
 
   private async owner(target: RuntimeTarget): Promise<string> {
@@ -71,6 +78,7 @@ export class GatewayTerminalManagement {
 
   private async invoke(admin: UserRow, target: RuntimeTarget, generation: number, method: 'adminList' | 'adminClose', args: object): Promise<unknown> {
     const instances = this.deps.instances
+    if (instances.resolveTarget !== undefined) target = await instances.resolveTarget(target)
     if (!await instances.isLive(target) || await instances.generationOf(target) !== generation) throw new TerminalManagementError(409, 'terminal runtime changed; reload inventory')
     if (instances.operationRef === undefined) throw new TerminalManagementError(503, 'terminal runtime leases unavailable')
     try { await instances.operationRef(target, 1, generation) } catch (error) {
@@ -80,7 +88,8 @@ export class GatewayTerminalManagement {
     try {
       const projectName = await this.owner(target)
       const authority = `127.0.0.1:${String(await instances.portOf(target))}`
-      const assertion = this.signer.issue({ user: admin, runtime: { ...target, generation }, purpose: 'terminal-admin',
+      const current = await this.administrator(admin)
+      const assertion = this.signer.issue({ user: current, runtime: { ...target, generation }, purpose: 'terminal-admin',
         scope: target.kind === 'user' ? { kind: 'personal' } : { kind: 'project', projectId: target.id, projectName, mode: 'ro' } })
       const rpcId = randomUUID(), endpoint = `terminal/${method}`
       const response = await fetch(`http://${authority}/api/${endpoint}`, {

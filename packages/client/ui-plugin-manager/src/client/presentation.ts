@@ -58,6 +58,8 @@ const CODE_KEYS = {
   'bundle-in-use': 'reasonBundleInUse',
   'stale-approval': 'reasonStaleApproval',
   'incompatible-version': 'reasonIncompatibleVersionUnnamed',
+  'install-source': 'reasonInstallSource',
+  'invalid-config': 'reasonInvalidConfig',
   'operation-error': 'reasonOperationError',
 } satisfies Record<ManagementError['code'], PluginManagerLocaleKey>
 
@@ -94,7 +96,9 @@ export function managementText(error: {
       }))
     return [...sentences, t(error.installing ? 'reasonIncompatibleInstall' : 'reasonIncompatibleInstalled')].join(t('sentenceSeparator'))
   }
-  if (error.code !== 'operation-error') return t(CODE_KEYS[error.code])
+  if (error.code !== 'operation-error') {
+    return t(CODE_KEYS[error.code])
+  }
   return error.diagnostic === undefined || error.diagnostic === '' ? t('reasonOperationError') : error.diagnostic
 }
 

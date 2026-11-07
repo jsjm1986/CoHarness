@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-guard-sdk-python",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=lib PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_managed_codex_model_snapshot.py -q",
+  "startedAt": "2026-10-25T04:02:33.252234+00:00",
+  "seconds": 5.455,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e5cacc3555411444198df524260c4caaced0410f74845e6ce5f3ae3fdd96bf89",
+  "inputsAfter": "e5cacc3555411444198df524260c4caaced0410f74845e6ce5f3ae3fdd96bf89",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

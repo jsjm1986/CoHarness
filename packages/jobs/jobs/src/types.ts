@@ -5,12 +5,65 @@
  * @module @deepseek-ai/dsh-jobs/types
  */
 
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionEventMap, SessionId } from '@deepseek-ai/dsh-session'
 import type { JobId } from './brand.ts'
 import type { JobChannel, JobChunk, JobKind, JobView } from './view.ts'
 
 export { JobId } from './brand.ts'
 export type { JobChannel, JobChunk, JobKind, JobKindMap, JobStatus, JobView } from './view.ts'
+
+/** Tool dispatch that created a job; nested calls retain their root invocation. */
+export interface JobToolCall {
+  /** Exact invocation, including a PTC sub-call when applicable. */
+  readonly callId: SessionEventMap['tool/call']['callId']
+  /** Root model-requested invocation owning this execution. */
+  readonly rootCallId: SessionEventMap['tool/call']['callId']
+}
+
+/** Durable identity and registration time of one owned job execution. */
+export interface JobRegisteredData {
+  /** Unique execution id accepted by job controls and retained in Session history. */
+  readonly jobId: JobId
+  /** Original owner; copied history does not transfer execution ownership. */
+  readonly owner: SessionId
+  /** Producer kind. */
+  readonly kind: string
+  /** Producer-supplied label. */
+  readonly label: string
+  /** Unix epoch milliseconds when registration committed. */
+  readonly startedAt: number
+  /** Creating tool invocation, when the producer was called through a tool. */
+  readonly toolCall?: JobToolCall
+}
+
+/** Registry settlement, including whether the producer reported a terminal outcome. */
+export interface JobSettledData extends JobRegisteredData {
+  /** Unix epoch milliseconds when the registry committed the terminal record. */
+  readonly finishedAt: number
+  /** Recorded terminal outcome. */
+  readonly status: JobOutcome['status']
+  /** Source of the termination request, or producer completion. */
+  readonly cause: JobSettleCause
+  /** True when done fulfilled; false for rejection or forced failure. Does not certify resource release. */
+  readonly producerReported: boolean
+  /** Terminal reason, including a recorded kill reason when applicable. */
+  readonly detail?: string
+}
+
+declare module '@deepseek-ai/dsh-session/types' {
+  interface SessionEventMap {
+    /**
+     * Log-only job registration; model output collection is not required.
+     * @param data - Execution identity, original owner, registration time, and creating tool call.
+     */
+    'job/registered': JobRegisteredData
+    /**
+     * Log-only terminal record, paired by the same unique jobId used for live control.
+     * @param data - Registration facts plus settlement time, outcome, and producer acknowledgement.
+     */
+    'job/settled': JobSettledData
+  }
+}
 
 /** Terminal result supplied by a producer through {@link JobHooks.done}. */
 export interface JobOutcome {
@@ -110,7 +163,8 @@ export interface JobHooks {
   cancel(reason?: string): void
   /**
    * Resolves after the producer releases its resources, not merely when work
-   * finishes. Must not reject; the runtime converts a rejection to `failed`.
+   * finishes. Must not reject; the runtime converts a rejection to a `failed`
+   * record while unconfirmed resource release keeps automatic idle release blocked.
    * If teardown cancellation throws, the runtime may force-fail only the
    * registry record without claiming that the work stopped.
    */
@@ -124,7 +178,7 @@ export interface JobHooks {
  * the output ring.
  */
 export interface JobSpec {
-  /** Producer kind — also the id prefix (`bash`, `subagent`, …). */
+  /** Producer kind — also the id prefix (`bash`, …). */
   kind: JobKind
   /** One-line model-facing label (the command; the delegation description). */
   label: string
@@ -135,6 +189,8 @@ export interface JobSpec {
    * caller until service disposal.
    */
   owner?: SessionId
+  /** Creating tool invocation, retained in the durable lifecycle records. */
+  toolCall?: JobToolCall
   /**
    * Optional UTF-8 byte cap for each complete model-facing completion notice or
    * output read, including controller status metadata. Independent of ring
@@ -243,9 +299,10 @@ export type JobEventListener = (event: JobEvent) => void
 export interface JobEvents {
   /**
    * Register an effect-scoped listener. Events are dispatched synchronously
-   * after the commit they announce; a job's first event is `registered`, and
-   * a `settled` event follows the release of every waiter. No listener runs
-   * after service disposal.
+   * after the commit they announce. Notifications triggered by an observer
+   * follow the current event for every matching subscriber. A job's first
+   * event is `registered`, and a `settled` event follows the release of every
+   * waiter. No listener runs after service disposal.
    * @param filter - which owners' events to deliver.
    * @param listener - receives each matching event.
    * @returns disposer that unregisters the listener.

@@ -1,0 +1,14 @@
+{
+  "name": "jobs-starting-slot-host-types-repaired",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-26T02:51:23.482731+00:00",
+  "seconds": 77.352,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a3cdf5c85be750da2821aaceca1904865182ec5ea7dce6d0414fe11d30b8ea17",
+  "inputsAfter": "a3cdf5c85be750da2821aaceca1904865182ec5ea7dce6d0414fe11d30b8ea17",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

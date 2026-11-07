@@ -1,0 +1,1 @@
+{"operation":"goal-resume-block-threshold","firstBlockedRound":3,"resumedBlockedRound":6,"results":[{"round":3,"accepted":true},{"round":4,"accepted":false},{"round":5,"accepted":false},{"round":6,"accepted":true}]}

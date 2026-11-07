@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { resumableUpload } from '../src/index.ts'
+import { resumableUpload, type ResumableUploadOptions } from '../src/index.ts'
 
-const ref = { docId: 'notes.txt' as never, name: 'notes.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1 }
+const ref = { docId: 'notes.txt' as never, path: '', name: 'notes.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1 }
 const uploadId = '00000000-0000-4000-8000-000000000000'
 
 function urlOf(input: RequestInfo | URL): string {
@@ -44,12 +44,215 @@ function installXhr(): MockXhr[] {
   return instances
 }
 
+function beginVerification(
+  states: Array<'verifying' | 'complete'>,
+  { expiresInMs = 60_000, abortOnVerification }: { expiresInMs?: number; abortOnVerification?: Error } = {},
+) {
+  const xhrs = installXhr()
+  const controller = new AbortController()
+  const file = new File(['hello'], 'notes.txt')
+  const startedAt = Date.now()
+  const statusReadAt: number[] = []
+  const requests: Array<{ method: string; url: string }> = []
+  let verificationStarted: () => void = () => {}
+  const verifying = new Promise<void>((resolve) => { verificationStarted = resolve })
+  const session = {
+    uploadId, name: file.name, directoryId: '', bytes: file.size, fingerprint: 'x', chunkBytes: 65536,
+    receivedBytes: 0, expiresAt: startedAt + expiresInMs, state: 'uploading' as const,
+  }
+  const options: ResumableUploadOptions = {
+    requestJson: async <T>(input: RequestInfo | URL, init?: RequestInit) => {
+      const url = urlOf(input)
+      requests.push({ method: init?.method ?? 'GET', url })
+      if (url.endsWith('/complete')) return { ...session, receivedBytes: file.size, state: 'verifying' } as T
+      if (init?.method === 'POST') return session as T
+      statusReadAt.push(Date.now())
+      const state = states[Math.min(statusReadAt.length - 1, states.length - 1)] ?? 'verifying'
+      return { ...session, receivedBytes: file.size, state, ...(state === 'complete' ? { ref } : {}) } as T
+    },
+    networkError: () => new Error('offline'),
+    responseError: (status, body) => new Error(`${String(status)}:${String(body)}`),
+  }
+  const pending = resumableUpload(file, '' as never, controller.signal, (_loaded, _total, phase) => {
+    if (phase !== 'verifying') return
+    if (abortOnVerification !== undefined) controller.abort(abortOnVerification)
+    verificationStarted()
+  }, options)
+  const settled = pending.then(() => undefined, () => undefined)
+  return { controller, file, startedAt, statusReadAt, requests, xhrs, states, options, verifying, pending, settled }
+}
+
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   try { globalThis.localStorage?.clear() } catch { /* jsdom may expose an opaque origin */ }
 })
 
 describe('resumableUpload', () => {
+  it('reads the first verification status without a scheduled delay', async () => {
+    vi.useFakeTimers()
+    const upload = beginVerification(['complete'])
+    try {
+      await upload.verifying
+      await vi.advanceTimersByTimeAsync(0)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      await expect(upload.pending).resolves.toEqual(ref)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it('waits 500 ms between later verification status reads', async () => {
+    vi.useFakeTimers()
+    const upload = beginVerification(['verifying', 'complete'])
+    try {
+      await upload.verifying
+      await vi.advanceTimersByTimeAsync(0)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      expect(vi.getTimerCount()).toBe(1)
+      await vi.advanceTimersByTimeAsync(499)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(upload.pending).resolves.toEqual(ref)
+      expect(upload.statusReadAt).toEqual([upload.startedAt, upload.startedAt + 500])
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it('aborts a later verification wait and resumes the same session', async () => {
+    vi.useFakeTimers()
+    const upload = beginVerification(['verifying', 'complete'])
+    try {
+      await upload.verifying
+      await vi.advanceTimersByTimeAsync(0)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      const reason = new Error('cancel verification wait')
+      upload.controller.abort(reason)
+      await expect(upload.pending).rejects.toBe(reason)
+      expect(vi.getTimerCount()).toBe(0)
+      const records = JSON.parse(globalThis.localStorage.getItem('dsh-userdoc-upload-sessions-v1') ?? '{}') as object
+      expect(Object.keys(records)).toHaveLength(1)
+
+      await expect(resumableUpload(upload.file, '' as never, undefined, undefined, upload.options)).resolves.toEqual(ref)
+      expect(upload.requests.at(-1)).toEqual({ method: 'GET', url: `/api/documents/uploads/${uploadId}` })
+      expect(upload.xhrs).toHaveLength(1)
+      expect(JSON.parse(globalThis.localStorage.getItem('dsh-userdoc-upload-sessions-v1') ?? '{}')).toEqual({})
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it('honors an abort before the first verification status read', async () => {
+    vi.useFakeTimers()
+    const reason = new Error('cancel before verification read')
+    const upload = beginVerification(['complete'], { abortOnVerification: reason })
+    try {
+      await upload.verifying
+      await expect(upload.pending).rejects.toBe(reason)
+      expect(upload.statusReadAt).toEqual([])
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it.each([
+    { expiresInMs: 300, deadlineMs: 300, name: 'server expiry' },
+    { expiresInMs: 600_000, deadlineMs: 300_000, name: 'client verification deadline' },
+  ])('stops verification at the $name', async ({ expiresInMs, deadlineMs }) => {
+    vi.useFakeTimers()
+    const upload = beginVerification(['verifying'], { expiresInMs })
+    try {
+      await upload.verifying
+      await vi.advanceTimersByTimeAsync(0)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      await vi.advanceTimersByTimeAsync(deadlineMs)
+      await expect(upload.pending).rejects.toMatchObject({ status: 504, code: 'DOCUMENT_UPLOAD_VERIFY_TIMEOUT' })
+      expect(upload.statusReadAt.at(-1)).toBe(upload.startedAt + deadlineMs)
+      expect(vi.getTimerCount()).toBe(0)
+      expect(JSON.parse(globalThis.localStorage.getItem('dsh-userdoc-upload-sessions-v1') ?? '{}')).toEqual({})
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it('polls an accepted verification after its session retention timestamp passes', async () => {
+    const calls: string[] = []
+    const result = await resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+      requestJson: async <T>(input: RequestInfo | URL, init?: RequestInit) => {
+        const url = urlOf(input)
+        calls.push(`${init?.method ?? 'GET'} ${url}`)
+        const complete = init?.method !== 'POST'
+        return { uploadId, name: 'notes.txt', directoryId: '', bytes: 5, fingerprint: 'x', chunkBytes: 65536,
+          receivedBytes: 5, expiresAt: 1, state: complete ? 'complete' : 'verifying', ...(complete ? { ref } : {}),
+        } as T
+      },
+      networkError: () => new Error('offline'), responseError: status => new Error(`Unexpected upload status ${status}`),
+    })
+    expect(result).toEqual(ref)
+    expect(calls).toEqual(['POST /api/documents/uploads',
+      'POST /api/documents/uploads/00000000-0000-4000-8000-000000000000/complete',
+      'GET /api/documents/uploads/00000000-0000-4000-8000-000000000000'])
+  })
+
+  it('still bounds a provider that keeps an accepted upload in verification', async () => {
+    let now = 1_000_000
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    let polls = 0
+    try {
+      await expect(resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+        requestJson: async <T>(_input: RequestInfo | URL, init?: RequestInit) => {
+          if (init?.method !== 'POST') { polls += 1; now += 5 * 60 * 1000 }
+          return { uploadId, name: 'notes.txt', directoryId: '', bytes: 5, fingerprint: 'x', chunkBytes: 65536,
+            receivedBytes: 5, expiresAt: 1, state: 'verifying' } as T
+        },
+        networkError: () => new Error('offline'), responseError: status => new Error(`Unexpected upload status ${status}`),
+      })).rejects.toMatchObject({ status: 504, code: 'DOCUMENT_UPLOAD_VERIFY_TIMEOUT' })
+      expect(polls).toBe(1)
+    } finally { clock.mockRestore() }
+  })
+
+  it('rejects a completed upload with a null document reference', async () => {
+    const invalid = vi.fn((status: number) => new Error(`Invalid upload response: ${status}`))
+    await expect(resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+      networkError: () => new Error('offline'), responseError: invalid,
+      requestJson: async <T>() => ({ uploadId, name: 'notes.txt', directoryId: '', bytes: 5,
+        fingerprint: 'x', chunkBytes: 65536, receivedBytes: 5, expiresAt: Date.now() + 1000,
+        state: 'complete', ref: null }) as T,
+    })).rejects.toThrow('Invalid upload response: 502')
+  })
+
+  it.each([
+    { ...ref, bytes: 4 }, { ...ref, docId: '' }, { ...ref, path: null }, { ...ref, modifiedAt: '1' },
+    { ...ref, identity: { incarnationId: 'one', revision: 0, origin: 'upload' } },
+  ])('refuses malformed completed document metadata %j', async (reference) => {
+    await expect(resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+      requestJson: async <T>() => ({ uploadId, name: 'notes.txt', directoryId: '', bytes: 5,
+        fingerprint: 'x', chunkBytes: 65536, receivedBytes: 5, expiresAt: Date.now() + 1000,
+        state: 'complete', ref: reference }) as T,
+      networkError: () => new Error('offline'), responseError: status => new Error(`Invalid metadata: ${status}`),
+    })).rejects.toThrow('Invalid metadata: 502')
+  })
+
+  it('returns an exact document version from a completed upload', async () => {
+    const identity = { incarnationId: 'incarnation:one', revision: 3, origin: 'upload', createdBy: 'user:7' }
+    const result = await resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+      requestJson: async <T>() => ({ uploadId, name: 'notes.txt', directoryId: '', bytes: 5,
+        fingerprint: 'x', chunkBytes: 65536, receivedBytes: 5, expiresAt: Date.now() + 1000,
+        state: 'complete', ref: { ...ref, identity: { ...identity, privatePath: '/private/control' } } }) as T,
+      networkError: () => new Error('offline'), responseError: status => new Error(`Invalid metadata: ${status}`),
+    })
+    expect(result).toEqual({ ...ref, identity })
+  })
+
   it('creates a session, sends a chunk, and completes it', async () => {
     const calls: string[] = []
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -173,6 +376,7 @@ describe('resumableUpload', () => {
         return {
           ...uploading,
           state: 'complete' as const,
+          receivedBytes: 5,
           ref,
           expiresAt: Date.now() + 60_000,
         } as T
@@ -206,10 +410,10 @@ describe('resumableUpload', () => {
         bytes: 1,
         fingerprint: 'x',
         chunkBytes: 65536,
-        receivedBytes: 0,
+        receivedBytes: 1,
         expiresAt: Date.now() + 60_000,
         state: 'complete' as const,
-        ref,
+        ref: { ...ref, docId: 'new.txt' as never, name: 'new.txt', bytes: 1 },
       } as T),
       networkError: () => new Error('offline'),
       responseError: (status, body) => new Error(`${String(status)}:${String(body)}`),

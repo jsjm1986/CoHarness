@@ -1,0 +1,14 @@
+{
+  "name": "document-http-owner-loader-node22",
+  "cwd": "gateway",
+  "command": "env DSH_EXAMPLE_MODE=lib /Users/a1234/.nvm/versions/node/v22.22.1/bin/node ../node_modules/vitest/vitest.mjs run tests/document-transfer-loader.spec.ts",
+  "startedAt": "2026-10-26T11:28:41.018389+00:00",
+  "seconds": 8.704,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fc6b8f2556828b687f18465a6e6abd73d12c8a3334c19686ab37b237cc73b10c",
+  "inputsAfter": "fc6b8f2556828b687f18465a6e6abd73d12c8a3334c19686ab37b237cc73b10c",
+  "postgresToolDirectory": null,
+  "outputSha256": "41b14d5343316ef9b77f304b78013ae9efbeadb7166e4588d05d66580e026cce",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  19:28:44\n   Duration  5.50s (transform 29ms, setup 0ms, import 48ms, tests 5.30s, environment 0ms)\n\n"
+}

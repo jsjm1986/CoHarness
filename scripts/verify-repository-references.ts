@@ -65,7 +65,7 @@ export function findRepositoryReferences(
     // Agent Notes record upstream commit identifiers as their subject matter
     // during alignment work, the same reason `upgrades/` is excluded; the
     // organization-url check above still applies to them.
-    const notesCommitEvidence = file.startsWith('.agents/notes/')
+    const notesCommitEvidence = file.startsWith('.agents/notes/') || file.startsWith('.agents/audits/')
     if (!selectionPin && !notesCommitEvidence && [...line.matchAll(commitCandidate)].some(match => commits.has(match[0].toLowerCase()))) {
       references.push({ file, line: index + 1, kind: 'commit-hash' })
     }

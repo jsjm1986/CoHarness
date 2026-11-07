@@ -33,11 +33,15 @@ Mount the service once beside the chosen provider in a Cordis composition:
 
 The service has no configuration. Provider plugins inject `computerUse` and call `ctx.computerUse.register(ComputerUseProviderName(name))`; the brand is exported from `@deepseek-ai/dsh-computer-use/brand`. The returned effect disposer releases that registration.
 
+A provider can register a known environment limitation with `{ unavailableReason: 'headless' | 'disabled' }`. The registration still reserves its provider name, while `run` refuses desktop effects before entering the driver. `unavailableReason` remains distinct from OS permissions and per-user authorization and clears when the provider unloads. The browser desktop status returns this limitation before offering a confirmation gesture.
+
 Providers stop admitting tool calls, close their resources, and await owned work before releasing the registration. `ctx.computerUse.providerName` reports the registered name until release.
 
 Providers wrap actual desktop effects in `ctx.computerUse.run(execution, operation)`. Independent local callers retain the host operator's authority. Managed runtimes require a live Agent and a `computerUseAuthorization` provider; losing that provider never restores local access. The deployment policy owns qualification, Session confirmation and leases. Its cancellation reaches the driver, and revoked results are rejected after the driver settles.
 
 The optional `computerUseAuthorization.confirmation` controller reads and changes the interactive user's confirmation. It requires a live human request and an exact root, node and desktop; it is not a model tool. Browser consumers import the wire value from `/types`, which does not load Host service declarations.
+
+A deployment can publish `computerUseEnvironment` without registering a driver. `computerUseUnavailableReason(ctx)` reports the registered provider's own state first and uses the environment limitation only without a provider. This metadata neither reserves the provider slot nor grants desktop access.
 
 -----
 

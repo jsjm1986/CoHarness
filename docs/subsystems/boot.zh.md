@@ -12,13 +12,21 @@
 
 `BundleInfo` 包含包名、可选的安装版本、组合层选择状态、删除可用性、可选的解析错误，以及——对 profile 自身依赖提供而安装未提供的组合包——`source`：该依赖作为 `pnpm add` 接受的 spec。
 
+`ParsedInstallSpec` 将解析后的包来源分为注册表、本地路径、压缩包或 Git，保留来源所需的名称、版本范围、路径或主机，以供策略检查。`PluginConfigValue` 是递归 JSON 值。`PluginConfigDescription` 将条目的配置（未声明时为 null）与可选的序列化 Schemastery schema 配对。
+
 `InstallBundleOptions.enabled` 默认为 true，false 表示安装但不选择组合包层。`approvedBuilds` 在安装前向指定的待审批包名授予持久脚本权限。
 
 `ChangeResult.changed` 报告磁盘修改，独立于 `application`：`applied`、`restart-required`、`overridden`、`cancelled` 或 `failed`。可选的 `error` 包含可本地化的错误码和外部诊断。`packageResult` 记录 pnpm 退出码、有界输出、截断标志及完整诊断日志路径。`pendingBuilds` 列出整个 profile 尚未决定的包；`approvedBuilds` 记录本次操作授予权限的包名；`bundle` 与 `version` 给出完成的安装新增的包及其清单版本。
 
 `PluginInstallFrame` 是一帧私有的进度、日志或最终结果。`installBundleStream` 要求唯一请求 id，仅携带本次安装的诊断，并在传输关闭时取消所属安装。消费者必须同时确认最终结果及流正常结束；不得重连并重放安装。
 
-`PluginManagementCapability` 将操作分为 `read`（对任何能到达服务的调用者开放）与 `manage`（由部署的授权策略判定）。`PluginManagementAccess` 报告调用者的 `manage` 授权，界面可据此门控控件而无需试探写入。
+`PluginManagementCapability` 区分 `read` 与 `manage`；已安装的部署策略决定两种能力。没有策略时，读取保持可用，管理器的授权模式决定变更权限。`PluginManagementAccess` 报告调用者的 `manage` 授权，界面可据此禁用控件而无需试探写入。
+
+`PluginManagementCatalog` 在权限结果上增加 `managementAvailable`、`bundles`、`plugins`，用于一次经过授权的读取。独立的 Web 目录入口在没有管理器时返回空列表和不可用状态；存在管理器时，各值来自实时读取，不保证属于一个原子 profile 修订。
+
+`ParsedInstallSpec` 保留提交的 `spec`，并区分 registry、path、tarball 和 git 来源。registry 来源包含 `name` 和可选的 `range`；path 来源包含 `path`；tarball 包含可选的 `path` 或 `host`；git 来源包含 `host`。安装授权可以在包操作开始前限制实际的获取来源。
+
+`PluginConfigValue` 是递归 JSON 值。`PluginConfigDescription.config` 包含条目配置，未声明时为 `null`；可选的 `schema` 包含插件的 Schemastery `toJSON` 序列化结果，供配置表单使用。
 
 `PluginDesiredState` 是部署对一个 profile 的期望组成：键集限于 `id`、`name`、`disabled` 的逐字 patch `entries`，加上有序的 `bundles` 选择。`PluginDesiredStateSnapshot` 将已存状态与存储的乐观并发 `revision` 配对（未保存时为 `'0'`），`PluginDesiredStatePublish` 以新 revision 应答 `applied`，或以存储当前快照应答 `conflict`。
 
@@ -113,10 +121,21 @@ Deployment-owned authority for current-profile management.
 
 ```ts cordis-catalog
 /** Recheck the current caller before profile reads or writes.
- * @param capability - 'read' permits any runtime principal; 'manage' enforces the deployment's policy.
+ * @param capability - the deployment's policy gates both 'read' and 'manage'; an unqualified account sees nothing.
  * @returns After the deployment permits the operation; rejects without permission.
  */
 authorize(capability?: PluginManagementCapability): Promise<void>
+
+/**
+ * Gate one installable spec by its form before pnpm runs. Present only in
+ * deployments that restrict install sources; absent means any spec form is
+ * acceptable. The parsed spec, not the raw string, reaches the policy so a
+ * URL spelled several ways cannot slip past a host rule.
+ * @param spec - the parsed install spec.
+ * @returns After the deployment permits the source; rejects with
+ * 'plugin-management/install-source' otherwise.
+ */
+authorizeInstall?(spec: ParsedInstallSpec): Promise<void>
 
 /**
  * Read the profile's saved desired state. Present only in deployments with
@@ -144,14 +163,15 @@ Manage profile files and apply their declared reload lifecycle.
 
 ```ts cordis-catalog
 /** Check deployment authority independently of tool approval or sandbox mode.
- * @param capability - 'read' permits every caller that reached the service;
- * 'manage' enforces the deployment's authorization provider.
+ * @param capability - the deployment's authorization provider gates both
+ * 'read' and 'manage'; without a provider, reads stay open unless the
+ * profile requires authorization.
  * @returns After the current caller is permitted the operation.
  */
 async authorize(capability: PluginManagementCapability = 'manage'): Promise<void>
 
 /** Report whether the caller may change the profile, for interfaces gating controls on it.
- * @returns `manage` after probing the deployment policy; read access is unconditional.
+ * @returns `manage` after probing the deployment policy.
  */
 @Remote async access(): Promise<PluginManagementAccess>
 
@@ -171,9 +191,10 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 @Remote async setVersionExemption(packageVersion: string, runtimeVersion: string, enabled: boolean, acceptRisk?: boolean): Promise<ChangeResult>
 
 /** Read current plugins, including why a row cannot be changed through the profile patch.
+ * @param includeMetadata Whether to read each entry's display resources; defaults to true. False returns controls without metadata.
  * @returns Current runtime entries with persistent patch targets.
  */
-@Remote async listPlugins(): Promise<PluginInfo[]>
+@Remote async listPlugins(includeMetadata?: boolean): Promise<PluginInfo[]>
 
 /** Read the profile's installed bundles, the bundles this dsh installation supplies, and the selected names that are not bundles.
  * A dependency without a bundle patch is listed, as a `not-bundle` problem, only while it is selected.
@@ -201,6 +222,24 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
  * @returns Saved and runtime outcomes, including higher-priority overrides.
  */
 @Remote async setPluginEnabled(id: PluginEntryId, enabled: boolean): Promise<ChangeResult>
+
+/** Read one plugin row's current config and its schema, when the module declares one.
+ * The schema serializes through schemastery `toJSON` for form rendering;
+ * modules without a `Config` schema report `schema: undefined`.
+ * @param id Loader entry identity returned by listPlugins.
+ * @returns The entry's declared config and its JSON-serialized schema.
+ */
+@Remote async describePluginConfig(id: PluginEntryId): Promise<PluginConfigDescription>
+
+/** Replace one plugin row's config in the profile patch, validated against its schema.
+ * `config: null` clears all matching profile config overrides so composition defaults apply. The loader
+ * rejects a failing schema at reload as well; validating here first reports a
+ * readable error instead of a broken reload.
+ * @param id Loader entry identity returned by listPlugins.
+ * @param config JSON-serializable config object, or `null` to clear the override.
+ * @returns Saved and runtime outcomes.
+ */
+@Remote async setPluginConfig(id: PluginEntryId, config: PluginConfigValue | null): Promise<ChangeResult>
 
 /** Select or remove a bundle layer while retaining installed dependencies.
  * @param name Bundle package name.
@@ -254,6 +293,26 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 ```
 
 Source: [`packages/boot/plugin-manager/src/index.ts`](../../packages/boot/plugin-manager/src/index.ts)
+
+<a id="ctxpluginmanagercatalog--pluginmanagercataloggateway"></a>
+
+### `ctx.pluginManagerCatalog` — `PluginManagerCatalogGateway`
+
+Aggregate the existing profile reads without allocating a second management owner or cache.
+
+```ts cordis-catalog
+/**
+ * Read current profile availability, mutation authority, bundles, and entries.
+ * Transport authorization precedes invocation, including the administrator assertion.
+ * A missing profile reads no files; a refused read publishes no catalog.
+ * @param includeEntryMetadata - whether to read runtime entry display resources; defaults to true. False keeps bundle and row metadata.
+ * @param signal - optional request cancellation; when absent, service disposal still cancels publication and drains reads.
+ * @returns live catalog values, without an atomic profile-revision guarantee.
+ */
+@Remote catalog(includeEntryMetadata?: boolean, signal?: AbortSignal): Promise<PluginManagementCatalog>
+```
+
+Source: [`packages/boot/plugin-manager/src/catalog.ts`](../../packages/boot/plugin-manager/src/catalog.ts)
 
 <a id="ctxpluginmarket--pluginmarket"></a>
 

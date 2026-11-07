@@ -16,6 +16,12 @@
     },
     {
       "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../context/resource-budget"
     }
   ]
 }

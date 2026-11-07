@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subprocess/subprocess/README.md
 document:
-  en: 5e32db92a754c6db09b15c9649fdec6369e99fd4
-  zh: 0005aa6e5b41abe1a9baa108985255c6c9acf8db
+  en: cac960d6d955fad6fa62ace8d446b84e8a054f9c
+  zh: fb08a195580f062c7be4161d4e706e2e6d17a386
 /:
   en: 04735af7a998f2ae
   zh: ab6bf3d0f098877a
@@ -33,17 +33,17 @@ document:
   en: 0d1d6d55cd5f7ec4
   zh: bab0c3f51ed743cb
 /deepseek-ai-dsh-subprocess/use-this-package/managing-process-lifetime:
-  en: 83d662d278184411
-  zh: 2c4e7fbe76823fa8
+  en: 3d0fd760439e24aa
+  zh: a0f523eacca96481
 /deepseek-ai-dsh-subprocess/use-this-package/running-a-terminal-session:
-  en: e3631497344c2ebd
-  zh: c4ebc7b08f0a316e
+  en: 756880d8da4d6e97
+  zh: 4c7694d881a4120a
 /deepseek-ai-dsh-subprocess/use-this-package/environment-every-child-starts-from:
   en: 4d4cbb311575d071
   zh: 7be2d265adb661bc
 /deepseek-ai-dsh-subprocess/use-this-package/what-can-go-wrong:
-  en: 51f2f43087a1ed18
-  zh: 6d2ebb099b707df3
+  en: e019dc50c8e5ed4d
+  zh: 915fc07a1d3ed3c7
 /deepseek-ai-dsh-subprocess/understand-the-implementation:
   en: 25cd344c959cfd9e
   zh: 045880776ab82d1e
@@ -54,8 +54,8 @@ document:
   en: 85e3d2109f49356d
   zh: 071ccfef37e8e33f
 /deepseek-ai-dsh-subprocess/understand-the-implementation/data-model-and-flow:
-  en: 9998dc0a990fbcf1
-  zh: ba179617f60cb9bc
+  en: 994bf76b8431b15f
+  zh: 5bf5f3febc18ff9a
 /deepseek-ai-dsh-subprocess/understand-the-implementation/lifecycle-and-invariants:
   en: a132325eea7cadb4
   zh: 434cbbc61ff9cd0e
@@ -69,8 +69,8 @@ document:
   en: e290ccc9b3c92c08
   zh: e7633834bd22a05d
 /deepseek-ai-dsh-subprocess/known-limitations-and-deferred-work:
-  en: 0b1c46aec1ba628d
-  zh: cf2a0db9d0682155
+  en: 191120515d3584ab
+  zh: 062a9a764cdca4aa
 /deepseek-ai-dsh-subprocess/known-limitations-and-deferred-work/dev-note:
   en: 56709c22873429b5
   zh: c0e86c62982a3e29

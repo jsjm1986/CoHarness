@@ -42,6 +42,7 @@ kind: "package-reference"
 - `ctx.agentPresets.composedPreset(agentCtx): string | undefined` 某个**活着的** agent 正在运行的 preset，从其 scope 链读取而不是从其会话读取——对于持久化 header 尚在构建中的 agent，这是唯一能拿到的答案。
 - `ctx.agentPresets.recompose(agentCtx, id): Promise<AgentPreset>` 把一个 agent 重链到另一个 preset 的常驻组装。仅在该 agent 尚无任何产出时合法——**由调用方负责该检查**；新挂载在链移动之前确保完成，失败时 agent 原封不动。与 `mount()` 一样拒绝损坏的 preset。
 - `ctx.agentPresets.standingKeyFor(id?): Promise<ScopeKey>` 没有 agent 的宿主读取方（冷读记录）解析 preset 注册所用的常驻 scope key；确保挂载而不启动任何 agent、会话或轮次。与 `mount()` 一样拒绝损坏的 preset。
+- `ctx.agentPresets.acquireScope(id?): Promise<{ key: ScopeKey; dispose(): Promise<void> }>` 在冷读期间持有声明式代际；读取结束后释放。重复释放会等待同一次释放完成。
 - `ctx.agentPresets.roots: readonly PresetRoot[]` 本 roster 实际扫描的根目录——全部已配置根目录按序在前，随后是推导出的 harness home 根目录。它不是 `config.roots`：判断「是否已组装 roster」应读它，从而由同一处推导决定。
 - `ctx.agentPresets.authorable: boolean` 上述根目录中是否有任一具备 `user` 信任级别，因而 preset 是否可创建。
 - `ctx.agentPresets.read(id): Promise<string>` 某个 preset 的组装文本，与存储内容逐字一致。
@@ -54,7 +55,9 @@ kind: "package-reference"
 
 ### 应在何处调用 `mount()`
 
-agent 工厂的 `setup(agentCtx)` 钩子是唯一受支持的调用点。只有在那里，认父是在 agent 尚未发布时完成的，因此组装被拒绝会让整次创建回滚，而不会留下一个组装到一半的会话。常驻子树归 roster 服务自己的 fiber 所有——刻意用其未追踪的上下文，因为从被追踪的 `this.ctx` 派生的子树会经调用方的 shadow fiber 解析一切服务、无视各 entry 自己的 inject store——所以它比任何 agent 都活得久，只随整棵树卸载。每个代际记录其组装文件的 stamp（mtime 与大小）：发现 stamp 过期的会话会开启下一个代际，而所有已加入的会话保持各自正在运行的那个——正在运行的会话所加入的组装在其文件被修改或删除后继续存活；文件是唯一的组装编辑器，stamp 正是把编辑送达后续会话的机制。
+agent 工厂的 `setup(agentCtx)` 钩子是唯一受支持的调用点。只有在那里，认父是在 agent 尚未发布时完成的，因此组装被拒绝会让整次创建回滚，而不会留下一个组装到一半的会话。文件型常驻子树归 roster 服务自己的 fiber 所有——刻意用其未追踪的上下文，因为从被追踪的 `this.ctx` 派生的子树会经调用方的 shadow fiber 解析一切服务、无视各 entry 自己的 inject store——所以它比任何 agent 都活得久，只随整棵树卸载。每个代际记录其组装文件的 stamp（mtime 与大小）：发现 stamp 过期的会话会开启下一个代际，而所有已加入的会话保持各自正在运行的那个——正在运行的会话所加入的组装在其文件被修改或删除后继续存活；文件是唯一的组装编辑器，stamp 正是把编辑送达后续会话的机制。
+
+声明式代际在注销后仍供已加入的 agent 和冷读租约使用，最后一个使用者退出时释放插件与环境。每个已挂载 agent 对当前代际持有一个引用，重复选择或在文件型与声明式 preset 之间切换也遵循此规则。待决挂载的预留引用在绑定或回滚后释放。
 
 ### 组装子 agent
 
@@ -156,6 +159,8 @@ agent-presets:
 
 挂载会拒绝有行向根 realm 发布服务的 preset；该检查只在挂载时执行一次，因此在激活后从定时器或异步续体中发布的行会逃脱检查。
 
+`environmentForAgent()` 通过挂载记录的 `environment` fiber 寻址 standing realm hook 安装的服务。文件 preset 与代码声明的 preset 共用该查询，尽管它们的 Loader 树具有不同的父级。缺少的环境服务保持缺失；宿主实现不能代替 SSH 执行环境。
+
 <a id="a-preset-file-is-an-input-never-a-persistence-target"></a>
 ## preset 文件是输入，不是持久化目标
 
@@ -167,6 +172,8 @@ agent-presets:
 ## 信任
 
 preset 就是组装，因此一个 preset 的权限恰好等于它所引用的插件。`user` preset——无论由人还是由 agent 写出——与 shell 访问权限同级；`trust` 字段的存在是为了让消费方呈现这一差异，而不是用来强制隔离。
+
+成员名册读取和编辑能力提示遵循[应用授权要求](../../context/collaboration/README.zh.md#application-authorization)。
 
 <a id="model-experience"></a>
 ## 模型体验

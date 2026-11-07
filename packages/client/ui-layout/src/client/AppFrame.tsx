@@ -29,7 +29,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share + locale seat. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.bottom' | 'shell.overlay' | 'shell.mobile.header.actions'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.bottom' | 'shell.overlay' | 'shell.mobile.header.context' | 'shell.mobile.header.actions'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'layout'>
   & { dismissRightbar: () => void }
@@ -57,13 +57,13 @@ function DetailsColumn(props: { children?: ReactNode }) {
  * strip; moves are rAF-batched into a single width write per frame; `side`
  * keys the hover-reveal CSS to the owning column.
  */
-function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart: () => void; onDrag: (dx: number) => void; onEnd: () => void }) {
+function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart: () => void; onDrag: (dx: number) => void }) {
   const [dragging, setDragging] = useState(false)
   const origin = useRef(0)
   const latest = useRef(0)
   const frame = useRef<number | null>(null)
-  const callbacks = useRef({ onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd })
-  callbacks.current = { onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd }
+  const callbacks = useRef({ onStart: props.onStart, onDrag: props.onDrag })
+  callbacks.current = { onStart: props.onStart, onDrag: props.onDrag }
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -87,7 +87,6 @@ function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart:
     if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
     callbacks.current.onDrag(latest.current - origin.current)
     setDragging(false)
-    callbacks.current.onEnd()
   }, [])
 
   return (
@@ -391,12 +390,8 @@ export function AppFrame({
   const detailsBase = useRef(0)
   const detailsRenderedRef = useRef(detailsRendered)
   detailsRenderedRef.current = detailsRendered
-  // Track-level transitions pause for the whole gesture: eased tracks would
-  // detach the column edge from the pointer (AppFrame.module.css).
-  const [dragging, setDragging] = useState(false)
-  const onDragEnd = useCallback(() => { setDragging(false) }, [])
-  const onSidebarStart = useCallback(() => { sidebarBase.current = colsRef.current.sidebar; setDragging(true) }, [])
-  const onDetailsStart = useCallback(() => { detailsBase.current = detailsRenderedRef.current; setDragging(true) }, [])
+  const onSidebarStart = useCallback(() => { sidebarBase.current = colsRef.current.sidebar }, [])
+  const onDetailsStart = useCallback(() => { detailsBase.current = detailsRenderedRef.current }, [])
   const onSidebarDrag = useCallback((dx: number) => {
     actions.setSidebar(sidebarBase.current + dx)
   }, [actions])
@@ -419,7 +414,6 @@ export function AppFrame({
         }}
       data-viewport={mode}
       data-viewport-short={shortCompact || undefined}
-      data-dragging={dragging || undefined}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={(overlayPanels ? !detailsOpen : cols.details === 0) || undefined}
     >
@@ -441,6 +435,9 @@ export function AppFrame({
             <span className={css.topbarTitle} title={currentTitle ?? t('app.title')}>
               {currentTitle ?? t('app.title')}
             </span>
+            <div className={css.topbarEnvironment}>
+              {renderSlot('shell.mobile.header.context', { compact: true })}
+            </div>
           </div>
           <div className={css.topbarActions} data-mobile-session-actions>
             <SessionProvider empty={() => null}>
@@ -494,6 +491,9 @@ export function AppFrame({
           registered global panel; details use the selected Session unless an
           explicit pane action pins their target. */}
       <CenterColumn>
+        {mode !== 'compact' && sidebarCollapsed && <div className={css.railEnvironment}>
+          {renderSlot('shell.mobile.header.context', { compact: false })}
+        </div>}
         {renderSlot('main', { compact: mode === 'compact' }, {
           entryKey: panels.panelInfo.activePanelId ?? 'conversation',
         })}
@@ -515,8 +515,8 @@ export function AppFrame({
       </div>
       {/* The collapsed rail is fixed-width and the compact drawer is not a
           column: resize handles belong to the wider modes only. */}
-      {mode !== 'compact' && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
-      {detailsRendered > 0 && !panels.rightbarFullscreen && <DragHandle side="details" left={viewport - detailsRendered} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
+      {mode !== 'compact' && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} />}
+      {detailsRendered > 0 && !panels.rightbarFullscreen && <DragHandle side="details" left={viewport - detailsRendered} onStart={onDetailsStart} onDrag={onDetailsDrag} />}
     </div>
   )
 }

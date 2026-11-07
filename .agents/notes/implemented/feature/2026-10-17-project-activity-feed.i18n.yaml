@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md
 document:
-  en: 9e8e441c09faae833f8eb3bfcfac879e7778ce70
-  zh: d5c07ec368566de6131fadbc887f0d9fe0e3d328
+  en: 399d01423a5057e19b3f24893b0fe73f7bbd306f
+  zh: 5b4d93bce051efe9ae89a571ac28a94ce82fca7c
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input:
   en: 032f3b6dc17cbb4f
   zh: a67b58c5bcc837c9
@@ -12,29 +12,29 @@ document:
   en: 355eb700fcfe1102
   zh: 98808c588911a8b3
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision:
-  en: 39da47c78a8f4229
-  zh: 559d825459f3b241
+  en: e9c9d8d83951e419
+  zh: 3c82803db6e0a4c6
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/recorded-content:
-  en: 350dde048fd162d5
-  zh: c5ad4bb815f31bc3
+  en: 7fcbadc963f4bb84
+  zh: 0e14415761743834
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/derivation-query-time-not-a-derived-table:
   en: 7674f9c22b2bb65b
   zh: 745b08da9d549e66
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/server-surface:
-  en: f1ec67e96848b737
-  zh: bdd18b9a96d228c0
+  en: eca6f107fdde122d
+  zh: cd14d03ac62bf0b4
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/client-surface:
-  en: e8e1f792cec5146b
-  zh: f097c4bd543599cc
+  en: 0389dba712426b07
+  zh: 8a88fc0b4d071d18
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/presentation-reviewed-html-mock:
-  en: 133d268a587816a4
-  zh: 69822e8ee858d5f7
+  en: 12b1f3dbee3eb215
+  zh: e4207996ee9c3211
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/alternatives-considered:
-  en: 436636b1978a454d
-  zh: 21ba3f9839761b67
+  en: ff486c5615315a70
+  zh: 69231140f2617e45
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/consequences:
   en: d4b121dc92ed6d80
   zh: 49fdbb8375218c4f
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/testing:
-  en: b0dfab564f1c6769
-  zh: 20ca80601292b685
+  en: 309dcc0103c565d6
+  zh: c4957d27a467624a

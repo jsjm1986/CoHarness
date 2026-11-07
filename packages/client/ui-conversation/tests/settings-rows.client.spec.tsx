@@ -19,7 +19,8 @@ afterEach(() => {
 
 function emptySessions() {
   return bindSnapshotSelector(createSnapshotStore<SessionListState>({
-    ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+    ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+    state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   }))
 }
 
@@ -34,7 +35,7 @@ function emptyPanelInfo() {
 }
 
 const readySection: ConversationSettings = {
-  busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+  busyEnter: 'queue', chatContentWidth: 700,
   performanceUsage: 'detailed', linkOpening: 'sidebar',
 }
 

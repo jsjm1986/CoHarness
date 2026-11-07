@@ -1,0 +1,399 @@
+{
+  "recordedAt": "2026-10-29T01:41:53.816450+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B296"
+  ],
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "baseline": {
+    "fetch": {
+      "name": "audit-final-permission-baseline-fetch",
+      "status": "passed",
+      "startedAt": "2026-10-29T01:39:48.365014+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "git",
+        "fetch",
+        "origin",
+        "master"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T01:39:51.527131+00:00"
+    },
+    "aheadOfOriginMaster": 139,
+    "behindOriginMaster": 0,
+    "sharedUncommittedWorkPreserved": true
+  },
+  "causalNegatives": [
+    {
+      "name": "workbench-computer-permissions-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T01:30:13.559427+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+        "DSH_AUDIT_WORKBENCH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-workbench-computer-replay.py",
+        "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+        "src",
+        "workbench-computer-permissions-causal-before"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T01:30:14.382066+00:00"
+    }
+  ],
+  "businessCounterexamples": {
+    "actualAuthenticatedHttpObservations": 4,
+    "revokedComputerMetadataRowsLeaked": 2,
+    "matchedOrdinaryAndIndependentAccountControls": 3
+  },
+  "behavior": [
+    "Each personal catalog root requires the current computer permission for that Session exact Runtime assignment. Another computer grant cannot expose its title, cwd or other metadata.",
+    "The actual Gateway account endpoint, production Runtime router/directory and production workbench handler preserve this restriction while the selected personal Runtime is unavailable. Unknown catalog completeness remains explicit; absence is not deletion.",
+    "Authorized roots on other computers, independent accounts and existing project conversation rules retain their existing visibility. No router, lifecycle, frontend, schema or released Session generation is changed."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "workbench-computer-permissions-current-source",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:31:13.120365+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_WORKBENCH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/workbench-computer-permissions-transcript.spec.ts",
+          "tests/workbench.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:31:14.950615+00:00"
+      },
+      {
+        "name": "workbench-computer-permissions-current-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:31:13.120360+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:31:16.608334+00:00"
+      },
+      {
+        "name": "workbench-computer-existing-route-regression",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:32:46.967209+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/collaboration-service.spec.ts",
+          "tests/server.spec.ts",
+          "-t",
+          "derives the list title|serves an ACL-filtered account|exposes personal catalog completeness",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:32:48.771467+00:00"
+      },
+      {
+        "name": "workbench-computer-private-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:32:46.967403+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-workbench-computer-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:32:49.512343+00:00"
+      },
+      {
+        "name": "workbench-computer-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:34:40.377994+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_WORKBENCH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-workbench-computer-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "lib",
+          "workbench-computer-built-node22",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/workbench-computer-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:34:41.118526+00:00"
+      },
+      {
+        "name": "workbench-computer-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:34:40.377967+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_WORKBENCH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-workbench-computer-replay.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "lib",
+          "workbench-computer-built-node24",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/workbench-computer-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:34:41.195292+00:00"
+      },
+      {
+        "name": "workbench-computer-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:34:40.377973+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/postgres/collaboration-service.ts",
+          "gateway/tests/workbench-computer-permissions-transcript.spec.ts",
+          "gateway/tests/fixtures/workbench-computer-permissions.mjs",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:34:41.821980+00:00"
+      },
+      {
+        "name": "workbench-computer-reviewed-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:32:46.967291+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          ".agents/notes/implemented/architecture/2026-09-08-cordis-multi-session-workbench.md",
+          "gateway/README.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/workbench-computer-permissions/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:32:47.561797+00:00"
+      },
+      {
+        "name": "workbench-computer-final-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:34:40.378001+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:35:53.835146+00:00"
+      },
+      {
+        "name": "workbench-computer-guide-clarification-pair",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:38:37.800664+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/workbench-computer-permissions/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:38:37.958553+00:00"
+      },
+      {
+        "name": "workbench-computer-final-pair-check",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:38:37.992491+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:38:47.319531+00:00"
+      },
+      {
+        "name": "node-configuration-and-permission-private-postgres-cleanup",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:36:14.507700+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/close-node-configuration-permissions-postgres.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:36:14.969264+00:00"
+      },
+      {
+        "name": "audit-final-permission-baseline-fetch",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:39:48.365014+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:39:51.527131+00:00"
+      }
+    ],
+    "source": {
+      "cases": 10,
+      "files": 3,
+      "actualAuthenticatedHttpObservations": 4,
+      "twoRevokedRuntimeRootsHidden": true,
+      "existingFilteredRouteAndTitleCases": 4,
+      "existingCasesFilteredOut": 47
+    },
+    "compiled": {
+      "nodes": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "actualAuthenticatedHttpObservationsPerNode": 4,
+      "goldenMatched": true,
+      "independentProcessesOverlapped": true,
+      "fixtureIsolation": "Unique organization/private directories and ephemeral Gateway listeners; both independent engine processes completed concurrently.",
+      "scope": "Two logical computer placements and their real PostgreSQL/production Gateway handlers on this host. Runtime unavailability is controlled before any execution or network probe. This does not claim physical cross-computer or node-agent network acceptance."
+    },
+    "coverage": "No new full-file percentage or100percent CI coverage claim. Real PostgreSQL/HTTP examples prove the SQL permission predicate and fallback caller path.",
+    "docs": "All20quickgatespassed. A subsequent wording clarification limits the grant statement to different computers; its reviewed bilingual pair was recorded again and the exact pairing check passed. Current-version guide triplet checks pass directly; no verify-upgrade-guides command exists.",
+    "whitespace": {
+      "recordedAt": "2026-10-29T01:39:49.498274+00:00",
+      "status": "passed",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "gateway/src/node-config-store.ts",
+        "gateway/src/postgres/node-configuration-authority.ts",
+        "gateway/src/postgres/deployment-lock.ts",
+        "gateway/src/postgres/administrator-authority.ts",
+        "gateway/src/admin-api.ts",
+        "gateway/tests/node-config-fixture.ts",
+        "gateway/tests/node-config-api.spec.ts",
+        "gateway/tests/node-config-store.spec.ts",
+        "gateway/tests/node-config-applier.spec.ts",
+        "gateway/tests/node-config-process.spec.ts",
+        "gateway/tests/deployment-backups.spec.ts",
+        "gateway/tests/node-config-filesystem.spec.ts",
+        "gateway/tests/node-configuration-authority-postgres.spec.ts",
+        "gateway/tests/node-configuration-administration-transcript.spec.ts",
+        "gateway/tests/fixtures/node-configuration-administration.mjs",
+        "gateway/tests/fixtures/node-config-fifo-reader.mjs",
+        "gateway/tests/expected/projects/node-configuration-administration.jsonl",
+        "gateway/tests/postgres-suite.spec.ts",
+        "gateway/package.json",
+        "gateway/src/postgres/maintenance-service.ts",
+        "gateway/src/server.ts",
+        "gateway/tests/maintenance-administration-postgres.spec.ts",
+        "gateway/tests/maintenance-administration-transcript.spec.ts",
+        "gateway/tests/fixtures/maintenance-administration.mjs",
+        "gateway/tests/expected/projects/maintenance-administration.jsonl",
+        "gateway/tests/deployment.spec.ts",
+        "gateway/tests/maintenance.spec.ts",
+        "gateway/src/execution-identity.ts",
+        "gateway/src/postgres/model-governance-service.ts",
+        "gateway/src/services.ts",
+        "gateway/tests/runtime-usage-attribution-transcript.spec.ts",
+        "gateway/tests/fixtures/runtime-usage-attribution.mjs",
+        "gateway/tests/expected/projects/runtime-usage-attribution.jsonl",
+        "gateway/src/postgres/collaboration-service.ts",
+        "gateway/tests/workbench-computer-permissions-transcript.spec.ts",
+        "gateway/tests/fixtures/workbench-computer-permissions.mjs",
+        "gateway/tests/expected/projects/workbench-computer-permissions.jsonl"
+      ],
+      "exitCode": 0,
+      "additionalCheck": "Every scoped file ends in exactly one trailing newline",
+      "scopeFiles": 37
+    }
+  },
+  "sourceHashes": {
+    "gateway/src/postgres/collaboration-service.ts": "6eda067c1008ab809bb1d052d61462ae2209b38fe84cb3edd2520770e37969bc",
+    "gateway/tests/workbench-computer-permissions-transcript.spec.ts": "5aa22ec2a837108a394d0f276ae2f53f6786c35a1d8973e5181caa31008bbb41",
+    "gateway/tests/fixtures/workbench-computer-permissions.mjs": "c2cd004517084ef4c86e6826232c5a759ac63f3e510a9532f16af893edefafaa",
+    "gateway/tests/expected/projects/workbench-computer-permissions.jsonl": "3642c6a383ed90a259c3786b0c8fc2f2a00116feb9f9fbc20bd75953cc4dc153",
+    "gateway/tests/postgres-suite.spec.ts": "519e2022d818a42ecacd41a9f67e80e24a502ec8a704efad2cfa24c72d6e5f83",
+    "gateway/package.json": "fd3a834e59a125998fe9eee75e5d31027a1da18eaa17ec144f3ec2dafc0076ba"
+  },
+  "artifacts": {
+    "privateGateway": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/workbench-computer-artifact-20261029/lib",
+    "metadata": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/workbench-computer-build-inputs-20261029.json",
+    "immutableMigrationSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029"
+  },
+  "noteReview": {
+    "extendedExisting": [
+      ".agents/notes/implemented/architecture/2026-09-08-cordis-multi-session-workbench.md"
+    ],
+    "keptIndependent": [
+      ".agents/notes/implemented/bug-fix/2026-09-13-workbench-catalog-session-format-compat.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "cleanup": {
+    "receipt": {
+      "name": "node-configuration-and-permission-private-postgres-cleanup",
+      "status": "passed",
+      "startedAt": "2026-10-29T01:36:14.507700+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/close-node-configuration-permissions-postgres.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T01:36:14.969264+00:00"
+    },
+    "ownedContainer": "hgw-node-configuration-6dba1831",
+    "ownedVolume": "hgw-node-configuration-6dba1831-data",
+    "containerAndVolumeRemoved": true,
+    "openClientConnectionsBeforeClose": 0,
+    "immutableFixtureHistoryRemovedWithOwnedDatabase": true,
+    "excludedPorts": [
+      5432,
+      55699
+    ],
+    "otherContainersModified": false
+  },
+  "limitations": [
+    "All12domains remain in_progress. B04allocations/B25nativecontainment/full-file coverage remain open.",
+    "Exact Runtime addressing in frontend catalogs and full per-computer capability/multi-node business acceptance remain incomplete.",
+    "Real model API and actual cloud delivery remain human-deferred."
+  ]
+}

@@ -27,13 +27,15 @@
     "./output": {
       "types": "./lib/types/output.d.ts",
       "default": "./lib/output.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/runner.js",
     "lib/runner-*.js",
-    "lib/output.js",
+    "lib/output.js", "lib/output-*.js",
     "scripts/ensure-spawn-helper.mjs",
     "lib/types/**/*.d.ts"
   ],
@@ -44,7 +46,8 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-subprocess": "workspace:*",
-    "@deepseek-ai/dsh-timeout": "workspace:*"
+    "@deepseek-ai/dsh-timeout": "workspace:*",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*"
   },
   "dependencies": {
     "@deepseek-ai/dsh-lazy-require": "workspace:*",
@@ -56,6 +59,7 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-loader-smoke": "workspace:*",
     "@deepseek-ai/dsh-subprocess": "workspace:*",
-    "@deepseek-ai/dsh-timeout": "workspace:*"
+    "@deepseek-ai/dsh-timeout": "workspace:*",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*"
   }
 }

@@ -19,12 +19,12 @@ export async function apply(ctx: Context): Promise<void> {
     writeFileSync(join(process.cwd(), 'confinement-audit.json'), JSON.stringify({ confineCalls, spawnCalls }) + '\n')
   }
   class GuardedSubprocess extends LocalSubprocessRuntime {
-    override spawn(): never {
+    protected override spawnProcess(): never {
       spawnCalls++
       audit()
       throw new Error('unexpected subprocess allocation after confinement refusal')
     }
-    override async spawnTerminal(): Promise<never> {
+    protected override async spawnTerminalProcess(): Promise<never> {
       spawnCalls++
       audit()
       throw new Error('unexpected terminal allocation after confinement refusal')

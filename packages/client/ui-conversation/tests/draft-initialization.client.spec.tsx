@@ -34,7 +34,7 @@ async function bench() {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
     api: { settings: {} }, isLoopback: false,
-    hostDescription: { getSnapshot: () => undefined },
+    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
   })
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })

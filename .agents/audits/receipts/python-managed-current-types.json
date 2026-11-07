@@ -1,0 +1,13 @@
+{
+  "name": "python-managed-current-types",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T15:49:52.342233+00:00",
+  "seconds": 7.902,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e56f08b1ff3cc5d241bd0318013e97a7631e92b0bee84b164acbd09480223b15",
+  "inputsAfter": "e56f08b1ff3cc5d241bd0318013e97a7631e92b0bee84b164acbd09480223b15",
+  "outputSha256": "0a7fb4ceedae5e1236efee2b894c780a8f8cd8c4115f79bb66bc27bbed54d821",
+  "outputTail": "packages/experimental/ptc-runtime-python/src/index.ts(1163,47): error TS2379: Argument of type '{ argv: [string, ...string[]]; cwd: string; env: NodeJS.ProcessEnv; signal: AbortSignal; sessionId: SessionId | undefined; graceMs: number; stdio: { stdin: \"pipe\"; stdout: \"pipe\"; stderr: \"pipe\"; control: \"pipe\"; }; }' is not assignable to parameter of type 'SubprocessSpawnSpec' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.\n  Types of property 'sessionId' are incompatible.\n    Type 'SessionId | undefined' is not assignable to type 'Branded<\"SessionId\">'.\n      Type 'undefined' is not assignable to type 'Branded<\"SessionId\">'.\n        Type 'undefined' is not assignable to type 'string'.\n"
+}

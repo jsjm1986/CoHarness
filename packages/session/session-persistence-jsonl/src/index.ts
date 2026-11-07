@@ -36,6 +36,7 @@ import {
 } from '@deepseek-ai/dsh-session-persistence'
 import { JsonlBackendTracker, JsonlSessionHandle, type StorageHandleState } from './storage.ts'
 import { SessionWriteLease } from './lease.ts'
+import { DEFAULT_MAX_PENDING_BYTES, DEFAULT_MAX_PENDING_EVENTS, type JsonlRetentionLimits } from './retention.ts'
 import { SESSION_FORMAT_VERSION, Session, SessionId as makeSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionId, SessionHeader, SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 import {
@@ -47,7 +48,8 @@ import {
   compressZstdFrame, createZstdFrameDecoder, decompressZstdFrame, decompressZstdPrefix, scanZstdFrames,
 } from './zstd.ts'
 import { ensureDurableDirectoryWin32, publishNewFileWin32 } from './win32.ts'
-import { verifyCurrentGenerationInWorker } from './migration-verifier.ts'
+import { JsonlMigrationVerifier } from './migration-verifier.ts'
+import { resourceBudgetOf, ResourceAdmissionError } from '@deepseek-ai/dsh-resource-budget'
 import { prepareCatalogFacts } from './catalog-migration.ts'
 import {
   JsonlGenerationSourceChangedError,
@@ -70,6 +72,8 @@ const COLD_LOG_MEMO_MAX_ENTRIES = 2
 
 const DEFAULT_COMPRESSION: JsonlCompression = 'zstd'
 const DEFAULT_LIST_CONCURRENCY = 3
+const DEFAULT_VERIFICATION_CONCURRENCY = 2
+const DEFAULT_MAX_QUEUED_VERIFICATIONS = 128
 /**
  * Internal scheduling constant, not deployment configuration: balance
  * frame-boundary event-loop yields against `setImmediate` overhead. One frame
@@ -91,7 +95,7 @@ export const JsonlCompressionSchema: z<JsonlCompression> = z.union([
 ]).default(DEFAULT_COMPRESSION)
 
 /** Plugin config for the JSONL backend's root and physical encoding. */
-export interface Config {
+export interface Config extends JsonlRetentionLimits {
   /**
    * Root directory for all session files. Required (no default): a default of
    * `process.cwd()` would scatter session files as the process's cwd changes
@@ -104,6 +108,10 @@ export interface Config {
   compression?: JsonlCompression
   /** Maximum concurrent filesystem reads while enumerating sessions; defaults to {@link DEFAULT_LIST_CONCURRENCY}. */
   listConcurrency?: number
+  /** Maximum verification Workers owned by this backend; defaults to 2. */
+  verificationConcurrency?: number
+  /** Maximum queued verification requests owned by this backend; defaults to 128. */
+  maxQueuedVerifications?: number
 }
 
 /** One stored event graph whose producer has established immutable sharing. */
@@ -298,9 +306,13 @@ class JsonlSessionPersistence extends SessionPersistence {
   private readonly coldLogMemo = new Map<SessionId, StoredLog>()
   /** One joinable decode/migration operation per selected historical Session file revision. */
   private readonly migrationPreparations = new Map<SessionId, MigrationPreparation>()
+  private readonly preparationTasks = new Set<Promise<PreparedStoredLog>>()
+  private readonly opening = new Set<Promise<SessionHandle>>()
+  private openingClosed = false
   private readonly listLimit: LimitFunction
 
-  constructor(ctx: Context, public config: Config, private readonly tracker: JsonlBackendTracker) {
+  constructor(ctx: Context, public config: Config, private readonly tracker: JsonlBackendTracker,
+    private readonly verifier: JsonlMigrationVerifier) {
     super(ctx)
     /* v8 ignore next 5 -- generated catalog and Session source share one build-time version owner. */
     if (sessionFormatCatalog.currentVersion !== SESSION_FORMAT_VERSION) {
@@ -367,7 +379,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     // before its first log bytes publish (ensureLease); an unmaterialized
     // session leaves no filesystem footprint at all.
     this.tracker.registerCreated(snapshot, inheritedEventCount)
-    return this.tracker.adopt(new JsonlSessionHandle(this, snapshot.id, snapshot, 'write', { cursor: 0, materialized: false, inheritedEventCount }))
+    return this.tracker.adopt(new JsonlSessionHandle(this, snapshot.id, snapshot, 'write', { cursor: 0, materialized: false, inheritedEventCount }, undefined, this.tracker.retention))
   }
 
   /**
@@ -390,7 +402,24 @@ class JsonlSessionPersistence extends SessionPersistence {
    * @param options - optional cancellation.
    * @returns the open handle.
    */
-  override async open(id: SessionId, access: SessionAccess, options?: SessionPersistenceOpenOptions): Promise<SessionHandle> {
+  override open(id: SessionId, access: SessionAccess, options?: SessionPersistenceOpenOptions): Promise<SessionHandle> {
+    if (this.openingClosed) return Promise.reject(new Error('session-persistence-jsonl is closed'))
+    const task = this.openAccepted(id, access, options)
+    this.opening.add(task)
+    const complete = (): void => { this.opening.delete(task) }
+    void task.then(complete, complete)
+    return task
+  }
+
+  /** @returns completion after accepted opens and all shared migration preparations settle. */
+  async drainOpenOperations(): Promise<void> {
+    this.openingClosed = true
+    while (this.opening.size > 0 || this.preparationTasks.size > 0) {
+      await Promise.allSettled([...this.opening, ...this.preparationTasks])
+    }
+  }
+
+  private async openAccepted(id: SessionId, access: SessionAccess, options?: SessionPersistenceOpenOptions): Promise<SessionHandle> {
     options?.signal?.throwIfAborted()
     await this.ensureRootEncoding()
     options?.signal?.throwIfAborted()
@@ -447,7 +476,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         recoveredTail: stored.recoveredTail,
         inheritedEventCount: stored.inheritedEventCount,
         primed: stored,
-      }, lease))
+      }, lease, this.tracker.retention))
     } catch (error) {
       // Free the in-process claim no matter how the kernel-lock release
       // fares, and keep the original diagnostic: a release failure joins it
@@ -518,6 +547,36 @@ class JsonlSessionPersistence extends SessionPersistence {
   }
 
   /**
+   * Read the requested artifact's validated header without listing other sessions.
+   * @param id - session to observe, including an unmaterialized local creation.
+   * @param signal - optional cancellation for discovery and header reads.
+   * @returns the selected generation's logical header, or undefined when absent.
+   */
+  override async readHeader(id: SessionId, signal?: AbortSignal): Promise<SessionHeader | undefined> {
+    return (await this.stat(id, signal === undefined ? undefined : { signal }))?.header
+  }
+
+  /**
+   * Read one artifact's source-qualified identity through targeted discovery.
+   * @param id - session to observe, including an unmaterialized local creation.
+   * @param signal - optional cancellation for discovery and identity reads.
+   * @returns the selected generation's revision, or undefined when absent.
+   */
+  override async revision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
+    return (await this.stat(id, signal === undefined ? undefined : { signal }))?.revision
+  }
+
+  /**
+   * Read the same targeted identity exposed by revision().
+   * @param id - session to observe, including an unmaterialized local creation.
+   * @param signal - optional cancellation for discovery and identity reads.
+   * @returns the selected generation's revision, or undefined when absent.
+   */
+  override async readRevision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
+    return this.revision(id, signal)
+  }
+
+  /**
    * List every stored session visible to this process: materialized artifacts
    * plus this process's created-but-unmaterialized sessions.
    * @param options - optional cancellation.
@@ -579,6 +638,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         || preparation.sourceRevision !== sourceRevision) {
         const controller = new AbortController()
         const promise = this.loadStoredMigration(id, selected, sourceRevision, controller.signal)
+        this.preparationTasks.add(promise)
         preparation = {
           sourcePath: selected.sourcePath,
           sourceRevision,
@@ -590,6 +650,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         this.migrationPreparations.set(id, preparation)
         const created = preparation
         const release = (): void => {
+          this.preparationTasks.delete(promise)
           created.settled = true
           if (this.migrationPreparations.get(id) === created) {
             this.migrationPreparations.delete(id)
@@ -713,7 +774,7 @@ class JsonlSessionPersistence extends SessionPersistence {
           }),
         },
         validateRelatedSources,
-        verifyCurrentFile: verifyCurrentGenerationInWorker,
+        verifyCurrentFile: this.verifier.verify.bind(this.verifier),
         validateHistoricalHeader: headerValue => this.validateSourceIdentity(
           selected,
           headerValue,
@@ -781,7 +842,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         { kind: 'jsonl', path: selected.sourcePath },
       )
     }
-    if (error instanceof JsonlGenerationSourceChangedError) return error
+    if (error instanceof JsonlGenerationSourceChangedError || error instanceof ResourceAdmissionError) return error
     if (error instanceof SessionFormatUnsupportedError
       || error instanceof SessionPersistenceCorruptionError
       || isErrnoException(error)
@@ -1921,6 +1982,10 @@ export const Config: z<Config> = z.object({
   root: z.string().required(),
   compression: JsonlCompressionSchema,
   listConcurrency: z.natural().min(1).default(DEFAULT_LIST_CONCURRENCY),
+  verificationConcurrency: z.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_VERIFICATION_CONCURRENCY),
+  maxQueuedVerifications: z.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_QUEUED_VERIFICATIONS),
+  maxPendingEvents: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_PENDING_EVENTS),
+  maxPendingBytes: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_PENDING_BYTES),
 })
 
 /**
@@ -1935,12 +2000,20 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   let service!: Fiber
   // A synchronous generator registers thenable disposers without awaiting them.
   ctx.effect(function* () {
-    const tracker = new JsonlBackendTracker(name)
+    const tracker = new JsonlBackendTracker(name, config)
+    const logger = ctx.logger
+    const verifier = new JsonlMigrationVerifier({
+      concurrency: config.verificationConcurrency ?? DEFAULT_VERIFICATION_CONCURRENCY,
+      maxQueued: config.maxQueuedVerifications ?? DEFAULT_MAX_QUEUED_VERIFICATIONS,
+    }, { budget: () => resourceBudgetOf(ctx), report: (error) => { logger.error(error) } })
+    yield () => verifier.dispose()
     yield tracker.install(ctx)
+    let persistence: JsonlSessionPersistence | undefined
+    yield async () => { await persistence?.drainOpenOperations() }
     service = ctx.plugin({
       name: 'session-persistence-jsonl-service',
       apply(serviceCtx: Context) {
-        new JsonlSessionPersistence(serviceCtx, config, tracker)
+        persistence = new JsonlSessionPersistence(serviceCtx, config, tracker, verifier)
       },
     })
     yield service.dispose

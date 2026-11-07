@@ -58,7 +58,7 @@ async function waitForGone(state: TreeState): Promise<void> {
 function cleanupTree(state: TreeState | undefined, identities: ProcessIdentity[]): void {
   if (state === undefined) return
   if (process.platform === 'win32') {
-    taskkillProcessTree(state.root)
+    taskkillProcessTree(state.root, 1000)
     for (const pid of [state.descendant, state.root]) {
       try {
         process.kill(pid, 'SIGKILL')
@@ -68,7 +68,7 @@ function cleanupTree(state: TreeState | undefined, identities: ProcessIdentity[]
     }
     return
   }
-  const inspector = createProcessInspector()
+  const inspector = createProcessInspector(1000)
   for (const identity of identities) {
     try {
       inspector.signalProcess(identity, 'SIGKILL')
@@ -110,7 +110,7 @@ async function runScenario(kind: ManagedKind, trigger: ExitTrigger) {
     // The host validates tree.json before waiting for proceed, so observing it
     // is sufficient readiness; a second marker only adds a redundant Windows poll.
     state = await readTree(join(root, 'tree.json'))
-    if (process.platform !== 'win32') identities = await captureIdentities(createProcessInspector(), state)
+    if (process.platform !== 'win32') identities = await captureIdentities(createProcessInspector(1000), state)
     await writeFile(join(root, 'proceed'), 'proceed')
     const outcome = await child
     settled = true

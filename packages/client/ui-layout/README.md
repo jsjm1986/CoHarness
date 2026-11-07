@@ -7,13 +7,15 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The shell owns one three-column AppFrame, resize geometry, and narrow-screen drawers. Its root declares `sidebar`, `conversation`, `rightbar`, the floating layer, and mobile header actions. The four-session Workbench remains the sole center conversation container; [ui-sidebar-right](../ui-sidebar-right/README.md) owns auxiliary tabs, splits, and visibility, while the frame consumes its presentation reports and allocates space. The theme presenter owns color scheme, alias tokens, font sizes, font lists, and document metadata.
+The shell owns one three-column AppFrame, resize geometry, and narrow-screen drawers. Its root declares `sidebar`, `conversation`, `rightbar`, the floating layer, and mobile header actions. The four-session Workbench remains the sole center conversation container; [ui-sidebar-right](../ui-sidebar-right/README.md) owns auxiliary tabs, splits, and visibility, while the frame consumes its presentation reports and allocates space. Column widths and resize strips take their final positions immediately, so restoring a panel does not reflow conversation text through intermediate widths. The theme presenter owns color scheme, alias tokens, font sizes, font lists, and document metadata.
 
 The frame publishes `data-viewport` and `--dsw-viewport-height` for narrow panes and on-screen keyboards. Medium mode keeps the navigation rail and overlays the auxiliary panel; compact mode uses a left drawer and fullscreen auxiliary panel. Scrim and Escape dismissal delegate to the tab owner instead of maintaining another visibility state. Closing the navigation drawer restores focus to its topbar control. Frame widths are transient; the sidebar owns Session-tab restoration.
 
+`shell.mobile.header.context` renders tab-wide identity beside the compact header title and above the center when the sidebar is a collapsed rail, including before a Session is selected. Session actions remain in `shell.mobile.header.actions` and require a selected Session.
+
 The `/client` exports are the plugin body (`apply`/`inject`), `LayoutController`, and the owner-share interfaces, including `MobileHeaderActionOwnerProps`. AppFrame, the panel store, and the concession solver remain package-internal.
 
-`layout.openDetails(sessionId, target)` delegates a tool call to the sole auxiliary-panel owner; `target.callId` fixes the call independently of chat selection. `layout.focusRightbar(sessionId)` changes only the auxiliary target, preserving the center pane selection. The panel reports visibility, track reservation, and fullscreen presentation to the frame; collapsing it does not end a Host Session.
+`layout.openDetails(sessionId, target)` delegates a tool call to the sole auxiliary-panel owner; `target.callId` fixes the call independently of chat selection. `layout.focusRightbar(sessionId)` changes only the auxiliary target, preserving the center pane selection. Leaving that Session after it is selected releases the frame target; the sidebar then shows the newly selected conversation's retained tabs. The panel reports visibility, track reservation, and fullscreen presentation to the frame; collapsing it does not end a Host Session.
 
 ## Summary
 
@@ -51,3 +53,5 @@ None; this package neither assembles nor sends a provider request.
 None.
 
 </details>
+
+The `shell.mobile.header.context` owner supplies `compact`: true in the phone header and false beside a collapsed desktop sidebar. Contributions use it to avoid repeating identity already present in a Session header.

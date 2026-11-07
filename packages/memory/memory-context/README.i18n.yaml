@@ -3,38 +3,38 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/memory/memory-context/README.md
 document:
-  en: 293eea9d1860c5aa7f449a2cb60425bf110ebc26
-  zh: 288951fedbb9d7399b47a7690d88411caf9c0fdf
+  en: 107de308ab9940ed7b08bbdd3f7ed065badd5ecf
+  zh: 490e52332ed10536b33fa25124b695e504951f4c
 /:
   en: 178cb0d273c0316e
   zh: 16cd523b71332f11
 /deepseek-ai-dsh-memory-context:
-  en: b8dfedaa954522af
-  zh: e68d958ba886f91a
+  en: 37831981bc382685
+  zh: d05b80996bdaa190
 /deepseek-ai-dsh-memory-context/summary:
-  en: 3e422c104615c045
-  zh: 3963eaf19b2573a4
+  en: 75978187fd77f091
+  zh: b0bcaa50b9a6535d
 /deepseek-ai-dsh-memory-context/table-of-contents:
   en: c4cbf1eb9239db12
   zh: 4a7ff9b6aefe4e30
 /deepseek-ai-dsh-memory-context/configuration:
-  en: 83c3c02b8bf68612
-  zh: a180673b0bc42cfd
+  en: 4fd4157a25756629
+  zh: 1c72d471d5c9d515
 /deepseek-ai-dsh-memory-context/publication-semantics:
-  en: cb68eecc0e3f636b
-  zh: b555ef79a25e607b
+  en: 606cd2187844ae4c
+  zh: 99e9e60c40ea1ff2
 /deepseek-ai-dsh-memory-context/per-question-recall:
-  en: b81431c71db912c2
-  zh: 40240a3109f4da8f
+  en: a0c57ebe25bd5f8e
+  zh: f8acd41392bae21b
 /deepseek-ai-dsh-memory-context/catalog-frame:
-  en: 1b8d9f82f2bd7221
-  zh: d101d70485076259
+  en: 69adf210de29a06b
+  zh: fc9b1db1c1c05234
 /deepseek-ai-dsh-memory-context/recall-frame:
-  en: fa0ea0ba26380238
-  zh: cdec7e7e6592dae4
+  en: 4089fde95a26fcac
+  zh: 25813f703f9bbf5c
 /deepseek-ai-dsh-memory-context/byte-budget:
-  en: 9b9dae56a7718c03
-  zh: 01ccc2421d8fd567
+  en: 357b0bd7ac1cdf66
+  zh: 00a0507bfb1e4f6f
 /deepseek-ai-dsh-memory-context/invariants:
   en: a995ae0700deea02
   zh: a2ae47bc11b44444
@@ -66,8 +66,8 @@ document:
   en: ecb5eead1d5473a2
   zh: 514c327d9ec2a674
 /deepseek-ai-dsh-memory-context/known-limitations-and-deferred-work:
-  en: 2842dbc040f0c328
-  zh: 7a95f2e8cbf83e30
+  en: 039479b413bc3f69
+  zh: 8639ac99edc16398
 /deepseek-ai-dsh-memory-context/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

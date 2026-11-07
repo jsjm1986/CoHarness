@@ -56,6 +56,8 @@ kind: "package-reference"
 
 不受支持的平台或不可用的 runner 会拒绝执行：`confine()` 以 `SANDBOX_UNAVAILABLE` 拒绝 并列出该平台的 runner 选项，消费方会呈现该错误，而不是让命令不受限制地运行。启动后拒绝自身 profile 的 runner 由其致命 stderr 签名与退出码识别，因此损坏的沙箱不会被误认为被拒绝的命令。`runnerCommand` 覆盖是操作方断言：它跳过功能探测，并假定配置的 runner 诚实实现与 bwrap 兼容的 profile。
 
+功能探测在 `probeTimeoutMs` 到期时强制终止停滞的原生客户端，并在客户端关闭后返回。超时使候选不可用，不能授权未隔离执行。提供者缓存已完成的选择结果。[探测所有权决策](../../../.agents/notes/implemented/bug-fix/2026-10-29-native-capability-probe-closure.zh.md)记录失败及生命周期规则。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -73,6 +75,7 @@ kind: "package-reference"
 ### 平台 profile
 
 bwrap profile 组合只读宿主根目录、全新 `/dev` 与私有 PID 命名空间中的 `/proc`——命令可管理其后代，但看不到宿主进程，因此 procfs 魔法链接无法绕过挂载；`workspace-write` 另加临时的 `/tmp` 与可写工作区绑定挂载。私有 PID 笔记记录该边界。
+
 
 `@deepseek-ai/node-addon-system/landlock-run` API 提供平台 launcher、功能探测与授权词汇；此提供方只做模式到授权的映射，把路径解析与探测解析保留在带版本的 binary 中。
 
@@ -110,8 +113,10 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 - [Windows ACL 受限令牌档](../sandbox-windows-acl/README.zh.md)——本提供方挂载的 win32 后端。
 - [子进程沙箱决策](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md)——能力边界与 runner 选择语义。
 
+
 -----
 
+<a id="model-experience"></a>
 ## 模型体验
 
 通过 [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md) 和 [`dsh-tool-bash`](../../shell/tool-bash/README.zh.md) 间接影响；它们渲染此提供方的强制执行与拒绝事实，而 [`dsh-sandbox`](../sandbox/README.zh.md) seam 拥有 `SANDBOX_UNAVAILABLE` 文本、本提供方拥有 runner 选择，profile 不进入上下文。
@@ -145,6 +150,5 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 
 [沙箱决策](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md)把环境一致的能力组示例（例如 bash 加 fs 针对同一个容器）列为延期阶段；该方向尚未决定。
 
-</details>
 
-<a id="model-experience"></a>
+</details>

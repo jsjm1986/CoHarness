@@ -1,0 +1,14 @@
+{
+  "name": "real-web-gateway-source-assembly",
+  "cwd": ".",
+  "command": "node --import tsx/esm gateway/tests/run-local-web-assembly.mjs src",
+  "startedAt": "2026-10-24T20:53:05.804466+00:00",
+  "seconds": 8.091,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "af07242253e431615b85c83ea324a49c32e145aa01d1fa5505f310a474c8e30f",
+  "inputsAfter": "af07242253e431615b85c83ea324a49c32e145aa01d1fa5505f310a474c8e30f",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "388fc3bea8ebd25005dab8306bf0c750e60b27fabb71a0e9e089c3ff3de22354",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/run-local-web-assembly.mjs:101\n        child.once('error', fail); child.once('exit', () => fail(new Error(`Gateway fixture exited: ${diagnostics}`)))\n                                                                 ^\n\nError: Gateway fixture exited: /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45\n    Error.captureStackTrace(err)\n          ^\n\nerror: duplicate key value violates unique constraint \"instances_assigned_node_id_port_key\"\n    at /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/local-runtime-web-gateway.mjs:63:1) {\n  length: 297,\n  severity: 'ERROR',\n  code: '23505',\n  detail: 'Key (assigned_node_id, port)=(2cb62725-d3b8-434f-af48-3e16e32bdca5, 53263) already exists.',\n  hint: undefined,\n  position: undefined,\n  internalPosition: undefined,\n  internalQuery: undefined,\n  where: undefined,\n  schema: 'harness',\n  table: 'instances',\n  column: undefined,\n  dataType: undefined,\n  constraint: 'instances_assigned_node_id_port_key',\n  file: 'nbtinsert.c',\n  line: '673',\n  routine: '_bt_check_unique'\n}\n\nNode.js v25.8.1\n\n    at ChildProcess.<anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/run-local-web-assembly.mjs:101:66)\n    at Object.onceWrapper (node:events:623:12)\n    at ChildProcess.emit (node:events:508:20)\n    at ChildProcess._handle.onexit (node:internal/child_process:294:12)\n\nNode.js v25.8.1\n"
+}

@@ -1,0 +1,56 @@
+{
+  "admissions": [
+    "model",
+    "process",
+    "model",
+    "model",
+    "model",
+    "model"
+  ],
+  "released": [
+    "model",
+    "model",
+    "model",
+    "model",
+    "process",
+    "model"
+  ],
+  "uncertain": [],
+  "processRefused": false,
+  "childRan": true,
+  "childStopped": true,
+  "childControlHidden": true,
+  "nativeChild": {
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "quiescent": 3,
+    "nativeRequests": 1,
+    "persistedBeforeHttp": true,
+    "usages": [
+      {
+        "inputTokens": 3,
+        "outputTokens": 2,
+        "totalTokens": 5,
+        "credentialSource": "file"
+      }
+    ]
+  },
+  "governance": {
+    "records": 5,
+    "allParentSession": true,
+    "nativeUsage": [
+      {
+        "provider": "sonar-owned",
+        "model": "sonar",
+        "credentialSource": "file",
+        "credentialClass": "personal",
+        "status": "succeeded",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 2,
+          "totalTokens": 5
+        }
+      }
+    ]
+  }
+}

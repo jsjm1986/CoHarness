@@ -12,6 +12,12 @@
   ],
   "references": [
     {
+      "path": "../../../native/system/packages/entry"
+    },
+    {
+      "path": "../../util/launch-environment"
+    },
+    {
       "path": "../directory-picker"
     },
     {

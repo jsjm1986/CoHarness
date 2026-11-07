@@ -99,7 +99,7 @@
 .count {
   flex: 1 1 auto;
   min-width: 0;
-  font-family: Inter, var(--dsw-font-family);
+  font-family: var(--dsw-font-family);
   font-size: 13px;
   font-weight: 500;
   line-height: 24px;
@@ -142,7 +142,7 @@
   min-width: 0;
   overflow: hidden;
   font: var(--dsw-font-xs-13);
-  font-family: Inter, var(--dsw-font-family);
+  font-family: var(--dsw-font-family);
   color: var(--dsw-alias-label-primary-dimmed);
   text-overflow: ellipsis;
   white-space: nowrap;

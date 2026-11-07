@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-19-cooperative-tool-cancellation.md
 document:
-  en: 5ca2b44b24a4af189df27c6f724021a7bf290e2b
-  zh: d6d49fb44c5d5629729a8b5b4bad07ea9b2f7ee9
+  en: 967c7285dfd0848de068a7dc430b975ebd9d929f
+  zh: 87318c3316bdabb8badeedadd4a96d5ce16f8db3
 /agent-note-cooperative-tool-cancellation-at-the-registry-boundary:
   en: 84c827aa3baa331a
   zh: 10cad03e58b10e31
@@ -30,8 +30,8 @@ document:
   en: fbd101d4576afa92
   zh: 35f5d3c2f6cad6a8
 /agent-note-cooperative-tool-cancellation-at-the-registry-boundary/alternatives-considered:
-  en: 1f205f1a78d4fd5b
-  zh: 6c17e35da2909302
+  en: c4d86feb135d2ac4
+  zh: 67c56c0bc2213949
 /agent-note-cooperative-tool-cancellation-at-the-registry-boundary/consequences:
   en: 24a9ad2c4c7c86b5
   zh: debdd29d272e07ea

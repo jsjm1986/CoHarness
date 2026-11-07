@@ -29,11 +29,11 @@ kind: "package-reference"
 
 ### 何时选择
 
-当部署希望使用 DeepSeek 原生服务端 web 搜索、且其用户登录 DeepSeek 账号或持有 `DEEPSEEK_API_KEY` 时选择此后端——提供方按[鉴权](#authentication)所述复用这些凭据。一次搜索比专用检索端点更重：DeepSeek 在完整模型轮次内执行搜索，因此每次搜索都要预期一次 Messages 调用的延迟与生成 token，每次请求最多 `maxUses` 次服务端搜索。当单次搜索的成本或延迟占主导时避免使用它。
+需要在兼容 DeepSeek 的 Messages 路由上进行原生服务器搜索时选择本后端。每次搜索执行完整模型回合，最多调用 `maxUses` 次服务器搜索。受管部署选择已配置的 LLM 提供方；独立 web 组合可使用独立的 API key 端点。
 
 ### 最小配置
 
-加载 web 服务与本提供方；密钥在已挂载 `ctx.credentials` 服务时从其解析，否则从进程环境解析。辅助搜索调用有独立的端点设置，使用 Anthropic 兼容基址 `https://api.deepseek.com/anthropic/v1`，并追加 `/messages`。它读取 `$DEEPSEEK_SEARCH_BASE_URL`，与会话适配器的 `$DEEPSEEK_BASE_URL` 相互独立。
+加载 web 服务和提供方。配置 `provider`，或已安装、要求模型授权时，搜索使用选定的 LLM 路由；默认路由为 `deepseek-official`，端点与凭据由其适配器拥有。不满足这些条件时，下列配置通过 `ctx.credentials` 或启动环境解析自己的密钥，并独立于会话设置读取 `DEEPSEEK_SEARCH_BASE_URL`。
 
 ```yaml
 - name: '@deepseek-ai/dsh-web'
@@ -45,9 +45,10 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `apiKey` | 未设置 | DeepSeek API 密钥字面值；优先使用 `apiKeyEnv`，避免密钥进入配置。非空字面值优先于 `apiKeyEnv`；账号 token 优先于两者 |
+| `provider` | 省略 | 受管 LLM 路由。该路由必须实现原生 Messages 搜索；不支持的协议或原生登录鉴权会明确失败 |
+| `apiKey` | 省略 | 独立搜索的 API key；优先使用 `apiKeyEnv`。非空字面量优先于 `apiKeyEnv`；受管搜索使用 LLM 路由凭据 |
 | `apiKeyEnv` | `DEEPSEEK_API_KEY` | 每次搜索通过 `ctx.credentials` 解析的凭据引用；没有该服务时从进程环境解析。需要 API 密钥却解析不到时，搜索以 `WEB_PROVIDER_CREDENTIAL_MISSING` 失败 |
-| `baseURL` | `https://api.deepseek.com/anthropic/v1` | Anthropic 兼容端点基址；追加 `/messages`。缺省时回退到 `$DEEPSEEK_SEARCH_BASE_URL`；无法解析时提供方不可用 |
+| `baseURL` | `https://api.deepseek.com/anthropic/v1` | 独立搜索的 Messages 根地址；追加 `/messages`，回退到 `$DEEPSEEK_SEARCH_BASE_URL`。受管搜索使用选定 LLM 路由的端点 |
 | `model` | `deepseek-v4-flash` | Anthropic 格式模型名称 |
 | `apiVersion` | `2023-06-01` | `anthropic-version` 标头值 |
 | `maxTokens` | `4096` | Messages 请求生成 token 的正整数上限 |
@@ -58,7 +59,9 @@ kind: "package-reference"
 <a id="authentication"></a>
 ### 鉴权
 
-当发起会话最近的 `request/context` 事件指明 `deepseek-account` 提供方路由，且 `ctx.deepseekAccount` 为搜索端点解析出 token 时，搜索使用 DeepSeek 账号鉴权。账号服务仅在已登录时、且仅对部署配置的推理 origin（默认 `https://api.deepseek.com`）解析 token。这类搜索只发送 `x-dsh-auth-token`，即使配置了 API 密钥也是如此。其余所有搜索，包括没有发起会话的调用以及端点属于其他 origin 的搜索，都把 API 密钥同时作为 `x-api-key` 与 `Authorization: Bearer` 发送。账号鉴权的搜索收到 HTTP 401 时以 `WEB_PROVIDER_ERROR` 失败，附带登录指引而非端点指引，账号保持登录。
+受管搜索保留预备 LLM 路由的端点、模型、凭据引用和标头。凭据只在获准执行时解析；独立的 `apiKey`、`apiKeyEnv` 与 `baseURL` 不覆盖该路由。DeepSeek API key 直连路由和显式配置的 pi-ai Messages 路由实现此操作。提供方原生登录和其他协议无法为该原生请求鉴权时会明确失败。
+
+独立搜索先解析非空 API key 字面量，再解析凭据引用，并同时发送 `x-api-key` 与 `Authorization: Bearer`。传输类也接受适配器拥有的 `resolveHeaders`，由它独占提供鉴权标头，不回退到账号或密钥。
 
 ### 搜索返回什么
 
@@ -66,11 +69,15 @@ kind: "package-reference"
 
 ### 请求日志
 
-由发起 agent（智能体）运行的搜索会在发出请求前一刻，追加仅用于日志的 `web/deepseek-search-llm-request` 会话事件。其中包含已解析端点、API 版本，以及发送给 DeepSeek 且不含密钥的精确 JSON 请求体；不包含标头和凭据。发出请求前发生凭据失败或取消时不会创建事件，而发出请求后的 HTTP 或响应失败会保留本次请求尝试的持久记录。
+受管搜索经过普通 LLM 中间件、精确路由授权、执行归属、模型准入和实际用量报告。在任何等待前捕获发起 Session。排队时撤销模型或执行权限会阻止 HTTP 派发；缺少必需策略不会恢复独立派发。每个请求只取得一个模型许可，持有到响应处理和取消结束。卸载中止并等待已接受搜索及清理。
+
+独立搜索在准入和凭据等待期间保留资源提供者，并在派发前核对当前归属和模型策略要求。提供者被移除、替换或新增准入时，过期 HTTP 以 `WEB_PROVIDER_ERROR` 拒绝，未使用的容量归还原所有者。新增必需模型策略也会阻止独立派发。应恢复授权并重新搜索，不转移旧许可。在记录之前被拒绝的请求不会向发起 Session 添加原生输入。
+
+存在发起 Session 时，`web/deepseek-search-llm-request` 记录精确端点、API 版本和无密钥请求体。受管搜索在进入模型中间件前追加，使 checkpoint 策略能在 HTTP 前完成持久化；拒绝的尝试保留已记录输入。独立搜索在鉴权和准入之后、HTTP 之前追加。不记录标头和凭据。实际提供方用量在结果映射前报告；缺失用量保持缺失。
 
 ### 失败与恢复
 
-失败抛出携带可按机器路由 code 的 `WebError`：凭据缺失为 `WEB_PROVIDER_CREDENTIAL_MISSING`，调用方取消为 `WEB_ABORTED`，提供方或传输失败，包括响应中没有 `web_search_tool_result` 块，为 `WEB_PROVIDER_ERROR`。HTTP 重定向会在接触 `Location` 指向的目标之前被拒绝。请求发出后的每项失败都会指出已解析的搜索端点，并说明搜索端点配置独立于聊天端点。如果该端点不符合用户预期，错误消息会要求会话模型指导用户进入 Plugins > Built-in plugin settings > Web search，修改 Messages API base URL 字段并保存。该页面不可用时，消息会把 `web-search-deepseek.baseURL` 作为部署配置方式。模型不得替用户选择或修改端点。面向模型的 `web_search` 工具会在自己的错误包装层内呈现这段文本。
+失败抛出 `WebError`：独立搜索缺少凭据使用 `WEB_PROVIDER_CREDENTIAL_MISSING`，取消使用 `WEB_ABORTED`，模型策略、提供方或传输失败使用 `WEB_PROVIDER_ERROR`。原始模型失败保留为 cause，供程序检查。重定向会在联系目标前拒绝。派发后失败指出精确端点；受管搜索引导用户检查拥有该端点的模型路由设置，独立搜索引导用户检查 Web search 设置。模型不得选择或更改端点。错误包装由 `web_search` Consumer 拥有。
 
 -----
 
@@ -94,12 +101,14 @@ kind: "package-reference"
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Config schema 与每次搜索的选项捕获 |
+| [`src/admission.ts`](src/admission.ts) | Session 捕获、模型准入与已接受搜索清理 |
 | [`src/provider.ts`](src/provider.ts) | `DeepSeekSearchProvider`：Messages 请求分发、块解析、引用拼接、凭据解析 |
+| [`src/usage.ts`](src/usage.ts) | 校验实际提供方 token 计数，不虚构缺失用量 |
 | [`src/types.ts`](src/types.ts) | 搜索响应的 Anthropic 协议类型 |
 
 ### 请求流程
 
-每次搜索先把当前 Config 段投影为提供方选项——端点、模型、密钥引用、上限——然后在发起会话使用账号路由时向 `ctx.deepseekAccount` 请求 token，否则通过 `ctx.credentials`（或环境）解析凭据引用，追加仅用于日志的会话事件，并以原生 `web_search` 服务器工具分发 Messages 请求。响应中的 `web_search_tool_result` 块变为 `sources[]`；文本块中的 `cited_text` 条目按其 URL 拼接为 snippet；结果按 URL 去重；服务在返回路径上强制执行请求的来源上限。
+受管搜索在选定 LLM 路由上预备并记录原生操作。独立搜索在准入后解析独立选项。两者共用 Messages 序列化与结果映射：`web_search_tool_result` 提供来源，引用提供 snippet，web 服务负责去重和来源数量限制。
 
 </details>
 

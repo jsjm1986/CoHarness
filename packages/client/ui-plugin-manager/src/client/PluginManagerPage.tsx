@@ -10,7 +10,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { PluginInstallFailureKind, Registry } from '@deepseek-ai/dsh-api-remotes/client'
+import type { PluginInfo, PluginInstallFailureKind, Registry } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   Button, IconCheckOutline16, IconChevronDownOutline14, IconChevronLeftOutline14,
   IconChevronRightOutline14, IconCloseOutline16,
@@ -44,7 +44,7 @@ export type PluginManagerPageProps =
   & PropsLocale<'pluginManager'>
   & PropsRenderSlots<
     | 'plugins.item' | 'plugins.bundle.config' | 'plugins.row.config' | 'plugins.bundle.activation'
-    | 'plugins.add.actions' | 'plugins.tab'
+    | 'plugins.add.actions' | 'plugins.tab' | 'plugins.context'
     | 'plugins.detail.actions' | 'plugins.detail.badge' | 'plugins.detail.section'
   >
   & InjectFace<PluginManagerFace>
@@ -68,20 +68,20 @@ function AddPluginMenu({ t, title, disabled, openInstall, renderSlot }: {
   const onDismiss = (): void => { setOpen(false) }
   return (
     <span className={css.addGroup} role="group" aria-label={t('addPlugin')}>
-      <Button variant="primary" size="sm" className={css.addPrimary} icon={<IconPlusOutline16 size={13} />}
+      <Button variant="soft" size="toolbar" className={css.addPrimary} icon={<IconPlusOutline16 />}
         disabled={disabled} {...title === undefined ? {} : { title }} onClick={() => { onDismiss(); openInstall() }}>
         {t('addPlugin')}
       </Button>
       <Menu open={open} onClose={onDismiss} align="end" portal autoFocus listClassName={css.addMenu}
         anchor={(
-          <Button variant="primary" size="sm" className={css.addMore}
+          <Button variant="soft" size="toolbar" className={css.addMore}
             disabled={disabled} {...title === undefined ? {} : { title }}
             aria-label={t('chooseAddMethod')} aria-haspopup="menu" aria-expanded={open}
             onClick={() => { setOpen(value => !value) }}
             onKeyDown={(event) => {
               if (!open && event.key === 'ArrowDown') { event.preventDefault(); setOpen(true) }
             }}>
-            <IconChevronDownOutline14 size={12} aria-hidden="true" />
+            <IconChevronDownOutline14 size={14} aria-hidden="true" />
           </Button>
         )}>
         <MenuItemButton icon={<IconDownloadOutline16 size={14} />} onSelect={() => { onDismiss(); openInstall() }}>
@@ -228,9 +228,12 @@ const ROW_ARTWORK_SIZE = 30
 /** The artwork of the official plugins that registered their configuration, by registration id. */
 const ITEM_ARTWORK = new Map<string, (props: IconProps) => ReactNode>([
   ['shell', PluginArtworkTerminal],
+  ['bash-sandbox', PluginArtworkTerminal],
+  ['pwsh-sandbox', PluginArtworkTerminal],
   ['agent-loop', PluginArtworkLoop],
   ['subagent', PluginArtworkSubagent],
   ['subagent-model-selection', PluginArtworkSubagent],
+  ['subagent-model-selection-settings', PluginArtworkSubagent],
   ['web-search', PluginArtworkSearch],
   ['web-search-deepseek', PluginArtworkSearch],
 ])
@@ -289,6 +292,50 @@ function RowSwitch({ row, title, t, busy, canManage, onChange }: {
 function rowStateText(row: PackageRow, t: Translate): string {
   if (!row.enabled) return t('partOff')
   return row.phase === null ? t('rowStateIdle') : t(PHASE_KEYS[row.phase])
+}
+
+/**
+ * The Host entry a `plugins.item` id names: a patch-addressable row answers
+ * by `patchId`; a row the patch cannot address still answers by the live
+ * entry its bundle carries. An `id` that resolves to neither stays an
+ * unbound configuration card.
+ * @param itemId - the `plugins.item` entry id.
+ * @param plugins - the Host's running-profile entries.
+ * @param packages - the bundles whose rows cover rows outside the patch.
+ * @returns the Host entry, or undefined for an unbound id.
+ */
+function resolveFeature(itemId: string, plugins: readonly PluginInfo[], packages: readonly PackageView[]): PluginInfo | undefined {
+  const direct = plugins.find(plugin => plugin.patchId === itemId)
+  if (direct !== undefined) return direct
+  for (const pkg of packages) {
+    const row = pkg.rows.find(row => row.rowId === itemId)
+    if (row?.entryId === undefined) continue
+    const live = plugins.find(plugin => plugin.entryId === row.entryId)
+    if (live !== undefined) return live
+  }
+  return undefined
+}
+
+/** A feature card's switch: locked, saying why, when the Host refuses to address the row. */
+function FeatureSwitch({ plugin, title, t, busy, canManage, onChange }: {
+  readonly plugin: PluginInfo
+  readonly title: string
+  readonly t: Translate
+  readonly busy: boolean
+  readonly canManage: boolean
+  readonly onChange: (enabled: boolean) => void
+}): ReactNode {
+  return (
+    <Switch
+      checked={plugin.enabled}
+      label={t('partToggle', { name: title })}
+      disabled={busy || plugin.readOnlyReason !== undefined || !canManage}
+      {...!canManage
+        ? { title: t('managementDenied') }
+        : plugin.readOnlyReason === undefined ? {} : { title: managementText({ code: plugin.readOnlyReason }, t) }}
+      onChange={onChange}
+    />
+  )
 }
 
 /** The dot beside a row: its fiber phase, or idle. */
@@ -587,16 +634,40 @@ function PackageCard({ pkg, t, resolveText, busy, highlighted, canManage, onOpen
 /**
  * One official plugin as a card that opens its page: its icon, its title from
  * the registration, and the one-liner the entry renders in its summary view.
+ * An entry bound to a patch row carries the row's switch beside the title.
  */
-function ItemCard({ item, t, onOpen, renderSlot }: {
+function ItemCard({ item, t, onOpen, renderSlot, feature, busy, canManage, onSetEnabled }: {
   readonly item: OfficialItem
   readonly t: Translate
   readonly onOpen: () => void
   readonly renderSlot: RenderConfig
+  /** The Host entry the id resolved to; an unbound item shows no switch. */
+  readonly feature?: PluginInfo | undefined
+  readonly busy?: boolean
+  readonly canManage?: boolean
+  readonly onSetEnabled?: ((enabled: boolean) => void) | undefined
 }): ReactNode {
   return (
     <li className={`${css.card} ${css.cardLink}`} data-plugin-item={item.id}>
-      <CardHead title={item.label} t={t} onOpen={onOpen} icon={itemArtwork(item.id)} description={renderSlot('plugins.item', { view: 'summary' }, { only: item.id })} />
+      <CardHead
+        title={item.label}
+        t={t}
+        onOpen={onOpen}
+        icon={itemArtwork(item.id)}
+        description={renderSlot('plugins.item', { view: 'summary' }, { only: item.id })}
+        end={feature === undefined || onSetEnabled === undefined
+          ? undefined
+          : (
+            <FeatureSwitch
+              plugin={feature}
+              title={item.label}
+              t={t}
+              busy={busy === true}
+              canManage={canManage === true}
+              onChange={onSetEnabled}
+            />
+          )}
+      />
     </li>
   )
 }
@@ -624,12 +695,17 @@ function packageRef(pkg: PackageView): PluginPackageRef {
  * contributed actions, its title with the contributed badges over its
  * one-liner, the form the entry renders, and the contributed sections.
  */
-function ItemDetail({ item, t, onBack, renderSlot, form }: {
+function ItemDetail({ item, t, onBack, renderSlot, form, feature, featureBusy, canManage, onSetFeatureEnabled }: {
   readonly item: OfficialItem
   readonly t: Translate
   readonly onBack: () => void
   readonly renderSlot: RenderConfig
   readonly form: ConfigPageForm | undefined
+  /** The Host entry the id resolved to; a bound item's page carries the row's switch. */
+  readonly feature?: PluginInfo | undefined
+  readonly featureBusy?: boolean
+  readonly canManage?: boolean
+  readonly onSetFeatureEnabled?: (enabled: boolean) => void
 }): ReactNode {
   const subject: PluginsSubject = { kind: 'item', id: item.id }
   return (
@@ -639,7 +715,23 @@ function ItemDetail({ item, t, onBack, renderSlot, form }: {
         crumbText={t('crumbRoot')}
         onBack={onBack}
         icon={itemArtwork(item.id)}
-        actions={<div className={css.detailActions}>{renderSlot('plugins.detail.actions', { subject })}</div>}
+        actions={(
+          <div className={css.detailActions}>
+            {renderSlot('plugins.detail.actions', { subject })}
+            {feature === undefined || onSetFeatureEnabled === undefined
+              ? null
+              : (
+                <FeatureSwitch
+                  plugin={feature}
+                  title={item.label}
+                  t={t}
+                  busy={featureBusy === true}
+                  canManage={canManage === true}
+                  onChange={onSetFeatureEnabled}
+                />
+              )}
+          </div>
+        )}
       />
       <div className={css.detailMain}>
         <div className={css.titleRow}>
@@ -648,6 +740,12 @@ function ItemDetail({ item, t, onBack, renderSlot, form }: {
         </div>
         <p className={css.detailDesc}>{renderSlot('plugins.item', { view: 'summary' }, { only: item.id })}</p>
       </div>
+      {feature === undefined || feature.enabled || feature.readOnlyReason !== undefined
+        ? null
+        : <p className={css.reason} role="status">{t('partOff')}</p>}
+      {feature?.readOnlyReason === undefined
+        ? null
+        : <p className={css.reason} role="status">{managementText({ code: feature.readOnlyReason }, t)}</p>}
       <div className={css.detailSections}>
         <section className={css.detailSection} data-plugin-config>
           {renderSlot('plugins.item', { view: 'page', form }, { only: item.id })}
@@ -1578,6 +1676,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   const refreshing = state.refreshStatus === 'refreshing'
   const openPkg = view.kind === 'package' || view.kind === 'row' ? listed.find(pkg => pkg.name === view.name) : undefined
   const openItem = view.kind === 'item' ? ledger.items.find(item => item.id === view.id) : undefined
+  const openItemFeature = openItem === undefined ? undefined : resolveFeature(openItem.id, state.plugins, state.packages)
   const openRow = view.kind === 'row' && openPkg !== undefined ? openPkg.rows.find(row => row.rowId === view.rowId) : undefined
   const onInstalled = tab === INSTALLED_TAB
   const showsCards = !onInstalled || (openPkg === undefined && openItem === undefined)
@@ -1615,13 +1714,43 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       onSetEnabled={(enabled) => { setActivation(enabled ? pkg.name : null); props.setEnabled(pkg.name, enabled) }}
     />
   )
-  // The Basic group lists the settings cards for namespaces the Host serves, so a card
-  // whose plugin was never composed leaves no empty shell.
-  const basicCards = ledger.items
-    .filter(item => configurations?.some(configuration => configuration.ns === item.id) ?? false)
-    .map(item => (
-      <ItemCard key={`item:${item.id}`} item={item} t={t} renderSlot={renderSlot} onOpen={() => { setView({ kind: 'item', id: item.id }) }} />
-    ))
+  // Built-in features bind their cordis row by entry id: a bound entry stays
+  // listed while its row is off so the card's switch can bring it back, and
+  // entries sharing a label merge on the group's live member — the idiom for
+  // a row whose id changes with the platform. An id no row or served
+  // namespace owns leaves no card.
+  const itemGroups = new Map<string, { item: OfficialItem; plugin: PluginInfo | undefined }[]>()
+  for (const item of ledger.items) {
+    const row = { item, plugin: resolveFeature(item.id, state.plugins, state.packages) }
+    const group = itemGroups.get(item.label)
+    if (group === undefined) itemGroups.set(item.label, [row])
+    else group.push(row)
+  }
+  const basicCards = [...itemGroups.values()].flatMap((group) => {
+    const bound = group.filter((row): row is { item: OfficialItem; plugin: PluginInfo } => row.plugin !== undefined)
+    const live = bound.find(row => row.plugin.enabled) ?? bound[0]
+    if (live !== undefined) {
+      const { item, plugin } = live
+      return [(
+        <ItemCard
+          key={`item:${item.id}`}
+          item={item}
+          t={t}
+          renderSlot={renderSlot}
+          feature={plugin}
+          busy={state.busy.includes(rowKey(plugin.entryId))}
+          canManage={canManage}
+          onSetEnabled={(enabled) => { props.setRowEnabled(plugin.entryId, enabled) }}
+          onOpen={() => { setView({ kind: 'item', id: item.id }) }}
+        />
+      )]
+    }
+    return group
+      .filter(row => configurations?.some(configuration => configuration.ns === row.item.id) ?? false)
+      .map(row => (
+        <ItemCard key={`item:${row.item.id}`} item={row.item} t={t} renderSlot={renderSlot} onOpen={() => { setView({ kind: 'item', id: row.item.id }) }} />
+      ))
+  })
   const renderGroup = (id: 'basic' | 'extensions' | 'bundles', heading: string, cards: readonly ReactNode[]): ReactNode => {
     const offersMore = id === 'extensions' && more.length > 0
     if (cards.length === 0 && !offersMore) return null
@@ -1646,7 +1775,10 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
         ? (
           <header className={css.pageHead} data-window-drag>
             <div className={css.pageHeading}>
-              <h1 className={css.pageTitle}>{t('title')}</h1>
+              <div className={css.titleRow}>
+                <h1 className={css.pageTitle}>{t('title')}</h1>
+                {renderSlot('plugins.context', {})}
+              </div>
               <div className={css.pageIntro}>
                 <span>{t('intro')}</span>
                 <Tooltip label={t('infoDescription')} side="bottom" delayMs={300} maxWidth={300} portal openOnClick>
@@ -1678,7 +1810,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
                     disabled={!loaded || !canManage} openInstall={props.openInstall} renderSlot={renderSlot} />
                 )
                 : (
-                  <Button variant="primary" size="sm" className={css.addButton} icon={<IconPlusOutline16 size={13} />}
+                  <Button variant="soft" size="toolbar" icon={<IconPlusOutline16 />}
                     title={!canManage ? t('managementDenied') : undefined}
                     disabled={!loaded || !canManage} onClick={props.openInstall}>
                     {t('installViewTask')}
@@ -1738,6 +1870,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             <IconChevronLeftOutline14 size={20} aria-hidden="true" />
           </Button>
           <h1 className={css.pageTitle}>{t('moreTitle')}</h1>
+          {renderSlot('plugins.context', {})}
         </header>
       ) : null}
       {installedCards && !loaded ? (
@@ -1811,7 +1944,19 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
         )
         : null}
       {onInstalled && loaded && openItem !== undefined
-        ? <ItemDetail form={formFor(openItem.id)} item={openItem} t={t} renderSlot={renderSlot} onBack={() => { setView({ kind: 'list' }) }} />
+        ? (
+          <ItemDetail
+            form={formFor(openItem.id)}
+            item={openItem}
+            t={t}
+            renderSlot={renderSlot}
+            feature={openItemFeature}
+            featureBusy={openItemFeature !== undefined && state.busy.includes(rowKey(openItemFeature.entryId))}
+            canManage={canManage}
+            onSetFeatureEnabled={(enabled) => { if (openItemFeature !== undefined) props.setRowEnabled(openItemFeature.entryId, enabled) }}
+            onBack={() => { setView({ kind: 'list' }) }}
+          />
+        )
         : null}
       {loaded && installedCards
         ? basicCards.length === 0 && official.length === 0 && mine.length === 0 && state.status !== 'error'

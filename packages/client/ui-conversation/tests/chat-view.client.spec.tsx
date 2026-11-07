@@ -172,7 +172,8 @@ const compaction = (over: Partial<CompactionSummaryNode> = {}): CompactionSummar
 /** Empty sessions-list hook for the global standard-kit seat. */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
+    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+      state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 
@@ -1975,6 +1976,56 @@ describe('ChatView', () => {
       expect(host.scrollTop).toBe(580) // approximate 100 + the row's 480px reflow shift
       // The restored position is above the floor: follow stays disarmed.
       expect(view.getByLabelText('回到底部')).toBeTruthy()
+    } finally {
+      rect.mockRestore()
+      host.remove()
+    }
+  })
+
+  it('preserves a restored row through later reflow until the reader scrolls', () => {
+    let notify: (() => void) | undefined
+    const disconnect = vi.fn()
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        notify = () => { callback([], this as unknown as ResizeObserver) }
+      }
+
+      observe = vi.fn()
+      disconnect = disconnect
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    const host = document.createElement('div')
+    host.setAttribute('data-conversation-scroll', '')
+    Object.defineProperty(host, 'scrollHeight', { value: 2_000, configurable: true })
+    Object.defineProperty(host, 'clientHeight', { value: 500, configurable: true })
+    document.body.appendChild(host)
+    let documentTop = 180
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.chatAnchorKey === 'fixture:user:1') {
+        const top = documentTop - host.scrollTop
+        return { top, bottom: top + 40 } as DOMRect
+      }
+      return { top: 0, bottom: 500 } as DOMRect
+    })
+    try {
+      const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+      h.chatScroll.save({ anchorKey: 'fixture:user:1', anchorTop: 80, scrollTop: 100 })
+      const view = render(<h.ChatView {...h.props} />, { container: host })
+      expect(host.scrollTop).toBe(100)
+      documentTop += 84
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(184)
+      expect(h.chatScroll.read()).toEqual({ anchorKey: 'fixture:user:1', anchorTop: 80, scrollTop: 184 })
+      fireEvent.scroll(host)
+      documentTop += 21
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(205)
+      readerScroll(host, 340)
+      documentTop += 42
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(340)
+      view.unmount()
+      expect(disconnect).toHaveBeenCalledOnce()
     } finally {
       rect.mockRestore()
       host.remove()

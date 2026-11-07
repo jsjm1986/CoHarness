@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-30-conversation-nul-search-and-query-fields.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-30-conversation-nul-search-and-query-fields.md
+document:
+  en: 6dfa9d35acfced7f126ba1fe0bac42ec81671b24
+  zh: 513bf665bee0f86d6721339b34ab124174e35cb1
+/agent-note-lossless-conversation-text-and-event-query-fields:
+  en: 3e4b76e11861fa51
+  zh: 425d5cc3534c639f
+/agent-note-lossless-conversation-text-and-event-query-fields/problem:
+  en: 5ab7d756850eaaf5
+  zh: a97eaa42d1ca1151
+/agent-note-lossless-conversation-text-and-event-query-fields/decision:
+  en: af4522047bab6c7e
+  zh: d664a4ffe304e256
+/agent-note-lossless-conversation-text-and-event-query-fields/alternatives-considered:
+  en: e30cddf8fe6706ff
+  zh: a91936770740c8f7
+/agent-note-lossless-conversation-text-and-event-query-fields/consequences:
+  en: b07b7a729d739852
+  zh: 1376002662a028a4
+/agent-note-lossless-conversation-text-and-event-query-fields/verification:
+  en: 1cb56dffa15e2acd
+  zh: 90a7551523c4c909

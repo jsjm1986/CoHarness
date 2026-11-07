@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-model-policy-refresh-coalescing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-model-policy-refresh-coalescing.md
+document:
+  en: 6afaa4d34370aded59fb0759e5ae80819893fd3a
+  zh: 4cbbcffb468623186397c318a0575f009ae8520d
+/agent-note-model-policy-refresh-coalescing:
+  en: 140f1c4dcc9edd6f
+  zh: 43b31dc28ec18126
+/agent-note-model-policy-refresh-coalescing/problem:
+  en: 248421239f711423
+  zh: 2d829b938acc3cfb
+/agent-note-model-policy-refresh-coalescing/decision:
+  en: c723ec4bdfdf9760
+  zh: 321c91399f0aae82
+/agent-note-model-policy-refresh-coalescing/alternatives-considered:
+  en: 0f71bd620d48a83d
+  zh: 9d81fe4b2da10ea8
+/agent-note-model-policy-refresh-coalescing/consequences:
+  en: ad0172bf5818a30f
+  zh: 71dd7acdb6e976d8
+/agent-note-model-policy-refresh-coalescing/verification:
+  en: 9ca0b1ad845fc78a
+  zh: 5af86ebe2e0280d6

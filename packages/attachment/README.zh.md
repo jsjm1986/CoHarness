@@ -15,6 +15,7 @@ kind: "package-group"
 | `attachment-local/` | `DSH_HOME` 下的私有内容寻址存储 | （注册至 `ctx.attachments`） |
 | `userdoc/` | 命名用户文档引用、限额与存储服务 | `ctx.userDocs` |
 | `userdoc-local/` | 一个用户可见文档根目录下的真实文件存储 | （注册至 `ctx.userDocs`） |
+| `userdoc-gateway/` | 面向普通文档路径的已认证 Gateway 提供方 | （注册至 `ctx.userDocs`） |
 | `tool-userdoc/` | 面向模型的个人文档发现与读取工具 | （消费 `ctx.userDocs`） |
 
 未发送的浏览器草稿刻意位于这项能力之外。只有用户提交提示词，或提供方适配器提交结构化模型输出时，字节才进入持久存储。

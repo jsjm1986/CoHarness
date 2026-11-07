@@ -76,17 +76,23 @@ export class PluginInventoryGateway extends TypertRemoteService {
 
 export default PluginInventoryGateway
 
-/** Read current Loader entries and optional preset compositions.
+/** Read current non-group Loader entries without discovering or inspecting agent presets.
  * @param ctx Context with the Loader service.
- * @returns Current inventory with optional display metadata and no separate runtime cache.
+ * @param includeMetadata Whether to read display resources; defaults to true. False omits metadata, including the include title.
+ * @returns Current runtime entries in Loader order, with optional display metadata and no separate cache.
  */
-export async function readPluginInventory(ctx: Context): Promise<PluginInventorySnapshot> {
+export function readRuntimePluginEntries(ctx: Context, includeMetadata: boolean = true): PluginInventoryEntry[] {
   const entries: PluginInventoryEntry[] = []
   const packages = ctx.get('pluginPackages')
   for (const entry of ctx.loader.entries()) {
     if (entry.options.group) continue
     const base = entry.parent.tree.ctx.baseUrl
-    const meta = base === undefined ? undefined : packages?.metaOf(entry.options.name, base)
+    let meta = !includeMetadata || base === undefined ? undefined : packages?.metaOf(entry.options.name, base)
+    // The root `cordis:include` entry is the included composition itself, not a
+    // package, so package metadata cannot resolve; give the row its own title.
+    if (includeMetadata && meta === undefined && entry.options.name === 'cordis:include') {
+      meta = { title: { en: 'Composition include', zh: '组合包含' } }
+    }
     entries.push({
       entryId: pluginEntryId(entry.id),
       moduleName: entry.options.name,
@@ -95,6 +101,16 @@ export async function readPluginInventory(ctx: Context): Promise<PluginInventory
       ...meta === undefined ? {} : { meta },
     })
   }
+  return entries
+}
+
+/** Read current Loader entries and optional preset compositions.
+ * @param ctx Context with the Loader service.
+ * @returns Current inventory with optional display metadata and no separate runtime cache.
+ */
+export async function readPluginInventory(ctx: Context): Promise<PluginInventorySnapshot> {
+  const entries = readRuntimePluginEntries(ctx)
+  const packages = ctx.get('pluginPackages')
   const presets = ctx.get('agentPresets')
   const management = ctx.get('pluginManager') === undefined ? {} : { managementAvailable: true }
   if (presets === undefined) return { entries, ...management }

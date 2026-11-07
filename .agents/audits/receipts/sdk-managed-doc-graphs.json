@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-doc-graphs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-doc-graphs.ts",
+  "startedAt": "2026-10-24T14:38:09.413763+00:00",
+  "seconds": 13.236,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "76ba49588cffdfa348790afede85d62f34312129a9bb34491f2fd0c9c5f11796",
+  "inputsAfter": "76ba49588cffdfa348790afede85d62f34312129a9bb34491f2fd0c9c5f11796",
+  "postgresToolDirectory": null,
+  "outputSha256": "3041e3536fb94f4532f99d25974235c4705410665d43ce7c0ff9bbc675e98ece",
+  "outputTail": "gen-doc-graphs: wrote 9 graph doc(s).\n"
+}

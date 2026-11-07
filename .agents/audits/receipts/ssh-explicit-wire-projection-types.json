@@ -1,0 +1,13 @@
+{
+  "name": "ssh-explicit-wire-projection-types",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T15:41:59.520651+00:00",
+  "seconds": 6.99,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "697220752d2a8e5afc8c6255c75a4936bb9062dafd706224c6bedef998657d96",
+  "inputsAfter": "697220752d2a8e5afc8c6255c75a4936bb9062dafd706224c6bedef998657d96",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

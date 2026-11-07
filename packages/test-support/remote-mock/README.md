@@ -79,6 +79,8 @@ A fake that stands in for a generated stream method returns an `AsyncIterable` â
 
 ### Connect a client
 
+The account-preferences transport includes the effective appearance and font defaults. Tests can set or unset them through the same revision-checked transport.
+
 `mock.api` is the `IApiClient` face and `mock.rpc` the `ClientConnectionRpc` face (`call` for unary, `stream` for opens). Hand `{ api: mock.api, rpc: mock.rpc, ...mock.transports }` to `installConnection` â€” or let `TestClient` bind them â€” so every domain call reaches `dispatch` and every generated stream method reaches `open` with no envelopes in between. Payloads carry `{ args }` as the whole-client proxies send them (an array) or as the Gateway's own endpoints send them (one object, delivered as one positional arg); a call whose signal aborts rejects with the abort reason. `RemoteMock.create()` answers the boot-time `host.describe` read (`host` from `RemoteMockOptions.host`, default `/home/mock`) and holds `events.mux` / `events.host` open, which is what lets the assembled client reach `connected`; a spec overrides or fails any of them like other rules.
 
 ### Observe and assert
@@ -114,6 +116,8 @@ A fake that stands in for a generated stream method returns an `AsyncIterable` â
 | [`src/streams.ts`](src/streams.ts) | `frames` / `openStream` scripts, `streamHandle` / `streamMethod` fake typing, and `MockStream` (handle + `AsyncIterable`) |
 | [`src/log.ts`](src/log.ts) | Log store with the shared `seq` counter |
 | [`src/transports.ts`](src/transports.ts) | `MockAccountPreferences` / `MockProjectModelSettings` seed transports |
+
+
 
 </details>
 

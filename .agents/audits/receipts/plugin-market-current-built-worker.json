@@ -1,0 +1,14 @@
+{
+  "name": "plugin-market-current-built-worker",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config vitest.e2e.config.ts packages/boot/plugin-market/tests/built-worker.e2e.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T22:03:17.679835+00:00",
+  "seconds": 2.512,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "inputsAfter": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "postgresToolDirectory": null,
+  "outputSha256": "ac13470ca1c8db42e36fe51169f7a1a66fd0bc06e07d456a3ccd77e325200c08",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  06:03:19\n   Duration  374ms (transform 34ms, setup 26ms, import 62ms, tests 200ms, environment 0ms)\n\n"
+}

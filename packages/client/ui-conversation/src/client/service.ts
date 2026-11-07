@@ -10,7 +10,7 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import { bytesToBase64, randomUUID } from '@deepseek-ai/dsh-util-crypto'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { addressRuntimeUrl, createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only imports: a plugin-to-plugin value import is a bundle purity
@@ -95,6 +95,12 @@ export interface IConversation {
    * session is unavailable or its input is in a locked submission phase.
    */
   attachDocument(sessionId: SessionId, ref: Pick<UserDocRef, 'docId' | 'name' | 'bytes' | 'mediaType'>): boolean
+  /**
+   * Check the addressed composer's live admission state before copying a document.
+   * @param sessionId - captured target session.
+   * @returns whether that live, unblocked composer can currently accept documents; acceptance is checked again on attachment.
+   */
+  canAttachDocument(sessionId: SessionId): boolean
 }
 
 /** Create one browser-only draft descriptor; only its id enters input state. */
@@ -191,14 +197,14 @@ export class ConversationController extends Service implements IConversation {
   }
 
   /**
-   * Submit ordered draft images with text through one host admission.
+   * Submit draft text and attachments through the addressed Session's admission.
    * @param session - target session.
    * @param text - serialized prompt text.
    * @param imageIds - ordered draft-local attachment ids.
    * @param documentIds - ordered draft-local document ids.
    * @param mode - queue or steer delivery selected by composer policy.
    * @param signal - optional cancellation for the complete Host admission.
-   * @returns the Host admission outcome; local attachment preparation failures reject.
+   * @returns success after a queue or durable input receipt; pre-admission failures preserve drafts and local preparation failures reject.
    */
   async sendSession(
     session: SessionFace,
@@ -234,11 +240,9 @@ export class ConversationController extends Service implements IConversation {
     }
 
     let finishRetirement: ((retirement: PendingSubmissionRetirement) => void) | undefined
-    const retirement = attachments.length === 0
-      ? undefined
-      : new Promise<PendingSubmissionRetirement>((resolve) => {
-        finishRetirement = resolve
-      })
+    const retirement = new Promise<PendingSubmissionRetirement>((resolve) => {
+      finishRetirement = resolve
+    })
     const submission = session.beginSubmission({
       mode,
       text,
@@ -267,8 +271,8 @@ export class ConversationController extends Service implements IConversation {
     }
     const result = await session.prompt(content, mode, signal, submission.requestId)
     if (!result.ok) return { kind: 'error' }
+    if ((await retirement).reason !== 'observed') return { kind: 'error' }
     this.releaseDraftDocuments(session.sessionId, documentIds)
-    if (retirement !== undefined && (await retirement).reason !== 'observed') return { kind: 'error' }
     return { kind: 'success' }
   }
 
@@ -362,7 +366,21 @@ export class ConversationController extends Service implements IConversation {
    * @param ref - durable document identity from the manager, user-document service, or a ready composer draft.
    * @returns true when the composer accepted the document.
    */
+  canAttachDocument(sessionId: SessionId): boolean {
+    if (this.disposed) return false
+    if (this.ctx.bail('conversation/document-admission', sessionId) === 'deny') return false
+    const sessions = this.ctx.get('sessions')
+    const binding = sessions?.binding(sessionId)
+    if (binding === undefined || binding.session.getSnapshot().removed
+      || this.blocks.storeFor(sessionId).getSnapshot() !== undefined) return false
+    const subagent = binding.session.getSnapshot().subagent
+    if (subagent !== null && (subagent.address.mode !== 'continuable' || !subagent.parentAvailable)) return false
+    const phase = this.input.for(binding.ctx).state.getSnapshot().phase
+    return phase !== 'adjudicating' && phase !== 'submitting'
+  }
+
   attachDocument(sessionId: SessionId, ref: Pick<UserDocRef, 'docId' | 'name' | 'bytes' | 'mediaType'>): boolean {
+    if (!this.canAttachDocument(sessionId)) return false
     if (this.disposed) return false
     const sessions = this.ctx.get('sessions')
     if (sessions === undefined) return false
@@ -778,11 +796,14 @@ export class ConversationController extends Service implements IConversation {
     if (sessions?.runtimeIdentityFor !== undefined && target === undefined) throw new Error('Document Session is unavailable')
     const connection = this.ctx.get('connection') as ConnectionHandle | undefined
     return createUserDocClient((path) => {
-      const url = new URL(path, 'http://dsh.internal')
-      if (target !== undefined) url.searchParams.set('dshTarget', target.kind === 'personal' ? 'personal' : `project:${target.projectId}`)
-      const addressed = `${url.pathname}${url.search}`
+      let addressed = path
+      if (target !== undefined && target.nodeId === undefined) {
+        const url = new URL(path, 'http://documents.invalid')
+        addressRuntimeUrl(url, target)
+        addressed = `${url.pathname}${url.search}${url.hash}`
+      }
       return connection?.privateResourceUrl?.(addressed) ?? addressed
-    })
+    }, () => target)
   }
 }
 

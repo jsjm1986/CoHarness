@@ -16,6 +16,7 @@ import cn.jpush.android.api.JPushInterface;
 public class NativePushStatusPlugin extends Plugin {
     public static final String EVENT_NOTIFICATION_ACTION = "notificationAction";
     public static final String EXTRA_SESSION_ID = "coharness.sessionId";
+    public static final String EXTRA_RUNTIME_ID = "coharness.runtimeId";
     public static final String EXTRA_EVENT_SEQ = "coharness.eventSeq";
 
     @PluginMethod
@@ -77,13 +78,16 @@ public class NativePushStatusPlugin extends Plugin {
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
         String sessionId = intent.getStringExtra(EXTRA_SESSION_ID);
-        if (sessionId == null || sessionId.trim().isEmpty()) return;
+        String runtimeId = intent.getStringExtra(EXTRA_RUNTIME_ID);
+        if (sessionId == null || sessionId.trim().isEmpty() || runtimeId == null) return;
         JSObject result = new JSObject();
         result.put("sessionId", sessionId.trim());
+        result.put("runtimeId", runtimeId.trim());
         String eventSeq = intent.getStringExtra(EXTRA_EVENT_SEQ);
         if (eventSeq != null && !eventSeq.trim().isEmpty()) result.put("eventSeq", eventSeq.trim());
         notifyListeners(EVENT_NOTIFICATION_ACTION, result, true);
         intent.removeExtra(EXTRA_SESSION_ID);
+        intent.removeExtra(EXTRA_RUNTIME_ID);
         intent.removeExtra(EXTRA_EVENT_SEQ);
     }
 

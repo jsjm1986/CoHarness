@@ -531,12 +531,13 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
         .toContain('lossless JSON')
     })
 
-    it('a child whose dispose() throws synchronously cannot wedge the script (the host acks anyway)', async () => {
+    it('retains a synchronous child cleanup failure until disposal can retry', async () => {
       const ctx = new Context()
       await ctx.plugin(SessionProjectionRegistry)
       await mountPtcRuntime(ctx)
       provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
+      let allowCleanup = false
       const provider: SubagentProvider = {
         name: 'bad-dispose',
         capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true },
@@ -546,22 +547,36 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
           localAgent: undefined,
           result: Promise.resolve({ output: [{ type: 'text', text: 'fine' }], stopReason: 'completed' }),
           cancel: () => { /* settled already */ },
-          dispose: () => { throw new Error('dispose exploded') },
+          dispose: () => {
+            if (!allowCleanup) throw new Error('dispose exploded')
+            return Promise.resolve()
+          },
         }),
       }
       ctx.subagents.registerProvider(provider)
       await ctx.plugin(PtcWorkflowEngine, { provider: 'bad-dispose', maxConcurrentAgents: 2 })
-      const result = await run(ctx, fakeParent(ctx), scripted("return await agent('p')"))
-      expect(result.stopReason).toBe('completed')
-      expect(result.value).toBe('fine')
+      const handle = ctx.workflowEngine.start({ ...scripted("return await agent('p')"), parent: fakeParent(ctx) })
+      try {
+        expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
+        expect((await handle.result).stopReason).toBe('error')
+        expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
+        await expect(handle.dispose()).rejects.toBeInstanceOf(AggregateError)
+        allowCleanup = true
+        await handle.dispose()
+        expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
+      } finally {
+        allowCleanup = true
+        await handle.dispose()
+      }
     })
 
-    it('a child dispose() rejecting an UNRENDERABLE value still acks — the containment warn is total', async () => {
+    it('retains an unrenderable child cleanup failure without throwing during error rendering', async () => {
       const ctx = new Context()
       await ctx.plugin(SessionProjectionRegistry)
       await mountPtcRuntime(ctx)
       provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
+      let allowCleanup = false
       const provider: SubagentProvider = {
         name: 'coercion-trap-dispose',
         capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true },
@@ -572,14 +587,23 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
           result: Promise.resolve({ output: [{ type: 'text', text: 'fine' }], stopReason: 'completed' }),
           cancel: () => { /* settled already */ },
           // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the non-Error rejection IS the scenario under test
-          dispose: () => Promise.reject({ toString: () => { throw new Error('coercion trap') } }),
+          dispose: () => allowCleanup ? Promise.resolve() : Promise.reject({ toString: () => { throw new Error('coercion trap') } }),
         }),
       }
       ctx.subagents.registerProvider(provider)
       await ctx.plugin(PtcWorkflowEngine, { provider: 'coercion-trap-dispose', maxConcurrentAgents: 2 })
-      const result = await run(ctx, fakeParent(ctx), scripted("return await agent('p')"))
-      expect(result.stopReason).toBe('completed')
-      expect(result.value).toBe('fine')
+      const handle = ctx.workflowEngine.start({ ...scripted("return await agent('p')"), parent: fakeParent(ctx) })
+      try {
+        const result = await handle.result
+        expect(result.stopReason).toBe('error')
+        expect(result.error).toEqual(expect.any(String))
+        await expect(handle.dispose()).rejects.toBeInstanceOf(AggregateError)
+        allowCleanup = true
+        await handle.dispose()
+      } finally {
+        allowCleanup = true
+        await handle.dispose()
+      }
     })
   })
 
@@ -1016,7 +1040,7 @@ await new Promise(() => {})`))
     })
 
     it('keeps a holder-owned run usable when the engine unloads before its child starts', async () => {
-      const { ctx, parent, provider, engineFiber } = await setup({ reply: () => text('survived reload') })
+      const { ctx, parent, provider, engineFiber } = await setup({ manual: true })
       let handle!: ReturnType<typeof ctx.workflowEngine.start>
       const holder = await ctx.plugin(Object.assign((inner: Context) => {
         handle = inner.workflowEngine.start({ ...scripted("return await agent('after reload')"), parent })
@@ -1027,6 +1051,9 @@ await new Promise(() => {})`))
         expect(provider.runs).toHaveLength(0)
         await engineFiber.dispose()
         expect(ctx.get('workflowEngine')).toBeUndefined()
+        await waitFor(() => { expect(provider.runs).toHaveLength(1) })
+        expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
+        provider.runs[0]!.settle(text('survived reload'))
 
         await expect(handle.result).resolves.toEqual({
           value: 'survived reload',
@@ -1034,6 +1061,7 @@ await new Promise(() => {})`))
           agentsStarted: 1,
         })
         expect(provider.runs).toHaveLength(1)
+        expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
       } finally {
         await handle.dispose()
         await holder.dispose()

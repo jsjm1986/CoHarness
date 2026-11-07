@@ -1,0 +1,14 @@
+- button "Select workbench":
+  - text: My workbench
+  - img
+- img "2 of 4 panes in use"
+- button "Layout":
+  - img
+- button "Workspace files":
+  - img
+- button "Add conversation":
+  - img
+  - text: Add conversation
+- tablist "Workbench":
+  - tab "Use the read tool twice Ready" [selected]
+  - tab "Use the read tool twice Ready"

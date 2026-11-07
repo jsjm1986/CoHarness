@@ -8,11 +8,10 @@ import { ConversationDisplaySettings } from '../src/client/display-settings.ts'
 describe('ConversationDisplaySettings', () => {
   it('uses safe defaults and clamps process-local writes', () => {
     const settings = new ConversationDisplaySettings()
-    expect(settings.getSnapshot()).toMatchObject({ chatContentWidth: 748, chatFontSize: 14 })
+    expect(settings.getSnapshot()).toMatchObject({ chatContentWidth: 748 })
 
     settings.setWidth(Number.POSITIVE_INFINITY)
-    settings.setFontSize(-100)
-    expect(settings.getSnapshot()).toMatchObject({ chatContentWidth: 560, chatFontSize: 12 })
+    expect(settings.getSnapshot()).toMatchObject({ chatContentWidth: 560 })
   })
 
   it('keeps optimistic values while a durable write is saving and adopts acceptance', () => {
@@ -23,7 +22,7 @@ describe('ConversationDisplaySettings', () => {
     stub.publish({
       status: 'ready',
       writable: true,
-      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13, performanceUsage: 'detailed', linkOpening: 'sidebar' },
+      value: { busyEnter: 'queue', chatContentWidth: 700, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     settings.setWidth(840)
@@ -32,7 +31,7 @@ describe('ConversationDisplaySettings', () => {
     stub.publish({ write: { status: 'saving' } })
     expect(settings.width()).toBe(840)
     stub.publish({
-      value: { busyEnter: 'queue', chatContentWidth: 840, chatFontSize: 13, performanceUsage: 'detailed', linkOpening: 'sidebar' },
+      value: { busyEnter: 'queue', chatContentWidth: 840, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     expect(settings.width()).toBe(840)
@@ -45,7 +44,7 @@ describe('ConversationDisplaySettings', () => {
     stub.publish({
       status: 'ready',
       writable: true,
-      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13, performanceUsage: 'detailed', linkOpening: 'sidebar' },
+      value: { busyEnter: 'queue', chatContentWidth: 700, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     settings.setFullWidth(true)
@@ -57,7 +56,7 @@ describe('ConversationDisplaySettings', () => {
     expect(stub.set).toHaveBeenCalledWith('chatFullWidth', false)
 
     stub.publish({
-      value: { busyEnter: 'queue', chatContentWidth: 900, chatFontSize: 13, chatFullWidth: false, performanceUsage: 'detailed', linkOpening: 'sidebar' },
+      value: { busyEnter: 'queue', chatContentWidth: 900, chatFullWidth: false, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     expect(settings.getSnapshot().chatFullWidth).toBe(false)
@@ -69,13 +68,13 @@ describe('ConversationDisplaySettings', () => {
     stub.publish({
       status: 'ready',
       writable: true,
-      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13, performanceUsage: 'detailed', linkOpening: 'sidebar' },
+      value: { busyEnter: 'queue', chatContentWidth: 700, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
-    settings.setFontSize(17)
-    expect(settings.fontSize()).toBe(17)
+    settings.setWidth(900)
+    expect(settings.width()).toBe(900)
     stub.publish({ write: { status: 'error', code: 'conflict', message: 'stale revision' } })
-    expect(settings.fontSize()).toBe(13)
+    expect(settings.width()).toBe(700)
   })
 
   it('unsubscribes once disposed', () => {

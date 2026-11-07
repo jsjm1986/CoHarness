@@ -1,0 +1,14 @@
+{
+  "name": "sdk-current-process-notification-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/sdk-child-coverage.config.mts --coverage --retry=0",
+  "startedAt": "2026-10-24T11:01:51.044569+00:00",
+  "seconds": 20.425,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7610d72ef80898a33e3b6eeaef0cec1c0caf8acbb16f1421f17b328d09250db5",
+  "inputsAfter": "7610d72ef80898a33e3b6eeaef0cec1c0caf8acbb16f1421f17b328d09250db5",
+  "postgresToolDirectory": null,
+  "outputSha256": "d9fafe7ddc54fb40cc0d0b8dade1e77c22e306c33a60b6df22e09dd4c8b7be86",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  5 passed (5)\n      Tests  152 passed (152)\n   Start at  19:02:06\n   Duration  5.23s (transform 3.26s, setup 0ms, import 4.33s, tests 7.31s, environment 0ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |     100 |     99.6 |     100 |     100 |                   \n sdk/client/src    |     100 |    99.41 |     100 |     100 |                   \n  client.ts        |     100 |    99.41 |     100 |     100 | 581               \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 464/464 )\nBranches     : 99.6% ( 252/253 )\nFunctions    : 100% ( 98/98 )\nLines        : 100% ( 407/407 )\n================================================================================\nERROR: Coverage for branches (99.41%) does not meet global threshold (100%) for packages/sdk/client/src/client.ts\n"
+}

@@ -30,7 +30,7 @@ describe('lazy Remote info', () => {
       package: '@fixture/goals',
       get methods() { inventoryReads++; return { 'goals/create': definition({ parameters: [{ name: 'request', source: 'json', codec: input, strictCodec: input }], result: output }) } },
     }
-    const runtime = { ...z }
+    const runtime = { strictObject: z.strictObject }
     const strictObject = vi.spyOn(runtime, 'strictObject')
     const info = createTypertRemoteInfo(spec, runtime)
     expect(Object.getPrototypeOf(info)).not.toBe(Object.prototype)

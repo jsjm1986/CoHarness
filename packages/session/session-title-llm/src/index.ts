@@ -143,6 +143,7 @@ export function resolveSessionTitleLlmConfig(
 /**
  * Provider-prepared model input, source-message attribution, and the
  * provider-owned reasoning selector consulted before dispatch.
+
  */
 export interface SessionTitleLlmPreparedRequest {
   /** Exact system prompt supplied by the provider. */
@@ -175,6 +176,7 @@ export interface SessionTitleLlmResponse {
   readonly finish: SessionTitleLlmFinish
   /** Exact auxiliary model route that produced the response. */
   readonly model: SessionTitleModelIdentity
+
 }
 
 /** Resolve the explicit pair or the exact route captured from `request/header`. */
@@ -259,12 +261,14 @@ export async function executeSessionTitleLlm(
     maxTokens,
     ...reasoningEffort === undefined ? {} : { reasoningEffort },
   }, callDeadline.signal)
+
   const options: GenerateOptions = deepFreeze({
     ...call.config,
     messages,
     system: prepared.system,
     sessionId: request.session.id,
     purpose: 'session-title',
+    resourceOrigin: 'infrastructure',
     signal: callDeadline.signal,
   })
   request.session.append('session/title-llm-request', {

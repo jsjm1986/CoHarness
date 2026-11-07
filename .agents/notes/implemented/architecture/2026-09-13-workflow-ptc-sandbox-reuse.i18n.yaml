@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.md
 document:
-  en: 7588b8235dc7ef515171129fdd5188412d5084fc
-  zh: 1adea81d1c5a928463313070694236e629d589c2
+  en: b6eb7ab2841a1229f2ad7133f03830172cc6000e
+  zh: 5c6b253797a5db407517537cc72e17602efa1dc0
 /agent-note-reuse-the-ptc-node-sandbox-for-workflows:
   en: 6db90d1dcfccd294
   zh: 0b66b16319b023a0
@@ -12,11 +12,11 @@ document:
   en: 42235162e945e015
   zh: 4edc5633720cd6cc
 /agent-note-reuse-the-ptc-node-sandbox-for-workflows/decision:
-  en: a0b3ccd245538256
-  zh: f122cf4aabfdcd96
+  en: 85922b931fa5c23c
+  zh: 68defb5adc321419
 /agent-note-reuse-the-ptc-node-sandbox-for-workflows/alternatives-considered:
-  en: 56d9a25713227146
-  zh: 2cd89bf6ccc3b3bd
+  en: b15ce23ec1b945c9
+  zh: f045ef408e890610
 /agent-note-reuse-the-ptc-node-sandbox-for-workflows/consequences:
   en: e650b834a6f6a3f2
   zh: de677719cdd49047

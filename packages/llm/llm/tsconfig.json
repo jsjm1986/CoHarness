@@ -35,6 +35,12 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/resource-budget"
+    },
+    {
+      "path": "../model-access"
     }
   ]
 }

@@ -1,0 +1,13 @@
+{
+  "name": "business-upstream-alignment",
+  "cwd": ".",
+  "command": "pnpm run gen-upstream-alignment-matrix",
+  "startedAt": "2026-10-23T19:10:53.083901+00:00",
+  "seconds": 3.558,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c5d2fd22fd7230a49fa49b4a7844579f34638cb0b5b2f2091b7ac85bb3f81291",
+  "inputsAfter": "c5d2fd22fd7230a49fa49b4a7844579f34638cb0b5b2f2091b7ac85bb3f81291",
+  "outputSha256": "3c19813de3e4ec7c75251c3f09e2f60eda9fdbb1bdb3994392ff56980ae69527",
+  "outputTail": "$ tsx scripts/gen-upstream-alignment-matrix.ts\ngen-upstream-alignment-matrix: usage: gen-upstream-alignment-matrix -- --tag <newTag>\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

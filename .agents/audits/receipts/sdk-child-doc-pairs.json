@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/subagent/subagent-dsh-sdk/README.md packages/subprocess/subprocess/README.md .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md .agents/notes/implemented/feature/2026-07-27-typescript-sdk-and-sdk-subagent-backend.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+  "startedAt": "2026-10-24T10:24:18.886157+00:00",
+  "seconds": 1.368,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "14f0a2abafe222a2a0a47a8528a104137971cb827ed6065c6fbf0e9339669587",
+  "inputsAfter": "47762303135d4da3efe2d90c10214b649e721689328adb777e2d6fe56f0475e0",
+  "postgresToolDirectory": null,
+  "outputSha256": "0e2f090797f0c8a62eef096bfa93c5362f19f6f328d2841c7f3aad9098cc3c65",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-07-27-typescript-sdk-and-sdk-subagent-backend.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-dsh-sdk/README.i18n.yaml\nverify-translation-pairing: recorded packages/subprocess/subprocess/README.i18n.yaml\nverify-translation-pairing: 5 record(s) written; run the check to validate the pairs.\n"
+}

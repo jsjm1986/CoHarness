@@ -9,6 +9,9 @@ kind: "package-reference"
 
 精确 `(provider, model)` 路由的部署侧授权 Service Definition。`ModelAccessService` 是发布为 `ctx.modelAccess` 的运行时接口，实现可以是普通对象；`ModelAccessPolicy` 是供树内 provider 选用的 Cordis `Service` 基类。消费方使用同一决策过滤目录、控制模型选择并约束执行。服务缺席表示未挂载模型授权策略。
 
+
+受管运行时在根上下文生命周期内发布 `modelAccessRequired`。模型调用在异步中间件前捕获已安装策略的所有者，跨等待时拒绝所有者撤下或替换，并在派发防护后执行其路由决定。缺少必需提供方以 `MODEL_POLICY_UNAVAILABLE` 失败；独立组合可省略策略。
+
 ## 概述
 
 使用 `dsh-model-access` 作为部署方自有、精确到 `(provider, model)` 路由的授权服务定义：目录、模型选择与执行共用同一个 `ctx.modelAccess` 决策；服务缺省即表示未挂载授权策略。

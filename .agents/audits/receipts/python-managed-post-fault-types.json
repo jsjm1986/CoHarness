@@ -1,0 +1,13 @@
+{
+  "name": "python-managed-post-fault-types",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T16:04:37.176323+00:00",
+  "seconds": 7.417,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4f8cbacc8da1c7c71518ace1447f378aa61771120025e64bc16611db50abde0d",
+  "inputsAfter": "4f8cbacc8da1c7c71518ace1447f378aa61771120025e64bc16611db50abde0d",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

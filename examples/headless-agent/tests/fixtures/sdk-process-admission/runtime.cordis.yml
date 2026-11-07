@@ -1,0 +1,17 @@
+- id: llm-deepseek
+  disabled: true
+
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, sdkProcessAdmissionReady]
+
+- insert:
+    - id: sdk-execution-authority-package
+      name: '@deepseek-ai/dsh-execution-authority'
+      disabled: true
+    - id: sdk-model-provider-package
+      name: '@deepseek-ai/dsh-model-provider-config'
+      disabled: true
+    - id: sdk-process-admission-fixture
+      name: './plugin.mjs'
+      config:
+        mode: !!js process.env.DSH_TEST_SDK_PROCESS_MODE ?? 'admit'

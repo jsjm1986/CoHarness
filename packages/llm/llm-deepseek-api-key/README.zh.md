@@ -13,6 +13,8 @@ kind: "package-reference"
 
 鉴权解析将验证后的 API key 放入 `x-api-key`，供 Messages 和 Files 请求共同使用。
 
+鉴权在验证密钥时同时保留解析出的凭据来源。适配器把来源附到实际用量上，使治理能区分个人文件凭据与部署环境或组织凭据。
+
 ## 目录
 
 - [使用此包](#use-this-package)

@@ -1,0 +1,211 @@
+{
+  "id": "authorization-owner-lifetime-2026-11-03",
+  "findings": [
+    "B489"
+  ],
+  "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+  "verifiedAt": "2026-11-02T20:28:11.137654+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T200555Z",
+  "delivery": {
+    "findings": [
+      "B489"
+    ],
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T200555Z/B489-authorization-owner-lifetime.delta.tar.gz",
+    "archiveSha256": "32f5a439338765c4dda2e450e4b8fb4ce6cd1bd63e93c52006ed936861b8243f",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T200555Z/B489-authorization-owner-lifetime-capsule-e7uzbrtn",
+    "manifestSha256": "dde6b04a57f2894998d40f57747f9d9db1e743debfcdf26f6a9c6b943b3197ce",
+    "ownedChanges": 16,
+    "verification": {
+      "normalDifferentNamedCases": 66,
+      "authorizationPackageCases": 50,
+      "actualModelsLoginAndAuthConsumerCases": 8,
+      "coveragePolicyCases": 8,
+      "normalCompleteChangedFileCoverage": {
+        "total": {
+          "lines": {
+            "total": 143,
+            "covered": 143,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 173,
+            "covered": 173,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 45,
+            "covered": 45,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 79,
+            "covered": 79,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/credentials/authorization/src/index.ts": {
+          "lines": {
+            "total": 143,
+            "covered": 143,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 45,
+            "covered": 45,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 173,
+            "covered": 173,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 79,
+            "covered": 79,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "originalCounterproofs": [
+        "Two original assertions run the stopped authorization or resolve the late secret prompt.",
+        "Original isolated ESM Loader and actual LocalCredentialProvider persist a new grant after authorization service disposal."
+      ],
+      "normalBuiltNode24LoaderExample": 1,
+      "builtRepeatNotAdded": true,
+      "nativeFileScope": "Actual Loader and local credential files: stopped-reference refusal, active cancellation with joined flow and no late UI/write, original admitted-write completion.",
+      "originalStoreReplacement": "Real Cordis and gated MemoryCredential provider test confirms original admitted record and empty replacement.",
+      "normalStrictDeclarations": "passed",
+      "normalPublicBundle": "passed",
+      "scopedLint": "passed",
+      "ownedBilingualPairs": "three consistent",
+      "documentationLeavesPassed": 8,
+      "upgradeGuide": "Direct current-version triplet/frontmatter/headings/newline/183words; checker unavailable in this fork.",
+      "coverageBaseline": "Exactly one pre-existing owned source exclusion removed; no threshold lowered or new exclusion added.",
+      "excludedExploration": [
+        "The first private old source import lacked its ESM manifest; excluded from causal proof.",
+        "The first coverage run measured zero files while the pre-existing exclusion remained; not coverage acceptance.",
+        "An earlier46-case measured run passed every assertion but failed actual incomplete entry coverage."
+      ],
+      "newDependencies": false,
+      "configurationOrWireOrSessionFormatChanged": false,
+      "productionAcceptanceClaimed": false,
+      "paidModelApiCalls": 0
+    },
+    "wholeProjectComplete": false
+  },
+  "checks": {
+    "normalDifferentNamedCases": 66,
+    "authorizationPackageCases": 50,
+    "actualModelsLoginAndAuthConsumerCases": 8,
+    "coveragePolicyCases": 8,
+    "normalCompleteChangedFileCoverage": {
+      "total": {
+        "lines": {
+          "total": 143,
+          "covered": 143,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 173,
+          "covered": 173,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 45,
+          "covered": 45,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 79,
+          "covered": 79,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/credentials/authorization/src/index.ts": {
+        "lines": {
+          "total": 143,
+          "covered": 143,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 45,
+          "covered": 45,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 173,
+          "covered": 173,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 79,
+          "covered": 79,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "originalCounterproofs": [
+      "Two original assertions run the stopped authorization or resolve the late secret prompt.",
+      "Original isolated ESM Loader and actual LocalCredentialProvider persist a new grant after authorization service disposal."
+    ],
+    "normalBuiltNode24LoaderExample": 1,
+    "builtRepeatNotAdded": true,
+    "nativeFileScope": "Actual Loader and local credential files: stopped-reference refusal, active cancellation with joined flow and no late UI/write, original admitted-write completion.",
+    "originalStoreReplacement": "Real Cordis and gated MemoryCredential provider test confirms original admitted record and empty replacement.",
+    "normalStrictDeclarations": "passed",
+    "normalPublicBundle": "passed",
+    "scopedLint": "passed",
+    "ownedBilingualPairs": "three consistent",
+    "documentationLeavesPassed": 8,
+    "upgradeGuide": "Direct current-version triplet/frontmatter/headings/newline/183words; checker unavailable in this fork.",
+    "coverageBaseline": "Exactly one pre-existing owned source exclusion removed; no threshold lowered or new exclusion added.",
+    "excludedExploration": [
+      "The first private old source import lacked its ESM manifest; excluded from causal proof.",
+      "The first coverage run measured zero files while the pre-existing exclusion remained; not coverage acceptance.",
+      "An earlier46-case measured run passed every assertion but failed actual incomplete entry coverage."
+    ],
+    "newDependencies": false,
+    "configurationOrWireOrSessionFormatChanged": false,
+    "productionAcceptanceClaimed": false,
+    "paidModelApiCalls": 0
+  },
+  "limitations": [
+    "Only named authorization service, attempt interaction, original credential store and existing Models.login/auth Consumers are accepted.",
+    "Custom flows must settle owned work after cancellation; service disposal joins that work.",
+    "Already-admitted writes can complete in the original store and are not revoked by late cancellation.",
+    "No new dependency, wire/Session format, configuration or Root production deployment.",
+    "No paid OAuth/model request or official Responses validation; controlled OAuth Consumer verification is keyless."
+  ],
+  "wholeProjectComplete": false,
+  "all12DomainsComplete": false,
+  "handoff": "Delivered once on2026-11-02T20:29UTC; no reply or immediate deployment requested."
+}

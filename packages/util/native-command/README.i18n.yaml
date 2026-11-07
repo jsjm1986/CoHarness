@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/native-command/README.md
 document:
-  en: a3a93ba05bf01d00fcff6fb76bcf57b1eb23daf6
-  zh: 3f93ce433092de3ded57f63f3d9b076e0dc1f746
+  en: 758c908449ce3571a0ee4b67158d75fb8db988a2
+  zh: 2717fa4ca9eb5bdb0f26bdcfad3bc4d7a456cca8
 /:
   en: 3e0acbcc586810bb
   zh: 688d34f126d1450e
@@ -21,14 +21,14 @@ document:
   en: aba695cba233905f
   zh: c6359da30eb8e372
 /deepseek-ai-dsh-native-command/use-this-package/running-a-command:
-  en: 6dbc6c9bf6db34be
-  zh: 9ab16a86ca5abcc2
+  en: 9131d2b9faf6d876
+  zh: f192f7a636320077
 /deepseek-ai-dsh-native-command/use-this-package/injecting-the-command-boundary:
   en: 987bed629737b59d
   zh: 258e30f813b0edcb
 /deepseek-ai-dsh-native-command/use-this-package/opening-a-host-path:
-  en: b4ec677605b12ff8
-  zh: f35256957eea141a
+  en: 7746dce7009d5442
+  zh: 3fee2aad82800bab
 /deepseek-ai-dsh-native-command/understand-the-implementation:
   en: 78e86818bea36f9f
   zh: 71dc1ad3e4cbe9f1

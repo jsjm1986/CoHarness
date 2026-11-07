@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/admin-ui/src/pages/TunnelAccessSection.tsx gateway/admin-ui/src/pages/TunnelAccessSection.spec.tsx gateway/admin-ui/src/pages/tunnel-access.copy.ts apps/web/tests/admin-form-values.e2e.ts gateway/src/tunnel-process.ts",
+  "startedAt": "2026-10-24T23:12:03.978999+00:00",
+  "seconds": 2.372,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "inputsAfter": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "postgresToolDirectory": null,
+  "outputSha256": "1a911d3097c2eb87c157a33a10b299697848b5b9e40e1bd559a390f5991c90d2",
+  "outputTail": "apps/web/tests/admin-form-values.e2e.ts:504:1: error @stylistic(max-len): This line has a length of 148. Maximum allowed is 140.\napps/web/tests/admin-form-values.e2e.ts:474:21: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\napps/web/tests/admin-form-values.e2e.ts:504:122: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\napps/web/tests/admin-form-values.e2e.ts:504:138: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\napps/web/tests/admin-form-values.e2e.ts:522:13: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\n"
+}

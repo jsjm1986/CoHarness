@@ -19,8 +19,9 @@ import { RpcId, serverRequestJson } from '../api/rpc.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import { clientRequestSchema, clientResponseSchema } from '../api/rpc.schema.ts'
 import {
-  sessionCancelRequestSchema,
+  sessionActivateRequestSchema,
   sessionAttachmentRequestSchema,
+  sessionCancelRequestSchema,
   sessionCreateRequestSchema,
   sessionForkRequestSchema,
   sessionHistoryRequestSchema,
@@ -115,6 +116,7 @@ const UNARY_ROUTES: UnaryRoutes = {
   'session.attachment': { schema: sessionAttachmentRequestSchema, invoke: (api, r) => api.sessions.attachment(r) },
   'session.updateQueue': { schema: sessionUpdateQueueRequestSchema, invoke: (api, r) => api.sessions.updateQueue(r) },
   'session.cancel': { schema: sessionCancelRequestSchema, invoke: (api, r) => api.sessions.cancel(r) },
+  'session.activate': { schema: sessionActivateRequestSchema, invoke: (api, r) => api.sessions.activate(r) },
   'subagent.history': { schema: subagentHistoryRequestSchema, invoke: (api, r, signal) => api.subagents.history(r, signal) },
   'jobs.output': { schema: jobsOutputRequestSchema, invoke: (api, r) => api.jobs.output(r) },
   'jobs.kill': { schema: jobsKillRequestSchema, invoke: (api, r) => api.jobs.kill(r) },
@@ -275,6 +277,8 @@ function sseResponse(
 
 /** Construction options for the Fetch carrier handler. */
 export interface FetchHandlerOptions {
+  /** Include unary processing time in Server-Timing; disabled by default. */
+  serverTiming?: boolean
   /** Complete history response target in uncompressed UTF-8 JSON bytes. */
   historyPageTargetBytes?: number
   /** Maximum UTF-8 bytes accepted for one unary JSON request body. */
@@ -387,6 +391,7 @@ export function toFetchHandler(
   const historyPageTargetBytes = options.historyPageTargetBytes
     ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const requestBodyMaxBytes = options.requestBodyMaxBytes ?? DEFAULT_REQUEST_BODY_MAX_BYTES
+  const serverTiming = options.serverTiming ?? false
   if (!Number.isSafeInteger(historyPageTargetBytes) || historyPageTargetBytes < 1) {
     throw new RangeError('historyPageTargetBytes must be a positive safe integer')
   }
@@ -484,7 +489,11 @@ export function toFetchHandler(
       if (message.method !== method) {
         return errorResponse(message.rpcId, { code: 'bad-request', message: `method "${message.method}" does not match path "${method}"`, details: { issues: [] } })
       }
-      return handleUnary(api, method, message, req.signal, historyPageTargetBytes)
+      if (!serverTiming) return handleUnary(api, method, message, req.signal, historyPageTargetBytes)
+      const startedAt = performance.now()
+      const response = await handleUnary(api, method, message, req.signal, historyPageTargetBytes)
+      response.headers.append('server-timing', `dsh_rpc;dur=${(performance.now() - startedAt).toFixed(2)}`)
+      return response
     },
   }
 }

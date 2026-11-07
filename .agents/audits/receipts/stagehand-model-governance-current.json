@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-governance-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run --config plugins/dsh-model-governance/vitest.config.ts tests/execution-billing.spec.ts --retry=0",
+  "startedAt": "2026-10-23T18:36:14.553060+00:00",
+  "seconds": 2.869,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "19ff75d72d4b7c55b969c261eb29c0e8f8a75171efb8ec4ed8d367c4046a70cb",
+  "inputsAfter": "19ff75d72d4b7c55b969c261eb29c0e8f8a75171efb8ec4ed8d367c4046a70cb",
+  "outputSha256": "8141a24af9894f7de159fa258ebc3f613fecc60a4b088c93740cfec3c85f13c8",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/plugins/dsh-model-governance\n\n\n Test Files  1 passed (1)\n      Tests  13 passed (13)\n   Start at  02:36:15\n   Duration  1.59s (transform 901ms, setup 0ms, import 1.22s, tests 199ms, environment 0ms)\n\n"
+}

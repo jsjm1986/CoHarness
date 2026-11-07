@@ -2,7 +2,6 @@
   - text: Add
   - option "Goal Set or view the goal for a long-running task" [selected]
   - option "Plan Enter or leave plan mode"
-  - option "Feedback Send feedback about this session"
   - text: Commands
   - option "Compact Compact older conversation history"
   - option "Permission Switch the permission preset (sandbox mode and approval policy)"

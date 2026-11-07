@@ -1,4 +1,6 @@
 /** Browser HTTP client for the optional Host user-document service. */
+import { userDocLocationUrl } from '@deepseek-ai/dsh-userdoc/identity'
+import type { UserDocScope } from '@deepseek-ai/dsh-userdoc'
 import type {
   UserDocIdType,
   UserDocLimits,
@@ -129,23 +131,27 @@ function uploadNetworkError(status: number): Error {
 /**
  * Create the conversation's document client with one explicit request owner.
  * @param requestUrl - binds every HTTP and XHR request to the captured account/runtime.
+ * @param location - captured document scope and computer, independent of later navigation.
  * @returns a client targeting that owner's document route.
  */
-export function createUserDocClient(requestUrl: (url: string) => string = url => url): UserDocClient {
+export function createUserDocClient(requestUrl: (url: string) => string = url => url,
+  location?: () => UserDocScope | undefined): UserDocClient {
+  const address = (path: string): string => requestUrl(userDocLocationUrl(path, location?.()))
+  const scopedRequest = <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => requestJson<T>(address(typeof input === 'string' ? input : 'href' in input ? input.href : input.url), init)
   return {
-    list: signal => requestJson<UserDocListResponse>(requestUrl(ROOT), signal === undefined ? {} : { signal }),
+    list: signal => scopedRequest<UserDocListResponse>(address(ROOT), signal === undefined ? {} : { signal }),
     upload: (file, signal, onProgress) => {
-      const query = new URL(requestUrl(ROOT), 'http://dsh.internal').search
+      const query = new URL(address(ROOT), 'http://dsh.internal').search
       return resumableUpload(file, '' as UserDocDirectoryIdType, signal, onProgress, {
         root: ROOT, query, resumeNamespace: query,
-        requestJson,
+        requestJson: scopedRequest,
         networkError: uploadNetworkError,
         responseError: errorFrom,
       })
     },
     remove: async (docId, signal) => {
       try {
-        await requestJson<undefined>(requestUrl(`${ROOT}?id=${encodeURIComponent(docId)}`),
+        await scopedRequest<undefined>(address(`${ROOT}?id=${encodeURIComponent(docId)}`),
           signal === undefined ? { method: 'DELETE' } : { method: 'DELETE', signal })
       } catch (error) {
         if (error instanceof UserDocServiceUnavailableError) return
@@ -153,12 +159,12 @@ export function createUserDocClient(requestUrl: (url: string) => string = url =>
         throw error
       }
     },
-    transfer: (request, signal) => requestJson<UserDocTransferResponse>(requestUrl(TRANSFER_PATH), {
+    transfer: (request, signal) => scopedRequest<UserDocTransferResponse>(address(TRANSFER_PATH), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(request),
       ...(signal === undefined ? {} : { signal }),
     }),
-    contentUrl: docId => requestUrl(contentUrl(docId)),
+    contentUrl: docId => address(contentUrl(docId)),
   }
 }

@@ -1,0 +1,14 @@
+{
+  "name": "progress-source-receipts-postgres-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-progress-postgres.spec.ts tests/node-resource-budget-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T22:39:50.289049+00:00",
+  "seconds": 15.119,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "862a35dafcaaf534eb1e30cc3f510e1c7371927aca56658e5a4c43c32d645038",
+  "inputsAfter": "862a35dafcaaf534eb1e30cc3f510e1c7371927aca56658e5a4c43c32d645038",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "00ee1553b9e79e9e2e085686d88a9a72708f417ce6db23437c4725a0517a30b9",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  47 passed (47)\n   Start at  06:39:52\n   Duration  12.42s (transform 804ms, setup 0ms, import 1.15s, tests 11.06s, environment 0ms)\n\n"
+}

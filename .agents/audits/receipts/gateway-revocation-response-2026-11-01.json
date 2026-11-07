@@ -1,0 +1,294 @@
+{
+  "finding": "B432",
+  "status": "fixed_verified_named_gateway_revocation_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T07:15:44.166114+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-origin-retry.json",
+    "priorTransientTlsFailureRetained": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-origin.json"
+  },
+  "problem": "Denied terminal rechecks and invalid authorization streams awaited response cancellation ACK before revoking or clearing readiness. A stalled ACK retained live authority; cleanup errors could also replace permission refusals.",
+  "fix": "Request unused body/reader cancellation synchronously, observe cleanup failure independently and apply denial/revocation immediately. Preserve exact terminal owner process cleanup and permission rechecks; use the same helper for other Gateway execution refusals.",
+  "verification": {
+    "distinctCases": 280,
+    "gatewayExecutionUnitCases": 276,
+    "typescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "newUnitCases": 7,
+    "versionRepeatsAndSubsetRerunsNotAdded": true,
+    "checks": [
+      {
+        "name": "gateway-cancellation-coverage-fixed",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-coverage-fixed.json"
+      },
+      {
+        "name": "gateway-cancellation-plugin-policy",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-plugin-policy.json"
+      },
+      {
+        "name": "terminal-revocation-sdk-source-realms",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/terminal-revocation-sdk-source-realms.json"
+      },
+      {
+        "name": "terminal-revocation-sdk-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/terminal-revocation-sdk-node22.json"
+      },
+      {
+        "name": "terminal-revocation-sdk-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/terminal-revocation-sdk-node24.json"
+      },
+      {
+        "name": "terminal-revocation-sdk-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/terminal-revocation-sdk-python.json"
+      },
+      {
+        "name": "gateway-cancellation-final-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-final-types.json"
+      },
+      {
+        "name": "gateway-cancellation-final-source-emit",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-final-source-emit.json"
+      },
+      {
+        "name": "gateway-cancellation-normal-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-normal-bundle.json"
+      },
+      {
+        "name": "gateway-cancellation-lint-fixed",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-lint-fixed.json"
+      },
+      {
+        "name": "terminal-revocation-fixture-syntax",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/terminal-revocation-fixture-syntax.json"
+      },
+      {
+        "name": "terminal-revocation-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/terminal-revocation-python-lint.json"
+      },
+      {
+        "name": "gateway-cancellation-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-export-docs.json"
+      },
+      {
+        "name": "gateway-cancellation-cordis-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-cordis-config.json"
+      },
+      {
+        "name": "gateway-cancellation-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-pairing.json"
+      },
+      {
+        "name": "gateway-cancellation-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-docs.json"
+      },
+      {
+        "name": "gateway-cancellation-origin-retry",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-cancellation-origin-retry.json"
+      },
+      {
+        "name": "gateway-revocation-references-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-revocation-references-final.json"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 104,
+          "covered": 104,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 131,
+          "covered": 131,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 107,
+          "covered": 107,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/gateway-execution/src/response.ts": {
+        "lines": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 4,
+          "covered": 4,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/gateway-execution/src/ssh.ts": {
+        "lines": {
+          "total": 42,
+          "covered": 42,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 12,
+          "covered": 12,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 52,
+          "covered": 52,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 49,
+          "covered": 49,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/gateway-execution/src/user-terminal.ts": {
+        "lines": {
+          "total": 59,
+          "covered": 59,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 12,
+          "covered": 12,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 75,
+          "covered": 75,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 56,
+          "covered": 56,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Existing100% per-file gate over response.ts,user-terminal.ts,ssh.ts, all4 metrics. Other changed sources are covered by behavior regressions without a whole-file100% claim. No threshold, coverage baseline or ignore changes.",
+    "physicalProof": "The shipped SDK profile mounts actual Gateway execution, terminal controller, Typert, query, sandbox shell and permission services. Only external Gateway/model/readiness inputs are controlled. A real PTY child is alive before403/503 recheck; denial revokes authority and confirms child exit before response cancellation ACK, then another terminal creation is refused.",
+    "counterfactual": "Complete77-file original provider, normal compiler references linked read-only.7 current unit scenarios fail intended permission assertions; both source and normal Node22 built SDK scenarios fail2 intended markers without module failures/timeouts.",
+    "originalTestPreservation": {
+      "status": "passed",
+      "records": [
+        {
+          "path": "packages/context/gateway-execution/tests/authority.spec.ts",
+          "originalTestCallsPreserved": 88,
+          "newTestCalls": 1
+        },
+        {
+          "path": "packages/context/gateway-execution/tests/user-terminal.spec.ts",
+          "originalTestCallsPreserved": 10,
+          "newTestCalls": 2
+        },
+        {
+          "path": "packages/context/gateway-execution/tests/ssh.spec.ts",
+          "originalTestCallsPreserved": 12,
+          "newTestCalls": 1
+        }
+      ]
+    },
+    "fixtureCorrections": "Intermediate missing services/configuration and duplicate sandbox failures are retained. Final Loader profile uses normal providers, no internal service mock or product sandbox bypass. The controlled watch-cancel fixture shadowing issue was corrected.",
+    "lintScope": "Repository lint passes runtime/test TypeScript. Existing .oxlintrc ignores mjs; standalone fixture lint therefore reports no files. Both mjs files pass Node syntax and actual source/Node22/Node24/Python execution; no lint policy change.",
+    "localCleanupRefactor": "The preexisting async authorizeInstall method had no await. A Promise continuation retains asynchronous rejection behavior; all12 existing policy cases pass after the local rewrite.",
+    "docsQuick": "20 passed,0 failed",
+    "bilingualPairs": 2,
+    "cordisConfigs": 437,
+    "productionAcceptanceClaimed": false,
+    "officialResponsesDeferred": true
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/gateway-revocation-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-revocation-response.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-revocation-response.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-revocation-response.zh.md",
+    "apps/cli/tests/profiles/sdk/terminal-revocation.expected.e2e.ts",
+    "examples/headless-agent/tests/fixtures/terminal-revocation/expected.json",
+    "examples/headless-agent/tests/fixtures/terminal-revocation/model.mjs",
+    "examples/headless-agent/tests/fixtures/terminal-revocation/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/terminal-revocation/runtime.cordis.yml",
+    "packages/context/gateway-execution/README.i18n.yaml",
+    "packages/context/gateway-execution/README.md",
+    "packages/context/gateway-execution/README.zh.md",
+    "packages/context/gateway-execution/src/desktop-confirmation.ts",
+    "packages/context/gateway-execution/src/index.ts",
+    "packages/context/gateway-execution/src/plugin-management.ts",
+    "packages/context/gateway-execution/src/response.ts",
+    "packages/context/gateway-execution/src/ssh.ts",
+    "packages/context/gateway-execution/src/user-terminal.ts",
+    "packages/context/gateway-execution/tests/authority.spec.ts",
+    "packages/context/gateway-execution/tests/ssh.spec.ts",
+    "packages/context/gateway-execution/tests/user-terminal.spec.ts",
+    "python/sdk/tests/test_terminal_revocation_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 67,
+  "artifactReferences": 20,
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T065020Z/note-supersession.json",
+  "remaining": [
+    "All12 project domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue remaining resource admission, cold model/tool/Inspector authorization, foreground subagent/workflow cleanup recovery, and account/computer ownership outside peer-reserved files.",
+    "Review other response cancellation consumers: Gateway runtime workspace catalog, archive-gateway acknowledgements and Host ApiProxy fetch handler. Peer owns Host ApiProxy fetch/client.ts and its Web refusal tests; do not duplicate or overwrite that work. No additional unverified finding is claimed.",
+    "Root B416+ capsules remain independent of peer-reported deployed R24/schema103. Peer R25 is an isolated candidate, not deployed; REAL-042 and full production/cross-computer acceptance remain open.",
+    "Official paid Responses remains deferred. No root production deploy/restart/dependency synchronization/reset/stash/commit/push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true
+}

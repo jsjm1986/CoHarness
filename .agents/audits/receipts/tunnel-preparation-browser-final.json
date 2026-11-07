@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-browser-final",
+  "cwd": ".",
+  "command": "env DSH_SNAPSHOT=replay node_modules/.bin/vitest run --config vitest.web.config.ts apps/web/tests/admin-form-values.e2e.ts --retry=0",
+  "startedAt": "2026-10-24T23:34:49.343095+00:00",
+  "seconds": 11.922,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "inputsAfter": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "postgresToolDirectory": null,
+  "outputSha256": "147e258531c494ff429298ee19f3107f9e1dc4f74c559920db5d693df554dd2c",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  07:34:50\n   Duration  10.97s (transform 717ms, setup 0ms, import 1.09s, tests 9.79s, environment 0ms)\n\n"
+}

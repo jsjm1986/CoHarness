@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-26-verified-cold-list-metadata.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-26-verified-cold-list-metadata.md
+document:
+  en: c8b506e312372d7ddd7c378cd8d93899ff3bb063
+  zh: e44fd8aa377891db2f40d02996a95f7e2021e22c
+/agent-note-reuse-verified-cold-list-metadata:
+  en: a689d98ba41bd441
+  zh: bb25268359e8b9ff
+/agent-note-reuse-verified-cold-list-metadata/problem:
+  en: 79fb50cec52f2d54
+  zh: 094ad2f1e292bf97
+/agent-note-reuse-verified-cold-list-metadata/decision:
+  en: 29fbeb9f00817269
+  zh: 64e0ac689e6104f6
+/agent-note-reuse-verified-cold-list-metadata/alternatives-considered:
+  en: 2b05f1cdc4221ec1
+  zh: 6b59a80011e3bd4f
+/agent-note-reuse-verified-cold-list-metadata/consequences:
+  en: e61a71a6920d9867
+  zh: c86dfdd1956e37e1

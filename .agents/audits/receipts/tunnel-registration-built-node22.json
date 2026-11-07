@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-built-node22",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node ../.agents/audits/.local/tunnel-built-node-acceptance.mjs",
+  "startedAt": "2026-10-24T23:01:56.167244+00:00",
+  "seconds": 1.006,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65c9935ef0ba71822f43e2e51979a665c2fc36c76a6bfcc18e9e040168926766",
+  "inputsAfter": "65c9935ef0ba71822f43e2e51979a665c2fc36c76a6bfcc18e9e040168926766",
+  "postgresToolDirectory": null,
+  "outputSha256": "6f15e8eacce26267794eec81827a347938e097b5b4737c9b21fa2f6577f52db0",
+  "outputTail": "file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/tunnel-built-node-acceptance.mjs:14\n  try{return JSON.parse(await readFile(join(root,`tunnel-${mode}.prepared`),'utf8')))}catch(error){if(error.code!=='ENOENT')throw error}\n                                                                                    ^\n\nSyntaxError: Unexpected token ')'\n    at compileSourceTextModule (node:internal/modules/esm/utils:346:16)\n    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:107:18)\n    at #translate (node:internal/modules/esm/loader:546:20)\n    at afterLoad (node:internal/modules/esm/loader:596:29)\n    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:601:12)\n    at #createModuleJob (node:internal/modules/esm/loader:624:36)\n    at #getJobFromResolveResult (node:internal/modules/esm/loader:343:34)\n    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:311:41)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:664:25)\n\nNode.js v22.22.1\n"
+}

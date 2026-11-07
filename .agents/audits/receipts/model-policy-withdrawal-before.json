@@ -1,0 +1,14 @@
+{
+  "name": "model-policy-withdrawal-before",
+  "cwd": "plugins/dsh-model-governance",
+  "command": "../../node_modules/.bin/vitest run tests/execution-billing.spec.ts -t 'policy-owner withdrawal' --retry=0",
+  "startedAt": "2026-10-24T06:30:21.539049+00:00",
+  "seconds": 3.104,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "86af9242b91684b0154b9a0f3e13537d9e757cfe5766096aa95c4cc681a931a9",
+  "inputsAfter": "86af9242b91684b0154b9a0f3e13537d9e757cfe5766096aa95c4cc681a931a9",
+  "postgresToolDirectory": null,
+  "outputSha256": "3f752d262d3c0687c1e7275c3692622b25328a96ec351ef11140158a7f591990",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/plugins/dsh-model-governance\n\n ❯ tests/execution-billing.spec.ts (14 tests | 1 failed | 13 skipped) 17ms\n   × refuses queued model dispatch after policy-owner withdrawal 17ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/execution-billing.spec.ts > refuses queued model dispatch after policy-owner withdrawal\nAssertionError: expected [ { provider: 'p', model: 'm', …(2) } ] to have a length of +0 but got 1\n\n- Expected\n+ Received\n\n- 0\n+ 1\n\n ❯ tests/execution-billing.spec.ts:108:30\n    106|   granted.resolve(undefined)\n    107|   const chunks = await result\n    108|   expect(f.adapter.requests).toHaveLength(0)\n       |                              ^\n    109|   expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind…\n    110|   expect(release).toHaveBeenCalledOnce()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 13 skipped (14)\n   Start at  14:30:23\n   Duration  798ms (transform 469ms, setup 0ms, import 693ms, tests 17ms, environment 0ms)\n\n"
+}

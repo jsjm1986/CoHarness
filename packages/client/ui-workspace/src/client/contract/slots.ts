@@ -32,7 +32,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
-  ConversationViewportSnapshot, DirectoryListing, SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
+  ConversationViewportSnapshot, DirectoryListing, SessionRuntimeTarget, SessionId, SessionListState, SessionSearchResultItem,
+  WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkspaceViewStore } from '../stores.ts'
 import type { WorkspaceShortcutState } from '../shortcuts.ts'
@@ -43,6 +44,8 @@ import type { WorkspaceShortcutState } from '../shortcuts.ts'
  * to run/render its interaction and reports exactly one outcome per open.
  */
 export interface DirectoryFlowOwnerProps {
+  /** Exact Runtime captured by the opening gesture; null retains the bootstrap Host. */
+  runtimeTarget?: SessionRuntimeTarget | null
   /** True while a picking interaction is requested; flipping back to false withdraws the request. */
   open: boolean
   /** True while the owner adopts a picked path (`createWorkspace` in flight); occupants disable their commit affordances. */
@@ -174,7 +177,9 @@ export type DirectoryPickingInjected = {
    * Native Hosts that inject this and then reject with
    * `directory-picker-unavailable` also skip the check.
    */
-  listDirectory?: ((path?: string, signal?: AbortSignal) => Promise<DirectoryListing>) | undefined
+  listDirectory?: ((
+    path?: string, signal?: AbortSignal, runtimeTarget?: SessionRuntimeTarget | null,
+  ) => Promise<DirectoryListing>) | undefined
 }
 
 /** Component-side view of the picking share: the bound occupancy selector hook. */
@@ -186,11 +191,17 @@ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']
  * browsing region drives.
  */
 export type WorkspaceBrowserInjected = {
+  /** Create in one exact personal Runtime; directory disclosure alone never calls this. */
+  startRuntimeSession?: (target: import('@deepseek-ai/dsh-client-runtime/client').SessionRuntimeTarget, workspaceId?: WorkspaceId) => Promise<void>
+  /** Refresh the granted personal computer directory without opening Runtime connections. */
+  refreshComputers?: () => Promise<void>
   hooks: DirectoryPickingInjected['hooks'] & {
     /** Current conversation presentation; workbench mode temporarily replaces the history tree. */
     viewport: HostObservable<ConversationViewportSnapshot>
     /** Session list for the authenticated current space, excluding workbench targets. */
     currentSessions: HostObservable<SessionListState>
+    /** Authorized blank Sessions holding this document's composer input. */
+    inputDraftSessions: HostObservable<readonly SessionId[]>
     /** Current generation's Host description, bound by the slot renderer. */
     hostDescription: HostDescriptionSource
     /** Browser-owned opening requests published by workspace commands. */
@@ -207,6 +218,8 @@ export type WorkspaceBrowserInjected = {
   startSession: (workspaceId?: WorkspaceId) => void
   /** Open a real Session. */
   open: (sessionId: SessionId) => void | Promise<void>
+  /** Retry failed Session and Workspace baselines in the authenticated current space. */
+  retryLists: () => void
   /**
    * Search current visible conversation messages. The Host fixes the result
    * bound; `hasMore` means the query needs narrowing.
@@ -239,9 +252,11 @@ export type WorkspaceBrowserInjected = {
    */
   insertSessionBefore: (workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId) => Promise<void>
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
-  createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  createWorkspace: (input: { path: string; runtimeTarget?: SessionRuntimeTarget | null }) => Promise<WorkspaceView>
   /** List one host directory level for workspace document management. */
-  listDirectory?: ((path?: string, signal?: AbortSignal) => Promise<DirectoryListing>) | undefined
+  listDirectory?: ((
+    path?: string, signal?: AbortSignal, runtimeTarget?: SessionRuntimeTarget | null,
+  ) => Promise<DirectoryListing>) | undefined
   /** Open the browser search and focus its input. */
   requestSearch: () => void
   /** Request the existing directory picker. */
@@ -464,7 +479,7 @@ export type WorkspaceBrowserProps =
  */
 export type WorkspacePickerInjected = DirectoryPickingInjected & {
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
-  createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  createWorkspace: (input: { path: string; runtimeTarget?: SessionRuntimeTarget | null }) => Promise<WorkspaceView>
 }
 
 /**

@@ -45,13 +45,16 @@
         "scripts/bundle-input-isolation.ts",
         "scripts/coverage-canonical-locations.ts",
         "scripts/web-product-bundle-isolation.ts",
-        "scripts/workspace-runtime/verify-installed.ts"
+        "scripts/workspace-runtime/verify-installed.ts",
+        "scripts/compile-referenced-projects.ts"
       ],
       "ignoreUnresolved": [
         "client-build-environment"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-ssh-helper-runtime"
+        "@deepseek-ai/dsh-ssh-helper-runtime",
+        "pg",
+        "punycode"
       ],
       "project": [
         "scripts/**/*.ts",
@@ -98,7 +101,15 @@
         "*/tests/**/*.snapshot.ts",
         "acp-agent/tests/fixtures/subagent-activation-limit.ts",
         "headless-agent/tests/fixtures/serial-preset.ts",
-        "acp-agent/tests/fixtures/shell/tool-pwsh/driver.ts"
+        "acp-agent/tests/fixtures/shell/tool-pwsh/driver.ts",
+        "headless-agent/tests/fixtures/memory-observer-failure.ts",
+        "headless-agent/tests/fixtures/memory-curation-race-model.ts",
+        "headless-agent/tests/fixtures/memory-execution-model.ts",
+        "headless-agent/tests/fixtures/memory-disabled-tools-model.ts",
+        "headless-agent/tests/fixtures/memory-consolidation-sessions-model.ts",
+        "headless-agent/tests/fixtures/memory-recall-integrity-model.ts",
+        "headless-agent/tests/fixtures/model-policy-driver.ts",
+        "headless-agent/tests/fixtures/model-policy-model.ts"
       ],
       "project": [
         "**/*.ts"
@@ -141,18 +152,6 @@
         "zod"
       ]
     },
-    "packages/feedback/command-feedback": {
-      "entry": [
-        "tests/**/*.spec.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "zod"
-      ]
-    },
     "packages/host/directory-picker-native": {
       "entry": [
         "tests/**/*.spec.{ts,tsx}",
@@ -165,7 +164,8 @@
     },
     "packages/client/runtime": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/list-projection.perf.client.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -300,7 +300,8 @@
     "packages/client/ui-workbench": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.spec.tsx"
+        "tests/**/*.spec.tsx",
+        "tests/html-pack-perf.client.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -897,6 +898,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-tool-subagent"
       ]
     },
     "packages/subagent/subagent-claude-code": {
@@ -907,6 +911,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-tool-subagent"
       ]
     },
     "packages/fs/tool-fs": {
@@ -1024,6 +1031,8 @@
         "tests/**/*.ts"
       ],
       "ignoreDependencies": [
+        "base",
+        "optional",
         "react"
       ]
     },
@@ -1039,8 +1048,7 @@
     "packages/subagent/subagent-dsh-sdk": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts",
-        "tests/fixtures/loader/*.ts"
+        "tests/**/*.e2e.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -1307,7 +1315,8 @@
     },
     "packages/experimental/browser-use-runtime": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -1734,6 +1743,36 @@
       ]
     },
     "packages/typert/protocol": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/document/office-to-pdf": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.perf.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/ssh/fs-ssh": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/ssh/subprocess-ssh": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"

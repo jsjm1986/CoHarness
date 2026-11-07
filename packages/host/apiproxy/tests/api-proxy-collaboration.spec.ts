@@ -5,8 +5,9 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { collaborationCapabilities, CollaborationError, type CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import type { Session } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
   TypertLookupFailure,
   type TypertGatewayAuthorizationRequest,
@@ -15,7 +16,7 @@ import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { HostFrame, MuxFrame, RpcRequest, RpcResponse } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { authorizeTypertRemote, createApiProxy } from '../src/api-proxy.ts'
+import { authorizeTypertRemote, createApiProxy, invokeTypertRemote } from '../src/api-proxy.ts'
 
 // The Host canonicalizes the project root through realpath, so it must exist
 // on every platform; a bare `/tmp` gains a drive letter on Windows and does not.
@@ -108,6 +109,7 @@ async function harness(
 ): Promise<{
   ctx: Context
   api: ReturnType<typeof createApiProxy>
+  withdrawCollaboration: () => void
 }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
@@ -126,13 +128,14 @@ async function harness(
   if (options.agentPresets !== undefined) {
     ctx.provide('agentPresets', options.agentPresets as never)
   }
-  ctx.provide('collaboration', {
+  const withdrawCollaboration = ctx.provide('collaboration', {
     capture: () => authority,
     currentCreation: () => undefined,
     withSessionCreation: (_creation: unknown, operation: () => Promise<unknown>) => operation(),
   } as never)
   return {
     ctx,
+    withdrawCollaboration,
     api: createApiProxy(ctx, {
       defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }),
       cwd: options.cwd ?? PROJECT_ROOT,
@@ -165,7 +168,7 @@ function typertRequest(
 }
 
 async function expectTypertCollaborationFailure(
-  operation: Promise<void>,
+  operation: Promise<unknown>,
 ): Promise<TypertLookupFailure> {
   try {
     await operation
@@ -206,6 +209,43 @@ describe('user terminal Remote admission', () => {
 })
 
 describe('project collaboration Typert Remote ACL', () => {
+  it.each(['memory/list', 'memory/save', 'goals/edit'])('refuses managed %s while collaboration is unavailable', async (endpoint) => {
+    const { ctx, withdrawCollaboration } = await harness(readOnlyAuthority())
+    try {
+      ctx.provide('collaborationRequired', true)
+      withdrawCollaboration()
+      const failure = await expectTypertCollaborationFailure(authorizeTypertRemote(
+        ctx, typertRequest(endpoint, { agentId: SessionId('private-session') }),
+      ))
+      expect(failure.failure).toMatchObject({
+        code: 'collaboration-forbidden', details: { reason: 'gateway-unavailable' },
+      })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('does not invoke an unfiltered schedule catalog after collaboration withdrawal', async () => {
+    const { ctx, withdrawCollaboration } = await harness(readOnlyAuthority())
+    try {
+      ctx.provide('collaborationRequired', true)
+      withdrawCollaboration()
+      const next = vi.fn(async () => [{ sessionId: 'private-session' }])
+      const failure = await expectTypertCollaborationFailure(invokeTypertRemote(ctx, typertRequest('schedule/catalog', {}), next))
+      expect(failure.failure).toMatchObject({ code: 'collaboration-forbidden', details: { reason: 'gateway-unavailable' } })
+      expect(next).not.toHaveBeenCalled()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('refuses raw workspace reads while a managed collaboration provider is unavailable', async () => {
+    const { ctx, api, withdrawCollaboration } = await harness(readOnlyAuthority())
+    try {
+      ctx.provide('collaborationRequired', true)
+      withdrawCollaboration()
+      expect((await api.workspace.list(request({}))).result).toMatchObject({
+        ok: false, error: { code: 'collaboration-forbidden', details: { reason: 'gateway-unavailable' } },
+      })
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('authorizes every current session-scoped Remote with its declared action', async () => {
     const authority = controlledAuthority().authority
     const authorize = vi.fn(authority.authorize.bind(authority))
@@ -227,9 +267,6 @@ describe('project collaboration Typert Remote ACL', () => {
         args: { agentId: sessionId },
       })),
       { endpoint: 'agentPresets/select', action: 'write', args: { agentId: sessionId } },
-      { endpoint: 'messageFeedback/list', action: 'read', args: { request: { sessionId } } },
-      { endpoint: 'messageFeedback/put', action: 'write', args: { request: { sessionId } } },
-      { endpoint: 'messageFeedback/delete', action: 'write', args: { request: { sessionId } } },
       { endpoint: 'dynamicCordisRunner/runHostHalf', action: 'approve', args: { agentId: sessionId } },
       { endpoint: 'dynamicCordisRunner/getClientCode', action: 'read', args: { agentId: sessionId } },
       { endpoint: 'dynamicCordisRunner/settleUserRun', action: 'write', args: { agentId: sessionId } },
@@ -356,8 +393,17 @@ describe('project collaboration Typert Remote ACL', () => {
     )).resolves.toBeUndefined()
     await expect(authorizeTypertRemote(
       ctx,
+      typertRequest('pluginManager/catalog', {}),
+    )).resolves.toBeUndefined()
+    await expect(authorizeTypertRemote(
+      ctx,
       typertRequest('dynamicCordisRunner/syncInspectManifest', { providers: [] }),
     )).resolves.toBeUndefined()
+  })
+
+  it('delegates catalog authority for read-only project members to plugin management', async () => {
+    const { ctx } = await harness(readOnlyAuthority())
+    await expect(authorizeTypertRemote(ctx, typertRequest('pluginManager/catalog', {}))).resolves.toBeUndefined()
   })
 
   it('applies Session write ACL to inspect-query resolution', async () => {
@@ -462,6 +508,44 @@ describe('project collaboration streams', () => {
       controlled.firstRead.resolve(new Set([secretId, witnessId]))
       const first = await stream.next()
       expect(first).toMatchObject({ done: false, value: { payload: { type: 'session/subscribed', sessionId: witnessId } } })
+    } finally {
+      abort.abort()
+      await stream.return?.()
+    }
+  })
+
+  it('streams a constructor-silent append before its subscription baseline', async () => {
+    const authority = controlledAuthority().authority
+    authority.readableSessionIds = sessionIds => Promise.resolve(new Set(sessionIds))
+    const { ctx, api } = await harness(authority)
+    const abort = new AbortController()
+    const stream = api.events.mux(request({}), abort.signal)[Symbol.asyncIterator]()
+    try {
+      // A restored seed lacking the resume marker appends `session/end-seed`
+      // inside the Session constructor — before the store entry exists, so no
+      // session/event observer sees it. The baseline publish must stream that
+      // durable event first; otherwise a client window ending at the seed tail
+      // reads lastSeq past its tail and repulls the same history page.
+      const sessionId = SessionId('silent-resume-marker')
+      ctx.sessions.create(sessionId, {
+        seed: [{
+          type: 'user/message', seq: SessionSeq(0), time: 2000,
+          data: createUserMessage({ content: [{ type: 'text', text: 'stored' }], source: { kind: 'user' } }),
+          surfaceOp: 'append',
+        } satisfies SessionEvent],
+        meta: { cwd: PROJECT_ROOT, createdAt: 1000 },
+      })
+      const frames: MuxFrame[] = []
+      while (frames.length < 2) {
+        const next = await stream.next()
+        expect(next.done).toBe(false)
+        if (next.done) break
+        const payload = next.value.payload
+        if ('sessionId' in payload && payload.sessionId === sessionId) frames.push(payload)
+      }
+      const [live, baseline] = frames
+      expect(live).toMatchObject({ type: 'session/event', sessionId, event: { type: 'session/end-seed', seq: 1 } })
+      expect(baseline).toMatchObject({ type: 'session/subscribed', sessionId, lastSeq: 1 })
     } finally {
       abort.abort()
       await stream.return?.()
@@ -837,6 +921,40 @@ describe('project collaboration streams', () => {
     } finally {
       abort.abort()
       await consuming
+    }
+  })
+
+  it.each(['mux', 'host'] as const)('keeps the %s stream open only through its current verified deadline', async (kind) => {
+    const source = new AbortController()
+    let expiresAt = Date.now() + 30_000
+    const authority: CollaborationAuthority = {
+      ...controlledAuthority().authority,
+      get expiresAt() { return expiresAt },
+      signal: source.signal,
+      readableSessionIds: sessionIds => Promise.resolve(new Set(sessionIds)),
+    }
+    const { api } = await harness(authority)
+    vi.useFakeTimers()
+    const stream = kind === 'mux'
+      ? api.events.mux(request({}), source.signal)
+      : api.events.host(request({}), source.signal)
+    let finished = false
+    const consuming = (async () => {
+      for await (const _frame of stream) { /* The deadline owns completion even without publications. */ }
+      finished = true
+    })()
+    try {
+      await vi.advanceTimersByTimeAsync(10_000)
+      expiresAt += 10_000
+      await vi.advanceTimersByTimeAsync(20_001)
+      expect(finished).toBe(false)
+      await vi.advanceTimersByTimeAsync(10_000)
+      await consuming
+      expect(finished).toBe(true)
+    } finally {
+      source.abort()
+      await consuming
+      vi.useRealTimers()
     }
   })
 

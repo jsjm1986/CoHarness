@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-handoff-pg-capacity-final",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/instance-capacity-postgres.spec.ts tests/node-resource-budget-postgres.spec.ts --retry=0 --no-file-parallelism --maxWorkers=1",
+  "startedAt": "2026-10-24T20:00:25.786602+00:00",
+  "seconds": 5.982,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "19eba6a5ef00556143f7eda8dd1b81e947b4bfe787ad269d79ae007e1cb0e1d7",
+  "inputsAfter": "19eba6a5ef00556143f7eda8dd1b81e947b4bfe787ad269d79ae007e1cb0e1d7",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "cbb7d388887c8d2da952b415623adfa7d4a8d12a6ef8d5ba6f02cc3db65329c6",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  45 passed (45)\n   Start at  04:00:27\n   Duration  3.95s (transform 797ms, setup 0ms, import 1.12s, tests 2.64s, environment 0ms)\n\n"
+}

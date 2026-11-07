@@ -1,0 +1,6 @@
+{"phase":"model-close-recovered"}
+{"phase":"consumer-paused"}
+{"phase":"adapter-stopped"}
+{"phase":"consumer-closed"}
+{"phase":"process-stopped"}
+{"outcome":"completed","allocations":5,"occupied":0}

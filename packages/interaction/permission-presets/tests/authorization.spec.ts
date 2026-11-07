@@ -1,7 +1,7 @@
 import { setImmediate } from 'node:timers/promises'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
@@ -95,10 +95,30 @@ describe('permission command authorization', () => {
     expect(f.ctx.permissionPresets.current(f.session)).toBe(AUTO_PRESET)
   })
 
+  it('refuses a pending selection when a newly composed registry does not own its caller', async () => {
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const f = await fixture(async () => { entered.resolve(undefined); await release.promise })
+    const pending = f.select()
+    const rejected = expect(pending).rejects.toThrow('Agent is no longer active')
+    try {
+      await entered.promise
+      await f.ctx.plugin(AgentRegistry)
+    } finally { release.resolve(undefined) }
+    await rejected
+    expect(f.ctx.permissionPresets.current(f.session)).toBe('workspace-write')
+  })
+
   it('refuses a managed selection while its execution Provider is unavailable', async () => {
     const f = await fixture()
     f.ctx.provide('executionAuthorityRequired', true)
     await expect(f.select()).rejects.toThrow('Managed execution requires its authorization provider')
+    expect(f.ctx.permissionPresets.current(f.session)).toBe('workspace-write')
+  })
+
+  it('refuses a managed selection without its required live selection policy', async () => {
+    const f = await fixture()
+    await f.ctx.plugin(TracedAuthority)
+    await expect(f.select()).rejects.toThrow('managed selection requires live authorization')
     expect(f.ctx.permissionPresets.current(f.session)).toBe('workspace-write')
   })
 
@@ -129,6 +149,15 @@ class MemorySettings extends SettingsProvider {
 }
 
 describe('permission default authorization', () => {
+  it('refuses a managed default without its required live default policy', async () => {
+    const f = await fixture()
+    await f.ctx.plugin(TracedAuthority)
+    await f.ctx.plugin(MemorySettings)
+    const settings = f.ctx.settings as MemorySettings
+    await expect(settings.mutate('permission', [{ op: 'set', path: ['defaultPreset'], value: 'danger-full-access' }]))
+      .rejects.toThrow('managed defaults require live authorization')
+    expect(settings.doc).toEqual({})
+  })
   it('persists an authorized default while its traced authority provider remains current', async () => {
     const f = await fixture()
     await f.ctx.plugin(TracedAuthority)

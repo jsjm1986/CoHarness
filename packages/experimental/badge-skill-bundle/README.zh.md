@@ -1,5 +1,5 @@
 ---
-description: "让 Agent 为文档、PR 等产出添加「powered by dsh」徽章。"
+description: "让 Agent 为文档、PR 等产出添加「powered by CoHarness」徽章。"
 kind: "package-bundle"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-让预设支持技能加载的智能体为文档、PR 等产出添加「powered by dsh」徽章。共享提供者不添加模型工具。 Web 和 Desktop 随附此功能，默认关闭。在插件页选择它即可启用。
+让预设支持技能加载的智能体为文档、PR 等产出添加「powered by CoHarness」徽章。共享提供者不添加模型工具。 Web 和 Desktop 随附此功能，默认关闭。在插件页选择它即可启用。
 
 ## 目录
 
@@ -25,7 +25,7 @@ kind: "package-bundle"
 <a id="use-this-package"></a>
 ## 使用此包
 
-在 Web 或 Desktop 中打开插件页，在官方分组启用 **DSH 徽章技能**。关闭后移除其配置层。
+在 Web 或 Desktop 中打开插件页，在官方分组启用 **CoHarness 徽章技能**。关闭后移除其配置层。
 
 开关为已有和新建智能体添加或移除 Host 级技能提供方。提供技能加载能力的预设可以使用徽章；minimal 的工具目录保持不变。
 

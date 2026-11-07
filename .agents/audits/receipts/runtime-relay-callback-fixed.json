@@ -1,0 +1,14 @@
+{
+  "name": "runtime-relay-callback-fixed",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/runtime-relay.spec.ts tests/instances.spec.ts tests/apply-grants.spec.ts tests/proxy.spec.ts --retry=0",
+  "startedAt": "2026-10-25T00:54:12.352158+00:00",
+  "seconds": 17.749,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "713d1f33657a48351f7db937385e7f9134d830097ad6e0b60e49b9737637b87a",
+  "inputsAfter": "713d1f33657a48351f7db937385e7f9134d830097ad6e0b60e49b9737637b87a",
+  "postgresToolDirectory": null,
+  "outputSha256": "618e62af0d64de879675b41994a50babebe9ca8f3382b4c7c4cea2de3eb8c3ab",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  4 passed (4)\n      Tests  79 passed (79)\n   Start at  08:54:12\n   Duration  17.13s (transform 1.30s, setup 0ms, import 1.81s, tests 29.61s, environment 0ms)\n\n"
+}

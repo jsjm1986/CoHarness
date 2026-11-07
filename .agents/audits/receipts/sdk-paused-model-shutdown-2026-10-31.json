@@ -1,0 +1,401 @@
+{
+  "findings": [
+    "B377"
+  ],
+  "status": "fixed_named_sdk_paused_model_cases_verified_remaining_full_review_open",
+  "updatedAt": "2026-10-30T23:22:12.266169+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T231300Z",
+  "sourcePaths": [
+    "packages/subagent/subagent-dsh-sdk/src/managed.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown-child.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/model-shutdown.jsonl",
+    "packages/subagent/subagent-dsh-sdk/README.md",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subagent/subagent-dsh-sdk/src/managed.ts": "44d83b1e3ea5c069d6a23ead27702746f02c456c235642606dd6036c2ab15de2",
+    "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts": "0375d4655e292a494ec3993d8dcce17b26a243a6dbb83f6ca45db7b90884d797",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts": "9d0851ed68f7fe903079f48a87d2ddfd9a20cc492011585de9952722c4d449a0",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs": "37ccb2ef87f3604dd22fa4b55af9625650229130b3b5904c4eca67da2f8afe79",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown-child.mjs": "acdf5c7b6d434870334c89bd2060c5309dcda49b0fec4852ca36f356141480db",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/model-shutdown.jsonl": "d627541facc5faa02c0c83fbc4d24fba6223c5b577e0aadb939bbd4832d4237c",
+    "packages/subagent/subagent-dsh-sdk/README.md": "b36da0c75a26d17b9af8c49c489ac98c79ee1811cb16ce7b0a78163e305ea147",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md": "f19b2d35ea9d1fcb173b453efa172b8fda4da687246f2090e33b1f3362ae7317",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml": "129821d6cc6736406627c63e2185ca382f160854dda2ddb1d6d3ef5c8ceafa8f",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md": "c200e8044493be068eafb7aa497ab0e0c8521663b5def240786daf1039db7b4b",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md": "14e71d0571ae8fbbc574438818f9cdf54f909edccbe041c4099988a53947b405",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml": "ddbf35c07b3ca3b07e5707f45fa7ee4e24aa814b5996b9807f9e4ad762ce9db5",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md": "2ae59d42270ae6e53a63fe9bf59d70b1ef43f00de38383545f15d502327e4031",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md": "3f10fb63cca23a47ae60c6a4ca5f9cea8ec81bcdae9399fa8d0c9a190c234e3a",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml": "394f571e4956a06715eec1a6c342b6dc9646fe6ae5516a5d18b15b88d86ccb36"
+  },
+  "compiledArtifactHashes": {
+    "packages/subagent/subagent-dsh-sdk/lib/index.js": "cbceb4ec4f3b961341725c5f592c2880f87a2d41463a2cf18f032a05d2e95263",
+    "packages/subagent/subagent-dsh-sdk/lib/managed.js": "83a035167061902d5a125b680e843d1f4cc9297279e83b59a13920bd3bf659f9"
+  },
+  "repairs": [
+    {
+      "id": "B377",
+      "title": "A paused SDK model consumer prevents adapter cancellation and managed-provider shutdown",
+      "repair": "Own adapter cancellation and model-span completion independently of consumer iteration; join startup before the adapter pump and retain one shared completion for eventual iterator closure."
+    }
+  ],
+  "causalEvidence": {
+    "originalSourceNegative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T23:13:08.995315+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+        "-t",
+        "unloads a paused",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T23:13:12.483218+00:00"
+    },
+    "privateCompiledNegative": {
+      "status": "passed",
+      "startedAt": "2026-10-30T23:19:40.065050+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T231300Z/run-model-negative.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T23:19:49.923774+00:00"
+    },
+    "privateCompiledObserved": {
+      "exitCode": 1,
+      "outerTimeout": false,
+      "records": [
+        {
+          "phase": "consumer-paused"
+        }
+      ]
+    },
+    "onlyManagedBootstrapChanged": true,
+    "sharedArtifactsMutatedForNegative": false
+  },
+  "verification": {
+    "uniqueRelatedCases": 226,
+    "sdkPackageCases": 221,
+    "composedAndTypeScriptSdkCases": 4,
+    "pythonSdkCases": 1,
+    "counting": "The focused137cases, source example reruns and engine reruns overlap the221SDK package cases and are not counted again. The Node22name filter deselects the other existing example; it is not an acceptance pass.",
+    "newConditionalSkips": 0,
+    "coverage": {
+      "managed.ts": {
+        "statements": [
+          103,
+          103
+        ],
+        "branches": [
+          40,
+          40
+        ],
+        "functions": [
+          18,
+          18
+        ],
+        "lines": [
+          79,
+          79
+        ],
+        "allFourMetrics": 100
+      }
+    },
+    "actualLoaderSdkTrace": {
+      "normalTurn": "completed",
+      "phases": [
+        "consumer-paused",
+        "adapter-stopped",
+        "consumer-closed"
+      ],
+      "allocations": 3,
+      "acknowledgedReleases": 3,
+      "occupied": 0,
+      "sameParentSessionForAllAdmissions": true
+    },
+    "engines": [
+      "macOS Node22 compiled actual SDK example",
+      "macOS Node24 compiled actual SDK example and SDK package cases"
+    ],
+    "buildGates": 8,
+    "documentationGates": 20,
+    "receipts": {
+      "sdk-model-owned-cleanup-complete-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:17:05.370908+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T231300Z/coverage-complete"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:17:20.159324+00:00"
+      },
+      "sdk-model-shutdown-source-example": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:17:50.412050+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:17:57.667346+00:00"
+      },
+      "sdk-model-shutdown-built-node24-suite": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:18:56.740537+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:19:09.182815+00:00"
+      },
+      "sdk-model-shutdown-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:18:56.740538+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "-t",
+          "model-shutdown",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:18:59.887067+00:00"
+      },
+      "sdk-model-shutdown-projection-snapshots": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:19:41.235139+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/scoped-sdk-model-admission.snapshot.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:19:45.471668+00:00"
+      },
+      "sdk-model-shutdown-python-sdk": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:19:41.235106+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_memory_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:19:42.863512+00:00"
+      },
+      "sdk-model-shutdown-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:16:34.180246+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:17:25.198746+00:00"
+      },
+      "sdk-model-shutdown-final-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:20:57.742765+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:21:02.354646+00:00"
+      },
+      "sdk-model-shutdown-lint-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:18:57.924654+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown-child.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:19:00.094491+00:00"
+      },
+      "sdk-model-shutdown-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:18:18.651070+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:18:46.615528+00:00"
+      },
+      "sdk-model-shutdown-guide-artifact": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:19:22.965499+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T231300Z/verify-sdk-guide.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:19:23.002242+00:00"
+      },
+      "sdk-model-shutdown-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:19:42.373874+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:19:46.073569+00:00"
+      },
+      "sdk-model-shutdown-entrypoints": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:20:31.123299+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-application-entrypoints.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:20:31.710138+00:00"
+      },
+      "sdk-model-shutdown-compiled-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:19:40.065050+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T231300Z/run-model-negative.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:19:49.923774+00:00"
+      }
+    }
+  },
+  "noteReview": {
+    "updatedOwningNote": ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    "newNotes": 0,
+    "archivedOrDeleted": 0,
+    "retainedActive": [
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+      ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.md"
+    ],
+    "reason": "The managed model note owns stream cancellation and completion. Process ownership and inspector cleanup remain distinct active decisions; no frozen archive was edited.",
+    "upgradeGuide": "Updated the current SDK process-admission guide pair and package README; guide is484English words. No SDK arguments, wire fields, Session events or durable schema versions changed."
+  },
+  "coordination": {
+    "peerFrozenRelease": "coharness-full-real-20261031-r4",
+    "frozenDirectory": "/Users/a1234/harness-gateway-releases/coharness-full-real-20261031-r4",
+    "frozenManagedSourceMatchesBeforeFix": true,
+    "rootDidNotModifyFrozenRelease": true,
+    "scope": "B377follows the frozen R4. Root did not deploy or operate Docker/production services. No current deployment claim is made.",
+    "peerReservedFiles": [
+      "gateway/src/runtime-resource-api.ts",
+      "gateway/src/node-resource-budget.ts",
+      "packages/context/gateway-runtime/src/resource-budget.ts"
+    ],
+    "peerAdditionalOwnership": "ui-collaboration conversation URLs, corresponding tests and identity documents remain with the peer.",
+    "latestPeerReport": {
+      "receivedAt": "2026-10-30T23:23:24.444204+00:00",
+      "evidenceKind": "peer_report_not_independently_retested_by_root",
+      "release": "coharness-full-real-20261031-r4",
+      "deployment": "Peer reports both hosts switched to R4 and real UI verification is ongoing.",
+      "additionalOwnership": "Peer owns ui-conversation apply.ts/stores.ts late-authentication draft hydration, related fixtures and browser coverage.",
+      "peerValidation": "Peer reports39related tests and17draft/collaboration browser regressions pass; root does not add these to its226case count.",
+      "loadCoordination": "Peer is running full doc-sync with1worker; root completed its checks and will avoid concurrent heavy rebuilding.",
+      "resourceConstraint": "Peer reports5.9GBfree after removing unused caches; preserve DB disk space.",
+      "notIncluded": "B375/B376remain outside R4; B377also follows the frozen release."
+    }
+  },
+  "additionalReadOnlyReview": {
+    "paths": [
+      "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+      "packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+      "packages/subagent/subagent-dsh-sdk/src/model-relay.ts",
+      "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+      "packages/llm/llm/src/index.ts"
+    ],
+    "scope": "Selected startup, cancellation, iterator cleanup and report ownership paths. Read-only review does not complete these files."
+  },
+  "remaining": [
+    "All12business domains remain in progress; B04/B25remain implementation_in_progress.",
+    "Aggregate managed-SDK shutdown timing, failed model-span acknowledgements and the remaining model/process allocation inventory still require review.",
+    "No new Linux or physical Windows acceptance was run for this change. Root real Responses validation remains deferred by the user."
+  ]
+}

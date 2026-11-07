@@ -56,6 +56,8 @@ With the provider mounted, a command runs under the mode you resolve per call. E
 
 An unsupported platform or an unusable runner fails closed: `confine()` rejects with `SANDBOX_UNAVAILABLE` and names the runner options for the platform, and the consumer surfaces that error rather than running the command unconfined. A runner that starts but refuses its profile is identified by its fatal stderr signature and exit code, so a broken sandbox is not mistaken for a denied command. The `runnerCommand` override is an operator assertion: it skips functional probes and assumes the configured runner implements the bwrap-compatible profile honestly.
 
+Functional probes force-kill a stalled native client at `probeTimeoutMs` and return only after that client closes. A timeout makes the candidate unusable; it cannot authorize unconfined execution. The provider caches the completed selection verdict. The [probe ownership decision](../../../.agents/notes/implemented/bug-fix/2026-10-29-native-capability-probe-closure.md) records the failure and lifetime rules.
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -73,6 +75,7 @@ Selection is by platform first, probes second: each platform has a runner chain 
 ### Platform profiles
 
 The bwrap profile combines a read-only host root, a fresh `/dev`, and `/proc` from a private PID namespace — commands manage their descendants but cannot see host processes, so procfs magic links cannot bypass the mounts; `workspace-write` adds an ephemeral `/tmp` and a writable workspace bind. The private-PID note records the boundary.
+
 
 The `@deepseek-ai/node-addon-system/landlock-run` API supplies the platform launcher, functional probe, and grant vocabulary; this provider maps mode to grants only, keeping path resolution and probe parsing with the versioned binary.
 
@@ -110,6 +113,7 @@ Start with the subsystem reference for the shared vocabulary, then the seam cont
 - [Windows ACL restricted-token rung](../sandbox-windows-acl/README.md) — the win32 backend this provider mounts.
 - [The subprocess sandbox decision](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — capability boundary and runner selection semantics.
 
+
 -----
 
 <a id="model-experience"></a>
@@ -144,5 +148,6 @@ This Dev Note is working context for maintainers: undecided directions and open 
 #### Future: environment-coherent groups
 
 The [sandbox decision](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) lists an environment-coherent capability group example (for example bash plus fs against one container) as a deferred phase; it is not decided.
+
 
 </details>

@@ -1,0 +1,281 @@
+{
+  "recordedAt": "2026-10-29T14:13:25.413767+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-control-final-baseline-and-hashes.json",
+  "realProviderApiValidation": "human-deferred",
+  "ownedPostgresCleanup": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T14:11:57.320318+00:00",
+    "resource": "hgw-node-native-ff4ed94b48",
+    "containerId": "8919276f8605bb0a5614449732ec7127bca13806f98b6497f348b455671ea3dd",
+    "volume": "hgw-node-native-ff4ed94b48-data",
+    "port": 58487,
+    "database": "hgw_native_node_config_test",
+    "otherTestClients": 0,
+    "containerRemoved": true,
+    "volumeRemoved": true,
+    "hostMounts": [],
+    "peerAndProductionResourcesAccessed": false
+  },
+  "limitations": [
+    "Native client closure does not prove the service manager cancelled its job; current computer health and durable apply recovery remain authoritative.",
+    "macOS/Linux command selection and inert native clients are covered; this is not a claim of real cross-computer public-network hardware acceptance.",
+    "Coverage is scoped to three changed modules. node-config-host.ts:97.46% lines/78.94% branches; node-resource-pressure.ts:87.23% lines/64.7% branches. The shared command helper has100% across all four metrics. Linux memory acquisition is outside this macOS coverage selection."
+  ],
+  "findings": [
+    "B316"
+  ],
+  "repair": "The fixed installed-service action uses the joined native-command owner, scrubbed inheritance, configured control timeout, bounded64KiB output and noninteractive Linux arguments. Explicit cancellation force-kills a SIGTERM-ignoring client and waits for close. The real service fixture supplies its independently installed bootstrap environment.",
+  "paths": [
+    "gateway/src/node-config-host.ts",
+    "gateway/src/child-command.ts",
+    "gateway/tests/node-config-host-native.spec.ts",
+    "gateway/tests/node-config-process.spec.ts"
+  ],
+  "negativeEvidence": [
+    {
+      "name": "node-configuration-native-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T13:38:35.793184+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/node-config-host-native.spec.ts",
+        "--maxWorkers=2",
+        "--retry=0"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T13:38:48.216619+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-configuration-native-causal-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-configuration-native-causal-before.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "node-config-real-gateway-fixed",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:59:56.298390+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "tests/node-config-process.spec.ts",
+          "--maxWorkers=1",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:00:01.615494+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-real-gateway-fixed.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-real-gateway-fixed.log"
+      },
+      {
+        "name": "node-config-host-real-preflight-repaired",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:05:48.837873+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/node-config-host-postgres.spec.ts",
+          "tests/node-config-host-native.spec.ts",
+          "tests/node-config-health-identity.spec.ts",
+          "tests/node-config-store.spec.ts",
+          "tests/node-config-filesystem.spec.ts",
+          "tests/node-config-applier.spec.ts",
+          "tests/node-config-api.spec.ts",
+          "tests/node-resource-pressure.spec.ts",
+          "tests/node-resource-pressure-native.spec.ts",
+          "tests/systemd-command.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=src/node-config-host.ts",
+          "--coverage.include=src/child-command.ts",
+          "--coverage.include=src/node-resource-pressure.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-preflight-repaired-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:06:21.646134+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-host-real-preflight-repaired.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-host-real-preflight-repaired.log"
+      },
+      {
+        "name": "node-config-health-replay-source",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:02:28.514163+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/node-configuration-health-transcript.spec.ts",
+          "--maxWorkers=1",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:02:37.260804+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-health-replay-source.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-health-replay-source.log"
+      },
+      {
+        "name": "node-config-health-private-artifact-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:10:04.693611+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/fixtures/node-configuration-health.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/gateway-artifacts-node22/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:10:11.164270+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-health-private-artifact-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-health-private-artifact-node22.log"
+      },
+      {
+        "name": "node-config-health-private-artifact-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:10:11.199953+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/fixtures/node-configuration-health.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/gateway-artifacts-node24/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:10:17.626488+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-health-private-artifact-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-config-health-private-artifact-node24.log"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 134,
+          "covered": 126,
+          "skipped": 0,
+          "pct": 94.02
+        },
+        "statements": {
+          "total": 183,
+          "covered": 158,
+          "skipped": 0,
+          "pct": 86.33
+        },
+        "functions": {
+          "total": 28,
+          "covered": 25,
+          "skipped": 0,
+          "pct": 89.28
+        },
+        "branches": {
+          "total": 132,
+          "covered": 100,
+          "skipped": 0,
+          "pct": 75.75
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/child-command.ts": {
+        "lines": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/node-config-host.ts": {
+        "lines": {
+          "total": 79,
+          "covered": 77,
+          "skipped": 0,
+          "pct": 97.46
+        },
+        "functions": {
+          "total": 15,
+          "covered": 12,
+          "skipped": 0,
+          "pct": 80
+        },
+        "statements": {
+          "total": 110,
+          "covered": 97,
+          "skipped": 0,
+          "pct": 88.18
+        },
+        "branches": {
+          "total": 95,
+          "covered": 75,
+          "skipped": 0,
+          "pct": 78.94
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/node-resource-pressure.ts": {
+        "lines": {
+          "total": 47,
+          "covered": 41,
+          "skipped": 0,
+          "pct": 87.23
+        },
+        "functions": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 62,
+          "covered": 50,
+          "skipped": 0,
+          "pct": 80.64
+        },
+        "branches": {
+          "total": 34,
+          "covered": 22,
+          "skipped": 0,
+          "pct": 64.7
+        }
+      }
+    }
+  },
+  "intermediateFailuresRetained": [
+    "node-config-host-real-preflight-coverage: fixture had not established a cluster-control row before advancing its epoch; fixture now enters maintenance first.",
+    "node-config-health-artifact-node22: shared SQLite binary had Node25 ABI; independent matching Node22 and Node24 native packages passed without changing shared dependencies.",
+    "node-control-docs-quick: direct launcher omitted required pnpm context; correct pnpm run passed20gates.",
+    "node-control-ci-contracts: existing assertion omitted the already configured node-agent command; actual compiled control acceptance is now explicitly required."
+  ]
+}

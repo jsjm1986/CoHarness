@@ -1,0 +1,13 @@
+{
+  "name": "inspector-admission-host-emit",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T14:40:13.818058+00:00",
+  "seconds": 42.472,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "39d7d07d805be1df6b109a59d6a99d39363914f22e53155ed3a7275086d172eb",
+  "inputsAfter": "e23d1b34fd7fb625887c3dfff221d868f291a6674d7d8e831cec34a730440edd",
+  "outputSha256": "c9a64fe1261b8444640b05a6265f46bd50639128ce9e42c686ecaca7e8b2ca6d",
+  "outputTail": "packages/experimental/inspector/src/host/bridge/controller.ts(208,50): error TS2379: Argument of type '{ kind: \"process\"; origin: \"infrastructure\"; signal: AbortSignal | undefined; }' is not assignable to parameter of type 'ResourceRequest' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.\n  Types of property 'signal' are incompatible.\n    Type 'AbortSignal | undefined' is not assignable to type 'AbortSignal'.\n      Type 'undefined' is not assignable to type 'AbortSignal'.\n"
+}

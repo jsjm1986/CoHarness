@@ -277,6 +277,26 @@ describe('normalizeSessionLog', () => {
   const header = (over: object) => JSON.stringify({ type: 'session', version: 0, id: 's', createdAt: 123, ...over })
   const event = (over: object) => JSON.stringify({ type: 'turn/start', seq: 1, time: 999, data: { turn: 1 }, ...over })
 
+  it('normalizes owned job clocks while preserving lifecycle facts and arbitrary payload text', () => {
+    const data = { jobId: 'opaque-job', owner: 'owner', label: 'startedAt: 123', startedAt: 123,
+      finishedAt: 456, status: 'failed', cause: 'teardown', producerReported: false, detail: 'finishedAt: 456' }
+    const rows = ['job/registered', 'job/settled', 'tool/result'].map(type => event({ type, data }))
+    const parsed = normalizeSessionLog([header({}), ...rows].join('\n'), ctx).trim().split('\n')
+      .map(line => JSON.parse(line) as { type: string; data: typeof data })
+    expect(parsed[1]?.data).toEqual({ ...data, startedAt: 0 })
+    expect(parsed[2]?.data).toEqual({ ...data, startedAt: 0, finishedAt: 0 })
+    expect(parsed[3]?.data).toEqual(data)
+    const changed = event({ type: 'job/settled', data: { ...data, producerReported: true } })
+    expect(normalizeSessionLog(rows[1]!, ctx)).not.toEqual(normalizeSessionLog(changed, ctx))
+  })
+
+  it.each([null, 123, { startedAt: 'invalid-clock', finishedAt: { user: 456 } }, {}])(
+    'keeps invalid or absent job clocks visible: %j', (data) => {
+      const input = event({ type: 'job/settled', data })
+      expect((JSON.parse(normalizeSessionLog(input, ctx)) as { data: unknown }).data).toEqual(data)
+    },
+  )
+
   it('keeps unexpected request-header fields observable in comparisons', () => {
     const request = (system: boolean) => event({
       type: 'request/header',

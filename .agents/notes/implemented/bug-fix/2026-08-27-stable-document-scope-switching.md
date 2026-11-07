@@ -16,6 +16,8 @@ Current and alternate scope reads share a bounded in-memory metadata cache keyed
 
 The initial runtime listing remains request-owned until account context confirms its scope. Both cursor pages and legacy non-paged responses settle into the scope-qualified cache after confirmation; an unavailable context leaves the temporary listing usable only by that active request. Reopening the manager refreshes account context without discarding a fresh listing, and an identity change loads the new runtime rather than retaining metadata from the former active scope.
 
+Local listing reads belong to the account-confirmed runtime, and copy destinations exclude the scope of the displayed listing. The captured attachment destination remains independent, including after focusing a pane from another runtime and exiting the workbench. Choosing that destination uses the scope broker when it differs from the browsing runtime; attachment copies still target the captured Session.
+
 Gateway-selected scope metadata forwarding uses `HGW_UPSTREAM_TIMEOUT_MS`. A stalled upstream returns `DOCUMENT_SCOPE_TIMEOUT` with HTTP 504 and releases its runtime lease. Successful document content streams are exempt from the metadata deadline and keep the lease through EOF or cancellation.
 
 ## Alternatives considered

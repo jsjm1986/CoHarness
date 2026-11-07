@@ -61,6 +61,12 @@ ctx.commands.register({
 
 交互式适配器调用 `execute(agent, line, attachments, signal)`，传入确切的接收 agent、完整命令行与本次提交的有序附件。它返回已结算的 `CommandExecution`——规范化结果加生命周期配对 `commandId`——语法无效或名称未知时返回 `undefined`。`list(agent)` 与 `find(agent, name)` 在应用 agent 作用域遮蔽后用于命令发现。
 
+处理器开始运行时，最初选中的注册项必须仍然生效。附件准入期间若该项被移除、替换，或出现限定到 agent 的覆盖项，执行会以已记录的错误结算。调用不会转交给其他处理器；调用方可以按当前命令重试。
+
+等待附件准入与处理器清理期间，原调用 Agent 会阻止自动空闲回收。取消 UI 等待后，该保护仍保留到处理器 promise 结算。组合了 Agent 注册表时，移除或替换原 Agent 会阻止进入处理器；独立组合可以省略该注册表。 服务撤下会取消已接收的命令，并等待其准入及实际处理器清理结束后再移除空闲保护。持有旧服务引用的调用方不能开始新命令。
+
+会话事件发布和附件存储之后、处理器入口之前会再次检查取消状态。此时被取消的请求会以取消原因拒绝，并记录失败的执行；命令处理器不会开始运行。
+
 ### 取消
 
 调用方的中止信号会让注册表停止等待处理器；无视信号的处理器可能在调用方停止等待后继续产生自身的外部副作用。被取消或抛异常的处理器在日志中以 `command/done` 错误结算。
@@ -105,7 +111,7 @@ ctx.commands.register({
 当包级约定不够用时阅读以下页面。它们从共享命令词汇逐步进入设计证据与相邻表面。
 
 - [命令子系统参考](../../../docs/subsystems/commands.zh.md)——注册表语义、输入元数据与 `ctx.commands` 的 Cordis 接口面。
-- [命令注册 Agent Note](../../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md)——此服务背后的边界与分发约定。
+- [历史命令注册 Agent Note](../../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md)——此服务背后的边界与分发约定。
 - [交互组映射](../README.zh.md)——相邻的审批、权限与问答包。
 - [Plan mode 包](../../plan/plan-mode/README.zh.md)——一个驱动模型可见工作的已交付命令生产方。
 

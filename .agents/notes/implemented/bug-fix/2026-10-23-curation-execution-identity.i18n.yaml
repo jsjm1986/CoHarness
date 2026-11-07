@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-curation-execution-identity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-curation-execution-identity.md
+document:
+  en: e1952e1dfa3d75f98b95a9deaef94ad9b5149628
+  zh: 18ecbeead0881dc893cb6fecd21e37362525995d
+/agent-note-curation-execution-identity:
+  en: 440500826c9f118f
+  zh: 44d135fe1ccb75c5
+/agent-note-curation-execution-identity/problem:
+  en: e5e6a1e45289e603
+  zh: 7afe439ddd83b20f
+/agent-note-curation-execution-identity/decision:
+  en: feabea850dc18895
+  zh: b7d125c68e26578e
+/agent-note-curation-execution-identity/alternatives-considered:
+  en: c5ebb7d9e35abccf
+  zh: 1b835c73c5d2d2ec
+/agent-note-curation-execution-identity/consequences:
+  en: a5c6fd8364d797d0
+  zh: e6cdc8c30d38160d
+/agent-note-curation-execution-identity/verification:
+  en: 4b45fc5df9c83275
+  zh: a94491e729e0b8dd

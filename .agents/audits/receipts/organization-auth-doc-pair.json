@@ -1,0 +1,13 @@
+{
+  "name": "organization-auth-doc-pair",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write gateway/README.md .agents/notes/implemented/bug-fix/2026-10-23-case-insensitive-login-admission.md .agents/notes/implemented/bug-fix/2026-10-24-disabled-organization-human-auth.md",
+  "startedAt": "2026-10-23T19:20:34.063207+00:00",
+  "seconds": 5.017,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5cdb44c96e798137c7a1c36b104c4975168e45a18c14a7ca7975c4807f0cc4cb",
+  "inputsAfter": "00ad38e0c05a4a0157b15255eb7afc1ef539ecada00a96d2bb2dcefd25e268b4",
+  "outputSha256": "f6293db03fd5a563bf072a030b6a680c0616f9e6cdd31dd871aeab7a7f45113e",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/bug-fix/2026-10-23-case-insensitive-login-admission.md .agents/notes/implemented/bug-fix/2026-10-24-disabled-organization-human-auth.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-23-case-insensitive-login-admission.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-disabled-organization-human-auth.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

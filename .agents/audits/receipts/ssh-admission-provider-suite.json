@@ -1,0 +1,13 @@
+{
+  "name": "ssh-admission-provider-suite",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/ssh/ssh/tests packages/ssh/subprocess-ssh/tests --retry=0",
+  "startedAt": "2026-10-23T15:05:47.871205+00:00",
+  "seconds": 3.772,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9383a6a5aa9aba6dd64611f39945198feea8cf29edca5bab2a15b170275e0c67",
+  "inputsAfter": "9383a6a5aa9aba6dd64611f39945198feea8cf29edca5bab2a15b170275e0c67",
+  "outputSha256": "a45c8700299cd525c695ee5b06f227a5264498e2a18cb5884cf57f4917c0f6b8",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/ssh/subprocess-ssh/tests/terminal-behavior.spec.ts (9 tests | 1 failed) 1062ms\n     × releases the SSH connection when abort cannot confirm remote termination 1033ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/ssh/subprocess-ssh/tests/terminal-behavior.spec.ts > SSH terminal behavior > releases the SSH connection when abort cannot confirm remote termination\nAssertionError: expected +0 to be 1 // Object.is equality\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ packages/ssh/subprocess-ssh/tests/terminal-behavior.spec.ts:160:72\n    158|     const handle = await test.runtime.spawnTerminal({ ...spec, signal:…\n    159|     controller.abort()\n    160|     await expect.poll(() => test.connection.dispose.mock.calls.length)…\n       |                                                                        ^\n    161|     options.terminateFailure = undefined\n    162|     await handle.terminate()\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ packages/ssh/subprocess-ssh/tests/terminal-behavior.spec.ts:160:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 25 passed (26)\n      Tests  1 failed | 200 passed (201)\n   Start at  23:05:50\n   Duration  1.56s (transform 3.52s, setup 706ms, import 6.25s, tests 4.61s, environment 2ms)\n\n"
+}

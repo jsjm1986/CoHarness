@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-coverage-complete",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests --coverage --coverage.include=packages/experimental/browser-use-stagehand-native/src/model.ts --coverage.include=packages/experimental/browser-use-stagehand-native/src/worker-client.ts --coverage.include=packages/experimental/browser-use-stagehand-native/src/index.ts --coverage.include=packages/experimental/browser-use-stagehand-native/src/native.ts --coverage.include=packages/experimental/browser-use-stagehand-native/src/worker.ts --coverage.reportsDirectory=.agents/audits/.local/stagehand-model-coverage-complete --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T18:26:44.372194+00:00",
+  "seconds": 20.344,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "85b4c71fa5be25d31d975670076dd926793b99dfd977a3bcc918b752cad0ad6a",
+  "inputsAfter": "85b4c71fa5be25d31d975670076dd926793b99dfd977a3bcc918b752cad0ad6a",
+  "outputSha256": "8e29a22855dfafd734dfba1ab443ec40f92672a36c192a51ca4c1c44c9101c0b",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  11 passed (11)\n      Tests  146 passed (146)\n   Start at  02:26:57\n   Duration  7.19s (transform 1.64s, setup 183ms, import 3.26s, tests 3.39s, environment 0ms)\n\n % Coverage report from v8\n------------------|---------|----------|---------|---------|-------------------\nFile              | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n------------------|---------|----------|---------|---------|-------------------\n------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 377/377 )\nBranches     : 100% ( 222/222 )\nFunctions    : 100% ( 74/74 )\nLines        : 100% ( 306/306 )\n================================================================================\n"
+}

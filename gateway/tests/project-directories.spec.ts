@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { testConfig } from './test-config.ts'
+import { validateProjectRuntimePath } from '../src/instances.ts'
 import {
   assertProjectImportPathAllowed,
   listProjectDirectories,
@@ -37,6 +38,22 @@ function localFixture() {
 }
 
 describe('administrator project directory browser', () => {
+  it('revalidates user-managed runtime directories using their stored creation source', () => {
+    const { root, cfg, browse } = localFixture()
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }))
+    cfg.launcher = 'systemd'
+    cfg.projectPathRoots = [realpathSync(join(cfg.userProjectsRoot, '..'))]
+    const project = join(cfg.userProjectsRoot, 'collaboration')
+    mkdirSync(project)
+    expect(validateProjectRuntimePath(cfg, project, 'user')).toBe(realpathSync(project))
+    expect(() => validateProjectRuntimePath(cfg, project, 'admin')).toThrow('project-path-reserved')
+    expect(() => validateProjectRuntimePath(cfg, cfg.userProjectsRoot, 'user')).toThrow('project-path-reserved')
+    expect(() => validateProjectRuntimePath(cfg, browse, 'user')).toThrow('project-path-outside-root')
+    const replaced = join(cfg.userProjectsRoot, 'redirected')
+    symlinkSync(project, replaced)
+    expect(() => validateProjectRuntimePath(cfg, replaced, 'user')).toThrow('project-runtime-path-changed')
+  })
+
   it('lists one local host level, marks hidden folders, and omits files and reserved targets', () => {
     const { browse, cfg, usersRoot } = localFixture()
     mkdirSync(join(browse, 'Alpha'))

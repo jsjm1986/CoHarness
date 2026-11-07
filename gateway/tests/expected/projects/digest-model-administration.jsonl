@@ -1,0 +1,27 @@
+{"operation":"read","change":"role","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"read","change":"disabled-account","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"read","change":"deleted-account","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"read","change":"disabled-membership","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"read","change":"missing-membership","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"read","change":"disabled-organization","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"read","change":"current","status":200,"error":null,"model":null,"candidates":["org-shared/own-model","org-shared/space model"],"storedPin":null,"successfulAudit":0}
+{"operation":"read","change":"current-local","status":200,"error":null,"model":null,"candidates":["org-shared/own-model","org-shared/space model"],"storedPin":null,"successfulAudit":0}
+{"operation":"pin","change":"role","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"pin","change":"disabled-account","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"pin","change":"deleted-account","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"pin","change":"disabled-membership","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"pin","change":"missing-membership","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"pin","change":"disabled-organization","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"pin","change":"current","status":200,"error":null,"model":"org-shared/own-model","candidates":["org-shared/own-model","org-shared/space model"],"storedPin":"org-shared/own-model","successfulAudit":1}
+{"operation":"pin","change":"current-local","status":200,"error":null,"model":"org-shared/own-model","candidates":["org-shared/own-model","org-shared/space model"],"storedPin":"org-shared/own-model","successfulAudit":1}
+{"operation":"pin","change":"disabled-model-during-admission","status":400,"error":"digest-model-unavailable","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"clear","change":"role","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":"org-shared/own-model","successfulAudit":0}
+{"operation":"clear","change":"disabled-account","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":"org-shared/own-model","successfulAudit":0}
+{"operation":"clear","change":"deleted-account","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":"org-shared/own-model","successfulAudit":0}
+{"operation":"clear","change":"disabled-membership","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":"org-shared/own-model","successfulAudit":0}
+{"operation":"clear","change":"missing-membership","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":"org-shared/own-model","successfulAudit":0}
+{"operation":"clear","change":"disabled-organization","status":403,"error":"forbidden","model":null,"candidates":[],"storedPin":"org-shared/own-model","successfulAudit":0}
+{"operation":"clear","change":"current","status":200,"error":null,"model":null,"candidates":["org-shared/own-model","org-shared/space model"],"storedPin":null,"successfulAudit":1}
+{"operation":"clear","change":"current-local","status":200,"error":null,"model":null,"candidates":["org-shared/own-model","org-shared/space model"],"storedPin":null,"successfulAudit":1}
+{"operation":"pin-foreign","change":"current","status":400,"error":"digest-model-unavailable","model":null,"candidates":[],"storedPin":null,"successfulAudit":0}
+{"operation":"pin-spaces","change":"current","status":200,"error":null,"model":"org-shared/space model","candidates":["org-shared/own-model","org-shared/space model"],"storedPin":"org-shared/space model","successfulAudit":1}

@@ -1,0 +1,14 @@
+{
+  "name": "sonar-prepared-model-operations-coverage-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/native-governance-coverage.config.mts --coverage --retry=0",
+  "startedAt": "2026-10-24T09:18:37.878622+00:00",
+  "seconds": 3.934,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "963bd51742215d4d73f0ef7254311246024c9383237f800b3e0cb9f7eac75de0",
+  "inputsAfter": "963bd51742215d4d73f0ef7254311246024c9383237f800b3e0cb9f7eac75de0",
+  "postgresToolDirectory": null,
+  "outputSha256": "91e7ea2a9d66dfc5c7cc7e1bb250d338cddc10dae85775423c5a71e3e1a942ce",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  17 passed (17)\n      Tests  219 passed (219)\n   Start at  17:18:38\n   Duration  2.79s (transform 6.46s, setup 0ms, import 10.69s, tests 2.46s, environment 2ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |     100 |    99.73 |     100 |     100 |                   \n ...perplexity/src |     100 |    99.06 |     100 |     100 |                   \n  index.ts         |     100 |    97.14 |     100 |     100 | 115               \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 399/399 )\nBranches     : 99.73% ( 383/384 )\nFunctions    : 100% ( 99/99 )\nLines        : 100% ( 342/342 )\n================================================================================\nERROR: Coverage for branches (97.14%) does not meet global threshold (100%) for packages/web/web-search-perplexity/src/index.ts\n"
+}

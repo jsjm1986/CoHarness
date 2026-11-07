@@ -1,0 +1,14 @@
+{
+  "name": "pressure-bounds-units-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/node-resource-pressure.spec.ts tests/macos-release-control.spec.ts tests/config.spec.ts",
+  "startedAt": "2026-10-23T23:26:54.089797+00:00",
+  "seconds": 13.72,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a17b744fce0a67eea49049df5d1fc65e760349beb4915530596d0e173b527aea",
+  "inputsAfter": "a17b744fce0a67eea49049df5d1fc65e760349beb4915530596d0e173b527aea",
+  "postgresToolDirectory": null,
+  "outputSha256": "70ae9f3a67db1cef02c357172758dbb08cc78247533392ba6cdceda444a03207",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  65 passed (65)\n   Start at  07:26:55\n   Duration  12.44s (transform 529ms, setup 0ms, import 676ms, tests 12.44s, environment 0ms)\n\n"
+}

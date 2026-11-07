@@ -1,5 +1,6 @@
+import type { RuntimeId } from '../runtime-catalog.ts'
 /** Audited SQL execution channel for the resident steward runtime. */
-import type { PoolClient } from 'pg'
+import { Query, type PoolClient } from 'pg'
 import { connectFromPool } from './database.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 
@@ -25,6 +26,7 @@ const READONLY_HEAD = /^(select|with|values|table|show|explain)\b/i
 export interface StewardQuerySubject {
   organizationId: string
   projectInternalId: string
+  runtimeId: RuntimeId
   generation: number
 }
 
@@ -83,6 +85,61 @@ function stewardAuditDetail(
   })
 }
 
+/** Retain a bounded prefix while draining the single statement's row events. */
+function boundedStatement(
+  client: PoolClient,
+  text: string,
+  classification: 'read' | 'write',
+  dryRun: boolean,
+  rowLimit: number,
+): Promise<{ output: StewardQueryResult; bytes: number }> {
+  return new Promise((resolve, reject) => {
+    // An empty values array uses the simple protocol. Extended mode rejects
+    // additional statements before any can commit or leave READ ONLY mode.
+    const config = { text, queryMode: 'extended' }
+    const query = new Query<Record<string, unknown>>(config)
+    const retained: unknown[] = []
+    const capturesRows = dryRun || classification === 'read'
+    let observed = 0
+    let retainedBytes = 0
+    let baseBytes: number | undefined
+    let truncated = false
+    let serializationError: unknown
+    const output = (columns: string[], rowCount: number | null): StewardQueryResult => ({
+      classification, dryRun, columns,
+      rows: !dryRun && capturesRows ? retained : null,
+      plan: dryRun ? retained : null,
+      rowCount, truncated,
+    })
+    // A row listener without a callback prevents node-pg from accumulating
+    // the entire result in QueryResult.rows, including write RETURNING rows.
+    query.on('row', (row, result) => {
+      observed++
+      if (!capturesRows || truncated || serializationError !== undefined) return
+      if (retained.length >= rowLimit) { truncated = true; return }
+      try {
+        baseBytes ??= Buffer.byteLength(JSON.stringify(output(result!.fields.map(field => field.name), Number.MAX_SAFE_INTEGER)), 'utf8')
+        const bytes = Buffer.byteLength(JSON.stringify(row), 'utf8') + (retained.length > 0 ? 1 : 0)
+        if (baseBytes + retainedBytes + bytes > MAX_RESULT_BYTES) { truncated = true; return }
+        retained.push(row)
+        retainedBytes += bytes
+      } catch (error) {
+        serializationError = error
+      }
+    })
+    query.on('error', reject)
+    query.on('end', result => {
+      if (serializationError !== undefined) { reject(serializationError); return }
+      const value = output(result.fields.map(field => field.name), result.rowCount ?? observed)
+      const bytes = Buffer.byteLength(JSON.stringify(value), 'utf8')
+      if (bytes > MAX_RESULT_BYTES) {
+        reject(new StewardQueryError(413, 'steward-result-too-large', 'result metadata exceeds the result byte limit'))
+      } else resolve({ output: value, bytes })
+    })
+    client.query(query)
+  })
+}
+
 export class StewardQueryService {
   constructor(
     private readonly context: PostgresRuntimeContext,
@@ -121,7 +178,7 @@ export class StewardQueryService {
     }
     const classification = classify(statement)
     if (input.dryRun) {
-      return this.explain(subject, statement, classification, input.approvalId)
+      return this.explain(subject, statement, classification, input.approvalId, input.rowLimit)
     }
     if (classification === 'write' && input.approvalId === undefined) {
       await this.journal(subject, statement, classification, false, 'denied', null, null, null, 'approval-required', input.approvalId)
@@ -130,39 +187,28 @@ export class StewardQueryService {
 
     const client = await connectFromPool(this.context.pool)
     let failure: Error | null = null
+    let afterRelease: (() => Promise<void>) | undefined
     try {
       await client.query(classification === 'read' ? 'BEGIN READ ONLY' : 'BEGIN')
       await client.query(`SET LOCAL statement_timeout = ${STATEMENT_TIMEOUT_MS}`)
       let responderInternalId: string | null = null
       if (classification === 'write') {
-        responderInternalId = await this.verifyApproval(client, input.approvalId!, subject.projectInternalId)
+        responderInternalId = await this.verifyApproval(client, input.approvalId!, subject.projectInternalId, subject.runtimeId)
         if (responderInternalId === null) {
           await client.query('ROLLBACK')
-          await this.journal(subject, statement, classification, false, 'denied', null, null, null, 'approval-invalid', input.approvalId)
+          afterRelease = () => this.journal(subject, statement, classification, false, 'denied', null, null, null, 'approval-invalid', input.approvalId)
           throw new StewardQueryError(403, 'steward-approval-invalid', 'the supplied approval interaction is missing, expired, spent, or unqualified')
         }
       }
-      // Passing an empty params array keeps node-pg on the extended protocol,
-      // which rejects multi-statement input at the protocol level.
-      const result = await client.query(statement, [])
-      const rows = classification === 'read' ? (result.rows as unknown[]).slice(0, input.rowLimit) : null
-      let truncated = classification === 'read' && result.rows.length > input.rowLimit
-      let serialized = rows === null ? null : JSON.stringify(rows)
-      while (serialized !== null && serialized.length > MAX_RESULT_BYTES && Array.isArray(rows) && rows.length > 0) {
-        rows.splice(Math.ceil(rows.length / 2))
-        truncated = true
-        serialized = JSON.stringify(rows)
-      }
-      const bytes = serialized?.length ?? 0
-      const columns = (result.fields ?? []).map(field => field.name)
-      const rowCount = result.rowCount ?? (rows?.length ?? 0)
+      const { output, bytes } = await boundedStatement(client, statement, classification, false, input.rowLimit)
+      const { rowCount } = output
       if (classification === 'write') {
         await client.query(`INSERT INTO harness.steward_query_log(
-            organization_id,project_id,runtime_generation,statement,classification,dry_run,
+            organization_id,runtime_id,project_id,runtime_generation,statement,classification,dry_run,
             approval_interaction_id,responder_user_id,status,row_count,result_bytes)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,'ok',$9,$10)`, [
+          VALUES($1,$11,$2,$3,$4,$5,$6,$7,$8,'ok',$9,$10)`, [
           this.context.organizationId, subject.projectInternalId, subject.generation, statement,
-          classification, false, input.approvalId ?? null, responderInternalId, rowCount, bytes,
+          classification, false, input.approvalId ?? null, responderInternalId, rowCount, bytes, subject.runtimeId,
         ])
         await client.query(`INSERT INTO harness.audit_events(
             organization_id,actor_user_id,action,resource_type,source_ip,outcome,status_code,detail)
@@ -173,23 +219,15 @@ export class StewardQueryService {
         await client.query('COMMIT')
       } else {
         await client.query('COMMIT')
-        await this.journal(subject, statement, classification, false, 'ok', null, rowCount, bytes, null, input.approvalId)
+        afterRelease = () => this.journal(subject, statement, classification, false, 'ok', null, rowCount, bytes, null, input.approvalId)
       }
-      return {
-        classification,
-        dryRun: false,
-        columns,
-        rows,
-        plan: null,
-        rowCount,
-        truncated,
-      }
+      return output
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {})
-      // Denied writes journal 'denied' before throwing; only execution failures land here.
-      if (!(error instanceof StewardQueryError)) {
+      // Each attempt has one verdict; denied approvals are not execution errors.
+      if (!(error instanceof StewardQueryError && error.code === 'steward-approval-invalid')) {
         const message = error instanceof Error ? error.message : String(error)
-        await this.journal(subject, statement, classification, false, 'error', null, null, null, message, input.approvalId)
+        afterRelease = () => this.journal(subject, statement, classification, false, 'error', null, null, null, message, input.approvalId)
       }
       failure = error instanceof Error ? error : new Error(String(error))
       throw error
@@ -197,28 +235,32 @@ export class StewardQueryService {
       // Releasing with the error destroys a dead connection instead of lending it out again.
       if (failure === null) client.release()
       else client.release(failure)
+      // Best-effort journals borrow from the pool after this query releases it.
+      await afterRelease?.()
     }
   }
 
-  private async explain(subject: StewardQuerySubject, statement: string, classification: 'read' | 'write', approvalId: string | undefined): Promise<StewardQueryResult> {
+  private async explain(subject: StewardQuerySubject, statement: string, classification: 'read' | 'write', approvalId: string | undefined, rowLimit: number): Promise<StewardQueryResult> {
     const client = await connectFromPool(this.context.pool)
     let failure: Error | null = null
+    let afterRelease: (() => Promise<void>) | undefined
     try {
       await client.query('BEGIN READ ONLY')
       await client.query(`SET LOCAL statement_timeout = ${STATEMENT_TIMEOUT_MS}`)
-      const result = await client.query(`EXPLAIN ${statement}`, [])
+      const { output, bytes } = await boundedStatement(client, `EXPLAIN ${statement}`, classification, true, rowLimit)
       await client.query('COMMIT')
-      await this.journal(subject, statement, classification, true, 'ok', null, result.rows.length, null, null, approvalId)
-      return { classification, dryRun: true, columns: ['QUERY PLAN'], rows: null, plan: result.rows, rowCount: result.rows.length, truncated: false }
+      afterRelease = () => this.journal(subject, statement, classification, true, 'ok', null, output.rowCount, bytes, null, approvalId)
+      return output
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {})
       const message = error instanceof Error ? error.message : String(error)
-      await this.journal(subject, statement, classification, true, 'error', null, null, null, message, approvalId)
+      afterRelease = () => this.journal(subject, statement, classification, true, 'error', null, null, null, message, approvalId)
       failure = error instanceof Error ? error : new Error(String(error))
       throw error
     } finally {
       if (failure === null) client.release()
       else client.release(failure)
+      await afterRelease?.()
     }
   }
 
@@ -234,30 +276,32 @@ export class StewardQueryService {
    * exactly one write. The outcome column stores the literal wire verdict
    * `'allowed-once'`.
    */
-  private async verifyApproval(client: PoolClient, approvalId: string, projectInternalId: string): Promise<string | null> {
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [approvalId])
+  private async verifyApproval(client: PoolClient, approvalId: string, projectInternalId: string, runtimeId: RuntimeId): Promise<string | null> {
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [JSON.stringify([this.context.organizationId, runtimeId, approvalId])])
     const result = await client.query<{ responder: string }>(`SELECT r.responder_user_id::text responder
       FROM harness.conversation_interaction_responses r
-      JOIN harness.conversation_sessions c ON c.organization_id=r.organization_id AND c.id=r.conversation_id
-      JOIN harness.conversation_sessions root ON root.organization_id=c.organization_id
+      JOIN harness.conversation_sessions c ON c.organization_id=r.organization_id AND c.runtime_namespace=r.runtime_namespace AND c.id=r.conversation_id
+      JOIN harness.conversation_sessions root ON root.organization_id=c.organization_id AND root.runtime_namespace=c.runtime_namespace
         AND root.id=c.root_session_id AND root.project_id=$3
       JOIN harness.users u ON u.organization_id=r.organization_id AND u.id=r.responder_user_id AND u.status='active'
       JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
         AND m.status='active' AND m.role='admin'
-      JOIN harness.steward_access_policies sp ON sp.organization_id=u.organization_id AND sp.user_id=u.id AND sp.enabled
-      WHERE r.organization_id=$1 AND r.interaction_kind='approval' AND r.interaction_id=$2
+      JOIN harness.steward_access_policies sp ON sp.organization_id=u.organization_id AND sp.user_id=u.id
+        AND sp.node_id=harness.project_node_id(r.organization_id,$3) AND sp.enabled
+      WHERE r.organization_id=$1 AND r.runtime_id=$4 AND r.interaction_kind='approval' AND r.interaction_id=$2
+        AND harness.project_computer_use_allowed(r.organization_id,u.id,$3)
         AND r.responded_at > now() - interval '${APPROVAL_TTL_MINUTES} minutes'
         AND r.outcome = to_jsonb('allowed-once'::text)
         AND NOT EXISTS (
           SELECT 1 FROM harness.steward_query_log l
-          WHERE l.organization_id=r.organization_id AND l.approval_interaction_id=r.interaction_id
+          WHERE l.organization_id=r.organization_id AND l.runtime_namespace=r.runtime_namespace AND l.approval_interaction_id=r.interaction_id
             AND l.classification='write' AND l.dry_run=false AND l.status='ok')
       ORDER BY r.responded_at DESC LIMIT 1`,
-    [this.context.organizationId, approvalId, projectInternalId])
+    [this.context.organizationId, approvalId, projectInternalId, runtimeId])
     return result.rows[0]?.responder ?? null
   }
 
-  /** Best-effort journal for attempts that never reached the transaction. */
+  /** Record a best-effort outcome outside the statement transaction. */
   private async journal(
     subject: StewardQuerySubject,
     statement: string,
@@ -272,11 +316,11 @@ export class StewardQueryService {
   ): Promise<void> {
     try {
       await this.context.pool.query(`INSERT INTO harness.steward_query_log(
-          organization_id,project_id,runtime_generation,statement,classification,dry_run,
+          organization_id,runtime_id,project_id,runtime_generation,statement,classification,dry_run,
           approval_interaction_id,responder_user_id,status,row_count,result_bytes,error)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [
+        VALUES($1,$13,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [
         this.context.organizationId, subject.projectInternalId, subject.generation, statement,
-        classification, dryRun, approvalId ?? null, responderInternalId, status, rowCount, bytes, error,
+        classification, dryRun, approvalId ?? null, responderInternalId, status, rowCount, bytes, error, subject.runtimeId,
       ])
       // Mirror every journaled attempt into the administrator-facing audit log;
       // the statement itself stays in steward_query_log only.

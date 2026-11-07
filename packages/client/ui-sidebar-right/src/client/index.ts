@@ -24,7 +24,7 @@ import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
 import { observeSidebarFocus } from './focus.ts'
 import { registerSidebarShortcuts } from './shortcuts.ts'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { parseWorkspaceResourceAddress, workspaceResourceAddress, sessionPersistenceKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
+import { parseWorkspaceResourceAddress, workspaceResourceAddress, sessionPersistenceKey, parseClientSessionKey, type ConversationViewport } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -88,7 +88,7 @@ declare module '@deepseek-ai/dsh-client-runtime/client' {
 }
 
 /** Required browser services: the slot registry, the frame's panel actions, copy, and the resource model. */
-export const inject = ['slots', 'layout', 'locale', 'sessions', 'workspaceResources', 'connection', 'projectUiPolicy', 'shortcuts']
+export const inject = ['slots', 'layout', 'locale', 'sessions', 'workspaceResources', 'connection', 'projectUiPolicy', 'shortcuts', 'conversationViewport']
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -115,23 +115,20 @@ export function apply(ctx: ClientContext): void {
   // template this follows (ui-conversation's definition registry) is built at
   // its own apply top level for the same reason.
   const connection = ctx.get('connection') as ConnectionHandle
+  const viewport = ctx.get('conversationViewport') as ConversationViewport
   const t = ctx.locale.bind(NS)
   const tabs = new SidebarRightTabRegistry(ctx)
   // Independently retained Session views keep their mounted subtrees across
   // selection changes; the root below drives `select` through the frame's
   // target prop so a pinned `targetSessionId` wins over current selection.
   const views = new SidebarSessionViews(ctx.sessions)
-  const current = ctx.sessions.list
-  ctx.effect(() => {
-    const sync = (): void => { views.select(current.getSnapshot().current) }
-    const unsubscribe = current.subscribe(sync)
-    sync()
-    return () => { unsubscribe(); views.dispose() }
-  }, 'ui-sidebar-right: retained Session views')
+  ctx.effect(() => () => { views.dispose() }, 'ui-sidebar-right: retained Session views')
   const validateResource = (sessionId: SessionId, address: string): void => {
     const target = parseWorkspaceResourceAddress(address) ?? parseToolAddress(address)
     const owner = target?.sessionId ?? tabs.get(tabs.claim(address).kind)?.resourceSession?.(address)
     if (owner !== sessionId) throw new Error('Sidebar resource does not belong to this Session')
+    if (sessionPersistenceKey(ctx.sessions, sessionId, connection.hostDescription.getSnapshot()?.executionAuthorityRequired,
+      ctx.projectUiPolicy.getSnapshot().verifiedAccountId) === undefined) throw new Error(t('resource.verifying'))
   }
   const layout: ILayout = ctx.layout
   const { controller, adopt, forget, show, measure } = createSidebarRightController(
@@ -310,7 +307,7 @@ export function apply(ctx: ClientContext): void {
         name: 'rightbar',
         children: { 'rightbar.session': { kind: 'single', scope: 'session' } },
         inject: (): RightbarRootInjected => ({
-          hooks: { views: views.source },
+          hooks: { views: views.source, viewport: viewport.snapshot },
           mountView: reference => views.mount(reference),
           selectView: (sessionId) => { views.select(sessionId) },
         }),

@@ -1,0 +1,13 @@
+{
+  "name": "browser-lifecycle-current-emit",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T14:28:50.260602+00:00",
+  "seconds": 2.266,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7923fc153ec7c622084c6991c34ba09a67022bde1219f1ce2d3e69b63f685071",
+  "inputsAfter": "7923fc153ec7c622084c6991c34ba09a67022bde1219f1ce2d3e69b63f685071",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

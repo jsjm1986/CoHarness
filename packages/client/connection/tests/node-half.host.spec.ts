@@ -141,6 +141,15 @@ function browserCookie(connection: HostConnectionHandle, authority: string): str
 }
 
 describe('connection node half', () => {
+  it('keeps the browser unary default and rejects invalid deployment deadlines', async () => {
+    expect(Config({})).toMatchObject({ rpcTimeoutMs: 30_000 })
+    expect(Config({ rpcTimeoutMs: 120_000 })).toMatchObject({ rpcTimeoutMs: 120_000 })
+    for (const rpcTimeoutMs of [0, 1.5, MAX_TIMER_DELAY_MS + 1]) expect(() => Config({ rpcTimeoutMs })).toThrow()
+    const ctx = new Context()
+    try { await expect(apply(ctx, { rpcTimeoutMs: 0 })).rejects.toThrow('rpcTimeoutMs') }
+    finally { await ctx.fiber.dispose() }
+  })
+
   it('validates the WebSocket heartbeat interval', () => {
     expect(Config({})).toMatchObject({ websocketHeartbeatIntervalMs: 30_000 })
     expect(Config({ websocketHeartbeatIntervalMs: MAX_TIMER_DELAY_MS }))
@@ -494,6 +503,35 @@ describe('connection node half', () => {
     expect(calls).toEqual(['content'])
     await expect(connection.dispatchHttp(missingUrl, fakeResponse().response)).resolves.toBe(false)
     await fiber.dispose()
+  })
+
+  it.each([undefined, false, true])('forwards runtime and unary timing only when enabled (%s)', async (serverTiming) => {
+    const apiProxy = {
+      sessions: {
+        async list(request: Parameters<ApiProxy['sessions']['list']>[0]) {
+          return { rpcId: request.rpcId, result: { ok: true as const, value: { items: [] } } }
+        },
+      },
+    } as unknown as ApiProxy
+    const { routes, connection, dispose } = await mounted(serverTiming === undefined ? {} : { serverTiming }, apiProxy)
+    try {
+      const result = fakeResponse()
+      await routes[0]!.handler(fakePost({
+        host: '127.0.0.1:3080', cookie: browserCookie(connection, '127.0.0.1:3080'),
+      }, '/api/session.list', {
+        type: 'client-request', rpcId: 'timed-list', method: 'session.list', payload: {},
+      }), result.response)
+      expect(result.state.status).toBe(200)
+      if (serverTiming === true) {
+        expect(result.state.headers?.['server-timing'])
+          .toMatch(/^dsh_rpc;dur=\d+\.\d{2}, dsh_conn;dur=\d+\.\d{2}$/)
+      } else {
+        expect(result.state.headers?.['server-timing']).toBeUndefined()
+      }
+      expect(JSON.parse(String(result.state.body))).toEqual({
+        type: 'server-response', rpcId: 'timed-list', result: { ok: true, value: { items: [] } },
+      })
+    } finally { await dispose() }
   })
 
   it('applies historyPageTargetBytes to physical session.history responses', async () => {

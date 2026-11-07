@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,7 +17,8 @@ import {
   type ExternalTurnOutcome,
 } from '@deepseek-ai/dsh-subagent/external'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import type { SubprocessHandle, SubprocessOutcome } from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessHandle, SubprocessOutcome, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import type { ManagedCodexModel } from '../src/managed-model.ts'
 type JsonObject = Record<string, unknown>
 import * as codex from '../src/index.ts'
 import {
@@ -232,6 +233,148 @@ function writeRollout(home: string, threadId: string, entries: object[]): void {
 }
 
 describe('CodexMemberTransport', () => {
+  it.each(['model', 'process'] as const)('retains a rejected %s preparation without leaking an earlier owner', async (phase) => {
+    const error = new Error(`${phase} preparation failed`)
+    const close = vi.fn(async () => {})
+    const spawn = vi.fn(async () => { throw error })
+    const transport = new CodexMemberTransport(memberConfig(root()), spawn, async () => {
+      if (phase === 'model') throw error
+      return { model: 'm', config: [], env: {}, close }
+    })
+    const session = await transport.open(undefined, signal)
+    onTestFinished(() => session.dispose())
+    await expect(session.turn('task', signal)[Symbol.asyncIterator]().next()).rejects.toBe(error)
+    await expect(session.dispose()).resolves.toBeUndefined()
+    expect(spawn).toHaveBeenCalledTimes(phase === 'model' ? 0 : 1)
+    expect(close).toHaveBeenCalledTimes(phase === 'model' ? 0 : 1)
+  })
+
+  it.each(['model', 'process'] as const)('preserves an isolated %s cleanup failure after joining both owners', async (phase) => {
+    const child = fakeChild()
+    const error = new Error(`${phase} cleanup failed`)
+    if (phase === 'process') vi.spyOn(child.handle, 'waitForExit').mockRejectedValue(error)
+    const close = vi.fn(async () => { if (phase === 'model') throw error })
+    const transport = new CodexMemberTransport(memberConfig(root()), () => child.handle,
+      async () => ({ model: 'm', config: [], env: {}, close }))
+    const session = await transport.open(undefined, signal)
+    onTestFinished(async () => { await session.dispose().catch(() => { /* The asserted cleanup failure is memoized. */ }) })
+    const outcome = expect(session.turn('task', signal)[Symbol.asyncIterator]().next()).rejects.toThrow()
+    await child.peer.nextMethod('initialize')
+    if (phase === 'model') await expect(session.dispose()).rejects.toBe(error)
+    else await expect(session.dispose()).rejects.toHaveProperty('cause', error)
+    await outcome
+    expect(close).toHaveBeenCalledOnce()
+    await expect(child.handle.done).resolves.toEqual({ exitCode: 0, signal: null })
+  })
+
+  it('recovers without opening a model transport or allocating a process', async () => {
+    const spawn = vi.fn(() => fakeChild().handle)
+    const openModel = vi.fn<(_signal: AbortSignal) => Promise<ManagedCodexModel>>()
+    const transport = new CodexMemberTransport(memberConfig(root()), spawn, openModel)
+    const session = await transport.open(undefined, signal)
+    onTestFinished(() => session.dispose())
+    const message = userMessages(['pending'])[0]!
+    await expect(session.recover({ prompt: 'pending', throughMessageId: message.id }, signal)).resolves.toEqual({ kind: 'absent' })
+    expect(spawn).not.toHaveBeenCalled()
+    expect(openModel).not.toHaveBeenCalled()
+  })
+
+  it('joins pending model preparation and prevents process allocation after disposal', async () => {
+    const preparing = Promise.withResolvers<AbortSignal>()
+    const release = Promise.withResolvers<ManagedCodexModel>()
+    const close = vi.fn(async () => {})
+    const spawn = vi.fn(() => fakeChild().handle)
+    const transport = new CodexMemberTransport(memberConfig(root()), spawn, (signal) => {
+      preparing.resolve(signal)
+      return release.promise
+    })
+    const session = await transport.open(undefined, signal)
+    onTestFinished(async () => {
+      release.resolve({ model: 'm', config: [], env: {}, close })
+      await session.dispose()
+    })
+    const turn = session.turn('pending', signal)[Symbol.asyncIterator]().next()
+    const outcome = expect(turn).rejects.toMatchObject({ name: 'AbortError' })
+    const ownedSignal = await preparing.promise
+    const closing = session.dispose()
+    expect(session.dispose()).toBe(closing)
+    expect(ownedSignal.aborted).toBe(true)
+    expect(close).not.toHaveBeenCalled()
+    release.resolve({ model: 'm', config: [], env: {}, close })
+    await Promise.all([outcome, closing])
+    expect(close).toHaveBeenCalledOnce()
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('cancels pending process admission and joins a late process before completing disposal', async () => {
+    const entered = Promise.withResolvers<SubprocessSpawnSpec>()
+    const release = Promise.withResolvers<SubprocessHandle>()
+    const child = fakeChild()
+    const terminate = vi.spyOn(child.handle, 'terminate')
+    const close = vi.fn(async () => {})
+    const transport = new CodexMemberTransport(memberConfig(root()), (spec) => {
+      entered.resolve(spec)
+      return release.promise
+    }, async () => ({ model: 'm', config: [], env: {}, close }))
+    const session = await transport.open(undefined, signal)
+    onTestFinished(async () => { release.resolve(child.handle); await session.dispose() })
+    const turn = session.turn('pending', signal)[Symbol.asyncIterator]().next()
+    const outcome = expect(turn).rejects.toMatchObject({ name: 'AbortError' })
+    const spec = await entered.promise
+    const closing = session.dispose()
+    expect(spec.signal?.aborted).toBe(true)
+    expect(terminate).not.toHaveBeenCalled()
+    release.resolve(child.handle)
+    await Promise.all([closing, outcome])
+    expect(terminate).toHaveBeenCalledOnce()
+    expect(close).toHaveBeenCalledOnce()
+    await expect(child.handle.waitForExit()).resolves.toBe(true)
+  })
+
+  it('does not abort an admitted process before closing its protocol during normal disposal', async () => {
+    const child = fakeChild()
+    let processSignal: AbortSignal | undefined
+    const close = vi.fn(async () => {})
+    const transport = new CodexMemberTransport(memberConfig(root()), (spec) => {
+      processSignal = spec.signal
+      return child.handle
+    }, async () => ({ model: 'm', config: [], env: {}, close }))
+    const session = await transport.open(undefined, signal)
+    onTestFinished(() => session.dispose())
+    const driving = driveTurn(child, { threadId: 'managed-thread', answer: 'answer', resume: false })
+    const pieces: (string | ExternalTurnBound | ExternalTurnOutcome)[] = []
+    for await (const piece of session.turn('task', signal)) pieces.push(piece)
+    await driving
+    expect(pieces.at(-1)).toEqual({ text: 'answer' })
+    const original = child.handle.terminate.bind(child.handle)
+    vi.spyOn(child.handle, 'terminate').mockImplementation(() => {
+      expect(processSignal?.aborted).toBe(false)
+      expect(child.toChild.writableEnded).toBe(true)
+      original()
+    })
+    await session.dispose()
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('joins independent model and process cleanup failures during an active turn', async () => {
+    const child = fakeChild()
+    const processError = new Error('Process cleanup is unconfirmed.')
+    const modelError = new Error('Model transport cleanup failed.')
+    vi.spyOn(child.handle, 'waitForExit').mockRejectedValue(processError)
+    const close = vi.fn(async () => { throw modelError })
+    const transport = new CodexMemberTransport(memberConfig(root()), () => child.handle,
+      async () => ({ model: 'm', config: [], env: {}, close }))
+    const session = await transport.open(undefined, signal)
+    onTestFinished(async () => { await session.dispose().catch(() => {}) })
+    const next = session.turn('task', signal)[Symbol.asyncIterator]().next()
+    const outcome = expect(next).rejects.toThrow()
+    await child.peer.nextMethod('initialize')
+    await expect(session.dispose()).rejects.toMatchObject({ errors: [expect.any(Error), modelError] })
+    await outcome
+    expect(close).toHaveBeenCalledOnce()
+    await expect(child.handle.done).resolves.toEqual({ exitCode: 0, signal: null })
+  })
+
   it('starts a persistent thread on the first turn and resumes it after', async () => {
     const dir = root()
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
@@ -575,7 +718,7 @@ describe('codex member plugin', () => {
     }
     const hostSpawn = remote ? vi.spyOn(ctx.subprocess, 'spawn') : undefined
     const child = fakeChild()
-    const spawn = vi.spyOn(target.subprocess, 'spawn').mockImplementation(() => child.handle)
+    const spawn = vi.spyOn(target.subprocess, 'spawn').mockImplementation(async () => child.handle)
     await ctx.plugin(codex, { stateDir: dir, ...remote ? { model: 'chosen-codex' } : {}, memberCwd: dir })
 
     const provider = ctx.subagents.getProvider('codex')!
@@ -603,7 +746,7 @@ describe('codex member plugin', () => {
     if (remote) {
       expect(spawn.mock.calls[0]![0].argv).toEqual(['/target/bin/codex', 'app-server', '--stdio'])
       const once = fakeChild()
-      spawn.mockImplementationOnce(() => once.handle)
+      spawn.mockImplementationOnce(async () => once.handle)
       const drivingOnce = driveTurn(once, { threadId: 'one-shot', answer: 'one-shot answer', resume: false, ephemeral: true })
       const run = await ctx.subagents.start('codex', { parent: { id: memberSession.id, session: memberSession, ctx } as Agent,
         prompt: [{ type: 'text', text: 'one shot' }], signal })

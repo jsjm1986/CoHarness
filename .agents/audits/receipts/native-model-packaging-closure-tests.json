@@ -1,0 +1,14 @@
+{
+  "name": "native-model-packaging-closure-tests",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run scripts/build-exe-for-python-sdk-staging.spec.ts scripts/build-exe-for-python-sdk-assets.spec.ts scripts/check-workspace-constraints.spec.ts --retry=0",
+  "startedAt": "2026-10-24T07:41:34.555884+00:00",
+  "seconds": 5.859,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "inputsAfter": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "postgresToolDirectory": null,
+  "outputSha256": "dd3178a34409ba785467acb2fc2a6c2905ab88615f7916916a77c9e82d5a313e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  3 passed (3)\n      Tests  115 passed (115)\n   Start at  15:41:39\n   Duration  1.04s (transform 604ms, setup 136ms, import 865ms, tests 347ms, environment 0ms)\n\n"
+}

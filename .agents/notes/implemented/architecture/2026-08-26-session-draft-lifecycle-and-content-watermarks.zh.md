@@ -12,11 +12,13 @@ Status: implemented
 
 `SessionHeader.draft` 标记浏览器创建且延迟物理持久化的根会话。`PersistenceCoordinator` 将非实体化事件保留在内存中，并在首个非空 surface 消息到达时以原子方式写入缓冲前缀。命令、goal 和 plan 状态事件会实体化为隐藏的 command-only 记录；未实体化草稿在 dispose 时丢弃缓冲。可见消息会把已存储 header 提升为正式会话。附加摘要、projection 和持久化元数据都只使用共享的 `hasConversationContent` 判定空白。
 
-Gateway runtime 在创建 Agent 前预留按 scope 限定的 `(draftId, sessionId)`。PostgreSQL 为重试返回 canonical Session id，续期一小时 lease，并在实体化或草稿成功 dispose 后释放。reservation 不包含 prompt 文本、附件字节或凭据。本地 JSONL 与 SQLite 使用同一套延迟 coordinator，并持久化已提升的草稿标记；SQLite 在预发布无迁移策略下拒绝旧 schema。
+Gateway runtime 在创建 Agent 前预留按 scope 限定的 `(draftId, sessionId)`。PostgreSQL 为重试返回 canonical Session id，续期一小时 lease，并在实体化或草稿成功 dispose 后释放。reservation 不包含 prompt 文本、附件字节或凭据。本地 JSONL 与 SQLite 使用同一套延迟 coordinator，并持久化已提升的草稿标记；SQLite 在预发布无迁移策略下拒绝旧 schema。 首次预留尝试在读取租约行前，获取按组织、Runtime、scope 和草稿 id 区分的事务级锁。即使候选 Session id 不同且尚未物化任何 Session，重叠调用仍复用先提交的 Session id。
 
 Gateway 会话行在同一 append 事务中维护 `has_visible_content`、`visible_content_seq` 和 `last_prompt_at`。`listSnapshots()` 将这些事实提供给冷消费者；有 Gateway 索引时，冷列表不再为了判定空白而解析大日志。迁移回填会对含转义 NUL 的历史事件 JSON 采用保守归类，不对该值使用 PostgreSQL JSON 运算符。已有空根会话可以进入仅管理员可见的 dry-run，并通过现有保留窗口进入可恢复的 empty-draft 回收站。
 
 JSONL 在物理 header 读取器和格式 catalog 元数据适配器中都保留可选布尔字段 `draft`。冷读取收到与写入端接纳时相同的生命周期标记；丢弃该标记不能替代可见内容判断。[V5 后继](../bug-fix/2026-09-22-v5-draft-header-successor.zh.md)确认物理 header 修正，不改变已提交 generation 的字节。未知 header 键和非布尔 draft 值仍然无效。
+
+Runtime 归属和维护选择遵循[会话身份决策](2026-10-30-postgres-session-runtime-namespace.zh.md)。
 
 ## Alternatives considered
 

@@ -9,7 +9,7 @@ import { WorkspaceFileTab } from '../src/client/components/WorkspaceFileTab.tsx'
 import { previewRequest } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/pdf/pdf.tsx', () => ({ PdfBody: ({ data }: { data: Uint8Array }) => <pre data-testid="pdf">{new TextDecoder().decode(data)}</pre> }))
-vi.mock('../src/client/excel/LazyExcelBody.tsx', () => ({ LazyExcelBody: ({ path }: { path: string }) => <pre data-testid="excel">{path}</pre> }))
+vi.mock('../src/client/excel/excel.tsx', () => ({ ExcelBody: ({ path }: { path: string }) => <pre data-testid="excel">{path}</pre> }))
 
 afterEach(cleanup)
 const sessionId = 'files-owner' as SessionId
@@ -53,7 +53,11 @@ function harness(path = 'a.txt') {
   const readDocument = vi.fn(async () => ({ bytes: btoa('PDF v1'), version: 'v1', missingFonts: [] as string[] }))
   const props = (visible: boolean, line?: number, revision = 0): Parameters<typeof WorkspaceFileTab>[0] => ({
     sessionId, runtimeTarget, useWorkspaceResource, readPreview, readBytesPreview, readFileBytes, readDocument,
-    reloadResource: (request: WorkspaceResourceOpenRequest) => resources.source(request).reload(),
+    reloadResource: async (request: WorkspaceResourceOpenRequest) => {
+      const source = resources.source(request)
+      await source.reload()
+      return source.getSnapshot().status === 'live'
+    },
     revokeResource: (request: WorkspaceResourceOpenRequest, message: string) => {
       resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
     },

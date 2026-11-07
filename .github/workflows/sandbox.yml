@@ -144,7 +144,14 @@ jobs:
       # take their darwin branch only on this runner.
       - name: Unit tests (darwin parity)
         if: matrix.runner == 'seatbelt'
-        run: pnpm run test
+        # The same key and value the coverage and serial lanes grant: on the
+        # shared 3-vCPU runner, cases that inherit Vitest's 5000 ms default timed
+        # out in spawn.spec.ts and changes.spec.ts while passing in under a
+        # second on a quiet host. The ci-unit aggregate is `pnpm run test`
+        # through the path that consumes the variable.
+        env:
+          DSH_COVERAGE_TEST_TIMEOUT_MS: '90000'
+        run: pnpm run check:ci:unit
 
       # Publish-path rehearsal, Landlock legs only. Build the launcher on its
       # native architecture, then install the local native and harness tarballs

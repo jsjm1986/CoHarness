@@ -187,21 +187,6 @@ it('assembles the shipped Web transport, catalog, guidance, and defaults', async
   expect(scaffold.ctx.approval.config.policy).toBe('ask')
   expect(scaffold.ctx.permissionPresets.defaultPreset).toBe('workspace-write')
 
-  const commandHandle = await scaffold.ctx.agents.create({
-    sessionId: SessionId('shipped-command-catalog'),
-    meta: { cwd: scaffold.workspaceCwd },
-    agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
-  })
-  try {
-    expect(scaffold.ctx.commands.list(commandHandle.agent)).toContainEqual({
-      name: 'feedback',
-      definitionId: '@deepseek-ai/dsh-command-feedback',
-      description: 'record feedback about this session',
-      input: { hint: '<text>' },
-    })
-  } finally {
-    await commandHandle.dispose()
-  }
 }, 120_000)
 
 it('ships PTC with run_code but without the general workflow SDK binding', async () => {

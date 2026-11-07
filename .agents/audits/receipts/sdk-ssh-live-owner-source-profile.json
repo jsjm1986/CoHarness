@@ -1,0 +1,14 @@
+{
+  "name": "sdk-ssh-live-owner-source-profile",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=src DSH_SNAPSHOT_MAX_CONCURRENCY=1 node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/sdk-remote-target.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T17:40:25.806789+00:00",
+  "seconds": 4.123,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fea4213663bd355ed4b2b4befd6428d626e87c9fefe1c448d1b16f554fd9aad6",
+  "inputsAfter": "fea4213663bd355ed4b2b4befd6428d626e87c9fefe1c448d1b16f554fd9aad6",
+  "postgresToolDirectory": null,
+  "outputSha256": "254e6362ff0e1dff3f8de4d26440302bc01439193d494768dc8bf2b17065ef2f",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ examples/headless-agent/tests/sdk-remote-target.snapshot.ts (1 test | 1 failed) 872ms\n   × refuses local SDK execution for a live SSH-bound Agent 871ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  examples/headless-agent/tests/sdk-remote-target.snapshot.ts > refuses local SDK execution for a live SSH-bound Agent\nAssertionError: expected '' to be 'SDK_REMOTE_TARGET_REFUSED' // Object.is equality\n\n- Expected\n+ Received\n\n- SDK_REMOTE_TARGET_REFUSED\n\n ❯ examples/headless-agent/tests/sdk-remote-target.snapshot.ts:13:34\n     11|   withAuxiliaryModelHarness(fixture, { provider: 'sdk-remote-guard', m…\n     12|     const result = await harness.run('Check delegation to the selected…\n     13|     expect(result.finalResponse).toBe('SDK_REMOTE_TARGET_REFUSED')\n       |                                  ^\n     14|     const completion = result.events.map(event => pluginRecordOf(valid…\n     15|       .find(record => record?.type === 'plugin:sdk-remote-target/compl…\n ❯ withAuxiliaryModelHarness examples/headless-agent/tests/auxiliary-model-fixture.ts:44:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  01:40:28\n   Duration  1.81s (transform 620ms, setup 23ms, import 834ms, tests 872ms, environment 0ms)\n\n"
+}

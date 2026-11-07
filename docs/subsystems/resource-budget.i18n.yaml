@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for resource-budget.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/resource-budget.md
+document:
+  en: a07fb5ede9f71873ab0fd1988d114f7aad505db3
+  zh: 22a6263a475c7ca326c82e252068f5cef493ca9b
+/resource-admission:
+  en: 2955dd3350363920
+  zh: 0546df41ca73a19c
+/resource-admission/permit-records:
+  en: 7ae06f587c564380
+  zh: 7c3df04f70f0123a

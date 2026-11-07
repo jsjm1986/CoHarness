@@ -1,0 +1,14 @@
+{
+  "name": "jobs-disposal-admission-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/jobs/jobs-local/src/index.ts packages/jobs/jobs-local/tests/jobs.spec.ts packages/jobs/jobs-local/tests/loader-composition.spec.ts",
+  "startedAt": "2026-10-26T02:55:38.681942+00:00",
+  "seconds": 6.142,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e8cf7ee9e85ae18f72f844697e6acbabba767f9e2bc84d1d40729039f4031666",
+  "inputsAfter": "e8cf7ee9e85ae18f72f844697e6acbabba767f9e2bc84d1d40729039f4031666",
+  "postgresToolDirectory": null,
+  "outputSha256": "5ccd36034063fe01d8ebe8a3dce69aa6d3c9b04180a4f0efe1b501b21733e3ba",
+  "outputTail": "packages/jobs/jobs-local/tests/jobs.spec.ts:1108:46: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\n"
+}

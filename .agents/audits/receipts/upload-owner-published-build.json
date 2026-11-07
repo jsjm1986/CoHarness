@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-published-build",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/build.ts",
+  "startedAt": "2026-10-25T09:52:17.788168+00:00",
+  "seconds": 93.338,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f5b3b1da0cc373ce78776050bf26b466ae5ffc0e4b8f7ec46867718b1ad50f1f",
+  "inputsAfter": "f5b3b1da0cc373ce78776050bf26b466ae5ffc0e4b8f7ec46867718b1ad50f1f",
+  "postgresToolDirectory": null,
+  "outputSha256": "2155fa0b29edc9a5166c8d332d02befa0cc40a92986b4f1c0a8d2c03ee766866",
+  "outputTail": "run-gates: build running 8 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s).\nrun-gates: start native addon\nrun-gates: PASS native addon (2.28s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (2.69s)\nrun-gates: start Host bundle\nrun-gates: start host aggregate check\nrun-gates: PASS Host bundle (13.08s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (6.78s)\nrun-gates: start Client bundle\nrun-gates: start client aggregate check\nrun-gates: PASS Client bundle (12.42s)\nrun-gates: start Web build\nrun-gates: PASS Web build (5.85s)\nrun-gates: PASS client aggregate check (50.24s)\nrun-gates: PASS host aggregate check (83.25s)\n\nrun-gates: 8 passed, 0 failed, 0 skipped in 88.22s.\nbuild: recorded 266 client artifact(s) with 3 public value(s)\n"
+}

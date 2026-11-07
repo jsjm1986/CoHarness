@@ -84,7 +84,7 @@
       "sovereignty": "tracked"
     },
     "bundle/web-app": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "client/connection": {
       "sovereignty": "adapted",
@@ -213,13 +213,6 @@
     },
     "client/ui-memory": {
       "sovereignty": "owned"
-    },
-    "client/ui-message-feedback": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
-      "removedUpstreamPaths": [
-        "packages/client/ui-message-feedback/src/client/surface.ts"
-      ]
     },
     "client/ui-model-selection": {
       "sovereignty": "adapted",
@@ -394,7 +387,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "compaction/command-compact": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "compaction/compaction": {
       "sovereignty": "adapted"
@@ -403,7 +396,7 @@
       "sovereignty": "tracked"
     },
     "compaction/compaction-image-offload": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "compaction/compaction-tool-result-pruner": {
       "sovereignty": "tracked"
@@ -412,7 +405,7 @@
       "sovereignty": "adapted"
     },
     "context/agent-instructions": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/bug-fix/2026-10-12-session-reliability-fixes.md"
     },
     "context/archive-gateway": {
@@ -447,6 +440,10 @@
     "context/harness-dev-context": {
       "note": ".agents/notes/implemented/bug-fix/2026-07-28-web-agent-runtime-context.md",
       "sovereignty": "adapted"
+    },
+    "context/resource-budget": {
+      "sovereignty": "owned",
+      "note": "packages/context/resource-budget/README.md"
     },
     "context/session-reference": {
       "sovereignty": "adapted"
@@ -532,24 +529,25 @@
       "sovereignty": "adapted"
     },
     "experimental/badge-skill-bundle": {
-      "sovereignty": "tracked",
+      "sovereignty": "adapted",
       "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
     },
     "experimental/browser-use-chrome-devtools-mcp": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/browser-use-playwright-mcp": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/browser-use-runtime": {
-      "sovereignty": "tracked",
+      "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-10-15-session-working-directory.md"
     },
     "experimental/browser-use-stagehand-native": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "experimental/claude-code-mods": {
-      "sovereignty": "tracked",
+      "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-10-17-experimental-claude-code-mods-extraction.md"
     },
     "experimental/client-ui-agent-team": {
@@ -639,7 +637,8 @@
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "experimental/worktree": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "extensions/cordis-client-runner": {
       "sovereignty": "adapted"
@@ -651,12 +650,6 @@
       "sovereignty": "adapted"
     },
     "extensions/ui-cordis": {
-      "sovereignty": "adapted"
-    },
-    "feedback/command-feedback": {
-      "sovereignty": "adapted"
-    },
-    "feedback/message-feedback": {
       "sovereignty": "adapted"
     },
     "fs/fs": {
@@ -745,7 +738,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "interaction/commands": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "interaction/permission-presets": {
       "sovereignty": "adapted"
@@ -754,7 +747,7 @@
       "sovereignty": "adapted"
     },
     "interaction/user-approval": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "interaction/user-questions": {
       "sovereignty": "adapted",
@@ -833,7 +826,7 @@
       "note": ".agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md"
     },
     "preset/agent-preset": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "packages/preset/agent-preset/skills/cordis-composition-reference/references/packages.md"
     },
     "preset/agent-preset-registry": {
@@ -844,10 +837,11 @@
       "sovereignty": "tracked"
     },
     "ptc-runtime/ptc-runtime": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "ptc-runtime/ptc-runtime-node": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "remote-desktop/remote-desktop": {
       "sovereignty": "owned"
@@ -862,7 +856,7 @@
       "sovereignty": "tracked"
     },
     "sandbox/sandbox-local": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "sandbox/sandbox-policy": {
       "sovereignty": "tracked"
@@ -901,7 +895,7 @@
       "sovereignty": "owned"
     },
     "session/session-checkpoint-policy": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "session/session-format": {
       "sovereignty": "adapted"
@@ -1065,7 +1059,8 @@
       "sovereignty": "tracked"
     },
     "ssh/subprocess-ssh": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "storage/storage": {
       "sovereignty": "tracked"
@@ -1138,7 +1133,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "test-support/llm-mock-server": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "test-support/llm-replay": {
       "sovereignty": "adapted"
@@ -1159,13 +1154,13 @@
       "sovereignty": "adapted"
     },
     "typert/loader": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "typert/protocol": {
       "sovereignty": "adapted"
     },
     "typert/registry": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/atomic-write": {
       "sovereignty": "adapted"
@@ -1192,7 +1187,7 @@
       "sovereignty": "tracked"
     },
     "util/launch-environment": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/lazy-require": {
       "sovereignty": "tracked"
@@ -1262,13 +1257,16 @@
       "sovereignty": "adapted"
     },
     "workflow/workflow": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "workflow/workflow-ptc": {
       "sovereignty": "adapted"
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
+    },
+    "attachment/userdoc-gateway": {
+      "sovereignty": "owned"
     }
   },
   "upstreamOnly": [
@@ -1470,6 +1468,18 @@
       "package": "experimental/webhook-github",
       "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its webhook/ layout",
       "replacedBy": "webhook/webhook-github"
+    },
+    {
+      "package": "client/ui-message-feedback",
+      "reason": "feedback UI removed at user request; no consumer for recorded feedback"
+    },
+    {
+      "package": "feedback/command-feedback",
+      "reason": "session /feedback command and sessionFeedback remote removed; no consumer"
+    },
+    {
+      "package": "feedback/message-feedback",
+      "reason": "per-message feedback sidecar and remote removed; no consumer"
     }
   ],
   "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json"

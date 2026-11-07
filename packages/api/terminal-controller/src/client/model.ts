@@ -77,6 +77,7 @@ export class TerminalView {
   private closing: Promise<void> | undefined
   private writes: Promise<void> = Promise.resolve()
   private queuedInput = 0
+  private pendingInput: { attachmentId: TerminalAttachmentId; data: string; bytes: number } | undefined
   private readonly detaching = new Set<Promise<void>>()
 
   /**
@@ -206,7 +207,8 @@ export class TerminalView {
   }
 
   /**
-   * Serialize raw input so concurrent RPC requests cannot reorder keystrokes.
+   * Serialize raw input and coalesce adjacent queued keystrokes for one attachment.
+   * A resize or attachment change ends the batch; UTF-8 limits include in-flight input.
    * @param data - input from the terminal emulator.
    */
   write(data: string): void {
@@ -216,11 +218,20 @@ export class TerminalView {
     const bytes = new TextEncoder().encode(data).byteLength
     if (this.queuedInput + bytes > (state.environment?.maxInputBytes ?? 0)) { this.fail(new TerminalViewError('inputFull')); return }
     this.queuedInput += bytes
+    if (this.pendingInput?.attachmentId === attachmentId) {
+      this.pendingInput.data += data
+      this.pendingInput.bytes += bytes
+      return
+    }
+    const input = { attachmentId, data, bytes }
+    this.pendingInput = input
     const id = state.info.id
     this.writes = this.writes.then(async () => {
+      if (this.pendingInput === input) this.pendingInput = undefined
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable) return
-      valueOf(await this.remote.write(this.sessionId, id, attachmentId, data))
-    }).catch((error: unknown) => { if (this.attachmentId === attachmentId) this.fail(error) }).finally(() => { this.queuedInput -= bytes })
+      valueOf(await this.remote.write(this.sessionId, id, attachmentId, input.data))
+    }).catch((error: unknown) => { if (this.attachmentId === attachmentId) this.fail(error) })
+      .finally(() => { this.queuedInput -= input.bytes })
   }
 
   /**
@@ -236,6 +247,7 @@ export class TerminalView {
     const id = state.info.id
     cols = Math.min(cols, state.environment?.maxCols ?? cols)
     rows = Math.min(rows, state.environment?.maxRows ?? rows)
+    this.pendingInput = undefined
     this.writes = this.writes.then(async () => {
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable) return
       valueOf(await this.remote.resize(this.sessionId, id, attachmentId, cols, rows))
@@ -290,6 +302,7 @@ export class TerminalView {
     const previous = this.stream
     this.stream = undefined
     this.attachmentId = undefined
+    this.pendingInput = undefined
     this.pendingRender?.resolve()
     this.pendingRender = undefined
     if (previous !== undefined) {

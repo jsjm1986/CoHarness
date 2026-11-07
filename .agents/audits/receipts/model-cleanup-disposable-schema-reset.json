@@ -1,0 +1,14 @@
+{
+  "name": "model-cleanup-disposable-schema-reset",
+  "cwd": "gateway",
+  "command": "node --input-type=module -e 'import pg from \"pg\"; const pool = new pg.Pool({connectionString: process.env.HGW_TEST_DATABASE_URL}); try { await pool.query(\"DROP SCHEMA harness CASCADE\"); } finally { await pool.end(); }'",
+  "startedAt": "2026-10-24T00:22:37.464428+00:00",
+  "seconds": 0.71,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7734939bf433e6915a0a94eb636a2ca6107db94892c0341fe810a1913614e4c1",
+  "inputsAfter": "7734939bf433e6915a0a94eb636a2ca6107db94892c0341fe810a1913614e4c1",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

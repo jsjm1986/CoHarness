@@ -1,0 +1,14 @@
+{
+  "name": "gateway-runtime-environment-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/local-runtime-launcher.spec.ts -t 'Gateway database and credential variables' --retry=0",
+  "startedAt": "2026-10-24T20:30:03.043091+00:00",
+  "seconds": 4.214,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f19f26215e7dd5b6d7de314e8189ae4c45c88da3ce00840afd4c2fa2c1e6ee08",
+  "inputsAfter": "f19f26215e7dd5b6d7de314e8189ae4c45c88da3ce00840afd4c2fa2c1e6ee08",
+  "postgresToolDirectory": null,
+  "outputSha256": "15fd2bb9c5a68094f7714f16bde2a78148d219bbb0d0156494b671bd70ee5aa6",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/local-runtime-launcher.spec.ts (15 tests | 1 failed | 14 skipped) 467ms\n     × keeps Gateway database and credential variables out of the actual Runtime environment 466ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/local-runtime-launcher.spec.ts > recoverable LocalLauncher > keeps Gateway database and credential variables out of the actual Runtime environment\nAssertionError: expected { HGW_DATABASE_URL: 'present', …(5) } to deeply equal { HGW_DATABASE_URL: 'absent', …(5) }\n\n- Expected\n+ Received\n\n  {\n-   \"CLOUD_CREDENTIALS\": \"absent\",\n-   \"DATABASE_URL\": \"absent\",\n-   \"HGW_DATABASE_URL\": \"absent\",\n-   \"HGW_TEST_DATABASE_URL\": \"absent\",\n-   \"HGW_USERS_ROOT\": \"absent\",\n+   \"CLOUD_CREDENTIALS\": \"present\",\n+   \"DATABASE_URL\": \"present\",\n+   \"HGW_DATABASE_URL\": \"present\",\n+   \"HGW_TEST_DATABASE_URL\": \"present\",\n+   \"HGW_USERS_ROOT\": \"present\",\n    \"PATH\": \"operating-system\",\n  }\n\n ❯ tests/local-runtime-launcher.spec.ts:67:21\n     65|       let value: unknown\n     66|       await vi.waitFor(async () => { value = JSON.parse(await readFile…\n     67|       expect(value).toEqual({ HGW_DATABASE_URL: 'absent', HGW_TEST_DAT…\n       |                     ^\n     68|         DATABASE_URL: 'absent', CLOUD_CREDENTIALS: 'absent', PATH: 'op…\n     69|     } finally { vi.unstubAllEnvs() }\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 14 skipped (15)\n   Start at  04:30:05\n   Duration  1.26s (transform 560ms, setup 0ms, import 681ms, tests 467ms, environment 0ms)\n\n"
+}

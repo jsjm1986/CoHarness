@@ -1,0 +1,14 @@
+{
+  "name": "jobs-starting-slot-and-timer-lint-repaired",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/jobs/jobs-local/src/index.ts packages/jobs/jobs-local/src/pump.ts packages/jobs/jobs-local/tests/jobs.spec.ts packages/jobs/jobs-local/tests/pump.spec.ts packages/jobs/jobs-local/tests/loader-composition.spec.ts",
+  "startedAt": "2026-10-26T02:47:38.068571+00:00",
+  "seconds": 5.69,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2b2b4267ff3f0a3754d516d02a1a95737d5275a4f7eac42959b9ee82e9eb280a",
+  "inputsAfter": "2b2b4267ff3f0a3754d516d02a1a95737d5275a4f7eac42959b9ee82e9eb280a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

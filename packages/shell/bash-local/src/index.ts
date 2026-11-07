@@ -325,7 +325,7 @@ export class LocalBashExecutor extends ShellExecutor {
     let syncSpawnError: { error: unknown } | undefined
     try {
       if (!preparationTimedOut) {
-        running = this.ctx.subprocess.spawn(this.spawnSpec(spec, argv, spec.stdoutMaxBytes, spawnSignal))
+        running = await this.ctx.subprocess.spawn(this.spawnSpec(spec, argv, spec.stdoutMaxBytes, spawnSignal))
       }
     } catch (error) {
       syncSpawnError = { error }
@@ -386,11 +386,10 @@ export class LocalBashExecutor extends ShellExecutor {
         // A live handle whose rejection follows this execution's own
         // termination — kill() or the spawn signal's abort — reports its
         // terminal outcome: a provider that terminated the range before the
-        // target started has no exit to report and rejects with the
-        // cancellation reason instead. The result projection classifies it
-        // from the deadline wiring; nothing is a provider failure. A
-        // synchronous spawn throw never produced a handle and stays a failure.
-        if (running !== undefined && (proc.status === 'killed' || spawnSignal?.aborted === true)) {
+        // target started has no exit to report and rejects with cancellation.
+        // Queue cancellation also has no process outcome; deadline wiring
+        // retains its original timeout or caller-abort classification.
+        if (proc.status === 'killed' || spawnSignal?.aborted === true) {
           proc.status = 'killed'
           this.onProcessDone(proc, collected.stderr.readFrom(0).text, false)
           disarm()

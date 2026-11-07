@@ -1,0 +1,14 @@
+{
+  "name": "sonar-cordis-config",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-cordis-config.ts",
+  "startedAt": "2026-10-24T09:36:48.944938+00:00",
+  "seconds": 2.965,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "2455dd32b9751385d868d4fe6ae28f4c3a047414db65546eeb51c7c6d0bacd18",
+  "outputTail": "verify-cordis-config: 403 config files passed.\n"
+}

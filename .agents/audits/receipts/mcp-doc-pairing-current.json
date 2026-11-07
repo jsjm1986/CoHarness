@@ -1,0 +1,13 @@
+{
+  "name": "mcp-doc-pairing-current",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/mcp/mcp-client/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T17:04:48.548466+00:00",
+  "seconds": 3.617,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0008efa54d18a6fd55948f676e9154857c0285fe690f369f5a4f06ee299fefa3",
+  "inputsAfter": "242b98400e9d9fb9dcf1cffe6d5decc42009d9a10195d63558fed5871da6a821",
+  "outputSha256": "ed8d5ce010c263d1390c1657f9e994a6e97b51a564c9c33a1aeed766232e7145",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/mcp/mcp-client/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded packages/mcp/mcp-client/README.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

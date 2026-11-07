@@ -59,6 +59,8 @@ The canonical success is `{ kind: 'foreground', cwd, ...ShellRunResult }` for a 
 
 When `run_in_background` is true, this plugin preflights `ctx.jobs.start()` before spawning, registers the calling agent as owner, and adapts the returned `ShellProcess` handle into generic cancel/done/incremental-output hooks. The job runtime owns ids, cross-session isolation, completion notices, waiting, and disposal cleanup; this plugin only maps bash exit/sandbox facts into job output and outcome detail. `enableRunInBackground: false` removes the parameter and rejects a forced background call at execution time.
 
+The producer also supplies the exact and root tool-call ids to the job registry for its owned lifecycle records.
+
 <a id="ui-presentation"></a>
 ## UI presentation
 

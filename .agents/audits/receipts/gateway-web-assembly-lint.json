@@ -1,0 +1,14 @@
+{
+  "name": "gateway-web-assembly-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/launcher.ts gateway/tests/local-runtime-launcher.spec.ts gateway/tests/local-runtime-web-assembly.spec.ts gateway/tests/run-local-web-assembly.mjs gateway/tests/fixtures/local-runtime-web-gateway.mjs gateway/tests/fixtures/local-runtime-server.mjs gateway/tests/run-built-local-supervision.mjs",
+  "startedAt": "2026-10-24T21:08:32.809276+00:00",
+  "seconds": 2.095,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bfe710089207c973107dc6242e5846d6b0b190a4f3e70e4183922c5b4f97eedb",
+  "inputsAfter": "bfe710089207c973107dc6242e5846d6b0b190a4f3e70e4183922c5b4f97eedb",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

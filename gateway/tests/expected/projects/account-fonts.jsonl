@@ -1,0 +1,9 @@
+{"scenario":"personal-import","values":{"fontSize":18,"codeFontSize":15,"terminalFontSize":16,"textFontFamily":"Noto Sans","codeFontFamily":"Fira Code","terminalFontFamily":"JetBrains Mono","preference":"dark"},"retainedLegacy":true}
+{"scenario":"account-field","field":"fontSize","value":20,"secondComputer":true,"otherAccountIsolated":true,"accountRoute":true}
+{"scenario":"account-field","field":"codeFontSize","value":14,"secondComputer":true,"otherAccountIsolated":true,"accountRoute":true}
+{"scenario":"account-field","field":"terminalFontSize","value":17,"secondComputer":true,"otherAccountIsolated":true,"accountRoute":true}
+{"scenario":"account-field","field":"textFontFamily","value":"Account Text","secondComputer":true,"otherAccountIsolated":true,"accountRoute":true}
+{"scenario":"account-field","field":"codeFontFamily","value":"Account Code","secondComputer":true,"otherAccountIsolated":true,"accountRoute":true}
+{"scenario":"account-field","field":"terminalFontFamily","value":"Account Terminal","secondComputer":true,"otherAccountIsolated":true,"accountRoute":true}
+{"scenario":"reset-retained","fontSize":14,"revision":8,"accountRoute":true}
+{"scenario":"revoked-account","denied":true,"otherAccountFontSize":14}

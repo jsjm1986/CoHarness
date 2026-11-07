@@ -55,10 +55,20 @@ export interface PluginManagementAuthorization {
   /** Modules a managed profile cannot disable or replace through a bundle. */
   readonly protectedModules: ReadonlySet<string>
   /** Recheck the current caller before profile reads or writes.
-   * @param capability - 'read' permits any runtime principal; 'manage' enforces the deployment's policy.
+   * @param capability - the deployment's policy gates both 'read' and 'manage'; an unqualified account sees nothing.
    * @returns After the deployment permits the operation; rejects without permission.
    */
   authorize(capability?: PluginManagementCapability): Promise<void>
+  /**
+   * Gate one installable spec by its form before pnpm runs. Present only in
+   * deployments that restrict install sources; absent means any spec form is
+   * acceptable. The parsed spec, not the raw string, reaches the policy so a
+   * URL spelled several ways cannot slip past a host rule.
+   * @param spec - the parsed install spec.
+   * @returns After the deployment permits the source; rejects with
+   * 'plugin-management/install-source' otherwise.
+   */
+  authorizeInstall?(spec: ParsedInstallSpec): Promise<void>
   /**
    * Read the profile's saved desired state. Present only in deployments with
    * a durable state store; standalone profiles manage files directly.
@@ -78,6 +88,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** Profile management requires current deployment authorization. */
     'plugin-management/forbidden': Record<string, never>
+    /** The deployment's install-source policy refused the spec's form or host. */
+    'plugin-management/install-source': Record<string, never>
   }
 }
 
@@ -95,7 +107,7 @@ export interface IncompatiblePlugin {
 
 /** Localizable management failure and optional external diagnostic. */
 export interface ManagementError {
-  code: ReadOnlyReason | 'unknown-plugin' | 'invalid-spec' | 'already-installed' | 'ambiguous-install' | 'not-bundle' | 'not-removable' | 'stop-profile' | 'bundle-in-use' | 'stale-approval' | 'incompatible-version' | 'operation-error'
+  code: ReadOnlyReason | 'unknown-plugin' | 'invalid-spec' | 'invalid-config' | 'already-installed' | 'ambiguous-install' | 'not-bundle' | 'not-removable' | 'stop-profile' | 'bundle-in-use' | 'stale-approval' | 'incompatible-version' | 'install-source' | 'operation-error'
   diagnostic?: string
   /** Present with `incompatible-version`: the packages the running DSH version rejects. */
   incompatible?: IncompatiblePlugin[]
@@ -197,6 +209,17 @@ export interface PackageResult {
   incompatible?: IncompatiblePlugin[]
 }
 
+/** JSON value crossing the Remote boundary for plugin entry configuration. */
+export type PluginConfigValue = null | boolean | number | string | PluginConfigValue[] | { [key: string]: PluginConfigValue }
+
+/** One entry's config plus its schemastery `toJSON` serialization, when declared. */
+export interface PluginConfigDescription {
+  /** The composition entry's config; `null` when no row declares one. */
+  config: PluginConfigValue | null
+  /** Schemastery-serialized `Config` schema for form rendering; absent without a schema. */
+  schema?: PluginConfigValue
+}
+
 /** Persisted change and independently observed application outcome. */
 export interface ChangeResult {
   changed: boolean
@@ -205,7 +228,7 @@ export interface ChangeResult {
   /** Present with `restart-required`: why the change takes effect only at the next start. */
   restartReason?: RestartReason
   /** Last attempted step; successful installation can proceed to enablement. */
-  stage: 'install' | 'enable' | 'remove'
+  stage: 'install' | 'enable' | 'remove' | 'configure'
   target: string
   enabled?: boolean
   error?: ManagementError
@@ -350,6 +373,16 @@ export type PluginInstallFrame =
 export interface PluginManagementAccess {
   /** Whether the caller may change the profile's plugins and bundles. */
   manage: boolean
+}
+
+/** One live authorized management read; absence of a profile returns empty lists and no mutation grant. */
+export interface PluginManagementCatalog extends PluginManagementAccess {
+  /** Whether this Host currently has persistent profile management. */
+  managementAvailable: boolean
+  /** The same bundle records exposed by the existing list operation. */
+  bundles: BundleInfo[]
+  /** Current plugin entries and control availability; display metadata is absent when `includeEntryMetadata` is false. */
+  plugins: PluginInfo[]
 }
 
 /** What changed in the profile, for consumers that show it. */

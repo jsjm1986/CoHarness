@@ -31,6 +31,7 @@ import type {
   SessionHandleReadResult,
 } from '@deepseek-ai/dsh-session-persistence'
 import type { SessionWriteLease } from './lease.ts'
+import { JsonlRetentionBudget, type JsonlRetentionLimits } from './retention.ts'
 
 /** Maximum intentional wait before a routed live session batch starts writing. */
 export const LIVE_WRITE_BATCH_MAX_DELAY_MS = 200
@@ -86,8 +87,12 @@ export class JsonlSessionHandle implements SessionHandle {
   private chain: Promise<unknown> = Promise.resolve()
   private closing: Promise<void> | undefined
   private observedLength = 0
-  /** Routed live events awaiting their batching deadline (persistence-owned copies). */
+  /** Borrowed immutable live events awaiting their batching deadline. */
   private buffered: SessionEvent[] = []
+  private readonly reservations = new Map<SessionEvent, () => void>()
+  private admissionFailure: Error | undefined
+  /** Final drain has quiesced; lease release must not admit another live event. */
+  private liveAdmissionClosed = false
   private batchTimer: ReturnType<typeof setTimeout> | undefined
   /** Set when a drain failed; the automatic timer stays quiet until the next drain. */
   private drainPaused = false
@@ -101,6 +106,7 @@ export class JsonlSessionHandle implements SessionHandle {
     private readonly state: StorageHandleState,
     /** The cross-process write lock; a create handle acquires it lazily at first materialization. */
     private lease?: SessionWriteLease,
+    private readonly retention = new JsonlRetentionBudget(),
   ) {}
 
   /** Exact fork-inherited prefix length stored with this session's log. */
@@ -186,38 +192,46 @@ export class JsonlSessionHandle implements SessionHandle {
    */
   async append(events: readonly SessionEvent[], options?: SessionHandleAppendOptions): Promise<void> {
     this.assertOpen('append')
+    if (this.admissionFailure !== undefined) throw this.admissionFailure
     // Validate and deep-snapshot the batch HERE, before queueing behind the
     // chain, so the checked value is exactly the value persisted.
     const batch = materializeAppendBatch(events)
-    return this.run('append', async () => {
-      options?.signal?.throwIfAborted()
-      await this.persistContiguous(batch)
-    })
+    const releases: Array<() => void> = []
+    try {
+      for (const event of batch) releases.push(this.retention.reserve(event))
+      await this.run('append', async () => {
+        options?.signal?.throwIfAborted()
+        await this.persistContiguous(batch)
+      })
+    } finally {
+      for (const release of releases) release()
+    }
   }
 
   /**
    * Durability barrier; materializes the artifact when nothing has been
    * appended yet, so an explicitly flushed empty session survives this process.
+   * Drains accepted live events before reporting a capacity refusal.
    * @param options - optional cancellation observed before the barrier starts.
    */
   flush(options?: SessionHandleFlushOptions): Promise<void> {
-    return this.run('flush', async () => {
+    return this.drainLive().then(() => this.run('flush', async () => {
       options?.signal?.throwIfAborted()
       if (this.access !== 'write') throw new SessionReadOnlyError(this.id, 'flush')
       if (this.state.materialized) return // appends are durable on resolution
       await this.ensureLease()
       await this.storage.persistHeader(this.header, this.state.inheritedEventCount)
       this.state.materialized = true
-    })
+    }))
   }
 
   /**
    * Release the handle; see the seam contract. Idempotent and uncancellable.
    * A write handle first drains its routed live buffer through the still-open
-   * storage, so backend teardown loses nothing regardless of which fiber
-   * unwinds first; a drain or lock-release failure still frees the in-process
-   * claim, then rejects — both failures together reject as one
-   * `AggregateError`.
+   * storage. Final lease release refuses new live events before commit.
+   * A drain or lock-release failure still frees the in-process claim and
+   * retained memory, then rejects; a failed drain cannot guarantee durability
+   * for the accepted buffer. Both failures reject as one `AggregateError`.
    * @returns settlement of the release.
    */
   close(): Promise<void> {
@@ -238,6 +252,7 @@ export class JsonlSessionHandle implements SessionHandle {
         await this.chain
         if (this.buffered.length === 0) break
       }
+      this.liveAdmissionClosed = true
       // After a drain failure the chain may still hold in-flight mutations.
       await this.chain
       // Free the in-process claim no matter how the kernel-lock release
@@ -254,6 +269,9 @@ export class JsonlSessionHandle implements SessionHandle {
         failures.push(releaseFailure instanceof Error ? releaseFailure : new Error(errorChain(releaseFailure)))
       }
       this.storage.releaseTrackedHandle(this, this.state.materialized)
+      for (const release of this.reservations.values()) release()
+      this.reservations.clear()
+      this.buffered = []
       if (failures.length > 1) throw new AggregateError(failures, `session "${this.id}": close failed to drain and to release its write lock`)
       if (failures[0] !== undefined) throw failures[0]
     })()
@@ -265,14 +283,40 @@ export class JsonlSessionHandle implements SessionHandle {
   }
 
   /**
+   * Reserve provider capacity before a live Session accepts this immutable event.
+   * A refusal closes this writer to further live events until it is released.
+   * @param event - frozen candidate that has not entered its Session log.
+   * @returns rollback when the Session refuses the candidate before commit.
+   * @throws the first capacity refusal for this writer and every later candidate.
+   */
+  reserveLive(event: SessionEvent): () => void {
+    if (this.liveAdmissionClosed) throw new SessionHandleClosedError(this.id, 'append')
+    if (this.admissionFailure !== undefined) throw this.admissionFailure
+    let release: () => void
+    try {
+      release = this.retention.reserve(event)
+    } catch (error: unknown) {
+      const detail = errorChain(error)
+      this.admissionFailure = new Error(`${detail}; new event refused. Drain accepted events, then close and resume this session to continue.`, { cause: error })
+      throw this.admissionFailure
+    }
+    this.reservations.set(event, release)
+    return () => {
+      this.reservations.delete(event)
+      release()
+    }
+  }
+
+  /**
    * Buffer one published live session event and arm the bounded batching
    * window when it is idle. The routing installer is the only caller.
-   * @param event - the live event, retained as a persistence-owned copy.
+   * @param event - borrowed immutable live event whose pre-commit reservation is consumed.
    * @param reportBackgroundFailure - observes a deadline-driven drain failure
    *   (the events stay buffered; the next {@link drainLive} retries loudly).
    */
   enqueueLive(event: SessionEvent, reportBackgroundFailure: (error: unknown) => void): void {
-    this.buffered.push(structuredClone(event))
+    if (!this.reservations.has(event)) this.reserveLive(event)
+    this.buffered.push(event)
     if (this.batchTimer !== undefined || this.drainPaused) return
     this.batchTimer = setTimeout(() => {
       this.batchTimer = undefined
@@ -286,7 +330,9 @@ export class JsonlSessionHandle implements SessionHandle {
    * order so `session/flush` can retry and reject loudly.
    */
   drainLive(): Promise<void> {
-    return this.draining ??= this.drainBuffered().finally(() => {
+    return this.draining ??= this.drainBuffered().then(() => {
+      if (this.admissionFailure !== undefined) throw this.admissionFailure
+    }).finally(() => {
       this.draining = undefined
     })
   }
@@ -305,7 +351,11 @@ export class JsonlSessionHandle implements SessionHandle {
         // while-guard saw is still here when the chained turn runs.
         const batch = this.buffered.splice(0)
         try {
-          await this.persistContiguous(materializeAppendBatch(batch))
+          await this.persistContiguous(batch)
+          for (const event of batch) {
+            this.reservations.get(event)?.()
+            this.reservations.delete(event)
+          }
         } catch (error: unknown) {
           this.buffered = batch.concat(this.buffered)
           this.drainPaused = true
@@ -389,6 +439,8 @@ export interface PendingSession {
  * process can already observe.
  */
 export class JsonlBackendTracker {
+  /** Capacity shared by pending and active writes across this provider's handles. */
+  readonly retention: JsonlRetentionBudget
   /** Every open handle; teardown closes what remains. */
   readonly openHandles = new Set<SessionHandle>()
   /** `null` marks a claim whose handle is still being constructed. */
@@ -396,8 +448,13 @@ export class JsonlBackendTracker {
   private readonly pending = new Map<SessionId, PendingSession>()
   private counter = 0
 
-  /** @param name - backend label used in in-memory revision tokens and teardown errors. */
-  constructor(private readonly name: string) {}
+  /**
+   * @param name - backend label used in in-memory revision tokens and teardown errors.
+   * @param limits - provider-wide pending-write capacity.
+   */
+  constructor(private readonly name: string, limits: JsonlRetentionLimits = {}) {
+    this.retention = new JsonlRetentionBudget(limits)
+  }
 
   /**
    * Claim write ownership and record the created session as pending, making
@@ -555,6 +612,10 @@ export class JsonlBackendTracker {
         }
         if (errors.length > 0) throw new AggregateError(errors, `${name} dispose failed`)
       }
+      const admission = ctx.inject(['sessions'], (sessionCtx) => {
+        sessionCtx.sessions.registerAppendAdmission((session, event) => writers.get(session.id)?.reserveLive(event))
+      })
+      yield admission.dispose
       yield ctx.on('session/event', (session: Session, event) => {
         writers.get(session.id)?.enqueueLive(event, (error) => {
           ctx.logger.warn(`session-persistence: background write for session "${session.id}" failed (buffered events retained): ${String(error)}`)

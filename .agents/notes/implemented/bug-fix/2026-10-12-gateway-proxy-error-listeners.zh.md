@@ -10,7 +10,15 @@ Status: implemented
 
 ## Decision
 
-Gateway 持有一个服务器级 `'error'` 监听器，记录有界诊断（错误码、方法、路径）并妥善结算事件携带的对象：仍可用的 `ServerResponse` 收到 `502 INSTANCE_UNREACHABLE`，已写头的响应被结束，WebSocket 双工被销毁。同时在既有 `proxyRes` 钩子里为每个 `proxyRes` 挂上 `'error'` 监听，使上游在响应体中途复位时客户端响应得以结束。逐请求回调仍是第一道结算层，并在写出前检查 `res.destroyed`，使迟到的错误无法在回调内部抛出。
+Gateway 持有一个服务器级 `'error'` 监听器，记录有界诊断（错误码、方法、路径）并妥善结算事件携带的对象：仍可用的 `ServerResponse` 收到 `502 INSTANCE_UNREACHABLE`，已发送响应头但尚未完成的响应被销毁，WebSocket 双工被销毁。同时在既有 `proxyRes` 钩子里为每个 `proxyRes` 挂上 `'error'` 监听，使上游在响应体中途复位时销毁客户端响应。逐请求回调仍是第一道结算层，并在写出前检查 `res.destroyed`，使迟到的错误无法在回调内部抛出。
+
+不完整响应体不能作为成功的 HTTP 消息结束。正常结束会保留上游的成功状态，让浏览器或 CDN 缓存截断的不可变插件脚本。销毁连接会向下游保留传输失败的结果。
+
+跨电脑转发保留每个 `ClientRequest` 的错误监听器，直到传输对象销毁完毕。HTTP 请求或 WebSocket 握手失败后，其双工流仍可能再发出一次中止错误；该事件必须继续限制在同一个请求内。
+
+节点本机 TCP 连接在响应读取结束后保持写入方向打开，等两个传输管道完成后再销毁传输；正常 TCP 关闭也不会销毁待发送的 WebSocket 数据。否则，本机快速结束响应而出站连接较慢时，脚本或下载会在成功响应头之后被截断。
+
+空闲控制连接按已认证租约的心跳间隔发送 WebSocket Ping。网络连接保活独立于 PostgreSQL 租约续期，不能在租约到期后保留执行授权；通道关闭时先清理 Ping 定时器，再重新连接。
 
 ## Alternatives considered
 
@@ -24,7 +32,11 @@ Gateway 持有一个服务器级 `'error'` 监听器，记录有界诊断（错�
 
 ## Verification
 
-`gateway/tests/proxy.spec.ts` 用 `resetAndDestroy()` 复位一条已准入 WebSocket 的客户端 socket，并在响应体中途杀死运行时；两条路径过去都以 `Error: read ECONNRESET` 未捕获异常的形式出现，现在只留下有界日志行，同时 Gateway 继续服务。
+`gateway/tests/proxy.spec.ts` 用 `resetAndDestroy()` 复位一条已准入 WebSocket 的客户端 socket，并在响应体中途杀死运行时。两条路径都产生有界日志，同时 Gateway 继续服务；读取不完整 HTTP 响应体会失败。
+
+`gateway/tests/node-service.spec.ts` 令真实转发的空间切换和 WebSocket 请求失败，再向各自的 `ClientRequest` 对象送达迟到的传输中止错误，并确认 Gateway 仍可提供账号元数据。
+
+同一测试环境将一个出站响应帧保持到本机 TCP 读取结束及关闭回调阶段，再释放该帧并核对完整响应。
 
 ## Related
 

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-stream-forwarding-cancellation/guide.md
+document:
+  en: 50153f0f7eea9fc6e2e70a62dcc3e28b6ff374ef
+  zh: 5632b36ae9a80990a3f7b300d746bd724b87a5c2
+/:
+  en: a85a1d654c142c6e
+  zh: 337c258f330a2cb6
+/ssh-stream-cancellation-confirms-forwarding-cleanup:
+  en: 96f2398f0216169c
+  zh: e7b4b235c2b39cf0
+/ssh-stream-cancellation-confirms-forwarding-cleanup/change:
+  en: 9b0ce7678d5a62cc
+  zh: 6166ce581cae2e7a
+/ssh-stream-cancellation-confirms-forwarding-cleanup/migration:
+  en: de381650c84a3e67
+  zh: c9d0386f172197c3

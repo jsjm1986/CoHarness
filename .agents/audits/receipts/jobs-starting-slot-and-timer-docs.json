@@ -1,0 +1,14 @@
+{
+  "name": "jobs-starting-slot-and-timer-docs",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run test:docs",
+  "startedAt": "2026-10-26T02:47:38.068567+00:00",
+  "seconds": 158.389,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2b2b4267ff3f0a3754d516d02a1a95737d5275a4f7eac42959b9ee82e9eb280a",
+  "inputsAfter": "2b2b4267ff3f0a3754d516d02a1a95737d5275a4f7eac42959b9ee82e9eb280a",
+  "postgresToolDirectory": null,
+  "outputSha256": "3bcc0f203247ed23a74c050ca47547a53623fd92edfd53d09b740c160fb50eaa",
+  "outputTail": "$ tsx scripts/run-gates.ts doc-quick\nrun-gates: doc-quick running 20 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start markdown links\nrun-gates: PASS markdown links (36.63s)\nrun-gates: start type equivalence\nrun-gates: PASS type equivalence (16.69s)\nrun-gates: start translation pairing\nrun-gates: PASS translation pairing (16.96s)\nrun-gates: start markdown wrap\nrun-gates: PASS markdown wrap (17.17s)\nrun-gates: start npm dependency catalog\nrun-gates: PASS npm dependency catalog (0.63s)\nrun-gates: start Session format references\nrun-gates: PASS Session format references (8.43s)\nrun-gates: start public repository links\nrun-gates: PASS public repository links (11.06s)\nrun-gates: start repository references\n\n== FAILED repository references (24.78s) ==\ncommand: pnpm run verify-repository-references\noutcome: exit 1\n$ tsx scripts/verify-repository-references.ts\nverify-repository-references: use release tags or maintained repository links:\n  .agents/audits/receipts/audit-baseline-job-state-phase.json:13 commit-hash\n[ELIFECYCLE] Command failed with exit code 1.\nrun-gates: start concrete terms\nrun-gates: PASS concrete terms (3.13s)\nrun-gates: start doc refs\nrun-gates: PASS doc refs (1.11s)\nrun-gates: start package README Summaries\nrun-gates: PASS package README Summaries (0.50s)\nrun-gates: start package README model experience\nrun-gates: PASS package README model experience (4.30s)\nrun-gates: start agent note classification\nrun-gates: PASS agent note classification (0.56s)\nrun-gates: start agent note format\nrun-gates: PASS agent note format (0.70s)\nrun-gates: start archived agent notes\nrun-gates: PASS archived agent notes (0.69s)\nrun-gates: start skill invocation metadata\nrun-gates: PASS skill invocation metadata (0.55s)\nrun-gates: start translation prompt\nrun-gates: PASS translation prompt (0.50s)\nrun-gates: start doc budgets\nrun-gates: PASS doc budgets (0.54s)\nrun-gates: start documentation standard tests\nrun-gates: PASS documentation standard tests (3.26s)\nrun-gates: start package README limitations\nrun-gates: PASS package README limitations (4.23s)\n\nrun-gates: 19 passed, 1 failed, 0 skipped in 152.43s.\nrun-gates: unsuccessful gates:\n  - FAILED repository references (24.78s, exit 1)\n    pnpm run verify-repository-references\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

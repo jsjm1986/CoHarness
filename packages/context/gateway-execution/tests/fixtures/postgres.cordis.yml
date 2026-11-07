@@ -19,4 +19,5 @@
     mode: workspace-write
 - name: 'fixture:connection'
 - name: '@deepseek-ai/dsh-gateway-runtime'
+- name: '@deepseek-ai/dsh-gateway-runtime/resource-budget'
 - name: '@deepseek-ai/dsh-gateway-execution'

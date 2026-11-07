@@ -1,0 +1,38 @@
+[
+  {
+    "phase": "missing",
+    "status": 503,
+    "error": "required-plugins-unavailable",
+    "proofVerified": false
+  },
+  {
+    "phase": "import-failed",
+    "status": 503,
+    "error": "required-plugins-unavailable",
+    "proofVerified": false
+  },
+  {
+    "phase": "active",
+    "status": 200,
+    "error": null,
+    "proofVerified": true
+  },
+  {
+    "phase": "disabled",
+    "status": 503,
+    "error": "required-plugins-unavailable",
+    "proofVerified": false
+  },
+  {
+    "phase": "restored",
+    "status": 200,
+    "error": null,
+    "proofVerified": true
+  },
+  {
+    "phase": "removed",
+    "status": 503,
+    "error": "required-plugins-unavailable",
+    "proofVerified": false
+  }
+]

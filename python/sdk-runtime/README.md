@@ -29,6 +29,8 @@ Repository builds also materialize a dev-only `runtime/node/` carrier. It runs `
 
 Both carriers execute the same `dsh` grammar and shipped profiles, including the standalone `sdk-minimal` tree and the full `web` profile with its frontend assets. The private `dsh-python-runtime-closure` manifest defines the packaged dependency closure. This package also checks in `runtime/cordis.yml`, a bundled bootstrap composition selectable through an explicit `DSH_CORDIS_CONFIG` or argv config path.
 
+The closure includes the [resource-budget service definition](../../packages/context/resource-budget/README.md) and [model-access service definition](../../packages/llm/model-access/README.md) required by model, native-operation and subprocess consumers. Provider activation remains owned by the selected composition.
+
 ## Python module API
 
 - `bundled_package_dir() -> Path` returns the installed module-data root and verifies its release metadata.
@@ -49,6 +51,8 @@ External profile management uses `dsh plugin --profile <name> ...`. That command
 ## Build and distribution
 
 Production deployment permits unused workspace patches for packages outside the runtime closure; patches for included packages must still apply successfully. This exception is confined to the deploy command; repository installation still rejects unused patches.
+
+The shared runtime builder verifies each locked archive digest and streams ZIP entries through path, entry-type, and duplicate-path checks. It rejects symlinks, special files, and unsupported wheel installation schemes.
 
 From the repository root, `pnpm exec tsx scripts/build-exe-for-python-sdk.ts` verifies the closure, builds packages, deploys a symlink-free tree, packages the selected target, and syncs the executable and sidecars into this module. `scripts/build-python-release.py` stages release-shaped wheels at the root repository version and pins `deepseek-harness-sdk` to the exact runtime version.
 

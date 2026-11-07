@@ -10,6 +10,18 @@ import { Workspace, type WorkspaceCreateInput } from './workspace.ts'
 /** Monotone workspace-list arrival lifecycle. */
 export type WorkspaceListPhase = 'pending' | 'ready'
 
+/** Archive facts from one successfully installed Workspace baseline. */
+export interface WorkspaceArchiveSnapshot {
+  archivedSessionIds: readonly SessionId[]
+  archiveRevision?: number
+}
+
+interface WorkspaceRefresh {
+  controller: AbortController
+  result: Promise<WorkspaceArchiveSnapshot | undefined>
+  completion: Promise<void>
+}
+
 /** Immutable workspace-list snapshot. */
 export interface WorkspaceListSnapshot {
   items: readonly WorkspaceView[]
@@ -55,7 +67,7 @@ export class WorkspaceManager {
   private state: WorkspaceListSnapshot['state'] = 'idle'
   private phase: WorkspaceListPhase = 'pending'
   private error: RpcError | null = null
-  private inflight: Promise<void> | null = null
+  private inflight: WorkspaceRefresh | null = null
   private refreshFrames: WorkspaceDelta[] | null = null
   /** Latest local reorder request; only its unary echo may install order. */
   private orderRequestGeneration = 0
@@ -95,15 +107,39 @@ export class WorkspaceManager {
    * @returns the shared in-flight refresh.
    */
   refresh(): Promise<void> {
-    if (this.inflight !== null) return this.inflight
+    return this.startRefresh().completion
+  }
+
+  /**
+   * Share the in-flight baseline read (or start one) with per-reader
+   * cancellation: aborting withdraws the shared RPC, and an `undefined`
+   * resolution defers the cause to `state`/`error`.
+   * @param signal - reader-owned cancellation, bound to the shared controller.
+   * @returns the settled archive snapshot, or `undefined` on abort or failure.
+   */
+  shareRefresh(signal: AbortSignal): Promise<WorkspaceArchiveSnapshot | undefined> {
+    const refresh = this.startRefresh()
+    const abort = (): void => { refresh.controller.abort(signal.reason) }
+    if (signal.aborted) abort()
+    else signal.addEventListener('abort', abort, { once: true })
+    return refresh.result.finally(() => { signal.removeEventListener('abort', abort) })
+  }
+
+  private startRefresh(): WorkspaceRefresh {
+    // A cancelled reader leaves its RPC promise pending until the wire
+    // settles; treat the dead in-flight read as gone so the next caller
+    // issues a fresh request instead of waiting on a retired operation.
+    if (this.inflight !== null && !this.inflight.controller.signal.aborted) return this.inflight
+    const controller = new AbortController()
     this.state = 'loading'
     this.error = null
     const frames: WorkspaceDelta[] = []
     this.refreshFrames = frames
     this.notifier.markDirty()
-    this.inflight = (async () => {
+    const result = (async (): Promise<WorkspaceArchiveSnapshot | undefined> => {
       try {
-        const { result } = await this.api.workspace.list({})
+        const { result } = await this.api.workspace.list({}, controller.signal)
+        if (controller.signal.aborted) return undefined
         if (result.ok) {
           let items = result.value.items
           items = items.filter(workspace => !this.removedIds.has(workspace.workspaceId))
@@ -115,22 +151,31 @@ export class WorkspaceManager {
           this.installPinned(result.value.pinnedSessionIds)
           this.state = 'idle'
           this.phase = 'ready'
+          return { archivedSessionIds: this.archivedSessionIds, archiveRevision: this.archiveRevision }
         } else {
           this.state = 'error'
           this.error = result.error
         }
       } catch (error) {
+        if (controller.signal.aborted) return undefined
         this.state = 'error'
         const folded = transportError<never>(error)
         /* v8 ignore next -- transportError always returns the failure branch. */
         this.error = folded.ok ? null : folded.error
       } finally {
-        this.refreshFrames = null
-        this.inflight = null
-        this.notifier.markDirty()
+        if (this.refreshFrames === frames) this.refreshFrames = null
+        if (!controller.signal.aborted) this.notifier.markDirty()
       }
     })()
-    return this.inflight
+    const operation: WorkspaceRefresh = {
+      controller,
+      result,
+      completion: result.then(() => {
+        if (this.inflight === operation) this.inflight = null
+      }),
+    }
+    this.inflight = operation
+    return operation
   }
 
   /**
@@ -327,9 +372,20 @@ export class WorkspaceManager {
     }
   }
 
-  /** Re-pull the baseline after each connection generation. */
-  handleConnected(): void {
-    void this.refresh()
+  /**
+   * Re-pull the baseline for a new connection generation.
+   * @returns installed archive facts, or undefined after failure or generation cancellation.
+   */
+  handleConnected(): Promise<WorkspaceArchiveSnapshot | undefined> {
+    this.handleDisconnected()
+    return this.startRefresh().result
+  }
+
+  /** Cancel the current generation's refresh without withdrawing retained rows. */
+  handleDisconnected(): void {
+    this.inflight?.controller.abort()
+    this.inflight = null
+    this.refreshFrames = null
   }
 
   /**

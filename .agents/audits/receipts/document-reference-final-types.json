@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-final-types",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 DSH_GATE_CONCURRENCY=1 pnpm run build --scope check",
+  "startedAt": "2026-10-26T22:58:40.482172+00:00",
+  "seconds": 18.54,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "inputsAfter": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "postgresToolDirectory": null,
+  "outputSha256": "e70bf964d07662fa6436b18af638d24b0c90b0d02eb2cd81326e32eb73ab6bc8",
+  "outputTail": "$ tsx scripts/build.ts --scope check\nrun-gates: build:check running 2 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start host aggregate check\nrun-gates: PASS host aggregate check (11.59s)\nrun-gates: start client aggregate check\nrun-gates: PASS client aggregate check (4.00s)\n\nrun-gates: 2 passed, 0 failed, 0 skipped in 15.59s.\n"
+}

@@ -3,9 +3,12 @@
 import type { PoolClient } from 'pg'
 import { errorCodeForDiagnostics } from './postgres/database.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
+import type { RuntimeNodeId } from './runtime-catalog.ts'
 
 /** Traffic affected by an access change; an empty subject invalidates the organization. */
 export interface AccessInvalidationSubject {
+  /** Omitted for organization-wide changes; present changes affect only this computer. */
+  nodeId?: RuntimeNodeId
   userId?: number
   projectId?: number
   /** Directory projections or runtime ownership changed and require a fresh process. */
@@ -22,12 +25,27 @@ export interface GatewayAccessMonitor {
   subscribe(listener: (subject: AccessInvalidationSubject) => void | Promise<void>): () => void
 }
 
+/**
+ * Bind local process, file and execution consumers to their computer while retaining global revocations.
+ * @param monitor - organization-owned monitor; cross-computer forwarding keeps this original monitor.
+ * @param nodeId - computer whose local consumers receive qualification changes.
+ * @returns a subscriber adapter; synchronization and lifecycle remain owned by the original monitor.
+ */
+export function scopeAccessMonitor(monitor: GatewayAccessMonitor, nodeId: RuntimeNodeId): GatewayAccessMonitor {
+  return {
+    get available() { return monitor.available },
+    synchronize: () => monitor.synchronize(),
+    subscribe: listener => monitor.subscribe(subject => subject.nodeId === undefined || subject.nodeId === nodeId ? listener(subject) : undefined),
+  }
+}
+
 function subjects(value: unknown): AccessInvalidationSubject[] {
   if (!Array.isArray(value) || value.length === 0) throw new Error('invalid access invalidation subjects')
   return value.map((item: unknown) => {
     if (typeof item !== 'object' || item === null || Array.isArray(item)) throw new Error('invalid access invalidation subject')
     const row = item as Record<string, unknown>
     for (const [key, entry] of Object.entries(row)) {
+      if (key === 'nodeId' && typeof entry === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(entry)) continue
       if (key === 'restartRuntime' && typeof entry === 'boolean') continue
       if ((key === 'userId' || key === 'projectId') && typeof entry === 'number' && Number.isSafeInteger(entry) && entry > 0) continue
       throw new Error('invalid access invalidation subject field')
@@ -206,7 +224,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
         const next = BigInt(row.revision)
         if (next !== cursor + 1n) throw new Error('access invalidation revision is not contiguous')
         for (const subject of subjects(row.subjects)) {
-          const key = `${subject.userId ?? '*'}:${subject.projectId ?? '*'}`
+          const key = `${subject.nodeId ?? '*'}:${subject.userId ?? '*'}:${subject.projectId ?? '*'}`
           const prior = changes.get(key)
           changes.set(key, { ...subject, ...(prior?.restartRuntime === true ? { restartRuntime: true } : {}) })
         }

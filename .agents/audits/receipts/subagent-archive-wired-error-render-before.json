@@ -1,0 +1,14 @@
+{
+  "name": "subagent-archive-wired-error-render-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent/tests/archive-admission.spec.ts",
+  "startedAt": "2026-10-26T09:03:02.539630+00:00",
+  "seconds": 5.273,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f2dbf574ac1f55cf95f813a892cdbdc24c042b74dac92a5c04c67b9ae4462a39",
+  "inputsAfter": "f2dbf574ac1f55cf95f813a892cdbdc24c042b74dac92a5c04c67b9ae4462a39",
+  "postgresToolDirectory": null,
+  "outputSha256": "f83e7820e2f4483c9546d3a0cf3cd8afd94ee5b3442e00ca53ee9dbe9313f008",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent/tests/archive-admission.spec.ts (2 tests | 1 failed) 16ms\n   × cancels remaining descendants when one child throws an 'unrenderable' error 5ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent/tests/archive-admission.spec.ts > cancels remaining descendants when one child throws an 'unrenderable' error\nTypeError: Cannot convert object to primitive value\n ❯ packages/subagent/subagent/src/archive-admission.ts:36:95\n     34|       } catch (error: unknown) {\n     35|         // One child refusing its cancel must not keep its siblings ru…\n     36|         ctx.logger.warn(`subagent: cancelling \"${child.id}\" for an arc…\n       |                                                                                               ^\n     37|       }\n     38|     }\n ❯ Object.apply vendor/cordis/src/reflect.ts:411:24\n ❯ vendor/cordis/src/events.ts:184:90\n ❯ Proxy.parallel vendor/cordis/src/events.ts:184:74\n ❯ packages/subagent/subagent/tests/archive-admission.spec.ts:44:13\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed (2)\n   Start at  17:03:06\n   Duration  1.59s (transform 1.19s, setup 41ms, import 1.44s, tests 16ms, environment 0ms)\n\n"
+}

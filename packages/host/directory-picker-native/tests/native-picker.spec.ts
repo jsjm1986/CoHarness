@@ -12,13 +12,20 @@ type ExecFileCallback = (
 type ExecFileMock = (
   command: string,
   args: readonly string[],
-  options: { encoding: string; signal: AbortSignal; windowsHide: boolean },
+  options: { encoding: string; signal?: AbortSignal; windowsHide: boolean },
   callback: ExecFileCallback,
 ) => void
 
 const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn<ExecFileMock>() }))
 
-vi.mock('node:child_process', () => ({ execFile: execFileMock }))
+vi.mock('node:child_process', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:child_process')>()
+  return { ...original, execFile: (...args: Parameters<ExecFileMock>) => {
+    const child = new original.ChildProcess()
+    queueMicrotask(() => { execFileMock(...args); child.emit('close', 0, null) })
+    return child
+  } }
+})
 
 import { describe, expect, it, vi } from 'vitest'
 import { pickNativeDirectory, type DirectoryPickerRunner } from '../src/native-picker.ts'
@@ -33,6 +40,22 @@ const signal = () => new AbortController().signal
 const noDialog = async (): Promise<string | null> => { throw new Error('dialog unavailable') }
 
 describe('native directory picker', () => {
+  it.each(['darwin', 'zenity', 'kdialog'].flatMap(backend => [
+    { label: 'LF', suffix: '\n' }, { label: 'CR', suffix: '\r' },
+    { label: 'CRLF', suffix: '\r\n' }, { label: 'two LF characters', suffix: '\n\n' },
+  ].map(value => ({ backend, ...value }))))('preserves a directory name ending in $label through $backend', async ({ backend, suffix }) => {
+    const selected = '/fixture/目录' + suffix
+    const run = vi.fn<DirectoryPickerRunner>()
+    if (backend === 'kdialog') run.mockRejectedValueOnce(failure('ENOENT'))
+    run.mockResolvedValueOnce({ stdout: selected + '\n', stderr: '' })
+    await expect(pickNativeDirectory(signal(), { platform: backend === 'darwin' ? 'darwin' : 'linux', run })).resolves.toBe(selected)
+  })
+
+  it('preserves an unterminated nonempty response', async () => {
+    const run = vi.fn<DirectoryPickerRunner>(async () => ({ stdout: '/fixture/no-terminator', stderr: '' }))
+    await expect(pickNativeDirectory(signal(), { platform: 'darwin', run })).resolves.toBe('/fixture/no-terminator')
+  })
+
   it('opens the macOS Edit-menu panel and maps an unanswered panel to null', async () => {
     const run = vi.fn<DirectoryPickerRunner>(async () => ({ stdout: '/Users/test/project/\n', stderr: '' }))
     await expect(pickNativeDirectory(signal(), { platform: 'darwin', run })).resolves.toBe('/Users/test/project/')
@@ -112,7 +135,7 @@ describe('native directory picker', () => {
     expect(args).toEqual(expect.arrayContaining(['--file-selection', '--directory']))
     expect(options.encoding).toBe('utf8')
     expect(options.windowsHide).toBe(true)
-    expect(options.signal).toBeInstanceOf(AbortSignal)
+    expect(options.signal).toBeUndefined()
 
     // A non-cancellation command failure surfaces as-is with its cause and
     // captured stdio attached; no tier masks or rewraps it.

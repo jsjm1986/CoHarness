@@ -1,0 +1,14 @@
+{
+  "name": "sonar-format-facts-check",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/persistence-formats.ts",
+  "startedAt": "2026-10-24T09:33:17.881079+00:00",
+  "seconds": 6.015,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "d259cd2522ec7c075e4440ff5779b669439138f6887442803f57e362a368a77e",
+  "outputTail": "Persistence formats: v0 through v7 verified (8 complete references).\n"
+}

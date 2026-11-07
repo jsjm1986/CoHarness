@@ -1,0 +1,22 @@
+- menu:
+  - menuitem "My workbench · 2/4":
+    - text: My workbench · 2/4
+    - img
+  - menuitem "Navigation B · 2/4"
+  - separator
+  - menuitem "New workbench":
+    - img
+    - text: New workbench
+  - menuitem "Rename workbench":
+    - img
+    - text: Rename workbench
+  - menuitem "Duplicate workbench":
+    - img
+    - text: Duplicate workbench
+  - menuitem "Delete workbench":
+    - img
+    - text: Delete workbench
+  - separator
+  - menuitem "Exit workbench":
+    - img
+    - text: Exit workbench

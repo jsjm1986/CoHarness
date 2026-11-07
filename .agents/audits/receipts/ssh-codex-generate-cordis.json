@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-generate-cordis",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-cordis-catalog.ts",
+  "startedAt": "2026-10-25T12:17:48.070430+00:00",
+  "seconds": 11.157,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d137173acb00eb326b039b894693a0d5f98c69b7d3abfc3c27e815feea8966b8",
+  "inputsAfter": "c1889149f29993971d084a89778530898897325247375fd02e302bbd1685bd19",
+  "postgresToolDirectory": null,
+  "outputSha256": "3c3a3eeac5f1918a410c66e3fc83d983b730175847d883a74b2bbbce879ac347",
+  "outputTail": "gen-cordis-catalog: 127 artifact(s) computed, 3 written.\n"
+}

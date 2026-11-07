@@ -43,7 +43,7 @@ type BrowserLauncher = ChildProcess & { stderr: PassThrough }
 
 /** Minimal browser-launcher process for the native handoff adapter. */
 function launcher(): BrowserLauncher {
-  return Object.assign(new EventEmitter(), { stderr: new PassThrough() }) as BrowserLauncher
+  return Object.assign(new EventEmitter(), { pid: 4242, stderr: new PassThrough() }) as BrowserLauncher
 }
 
 /** Stage a dist fixture and point the bundle's resolver at it. */
@@ -130,7 +130,7 @@ describe('web-app runtime glue', () => {
 
     expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567/?token=test-token')
     expect(log).toHaveBeenCalledWith('dsh web: opening the default browser; pass --no-open to disable')
-    expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:4567/?token=test-token')
+    expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:4567/?token=test-token', expect.any(AbortSignal))
     expect(lifecycle).toEqual([
       'dsh web: http://127.0.0.1:4567/?token=test-token',
       'dsh web: opening the default browser; pass --no-open to disable',
@@ -260,7 +260,7 @@ describe('web-app runtime glue', () => {
       `dsh web: listening on ${bind} over plain HTTP; restrict this port to a trusted proxy or network`,
     )
     expect(log).toHaveBeenCalledWith(`dsh web: http://${printed}:4567/?token=test-token`)
-    expect(openBrowser).toHaveBeenCalledWith(`http://${printed}:4567/?token=test-token`)
+    expect(openBrowser).toHaveBeenCalledWith(`http://${printed}:4567/?token=test-token`, expect.any(AbortSignal))
   })
 
 
@@ -324,6 +324,34 @@ describe('web-app runtime glue', () => {
     await ctx.fiber.dispose()
   })
 
+  it('publishes only the replacement URL when its first owner unloads before readiness', async () => {
+    stageDist()
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    ctx.provide('webServer', fakeHttpServer().server)
+    provideConnection(ctx)
+    const settlement = Promise.withResolvers<undefined>()
+    const waiting = Promise.withResolvers<undefined>()
+    provideLoader(ctx, () => { waiting.resolve(undefined); return settlement.promise })
+    const opened = Promise.withResolvers<string>()
+    internals.openBrowser = async (url) => { opened.resolve(url) }
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const mount = (publicUrl: string) => ctx.plugin({
+      name: 'web-app-owner',
+      apply(owner: Context) { apply(owner, new Config({ openBrowser: true, printUrl: true, surfaceContext: false, publicUrl })) },
+    })
+    const old = mount('http://127.0.0.1:4567/withdrawn/')
+    await old.await()
+    await waiting.promise
+    await old.dispose()
+    const replacement = mount('http://127.0.0.1:4567/current/')
+    await replacement.await()
+    settlement.resolve(undefined)
+    await expect(opened.promise).resolves.toBe('http://127.0.0.1:4567/current/?token=test-token')
+    expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567/current/?token=test-token')
+    expect(log.mock.calls.flat().join('\n')).not.toContain('/withdrawn/')
+  })
+
   it('advertises the loopback URL when the composition sets publicUrl to null', async () => {
     stageDist()
     const ctx = new Context()
@@ -374,7 +402,7 @@ describe('web-app runtime glue', () => {
     release!()
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567/?token=test-token')
-    expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:4567/?token=test-token')
+    expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:4567/?token=test-token', expect.any(AbortSignal))
     await settled.fiber.dispose()
 
     // Failed path: Loader reports the sibling failure; the app prints no URL
@@ -440,7 +468,7 @@ describe('web-app runtime glue', () => {
     await Promise.allSettled(audit.mock.results.map(result => result.value as Promise<void>))
     if (announces) {
       expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567/?token=test-token')
-      expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:4567/?token=test-token')
+      expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:4567/?token=test-token', expect.any(AbortSignal))
     } else {
       expect(log).not.toHaveBeenCalled()
       expect(openBrowser).not.toHaveBeenCalled()
@@ -476,12 +504,85 @@ describe('web-app runtime glue', () => {
     await ctx.fiber.dispose()
   })
 
+  it('joins an unfinished browser helper when its owner unloads', async () => {
+    stageDist()
+    const ctx = new Context()
+    ctx.provide('webServer', fakeHttpServer().server)
+    provideConnection(ctx)
+    const child = launcher(), spawned = Promise.withResolvers<undefined>(), killed = Promise.withResolvers<undefined>()
+    const kill = vi.fn(() => { killed.resolve(undefined); return true })
+    child.kill = kill
+    vi.mocked(spawn).mockImplementationOnce(() => { spawned.resolve(undefined); return child })
+    const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    onTestFinished(async () => { child.emit('close', 0); child.stderr.destroy(); await ctx.fiber.dispose() })
+    apply(ctx, new Config({ openBrowser: true, printUrl: false, surfaceContext: false }))
+    await spawned.promise
+    let disposed = false
+    const disposal = ctx.fiber.dispose().then(() => { disposed = true })
+    const progress = await Promise.race([disposal.then(() => 'disposed'), killed.promise.then(() => 'signalled')])
+    expect(progress).toBe('signalled')
+    expect(disposed).toBe(false)
+    expect(kill).toHaveBeenCalledWith('SIGKILL')
+    child.emit('close', null, 'SIGKILL')
+    await disposal
+    expect(diagnostic).not.toHaveBeenCalled()
+  })
+
+  it('refuses pre-cancelled browser work and joins cancellation with a string reason', async () => {
+    await expect(originalOpenBrowser('http://127.0.0.1:4567', AbortSignal.abort())).rejects.toThrow()
+    expect(spawn).not.toHaveBeenCalled()
+    const child = launcher(), controller = new AbortController()
+    const kill = vi.fn(() => true)
+    child.kill = kill
+    vi.mocked(spawn).mockReturnValueOnce(child)
+    onTestFinished(() => { child.emit('close', 0); child.stderr.destroy() })
+    let settled = false
+    const work = originalOpenBrowser('http://127.0.0.1:4567', controller.signal)
+      .then(() => undefined, (error: unknown) => error).finally(() => { settled = true })
+    controller.abort('browser handoff cancelled')
+    expect(kill).toHaveBeenCalledWith('SIGKILL')
+    await new Promise(resolve => setImmediate(resolve))
+    expect(settled).toBe(false)
+    child.emit('close', null, 'SIGKILL')
+    expect(await work).toMatchObject({ message: 'browser handoff cancelled' })
+  })
+
+  it('cancels a failed browser allocation without signalling its unallocated native handle', async () => {
+    const child = launcher(), controller = new AbortController(), kill = vi.fn(() => true)
+    Object.defineProperty(child, 'pid', { value: undefined })
+    child.kill = kill
+    vi.mocked(spawn).mockReturnValueOnce(child)
+    onTestFinished(() => { child.emit('close', -2); child.stderr.destroy() })
+    const work = originalOpenBrowser('http://127.0.0.1:4567', controller.signal)
+    const failure = expect(work).rejects.toThrow('cancelled during allocation')
+    controller.abort(new Error('cancelled during allocation'))
+    expect(kill).not.toHaveBeenCalled()
+    child.emit('error', Object.assign(new Error('allocation failed'), { code: 'EAGAIN' }))
+    child.emit('close', -2)
+    await failure
+  })
+
+  it('retains a failed browser helper until native close', async () => {
+    const child = launcher(), failure = new Error('native helper failed')
+    vi.mocked(spawn).mockReturnValueOnce(child)
+    onTestFinished(() => { child.emit('close', 0); child.stderr.destroy() })
+    let settled = false
+    const work = originalOpenBrowser('http://127.0.0.1:4567', new AbortController().signal)
+      .then(() => undefined, (error: unknown) => error).finally(() => { settled = true })
+    child.emit('error', failure)
+    await new Promise(resolve => setImmediate(resolve))
+    expect(settled).toBe(false)
+    child.emit('close', 1)
+    expect(await work).toBe(failure)
+  })
+
   it('scrubs the helper environment and reports helper spawn or exit failures', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', 'must-not-reach-browser')
     vi.stubEnv('DSH_HOME', '/must-not-reach-browser')
     const completed = launcher()
     vi.mocked(spawn).mockReturnValueOnce(completed)
-    const completion = originalOpenBrowser('http://127.0.0.1:4567')
+    const completion = originalOpenBrowser('http://127.0.0.1:4567', new AbortController().signal)
     const [command, args, options] = vi.mocked(spawn).mock.calls[0]!
     expect(command).toBe(process.execPath)
     expect(args).toEqual([
@@ -502,7 +603,7 @@ describe('web-app runtime glue', () => {
     const completedWithStderr = launcher()
     vi.mocked(spawn).mockReturnValueOnce(completedWithStderr)
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-    const completionWithStderr = originalOpenBrowser('http://127.0.0.1:4567')
+    const completionWithStderr = originalOpenBrowser('http://127.0.0.1:4567', new AbortController().signal)
     completedWithStderr.stderr?.write('launcher note\n')
     completedWithStderr.emit('close', 0)
     await expect(completionWithStderr).resolves.toBeUndefined()
@@ -510,7 +611,7 @@ describe('web-app runtime glue', () => {
 
     const failedWithReason = launcher()
     vi.mocked(spawn).mockReturnValueOnce(failedWithReason)
-    const reasonFailure = originalOpenBrowser('http://127.0.0.1:4567')
+    const reasonFailure = originalOpenBrowser('http://127.0.0.1:4567', new AbortController().signal)
     const reasonAssertion = expect(reasonFailure).rejects.toThrow('desktop unavailable')
     failedWithReason.stderr?.write('Error: desktop unavailable\n    at fixture')
     failedWithReason.emit('close', 1)
@@ -518,7 +619,7 @@ describe('web-app runtime glue', () => {
 
     const failed = launcher()
     vi.mocked(spawn).mockReturnValueOnce(failed)
-    const failure = originalOpenBrowser('http://127.0.0.1:4567')
+    const failure = originalOpenBrowser('http://127.0.0.1:4567', new AbortController().signal)
     const failureAssertion = expect(failure).rejects.toThrow('exited with code 3')
     await Promise.resolve()
     failed.emit('close', 3)
@@ -526,10 +627,11 @@ describe('web-app runtime glue', () => {
 
     const errored = launcher()
     vi.mocked(spawn).mockReturnValueOnce(errored)
-    const error = originalOpenBrowser('http://127.0.0.1:4567')
+    const error = originalOpenBrowser('http://127.0.0.1:4567', new AbortController().signal)
     const errorAssertion = expect(error).rejects.toThrow('spawn failed')
     await Promise.resolve()
     errored.emit('error', new Error('spawn failed'))
+    errored.emit('close', null)
     await errorAssertion
     expect(errored.listenerCount('close')).toBe(0)
   })

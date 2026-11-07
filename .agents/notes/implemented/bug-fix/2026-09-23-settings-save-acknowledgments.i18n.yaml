@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-23-settings-save-acknowledgments.md
 document:
-  en: 8f5d18d4d3365ebbeba4c3343966df27d13cc021
-  zh: b5431e53b156d59407a1f19b7313d71956088ddc
+  en: e663d73fd2cd60956b149b3547bc0074911fa5e5
+  zh: 9e19ebcd823ac04bb44a8c424c892b33b57266cf
 /agent-note-settings-saves-acknowledge-individual-submitted-drafts:
   en: 3c4e1287d8a79574
   zh: e48fe2beee620b43
@@ -12,8 +12,8 @@ document:
   en: 5329f745bf84a6b2
   zh: 42eca010f99601bb
 /agent-note-settings-saves-acknowledge-individual-submitted-drafts/decision:
-  en: 31b415be5a54f179
-  zh: ba4bdf8a3b1e9c5c
+  en: 5b772187703e1887
+  zh: 7906185b05ea3529
 /agent-note-settings-saves-acknowledge-individual-submitted-drafts/alternatives-considered:
   en: f017c15c24428742
   zh: fdc5090267fe3f67

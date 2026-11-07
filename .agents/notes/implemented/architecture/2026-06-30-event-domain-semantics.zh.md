@@ -28,6 +28,8 @@ harness 通过 Cordis 事件分类体系扩展 agent loop（智能体循环）�
 
 **将规则应用于边界镜像：** 全部四个边界镜像——`agent/turn-start`、`agent/turn-end`、`agent/step-start`、`agent/step-end`——被**移除**。没有生产消费方需要在边界处获取活的 `Agent`：ACP（Agent Client Protocol）桥接将其进行中的提示词与精确对应的 `session/event` `turn/start`/`turn/end` 事件对关联，其他 transcript 消费方同样从持久流派生边界。见[移除边界镜像事件 Agent Note](../simplification/2026-06-20-remove-agent-boundary-mirror-events.zh.md)，该决策由它负责。移除 emit 也简化了循环的 `closeStep`/`closeTurn`（各只需一次 append，无需配对 emit）。
 
+只用于观察的 Session 与 Agent 通知会逐个监听器隔离抛出值和拒绝值。诊断路径使用[值工具](../../../../packages/util/values/README.zh.md#render-failure)中的 `formatThrownValue`，保留普通异常文本，在转换失败时使用固定标签。报告观察者失败不能否决已提交的事实、阻止后续监听器，也不能阻断取消信号。受等待的 `agent/created` 监听器、同步的 `session/created` 抛错和提交前校验继续保留各自已声明的发布否决权。
+
 ## 后果
 
 - 循环不再 emit 任何边界镜像；`closeStep` 仅追加 `step/end`，`closeTurn` 仅追加 `turn/end`。`Session.append` 负责 post-commit observer 隔离，因此抛出异常的边界 observer 无法改变轮次结果或饿死后续消费方；事件接纳失败或内部校验失败仍会在边界进入日志之前向外抛出。

@@ -4,12 +4,15 @@ import type { ClientRemote } from '../../../../packages/api/remotes/lib/types/cl
 import managerContribution from '../../../../packages/boot/plugin-manager/lib/typert.remote-client.js'
 import inventoryContribution from '../../../../packages/host/plugin-inventory/lib/typert.remote-client.js'
 import { readRpcStream } from '../../../../packages/client/connection/src/rpc-stream-reader.ts'
+import { ConnectionRpcStreamInterrupted } from '../../../../packages/client/connection/src/rpc-stream.ts'
 import type { ChangeResult, PluginInstallFrame } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import { settingsDescribeValueSchema, settingsMutateValueSchema } from '../../../../packages/host/apiproxy/src/api/settings.schema.ts'
 import type { SettingsNamespaceView, SettingsPathOpView } from '../../../../packages/host/apiproxy/src/api/settings.ts'
 import { AdminRequestError, pluginManagementInvoke, type PluginManagementTarget } from '../api.ts'
 import { adminLanguage } from '../language.ts'
 import { translatePlugin } from './presentation.ts'
+import { adminComputerRequestUrl } from '../computer-target.ts'
+import { computerErrorMessage } from '../computer.copy.ts'
 
 type Answers<Methods> = { [K in keyof Methods]: Methods[K] extends (...args: infer Args) => Promise<{ ok: true; value: infer Value } | { ok: false; error: unknown }> ? (...args: Args) => Promise<Answer<Value>> : never }
 export interface ProfileSettingsRemote {
@@ -18,7 +21,7 @@ export interface ProfileSettingsRemote {
 }
 export interface PluginManagementRemote {
   settings: ProfileSettingsRemote
-  pluginManager: Answers<Pick<ClientRemote['pluginManager'], 'listPlugins' | 'listBundles' | 'inspect' | 'setPluginEnabled' | 'setBundleEnabled' | 'installBundle' | 'cancelInstall' | 'removeBundle' | 'registries' | 'waitForInstall'>>
+  pluginManager: Answers<Pick<ClientRemote['pluginManager'], 'catalog' | 'listPlugins' | 'listBundles' | 'inspect' | 'setPluginEnabled' | 'setPluginConfig' | 'describePluginConfig' | 'setBundleEnabled' | 'installBundle' | 'cancelInstall' | 'removeBundle' | 'registries' | 'waitForInstall'>>
   pluginInventory: Answers<Pick<ClientRemote['pluginInventory'], 'list'>>
   /** The gateway answers it locally; the managed runtime carries no such service. */
   pluginRegistryProbe: { fastest(): Promise<Answer<string | null>> }
@@ -44,8 +47,9 @@ function decode<T>(endpoint: string, value: unknown): T {
 /** Bind every request to the selected node and generation; installation streams never reconnect or replay effects. */
 export function pluginManagementRemote(target: PluginManagementTarget, lifetime: AbortSignal, progress: (frame: PluginInstallFrame) => void, invalidate: (message: string) => void): PluginManagementRemote {
   const interrupted = (error: unknown) => {
-    if (!lifetime.aborted && error instanceof AdminRequestError && [401, 403, 404, 409].includes(error.status)) invalidate(messageOf(error))
-    return refused(messageOf(error))
+    const failure = error instanceof ConnectionRpcStreamInterrupted && error.cause instanceof AdminRequestError ? error.cause : error
+    if (!lifetime.aborted && failure instanceof AdminRequestError && [401, 403, 404, 409].includes(failure.status)) invalidate(messageOf(failure))
+    return refused(messageOf(failure))
   }
   const remoteFailure = (error: { message: string; code?: unknown }) => {
     if (!lifetime.aborted && (error.code === 'plugin-management/forbidden' || error.code === 'collaboration-forbidden')) invalidate(error.message)
@@ -55,8 +59,11 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
   const request = (endpoint: string, args: object) => ({ ...target, rpcId: randomUUID(), endpoint, args })
   const call = async <T,>(endpoint: string, args: object, signal?: AbortSignal): Promise<Answer<T>> => {
     const input = request(endpoint, args)
+    const abort = signal === undefined ? lifetime : AbortSignal.any([lifetime, signal])
     try {
-      const value = await pluginManagementInvoke(input, signal === undefined ? lifetime : AbortSignal.any([lifetime, signal]))
+      abort.throwIfAborted()
+      const value = await pluginManagementInvoke(input, abort)
+      abort.throwIfAborted()
       if (typeof value !== 'object' || value === null || !('rpcId' in value) || value.rpcId !== input.rpcId || !('result' in value)) throw new Error(t()('wireMismatched'))
       const result = value.result
       if (typeof result !== 'object' || result === null || !('ok' in result)) throw new Error(t()('wireNoResult'))
@@ -70,10 +77,14 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
     pluginInventory: { list: () => call('pluginInventory/list', {}) },
     pluginRegistryProbe: { fastest: () => call('pluginRegistryProbe/fastest', {}) },
     pluginManager: {
-      listPlugins: () => call('pluginManager/listPlugins', {}),
+      catalog: (includeEntryMetadata, signal) => call('pluginManager/catalog',
+        includeEntryMetadata === undefined ? {} : { includeEntryMetadata }, signal),
+      listPlugins: includeMetadata => call('pluginManager/listPlugins', includeMetadata === undefined ? {} : { includeMetadata }),
       listBundles: () => call('pluginManager/listBundles', {}),
       inspect: (spec, options, signal) => call('pluginManager/inspect', { spec, options }, signal),
       setPluginEnabled: (id, enabled) => call('pluginManager/setPluginEnabled', { id, enabled }),
+      describePluginConfig: id => call('pluginManager/describePluginConfig', { id }),
+      setPluginConfig: (id, config) => call('pluginManager/setPluginConfig', { id, config }),
       setBundleEnabled: (name, enabled) => call('pluginManager/setBundleEnabled', { name, enabled }),
       removeBundle: (name, signal) => call('pluginManager/removeBundle', { name }, signal),
       cancelInstall: requestId => call('pluginManager/cancelInstall', { requestId }),
@@ -85,9 +96,13 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
         let final: ChangeResult | undefined
         try {
           for await (const answer of readRpcStream(async (_url, init) => {
-            const response = await fetch('/admin/api/plugins/invoke', {
+            const response = await fetch(adminComputerRequestUrl('/admin/api/plugins/invoke'), {
               ...init, credentials: 'same-origin', body: JSON.stringify(input),
             })
+            if ([503, 504].includes(response.status)) {
+              await response.body?.cancel()
+              throw new AdminRequestError(response.status, computerErrorMessage(response.status === 504 ? 'node-service/timeout' : 'node-service/unavailable'))
+            }
             if ([401, 403, 404, 409].includes(response.status)) {
               await response.body?.cancel()
               if (!lifetime.aborted) invalidate(t()('wireStale'))

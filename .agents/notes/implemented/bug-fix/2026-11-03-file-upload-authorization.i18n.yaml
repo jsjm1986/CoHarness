@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-03-file-upload-authorization.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-03-file-upload-authorization.md
+document:
+  en: 5dc31a1cc3cd3e23907570a836f1be937d4a9842
+  zh: d400649c1c2347301ae0173d107380ef5c06e18c
+/agent-note-file-uploads-require-session-permission-and-live-owners:
+  en: 0b97245eb3178ab5
+  zh: e2c82439fd9e748a
+/agent-note-file-uploads-require-session-permission-and-live-owners/problem:
+  en: a1906bca2e0780d2
+  zh: 26be664c270a99a9
+/agent-note-file-uploads-require-session-permission-and-live-owners/decision:
+  en: 9de448ce40522bd1
+  zh: 448793f3fba96049
+/agent-note-file-uploads-require-session-permission-and-live-owners/alternatives-considered:
+  en: 0e43e6887c9e8499
+  zh: ed831da6e5727582
+/agent-note-file-uploads-require-session-permission-and-live-owners/consequences:
+  en: a82adc0ad1cd6114
+  zh: 80da16da72de1129
+/agent-note-file-uploads-require-session-permission-and-live-owners/verification:
+  en: e69daa4fc87ae607
+  zh: 859d572916abec0a

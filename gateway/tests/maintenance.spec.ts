@@ -1,4 +1,5 @@
 /** Maintenance windows, writer convergence, restore fencing, node status, and the operation ledger. @module */
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -9,7 +10,7 @@ import { PostgresBackupService } from '../src/postgres/backup-service.ts'
 import { acquireDeploymentDataLock } from '../src/postgres/deployment-lock.ts'
 import { createExecutionFixture } from './execution-fixture.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 let pool: Pool
 let cleanup: Array<() => Promise<unknown> | void> = []
@@ -188,6 +189,7 @@ describePg('Gateway maintenance control', () => {
       path: '/tmp/harness-1.dump', migrationVersion: 41, writeEpoch: 1n,
       sizeBytes: 128, sha256: 'a'.repeat(64), managedSnapshot: { version: 1, roots: [], directories: [], absent: [], files: [] }, actor: f.admin.id,
     })
+    await backups.setVerified(backup.id, true)
     const request = await maintenance.requestRestore(f.admin.id, backup.id)
     expect(request.status).toBe('pending')
     await expect(maintenance.requestRestore(f.admin.id, backup.id)).rejects.toMatchObject({ status: 409, message: 'restore-already-pending' })

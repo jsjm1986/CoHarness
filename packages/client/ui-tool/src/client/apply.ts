@@ -1,6 +1,6 @@
 /** Register the Tool call tree, details renderer, and built-in atomic views. */
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { ToolCallTree } from './tool/ToolCallTree.tsx'
 import { ToolDetails } from './tool/ToolDetails.tsx'
@@ -17,7 +17,7 @@ import { todoToolview } from './tool/toolviews/todo-row.tsx'
 import { webToolview } from './tool/toolviews/web-row.tsx'
 
 /** Required services: the slot registry and the Host description used for POSIX `~`. */
-export const inject = ['slots', 'connection']
+export const inject = ['slots', 'connection', 'sessions']
 
 /**
  * Mount the whole-Tool renderers and built-in atomic Tool registrations.
@@ -25,7 +25,12 @@ export const inject = ['slots', 'connection']
  */
 export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
-  const toolInject = () => ({ hooks: { hostDescription: connection.hostDescription } })
+  const toolInject = (sessionId: SessionId) => {
+    const target = ctx.sessions.runtimeTargetFor?.(sessionId)
+    const transport = target === undefined ? connection : connection.forTarget?.(target)
+    if (transport === undefined) throw new Error('Tool Runtime description is unavailable')
+    return { hooks: { hostDescription: transport.hostDescription } }
+  }
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'tool-call',

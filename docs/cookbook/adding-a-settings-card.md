@@ -2,7 +2,7 @@
 
 English | [中文](adding-a-settings-card.zh.md)
 
-How a plugin puts its own configuration on the web Plugins page. Nothing in this path needs a change inside this repository: the Host serves every registered settings namespace, and the page's **Configuration** group keys its items on the namespace they edit, so a plugin that registers both halves is paired up automatically.
+How a plugin puts its own configuration on the web Plugins page. Nothing in this path needs a change inside this repository: the Host serves every registered settings namespace, and the page's built-in features group pairs each `plugins.item` id with the Host row or served namespace it names, so a plugin that registers both halves is paired up automatically.
 
 The two halves live in one package — the Host half under `src/`, the browser half under `src/client/`, exported as `./client` and declared with `dsh.client`. [`packages/client/ui-theme`](../../packages/client/ui-theme) is a worked example of that packaging; the items this page ships live in [`packages/client/ui-settings-plugins`](../../packages/client/ui-settings-plugins).
 
@@ -45,7 +45,7 @@ export function apply(ctx: Context, config: Config) {
 
 ## 2. Register the item (browser half)
 
-The item registers into `plugins.item` under its namespace and owns everything below the page's title — controls and copy. The page asks the entry for `view: 'summary'` on its card and `view: 'page'` on the item's own page. It reads and writes through `ctx.settingsScope`, which fences each write with the revision it read:
+The item registers into `plugins.item` under a stable id and owns everything below the page's title — controls and copy. Name the settings namespace the card edits for a plain configuration card, or the cordis patch row the feature runs as when the card should carry the row's live state and switch. The page asks the entry for `view: 'summary'` on its card and `view: 'page'` on the item's own page. It reads and writes through `ctx.settingsScope`, which fences each write with the revision it read:
 
 ```ts ignore-check
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
@@ -73,7 +73,7 @@ The scope snapshot carries what a form needs: the resolved `value`, the composit
 
 ## 3. What the group does with it
 
-The **Configuration** group reads which namespaces the Host serves and keeps only `plugins.item` entries whose id names one. An item is rendered when the Host serves its namespace and skipped when it does not, so a deployment that never composed the Host half shows no trace of the item. A served namespace no item claims renders nothing — that is how the namespaces owned by other surfaces (`ui-theme`, `permission`, `llm-*`) stay off this group.
+The built-in features group resolves each `plugins.item` id against the Host's running-profile entries. An id naming a patch row binds that row: the card carries its live state and a switch, and stays listed while the row is off so the switch can turn it back on; entries sharing a `label` merge onto the group's live member. An id no row owns keeps only while it also names a settings namespace the Host serves, so a deployment that never composed the Host half shows no trace of the item. A served namespace no item claims renders nothing — that is how the namespaces owned by other surfaces (`ui-theme`, `permission`, `llm-*`) stay off this group.
 
 Items follow their registration `order`.
 

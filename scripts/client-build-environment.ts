@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { clientContentRevision, stampClientArtifact } from '../packages/client/modules/src/artifact-revision.ts'
 
 /** Prefix reserved for build-time values that may be embedded in browser artifacts. */
 const CLIENT_BUILD_ENV_PREFIX = 'DSH_CLIENT_'
@@ -363,6 +364,17 @@ function clientArtifactDigest(root: string): ClientArtifactDigest {
   const digest = createHash('sha256')
   for (const path of paths) {
     const content = readFileSync(resolve(root, path))
+    if (path.endsWith('/lib/client.js')) {
+      if (clientContentRevision(content) === undefined) {
+        throw new Error(`client build: missing content stamp in ${path}; rebuild with the shared client preset`)
+      }
+      const prefix = path.slice(0, -'client.js'.length)
+      const chunks = paths.filter(sibling => sibling !== path && sibling.startsWith(prefix + 'client.') && sibling.endsWith('.js'))
+        .map(sibling => ({ fileName: sibling.slice(prefix.length), code: readFileSync(resolve(root, sibling), 'utf8') }))
+      if (stampClientArtifact(content.toString('utf8'), chunks) !== content.toString('utf8')) {
+        throw new Error(`client build: executable chunks differ from the content stamp in ${path}; rebuild the complete package`)
+      }
+    }
     digest.update(`${Buffer.byteLength(path)}:`)
     digest.update(path)
     digest.update(`${content.byteLength}:`)

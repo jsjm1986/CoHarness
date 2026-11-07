@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Remote desktop stream",
+    "description": "WebSocket mount for ctx.remoteDesktop"
+  }
+}

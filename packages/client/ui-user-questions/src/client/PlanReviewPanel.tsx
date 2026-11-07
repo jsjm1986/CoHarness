@@ -64,7 +64,7 @@ export function PlanReviewPanel({ pending, review, t, renderSlot }: PlanReviewPa
             {renderSlot('conversation.plan-review.actions', { review, requestKey: pending.key })}
           </div>
         </div>
-        <div className={css.summary}>
+        <div className={css.summary} data-plan-review-scroll="" tabIndex={0} role="group" aria-label={t('plan.header')}>
           <h3 className={css.title}>{summary.title}</h3>
           {summary.description !== '' && <p className={css.description}>{summary.description}</p>}
         </div>

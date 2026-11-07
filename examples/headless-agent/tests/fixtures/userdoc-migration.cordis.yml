@@ -1,0 +1,6 @@
+- id: userdoc-local
+  name: '@deepseek-ai/dsh-userdoc-local'
+  config:
+    uploadRoot: !!js "process.cwd() + '/documents'"
+    legacyUploadRoot: !!js "process.cwd() + '/uploads'"
+    uploadMinFreeBytes: 0

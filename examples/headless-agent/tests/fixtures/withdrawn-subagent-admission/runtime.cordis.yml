@@ -1,0 +1,9 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, withdrawnAdmissionReady]
+- insert:
+    - id: withdrawn-admission-runtime
+      name: './runtime.mjs'
+    - id: withdrawn-admission-model
+      name: './model.mjs'

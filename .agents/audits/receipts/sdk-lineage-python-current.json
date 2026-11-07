@@ -1,0 +1,14 @@
+{
+  "name": "sdk-lineage-python-current",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_sdk_session_lineage.py -q",
+  "startedAt": "2026-10-24T11:24:01.300933+00:00",
+  "seconds": 2.868,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2ea1d6a8b382cb39cf8cf1f3e6d90861c0603b24153dee24557d962d9f37d9c7",
+  "inputsAfter": "2ea1d6a8b382cb39cf8cf1f3e6d90861c0603b24153dee24557d962d9f37d9c7",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

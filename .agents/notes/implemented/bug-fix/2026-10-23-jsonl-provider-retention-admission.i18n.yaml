@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-jsonl-provider-retention-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-jsonl-provider-retention-admission.md
+document:
+  en: d94628b2e0cd5e878cb458514d5040a0dafb39b5
+  zh: 33bc748e5bf4ecf275306e15ac4b9c4baa3db2e5
+/agent-note-reserve-jsonl-provider-capacity-before-session-commit:
+  en: d5c53a6e2cce7805
+  zh: 188f68aef72ee608
+/agent-note-reserve-jsonl-provider-capacity-before-session-commit/problem:
+  en: a12b3984d5a165f1
+  zh: 638d2664ad8998bb
+/agent-note-reserve-jsonl-provider-capacity-before-session-commit/decision:
+  en: 8e3cd5eb1226b3c1
+  zh: b212c9e07f8ed1e8
+/agent-note-reserve-jsonl-provider-capacity-before-session-commit/alternatives-considered:
+  en: b3dc065f2481add3
+  zh: 3508e0c2e52885d1
+/agent-note-reserve-jsonl-provider-capacity-before-session-commit/consequences:
+  en: 17d7aae417e52d62
+  zh: 768dd4da548f758d
+/agent-note-reserve-jsonl-provider-capacity-before-session-commit/verification:
+  en: 4d4b3cd839882712
+  zh: cdcf6c02c8df46df

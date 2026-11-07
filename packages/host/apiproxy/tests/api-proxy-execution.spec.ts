@@ -47,7 +47,7 @@ it('does not execute a managed write when its authority provider is missing', as
   ctx.provide('agents', { get: () => agent } as never)
   ctx.provide('executionAuthorityRequired', true)
   const next = vi.fn(async () => 'must not execute')
-  expect(() => invokeTypertRemote(ctx, { endpoint: 'goals/resume', namespace: 'goals', method: 'resume', service: 'goals',
-    args: { agentId: agent.id }, signal: new AbortController().signal }, next)).toThrow('requires its authorization provider')
+  await expect(invokeTypertRemote(ctx, { endpoint: 'goals/resume', namespace: 'goals', method: 'resume', service: 'goals',
+    args: { agentId: agent.id }, signal: new AbortController().signal }, next)).rejects.toThrow('requires its authorization provider')
   expect(next).not.toHaveBeenCalled()
 })

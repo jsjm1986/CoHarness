@@ -1,0 +1,14 @@
+{
+  "name": "native-model-owned-postgres-stop",
+  "cwd": ".",
+  "command": "python3 -c 'import json,subprocess; from pathlib import Path; o=json.loads(Path(\".agents/audits/.local/sdk-local-postgres-owner.json\").read_text()); local=Path(\".agents/audits/.local\").resolve(); data=Path(o[\"data\"]).resolve(); binary=Path(o[\"binary\"]).resolve(); assert o[\"owned\"] is True and o[\"port\"]==56818 and data.is_relative_to(local) and binary.is_relative_to(local); lines=(data/\"postmaster.pid\").read_text().splitlines(); assert Path(lines[1]).resolve()==data and lines[3]==\"56818\"; subprocess.run([str(binary/\"pg_ctl\"),\"-D\",str(data),\"-m\",\"fast\",\"-w\",\"-t\",\"30\",\"stop\"],check=True); assert not (data/\"postmaster.pid\").exists(); print(json.dumps({\"stopped\":True,\"port\":56818,\"dataRetained\":data.is_dir()}))'",
+  "startedAt": "2026-10-25T04:04:52.763068+00:00",
+  "seconds": 0.582,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e5cacc3555411444198df524260c4caaced0410f74845e6ce5f3ae3fdd96bf89",
+  "inputsAfter": "e5cacc3555411444198df524260c4caaced0410f74845e6ce5f3ae3fdd96bf89",
+  "postgresToolDirectory": null,
+  "outputSha256": "ebd56023d9e1620d103973cf1fb5db8a0f41dce3c9562d9cb49d29c194e7196c",
+  "outputTail": "waiting for server to shut down.... done\nserver stopped\n{\"stopped\": true, \"port\": 56818, \"dataRetained\": true}\n"
+}

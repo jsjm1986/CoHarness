@@ -1,0 +1,14 @@
+{
+  "name": "sonar-upgrade-guide-structure",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-governed-native-guide.py",
+  "startedAt": "2026-10-24T09:27:52.864972+00:00",
+  "seconds": 0.553,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "131944b34e9d59118d2eb7478ca6ee12cb1a2e219ddac3f91d47581714927e6e",
+  "outputTail": "guide.md structure verified 294 words\nguide.zh.md structure verified 88 words\nCurrent guide only; the repository has no verify-upgrade-guides script.\n"
+}

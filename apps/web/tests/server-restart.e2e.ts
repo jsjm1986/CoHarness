@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { REPO_ROOT, connectFreshWorkspace, newEnglishPage, saveFailureDom, saveFailureShot } from './support.ts'
-import { writeWelcomeNoticeAck } from './scaffold.ts'
 
 class RestartableServer {
   private child: ChildProcess | undefined
@@ -101,9 +100,6 @@ it('keeps an opened Session and draft when the server restarts on the same port'
   })
   const modelAddress = model.address()
   if (modelAddress === null || typeof modelAddress === 'string') throw new Error('Model fixture did not listen')
-  // Restart persistence is the subject; a first-run home would paint the
-  // versioned welcome modal over the composer.
-  await writeWelcomeNoticeAck(join(world, 'home'))
   const server = new RestartableServer(world, `http://127.0.0.1:${String(modelAddress.port)}`)
   onTestFinished(() => server.stop())
 

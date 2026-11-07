@@ -16,6 +16,8 @@ Migration 系列只使用一个钉死版本的 PostgreSQL 17 数据库。关系�
 
 SQL migration 是不可变编号文件。Migration ledger 保存 SHA-256 checksum，并用 PostgreSQL advisory lock 保证同一时间只有一个迁移者。Migration 3 加入共享项目运行时归属、根继承的 `project`/`private` 可见性、参与者投影、审批/问题原子抢占，以及项目额度/用量主体。Migration 4 把完整事件列改为 PostgreSQL `json`，并移除 payload 表达式索引。本机 Docker 部署同时钉死 PostgreSQL tag 和镜像 digest，只绑定回环地址，使用 named volume，并从 Compose secret 文件读取密码。
 
+合并分支时，已发布迁移保持其版本、文件名和精确 SQL 字节。已发布项目进展记录保留在 [059](../../../../gateway/deploy/postgres/migrations/059_project_journal.sql)；节点资源预算存储在组织摘要迁移之后追加为 [061](../../../../gateway/deploy/postgres/migrations/061_node_resource_budget.sql)。复用 059 会在启动前因已发布台账不符而拒绝，按 061 重放项目进展记录则会重复建表。修改已应用台账或放宽校验和、未知版本拒绝都不能替代迁移。回滚 release 必须识别每份已应用文件名和校验和；旧源码树不会自动兼容较新的 schema。
+
 会话 append 会锁定 session 行，要求连续序号，保留任意字符串 Session ID，并使用全局幂等 batch ID。创建根时保存已认证创建者、项目和可见性；后代复制已锁定的根 ACL。已提交参与者消息的 source 会更新逐根贡献者记录，PostgreSQL 唯一性为每项共享审批/问题选择一位响应者。完整事件存为 PostgreSQL `json`；用户消息、最终助手消息和工具结果文本投影到 trigram 搜索表。Provider 连续 chunk 继续采用现有 Harness 打包行为，而不是每个 token 写一行数据库。
 
 SQLite 导入器在单个事务中运行，并可重复导入同一控制面。它保留密码哈希、用户、项目和本机挂载、停止状态的个人实例分配、治理、价格历史、用户额度、用量、告警和审计。Migration 3 为已挂载的活跃项目分配共享运行时记录，并在需要时恢复每个项目创建者的 `rw` 成员身份。认证会话、登录尝试、运行时/intake token 和 JSONL transcript 明确丢弃，使凭据与协作历史在切换后从 PostgreSQL 权威重新开始。
@@ -23,6 +25,8 @@ SQLite 导入器在单个事务中运行，并可重复导入同一控制面。�
 ## 测试
 
 真实 PostgreSQL 17.6 容器验证直到版本 4 的 migration、幂等、checksum 和未知版本拒绝、企业隔离、任意字符串 Session ID、包含 NUL 字符串的完整 JSON 事件往返、序号拒绝、并发重试幂等、嵌套工具结果搜索、根 ACL 继承、参与者投影、交互竞态、项目用量/额度记录，以及完整控制面 fixture 和生产 SQLite 在线快照的可重复导入。备份验证使用仅所有者可读的 custom-format dump，并在接受流程前恢复到一次性数据库中。
+
+[历史回归](../../../../gateway/tests/migration-history.spec.ts)固定已发布进展记录迁移的文件名与 SHA-256。[PostgreSQL 升级 fixture](../../../../gateway/tests/postgres.spec.ts)先达到已发布版本 60 台账，插入合成进展记录与状态行，只应用追加的资源预算迁移，保留这些行并验证幂等重放。
 
 ## 曾考虑的替代方案
 

@@ -1,0 +1,14 @@
+{
+  "name": "subagent-initiator-realm-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk packages/subagent/subagent-codex/tests/managed-model-control.spec.ts packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts packages/subagent/subagent-acp/tests/managed-model-control.spec.ts packages/subagent/subagent-codex/tests/real-product.spec.ts -t 'initiating Agent|isolated owner|policy isolated|isolated initiating' --retry=0",
+  "startedAt": "2026-10-24T17:24:21.053336+00:00",
+  "seconds": 6.64,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1454c31da70fb5465bbec608e054090df2822b344532a66a880e38b03393cba0",
+  "inputsAfter": "1454c31da70fb5465bbec608e054090df2822b344532a66a880e38b03393cba0",
+  "postgresToolDirectory": null,
+  "outputSha256": "1031dac7dbd4f3bebc54e7004a150eeaa8dae040e1dd7a1003dc8abd1457b24d",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  5 passed | 3 skipped (8)\n      Tests  12 passed | 193 skipped (205)\n   Start at  01:24:24\n   Duration  2.67s (transform 11.49s, setup 488ms, import 18.25s, tests 140ms, environment 1ms)\n\n"
+}

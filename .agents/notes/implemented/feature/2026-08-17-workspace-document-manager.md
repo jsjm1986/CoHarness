@@ -18,15 +18,16 @@ The manager uses the directory operations and `documents` storage layout owned b
 
 - **Package**: `packages/client/ui-documents/` follows the pattern of `ui-collaboration`: a `client/` subentry with browser-only plugin code, `tsdown.config.ts` for the client bundle, and `src/client/` for components.
 - **Entry point**: `sidebar.footer.action` slot, alongside the scope selector from `ui-collaboration`. The button uses `IconBrowseOutline16` and a tooltip; the expanded sidebar shows the Documents label.
-- **Modal**: a 960px `Modal` (full-width bottom sheet below 768px) with limits in `description`, folder breadcrumbs and rows, upload into the current folder, and create, rename, move, and empty-folder delete flows. Search, type, sort, paging, and batch delete are owned by [document manager filter, pages, and batch delete](2026-08-19-document-manager-filter-pages-batch.md). Compact document actions wrap below the name and retain 44px targets.
-- **Preview**: routes by media type — images (`<img>`), PDFs (`<iframe>`), text-based files (fetch + `<pre>`, capped at 256 KiB), others fallback — in a matching-width dialog.
+- **Modal**: one bounded desktop workbench with scope navigation, folder breadcrumbs, direct attachment actions, and a removable inline preview. Phones use scope/action sheets, 44px controls, and full-screen reading. Sorting separates field and direction while preserving the six listing values owned by [document manager filter, pages, and batch delete](2026-08-19-document-manager-filter-pages-batch.md).
+- **Auxiliary flows**: dialogs share scrollable content and pinned actions. Destination search only filters display; it retains the selected directory and the empty string denoting the root. Desktop scope selection keeps its confirmation step; compact scope navigation still switches immediately.
+- **Preview**: image, PDF, and bounded text rendering reuse the authorized content reader. The selected preview is qualified by browsing scope and directory and remains visible only while its document is in the confirmed listing. This prevents a moved/deleted file or a previous scope from retaining active preview actions. Checkbox selection is independent; a single-file copy captures its own target instead of reading the batch selection. The [native PDF framing decision](../bug-fix/2026-10-23-native-document-pdf-framing.md) owns the authenticated PDF response policy.
 - **Delete**: confirmation dialog with a conversation-history warning; project-scope chrome (title and all-members extra) comes from fail-open `GET /account/api/context`.
 - **Locale**: bilingual (zh/en) via `locales.ts`.
 - **HTTP client**: this package owns a local `/api/documents` client. The client-bundle purity gate forbids a value import from `ui-conversation`, so the manager does not re-export conversation's client.
 
 ## Consequences
 
-Users can browse real folders and preview, upload, move, download, and delete documents through the conversation UI. Personal and project runtimes remain isolated because each manager talks only to its current runtime's document root.
+Users can browse real folders and preview, upload, move, download, delete, and attach documents through one manager. Scope authorization and storage remain owned by the [Gateway document broker](../architecture/2026-10-15-gateway-local-document-broker.md); the workbench changes presentation and selection state only.
 
 ## Verification
 

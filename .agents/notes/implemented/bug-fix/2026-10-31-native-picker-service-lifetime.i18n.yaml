@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-native-picker-service-lifetime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.md
+document:
+  en: 177cefc03c19e4fdcbd4f383c0b1efee99520f76
+  zh: 8aff4e7784db5ea0f88c1744d6164e2eded7a417
+/agent-note-native-chooser-service-lifetime:
+  en: 3fb38b92a9f1841d
+  zh: 7a45e9ae0c7104b9
+/agent-note-native-chooser-service-lifetime/problem:
+  en: e4dfff30d3f15783
+  zh: 3fec575dde852076
+/agent-note-native-chooser-service-lifetime/decision:
+  en: 39ed3dbbf5598d2a
+  zh: 4502026504564fd1
+/agent-note-native-chooser-service-lifetime/alternatives-considered:
+  en: daa7178f2b99d69b
+  zh: 9c08e1729c57b24f
+/agent-note-native-chooser-service-lifetime/consequences:
+  en: a8bf5992e1e243a1
+  zh: 91e131fbb552c03b

@@ -32,7 +32,11 @@ A question may carry a presentation `intent`, which declares that it IS a known 
 
 When a request carries an agent, `ask()` authenticates its exact identity through the live `AgentRegistry` and admits only a runtime root. A live child cannot open a human interaction. An agentless programmatic request remains available to unscoped local waterfall listeners and fails with `NO_PROVIDER` when none accepts it.
 
+Foreground questions belong to their live service and exact Agent until settlement. Answerers receive a service-owned signal linked to caller cancellation, service withdrawal and disposal of that Agent. Cancellation refuses late answers even when an answerer ignores its signal; each delegated continuation and returned answer rechecks the caller. Pending foreground questions and timed waits prevent idle retirement. A same-turn typed answerer rejection retains its domain code; otherwise cancellation settles by the next Host event-loop turn.
+
 While the tool call is open, the only answer path is that request; a browser that reconnects receives it again and can still complete it. Once the call has returned pending, or the process that owned it ended, the question is `continued`: the `answer` Remote method steers the reply into the agent as a `user-question-reply` message. No Remote method abandons a question — a Client that puts its panel away sends nothing, so the call stays answerable until an answer arrives. Answering a closed Session resumes its root agent first. Neither path fabricates a result for the finished tool call.
+
+`answer(agent, callId, batch, signal)` is asynchronous. In managed runtimes it attests the actual reply before queuing it, so later requests use the answerer's identity even when another user started the running turn. Cancellation, service withdrawal, caller replacement or authority replacement during attestation prevents delivery. Pending attestation and queued replies prevent idle retirement of their exact Agent. Managed project replies also retain the authenticated answerer snapshot for the contribution log and model-visible attribution; restored sessions preserve it while execution permissions are checked again. Independent compositions may omit execution authority.
 
 <a id="role"></a>
 ## Role

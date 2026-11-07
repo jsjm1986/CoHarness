@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-final-emit",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/build.ts",
+  "startedAt": "2026-10-25T10:22:43.927339+00:00",
+  "seconds": 28.989,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a14c198776dfe0c582c5eed0c2a9dfd204be8402b12938431d058eb0ca449854",
+  "inputsAfter": "a14c198776dfe0c582c5eed0c2a9dfd204be8402b12938431d058eb0ca449854",
+  "postgresToolDirectory": null,
+  "outputSha256": "341ac9115b7d80e60c2c2863fdb0851d1bbf488a3993d54532aafdeb3e66ba1e",
+  "outputTail": "run-gates: build running 8 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s).\nrun-gates: start native addon\nrun-gates: PASS native addon (1.52s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (3.55s)\nrun-gates: start Host bundle\nrun-gates: start host aggregate check\nrun-gates: PASS Host bundle (11.32s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (0.53s)\nrun-gates: start Client bundle\nrun-gates: start client aggregate check\n\n== FAILED host aggregate check (12.36s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: exit 2\npackages/host/userdoc-http/tests/acl.spec.ts(178,9): error TS2540: Cannot assign to 'get' because it is a read-only property.\nrun-gates: PASS client aggregate check (3.39s)\nrun-gates: PASS Client bundle (5.18s)\nrun-gates: start Web build\nrun-gates: PASS Web build (3.35s)\n\nrun-gates: 7 passed, 1 failed, 0 skipped in 25.46s.\nrun-gates: unsuccessful gates:\n  - FAILED host aggregate check (12.36s, exit 2)\n    tsc -p tsconfig.host.json\n"
+}

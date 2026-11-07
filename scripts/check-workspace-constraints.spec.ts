@@ -28,6 +28,56 @@ const experimental = {
 } satisfies WorkspaceManifest
 
 describe('workspace dependency ranges', () => {
+  it('publishes every document Gateway entry and shared chunk while refusing broader runtime globs', () => {
+    const dir = 'packages/attachment/userdoc-gateway'
+    const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+    expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+    for (const required of ['lib/protocol.js', 'lib/server.js', 'lib/frame-*.js', 'lib/protocol-*.js']) {
+      expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.filter(file => file !== required) } }))
+        .toEqual([expect.stringContaining('package.json files must be')])
+    }
+    expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: ['locale/*.json', 'lib/*.js', 'lib/types/**/*.d.ts'] } }))
+      .toEqual([expect.stringContaining('package.json files must be')])
+  })
+
+  it('publishes the document icon license and refuses its omission or unrelated files', () => {
+    const dir = 'packages/client/ui-documents'
+    const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+    expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+    for (const files of [manifest.files!.filter(file => file !== 'LICENSE.material-icon-theme'), [...manifest.files!, 'lib/unowned.js']]) {
+      expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files } }))
+        .toEqual([expect.stringContaining('package.json files must be')])
+    }
+  })
+
+  it('publishes the SDK child control entry and rejects missing or unrelated runtime files', () => {
+    const dir = 'packages/subagent/subagent-dsh-sdk'
+    const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+    expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+    for (const files of [manifest.files!.filter(file => file !== 'lib/managed.js'), [...manifest.files!, 'lib/unowned.js']]) {
+      expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files } }))
+        .toEqual([expect.stringContaining('package.json files must be')])
+    }
+  })
+
+  it('publishes the standalone resource wire bundle and rejects its omission', () => {
+    const dir = 'packages/context/resource-budget'
+    const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+    expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+    expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.filter(file => file !== 'lib/wire.js') } }))
+      .toEqual([expect.stringContaining('package.json files must be')])
+  })
+
+  it('publishes only the independent document identity entry beside its service', () => {
+    const dir = 'packages/attachment/userdoc'
+    const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+    expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+    for (const files of [manifest.files!.filter(file => file !== 'lib/identity.js'), [...manifest.files!, 'lib/unowned.js']]) {
+      expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files } }))
+        .toEqual([expect.stringContaining('package.json files must be')])
+    }
+  })
+
   const dependency = { dir: 'packages/core/runtime', manifest: { name: '@deepseek-ai/dsh-runtime' } }
   const cli = { dir: 'apps/cli', manifest: { name: '@deepseek-ai/dsh' } }
   const vendor = { dir: 'vendor/cordis', manifest: { name: '@deepseek-ai/cordis' } }
@@ -376,11 +426,20 @@ it('rejects a shared Web payload that omits the stylesheet chunks', () => {
   } })).toEqual([expect.stringContaining('package.json files must be')])
 })
 
-it('publishes the Workbench PDF chunk while rejecting unrestricted client chunks', () => {
+it('publishes the Workbench viewer chunks while rejecting unrestricted and unused client chunks', () => {
   const dir = 'packages/client/ui-workbench'
   const manifest = JSON.parse(readFileSync(`${dir}/package.json`, 'utf8')) as WorkspaceManifest['manifest']
   expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
   expect(expectedDshPackageFiles(manifest)).toContain('lib/client.pdf.js')
+  expect(expectedDshPackageFiles(manifest)).toContain('lib/client.excel.js')
+  for (const kind of ['cmaps', 'fonts', 'wasm']) {
+    expect(expectedDshPackageFiles(manifest)).toContain(`lib/client.${kind}.js`)
+    expect(checkWorkspaceManifest({ dir, manifest: {
+      ...manifest, files: manifest.files!.filter(file => file !== `lib/client.${kind}.js`),
+    } })).toContainEqual(expect.stringContaining('package.json files must be'))
+  }
+  expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: [...manifest.files!, 'lib/client.LazyExcelBody.js'] } }))
+    .toContainEqual(expect.stringContaining('package.json files must be'))
   expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.map(file => file === 'lib/client.pdf.js' ? 'lib/client.*.js' : file) } }))
     .toContainEqual(expect.stringContaining('package.json files must be'))
 })

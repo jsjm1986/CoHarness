@@ -1,0 +1,505 @@
+{
+  "findings": [
+    "B350",
+    "B351",
+    "B352",
+    "B353"
+  ],
+  "status": "fixed_and_verified_named_consumer_scope",
+  "updatedAt": "2026-10-30T12:36:44.025962+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T114010Z",
+  "sourcePaths": [
+    "packages/client/ui-project-activity/src/client/index.ts",
+    "packages/client/ui-project-activity/src/client/feed.ts",
+    "packages/client/ui-project-activity/tests/apply.client.spec.ts",
+    "packages/client/ui-project-activity/tests/feed.client.spec.ts",
+    "packages/client/ui-project-activity/tests/requests.client.spec.ts",
+    "packages/client/ui-project-activity/tests/fetch-input.ts",
+    "scripts/coverage-policy.ts",
+    "scripts/coverage-selection.spec.ts",
+    "apps/web/tests/project-progress.e2e.ts",
+    "apps/web/tests/snapshots/project-progress/journal.expected.md",
+    "apps/web/tests/snapshots/project-progress/source.expected.md",
+    "apps/web/tests/snapshots/project-progress/groups.expected.md",
+    "packages/client/ui-project-activity/README.md",
+    "packages/client/ui-project-activity/README.zh.md",
+    "packages/client/ui-project-activity/README.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-10-17-project-activity-feed.md",
+    ".agents/notes/implemented/feature/2026-10-17-project-activity-feed.zh.md",
+    ".agents/notes/implemented/feature/2026-10-17-project-activity-feed.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-activity-runtime/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-activity-runtime/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-activity-runtime/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/client/ui-project-activity/src/client/index.ts": "d2cbd08d21cf2156dc04ececad13c0d9ad8ac669838334df5fb093b2459c6603",
+    "packages/client/ui-project-activity/src/client/feed.ts": "e6e3a7b46c99374b6d55ea796ba76e235040c0b2ed8414f21528e6e31af5321d",
+    "packages/client/ui-project-activity/tests/apply.client.spec.ts": "6417241a59c36847a94c7be969765368fc0921e75303b0b6fd2bbebff0a3c41b",
+    "packages/client/ui-project-activity/tests/feed.client.spec.ts": "e569f8fa3e9c77d84f29ee843346157caab4b442140ac70c8d869b5f9589a510",
+    "packages/client/ui-project-activity/tests/requests.client.spec.ts": "f5306bb5680dde8565d9815ec5b6ab4493c8187d79e7d9760fbf34594db7d3d4",
+    "packages/client/ui-project-activity/tests/fetch-input.ts": "aa48fc117420fff676f3ed2a5d33f948764c2a07ee597b62cffa2b834f0ccd00",
+    "scripts/coverage-policy.ts": "bfa61aaf04baeaf4a428aad51276abbc9d4588ca79992735775694d2390bfd43",
+    "scripts/coverage-selection.spec.ts": "c32d5387f410b0e3c3b9c7c16dd159a3608f3b4bc8b0207140822a9e9e208fa9",
+    "apps/web/tests/project-progress.e2e.ts": "29c311cac623f482590ddd3b0ae20abc72ff39c61e626b75219bf9933d88287c",
+    "apps/web/tests/snapshots/project-progress/journal.expected.md": "e1f3cdbe84eb3769da20c7362ad2c2b6bb101b01888a8d24cc0ed091a0f2ecd0",
+    "apps/web/tests/snapshots/project-progress/source.expected.md": "b7bdf68fd8e31013e1b850a6e4a77ba547d729a210f0a97d706d703368db5bcc",
+    "apps/web/tests/snapshots/project-progress/groups.expected.md": "b1373543ee7fe7aa5a4656c6b071568ab906ee287e8e4d793558e7220184efcf",
+    "packages/client/ui-project-activity/README.md": "cfc48b1f7ae91d10472b4f3c3fae22cbe30f554655e900233de7daf4722353d8",
+    "packages/client/ui-project-activity/README.zh.md": "df306f73db6479f4b72a49ef3f8132a898d10822b01f0db1dd3d2b6acf74c4dc",
+    "packages/client/ui-project-activity/README.i18n.yaml": "a39416d2dc4c70bf2644ace024bd99a51516834126eddfdd964f6840bdf26abb",
+    ".agents/notes/implemented/feature/2026-10-17-project-activity-feed.md": "642f5013160417445271d8270539b4ba8ed4b1b93c37c64ed0216bd49692205e",
+    ".agents/notes/implemented/feature/2026-10-17-project-activity-feed.zh.md": "53e173cf453d5d48ac4607e55b6ec2c0b9b13966358f62abda5520dc44203bd4",
+    ".agents/notes/implemented/feature/2026-10-17-project-activity-feed.i18n.yaml": "a3d3378bc3e13cdd7beb42c8c8bd82f5f7d64c8aadff91778a3ced0080ea6e4c",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-activity-runtime/guide.md": "017fde50f335f0d2d7d74143957c54043dc1c717ae08fd8ac543dc25d45dc40f",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-activity-runtime/guide.zh.md": "8b595715b3a3f17ead1a9a94d45963a0149c1af5735e09f1b383c41417bf0c25",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-activity-runtime/guide.i18n.yaml": "22df037fae6bd42e18796980904aec108d6911d34b735be58855c708b1261364"
+  },
+  "compiledArtifactHashes": {
+    "packages/client/ui-project-activity/lib/client.js": "85f70971ce1b43c484d5e66238a20a8ea56e95422a90098c53c8da7947c63a36",
+    "packages/client/ui-project-activity/lib/types/client/feed.d.ts": "219e20d6bfff8655ceb3cb7f6932aaceeca4043de5657518434a507e57464399"
+  },
+  "repair": {
+    "B350": "Activity availability follows the selected Session owner. A body retains the complete Runtime for activity, journal, generation and source navigation. Restored qualified keys retain allocation identity even without the optional pool key helper. Only unqualified standalone Sessions fall back to page policy.",
+    "B351": "One bounded poll window reads generation status without recursively resetting its round budget. Refresh supersedes the old window, including synchronous publication-triggered refresh.",
+    "B352": "Conversation and member groups use stable IDs; first-row display metadata follows newest-first order. Renames remain one group and concatenation collisions do not merge identities.",
+    "B353": "A superseded feed read checks its signal after body decoding before publishing; stale data cannot overwrite a fresh page."
+  },
+  "causalNegative": {
+    "owner": {
+      "receipt": "project-activity-exact-owner-source-negative.json",
+      "failed": 2,
+      "controlsPassed": 4
+    },
+    "shippedWeb": {
+      "receipt": "project-activity-exact-owner-shipped-web-negative.json",
+      "failed": 1,
+      "controlsPassed": 2,
+      "failure": "After the account fixture includes the real environment UUID, the legacy source-conversation key cannot open DONE.",
+      "olderClientAssetFingerprintCaptured": false
+    },
+    "pollBudget": {
+      "receipt": "project-activity-poll-budget-negative.json",
+      "failed": 1,
+      "failure": "A50thjournal read continues past the existing48round window."
+    },
+    "groupIdentity": {
+      "receipt": "project-activity-group-identity-negative.json",
+      "failed": 3,
+      "controlsPassed": 10
+    },
+    "supersededReadAndCompactProvider": {
+      "receipt": "project-activity-superseded-response-negative.json",
+      "failed": 2,
+      "controlPassed": 1,
+      "failure": "Late feed JSON overwrites a fresh page; missing optional key helper discards the restored allocation. The journal late-read guard passes."
+    },
+    "workingTreeRollback": false
+  },
+  "verification": {
+    "uniqueCasesThisPhase": 49,
+    "packageSourceCases": 38,
+    "coveragePolicyCases": 7,
+    "browserCases": 4,
+    "browserExecutionsAcrossNode22And24": 8,
+    "repeatedCasesAreNotAdditionalCoverage": true,
+    "newAriaGoldens": 3,
+    "goldenFixtureTimestampFixed": true,
+    "browserTimezone": "UTC",
+    "browser": "installed Google Chrome",
+    "nodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledClient": true,
+    "hostRunsThroughVitestSourceLoader": true,
+    "compiledPlainNodeGatewayAcceptanceThisPhase": false,
+    "accountGatewayResponsesMocked": true,
+    "realClientSessionPoolAndHostComposition": true,
+    "realPostgresThisPhase": false,
+    "fullRootBuildGates": 8,
+    "docQuickGates": 20,
+    "checks": {
+      "project-activity-standard-package-coverage-accepted": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:26:39.066848+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/vitest",
+          "run",
+          "packages/client/ui-project-activity/tests/apply.client.spec.ts",
+          "packages/client/ui-project-activity/tests/feed.client.spec.ts",
+          "packages/client/ui-project-activity/tests/requests.client.spec.ts",
+          "scripts/coverage-selection.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/client/ui-project-activity/src/**/*.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T114010Z/project-activity-standard-package-coverage-accepted"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:26:52.199104+00:00"
+      },
+      "project-activity-standard-ci-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:18:45.922162+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/vitest",
+          "run",
+          "packages/client/ui-project-activity/tests/apply.client.spec.ts",
+          "packages/client/ui-project-activity/tests/feed.client.spec.ts",
+          "packages/client/ui-project-activity/tests/requests.client.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/client/ui-project-activity/src/client/index.ts",
+          "--coverage.include=packages/client/ui-project-activity/src/client/feed.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T114010Z/project-activity-standard-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:18:57.441650+00:00"
+      },
+      "project-activity-workspace-web-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:22:24.739391+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_SNAPSHOT=replay",
+          "NODE_OPTIONS=--import=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T114010Z/installed-chrome-workspace.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "./node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.web.config.ts",
+          "apps/web/tests/project-progress.e2e.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:22:38.537030+00:00"
+      },
+      "project-activity-workspace-web-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:22:24.739368+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_SNAPSHOT=replay",
+          "NODE_OPTIONS=--import=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T114010Z/installed-chrome-workspace.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "./node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.web.config.ts",
+          "apps/web/tests/project-progress.e2e.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:22:38.326431+00:00"
+      },
+      "project-activity-accepted-production-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:15:16.123908+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:15:55.784499+00:00"
+      },
+      "project-activity-accepted-client-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:15:16.123887+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "--tsconfig=tsconfig.client.json",
+          "packages/client/ui-project-activity/src/client/index.ts",
+          "packages/client/ui-project-activity/src/client/feed.ts",
+          "packages/client/ui-project-activity/tests/apply.client.spec.ts",
+          "packages/client/ui-project-activity/tests/feed.client.spec.ts",
+          "packages/client/ui-project-activity/tests/requests.client.spec.ts",
+          "packages/client/ui-project-activity/tests/fetch-input.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:15:20.340156+00:00"
+      },
+      "project-activity-corrected-browser-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:10:20.814647+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "--tsconfig=tsconfig.host.json",
+          "apps/web/tests/project-progress.e2e.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:10:24.484626+00:00"
+      },
+      "project-activity-final-policy-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:26:40.262685+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "--tsconfig=tsconfig.host.json",
+          "scripts/coverage-policy.ts",
+          "scripts/coverage-selection.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:26:43.651993+00:00"
+      },
+      "project-activity-policy-final-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:25:45.605002+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:25:50.470980+00:00"
+      },
+      "project-activity-final-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T12:07:02.506964+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T12:07:41.671664+00:00"
+      }
+    }
+  },
+  "coverage": {
+    "standardConfiguration": true,
+    "thresholdsLowered": false,
+    "summary": {
+      "total": {
+        "lines": {
+          "total": 148,
+          "covered": 148,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 187,
+          "covered": 187,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 42,
+          "covered": 42,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 92,
+          "covered": 92,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/client/ui-project-activity/src/css-modules.d.ts": {
+        "lines": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/client/ui-project-activity/src/index.ts": {
+        "lines": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/client/ui-project-activity/src/client/feed.ts": {
+        "lines": {
+          "total": 76,
+          "covered": 76,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 21,
+          "covered": 21,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 96,
+          "covered": 96,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 48,
+          "covered": 48,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/client/ui-project-activity/src/client/index.ts": {
+        "lines": {
+          "total": 70,
+          "covered": 70,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 20,
+          "covered": 20,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 89,
+          "covered": 89,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 44,
+          "covered": 44,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/client/ui-project-activity/src/client/locales.ts": {
+        "lines": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "executableSourceCount": 4,
+    "emptyDeclarationEntryIsNotExecutableCoverage": true,
+    "changedBusinessModules": 2,
+    "changedBusinessMetrics": {
+      "statements": 185,
+      "branches": 92,
+      "functions": 41,
+      "lines": 146,
+      "allPercent": 100
+    },
+    "priorBroadExemptionRemoved": "packages/client/ui-project-activity/src/*",
+    "remainingExemptions": [
+      "packages/client/ui-project-activity/src/client/*.tsx",
+      "packages/client/ui-project-activity/src/client/store.ts"
+    ],
+    "negativeGateReceipt": "project-activity-standard-coverage-negative-control.json",
+    "negativeCasesPassed": 36,
+    "negativeCasesSkipped": 2,
+    "negativeBranchPercent": 97.91,
+    "negativeGateRejected": true,
+    "initialZeroFileReportIsNotAcceptance": true
+  },
+  "documentation": {
+    "ownedPairs": 3,
+    "updatedExistingDecision": ".agents/notes/implemented/feature/2026-10-17-project-activity-feed",
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false,
+    "groupRepresentation": "Private maps hold populated tuple groups; display metadata never determines identity. Unreachable empty-group and empty-codepoint fallback branches are removed."
+  },
+  "iterationCorrectionsNotProductFindings": [
+    "Initial coverage selected0files under the existing UI exemption. Measurement was first explicit, then the standard policy was narrowed and guarded for Linux/macOS/Windows.",
+    "A request fixture reused a consumed Response; each call now returns its own body.",
+    "New golden generation initially lacked its directory; the committed golden directory and fixed timestamp/UTC fixtures are now present.",
+    "A mechanical arrow-format edit affected return-type parentheses; corrected source passes the full build and lints.",
+    "Raw aggregate checking initially saw stale helper declarations; the normal build regenerated them and checked both compiler faces.",
+    "An exact-optional-property fixture now retains its known Runtime type through satisfies instead of supplying a possibly undefined field.",
+    "Direct Node22/24 invocation bypassed the pnpm shim NODE_PATH. The private browser preload now resolves Playwright from its owning Web workspace.",
+    "The coverage selector returns sorted paths; the new policy assertion follows that established order."
+  ],
+  "limits": [
+    "This phase verifies the activity consumer and standard coverage policy, not the entire project or cross-account Gateway authorization.",
+    "Browser matrix runs a compiled client with a source Host and mocked account routes, not a compiled production Gateway/Postgres or physical second computer.",
+    "Component/store coverage debt, filesystem replacement races, native helper lifecycle and remaining resource consumers stay open.",
+    "All12original domains and B04/B25remain in progress.",
+    "Real paid model success and public push remain human-deferred. The peer-owned frozen deployment does not contain this group."
+  ]
+}

@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/agent/README.md
 document:
-  en: 79df4f6e269d186239f378f55b5f3aee7228b0f6
-  zh: 75672ee51d43c7137a637e0d507143d71230b6d0
+  en: 38dfe6c97395061229fe5b06d1232c65dc0f40c0
+  zh: 19ca21789877cb8c89bddf8da578baa534e6035b
 /:
   en: b6bcf3c8b941d336
   zh: 28b5d2aa43fdd026
 /deepseek-ai-dsh-agent:
-  en: 31791e9820e4d7bd
-  zh: a0d8b231e5299622
+  en: e0997ac625e7f4ae
+  zh: 71c5997c2749a2bf
 /deepseek-ai-dsh-agent/summary:
   en: 717e7d19a6f72e56
   zh: 152c18689fe4f377
@@ -30,8 +30,8 @@ document:
   en: 2594a1e02adea801
   zh: cae8860369728efb
 /deepseek-ai-dsh-agent/use-this-package/intercept-or-observe-work-in-flight:
-  en: fb42e501ef88a040
-  zh: 8822f29727d14bef
+  en: 20434581a48b8e1b
+  zh: 146aefcd7cdb3e53
 /deepseek-ai-dsh-agent/understand-the-implementation:
   en: ce7e776e9d516bdb
   zh: 59d2751743db7795

@@ -1,0 +1,251 @@
+{
+  "finding": "B439",
+  "status": "fixed_verified_named_workflow_provider_identity_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T10:29:15.283417+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-origin-final.json",
+    "fetchCompletedAt": "2026-11-01T10:29:05.488965+00:00"
+  },
+  "problem": "Resolving each child by a provider name allows a running workflow or later Ralph round to switch to a same-name provider with parent-history inheritance after the Consumer admitted fresh context.",
+  "fix": "Capture the selected provider instance at workflow admission and verify it remains registered inside each captured execution-authority callback immediately before child dispatch. Fail new starts after withdrawal/replacement; retain previously admitted children and allow a new workflow to select the replacement.",
+  "verification": {
+    "distinctBusinessCases": 217,
+    "relatedPackageCases": 213,
+    "newUnitCases": 6,
+    "typescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "versionRepeatsAndSubsetRerunsNotAdded": true,
+    "checks": [
+      {
+        "name": "workflow-provider-complete-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-complete-coverage.json"
+      },
+      {
+        "name": "workflow-provider-final-targeted",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-final-targeted.json"
+      },
+      {
+        "name": "workflow-provider-exact-source-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-exact-source-sdk.json"
+      },
+      {
+        "name": "workflow-provider-exact-built-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-exact-built-node22.json"
+      },
+      {
+        "name": "workflow-provider-built-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-built-node24.json"
+      },
+      {
+        "name": "workflow-provider-exact-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-exact-python-sdk.json"
+      },
+      {
+        "name": "workflow-provider-normal-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-normal-build.json"
+      },
+      {
+        "name": "workflow-provider-matched-final-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-matched-final-types.json"
+      },
+      {
+        "name": "workflow-provider-final-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-final-lint.json"
+      },
+      {
+        "name": "workflow-provider-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-export-docs.json"
+      },
+      {
+        "name": "workflow-provider-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-config.json"
+      },
+      {
+        "name": "workflow-provider-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-python-lint.json"
+      },
+      {
+        "name": "workflow-provider-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-pairing.json"
+      },
+      {
+        "name": "workflow-provider-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-docs.json"
+      },
+      {
+        "name": "workflow-provider-origin-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-origin-final.json"
+      },
+      {
+        "name": "workflow-provider-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-final-repository-references.json"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 193,
+          "covered": 193,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 232,
+          "covered": 232,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 52,
+          "covered": 52,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 135,
+          "covered": 135,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/workflow-ptc/src/host.ts": {
+        "lines": {
+          "total": 150,
+          "covered": 150,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 42,
+          "covered": 42,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 187,
+          "covered": 187,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 109,
+          "covered": 109,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/workflow-ptc/src/index.ts": {
+        "lines": {
+          "total": 43,
+          "covered": 43,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 45,
+          "covered": 45,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Both modified production files host.ts and index.ts reach100% in all4 per-file metrics through the full213 related cases. No ignore or threshold changes; no whole-project or all-package coverage claim.",
+    "physicalProof": "The shipped sdk-minimal profile executes actual native Node PTC and the ordinary Ralph Consumer. A completed parent turn contains a fixture-only marker. Replacing the selected fresh provider with the real in-process fork provider is rejected before the first child and between Ralph rounds. No inheriting Agent is created; the admitted original round still cleans up.",
+    "counterfactual": "The complete unchanged69-file original workflow-ptc package reproduces2 intended WORKFLOW_ROUTE_FAILED assertions under both current source and Node22 built fixtures. In both modes, the actual fork provider creates1 Agent containing the parent-history marker. No module error or test timeout is counted as proof. Six original-code controlled cases also fail expected dispatch/diagnostic assertions.",
+    "originalTestPreservation": {
+      "status": "passed",
+      "originalHostAssertionsUnchanged": true,
+      "otherOriginalTestFilesUnchanged": 13,
+      "hostFixtureChange": "Expose the existing provider-registration disposer without modifying any original assertion or test body.",
+      "addedUnitCases": 6
+    },
+    "fixtureSyntax": {
+      "status": "passed",
+      "command": "NODE_DISABLE_COMPILE_CACHE=1 node --check <each fixture>",
+      "paths": [
+        "examples/headless-agent/tests/fixtures/workflow-provider-route/model.mjs",
+        "examples/headless-agent/tests/fixtures/workflow-provider-route/prepare.mjs",
+        "examples/headless-agent/tests/fixtures/workflow-provider-route/runtime.mjs"
+      ],
+      "originalPackageFilesPreserved": 69
+    },
+    "verificationCorrections": "The initial host-only coverage run passed36 cases but missed paths covered by other existing workflow suites; the complete213-case run covers both changed files at100%. New barrier annotations were corrected to undefined and the6 cases plus lint rechecked. Full stable error assertions use actual Tool text, removing fixture-only JSON encoding; final source/built/Python scenarios pass. Initial failed receipts remain preserved.",
+    "docsQuick": "20 passed,0 failed",
+    "bilingualPairs": 2,
+    "cordisConfigs": 441,
+    "productionAcceptanceClaimed": false,
+    "officialResponsesDeferred": true
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/workflow-provider-route-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.md",
+    ".agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.zh.md",
+    "apps/cli/tests/profiles/sdk/workflow-provider-route.expected.e2e.ts",
+    "examples/headless-agent/tests/fixtures/workflow-provider-route/expected.json",
+    "examples/headless-agent/tests/fixtures/workflow-provider-route/model.mjs",
+    "examples/headless-agent/tests/fixtures/workflow-provider-route/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/workflow-provider-route/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/workflow-provider-route/runtime.mjs",
+    "packages/workflow/workflow-ptc/README.i18n.yaml",
+    "packages/workflow/workflow-ptc/README.md",
+    "packages/workflow/workflow-ptc/README.zh.md",
+    "packages/workflow/workflow-ptc/src/host.ts",
+    "packages/workflow/workflow-ptc/src/index.ts",
+    "packages/workflow/workflow-ptc/tests/host.spec.ts",
+    "python/sdk/tests/test_workflow_provider_route_expected.py"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 120,
+  "artifactReferences": 11,
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/note-review.json",
+  "remaining": [
+    "All12 domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue foreground Workflow/Ralph cleanup failure recovery, in-flight ownership transfer during service withdrawal, and queued continuation/provider/permission transitions. Prove a reachable failure before extending recovery ownership.",
+    "Continue remaining resource/model/tool/Inspector authorization and cross-account/computer business logic outside peer-reserved surfaces. Full file-level and production/platform coverage remains open.",
+    "The B416-to-current frozen integration index contains per-batch verified deltas; it is not an assembled release or production acceptance. B417 requires matching writers, all readers and SDK hosts; never downgrade an old reader against a committed generation containing its required event.",
+    "Trusted peer last reports live R26/schema103/epoch51 and R27 tests only, excluding B416+ capsules. OS pressure, managed B latency/admission and the complete cross-computer matrix remain open. Root has not independently verified those production reports.",
+    "Official paid Responses remains deferred. No root production deployment/restart/dependency synchronization/reset/stash/commit/push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T100420Z/B416-B439-integration-index.json"
+}

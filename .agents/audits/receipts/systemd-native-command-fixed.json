@@ -1,0 +1,14 @@
+{
+  "name": "systemd-native-command-fixed",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/systemd-command.spec.ts tests/launcher.spec.ts tests/config.spec.ts tests/tunnel-install.spec.ts tests/tunnel-supervisor.spec.ts --retry=0",
+  "startedAt": "2026-10-25T00:45:03.117155+00:00",
+  "seconds": 15.151,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "16e07d4d752e28605d760579b30107bf8d42f824b253a56252ec492229e4d1ed",
+  "inputsAfter": "16e07d4d752e28605d760579b30107bf8d42f824b253a56252ec492229e4d1ed",
+  "postgresToolDirectory": null,
+  "outputSha256": "4d9ed8c3df9e64807fbc615181456de6b879518a720a91b8073b1af4a75c8e8d",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  5 passed (5)\n      Tests  74 passed (74)\n   Start at  08:45:04\n   Duration  13.35s (transform 903ms, setup 0ms, import 1.20s, tests 15.47s, environment 0ms)\n\n"
+}

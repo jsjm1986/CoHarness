@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-26-workbench-catalog-read-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-26-workbench-catalog-read-ownership.md
+document:
+  en: 3ef36688e4b1407e74e28dcfa75750c1cbb130f3
+  zh: 55f57645e2e04607c55d378d0f547c927a4e03af
+/agent-note-workbench-catalog-read-ownership:
+  en: 9e357746bb539e9d
+  zh: d052fbe46097fe6e
+/agent-note-workbench-catalog-read-ownership/problem:
+  en: 07e88bf9c13604e2
+  zh: c834bdeffb22113a
+/agent-note-workbench-catalog-read-ownership/decision:
+  en: 8e666b14de8f3bf0
+  zh: e0660342ff0b9356
+/agent-note-workbench-catalog-read-ownership/alternatives-considered:
+  en: 0ca24e2fb22a0006
+  zh: ee9aff331249962c
+/agent-note-workbench-catalog-read-ownership/consequences:
+  en: 83e9fcbb72d2b904
+  zh: 6b8373110c7a4c1c

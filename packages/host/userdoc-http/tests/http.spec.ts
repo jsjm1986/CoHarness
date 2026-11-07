@@ -1,14 +1,17 @@
 import { createServer, type Server } from 'node:http'
 import { createHash } from 'node:crypto'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AddressInfo } from 'node:net'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LocalUserDocStore from '@deepseek-ai/dsh-userdoc-local'
 import {
   DOCUMENT_UPLOAD_PROTOCOL_CODE,
+  DOCUMENT_TRASHED_CODE,
+  UserDocError,
+  UserDocId,
 } from '@deepseek-ai/dsh-userdoc'
 import {
   handleUserDocHttp,
@@ -34,6 +37,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   if (server !== undefined) await new Promise<void>(resolve => server.close(() => { resolve() }))
   await context.fiber.dispose()
   await rm(root, { recursive: true, force: true })
@@ -83,6 +87,32 @@ async function completeUpload(uploadId: string, body: string): Promise<Response>
 }
 
 describe('user-document HTTP consumer', () => {
+  it.each([
+    ['POST', false], ['DELETE', false], ['POST', true], ['DELETE', true],
+  ] as const)('does not report %s success for a reused path while the replacement remains active (legacy provider: %s)', async (method, legacyProvider) => {
+    const upload = async (text: string): Promise<string> => {
+      const session = await (await beginUpload('reused.txt', text.length, text)).json() as { uploadId: string }
+      expect((await uploadChunk(session.uploadId, 0, text, text.length, 0)).status).toBe(200)
+      const completed = await completeUpload(session.uploadId, text)
+      expect(completed.status).toBe(200)
+      return (await completed.json() as { ref: { docId: string } }).ref.docId
+    }
+    const original = await upload('old')
+    expect((await fetch(`${origin}${USERDOC_TRASH_PATH}?id=${encodeURIComponent(original)}`, { method: 'POST' })).status).toBe(200)
+    const replacement = await upload('new')
+    expect(replacement).toBe(original)
+    if (legacyProvider) vi.spyOn(context.userDocs, 'trash').mockRejectedValue(new UserDocError('Already trashed', DOCUMENT_TRASHED_CODE))
+    const path = method === 'POST' ? USERDOC_TRASH_PATH : USERDOC_HTTP_PATH
+    const response = await fetch(`${origin}${path}?id=${encodeURIComponent(replacement)}`, { method })
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: { code: 'DOCUMENT_TRASH_CONFLICT' } })
+    expect(await readFile(join(root, replacement), 'utf8')).toBe('new')
+    expect(await context.userDocs.listTrash()).toHaveLength(1)
+    const restored = await context.userDocs.restore(UserDocId(original), undefined, 'saved-old.txt')
+    expect(await readFile(restored.path, 'utf8')).toBe('old')
+    expect(await readFile(join(root, replacement), 'utf8')).toBe('new')
+  })
+
   it('uploads through resumable chunks, lists, downloads, and deletes idempotently', async () => {
     const started = await beginUpload('年报.txt', 5)
     expect(started.status).toBe(200)
@@ -223,6 +253,46 @@ describe('user-document HTTP consumer', () => {
     const badRef = await fetch(`${origin}${USERDOC_HTTP_PATH}/content?id=..%2Foutside`)
     expect(badRef.status).toBe(400)
     expect(await badRef.text()).not.toContain(root)
+  })
+
+  it('answers oversized upload metadata instead of destroying the connection', async () => {
+    // The size guard fires while the body is still streaming; a structured
+    // response must reach the client rather than the socket being torn down.
+    const oversized = await fetch(`${origin}${USERDOC_UPLOADS_PATH}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        version: 1, name: 'big.json', directory: '', bytes: 1, fingerprint: 'x'.repeat(70 * 1024),
+      }),
+    })
+    expect(oversized.status).toBe(422)
+    expect(await oversized.json()).toMatchObject({ error: { code: 'DOCUMENT_UPLOAD_SIZE' } })
+
+    // The drained request keeps the keep-alive socket usable for a follow-up.
+    const healthy = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=`)
+    expect(healthy.status).toBe(200)
+  })
+
+  it('rejects folder names containing separators instead of trimming to a leaf', async () => {
+    for (const raw of ['../../etc', 'a/b', 'a\\b']) {
+      const created = await fetch(
+        `${origin}${USERDOC_HTTP_PATH}/folders?directory=&name=${encodeURIComponent(raw)}`,
+        { method: 'POST' },
+      )
+      expect(created.status).toBe(400)
+      expect(await created.json()).toMatchObject({ error: { code: 'INVALID_DOCUMENT_DIRECTORY' } })
+    }
+
+    const created = await fetch(`${origin}${USERDOC_HTTP_PATH}/folders?directory=&name=reports`, { method: 'POST' })
+    expect(created.status).toBe(201)
+    const renamed = await fetch(
+      `${origin}${USERDOC_HTTP_PATH}/folders?id=reports&name=${encodeURIComponent('../escape')}`,
+      { method: 'PATCH' },
+    )
+    expect(renamed.status).toBe(400)
+
+    const listing = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=`)
+    expect(await listing.json()).toMatchObject({ directories: [{ directoryId: 'reports', name: 'reports' }] })
   })
 
   it('returns 404 for paths and methods outside the owned contract', async () => {

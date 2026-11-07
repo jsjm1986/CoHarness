@@ -1,0 +1,14 @@
+{
+  "name": "native-search-dependency-catalog",
+  "cwd": ".",
+  "command": "pnpm run gen-dependency-catalog",
+  "startedAt": "2026-10-24T03:40:55.335914+00:00",
+  "seconds": 4.54,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3be91457491ba87471ce39725681b096b2224e00588f036e3526080a8ae3042f",
+  "inputsAfter": "3be91457491ba87471ce39725681b096b2224e00588f036e3526080a8ae3042f",
+  "postgresToolDirectory": null,
+  "outputSha256": "5092cd3c49be397b45d12627ef1bda3ae3113b5350b8b2c9a3a31c94dab506f3",
+  "outputTail": "$ tsx scripts/gen-dependency-catalog.ts\ndependency-catalog: generated docs/dependency-catalog.json\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "conversation-writer-locks-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-24T00:46:33.386189+00:00",
+  "seconds": 5.572,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9ee0ee07bdf74a68cf0241351be7b2eaba85639c3b57f349e0fa6e610025d0d2",
+  "inputsAfter": "9ee0ee07bdf74a68cf0241351be7b2eaba85639c3b57f349e0fa6e610025d0d2",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

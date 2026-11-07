@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/spill/spill/README.md
 document:
-  en: 1f883fe8bb3bab06b37783b26db5a2a185a27eac
-  zh: 39e460db3a5ea9b5be3706de382a650ec2d0ab96
+  en: f7292ad71d43a3d8d52f0dadeb461a7fb909e88d
+  zh: 28c112b767c5bc5fe9f4e0120afdf689a735e17a
 /:
   en: 4034d57a42147894
   zh: 61495d48365178df

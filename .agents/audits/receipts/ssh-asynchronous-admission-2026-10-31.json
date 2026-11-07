@@ -1,0 +1,200 @@
+{
+  "at": "2026-10-31T04:47:07.545847+00:00",
+  "findings": [
+    "B388"
+  ],
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z",
+  "sourcePaths": [
+    "packages/subprocess/subprocess/src/index.ts",
+    "packages/ssh/subprocess-ssh/src/index.ts",
+    "packages/subprocess/subprocess/tests/admission.spec.ts",
+    "packages/ssh/subprocess-ssh/tests/process-behavior.spec.ts",
+    "packages/ssh/subprocess-ssh/tests/terminal-behavior.spec.ts",
+    "packages/ssh/subprocess-ssh/tests/admission-owner-example.host.spec.ts",
+    "packages/ssh/subprocess-ssh/tests/fixtures/admission-owner.mjs",
+    "packages/ssh/subprocess-ssh/tests/expected/admission-owner.jsonl",
+    "packages/extensions/tool-cordis/src/api-catalog.ts",
+    "packages/subprocess/subprocess/README.md",
+    "packages/subprocess/subprocess/README.zh.md",
+    "packages/subprocess/subprocess/README.i18n.yaml",
+    "packages/ssh/subprocess-ssh/README.md",
+    "packages/ssh/subprocess-ssh/README.zh.md",
+    "packages/ssh/subprocess-ssh/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.i18n.yaml",
+    "docs/subsystems/subprocess.md",
+    "docs/subsystems/subprocess.zh.md",
+    "docs/subsystems/subprocess.i18n.yaml",
+    "docs/subsystems/llm-streaming.md",
+    "docs/subsystems/llm-streaming.zh.md",
+    "docs/subsystems/llm-streaming.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subprocess/subprocess/src/index.ts": "dcc0938d7da21683329a3a7ba0a015a24b2bb3230ec22fb21dbae64f5b228e9d",
+    "packages/ssh/subprocess-ssh/src/index.ts": "f556950ceaf1899628e1720788219f310fb4f8cf0330ec22f3ee85abfe552232",
+    "packages/subprocess/subprocess/tests/admission.spec.ts": "1671d0bbc72dc120e0da9ed7d7e7386a9f57dd095d87869eb05c1ff47c2a134e",
+    "packages/ssh/subprocess-ssh/tests/process-behavior.spec.ts": "84784e747a67b2aacf2f3f54b9cdc390fb04ebae89c84684f088381817dcfc18",
+    "packages/ssh/subprocess-ssh/tests/terminal-behavior.spec.ts": "da98d57909463cf578283f7632816facd1cfdfad434963aee91c34ffffb4f52a",
+    "packages/ssh/subprocess-ssh/tests/admission-owner-example.host.spec.ts": "ff75014cec86d9728694bd4e349bde47f6300fc9ef591a9e814d54454dd2bdb9",
+    "packages/ssh/subprocess-ssh/tests/fixtures/admission-owner.mjs": "a76a8d7fc48f19bf259c7cf565c9884e6816696d6a2ceaf370f2c94321a0c6d1",
+    "packages/ssh/subprocess-ssh/tests/expected/admission-owner.jsonl": "6aaa79f735d58244f99cb036a2c2596c2c65c79706bba75ccc935ca58e2cb7c3",
+    "packages/extensions/tool-cordis/src/api-catalog.ts": "6b6736bd7c0da88f7b8acd86ea23c599d25bc48f3ee4ff8af31046eabd008696",
+    "packages/subprocess/subprocess/README.md": "b782ab94ec8ed68d88165370e2f5a2a934071c671e579f96802aef83e17bffb3",
+    "packages/subprocess/subprocess/README.zh.md": "244d172edf168386b24752f1d889415f17372481ae25415a116c1642fc09c8a3",
+    "packages/subprocess/subprocess/README.i18n.yaml": "be46cf609d9e87f1af8313138fa64431c52ee5a500490d6f213ff1555bff70e4",
+    "packages/ssh/subprocess-ssh/README.md": "64e75909f8245c22a39dee6df6e6afdb4e410d68bdd45d0b7d6c1d0a609be54d",
+    "packages/ssh/subprocess-ssh/README.zh.md": "a790574eda9b74b72fb6894faec6fb5daf3c83dd152c25bf5f368248cbe62c9e",
+    "packages/ssh/subprocess-ssh/README.i18n.yaml": "2eec492dbe853192b95666a4f6576a4c3292ccada39abb699dc3ee39cef7abb5",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md": "0ef46d2dfc5cc61a881313fb69e4beb571a281deeb2b60b72780b37d438bddf8",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.zh.md": "5ba4e1605160e3dc818c01c09c08da5521fbf42053cec6be4d952ad3a04de3aa",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.i18n.yaml": "8f87358c33be27197c0a2af4fe85d323c25e598e0d4673df16467eeb7327ea9a",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.md": "e3bd35fe53252ce2325274cb01f5fb75d3c86b33131ca810db0ca3c9c5fa1605",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.zh.md": "2ac25913f2817785051d620fc5cd2c9e735680a9f278c91fdb77c188d3c81a7d",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.i18n.yaml": "2df5e32126a71fb4396cef1c0cdbc76fa22c4de8dd4cd62c7b4e958df50a5adf",
+    "docs/subsystems/subprocess.md": "a60aa7f1dd41378b25989be31d151b6baabec5f884e260b579aa40275c7e53ec",
+    "docs/subsystems/subprocess.zh.md": "67cf38d28f6461bbc840dc216ab20f7c4498bb4c9be2868cbb89288d433212c8",
+    "docs/subsystems/subprocess.i18n.yaml": "5b4535a0c696e5f9d1950457ed498c620d0d98c93a78b3da02f28c96a8896578",
+    "docs/subsystems/llm-streaming.md": "cc01155be2d42b2ccec54bb143efd514d09a1eb7fc49277d72d98c13c3aefe28",
+    "docs/subsystems/llm-streaming.zh.md": "bdff14e380c27bd189ff42755088efb0a0b6386bcec546be5581196a5d3c99d5",
+    "docs/subsystems/llm-streaming.i18n.yaml": "3a602600a7c68221848eb5bddffad95f3e75da4dd45a76b1585749074d4ec52a"
+  },
+  "causalEvidence": "All 8 process/terminal, prepare/connect and withdrawn/replaced owner cases fail before the fix. A private old compiled provider with its matching old subprocess service physically creates every stale target through the same real helper and authenticated socket-forwarding Loader application. Updated source and Node22/24 artifacts issue zero start RPCs and create no marker in all 8; both unchanged-owner targets still start. Original grants release once and replacement target capacity is never acquired.",
+  "implementation": "The shared subprocess service supplies a provider-entry admission check retained through asynchronous preparation, and a private confirmed-cleanup rejection mechanism. SSH rechecks before preparation, after preparation and immediately before process.start. Confirmed terminal rollback releases its permit and preserves the original failure; unconfirmed rollback retains occupation. Resource completion failure preserves both allocation and accounting errors. Ordinary rejected handles retire only after confirmed range quiescence and stream closure.",
+  "verification": {
+    "checks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-final-coverage.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-build.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-doc-quick.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-built-node22.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-built-node24.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-sdk-projections.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-python-projections.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-complete-lint.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-catalog-freshness.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-final-export-jsdoc.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-guide.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T033904Z/ssh-admission-origin-fetch.json"
+    ],
+    "uniqueCases": 574,
+    "cases": {
+      "subprocessLocalSshAndCordisCatalog": 567,
+      "typescriptSdkSnapshots": 5,
+      "pythonSdkSnapshots": 2,
+      "platformSkipped": 16
+    },
+    "coverage": {
+      "packages/ssh/subprocess-ssh/src/index.ts": {
+        "statements": [
+          285,
+          285
+        ],
+        "branches": [
+          102,
+          102
+        ],
+        "functions": [
+          70,
+          70
+        ]
+      },
+      "packages/subprocess/subprocess/src/index.ts": {
+        "statements": [
+          125,
+          125
+        ],
+        "branches": [
+          39,
+          39
+        ],
+        "functions": [
+          35,
+          35
+        ]
+      }
+    },
+    "coverageTotals": {
+      "statements": [
+        410,
+        410
+      ],
+      "branches": [
+        141,
+        141
+      ],
+      "functions": [
+        105,
+        105
+      ],
+      "lines": [
+        314,
+        314
+      ]
+    },
+    "coveragePolicy": "Both changed runtime modules pass standard per-file 100% thresholds; no coverage baseline, exclusion or global policy changed.",
+    "application": "The Source Loader replay passed before the first build. It uses the real helper, real process/PTY creation and authenticated stream forwarding through a local carrier. Built replay passes on Node22/24. The carrier is an OpenSSH stand-in; these are not encryption or separate-physical-host tests.",
+    "build": "All 8 final build gates pass.",
+    "documentation": "All 20 quick documentation gates, global catalog freshness, edited guide format and global export JSDoc pass; the sole initial JSDoc failure was in peer HMR code and was corrected by its owner. Full doc-sync is not claimed.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": {
+    "owner": ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md",
+    "decision": "Extended the owning admission note with asynchronous start checks, cleanup certainty and helper verification. SDK private transport, model operations and default-spill lifetime remain separately owned; no frozen archive was edited.",
+    "upgradeGuide": "The current process-resource-ownership guide is 230 English words and requires matching subprocess/SSH artifacts. Published provider signatures and all wire/data fields remain unchanged.",
+    "generatedDocs": "Regenerated the subprocess references and synchronized API-catalog/LLM-streaming source-pointer drift from the earlier model-owner JSDoc change. The generated artifacts pass the repository freshness check."
+  },
+  "baseline": {
+    "at": "2026-10-31T04:35:06.791312+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "peerThread": "multi-computer architecture chat",
+    "peerReportedRelease": "R6 on mac-mini and Ubuntu; auth-only incremental deployment, schema102 and epoch83.",
+    "peerReportedVerification": "19 real PostgreSQL auth cases and 8-concurrent token performance 7932.94ms to 963.68ms; page performance remains REAL-001 open.",
+    "independentlyVerifiedByThisBatch": false,
+    "rootReleaseStatus": "B388 is verified and frozen for a subsequent matched build. Root did not deploy; peer R8 explicitly excludes B388.",
+    "reservedPeerPaths": [
+      "gateway/src/postgres/auth-service.ts",
+      "gateway/tests/auth-postgres.spec.ts",
+      "Gateway HTML and real Web assembly fixtures",
+      "topology/node access, CUA and migration101/102",
+      "the three resource-budget files and late UI authorization hydration",
+      "packages/client/runtime",
+      "ui-conversation",
+      "test-support/client-runtime",
+      "apps/web/tests/workspace-history-entry.e2e.ts",
+      "packages/client/ui-documents",
+      "packages/client/ui-agent-preset",
+      "packages/client/runtime Session/navigation/input state",
+      "packages/client/ui-collaboration",
+      "packages/boot/hmr/src/package-manifest.ts",
+      "packages/boot/hmr/src/package-methods.ts",
+      "packages/client/settings per-field authority"
+    ],
+    "handoff": "One receipt and source-hash handoff after verification; no repeated progress messages.",
+    "latestReadOnlyPeerSnapshot": "Peer reports a real collaborative project write succeeded on computer A; owner and readonly members saw the response, readonly had no send entry, and computer B draft remained independent. Root did not independently reproduce this report.",
+    "peerCandidateStatus": "Peer reports R7 candidate and GUI work are in progress, not deployed. It plans to integrate the frozen root candidate and preserve matched parent/child artifacts.",
+    "peerNewRace": "REAL-013: navigation can submit the previous Session composer while creating a new Session. Peer owns originating-Session input hold and its GUI/real Web regressions. No root acceptance of that fix is claimed.",
+    "productionPerformance": "Peer reports direct QA TLS to actual A Gateway reaches the workbench in about one second; public-entry performance still fails independently. No root verification is claimed.",
+    "peerLatestReported": "Peer reports R8 serving on both nodes after maintenance epoch85, project generation8 and personal generation10. A real session.create response held 46 seconds across 4 WebSocket connections preserves the composer hold and old draft; release selects the new Session and preserves the other tab. Peer is fixing per-field settings authority for account-writable/Host-readonly fonts. Peer HMR layer retirement has 245 cases, 100% on 2 modules, Node22 checks and a 45-case Web combination, with 167 frozen source/documentation paths.",
+    "peerSnapshotEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/peer-latest-compact.json",
+    "peerAcceptanceQualification": "Peer reports are not fresh root production, PostgreSQL or physical Linux acceptance.",
+    "rootCoordination": "Root reviewed the peer identity-fence refresh plan read-only and flagged principal-generation invalidation, persistence ownership and existing verified-account consumers. Root reported the peer HMR return-type gate failure; the peer fixed it and the global JSDoc gate passed."
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review quota/admission failure classification, valid resource-only managed Codex routing and remaining cross-computer permissions.",
+    "Review remote pipe completion/paused consumer behavior and remaining subprocess/resource lifecycle cases.",
+    "No fresh root PostgreSQL, physical Linux/Windows, paid API or deployment acceptance. Revalidate owned database identity/mapping before any future DB test.",
+    "Peer per-field settings authority and final real Web acceptance remain separately owned. Full doc-sync and whole-project completion are not claimed."
+  ]
+}

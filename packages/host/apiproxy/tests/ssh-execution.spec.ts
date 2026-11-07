@@ -194,6 +194,22 @@ describe('ensureSshRealm', () => {
     expect(shared.dispose).toHaveBeenCalledTimes(1)
   })
 
+  it('reports failed revocation cleanup while retiring the revoked generation', async () => {
+    const controller = new AbortController(), failure = new Error('remote cleanup could not be confirmed')
+    const { ctx, scopeCtx } = await realmHost(new Map([[7, { config: { host: 'h' }, signal: controller.signal, userId: 9 }]]))
+    const { hooks, invalidated, presets } = roster()
+    const error = vi.spyOn(ctx.logger, 'error').mockImplementation(() => {})
+    try {
+      ensureSshRealm(presets as never, 'ssh-target/7/u9', 7)
+      await hooks.get('ssh-target/7/u9')!(scopeCtx)
+      shared.dispose.mockRejectedValueOnce(failure)
+      controller.abort()
+      await Promise.resolve()
+      expect(invalidated).toEqual(['ssh-target/7/u9'])
+      expect(error).toHaveBeenCalledWith('SSH target cleanup after revocation failed', failure)
+    } finally { error.mockRestore() }
+  })
+
   it('treats a grant revoked before readiness settled as a mount failure', async () => {
     const controller = new AbortController()
     const grants = new Map<number, ResolvedGrant>([

@@ -1,0 +1,57 @@
+{
+  "reply": "SUBAGENT_CLEANUP_OK",
+  "completed": {
+    "mode": "completed",
+    "liveDuringCleanup": true,
+    "cleanupNotice": "Subagent cleanup is unconfirmed; request termination again to retry. Error: child transport cleanup unconfirmed",
+    "retainedTransport": true,
+    "ownerBusy": true,
+    "endEventsBeforeCleanup": 0,
+    "retryRequested": true,
+    "finalStatus": "failed",
+    "finalDetail": "dispose failed: Error: child transport cleanup unconfirmed",
+    "transportClosed": true,
+    "jobEndsAfterCleanup": 1
+  },
+  "rejected": {
+    "mode": "rejected",
+    "liveDuringCleanup": true,
+    "cleanupNotice": "Subagent cleanup is unconfirmed; request termination again to retry. Error: child transport cleanup unconfirmed",
+    "retainedTransport": true,
+    "ownerBusy": true,
+    "endEventsBeforeCleanup": 0,
+    "retryRequested": true,
+    "finalStatus": "failed",
+    "finalDetail": "Error: child result unavailable; dispose failed: Error: child transport cleanup unconfirmed",
+    "transportClosed": true,
+    "jobEndsAfterCleanup": 1
+  },
+  "pending-completed": {
+    "mode": "pending-completed",
+    "liveDuringCleanup": true,
+    "retainedTransport": true,
+    "ownerBusy": true,
+    "endEventsBeforeCleanup": 0,
+    "retryRequested": true,
+    "finalStatus": "failed",
+    "finalDetail": "dispose failed: Error: child transport cleanup unconfirmed",
+    "transportClosed": true,
+    "jobEndsAfterCleanup": 1,
+    "pendingCleanupAtTermination": true,
+    "cleanupAttempts": 2
+  },
+  "pending-rejected": {
+    "mode": "pending-rejected",
+    "liveDuringCleanup": true,
+    "retainedTransport": true,
+    "ownerBusy": true,
+    "endEventsBeforeCleanup": 0,
+    "retryRequested": true,
+    "finalStatus": "failed",
+    "finalDetail": "Error: child result unavailable; dispose failed: Error: child transport cleanup unconfirmed",
+    "transportClosed": true,
+    "jobEndsAfterCleanup": 1,
+    "pendingCleanupAtTermination": true,
+    "cleanupAttempts": 2
+  }
+}

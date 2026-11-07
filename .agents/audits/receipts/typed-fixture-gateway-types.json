@@ -1,0 +1,13 @@
+{
+  "name": "typed-fixture-gateway-types",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-23T20:11:20.472763+00:00",
+  "seconds": 7.337,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8cacdadaeafccbb973b5cb2975ccb73f9d8a5b627ba72aaae1c7a9178ad9a688",
+  "inputsAfter": "8cacdadaeafccbb973b5cb2975ccb73f9d8a5b627ba72aaae1c7a9178ad9a688",
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

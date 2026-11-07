@@ -1,0 +1,29 @@
+{
+  "reply": "RETIRED_CLEANUP_OK",
+  "workflow": {
+    "mode": "workflow",
+    "firstError": true,
+    "secondError": true,
+    "busyAfterFailedExit": true,
+    "startsBeforeRecovery": 1,
+    "oldOpenBeforeRecovery": true,
+    "thirdSucceeded": true,
+    "startsAfterRecovery": 2,
+    "oldClosedBeforeNew": true,
+    "allClosed": true,
+    "originalEndings": 1
+  },
+  "ralph": {
+    "mode": "ralph",
+    "firstError": true,
+    "secondError": true,
+    "busyAfterFailedExit": true,
+    "startsBeforeRecovery": 1,
+    "oldOpenBeforeRecovery": true,
+    "thirdSucceeded": true,
+    "startsAfterRecovery": 2,
+    "oldClosedBeforeNew": true,
+    "allClosed": true,
+    "originalEndings": null
+  }
+}

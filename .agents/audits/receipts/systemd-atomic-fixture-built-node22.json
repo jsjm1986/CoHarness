@@ -1,0 +1,14 @@
+{
+  "name": "systemd-atomic-fixture-built-node22",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node tests/run-built-systemd-control.mjs",
+  "startedAt": "2026-10-25T00:59:23.976897+00:00",
+  "seconds": 16.371,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "658d3ca198fa57f89556bccc6b2a066b4e177c83045834bf1ec2153e840bc210",
+  "inputsAfter": "658d3ca198fa57f89556bccc6b2a066b4e177c83045834bf1ec2153e840bc210",
+  "postgresToolDirectory": null,
+  "outputSha256": "120e48d88340b87ed0d6c54045de0b5354cd9efd45e1b1d679a657197b428b6e",
+  "outputTail": "Native control clients exclude Gateway database variables and disable prompts.\nCancellation closes the daemon-reload client before startup settles.\nCancellation closes the restart client and retains the generation cleanup handle.\nA stalled liveness client times out without proving unit exit.\nA stalled stop client times out without releasing service ownership.\n"
+}

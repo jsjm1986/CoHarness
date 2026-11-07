@@ -1,0 +1,1582 @@
+{
+  "adminRoutes": [
+    "/",
+    "/users",
+    "/users/:id",
+    "/projects",
+    "/projects/:id",
+    "/plugins",
+    "/models",
+    "/usage",
+    "/documents",
+    "/archives",
+    "/terminals",
+    "/ssh",
+    "/deployment",
+    "/steward",
+    "/webhooks",
+    "/desktops",
+    "/remote-desktops",
+    "/audit"
+  ],
+  "clientPackages": [
+    {
+      "package": "@deepseek-ai/dsh-client-connection",
+      "directory": "packages/client/connection",
+      "client": {
+        "inject": [],
+        "platform": "web",
+        "immediately": true
+      },
+      "description": "Wire consumer layer: HTTP-up/WebSocket-down client, ConnectionController dual streams with reconnect, and fixture api"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-file-upload",
+      "directory": "packages/client/file-upload",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web",
+        "immediately": true
+      },
+      "description": "Agent-scoped browser file upload, streaming intake, and staged receipt service"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-hmr",
+      "directory": "packages/client/hmr",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-modules"
+        ],
+        "platform": "web",
+        "immediately": true
+      },
+      "description": "Dev-only hot-reload driver for script-loaded client entries: SSE rebuilt frames → invalidate/prefetch → fiber swap through the vendored Loader entry"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-locale",
+      "directory": "packages/client/locale",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web",
+        "immediately": true
+      },
+      "description": "Locale plugin: Host-backed language preference, external language packs, fallback chains, snapshots, and typed namespace dictionaries"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-modules",
+      "directory": "packages/client/modules",
+      "client": {
+        "platform": "web",
+        "inject": [],
+        "immediately": true
+      },
+      "description": "Client module system, dual-face: node half composes the __DSH_BOOT__ entry graph (incremental dsh.client scan, bundle route, index tap, webPlugins service); browser half is the lazy-CJS module table the vendored cordis Loader consumes as its internal seam"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-runtime",
+      "directory": "packages/client/runtime",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-typert-registry",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web",
+        "immediately": true
+      },
+      "description": "Client core services: SlotRegistry, SessionRuntime (scope tree + object layer)"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-shortcuts",
+      "directory": "packages/client/shortcuts",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale"
+        ],
+        "platform": "web"
+      },
+      "description": "Application keyboard command registry and physical-key routing"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-agent-preset",
+      "directory": "packages/client/ui-agent-preset",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web"
+      },
+      "description": "Agent-preset surfaces: the default for later sessions, this session's seat, and the composition editor"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-attachment",
+      "directory": "packages/client/ui-attachment",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-ui-conversation"
+        ],
+        "platform": "web"
+      },
+      "description": "Dynamic attachment presentation plugin for conversation input, message-image, and trajectory image slots"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-brand-official",
+      "directory": "packages/client/ui-brand-official",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-sidebar"
+        ],
+        "platform": "web"
+      },
+      "description": "Official DeepSeek Harness brand occupants for the Web client's sidebar and conversation Hero slots"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-collaboration",
+      "directory": "packages/client/ui-collaboration",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-sidebar"
+        ],
+        "platform": "web"
+      },
+      "description": "Project scope, shared-conversation visibility, and read-only collaboration UI"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-commands",
+      "directory": "packages/client/ui-commands",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-input-trigger",
+          "@deepseek-ai/dsh-client-ui-conversation"
+        ],
+        "platform": "web"
+      },
+      "description": "Client command surface: global directory cache, '/' source, three command UI kinds, popupSelect registry"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-conversation",
+      "directory": "packages/client/ui-conversation",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-ui-layout"
+        ],
+        "platform": "web"
+      },
+      "description": "Conversation domain: skeleton, ordered chat flow, account-backed composer/display preferences, and details host"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-deliverables",
+      "directory": "packages/client/ui-deliverables",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-sidebar-right"
+        ],
+        "platform": "web"
+      },
+      "description": "Produced-files turn tail and clickable final-response file references for Web"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-directory-picker-browse",
+      "directory": "packages/client/ui-directory-picker-browse",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-workspace",
+          "@deepseek-ai/dsh-client-locale"
+        ],
+        "platform": "web"
+      },
+      "description": "In-app directory browsing surface: the workspace directory-flow owner rendering the host's listing and creation primitives"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-directory-picker-native",
+      "directory": "packages/client/ui-directory-picker-native",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-workspace"
+        ],
+        "platform": "web"
+      },
+      "description": "Native directory-picker surface: the renderless workspace directory-flow occupant driving the host's OS chooser"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-dockkit",
+      "directory": "packages/client/ui-dockkit",
+      "client": null,
+      "description": "Docking layout kit: split-tree engine with invertible operations, and the React components that render and drive it (zero cordis)"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-documents",
+      "directory": "packages/client/ui-documents",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-sidebar"
+        ],
+        "platform": "web"
+      },
+      "description": "Workspace document manager UI: browse, preview, upload, and delete uploaded documents"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-goal",
+      "directory": "packages/client/ui-goal",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-conversation"
+        ],
+        "platform": "web"
+      },
+      "description": "Session goal surface: GoalBar docked above the composer, read from the goal session projection"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-input-trigger",
+      "directory": "packages/client/ui-input-trigger",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-locale"
+        ],
+        "platform": "web"
+      },
+      "description": "Input trigger pipeline: '/' and '@' detection, candidate menu, pick routing to registered sources"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-jobs",
+      "directory": "packages/client/ui-jobs",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-primitives"
+        ],
+        "platform": "web"
+      },
+      "description": "Session-header background-job list: live registry state mirrored from session/jobs frames"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-layout",
+      "directory": "packages/client/ui-layout",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-theme",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-shortcuts"
+        ],
+        "platform": "web"
+      },
+      "description": "Shell plugin: three-column AppFrame with drag handles, ctx.layout viewing-state service (navigation + panels)"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-memory",
+      "directory": "packages/client/ui-memory",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-plugin-manager",
+          "@deepseek-ai/dsh-client-ui-primitives",
+          "@deepseek-ai/dsh-client-ui-workspace",
+          "@deepseek-ai/dsh-client-ui-sidebar-right"
+        ],
+        "platform": "web"
+      },
+      "description": "Durable memory browser and settings card: scoped entries the member can read, search, and edit"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-model-selection",
+      "directory": "packages/client/ui-model-selection",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-commands",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web"
+      },
+      "description": "Model selection: the /model popupSelect over session.models / session.selectModel"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-open-in-app",
+      "directory": "packages/client/ui-open-in-app",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-renderer",
+          "@deepseek-ai/dsh-client-runtime"
+        ],
+        "platform": "web"
+      },
+      "description": "Web Session-header \"Open In...\" split button opening the session workspace directory in a locally installed application"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-permission-presets",
+      "directory": "packages/client/ui-permission-presets",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-commands",
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-ui-settings"
+        ],
+        "platform": "web"
+      },
+      "description": "Permission surfaces: a new-session default in General settings and a current-session /permission popup over the permissions projection"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-plan",
+      "directory": "packages/client/ui-plan",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-sidebar-right"
+        ],
+        "platform": "web"
+      },
+      "description": "Plan-mode composer control, persistent submitted-plan cards, and Session-backed sidebar previews"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-plugin-manager",
+      "directory": "packages/client/ui-plugin-manager",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-layout",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-client-ui-sidebar"
+        ],
+        "platform": "web"
+      },
+      "description": "Plugin management for the dsh web client: the sidebar Plugins panel installs, enables, disables, retries, and composes installed plugin packages"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-plugin-market",
+      "directory": "packages/client/ui-plugin-market",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-plugin-manager"
+        ],
+        "platform": "web"
+      },
+      "description": "Discover tab of the dsh web Plugins page: browse configured plugin market indexes and install their bundles"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-primitives",
+      "directory": "packages/client/ui-primitives",
+      "client": null,
+      "description": "Pure React atoms for the dsh web UI: controls, icons, markdown, and JSON inspectors (zero cordis)"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-project-activity",
+      "directory": "packages/client/ui-project-activity",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-sidebar-right"
+        ],
+        "platform": "web"
+      },
+      "description": "Project member activity feed: attributed messages and question answers in the right Sidebar"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-reference",
+      "directory": "packages/client/ui-reference",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-input-trigger"
+        ],
+        "platform": "web"
+      },
+      "description": "Unified Web @file and @session reference source"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-remote-desktop",
+      "directory": "packages/client/ui-remote-desktop",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remote-desktop-controller",
+          "@deepseek-ai/dsh-client-ui-sidebar-right"
+        ],
+        "platform": "web"
+      },
+      "description": "Human remote-desktop tabs for the right sidebar: grant summary, explicit consent, attach, and the noVNC RFB screen"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-renderer",
+      "directory": "packages/client/ui-renderer",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-runtime"
+        ],
+        "platform": "web",
+        "immediately": true
+      },
+      "description": "Browser UI renderer: React slot bindings, ctx.uiRenderer, and the assembled application root"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-schedule",
+      "directory": "packages/client/ui-schedule",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-layout",
+          "@deepseek-ai/dsh-client-ui-sidebar",
+          "@deepseek-ai/dsh-client-ui-sidebar-right",
+          "@deepseek-ai/dsh-client-ui-tool",
+          "@deepseek-ai/dsh-client-ui-workspace",
+          "@deepseek-ai/dsh-client-ui-primitives"
+        ],
+        "platform": "web"
+      },
+      "description": "Host task management page and Session reminder catalog"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-settings",
+      "directory": "packages/client/ui-settings",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web"
+      },
+      "description": "Settings domain base plugin: the settings-namespace scope service and the canonical settings slot-type contract"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-settings-general",
+      "directory": "packages/client/ui-settings-general",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-ui-sidebar",
+          "@deepseek-ai/dsh-client-shortcuts",
+          "@deepseek-ai/dsh-client-modules",
+          "@deepseek-ai/dsh-client-ui-layout"
+        ],
+        "platform": "web"
+      },
+      "description": "Settings ownerless-copy and product onboarding plugin: the General section, shell trigger/header chrome content, settings dictionaries, and the versioned welcome notice"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-settings-models",
+      "directory": "packages/client/ui-settings-models",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web"
+      },
+      "description": "Models settings and shared product-onboarding dialogs over existing settings and credential joins"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-settings-plugin-inventory",
+      "directory": "packages/client/ui-settings-plugin-inventory",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-agent-preset",
+          "@deepseek-ai/dsh-client-modules"
+        ],
+        "platform": "web"
+      },
+      "description": "Read-only Cordis Loader inventory tab in Web Plugins settings"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-settings-plugins",
+      "directory": "packages/client/ui-settings-plugins",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web"
+      },
+      "description": "Official plugin configuration items on the Plugins page, one page per configurable host-plane namespace"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-settings-unarchive-sessions",
+      "directory": "packages/client/ui-settings-unarchive-sessions",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-settings"
+        ],
+        "platform": "web"
+      },
+      "description": "Archived-session settings page: the registry-global archive set with one Unarchive action per row"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-shortcuts",
+      "directory": "packages/client/ui-shortcuts",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-shortcuts",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-layout",
+          "@deepseek-ai/dsh-client-ui-settings"
+        ],
+        "platform": "web"
+      },
+      "description": "Keyboard shortcut reference, recording, and local preference editing"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-sidebar",
+      "directory": "packages/client/ui-sidebar",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-layout",
+          "@deepseek-ai/dsh-client-locale"
+        ],
+        "platform": "web"
+      },
+      "description": "Sidebar plugin: session multi-level tree, search, grouping, state dots"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-sidebar-browser",
+      "directory": "packages/client/ui-sidebar-browser",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-ui-sidebar-right",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-connection"
+        ],
+        "platform": "web"
+      },
+      "description": "Sandboxed Web browser tabs for the right Sidebar"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-sidebar-files",
+      "directory": "packages/client/ui-sidebar-files",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-shortcuts",
+          "@deepseek-ai/dsh-client-ui-sidebar-right",
+          "@deepseek-ai/dsh-client-ui-slots"
+        ],
+        "platform": "web"
+      },
+      "description": "Workspace file tree tab type for the right Sidebar: lazy directory listing over the workspaceFiles Remote namespace, opening files into the Sidebar"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-sidebar-right",
+      "directory": "packages/client/ui-sidebar-right",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-layout",
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-shortcuts"
+        ],
+        "platform": "web"
+      },
+      "description": "Right Sidebar: the docking surface's session-bound state, its panel and header expand control, and the navigation service over it"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-sidebar-terminal",
+      "directory": "packages/client/ui-sidebar-terminal",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-api-terminal-controller",
+          "@deepseek-ai/dsh-client-ui-sidebar-right",
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-ui-theme"
+        ],
+        "platform": "web"
+      },
+      "description": "Interactive shell tabs for the right Sidebar"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-skill",
+      "directory": "packages/client/ui-skill",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-tool",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-input-trigger",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web"
+      },
+      "description": "Web skill references and the dedicated skill tool row"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-slots",
+      "directory": "packages/client/ui-slots",
+      "client": null,
+      "description": "Slot registry pure core: typed ordinary Slots and reusable Component Factories, derived props, Store seats, and renderer installation"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-subagent",
+      "directory": "packages/client/ui-subagent",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-primitives",
+          "@deepseek-ai/dsh-client-ui-sidebar-right",
+          "@deepseek-ai/dsh-client-ui-input-trigger"
+        ],
+        "platform": "web"
+      },
+      "description": "Subagent conversation catalog, continuation routing UI, and '@' reference source"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-theme",
+      "directory": "packages/client/ui-theme",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-api-remotes"
+        ],
+        "platform": "web",
+        "immediately": true
+      },
+      "description": "Theme plugin: Host bootstrap for the pre-plugin palette; DOM-free ThemeRuntime for light/dark/system state; --dsw-* token styles and Appearance settings row"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-tool",
+      "directory": "packages/client/ui-tool",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-conversation"
+        ],
+        "platform": "web"
+      },
+      "description": "Client Tool call-tree renderer and keyed per-tool presentation slot"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-trajectory",
+      "directory": "packages/client/ui-trajectory",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation"
+        ],
+        "platform": "web"
+      },
+      "description": "Trajectory event ledger with an interactive timing overview: pure-consumer plugin registering into the conversation ViewMap (no service)"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-usage-alert",
+      "directory": "packages/client/ui-usage-alert",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-layout"
+        ],
+        "platform": "web"
+      },
+      "description": "Gateway usage-quota alerts in the global Harness shell overlay"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-user-questions",
+      "directory": "packages/client/ui-user-questions",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-api-remotes",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-renderer"
+        ],
+        "platform": "web"
+      },
+      "description": "Web ask_user_question feature: host tool mount plus composer-takeover question UI"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-workbench",
+      "directory": "packages/client/ui-workbench",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-workspace",
+          "@deepseek-ai/dsh-client-ui-layout",
+          "@deepseek-ai/dsh-client-ui-sidebar-right"
+        ],
+        "platform": "web"
+      },
+      "description": "Cordis multi-session Workspace workbench UI"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-workflow-run",
+      "directory": "packages/client/ui-workflow-run",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-ui-conversation"
+        ],
+        "platform": "web"
+      },
+      "description": "Durable workflow-run Conversation Node and nested member disclosure for dsh web"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-ui-workspace",
+      "directory": "packages/client/ui-workspace",
+      "client": {
+        "inject": [
+          "@deepseek-ai/dsh-client-connection",
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-runtime",
+          "@deepseek-ai/dsh-client-shortcuts",
+          "@deepseek-ai/dsh-client-ui-conversation",
+          "@deepseek-ai/dsh-client-ui-layout",
+          "@deepseek-ai/dsh-client-ui-sidebar"
+        ],
+        "platform": "web"
+      },
+      "description": "Workspace picker plugin: one WorkspacePicker registered into the sidebar and empty-state workspace slots"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-userdoc-upload",
+      "directory": "packages/client/userdoc-upload",
+      "client": null,
+      "description": "Shared browser resumable uploader for user documents"
+    },
+    {
+      "package": "@deepseek-ai/dsh-client-web",
+      "directory": "packages/client/web",
+      "client": null,
+      "description": "Web boot kernel: static module table, Cordis loader, framework-free boot page, and UI-renderer handoff"
+    }
+  ],
+  "adminFunctions": [
+    {
+      "file": "gateway/admin-ui/src/App.tsx",
+      "functions": [
+        "App",
+        "AdminDocument",
+        "ShellTitle",
+        "PluginsFallback",
+        "BrandMark",
+        "Brand",
+        "LanguageSelect",
+        "LogoutButton",
+        "AdminNav"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/ComputerSelector.tsx",
+      "functions": [
+        "ComputerSelector"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/ArchiveConversation.tsx",
+      "functions": [
+        "ArchiveConversation",
+        "ArchiveTimelineItemView",
+        "projectArchiveEvents",
+        "readableSystemEvent",
+        "firstToolResultBlock",
+        "contentText",
+        "errorText",
+        "record",
+        "stringValue",
+        "humanizeIdentifier",
+        "permissionPresetLabel",
+        "approvalOutcomeLabel",
+        "eventKey",
+        "eventLabel",
+        "formatArguments",
+        "formatEvent",
+        "formatTime"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/DesktopPermissions.tsx",
+      "functions": [
+        "DesktopPermissions"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/MemoryPermissions.tsx",
+      "functions": [
+        "MemoryPermissions"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/OrganizationModelsEditor.tsx",
+      "functions": [
+        "bindSnapshot",
+        "OrganizationModelsEditor"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/PluginPermissions.tsx",
+      "functions": [
+        "PluginPermissions"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/ProjectDirectoryBrowser.tsx",
+      "functions": [
+        "ProjectDirectoryBrowser",
+        "directoryMessageFrom"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/ResourcePermissions.tsx",
+      "functions": [
+        "ResourcePermissions",
+        "save"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/RuntimeAllocationPolicyEditor.tsx",
+      "functions": [
+        "RuntimeAllocationPolicyEditor",
+        "save"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/RuntimePicker.tsx",
+      "functions": [
+        "RuntimePicker"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/SshPermissions.tsx",
+      "functions": [
+        "SshPermissions"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/TerminalPermissions.tsx",
+      "functions": [
+        "TerminalPermissions"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/UserComputerPermissions.tsx",
+      "functions": [
+        "UserComputerPermissions",
+        "save"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/UserQualificationCard.tsx",
+      "functions": [
+        "UserQualificationCard",
+        "save"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/UserRuntimePanel.tsx",
+      "functions": [
+        "UserRuntimePanel",
+        "allocate"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/models.tsx",
+      "functions": [
+        "modelKey",
+        "ModelIdentity",
+        "RoleDefaults",
+        "OverrideSelect"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/ui.tsx",
+      "functions": [
+        "PageHeader",
+        "Section",
+        "Button",
+        "IconButton",
+        "StatusBadge",
+        "ErrorBanner",
+        "LoadingState",
+        "EmptyState",
+        "Field",
+        "Switch",
+        "Dialog",
+        "ConfirmDialog"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/usage.tsx",
+      "functions": [
+        "Metric",
+        "MeteringState",
+        "PricingState",
+        "QuotaSummary",
+        "QuotaLine",
+        "formatCompact",
+        "formatMoney"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/components/users.tsx",
+      "functions": [
+        "UserIdentity",
+        "RoleBadge",
+        "AutoReviewBadge",
+        "AccountBadge",
+        "InstanceState",
+        "InstanceCell",
+        "InstanceControls",
+        "Definition",
+        "UserCreateDialog",
+        "submit",
+        "UserEditDialog",
+        "submit",
+        "UserPasswordDialog",
+        "submit",
+        "UserDisableConfirm",
+        "UserDeleteConfirm"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/deployment-context.tsx",
+      "functions": [
+        "DeploymentContextProvider",
+        "useDeploymentContext"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/main.tsx",
+      "functions": []
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/ArchivesPage.tsx",
+      "functions": [
+        "emptyDraftKey",
+        "ArchivesPage",
+        "onFilter",
+        "onTab",
+        "scanEmptyDrafts",
+        "openEmptyDrafts",
+        "requestEmptyTrash",
+        "confirmEmptyTrash",
+        "resetFilters",
+        "openDetail",
+        "runAction",
+        "isStalePending",
+        "archiveActionMeta",
+        "archiveActionLabels",
+        "RowActionButtons",
+        "ArchiveTableRow",
+        "ArchiveMobileRow",
+        "ArchiveSyncState",
+        "DetailFooter",
+        "ArchiveDetail",
+        "ArchiveConversationOrRemoval",
+        "ArchiveStateBadge",
+        "formatTime",
+        "messageFrom"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/AuditPage.tsx",
+      "functions": [
+        "msFromDatetimeLocal",
+        "auditT",
+        "AuditPage",
+        "onFilter",
+        "resetFilters",
+        "selectFamily",
+        "ActorName",
+        "ActorCell",
+        "RequestResult",
+        "AuditMetadata",
+        "Definition",
+        "formatTime",
+        "messageFrom"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/DeploymentPage.tsx",
+      "functions": [
+        "heartbeatText",
+        "DeploymentPage"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/DeploymentTopologySection.tsx",
+      "functions": [
+        "DeploymentTopologySection",
+        "NodeConnectionSection"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/DesktopsPage.tsx",
+      "functions": [
+        "DesktopsPage",
+        "runAction",
+        "HolderLabel",
+        "RuntimeLabel",
+        "ResourceState",
+        "GrantState",
+        "QueueState",
+        "Definition",
+        "formatTime",
+        "messageFrom"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/DocumentsPage.tsx",
+      "functions": [
+        "DocumentsPage",
+        "apply",
+        "reset",
+        "openDetail",
+        "remove",
+        "changeState",
+        "requestPurge",
+        "confirmPurge",
+        "changeSelectedState",
+        "requestBatchPurge",
+        "confirmBatchPurge",
+        "transferOwner",
+        "DocumentTableRow",
+        "documentOwnerSourceLabel",
+        "documentStateLabel",
+        "Definition",
+        "formatBytes",
+        "formatTime",
+        "messageFrom"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/ModelsPage.tsx",
+      "functions": [
+        "modelsPageT",
+        "yuanToMicros",
+        "microsToYuan",
+        "registrationDate",
+        "ModelsPage",
+        "applyRegistrationFilters",
+        "resetRegistrationFilters",
+        "openGovernanceEditor",
+        "submitGovernance",
+        "changeOverride",
+        "PersonalRegistrationAudit",
+        "RegistrationRow",
+        "userName",
+        "formatRegistrationTime",
+        "ModelDirectory",
+        "PriceSummary",
+        "messageFrom",
+        "DigestModelSection",
+        "save"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/NodeAccessSection.tsx",
+      "functions": [
+        "mutationMessage",
+        "NodeAccessSection"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/NodeConfigurationSection.tsx",
+      "functions": [
+        "configurationMessage",
+        "NodeConfigurationSection",
+        "mutate"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/PluginsPage.tsx",
+      "functions": [
+        "Manager",
+        "ManagerView",
+        "TargetPolicy",
+        "DraftBar",
+        "LifecycleLine",
+        "SpacesOverview",
+        "CompositionView",
+        "PluginsPage",
+        "BoundPlugins"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/ProjectDetailPage.tsx",
+      "functions": [
+        "ProjectDetailPage",
+        "ProjectDetail",
+        "applyMode",
+        "confirmRemove",
+        "changeModelAssignment",
+        "changeAllModelAssignments",
+        "onRename",
+        "onDelete",
+        "openQuotaDialog",
+        "saveQuota",
+        "MemberIdentity",
+        "ProjectModelIdentity",
+        "PermissionControl",
+        "ProjectQuotaEditor",
+        "Definition",
+        "translate",
+        "quotaSourceLabel",
+        "formatQuotaTokens",
+        "formatQuotaCost",
+        "themePolicyLabel",
+        "changeMode",
+        "messageFrom",
+        "modelKey"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/ProjectListPage.tsx",
+      "functions": [
+        "projectListT",
+        "ProjectListPage",
+        "openCreate",
+        "closeCreate",
+        "onCreate",
+        "selectDirectory",
+        "messageFrom",
+        "projectMessageFrom",
+        "directoryName"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/RemoteDesktopPage.tsx",
+      "functions": [
+        "RemoteDesktopPage"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/SshPage.tsx",
+      "functions": [
+        "draftOf",
+        "fieldsOf",
+        "SshPage",
+        "save",
+        "toggle",
+        "remove",
+        "toggleShare"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/StewardPage.tsx",
+      "functions": [
+        "StewardPage",
+        "confirmGrant",
+        "runtimeLabel",
+        "admissionBadge",
+        "grantControl",
+        "MemberRow",
+        "MemberCard"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/TerminalsPage.tsx",
+      "functions": [
+        "TerminalsPage",
+        "close"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/TunnelAccessSection.tsx",
+      "functions": [
+        "TunnelAccessSection"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/UsagePage.tsx",
+      "functions": [
+        "UsagePage",
+        "openQuotaDialog",
+        "changeSubjectType",
+        "changeSubjectId",
+        "save",
+        "UsageIdentity",
+        "TokenBreakdown",
+        "ContributionValue",
+        "QuotaEditor",
+        "Definition",
+        "messageFrom"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/UserDetailPage.tsx",
+      "functions": [
+        "UserDetailPage",
+        "UserComputerProfile",
+        "UserDetail",
+        "run",
+        "onEdit",
+        "onResetPassword",
+        "onDisable",
+        "onDelete",
+        "UserModelAccess",
+        "changeOverride",
+        "UserMemberships",
+        "changeMode",
+        "onRemove",
+        "onAdd",
+        "UserQuota",
+        "save",
+        "QuotaMetricEditor"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/UsersPage.tsx",
+      "functions": [
+        "UsersPage",
+        "run",
+        "onCreate",
+        "onEdit",
+        "onResetPassword",
+        "onDisable",
+        "onDelete",
+        "UserActions",
+        "messageFrom"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pages/WebhooksPage.tsx",
+      "functions": [
+        "draftOf",
+        "fieldsOf",
+        "WebhooksPage",
+        "save",
+        "toggle",
+        "remove",
+        "openDeliveries",
+        "moreDeliveries",
+        "redispatch"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/pending-edits.tsx",
+      "functions": [
+        "PendingEditsProvider",
+        "PendingHistory",
+        "usePendingEdits",
+        "useProtectedNavigation"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/plugins/PluginConfiguration.tsx",
+      "functions": [
+        "fieldsFor",
+        "parsed",
+        "label",
+        "description",
+        "constraints",
+        "PluginConfiguration"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/plugins/PluginManagerPage.tsx",
+      "functions": [
+        "toastHoldMs",
+        "partsSummary",
+        "itemArtwork",
+        "PackageArtwork",
+        "RowSwitch",
+        "rowStateText",
+        "rowDotState",
+        "MetadataError",
+        "RowsSection",
+        "EnableSwitch",
+        "packageStatus",
+        "EntityHead",
+        "EntityControl",
+        "ListSkeleton",
+        "DetailTop",
+        "EntityRow",
+        "ItemDetail",
+        "RowDetail",
+        "EntryConfigSection",
+        "PackageDetail",
+        "terminalLabels",
+        "registryList",
+        "registryOption",
+        "failureText",
+        "SubjectCard",
+        "useInstallComposition",
+        "InstallDialog",
+        "ConfirmDialog",
+        "PluginManagerPage"
+      ]
+    },
+    {
+      "file": "gateway/admin-ui/src/plugins/PluginMatrix.tsx",
+      "functions": [
+        "statusLine",
+        "PluginMatrix"
+      ]
+    }
+  ],
+  "profilePackages": [
+    {
+      "file": "packages/bundle/base/cordis.patch.yml",
+      "names": [
+        "@deepseek-ai/cordis-plugin-timer",
+        "@deepseek-ai/dsh-agent",
+        "@deepseek-ai/dsh-agent-default-model",
+        "@deepseek-ai/dsh-agent-instructions",
+        "@deepseek-ai/dsh-agent-loop",
+        "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-attachment-local",
+        "@deepseek-ai/dsh-bash-sandbox",
+        "@deepseek-ai/dsh-command-compact",
+        "@deepseek-ai/dsh-command-goal",
+        "@deepseek-ai/dsh-commands",
+        "@deepseek-ai/dsh-compaction-basic",
+        "@deepseek-ai/dsh-compaction-image-offload",
+        "@deepseek-ai/dsh-compaction-tool-result-pruner",
+        "@deepseek-ai/dsh-credentials-local",
+        "@deepseek-ai/dsh-deepseek-llm-api-extensions",
+        "@deepseek-ai/dsh-fs-observation-policy",
+        "@deepseek-ai/dsh-fs-sandbox",
+        "@deepseek-ai/dsh-goal",
+        "@deepseek-ai/dsh-goal-round-driver",
+        "@deepseek-ai/dsh-hmr",
+        "@deepseek-ai/dsh-jobs-local",
+        "@deepseek-ai/dsh-llm",
+        "@deepseek-ai/dsh-llm-deepseek-api-key",
+        "@deepseek-ai/dsh-llm-pi-ai",
+        "@deepseek-ai/dsh-llm-retry",
+        "@deepseek-ai/dsh-mcp-resources",
+        "@deepseek-ai/dsh-permission-presets",
+        "@deepseek-ai/dsh-plan-mode",
+        "@deepseek-ai/dsh-plugin-manager",
+        "@deepseek-ai/dsh-plugin-manager/tools",
+        "@deepseek-ai/dsh-plugin-package-inventory-deepseek",
+        "@deepseek-ai/dsh-ptc-runtime-node",
+        "@deepseek-ai/dsh-pwsh-sandbox",
+        "@deepseek-ai/dsh-repeat-tool-reminder",
+        "@deepseek-ai/dsh-sandbox-local",
+        "@deepseek-ai/dsh-sandbox-policy",
+        "@deepseek-ai/dsh-session",
+        "@deepseek-ai/dsh-session-checkpoint-policy",
+        "@deepseek-ai/dsh-session-log-deepseek",
+        "@deepseek-ai/dsh-session-persistence-jsonl",
+        "@deepseek-ai/dsh-session-projection",
+        "@deepseek-ai/dsh-session-query-sqlite",
+        "@deepseek-ai/dsh-session-telemetry-otel",
+        "@deepseek-ai/dsh-session-title",
+        "@deepseek-ai/dsh-session-title-first-prompt-llm",
+        "@deepseek-ai/dsh-settings-file",
+        "@deepseek-ai/dsh-shell-env",
+        "@deepseek-ai/dsh-skill",
+        "@deepseek-ai/dsh-skill-filesystem",
+        "@deepseek-ai/dsh-spill-local",
+        "@deepseek-ai/dsh-spill-policy",
+        "@deepseek-ai/dsh-subagent",
+        "@deepseek-ai/dsh-subagent-fork-in-process",
+        "@deepseek-ai/dsh-subagent-spawn-in-process",
+        "@deepseek-ai/dsh-subprocess-local",
+        "@deepseek-ai/dsh-system-prompt",
+        "@deepseek-ai/dsh-token-meter",
+        "@deepseek-ai/dsh-tool-bash",
+        "@deepseek-ai/dsh-tool-call-timeout-policy",
+        "@deepseek-ai/dsh-tool-fs",
+        "@deepseek-ai/dsh-tool-fs-search",
+        "@deepseek-ai/dsh-tool-goal",
+        "@deepseek-ai/dsh-tool-jobs",
+        "@deepseek-ai/dsh-tool-present",
+        "@deepseek-ai/dsh-tool-pwsh",
+        "@deepseek-ai/dsh-tool-skill",
+        "@deepseek-ai/dsh-tool-str-replace-editor",
+        "@deepseek-ai/dsh-tool-subagent",
+        "@deepseek-ai/dsh-tool-subagent-control",
+        "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+        "@deepseek-ai/dsh-tool-todo",
+        "@deepseek-ai/dsh-tool-web",
+        "@deepseek-ai/dsh-tool-workflow",
+        "@deepseek-ai/dsh-tool-working-directory",
+        "@deepseek-ai/dsh-tools",
+        "@deepseek-ai/dsh-typert-loader",
+        "@deepseek-ai/dsh-typert-registry",
+        "@deepseek-ai/dsh-user-approval",
+        "@deepseek-ai/dsh-user-questions",
+        "@deepseek-ai/dsh-web",
+        "@deepseek-ai/dsh-web-deepseek-api",
+        "@deepseek-ai/dsh-web-fetch-http",
+        "@deepseek-ai/dsh-web-search-deepseek",
+        "@deepseek-ai/dsh-workflow-ptc",
+        "@deepseek-ai/dsh-working-directory"
+      ]
+    },
+    {
+      "file": "packages/bundle/web-app/cordis.patch.yml",
+      "names": [
+        "@deepseek-ai/dsh-agent-preset-registry",
+        "@deepseek-ai/dsh-api-remote-desktop-controller",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-terminal-controller",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-file-upload",
+        "@deepseek-ai/dsh-client-hmr",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-modules",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-shortcuts",
+        "@deepseek-ai/dsh-client-ui-agent-preset",
+        "@deepseek-ai/dsh-client-ui-attachment",
+        "@deepseek-ai/dsh-client-ui-brand-official",
+        "@deepseek-ai/dsh-client-ui-collaboration",
+        "@deepseek-ai/dsh-client-ui-commands",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-cordis",
+        "@deepseek-ai/dsh-client-ui-deliverables",
+        "@deepseek-ai/dsh-client-ui-documents",
+        "@deepseek-ai/dsh-client-ui-goal",
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-ui-jobs",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-memory",
+        "@deepseek-ai/dsh-client-ui-model-selection",
+        "@deepseek-ai/dsh-client-ui-permission-presets",
+        "@deepseek-ai/dsh-client-ui-plan",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-ui-project-activity",
+        "@deepseek-ai/dsh-client-ui-reference",
+        "@deepseek-ai/dsh-client-ui-remote-desktop",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-schedule",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-general",
+        "@deepseek-ai/dsh-client-ui-settings-models",
+        "@deepseek-ai/dsh-client-ui-settings-plugin-inventory",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-ui-settings-unarchive-sessions",
+        "@deepseek-ai/dsh-client-ui-shortcuts",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-sidebar-browser",
+        "@deepseek-ai/dsh-client-ui-sidebar-files",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-sidebar-terminal",
+        "@deepseek-ai/dsh-client-ui-skill",
+        "@deepseek-ai/dsh-client-ui-subagent",
+        "@deepseek-ai/dsh-client-ui-theme",
+        "@deepseek-ai/dsh-client-ui-tool",
+        "@deepseek-ai/dsh-client-ui-trajectory",
+        "@deepseek-ai/dsh-client-ui-user-questions",
+        "@deepseek-ai/dsh-client-ui-workbench",
+        "@deepseek-ai/dsh-client-ui-workflow-run",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-cordis-client-runner",
+        "@deepseek-ai/dsh-cordis-host-runner",
+        "@deepseek-ai/dsh-file-reference-local",
+        "@deepseek-ai/dsh-harness-dev-context",
+        "@deepseek-ai/dsh-host-apiproxy",
+        "@deepseek-ai/dsh-host-directory-picker-auto",
+        "@deepseek-ai/dsh-host-plugin-inventory",
+        "@deepseek-ai/dsh-host-userdoc-http",
+        "@deepseek-ai/dsh-host-webserver",
+        "@deepseek-ai/dsh-memory",
+        "@deepseek-ai/dsh-office-to-pdf",
+        "@deepseek-ai/dsh-remote-desktop-stream",
+        "@deepseek-ai/dsh-remote-desktop-vnc",
+        "@deepseek-ai/dsh-session-projection-cache",
+        "@deepseek-ai/dsh-session-reference",
+        "@deepseek-ai/dsh-session-stats",
+        "@deepseek-ai/dsh-session-turn-outline",
+        "@deepseek-ai/dsh-storage",
+        "@deepseek-ai/dsh-storage-domain",
+        "@deepseek-ai/dsh-storage-json",
+        "@deepseek-ai/dsh-tool-cordis/host",
+        "@deepseek-ai/dsh-tool-subagent/model-selection-settings",
+        "@deepseek-ai/dsh-userdoc-context",
+        "@deepseek-ai/dsh-userdoc-gateway",
+        "@deepseek-ai/dsh-userdoc-local",
+        "@deepseek-ai/dsh-web-app",
+        "@deepseek-ai/dsh-web-app/startup",
+        "@deepseek-ai/dsh-workspace",
+        "@deepseek-ai/dsh-workspace-changes"
+      ]
+    }
+  ],
+  "status": "Candidates requiring runtime verification; none are real-task pass evidence."
+}

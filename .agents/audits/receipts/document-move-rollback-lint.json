@@ -1,0 +1,14 @@
+{
+  "name": "document-move-rollback-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/store.ts packages/attachment/userdoc-local/tests/move-rollback.spec.ts packages/attachment/userdoc-local/tests/parts-loader.spec.ts packages/attachment/userdoc-local/tests/fixtures/parts-driver.mjs packages/attachment/userdoc-local/tests/fixtures/fifo-driver.mjs packages/attachment/userdoc-local/tests/fixtures/move-rollback-driver.mjs",
+  "startedAt": "2026-10-26T02:17:06.926235+00:00",
+  "seconds": 5.991,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "33e59651c8787dfe450b331cee652fc4ffdbfb6ec43c507f7aefe336968e55af",
+  "inputsAfter": "33e59651c8787dfe450b331cee652fc4ffdbfb6ec43c507f7aefe336968e55af",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

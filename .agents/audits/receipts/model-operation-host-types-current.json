@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-host-types-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json --noEmit --tsBuildInfoFile .agents/audits/.local/model-operation-host.tsbuildinfo",
+  "startedAt": "2026-10-24T05:49:34.829698+00:00",
+  "seconds": 51.082,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1cde6fc17882a49d860e442bf1c97fd1b01a9b041f68dd21c0d909a336ea728d",
+  "inputsAfter": "d226c83cadf9205350df0488b2379fca9424f4e5a48f7bdb243c01312c07bbc1",
+  "postgresToolDirectory": null,
+  "outputSha256": "a0ed5134e6591ab953dad07527fd6680d36856999cf519f6d1e1da2c47da8b4d",
+  "outputTail": "packages/llm/llm/tests/operations.spec.ts(3,32): error TS2614: Module '\"@deepseek-ai/dsh-llm\"' has no exported member 'LlmOperationDefinition'. Did you mean to use 'import LlmOperationDefinition from \"@deepseek-ai/dsh-llm\"' instead?\npackages/llm/llm/tests/operations.spec.ts(34,36): error TS7006: Parameter 'parameters' implicitly has an 'any' type.\npackages/llm/llm/tests/operations.spec.ts(34,48): error TS7006: Parameter 'config' implicitly has an 'any' type.\npackages/llm/llm/tests/operations.spec.ts(38,25): error TS7006: Parameter 'options' implicitly has an 'any' type.\npackages/llm/llm/tests/operations.spec.ts(38,34): error TS7006: Parameter 'observer' implicitly has an 'any' type.\npackages/llm/llm/tests/operations.spec.ts(62,33): error TS2339: Property 'prepareOperation' does not exist on type 'LlmRuntime'.\npackages/llm/llm/tests/operations.spec.ts(77,20): error TS2339: Property 'operation' does not exist on type 'GenerateOptions'.\npackages/llm/llm/tests/operations.spec.ts(78,36): error TS2339: Property 'operation' does not exist on type 'GenerateOptions'.\npackages/llm/llm/tests/operations.spec.ts(205,85): error TS2353: Object literal may only specify known properties, and 'operation' does not exist in type 'GenerateOptions'.\n"
+}

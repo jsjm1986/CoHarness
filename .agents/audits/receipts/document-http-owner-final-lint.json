@@ -1,0 +1,14 @@
+{
+  "name": "document-http-owner-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/handler-edges.spec.ts packages/host/userdoc-http/tests/loader-composition.spec.ts gateway/tests/document-transfer-loader.spec.ts gateway/tests/fixtures/document-transfer-loader.mjs gateway/src/documents-local.ts gateway/tests/documents-local.spec.ts",
+  "startedAt": "2026-10-26T11:28:41.019069+00:00",
+  "seconds": 8.338,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fc6b8f2556828b687f18465a6e6abd73d12c8a3334c19686ab37b237cc73b10c",
+  "inputsAfter": "fc6b8f2556828b687f18465a6e6abd73d12c8a3334c19686ab37b237cc73b10c",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

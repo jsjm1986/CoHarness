@@ -1,0 +1,14 @@
+{
+  "name": "gateway-document-receiver-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/server.ts gateway/src/runtime-api.ts gateway/src/runtime-document-store.ts gateway/tests/server.spec.ts gateway/tests/runtime-api.spec.ts scripts/build-production.ts scripts/gateway-runtime-packages.ts scripts/gateway-runtime-packages.spec.ts",
+  "startedAt": "2026-10-26T19:56:12.778528+00:00",
+  "seconds": 8.909,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4a82287ad88b9e0bae3365e68c83f43c85a7f958aba6b6a8400547f0a2ad3ccc",
+  "inputsAfter": "4a82287ad88b9e0bae3365e68c83f43c85a7f958aba6b6a8400547f0a2ad3ccc",
+  "postgresToolDirectory": null,
+  "outputSha256": "11bf3d3199fc5c80e1f0dfa02b21065866cc52bfa131db4fa4659ef8cdbdcbf0",
+  "outputTail": "scripts/build-production.ts:6:3: error eslint(no-unused-vars): Identifier 'readFileSync' is imported but never used. help: Consider removing this import.\nscripts/build-production.ts:10:10: error eslint(no-unused-vars): Identifier 'join' is imported but never used. help: Consider removing this import.\nscripts/gateway-runtime-packages.spec.ts:50:16: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\nscripts/gateway-runtime-packages.spec.ts:61:16: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\nscripts/gateway-runtime-packages.spec.ts:64:16: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\n"
+}

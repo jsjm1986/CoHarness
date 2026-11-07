@@ -1,0 +1,106 @@
+{
+  "at": "2026-10-31T05:07:30.201794+00:00",
+  "finding": "B389",
+  "title": "Model admission failures lose their resource reason and cancellation terminal kind",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/llm/llm/src/adapter-failure.ts",
+    "packages/llm/llm/tests/adapter-failure.spec.ts",
+    "packages/llm/llm/tests/resource-policy.spec.ts",
+    "packages/llm/llm/tests/fixtures/resource-owner.mjs",
+    "packages/llm/llm/tests/resource-owner-example.host.spec.ts",
+    "packages/llm/llm/tests/expected/resource-owner.jsonl",
+    "packages/llm/llm/README.md",
+    "packages/llm/llm/README.zh.md",
+    "packages/llm/llm/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.md",
+    ".agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.zh.md",
+    ".agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-classification-full-source.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-doc-quick.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-sdk-projections.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-python-projections.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-catalog-freshness.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-guide.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T044857Z/model-admission-origin-fetch.json"
+  ],
+  "causalEvidence": "Before the fix, all four normalization and all four actual stream admission cases fail. A private old compiled LLM replay preserves the three earlier owner checks but emits UNKNOWN/error for every added admission reason, including cancelled. Updated source and matching Node22/24 artifacts produce all seven expected Loader transcript rows with zero model HTTP calls.",
+  "behavior": {
+    "unavailable": "RESOURCE_BUDGET_UNAVAILABLE",
+    "cancelled": "ABORTED with aborted finish",
+    "expired": "RESOURCE_ADMISSION_EXPIRED",
+    "refused": "RESOURCE_ADMISSION_REFUSED",
+    "detailedFacts": "Validated carried failure facts take priority. SDK name/reason spoofing and inaccessible descriptors do not acquire owned codes.",
+    "statusAndRetry": "No synthetic provider HTTP status, rate-limit inference or default retry policy change."
+  },
+  "verification": {
+    "uniqueRelatedCases": 410,
+    "llmSourceCases": 403,
+    "typescriptSdkSnapshots": 5,
+    "pythonSdkSnapshots": 2,
+    "standardCoverage": {
+      "packages/llm/llm/src/adapter-failure.ts": {
+        "statements": [
+          46,
+          46
+        ],
+        "branches": [
+          61,
+          61
+        ],
+        "functions": [
+          8,
+          8
+        ],
+        "lines": [
+          41,
+          41
+        ]
+      }
+    },
+    "coverageLimits": "Only the named normalizer has four metrics at 100%; no claim that the entire LLM index or project meets 100%. No coverage exclusion or threshold changed.",
+    "artifactReplays": "Node22 and Node24 matching built Loader applications pass the seven-row transcript.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": {
+    "owner": ".agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.md",
+    "decision": "Extended the existing terminal-failure owner with resource categories; preserved separate retry, prepared-operation and admission-owner decisions. No new duplicate note or frozen archive edit.",
+    "upgradeGuide": "Updated the existing unreleased model-resource-ownership guide; 293 English words."
+  },
+  "baseline": {
+    "at": "2026-10-31T05:05:34.692960+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "at": "2026-10-31T05:07:30.201794+00:00",
+    "source": "Peer direct handoff; production facts are peer-reported, not root acceptance.",
+    "serving": "R8 remains serving normally.",
+    "frozenCandidate": "Peer R9 includes B379-B388 frozen 112 root source paths and 13 artifacts plus peer-owned changes. It is not yet activated and will not pick up B389 during its current packaging.",
+    "ownership": "Root retains LLM/subprocess/SSH review; peer retains topology, UI, HMR, field settings authority and deployment. No routine coordination interruption."
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Verify valid resource-only managed Codex routing and remaining resource/permission business logic.",
+    "Review remaining remote pipe consumers and completion semantics. The existing grace-bounded unread-output case passes; no indefinite wait has been established.",
+    "No root paid API, production database operation or deployment. Physical platform and fresh owned-PostgreSQL acceptance remain unclaimed.",
+    "Peer R9 and cross-computer UI/authority acceptance remain separately owned. Full doc-sync and whole-project completion are not claimed."
+  ]
+}

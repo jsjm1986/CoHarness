@@ -11,7 +11,7 @@ This package registers a Profile-named Codex subagent provider whose default nam
 
 ## Summary
 
-Install `@deepseek-ai/dsh-subagent-codex` into a Profile when delegated work should run in a genuine, unattended Codex session in the parent Session's workspace. Each delegation uses a fresh isolated Codex thread for one self-contained text task and returns only its final answer or a safe failure diagnostic. Native Codex configuration and authentication remain authoritative, while `permissionMode` selects the non-interactive approval and sandbox behavior. The Bundle supplies a compatible native Codex payload, but it exposes no model capability until a delegation tool is configured.
+Install `@deepseek-ai/dsh-subagent-codex` into a Profile when delegated work should run in a genuine, unattended Codex session in the parent Session's workspace. Each one-shot delegation uses a fresh isolated Codex thread for one self-contained text task and returns only its final answer or a safe failure diagnostic. Independent runs retain native Codex configuration and authentication; managed runs use the parent model route, while `permissionMode` selects the non-interactive approval and sandbox behavior. The Bundle supplies a compatible native Codex payload, but it exposes no model capability until a delegation tool is configured.
 
 ## Table of Contents
 
@@ -42,7 +42,7 @@ Local cancellation wins the result race and maps to `aborted`. For failed turns,
 <a id="capabilities-and-context"></a>
 ## Capabilities and context
 
-The provider advertises no optional start-time capabilities and reports `inheritsParentContext: false`. Codex receives the standalone text task and the parent Session cwd, but not the parent conversation, persona, tool filter, depth policy, or structured-output contract. The ephemeral Codex thread id and turn id stay private to this run and are never persisted in the parent Session.
+The provider advertises no optional start-time capabilities and reports `inheritsParentContext: false`. Codex receives the standalone text task and the parent Session cwd, but not the parent conversation, persona, tool filter, depth policy, or structured-output contract. Native thread and turn ids route the app-server exchange for this run. Managed inference records its native model input as described below.
 
 <a id="configuration"></a>
 ## Configuration
@@ -50,6 +50,12 @@ The provider advertises no optional start-time capabilities and reports `inherit
 | Key | Default | Meaning |
 |---|---|---|
 | `providerName` | `codex` | Non-empty registry name on `ctx.subagents`; each mounted instance needs a unique value. |
+| `modelProvider` | parent selected route in managed runs | Registered parent Responses route; setting it explicitly enables managed inference. |
+| `model` | parent selected model in managed runs | Model on that registered route; independent runs inherit native settings when omitted. |
+| `modelRequestBytes` | `8388608` | Maximum child request bytes. |
+| `modelResponseBytes` | `67108864` | Maximum provider response bytes. |
+| `modelRequestTimeoutMs` | `120000` | Authenticated HTTP body deadline; expiry returns `504 TIMEOUT` before model admission. At most `MAX_TIMER_DELAY_MS`. |
+| `modelPendingRequests` | `32` | Positive per-run bound on connections and pending requests. |
 | `env` | `{}` | Explicit child environment layered over the subprocess seam's credential-scrubbed parent environment. |
 | `permissionMode` | `never` | Native non-interactive approval and sandbox mode fixed for every thread from this Provider instance. |
 | `disposeGraceMs` | `3000` | Positive finite grace in milliseconds, no greater than [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md), between the shared process-tree owner's termination tiers; disposal then waits for whole-tree exit. |
@@ -57,8 +63,14 @@ The provider advertises no optional start-time capabilities and reports `inherit
 | `memberCwd` | member Session cwd | Workspace override for persistent members, validated on their execution target. |
 | `remoteCommand` | `codex` | Preinstalled program resolved inside an SSH target; local execution keeps the bundled program. |
 
+Managed runs send every native Responses request through the initiating Agent’s registered model adapter. Parents with execution authority alone also use this route. Each request records `subagent/codex-model-request` before its durable checkpoint, obtains a separate parent permit and rechecks parent plus registration policy after queue and credential waits. Model capability lookup also rechecks retained policy before listener startup. Replacing or withdrawing either retained resource owner refuses further model requests; start a new child after restoring admission. Parent execution scope retains Session and actor attribution. Only a private loopback credential reaches the child; upstream credentials stay in the parent. Native WebSocket inference and internal request retries are disabled. Unsupported routes refuse execution. Malformed JSON and substituted request fields return `400 INVALID_REQUEST`; unexpected parent failures return `502 SERVER` with a fixed safe message. A failed Session durability checkpoint prevents upstream dispatch. See the [model-control decision](../../../.agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md).
+
+Managed SSH runs use the initiating Agent’s standing SSH connection to forward a remote loopback port to that same parent model listener. The remote program receives the temporary bridge credential and the preinstalled `remoteCommand`; upstream authentication stays on the Harness host. The server must permit remote TCP forwarding. Missing realm connections or denied forwarding refuse startup. Connection disposal drains model requests before releasing their SSH forwarding owner; the [SSH package](../../ssh/ssh/README.md) defines cancellation and failure handling.
+
 <a id="persistent-members"></a>
 ## Persistent members
+
+A Codex member route is an orchestration, so the outer turn holds no model permit and is not billed as a native model. Before publication, its binding store pins native authentication or the exact managed provider and model, inheriting the initiating parent selection when omitted. Later turns and cold resumes retain that selection even when parent or instance settings change. A member delegating through the same provider instance inherits its saved upstream when `modelProvider` or `model` is omitted; explicit instance settings override the corresponding value for the new delegation. Each native request is logged and metered under the actual member Session and captured actor. Recovery only reads rollouts and opens no model listener or process. Legacy bindings without model selection remain intact and require a new member.
 
 SSH uses the target’s `remoteCommand`, without sending Host Node or package paths. A pending remote turn cannot be proven from a Host rollout, so it remains unknown and is not automatically resent; later explicit prompts still use the remote durable thread.
 
@@ -78,7 +90,7 @@ The binding store records the child ↔ thread mapping, pending prompt, acknowle
 | `approve-for-me` | `approvalPolicy: on-request`, `approvalsReviewer: auto_review`, `sandbox: workspace-write` | Route permission requests through Codex automatic review without a human. |
 | `dangerously-bypass-approvals-and-sandbox` | `approvalPolicy: never`, `sandbox: danger-full-access` | Skip approval and sandbox enforcement; this value must be selected explicitly. |
 
-Production resolves the `codex` bin declared by its pinned `@openai/codex@0.153.4` dependency and launches that JavaScript wrapper with the current Node executable. The wrapper selects the matching native platform payload; the provider neither inspects nor falls back to a host `codex` on `PATH`. Native Codex configuration and authentication remain authoritative through the parent cwd, `HOME`, and `CODEX_HOME`, while the Provider overrides only the selected thread approval/reviewer/sandbox fields. All other project, model, provider, MCP, hook, skill, and account settings remain native. The plugin does not select a model, create `CODEX_HOME`, log in, or probe an account. Credential-shaped ambient variables are removed by the subprocess seam before the explicit `env` overlay is applied.
+Production resolves the `codex` bin declared by its pinned `@openai/codex@0.153.4` dependency and launches that JavaScript wrapper with the current Node executable. The wrapper selects the matching native platform payload; the provider neither inspects nor falls back to a host `codex` on `PATH`. Independent runs retain native Codex configuration and authentication through the parent cwd, `HOME`, and `CODEX_HOME`, while the Provider overrides only the selected thread approval/reviewer/sandbox fields. All other project, model, provider, MCP, hook, skill, and account settings remain native. Independent mode does not create `CODEX_HOME`, log in, or probe an account. Credential-shaped ambient variables are removed by the subprocess seam before the explicit `env` overlay is applied.
 
 This package is an optional Profile Bundle. Install it into the target Profile, then restart that Profile; installation brings the official wrapper and one compatible native platform payload into that Profile, while the declared `cordis.patch.yml` layer registers only the dormant `codex` Host provider and starts no Codex process. Removing the package withdraws that provider and its private runtime closure on the next Profile start.
 
@@ -140,7 +152,7 @@ The standalone composition below shows the complete explicit capability. A Profi
 
 The production wire intentionally implements only the app-server methods required by this one-shot contract. The runtime dependency and all six optional-dependency aliases are pinned to `@openai/codex@0.153.4` / `codex-cli 0.153.4`. A normal install selects one payload for the current OS and CPU. For the current darwin-arm64 payload, `npm pack --dry-run --json @openai/codex@0.153.4-darwin-arm64` reports 115,672,312 packed bytes and 288,140,243 unpacked bytes. That package contains native `codex`, `codex-code-mode-host`, `rg`, and `zsh` resources; other platforms may differ, and these values are disclosure rather than an installation threshold.
 
-Generated schema evidence and package tests pin all sixteen error-info variants, HTTP-status locations, six lifecycle stages, process outcomes, stop-reason mapping, unknown fallback, sanitization, permission ordering, cancellation, concurrency, and cleanup aggregation. The keyless real-product test drives the package wrapper against a loopback Responses fixture and observes the package-local argv, exact Bearer key, original task, byte-exact final answer, thread-level `never` overriding ambient `on-request`, automatic-review startup, unattended rejection without file side effects, a real `internalServerError`, explicit dangerous-bypass writing in suite-owned temporary storage, process/protocol failure with safe exit facts, and wrapper/native quiescence. The same tier proves two named instances retain separate environments and native modes.
+Generated schema evidence and package tests pin all sixteen error-info variants, HTTP-status locations, six lifecycle stages, process outcomes, stop-reason mapping, unknown fallback, sanitization, permission ordering, cancellation, concurrency, and cleanup aggregation. The keyless real-product test drives the package wrapper against a loopback Responses fixture and observes the package-local argv, exact Bearer key, original task, byte-exact final answer, thread-level `never` overriding ambient `on-request`, automatic-review startup, unattended rejection without file side effects, a real `internalServerError`, explicit dangerous-bypass writing in suite-owned temporary storage, process/protocol failure with safe exit facts, and wrapper/native quiescence. The same tier proves two named instances retain separate environments and native modes. Resource-only compositions cover explicit and inherited routes for one-shot runs and resumed members, per-request attribution, and complete permit settlement with one model slot.
 
 Installing with optional dependencies omitted, using an unsupported platform, or losing the selected payload makes the first delegation fail at `initialize` with the safe `unknown` category and any observed process outcome. Raw wrapper text remains on Host stderr; the provider neither probes a host CLI nor retries with one. An isolated wrapper fixture separately proves the native payload failure and absence of host fallback.
 
@@ -177,6 +189,8 @@ Append-only: foreground adds one result after the reusable parent prefix, while 
 
 ## Known Limitations and Deferred Work
 
+- **Managed model control** — external starts and member turns follow the [shared parent-control restriction](../subagent/README.md#delegated-policy).
+
 - **One fresh process, thread, and turn per run** — there is no continuation, resume, pooling, progress stream, or product-session persistence.
 - **Static instance selection** — Profile rows fix provider names and tool bindings; calls cannot choose a provider dynamically, and every exposed tool needs a unique `toolName`.
 - **Authentication and account state remain native** — the Bundle supplies the CLI but does not create an account, log in, trust a project, or rewrite Codex settings; configuration and authentication failures surface with their lifecycle stage and the safe `unknown` fallback rather than a separate public taxonomy.
@@ -185,7 +199,7 @@ Append-only: foreground adds one result after the reusable parent prefix, while 
 - **No human approval path** — known unattended approval requests are denied and unknown server requests fail closed; the three Profile modes never create a DSH interaction channel or per-call allow policy.
 - **Assistant payload is final text only** — a failed run may additionally expose the separate safe diagnostic; reasoning, commentary, intermediate messages, tool traffic, usage, raw stderr, and workspace diffs remain outside the parent Session, while generic Job ids, notices, and status come from the shared job runtime.
 - **No optional shared capabilities** — `agentPreset`, `agentOptions`, output schemas, and harness depth enforcement are rejected by the shared service for this provider.
-- **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
+- **No overall turn deadline or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
 
 <a id="dev-note"></a>
 ### Dev Note

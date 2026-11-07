@@ -1,0 +1,13 @@
+{
+  "name": "chromium-module-graph",
+  "cwd": ".",
+  "command": "pnpm run gen-module-graph",
+  "startedAt": "2026-10-23T17:20:47.618948+00:00",
+  "seconds": 2.721,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6119d6131594153d607d564616b634391625559630c34644d3796c18243a26a3",
+  "inputsAfter": "6119d6131594153d607d564616b634391625559630c34644d3796c18243a26a3",
+  "outputSha256": "789aaecfde7cd649ca9b3b26b8c0910d3cf77f22da5971fe7d3df65010a08446",
+  "outputTail": "$ tsx scripts/gen-module-graph.ts\ngen-module-graph: 3 artifact(s) computed, 3 written.\n"
+}

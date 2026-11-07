@@ -71,6 +71,7 @@ import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-j
 import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
 import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 // Empty type imports carry the webServer/agents/sessionPersistence Context merges.
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-agent'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
@@ -112,28 +113,6 @@ const REPLAY_PROVIDERS = [{
   ],
 }]
 
-// Mirrored from packages/client/ui-settings-models/src/onboarding-copy.ts; the
-// scaffold inlines them so the test harness stays independent of the client
-// package graph.
-const WELCOME_NOTICE_SETTINGS_NAMESPACE = 'ui-onboarding'
-const WELCOME_NOTICE_ACK_FIELD = 'welcomeNoticeVersion'
-const WELCOME_NOTICE_VERSION = '2026-09-28.1'
-
-/**
- * Persist the shipped welcome acknowledgement into a harness home that no
- * server has booted yet — the pre-boot equivalent of the settled-context ack
- * below, for lanes that spawn `dsh` themselves. A first-run home would paint
- * the versioned notice modal over every page.
- * @param home - the `DSH_HOME` directory the spawned server reads.
- */
-export async function writeWelcomeNoticeAck(home: string): Promise<void> {
-  await mkdir(home, { recursive: true })
-  await writeFile(join(home, 'settings.yaml'), [
-    `${WELCOME_NOTICE_SETTINGS_NAMESPACE}:`,
-    `  ${WELCOME_NOTICE_ACK_FIELD}: '${WELCOME_NOTICE_VERSION}'`,
-    '',
-  ].join('\n'))
-}
 
 /**
  * The routes a shipped composition always has, with no ability to stream.
@@ -228,8 +207,6 @@ export interface LaunchOptions {
   workbench?: boolean
   /** Disable the optional native Open In app rows when the host package is not built in a fixture. */
   openInApp?: boolean
-  /** Leave the current welcome notice pending; ordinary scenarios pre-acknowledge it before browser boot. */
-  welcomeNoticePending?: boolean
   /**
    * Optional product overlay applied after the shipped Web surface and before
    * the scaffold's hermetic test patches, matching the launcher's `--patch`
@@ -543,12 +520,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     {
       id: 'webserver',
-      // Preserve the shipped response-compression policy while using an
-      // ephemeral port in this scaffold; a patch replaces the row's complete
-      // config.
+      // Preserve shipped encoding negotiation with low-effort codecs and an
+      // ephemeral port; a patch replaces the row's complete config.
       config: {
-        host: '127.0.0.1', port: 0, compression: 'gzip',
-        compressionLevel: 1, compressionThresholdBytes: 1024,
+        host: '127.0.0.1', port: 0, compression: 'auto',
+        compressionLevel: 1, compressionBrotliQuality: 1, compressionThresholdBytes: 1024,
       },
     },
     // The bundle's web-runtime row resolves the same built dist under test
@@ -714,14 +690,6 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     await mountRootInclude(ctx, rootConfig, readProfilePatches('dsh', profileContext))
     await ctx.loader.await()
     await auditStartupEntries(ctx, 'web e2e scaffold')
-    if (options.welcomeNoticePending !== true
-      // Overlays that omit the settings shell (e.g. goal-bar) leave the
-      // onboarding namespace unregistered; only ack when the owner mounted.
-      && ctx.settings.describe().some(descriptor => descriptor.ns === WELCOME_NOTICE_SETTINGS_NAMESPACE)) {
-      await ctx.settings.mutate(WELCOME_NOTICE_SETTINGS_NAMESPACE, [{
-        op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION,
-      }])
-    }
     const boundPort = ctx.get('webServer')?.port
     if (boundPort === undefined) {
       throw new Error('web e2e scaffold: webServer service missing after settled boot')
@@ -992,7 +960,7 @@ export function systemPromptTexts(events: readonly SessionEvent[]): string[] {
  * @param ordinal - the token's 1-based ordinal within that kind.
  * @returns the realized UUIDv4-shaped string.
  */
-export function realizedTokenId(kind: string, ordinal: number): string {
+function realizedTokenId(kind: string, ordinal: number): string {
   const hex = createHash('sha256').update(`${kind}:${ordinal}`).digest('hex').slice(0, 32).split('')
   hex[12] = '4'
   hex[16] = ['8', '9', 'a', 'b'][Number.parseInt(hex[16] as string, 16) % 4] as string

@@ -1,0 +1,16 @@
+{"type":"tool","phase":"off","name":"memory_read","isError":true,"code":"memory_invalid","text":"Error: Saved memories are unavailable to this conversation."}
+{"type":"tool","phase":"off","name":"memory_search","isError":true,"code":"memory_invalid","text":"Error: Saved memories are unavailable to this conversation."}
+{"type":"tool","phase":"off","name":"memory_read","isError":true,"code":"memory_invalid","text":"Error: Saved memories are unavailable to this conversation."}
+{"type":"tool","phase":"off","name":"memory_search","isError":true,"code":"memory_invalid","text":"Error: Saved memories are unavailable to this conversation."}
+{"type":"tool","phase":"off","name":"memory_search","isError":true,"code":"memory_invalid","text":"Error: Saved memories are unavailable to this conversation."}
+{"type":"tool","phase":"off","name":"memory_save","isError":true,"code":"memory_invalid","text":"Error: Saved memories are unavailable to this conversation."}
+{"type":"tool","phase":"off","name":"memory_delete","isError":true,"code":"memory_invalid","text":"Error: Saved memories are unavailable to this conversation."}
+{"type":"owner","phase":"off","scope":"personal","content":"Stored member guidance."}
+{"type":"owner","phase":"off","scope":"workspace","content":"Stored member guidance."}
+{"type":"tool","phase":"on","name":"memory_read","isError":false,"code":null,"text":"<memory key=\"release-rule\" scope=\"personal\" kind=\"guidance\" updated=\"2026-10-01\" revision=\"seed-personal\">\nStored member guidance.\n</memory>"}
+{"type":"tool","phase":"on","name":"memory_search","isError":false,"code":null,"text":"<memory_search query=\"member\">\n- `release-rule` (personal) [guidance, 2026-10-01]: Member guidance\n  Stored member guidance.\n</memory_search>"}
+{"type":"tool","phase":"on","name":"memory_read","isError":false,"code":null,"text":"<memory key=\"release-rule\" scope=\"workspace\" kind=\"guidance\" updated=\"2026-10-01\" revision=\"seed-workspace\">\nStored member guidance.\n</memory>"}
+{"type":"tool","phase":"on","name":"memory_search","isError":false,"code":null,"text":"<memory_search query=\"member\">\n- `release-rule` (workspace) [guidance, 2026-10-01]: Member guidance\n  Stored member guidance.\n</memory_search>"}
+{"type":"tool","phase":"on","name":"memory_search","isError":false,"code":null,"text":"<memory_search query=\"member\">\n- `release-rule` (personal) [guidance, 2026-10-01]: Member guidance\n  Stored member guidance.\n- `release-rule` (workspace) [guidance, 2026-10-01]: Member guidance\n  Stored member guidance.\n</memory_search>"}
+{"type":"owner","phase":"on","scope":"personal","content":"Stored member guidance."}
+{"type":"owner","phase":"on","scope":"workspace","content":"Stored member guidance."}

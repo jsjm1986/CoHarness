@@ -7,11 +7,12 @@ import type { PtcBindingFunction, PtcJsonValue, PtcRuntime } from '@deepseek-ai/
 import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type SubagentRuntime from '@deepseek-ai/dsh-subagent'
-import type { SubagentRun } from '@deepseek-ai/dsh-subagent'
+import type { SubagentProvider, SubagentRun } from '@deepseek-ai/dsh-subagent'
 import { assertObjectJsonSchema } from '@deepseek-ai/dsh-tools'
 import type { ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
 import { assertNever, snapshotJsonValue } from '@deepseek-ai/dsh-util-values'
 import type { WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowMeta, WorkflowResult, WorkflowRun, WorkflowRunId } from '@deepseek-ai/dsh-workflow'
+import { WorkflowError } from '@deepseek-ai/dsh-workflow'
 import { WORKFLOW_GUEST_SOURCE } from './guest-source.ts'
 import type { WorkflowProgress } from './guest-types.ts'
 import { renderThrown } from './realm.ts'
@@ -107,9 +108,10 @@ function workflowResult(value: unknown): WorkflowResult {
 }
 
 /**
- * Holder-owned workflow. Cancellation stops the program immediately; settlement waits for
- * its managed process and every admitted child startup/disposal. Engine unload does not
- * invalidate the captured runtime or subagent handles.
+ * Holder-owned workflow. Result settlement includes initial cleanup attempts;
+ * public disposal confirms child cleanup and retains failures for retry.
+ * Engine unload does not invalidate captured handles. Further children require
+ * the admitted provider instance to remain registered.
  */
 export class PtcWorkflowRun implements WorkflowRun {
   readonly result: Promise<WorkflowResult>
@@ -124,6 +126,7 @@ export class PtcWorkflowRun implements WorkflowRun {
   private disposed: Promise<void> | undefined
   private readonly externalAbort: () => void
   private readonly cwd: Promise<string>
+  private readonly releaseIdle: () => void
 
   constructor(
     private readonly ctx: Context,
@@ -133,7 +136,7 @@ export class PtcWorkflowRun implements WorkflowRun {
     readonly meta: WorkflowMeta,
     private readonly parent: Agent,
     private readonly init: WorkerInit,
-    private readonly provider: string,
+    private readonly provider: SubagentProvider,
     private readonly policy: SandboxExecutionPolicy,
     private readonly observer: ExecutionObserver,
     private readonly signal?: AbortSignal,
@@ -143,8 +146,13 @@ export class PtcWorkflowRun implements WorkflowRun {
     if (signal?.aborted) this.externalAbort()
     else signal?.addEventListener('abort', this.externalAbort, { once: true })
     this.cwd = ctx.workingDirectory.ensure(parent, this.controller.signal)
+    const busy = (): boolean => !this.terminal || this.pending.size > 0 || this.children.size > 0
+    const releaseRuntime = ctx.root.on('runtime/idle-release-check', () => busy() ? 'busy' : undefined, { global: true })
+    const releaseAgent = ctx.root.on('agent/idle-release-check', ({ agent }) =>
+      agent === parent && busy() ? 'busy' : undefined, { global: true })
+    this.releaseIdle = () => { releaseRuntime(); releaseAgent() }
     // Consumers attach durable run recording after start() returns.
-    this.result = Promise.resolve().then(() => this.drive())
+    this.result = Promise.resolve().then(() => this.drive()).finally(() => { this.releaseIdleIfSettled() })
   }
 
   /**
@@ -155,17 +163,25 @@ export class PtcWorkflowRun implements WorkflowRun {
     if (this.terminal || this.cancelReason !== undefined) return
     this.cancelReason = reason
     this.controller.abort(reason)
-    for (const record of this.children.values()) void this.disposeChild(record)
+    for (const record of this.children.values()) this.requestChildDisposal(record)
   }
 
   /**
    * Cancel unfinished work and await the program and child cleanup.
-   * @returns One shared completion promise for repeated disposal calls.
+   * @returns the shared cleanup attempt; a rejected attempt can be retried.
    */
   dispose(): Promise<void> {
     this.cancel('workflow disposed')
-    this.disposed ??= this.result.then(() => {})
-    return this.disposed
+    return this.disposed ??= this.result.then(async () => {
+      const settled = await Promise.allSettled([...this.children.values()].map(record => this.disposeChild(record)))
+      const errors = settled.flatMap(result => result.status === 'rejected' ? [result.reason as unknown] : [])
+      if (errors.length > 0) throw new AggregateError(errors, 'Workflow child cleanup failed.')
+    }).catch((error: unknown) => { this.disposed = undefined; throw error })
+  }
+
+  retainFailedCleanup(): Promise<void> {
+    return Promise.all([...this.children.values()].map(record =>
+      this.subagents.retainFailedCleanup(this.parent, record.run))).then(() => this.dispose())
   }
 
   private requireActive(): void {
@@ -174,8 +190,13 @@ export class PtcWorkflowRun implements WorkflowRun {
 
   private track<T>(task: Promise<T>): Promise<T> {
     this.pending.add(task)
-    void task.then(() => { this.pending.delete(task) }, () => { this.pending.delete(task) })
+    const settled = (): void => { this.pending.delete(task); this.releaseIdleIfSettled() }
+    void task.then(settled, settled)
     return task
+  }
+
+  private releaseIdleIfSettled(): void {
+    if (this.terminal && this.pending.size === 0 && this.children.size === 0) this.releaseIdle()
   }
 
   private bindings(): Record<string, PtcBindingFunction> {
@@ -203,18 +224,24 @@ export class PtcWorkflowRun implements WorkflowRun {
   private async startChild(request: ChildStartRequest): Promise<PtcJsonValue> {
     this.requireActive()
     const callId = ++this.started
-    const start = () => this.subagents.start(this.provider, {
-      prompt: [{ type: 'text', text: request.prompt }],
-      parent: this.parent,
-      signal: this.controller.signal,
-      ...request.schema === undefined ? {} : { outputSchema: request.schema },
-      ...request.provider === undefined && request.model === undefined ? {} : {
-        agentOptions: {
-          ...request.provider === undefined ? {} : { provider: request.provider },
-          ...request.model === undefined ? {} : { model: request.model },
+    const start = () => {
+      this.requireActive()
+      if (this.subagents.getProvider(this.provider.name) !== this.provider) {
+        throw new WorkflowError(`subagent provider "${this.provider.name}" changed after workflow admission; start a new workflow`, 'AGENT_START')
+      }
+      return this.subagents.start(this.provider.name, {
+        prompt: [{ type: 'text', text: request.prompt }],
+        parent: this.parent,
+        signal: this.controller.signal,
+        ...request.schema === undefined ? {} : { outputSchema: request.schema },
+        ...request.provider === undefined && request.model === undefined ? {} : {
+          agentOptions: {
+            ...request.provider === undefined ? {} : { provider: request.provider },
+            ...request.model === undefined ? {} : { model: request.model },
+          },
         },
-      },
-    })
+      })
+    }
     const authority = executionAuthorityOf(this.ctx)
     const run = await (authority === undefined || this.executionScope === undefined ? start()
       : authority.runCaptured(this.parent, this.executionScope, start))
@@ -247,12 +274,22 @@ export class PtcWorkflowRun implements WorkflowRun {
   }
 
   private disposeChild(record: ChildRecord): Promise<void> {
-    record.disposal ??= Promise.resolve().then(() => record.run.dispose()).catch((error: unknown) => {
-      this.ctx.logger.warn(`workflow-ptc: child dispose failed: ${renderThrown(error)}`)
-    }).finally(() => {
+    if (record.disposal !== undefined) return record.disposal
+    const disposal = Promise.resolve().then(() => record.run.dispose()).then(() => {
       this.children.delete(record.callId)
+    }, (error: unknown) => {
+      delete record.disposal
+      throw error
     })
-    return record.disposal
+    record.disposal = disposal
+    return this.track(disposal)
+  }
+
+  /** Retain failed cleanup for the run's holder while cancellation proceeds. */
+  private requestChildDisposal(record: ChildRecord): void {
+    void this.disposeChild(record).catch((error: unknown) => {
+      this.ctx.logger.warn(`workflow-ptc: child dispose failed: ${renderThrown(error)}`)
+    })
   }
 
   private onProgress(event: WorkflowProgress): void {
@@ -309,10 +346,8 @@ export class PtcWorkflowRun implements WorkflowRun {
       this.signal?.removeEventListener('abort', this.externalAbort)
       this.controller.abort('workflow settled')
       // Disposing published children releases binding waits; pending starts may publish more.
-      for (const record of this.children.values()) void this.disposeChild(record)
+      for (const record of this.children.values()) this.requestChildDisposal(record)
       while (this.pending.size > 0) await Promise.allSettled([...this.pending])
-      await Promise.all([...this.children.values()].map(record => this.disposeChild(record)))
-      this.children.clear()
       for (const info of this.liveAgents.values()) this.endAgent({ ...info, outcome: 'cancelled' })
     }
     return result

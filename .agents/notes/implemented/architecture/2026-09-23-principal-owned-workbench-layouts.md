@@ -14,6 +14,8 @@ The conversation viewport owns one versioned record per verified principal. The 
 
 A Host must explicitly declare independent local execution before the local principal is usable. Missing Gateway identity never selects that principal. Only the independent local operator may migrate legacy unscoped metadata, after the Session catalog is ready and inaccessible references have been removed. Gateway leaves those records unclaimed because their previous account cannot be proven. Storage denial keeps the current in-memory layout usable.
 
+Layout selection persists independently of pane changes. Selecting a different layout with the same pane ids, focus and ratios records that layout's id, including when the root store has no changed pane state to publish. Identity and legacy-migration restrictions apply to this write as they do to every saved-layout edit.
+
 The [Workbench sidebar decision](../feature/2026-09-17-workbench-sidebar-panel.md) remains active for pane navigation and narrow-pane rendering. The [auxiliary sidebar decision](2026-09-23-account-scoped-auxiliary-sidebar.md) owns resource-tab persistence and holds; it does not own the center Workbench layout.
 
 ## Alternatives considered
@@ -21,6 +23,8 @@ The [Workbench sidebar decision](../feature/2026-09-17-workbench-sidebar-panel.m
 **Keep two records.** Partial writes and independent restoration can select different active panes or discard manual ratios.
 
 **Assign legacy metadata to the next login.** A visible shared Session does not prove ownership of private layout names.
+
+**Save selection only after a pane-store notification.** Two named layouts can contain identical pane state, so a change to the selected layout does not necessarily emit that notification.
 
 ## Consequences
 

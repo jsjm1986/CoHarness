@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-26-document-operation-drain.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-26-document-operation-drain.md
+document:
+  en: 86868908e8cd99038674b15006551cefd60bbb48
+  zh: 4ae5cfbe7591e97af4a676080aa9bf2ab43ed996
+/agent-note-document-operation-drain:
+  en: efba417f2a2773c9
+  zh: 179828f946a3fe91
+/agent-note-document-operation-drain/problem:
+  en: 5b41d2f3aadb3e73
+  zh: adb217febe43e079
+/agent-note-document-operation-drain/decision:
+  en: 0b46d21e6b0fdeb7
+  zh: 9c74f6de5bed7b33
+/agent-note-document-operation-drain/alternatives-considered:
+  en: 0e9de8cf793206ff
+  zh: c182166d8d64c4be
+/agent-note-document-operation-drain/consequences:
+  en: be19e5918fe599cf
+  zh: 3f75220f15b0af40

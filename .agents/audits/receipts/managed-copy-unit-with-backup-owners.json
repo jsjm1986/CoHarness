@@ -1,0 +1,14 @@
+{
+  "name": "managed-copy-unit-with-backup-owners",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/managed-files-short-write.spec.ts tests/managed-files.spec.ts tests/deployment-commands.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T11:06:42.428148+00:00",
+  "seconds": 6.875,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a624ab3fb39c6b12f284e49096327ab3960ca73af3ebf0dd9fe49d9c666ddca8",
+  "inputsAfter": "a624ab3fb39c6b12f284e49096327ab3960ca73af3ebf0dd9fe49d9c666ddca8",
+  "postgresToolDirectory": null,
+  "outputSha256": "3da6096fb96e00d03f5bd960628295a9e62542ddf9502e51ea7355cf79ced7ef",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  17 passed (17)\n   Start at  19:06:45\n   Duration  3.56s (transform 89ms, setup 0ms, import 151ms, tests 3.15s, environment 0ms)\n\n"
+}

@@ -1,0 +1,3180 @@
+{
+  "createdAt": "2026-10-23T17:33:45.243Z",
+  "scope": "Current syntactic candidates include named/default/namespace aliases, simple local aliases, static dynamic imports/require and promisify/bind wrappers. Native-helper imports are listed separately. Shadowing, factories, SDK internals, Python and native source still require manual review; inventory is never review coverage.",
+  "imports": [
+    {
+      "path": "gateway/src/child-command.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFile",
+          "local": "execFile"
+        }
+      ]
+    },
+    {
+      "path": "gateway/src/local-runtime-protocol.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFile",
+          "local": "execFile"
+        }
+      ]
+    },
+    {
+      "path": "gateway/src/local-runtime-supervisor.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "gateway/src/tunnel-process.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "apps/plugin-market-generator/src/fetchers.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFile",
+          "local": "execFile"
+        }
+      ]
+    },
+    {
+      "path": "gateway/src/deployment-commands.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "gateway/src/index.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFileSync",
+          "local": "execFileSync"
+        }
+      ]
+    },
+    {
+      "path": "gateway/src/launcher.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "gateway/src/node-config-host.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFile",
+          "local": "execFile"
+        }
+      ]
+    },
+    {
+      "path": "gateway/src/node-resource-pressure.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFile",
+          "local": "execFile"
+        }
+      ]
+    },
+    {
+      "path": "packages/boot/app-boot/src/profile-resolution/resolver.ts",
+      "module": "node:worker_threads",
+      "aliases": []
+    },
+    {
+      "path": "packages/boot/app-boot/src/profile-resolution/worker-bootstrap.ts",
+      "module": "node:worker_threads",
+      "aliases": []
+    },
+    {
+      "path": "packages/boot/plugin-market/src/parse-thread.ts",
+      "module": "node:worker_threads",
+      "aliases": [
+        {
+          "imported": "Worker",
+          "local": "Worker"
+        }
+      ]
+    },
+    {
+      "path": "packages/boot/plugin-market/src/worker.ts",
+      "module": "node:worker_threads",
+      "aliases": []
+    },
+    {
+      "path": "packages/bundle/web-app/src/index.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
+      "module": "node:worker_threads",
+      "aliases": [
+        {
+          "imported": "Worker",
+          "local": "Worker"
+        }
+      ]
+    },
+    {
+      "path": "packages/experimental/browser-use-stagehand-native/src/worker-rpc.ts",
+      "module": "node:worker_threads",
+      "aliases": []
+    },
+    {
+      "path": "packages/experimental/browser-use-stagehand-native/src/worker.ts",
+      "module": "node:worker_threads",
+      "aliases": []
+    },
+    {
+      "path": "packages/experimental/inspector/src/host/bridge/controller.ts",
+      "module": "node:worker_threads",
+      "aliases": [
+        {
+          "imported": "Worker",
+          "local": "Worker"
+        }
+      ]
+    },
+    {
+      "path": "packages/experimental/inspector/src/worker/entry.ts",
+      "module": "node:worker_threads",
+      "aliases": []
+    },
+    {
+      "path": "packages/host/directory-picker-native/src/win32-dialog-host.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "packages/host/open-in-app/src/resolver.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "packages/sandbox/sandbox-local/src/index.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawnSync",
+          "local": "spawnSync"
+        }
+      ]
+    },
+    {
+      "path": "packages/sdk/client/src/client.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "packages/session/session-persistence-jsonl/src/migration-verifier.ts",
+      "module": "node:worker_threads",
+      "aliases": [
+        {
+          "imported": "Worker",
+          "local": "Worker"
+        }
+      ]
+    },
+    {
+      "path": "packages/session/session-persistence-jsonl/src/worker.ts",
+      "module": "node:worker_threads",
+      "aliases": []
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFile",
+          "local": "execFile"
+        },
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        },
+        {
+          "imported": "spawnSync",
+          "local": "spawnSync"
+        }
+      ]
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/process-inspector.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFileSync",
+          "local": "execFileSync"
+        }
+      ]
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/spawn.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        },
+        {
+          "imported": "spawnSync",
+          "local": "spawnSync"
+        }
+      ]
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/windows-inspector.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawnSync",
+          "local": "spawnSync"
+        }
+      ]
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/windows-job.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "packages/test-support/session-snapshot/src/launcher.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "spawn",
+          "local": "spawn"
+        }
+      ]
+    },
+    {
+      "path": "packages/typert/generator/src/tsdown-plugin.ts",
+      "module": "node:worker_threads",
+      "aliases": [
+        {
+          "imported": "Worker",
+          "local": "Worker"
+        }
+      ]
+    },
+    {
+      "path": "packages/typert/generator/src/worker.ts",
+      "module": "node:worker_threads",
+      "aliases": []
+    },
+    {
+      "path": "packages/util/native-command/src/runner.ts",
+      "module": "node:child_process",
+      "aliases": [
+        {
+          "imported": "execFile",
+          "local": "execFile"
+        }
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "path": "gateway/src/child-command.ts",
+      "line": 18,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "execute",
+      "owner": "runGatewayChildCommand",
+      "status": "administrative_native_command_environment_deadline_cancellation_and_close_verified",
+      "currentObservation": true,
+      "findings": [
+        "B128",
+        "B314",
+        "B316",
+        "B319"
+      ],
+      "receipts": [
+        "systemd-native-valid-fixture-before",
+        "systemd-atomic-fixture-built-node22",
+        "systemd-atomic-fixture-built-node24",
+        "systemd-atomic-fixture-built-node25",
+        "receipts/gateway-native-control-cancellation-2026-10-29.json",
+        "receipts/node-configuration-native-control-2026-10-29.json",
+        "receipts/node-pressure-native-command-2026-10-29.json"
+      ],
+      "evidence": "Native control infrastructure uses stable locale, force-kill cancellation and joined close; underlying runtime/service uncertainty remains separately retained."
+    },
+    {
+      "path": "gateway/src/local-runtime-protocol.ts",
+      "line": 27,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "promisify(execFile)",
+      "owner": "localKernelBootId",
+      "status": "historical_raw_boot_probe_delegated_to_joined_owner_real_start_cancellation_verified",
+      "currentObservation": false,
+      "finding": "B04",
+      "findings": [
+        "B321"
+      ],
+      "receipts": [
+        "receipts/local-runtime-boot-identity-2026-10-29.json"
+      ],
+      "currentHelper": "gateway/src/child-command.ts:runGatewayChildCommand"
+    },
+    {
+      "path": "gateway/src/local-runtime-supervisor.ts",
+      "line": 108,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "supervise",
+      "status": "one_runtime_under_inherited_owner_lease_posix_scope_verified",
+      "currentObservation": true,
+      "finding": "B25"
+    },
+    {
+      "path": "gateway/src/tunnel-process.ts",
+      "line": 67,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "spawnTunnelProcess",
+      "status": "owned_native_connector_registration_close_and_cancellation_verified",
+      "currentObservation": true,
+      "findings": [
+        "B106",
+        "B107",
+        "B109",
+        "B110",
+        "B117"
+      ],
+      "receipts": [
+        "tunnel-preparation-complete-source-declared",
+        "tunnel-preparation-complete-built"
+      ]
+    },
+    {
+      "path": "apps/plugin-market-generator/src/fetchers.ts",
+      "line": 152,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "run",
+      "owner": "git",
+      "status": "development_cli_git_named_transport_and_objects_cases_verified_product_admission_not_applicable",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/remaining-development-resource-owners-2026-10-30.json"
+      ]
+    },
+    {
+      "path": "gateway/src/deployment-commands.ts",
+      "line": 127,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "run",
+      "status": "maintenance_child_environment_and_named_pipe_closure_verified_argument_transport_and_wrapper_owner_review_open",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/postgres-command-environment-2026-10-31.json"
+      ]
+    },
+    {
+      "path": "gateway/src/index.ts",
+      "line": 832,
+      "module": "node:child_process",
+      "method": "execFileSync",
+      "expression": "execFileSync",
+      "owner": "ensureStewardSpace",
+      "status": "pending_review_peer_index_composition_ownership_respected",
+      "currentObservation": true
+    },
+    {
+      "path": "gateway/src/launcher.ts",
+      "line": 159,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "start",
+      "status": "runtime_cold_start_and_exact_generation_handoff_verified",
+      "currentObservation": true,
+      "findings": [
+        "B25",
+        "B104",
+        "B105"
+      ],
+      "receipts": [
+        "tunnel-preparation-complete-source-declared",
+        "tunnel-preparation-complete-built"
+      ]
+    },
+    {
+      "path": "gateway/src/node-config-host.ts",
+      "line": 127,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "execute",
+      "owner": "restartAndVerify",
+      "status": "delegated_to_joined_native_control_owner_named_scenarios_verified",
+      "currentObservation": false,
+      "historicalRawAllocation": true,
+      "findings": [
+        "B316",
+        "B317",
+        "B318"
+      ],
+      "currentHelper": "gateway/src/child-command.ts:runGatewayChildCommand",
+      "receipts": [
+        "receipts/node-configuration-native-control-2026-10-29.json",
+        "receipts/node-configuration-health-budgets-2026-10-29.json",
+        "receipts/node-configuration-health-identity-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "gateway/src/node-resource-pressure.ts",
+      "line": 111,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "execute",
+      "owner": "sample",
+      "status": "delegated_to_joined_native_control_owner_named_scenarios_verified",
+      "currentObservation": false,
+      "historicalRawAllocation": true,
+      "findings": [
+        "B319"
+      ],
+      "currentHelper": "gateway/src/child-command.ts:runGatewayChildCommand",
+      "receipts": [
+        "receipts/node-pressure-native-command-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/boot/plugin-market/src/parse-thread.ts",
+      "line": 73,
+      "module": "node:worker_threads",
+      "method": "Worker",
+      "expression": "Worker",
+      "owner": "runParser",
+      "status": "current_source_and_rebuilt_worker_admission_verified",
+      "currentObservation": true,
+      "finding": "B22"
+    },
+    {
+      "path": "packages/bundle/web-app/src/index.ts",
+      "line": 136,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "spawnBrowserLauncher",
+      "status": "administrative_browser_helper_cancellation_and_native_close_verified_os_delegation_external",
+      "currentObservation": true,
+      "receipt": "receipts/web-browser-helper-ownership-2026-10-31.json"
+    },
+    {
+      "path": "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
+      "line": 45,
+      "module": "node:worker_threads",
+      "method": "Worker",
+      "expression": "Worker",
+      "owner": "openBrowserWorker",
+      "status": "admission_integrated_targeted_verified",
+      "currentObservation": true,
+      "finding": "B28"
+    },
+    {
+      "path": "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
+      "line": 49,
+      "module": "node:worker_threads",
+      "method": "Worker",
+      "expression": "Worker",
+      "owner": "openBrowserWorker",
+      "status": "admission_integrated_targeted_verified",
+      "currentObservation": true,
+      "finding": "B28"
+    },
+    {
+      "path": "packages/experimental/inspector/src/host/bridge/controller.ts",
+      "line": 338,
+      "module": "node:worker_threads",
+      "method": "Worker",
+      "expression": "Worker",
+      "owner": "spawnWorker",
+      "status": "current_real_worker_completion_retry_and_native_bundles_verified_whole_inventory_open",
+      "currentObservation": true,
+      "finding": "B31",
+      "findings": [
+        "B04",
+        "B297"
+      ],
+      "receipt": "receipts/inspector-resource-completion-2026-10-29.json"
+    },
+    {
+      "path": "packages/experimental/inspector/src/host/bridge/controller.ts",
+      "line": 347,
+      "module": "node:worker_threads",
+      "method": "Worker",
+      "expression": "Worker",
+      "owner": "spawnWorker",
+      "status": "current_real_worker_completion_retry_and_native_bundles_verified_whole_inventory_open",
+      "currentObservation": true,
+      "finding": "B31",
+      "findings": [
+        "B04",
+        "B297"
+      ],
+      "receipt": "receipts/inspector-resource-completion-2026-10-29.json"
+    },
+    {
+      "path": "packages/host/directory-picker-native/src/win32-dialog-host.ts",
+      "line": 29,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "spawnDialogWorker",
+      "status": "driver_lifetime_verified_native_windows_platform_acceptance_open",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/native-dialog-worker-closure-2026-10-31.json"
+      ]
+    },
+    {
+      "path": "packages/host/directory-picker-native/src/win32-dialog-host.ts",
+      "line": 31,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "spawnDialogWorker",
+      "status": "driver_lifetime_verified_native_windows_platform_acceptance_open",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/native-dialog-worker-closure-2026-10-31.json"
+      ]
+    },
+    {
+      "path": "packages/host/open-in-app/src/resolver.ts",
+      "line": 76,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": null,
+      "status": "desktop_http_current_authorization_and_per_handoff_admission_verified_native_lifetime_review_open",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/desktop-request-authorization-2026-10-31.json"
+      ]
+    },
+    {
+      "path": "packages/sandbox/sandbox-local/src/index.ts",
+      "line": 70,
+      "module": "node:child_process",
+      "method": "spawnSync",
+      "expression": "spawnSync",
+      "owner": "defaultProbeBwrap",
+      "status": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
+      "currentObservation": true,
+      "findings": [
+        "B322"
+      ],
+      "receipts": [
+        "receipts/native-capability-probes-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/sandbox/sandbox-local/src/index.ts",
+      "line": 88,
+      "module": "node:child_process",
+      "method": "spawnSync",
+      "expression": "spawnSync",
+      "owner": "defaultProbeSeatbelt",
+      "status": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
+      "currentObservation": true,
+      "findings": [
+        "B322"
+      ],
+      "receipts": [
+        "receipts/native-capability-probes-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/sandbox/sandbox-local/src/index.ts",
+      "line": 106,
+      "module": "node:child_process",
+      "method": "spawnSync",
+      "expression": "spawnSync",
+      "owner": "defaultProbeWindowsAcl",
+      "status": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
+      "currentObservation": true,
+      "findings": [
+        "B322"
+      ],
+      "receipts": [
+        "receipts/native-capability-probes-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/sdk/client/src/client.ts",
+      "line": 296,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "start",
+      "status": "managed_sdk_parent_admission_and_original_child_cleanup_retry_source_native_artifact_verified_whole_inventory_open",
+      "currentObservation": true,
+      "evidence": [
+        "receipts/sdk-unpublished-startup-2026-10-29.json",
+        "receipts/sdk-client-close-recovery-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/session/session-persistence-jsonl/src/migration-verifier.ts",
+      "line": 244,
+      "module": "node:worker_threads",
+      "method": "Worker",
+      "expression": "Worker",
+      "owner": "runVerificationWorker",
+      "status": "admission_integrated_targeted_verified",
+      "currentObservation": true,
+      "finding": "B23"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
+      "line": 91,
+      "module": "node:child_process",
+      "method": "execFile",
+      "expression": "execFile",
+      "owner": "querySystemctl",
+      "status": "native_query_probe_and_signal_deadlines_named_real_clients_verified_complete_inventory_open",
+      "currentObservation": true,
+      "findings": [
+        "B313",
+        "B320"
+      ],
+      "receipts": [
+        "receipts/linux-provider-native-control-2026-10-29.json"
+      ],
+      "evidence": "Administrative native-control clients are distinct from user Session workload permits. Their closure retains unknown scope ownership on query failure; new Runtime slice membership has separate B313 evidence."
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/process-inspector.ts",
+      "line": 126,
+      "module": "node:child_process",
+      "method": "execFileSync",
+      "expression": "execFileSync",
+      "owner": null,
+      "status": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/partial-pty-process-observation-2026-10-30.json",
+        "receipts/native-process-control-deadlines-2026-10-31.json"
+      ],
+      "partialPtyOwnershipFollowup": "Known POSIX identities remain retained on incomplete or absent table completeness. Native command deadline and whole-file review remain open."
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/spawn.ts",
+      "line": 120,
+      "module": "node:child_process",
+      "method": "spawnSync",
+      "expression": "spawnSync",
+      "owner": "taskkillProcessTree",
+      "status": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/native-process-control-deadlines-2026-10-31.json"
+      ]
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/windows-inspector.ts",
+      "line": 153,
+      "module": "node:child_process",
+      "method": "spawnSync",
+      "expression": "spawnSync",
+      "owner": "taskkillTree",
+      "status": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/windows-terminal-observation-2026-10-30.json",
+        "receipts/native-process-control-deadlines-2026-10-31.json"
+      ]
+    },
+    {
+      "path": "packages/test-support/session-snapshot/src/launcher.ts",
+      "line": 137,
+      "module": "node:child_process",
+      "method": "spawn",
+      "expression": "spawn",
+      "owner": "launchAcpTestAgent",
+      "status": "test_only_acp_named_stdio_callback_and_refused_fallback_closure_verified_product_admission_not_applicable",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/remaining-development-resource-owners-2026-10-30.json"
+      ]
+    },
+    {
+      "path": "packages/typert/generator/src/tsdown-plugin.ts",
+      "line": 194,
+      "module": "node:worker_threads",
+      "method": "Worker",
+      "expression": "Worker",
+      "owner": "spawnWorker",
+      "status": "build_only_worker_named_success_and_failure_closure_verified_product_admission_not_applicable",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/remaining-development-resource-owners-2026-10-30.json"
+      ]
+    },
+    {
+      "path": "packages/typert/generator/src/tsdown-plugin.ts",
+      "line": 202,
+      "module": "node:worker_threads",
+      "method": "Worker",
+      "expression": "Worker",
+      "owner": "spawnWorker",
+      "status": "build_only_worker_named_success_and_failure_closure_verified_product_admission_not_applicable",
+      "currentObservation": true,
+      "receipts": [
+        "receipts/remaining-development-resource-owners-2026-10-30.json"
+      ]
+    },
+    {
+      "path": "packages/util/native-command/src/runner.ts",
+      "line": 30,
+      "module": "node:child_process",
+      "method": "execFile",
+      "expression": "execFile",
+      "owner": null,
+      "status": "direct_native_helper_cancellation_source_and_public_node22_node24_verified_native_desktop_acceptance_open",
+      "currentObservation": true,
+      "findings": [
+        "B312"
+      ],
+      "receipts": [
+        "receipts/native-command-cancellation-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "gateway/src/launcher.ts",
+      "line": 215,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "promisify(execFile)",
+      "owner": null,
+      "status": "historical_native_call_replaced_by_shared_bounded_command_owner",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal.",
+      "replacement": "gateway/src/child-command.ts",
+      "receipts": [
+        "receipts/remaining-development-resource-owners-2026-10-30.json"
+      ]
+    },
+    {
+      "path": "gateway/src/tunnel-supervisor.ts",
+      "line": 64,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "execFileAsync",
+      "owner": "runCommand",
+      "status": "historical_native_call_replaced_by_shared_bounded_command_owner",
+      "currentObservation": false,
+      "findings": [
+        "B114",
+        "B115",
+        "B116",
+        "B117",
+        "B128"
+      ],
+      "receipts": [
+        "tunnel-probes-node22",
+        "tunnel-probes-node24",
+        "tunnel-pinned-real-built-node22"
+      ],
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal.",
+      "replacement": "gateway/src/child-command.ts"
+    },
+    {
+      "path": "gateway/src/tunnel-supervisor.ts",
+      "line": 59,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "execFileAsync",
+      "owner": "defaultWhich",
+      "status": "historical_native_call_replaced_by_shared_bounded_command_owner",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal.",
+      "replacement": "gateway/src/child-command.ts",
+      "findings": [
+        "B128"
+      ]
+    },
+    {
+      "path": "gateway/src/tunnel-supervisor.ts",
+      "line": 69,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "execFileAsync",
+      "owner": "defaultVersionOf",
+      "status": "historical_native_call_replaced_by_shared_bounded_command_owner",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal.",
+      "replacement": "gateway/src/child-command.ts",
+      "findings": [
+        "B128"
+      ]
+    },
+    {
+      "path": "gateway/src/tunnel-supervisor.ts",
+      "line": 173,
+      "module": "node:child_process",
+      "method": "execFile",
+      "wrapper": "promisify",
+      "expression": "execFileAsync",
+      "owner": "installCloudflared",
+      "status": "historical_native_call_replaced_by_shared_bounded_command_owner",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal.",
+      "replacement": "gateway/src/child-command.ts",
+      "findings": [
+        "B128"
+      ]
+    },
+    {
+      "path": "gateway/src/launcher.ts",
+      "line": 49,
+      "module": "node:child_process",
+      "method": "spawnSync",
+      "owner": "installLocalChildCleanup",
+      "status": "retired_removed_with_independent_posix_ownership",
+      "finding": "B25",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal."
+    },
+    {
+      "path": "gateway/src/launcher.ts",
+      "line": 91,
+      "module": "node:child_process",
+      "method": "execFile",
+      "owner": "terminateWindowsTree",
+      "status": "retired_removed_with_independent_posix_ownership",
+      "finding": "B25",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal."
+    },
+    {
+      "path": "gateway/src/launcher.ts",
+      "line": 167,
+      "module": "node:child_process",
+      "method": "spawn",
+      "owner": "LocalLauncher.start",
+      "status": "runtime_cold_start_admission_and_exact_generation_kernel_handoff_verified",
+      "finding": "B25",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal."
+    },
+    {
+      "path": "gateway/src/tunnel-supervisor.ts",
+      "line": 53,
+      "module": "node:child_process",
+      "method": "spawnSync",
+      "owner": "installTunnelChildCleanup",
+      "status": "retired_owner_replaced_by_tunnel_process_handle",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal.",
+      "replacement": "gateway/src/tunnel-process.ts"
+    },
+    {
+      "path": "gateway/src/tunnel-supervisor.ts",
+      "line": 267,
+      "module": "node:child_process",
+      "method": "spawn",
+      "owner": "spawnCloudflared",
+      "status": "retired_owner_replaced_by_tunnel_process_handle",
+      "findings": [
+        "B106",
+        "B107",
+        "B108",
+        "B109",
+        "B110"
+      ],
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal.",
+      "replacement": "gateway/src/tunnel-process.ts"
+    },
+    {
+      "path": "gateway/src/launcher.ts",
+      "line": 222,
+      "module": "node:child_process",
+      "method": "execFile",
+      "owner": "runSystemctl",
+      "status": "retired_replaced_by_shared_bounded_command_owner",
+      "currentObservation": false,
+      "observation": "No matching call in current syntactic scan; historical review status preserved, not proof of removal.",
+      "replacement": "gateway/src/child-command.ts",
+      "findings": [
+        "B128"
+      ]
+    },
+    {
+      "path": "native/system/packages/entry/src/index.ts",
+      "module": "node:child_process",
+      "method": "spawnSync",
+      "expression": "spawnSync",
+      "owner": "probe",
+      "line": 120,
+      "status": "public_native_capability_probe_source_and_node22_node24_client_closure_verified",
+      "currentObservation": true,
+      "findings": [
+        "B322"
+      ],
+      "receipts": [
+        "receipts/native-capability-probes-2026-10-29.json"
+      ]
+    }
+  ],
+  "verifiedSdkAllocations": [
+    {
+      "owner": "MCP stdio discovery and serving",
+      "finding": "B36",
+      "status": "managed_admission_source_built_verified"
+    },
+    {
+      "owner": "Stagehand-owned Chromium",
+      "finding": "B37",
+      "status": "managed_admission_source_built_verified"
+    }
+  ],
+  "updatedAt": "2026-11-02T21:12:14.361405+00:00",
+  "scanner": {
+    "sourceFilesParsed": 2769,
+    "limitations": [
+      "Syntactic aliases may be shadowed; inspect ownership before assigning findings.",
+      "Helper imports do not identify native allocations or their admission.",
+      "Dynamic module paths and values escaping factories are not resolved."
+    ]
+  },
+  "helperImports": [
+    {
+      "path": "gateway/src/gateway-model-budget.ts",
+      "module": "@deepseek-ai/node-addon-system/flock",
+      "source": "import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "gateway/src/local-runtime-owner.ts",
+      "module": "@deepseek-ai/node-addon-system/flock",
+      "source": "import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/github-connection.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/operations.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/bundle/web-app/src/index.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/experimental/ptc-runtime-python/src/index.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { scrubbedParentEnv, type SubprocessHandle, type SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/experimental/ptc-runtime-python/src/launch.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { SUBPROCESS_CONTROL_ENV, SUBPROCESS_CONTROL_FD } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/host/apiproxy/src/ssh-execution.ts",
+      "module": "@deepseek-ai/dsh-ssh",
+      "source": "import { SshConnection } from '@deepseek-ai/dsh-ssh'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/host/directory-picker-native/src/native-picker.ts",
+      "module": "@deepseek-ai/dsh-native-command",
+      "source": "import { runNativeCommand, type NativeCommandRunner } from '@deepseek-ai/dsh-native-command'",
+      "status": "native_helper_role_and_direct_cancellation_verified_remaining_consumer_review_open",
+      "findings": [
+        "B312"
+      ],
+      "receipts": [
+        "receipts/native-command-cancellation-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/host/open-in-app/src/resolver.ts",
+      "module": "@deepseek-ai/dsh-native-command",
+      "source": "import {\n  canOpenNativePath, openNativePath, runNativeCommand, desktopEntryFields, desktopDataDirectories, type NativeCommandRunner,\n} from '@deepseek-ai/dsh-native-command'",
+      "status": "native_helper_role_and_direct_cancellation_verified_remaining_consumer_review_open",
+      "findings": [
+        "B312"
+      ],
+      "receipts": [
+        "receipts/native-command-cancellation-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/host/open-in-app/src/resolver.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'",
+      "status": "native_helper_role_and_direct_cancellation_verified_remaining_consumer_review_open",
+      "findings": [
+        "B312"
+      ],
+      "receipts": [
+        "receipts/native-command-cancellation-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/ptc-runtime/ptc-runtime-node/src/persistent-process-entry.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { openInheritedControlChannel } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/ptc-runtime/ptc-runtime-node/src/process-entry.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { openInheritedControlChannel } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/sandbox/sandbox-local/src/index.ts",
+      "module": "@deepseek-ai/node-addon-system/landlock-run",
+      "source": "import {\n  LAUNCHER_BIN,\n  LAUNCHER_FAILURE_EXIT,\n  launcherPath as landlockLauncherPath,\n  probe as defaultProbeLandlock,\n} from '@deepseek-ai/node-addon-system/landlock-run'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/sandbox/sandbox-local/src/profiles.ts",
+      "module": "@deepseek-ai/node-addon-system/landlock-run",
+      "source": "import { grantArgs as landlockGrantArgs } from '@deepseek-ai/node-addon-system/landlock-run'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/sandbox/sandbox-windows-acl/src/ffi.ts",
+      "module": "@deepseek-ai/dsh-win32-process",
+      "source": "import {\n  ERROR_INSUFFICIENT_BUFFER,\n  Win32Error,\n  extendWin32ProcessBindings,\n  isNullPtr,\n  throwLastError,\n} from '@deepseek-ai/dsh-win32-process'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/sandbox/sandbox-windows-acl/src/index.ts",
+      "module": "@deepseek-ai/dsh-win32-process",
+      "source": "import { Win32Error } from '@deepseek-ai/dsh-win32-process'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/sandbox/sandbox-windows-acl/src/runner.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { SUBPROCESS_CONTROL_ENV, SUBPROCESS_CONTROL_FD } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/sandbox/sandbox-windows-acl/src/spawn.ts",
+      "module": "@deepseek-ai/dsh-win32-process",
+      "source": "import {\n  spawnInheritedJobProcess,\n  spawnPipedProcess,\n  waitForProcessExit,\n} from '@deepseek-ai/dsh-win32-process'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/session/session-persistence-jsonl/src/lease.ts",
+      "module": "@deepseek-ai/node-addon-system/flock",
+      "source": "import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/ssh/fs-ssh/src/index.ts",
+      "module": "@deepseek-ai/dsh-ssh/protocol",
+      "source": "import { RemoteOperationError } from '@deepseek-ai/dsh-ssh/protocol'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/ssh/fs-ssh/src/index.ts",
+      "module": "@deepseek-ai/dsh-ssh/schemas",
+      "source": "import { editResultSchema, entriesSchema, infoSchema, pathInfoSchema, targetSchema, textStreamIdSchema, writeResultSchema } from '@deepseek-ai/dsh-ssh/schemas'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/ssh/subprocess-ssh/src/index.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { SubprocessRuntime, SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/ssh/subprocess-ssh/src/index.ts",
+      "module": "@deepseek-ai/dsh-ssh/schemas",
+      "source": "import { doneSchema, foregroundSchema, terminalActivitySchema, outputSnapshotFrameLimit, outputSnapshotSchema, preparedSchema, remotePath, streamEndpointSchema } from '@deepseek-ai/dsh-ssh/schemas'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/ssh/subprocess-ssh/src/index.ts",
+      "module": "@deepseek-ai/dsh-ssh/protocol",
+      "source": "import { SshRpcPeer, RemoteOperationError } from '@deepseek-ai/dsh-ssh/protocol'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subagent/subagent-claude-code/src/process.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import {\n  scrubbedParentEnv,\n  type SubprocessHandle,\n  type SubprocessOutcome,\n  type SubprocessSpawnSpec,\n} from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subagent/subagent-claude-code/src/run.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import {\n  scrubbedParentEnv,\n  type SubprocessHandle,\n  type SubprocessOutcome,\n  type SubprocessSpawnSpec,\n} from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subagent/subagent-dsh-sdk/src/run.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'",
+      "status": "sdk_unpublished_rollback_and_original_child_cleanup_named_cases_verified_whole_inventory_open",
+      "evidence": [
+        "receipts/sdk-unpublished-startup-2026-10-29.json",
+        "receipts/sdk-client-close-recovery-2026-10-29.json"
+      ]
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/control-spawn.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { SUBPROCESS_CONTROL_ENV, SUBPROCESS_CONTROL_FD } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/index.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { SubprocessRuntime, SubprocessExecutableNotFoundError } from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/linux-execve.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { SUBPROCESS_CONTROL_FD } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/runner-launch.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { SUBPROCESS_CONTROL_FD } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/spawn-runner.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { SUBPROCESS_CONTROL_FD } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/spawn-runner.ts",
+      "module": "@deepseek-ai/dsh-win32-process",
+      "source": "import {\n  closeHandleChecked,\n  isJobEmpty,\n  loadWin32ProcessBindings,\n  pollProcessExit,\n  spawnCurrentTokenJobProcess,\n  terminateJob,\n  Win32Error,\n} from '@deepseek-ai/dsh-win32-process'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/spawn.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/spawn.ts",
+      "module": "@deepseek-ai/dsh-subprocess/control",
+      "source": "import { SUBPROCESS_CONTROL_FD } from '@deepseek-ai/dsh-subprocess/control'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/subprocess/subprocess-local/src/windows-job.ts",
+      "module": "@deepseek-ai/dsh-win32-process",
+      "source": "import {\n  loadWin32ProcessBindings,\n  probeCurrentTokenJobSupport,\n} from '@deepseek-ai/dsh-win32-process'",
+      "status": "candidate_import_not_review_coverage"
+    },
+    {
+      "path": "packages/test-support/session-snapshot/src/environment.ts",
+      "module": "@deepseek-ai/dsh-subprocess",
+      "source": "import { SENSITIVE_ENV_PATTERN } from '@deepseek-ai/dsh-subprocess'",
+      "status": "candidate_import_not_review_coverage"
+    }
+  ],
+  "syntacticInventoryObservedAt": "2026-10-25T01:06:00.867827+00:00",
+  "manualClassificationUpdatedAt": "2026-10-31T14:14:41.700671+00:00",
+  "manualReview20261029": {
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z",
+    "scope": "Named existing allocation consumers, not a refreshed syntactic scan or complete review.",
+    "inspector": {
+      "finding": "B297",
+      "receipt": "receipts/inspector-resource-completion-2026-10-29.json"
+    },
+    "sdk": {
+      "findings": [
+        "B299",
+        "B300",
+        "B302"
+      ],
+      "receipt": "receipts/sdk-resource-completion-2026-10-29.json"
+    },
+    "parserTransferHypothesis": {
+      "status": "rejected_for_current_production_path",
+      "evidence": "plugin-market readBody constructs a fresh whole-buffer Uint8Array before transferring it; managed provider absence fails closed.",
+      "paths": [
+        "packages/boot/plugin-market/src/index.ts",
+        "packages/boot/plugin-market/src/parse-thread.ts"
+      ]
+    },
+    "nonSessionClassifications": {
+      "apps/plugin-market-generator/src/fetchers.ts": "Build/release Git consumer, bounded by configured fetch timeout; not an executing Session model request.",
+      "gateway/src/local-runtime-protocol.ts": "Fixed kernel boot UUID sysctl or proc read; ownership identity infrastructure, not another user workload.",
+      "gateway/src/node-resource-pressure.ts": "Serialized bounded sensor prerequisite for admission; recursively charging its own probe would prevent pressure observation.",
+      "gateway/src/node-config-host.ts": "Installed service restart command with lease cancellation, timeout and health confirmation; separate administrator maintenance authority."
+    },
+    "stillOpen": "B04 remains open: raw/helper/native/Python paths and lifecycle scope require complete review. Native desktop and browser opener entries remain pending; source classification is not platform execution evidence.",
+    "sdkStartupAndCloseRecovery": {
+      "recordedAt": "2026-10-29T08:36:51.587370+00:00",
+      "findings": [
+        "B303",
+        "B304",
+        "B305",
+        "B306",
+        "B307"
+      ],
+      "receipts": [
+        "receipts/sdk-unpublished-startup-2026-10-29.json",
+        "receipts/sdk-client-close-recovery-2026-10-29.json"
+      ],
+      "pythonOwner": "python/sdk/src/deepseek_harness/client.py",
+      "classification": "Standalone SDK clients own their transport subprocess outside Cordis; managed SDK Consumers reserve the parent permit before construction and return it after physical cleanup acknowledgement."
+    },
+    "additionalSourceRoles": {
+      "packages/host/open-in-app/src/resolver.ts": "Explicit user GUI handoff deliberately outlives dsh; argv-only and scrubbed parent environment. Native GUI/Windows acceptance and cancellation ownership remain open.",
+      "packages/host/directory-picker-native/src/win32-dialog-host.ts": "Native user-interaction child, not a model request. Source/driver role inspected; actual Windows dialog and termination handling remain unverified.",
+      "packages/bundle/web-app/src/index.ts": "Startup OS browser handoff uses scrubbed environment and argv-only opener; SSH launch suppression is explicit. This source classification is not native opener/lifecycle acceptance.",
+      "packages/sandbox/sandbox-local/src/index.ts": "Bounded functional provider probes of fixed profile commands, distinct from the admitted command they later confine; no extra user Session workload is inferred.",
+      "packages/test-support/session-snapshot/src/launcher.ts": "Keyless development/replay process fixture with independent error/close observation; not a released Session model allocation.",
+      "packages/typert/generator/src/tsdown-plugin.ts": "Build-time TypeScript reflection worker with joined termination before generation settlement; outside executing Session admission."
+    },
+    "pythonSdkPipeOwnership": {
+      "recordedAt": "2026-10-29T09:17:28.991954+00:00",
+      "findings": [
+        "B308",
+        "B309",
+        "B310"
+      ],
+      "receipt": "receipts/python-sdk-pipe-backpressure-2026-10-29.json",
+      "classification": "Standalone SDK native I/O maintenance thread, bounded by max_output_bytes and joined beside its owned process. This is not a second model or user workload permit.",
+      "inventoryStatus": "B04 remains open; no complete raw/helper/native/Python scan is claimed."
+    },
+    "runtimeExecutionNamespace": {
+      "finding": "B311",
+      "receipt": "receipts/runtime-execution-namespace-2026-10-29.json",
+      "scope": "Resource ancestry is Runtime-qualified. Existing082 disjoint generation counters remain intact; this is not closure of B04 or the allocation inventory."
+    },
+    "nativeCommandCancellation": {
+      "finding": "B312",
+      "receipt": "receipts/native-command-cancellation-2026-10-29.json",
+      "classification": "Host-native GUI/detection helper outside Session model/process workload admission. The direct helper is owned until close; desktop-handoff applications have independent lifetimes.",
+      "wholeAllocationInventoryComplete": false
+    },
+    "linuxNativeAndFallbackOwnership": {
+      "recordedAt": "2026-10-29T13:28:47.335734+00:00",
+      "findings": [
+        "B313",
+        "B314",
+        "B315"
+      ],
+      "receipts": [
+        "receipts/local-runtime-native-descendants-2026-10-29.json",
+        "receipts/gateway-native-control-cancellation-2026-10-29.json",
+        "receipts/incomplete-process-group-observation-2026-10-29.json"
+      ],
+      "wholeAllocationInventoryComplete": false,
+      "classification": "Gateway control commands are bounded administrative infrastructure, not extra Session model/process workload. Managed Runtime and provider descendant scopes require complete cleanup proof; incomplete fallback observations retain occupancy."
+    },
+    "nodeNativeConfigurationControl": {
+      "recordedAt": "2026-10-29T14:13:25.413767+00:00",
+      "findings": [
+        "B316",
+        "B317",
+        "B318",
+        "B319"
+      ],
+      "receipts": [
+        "receipts/node-configuration-native-control-2026-10-29.json",
+        "receipts/node-configuration-health-budgets-2026-10-29.json",
+        "receipts/node-configuration-health-identity-2026-10-29.json",
+        "receipts/node-pressure-native-command-2026-10-29.json"
+      ],
+      "wholeProjectComplete": false,
+      "domainsStillOpen": 12,
+      "ownedPostgres": "removed_after_zero_clients",
+      "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-control-final-baseline-and-hashes.json",
+      "verified": "Real PostgreSQL configuration apply switches a running Gateway listener and refuses occupied candidates; nine direct PostgreSQL preflight cases.51focused cases,26authority/adjacent cases,61CI contracts, source replay, Node22/24 private artifact replays, Gateway types/build/lint and20documentation gates passed.",
+      "coverageScope": "Coverage is scoped to three changed modules. node-config-host.ts:97.46% lines/78.94% branches; node-resource-pressure.ts:87.23% lines/64.7% branches. The shared command helper has100% across all four metrics. Linux memory acquisition is outside this macOS coverage selection.",
+      "coordination": "No messages sent to peer this continuation. Existing node-target protocol consumed; peer-owned server/UI/routes left unchanged."
+    },
+    "linuxProviderNativeClients": {
+      "recordedAt": "2026-10-29T14:26:37.611973+00:00",
+      "findings": [
+        "B320"
+      ],
+      "receipt": "receipts/linux-provider-native-control-2026-10-29.json",
+      "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+      "wholeProjectComplete": false,
+      "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-final-hashes.json",
+      "validation": "Source and Node22/24 emitted-owner real-client replays passed.395package cases passed,16platform skips; linux-scope.ts remains100% statements/branches/functions/lines. Public package rebuilt; host aggregate types, scoped lint and20documentation gates passed.",
+      "limitations": [
+        "The native-client scenarios use real private CLI processes and the production scope owner. They run on the current macOS host and emitted internal owner module under Node22/24; no new actual Linux cgroup or whole Loader acceptance is claimed.",
+        "Killing a control client cannot prove a managed range empty; unknown state must still retain ownership."
+      ]
+    },
+    "remainingTimeoutCandidates": {
+      "evidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/remaining-native-timeout-candidates.json",
+      "status": "unconfirmed_source_candidates"
+    },
+    "nativeProbeClosure": {
+      "recordedAt": "2026-10-29T15:05:40.314940+00:00",
+      "findings": [
+        "B321",
+        "B322"
+      ],
+      "receipts": [
+        "receipts/local-runtime-boot-identity-2026-10-29.json",
+        "receipts/native-capability-probes-2026-10-29.json"
+      ],
+      "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+      "wholeProjectComplete": false,
+      "validation": "92Gateway cases,54sandbox/native-source cases,61CI contracts; source and final Node22/24 compiled replays; public native entry Node22/24; host and Gateway types, scoped lint and20documentation gates passed. Four selected modules have100% statements/branches/functions/lines.",
+      "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/native-probe-final-source-artifact-hashes.json",
+      "coordination": "No peer messages or UI/routing/interface changes this continuation. Native probe, local bootstrap and fixture ownership remain in the audit lane."
+    },
+    "runtimeReadinessCompletion": {
+      "recordedAt": "2026-10-29T15:50:40.238900+00:00",
+      "findings": [
+        "B323",
+        "B324"
+      ],
+      "receipt": "receipts/runtime-readiness-completion-2026-10-29.json",
+      "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+      "wholeProjectComplete": false,
+      "validation": "Nine complete source scenarios and nine per Node22/24 private compiled artifact;95focused manager/proxy cases plus70independent PostgreSQL cases,46CI contracts,20docs gates,Gateway types,lint and full build passed. File coverage remains partial.",
+      "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-source-artifact-hashes.json",
+      "coordination": "No peer messages or edits to peer-owned UI/routing/request-context interfaces. InstanceManager private readiness, existing completion documentation and test ownership remain in the audit lane."
+    },
+    "terminalMonotonicCleanup": {
+      "recordedAt": "2026-10-29T16:05:39.211699+00:00",
+      "findings": [
+        "B325"
+      ],
+      "receipt": "receipts/terminal-monotonic-cleanup-2026-10-30.json",
+      "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+      "wholeProjectComplete": false,
+      "validation": "422adjacent cases passed,16platformcases skipped;terminal.ts100%allfourmetrics;actual source and Node22/24 public Loader/native PTY cases;full build,scoped lint and20docs gates passed.",
+      "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-final-source-artifact-hashes.json",
+      "coordination": "No peer messages or peer-owned UI/routing/interface edits. Terminal cleanup and source/native tests remain in the audit lane."
+    },
+    "exitListenerCandidate": {
+      "status": "causally_confirmed_named_terminal_recovery_fixed",
+      "finding": "B326",
+      "receipt": "receipts/subprocess-disposed-exit-protection-2026-10-30.json",
+      "otherListenerSourcesComplete": false
+    },
+    "disposedSubprocessExitProtection": {
+      "recordedAt": "2026-10-29T16:21:58.627566+00:00",
+      "findings": [
+        "B326"
+      ],
+      "receipt": "receipts/subprocess-disposed-exit-protection-2026-10-30.json",
+      "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+      "wholeProjectComplete": false,
+      "validation": "422adjacent cases pass/16platformskips. Provider entry POSIX exclusion removed;entry and terminal source both100%allfourmetrics. Exact callback identity captured in real two-session recovery; source and public Node22/24 native scenarios,full build,TS lint,explicit JS correctness,syntax and20docs gates pass.",
+      "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-final-source-artifact-hashes-v2.json",
+      "coordination": "No peer messages or UI/routing/interface edits. Native process cleanup, fixture ownership and coverage restoration remain in the audit lane."
+    },
+    "resourceScopeRuntimeIsolation": {
+      "recordedAt": "2026-10-29T17:13:50.445418+00:00",
+      "findings": [
+        "B328"
+      ],
+      "receipt": "receipts/resource-scope-runtime-isolation-2026-10-30.json",
+      "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+      "wholeProjectComplete": false,
+      "validation": "121selected source cases and17real provider/model-adapter/process/terminal cases pass. Source and Node22/24 compiled two-computer-identity HTTP transcripts pass; final compiled archive35-case matrix also passes on each. Gateway compiler/types,TS lint,explicit JS correctness,20docs gates,named final pairing,file format and owned PG cleanup pass. Source file coverage remains partial.",
+      "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-source-artifact-hashes.json",
+      "coordination": "No peer messages or peer-owned UI/routing/request-context interface edits. Execution identity and resource authority remain in the audit lane."
+    },
+    "archiveReadAuthority": {
+      "recordedAt": "2026-10-29T18:12:14.668923+00:00",
+      "findings": [
+        "B329"
+      ],
+      "receipt": "receipts/archive-read-administration-authority-2026-10-30.json",
+      "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+      "wholeProjectComplete": false,
+      "validation": "248complete selected cases plus2new unique PostgreSQL qualification cases;final read PG37cases and90-entry source transcript. Three compiled transcripts pass on each Node22/24. Reader and authority helper100%allfourmetrics; archive service partial. Gateway strict types/private build,TS lint,explicit JS correctness,20docs and exact owned PG cleanup pass.",
+      "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-source-artifact-hashes.json",
+      "coordination": {
+        "peerThreadId": "01a1821f-1577-7472-93db-3bd83ee42345",
+        "messagesThisContinuation": 1,
+        "scope": "One concrete message reserved only archive service/Admin sections and the existing index archive-reader callback. No repeated polling/messages, node/routing/UI interface edits or shared output rebuild window."
+      }
+    }
+  },
+  "archiveRuntimeNamespaceAcceptance": {
+    "receipt": "receipts/archive-runtime-namespace-2026-10-30.json",
+    "transport": "Fixture-owned loopback HTTP payloads and real generation-owned Runtime operation leases; no native Runtime OS process is launched. Browser/fixture child lifetimes close before pool disposal.",
+    "postgres": {
+      "name": "hgw-archive-namespace-055d29914b",
+      "port": 54606,
+      "status": "removed",
+      "nonObserverClients": 0,
+      "excludedPorts": [
+        5432,
+        58773
+      ]
+    },
+    "remaining": "Native multi-host/resource/process ownership review remains open."
+  },
+  "archiveCleanupAcknowledgement": {
+    "receipt": "receipts/archive-file-cleanup-acknowledgement-2026-10-30.json",
+    "sourceContainsNewProcesses": false,
+    "fixtureOwnership": "Unique child PostgreSQL database and mkdtemp paths; pool end, DROP DATABASE and directory removal awaited. Main audit-owned namespace database remains running for B331; no production/peer resources touched."
+  },
+  "projectProgressNodeAffinity": {
+    "receipt": "receipts/project-progress-node-affinity-2026-10-30.json",
+    "fixtureResources": "Unique child database, mkdtemp filesystem root, listen(0) model endpoint and two actual Gateway process owners; all cleanup awaited, failures aggregated after finally.",
+    "productionChanges": "Fixed-computer qualification before candidate/lease selection and again after admission; no new production subprocess."
+  },
+  "blankDraftArchiveLifecycle": {
+    "receipt": "receipts/blank-draft-archive-lifecycle-2026-10-30.json",
+    "fixtureResources": "Unique child DB and application-owned logical Runtime metadata. PG lock barriers wait for actual lock contention; no OS Runtime launched. HTTP child databases and loopback listeners close before drop.",
+    "postgresResumptionEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/owned-postgres-resumed-20261030.json",
+    "currentOwnedPostgresPort": 55933
+  },
+  "session099Acceptance": {
+    "receipt": "receipts/postgres-session-runtime-namespace-2026-10-30.json",
+    "resources": "Unique child PostgreSQL databases, mkdtemp roots, listen(0) endpoints and fixture-owned headless Chrome; normal cleanup awaited before success. Main owned database is administrative only and retains the earlier prototype schema.",
+    "currentOwnedPostgresPort": 55933,
+    "mainDatabaseMustNotRunCurrentMigrations": true,
+    "productionOrPeerDatabaseTouched": false
+  },
+  "nulConversationAcceptance": {
+    "findings": [
+      "B335",
+      "B336"
+    ],
+    "receipt": "receipts/nul-conversation-query-projection-2026-10-30.json",
+    "sourceCases": 205,
+    "scope": "Through100, named request/Session/progress/model-budget/usage scenarios; allocation inventory remains open.",
+    "B04": "open",
+    "B25": "open"
+  },
+  "recoveredOwnerLiveness": {
+    "receipt": "receipts/recovered-owner-liveness-2026-10-30.json",
+    "finding": "B337",
+    "fixedForNamedScope": true,
+    "B04": "open",
+    "B25": "open",
+    "physicalContainmentNotClaimed": true
+  },
+  "administratorManagementResponseAuthority": {
+    "findings": [
+      "B338",
+      "B339"
+    ],
+    "receipt": "receipts/administrator-management-response-authority-2026-10-30.json",
+    "scope": "Current management response authorization and organization eligibility; allocation policy and native containment remain open."
+  },
+  "developmentAllocationClassification": {
+    "receipt": "receipts/remaining-development-resource-owners-2026-10-30.json",
+    "selectedTests": 9,
+    "candidateEntriesClassified": 5,
+    "B04": "open",
+    "B25": "open"
+  },
+  "partialPtyObservation": {
+    "finding": "B340",
+    "receipt": "receipts/partial-pty-process-observation-2026-10-30.json",
+    "sourceTests": 110,
+    "changedModuleCoverage": "100percent statements/branches/functions/lines",
+    "B04": "open",
+    "B25": "open"
+  },
+  "restoreEnrollmentHistory": {
+    "receipt": "receipts/restore-node-enrollment-issuer-2026-10-30.json",
+    "scope": "Actual backup/restore subprocess closure exercised in4maintained database cases; native command allocation review is not complete."
+  },
+  "windowsObservation": {
+    "receipt": "receipts/windows-terminal-observation-2026-10-30.json",
+    "scope": "Known identity and native enumeration failure only; command deadlines and physical Windows remain open."
+  },
+  "managedDirectoryPolicy": {
+    "receipt": "receipts/managed-directory-access-2026-10-30.json",
+    "scope": "Managed automatic picker avoids native GUI allocation; native-helper lifecycle and open-in-app remain under review."
+  },
+  "fallbackIcon": {
+    "receipt": "receipts/favicon-runtime-allocation-2026-10-30.json"
+  },
+  "projectActivityConsumer": {
+    "receipt": "receipts/project-activity-runtime-ownership-2026-10-30.json",
+    "scope": "Finite browser HTTP poll window; no new production process allocation and no full native/model admission claim."
+  },
+  "directoryOperationVerification": {
+    "status": "passed_owned_container_removed",
+    "at": "2026-10-30T15:34:35.633364+00:00",
+    "image": "node:22.22.1-alpine",
+    "container": "hgw-b354-native-20261030",
+    "limits": {
+      "cpus": 2,
+      "memoryMiB": 512,
+      "pids": 128
+    },
+    "ports": [],
+    "mounts": [
+      "native/system read-only",
+      "private audit evidence output"
+    ],
+    "environment": "No host credentials or database URLs forwarded; tests run as the container node user.",
+    "cleanup": "Labeled audit container completed with --rm and is absent; only the image cache and private evidence remain.",
+    "receipt": "receipts/directory-replacement-ownership-2026-10-30.json",
+    "imageDigest": "sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00",
+    "nativeCases": 31,
+    "containerRemoved": true
+  },
+  "managedDocumentProviderSelection": {
+    "receipt": "receipts/managed-document-provider-selection-2026-10-31.json",
+    "newProductionProcesses": 0,
+    "scope": "Select the existing managed transport; no local document writer is opened during dependency startup."
+  },
+  "gatewayLaunchAuthority": {
+    "receipt": "receipts/gateway-credential-lifetime-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "testChild": "One explicitly owned credential-pipe child per replay;20second abort, observed close, private files removed.",
+    "scope": "Private identity retained per application, never cached by global descriptor/path."
+  },
+  "managedStartupRequirements": {
+    "receipt": "receipts/managed-startup-admission-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "observedOldBug": "Actual unadmitted private Node child and fake-model dispatch before requirement publication.",
+    "current": "Managed file/descriptor launches allocate neither; independent control owns and joins its real child."
+  },
+  "desktopHostAuthorization": {
+    "receipt": "receipts/desktop-request-authorization-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "runtimeBudgetClassification": "Authorized desktop handoff remains an optional local convenience capability with intentional independent application lifetime; remaining native owner/closure and Session workload inventories are not declared complete."
+  },
+  "runtimeStartIdentity": {
+    "receipt": "receipts/runtime-start-admission-identity-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "current": "Explicit environment references must match the durable allocation row before the process start credit is consumed. Remaining direct allocation ownership stays open."
+  },
+  "postgresMaintenanceChildEnvironment": {
+    "receipt": "receipts/postgres-command-environment-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "current": "Administrative PostgreSQL children have explicit database-only credential inheritance; remaining argument privacy and external-wrapper range closure are not declared complete."
+  },
+  "maintenanceDiagnosticRetention": {
+    "receipt": "receipts/maintenance-diagnostic-byte-ceiling-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "current": "Existing maintenance stderr retention now follows its byte ceiling with complete UTF-8 prefix; independent ownership and argument transport reviews remain open."
+  },
+  "nativeDirectoryPathIdentity": {
+    "receipt": "receipts/native-picker-path-terminator-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "current": "POSIX output parser verified; native chooser lifecycle/admission remains pending."
+  },
+  "nativeChooserLifetime": {
+    "receipt": "receipts/native-picker-service-lifetime-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "posix": "Provider withdrawal cancels and joins accepted direct helper operations; retained old capabilities refuse allocation.",
+    "remaining": "Win32 native process retirement and remaining allocation inventory stay open. Native desktop helper role is separate from Session workload admission."
+  },
+  "nativeDialogWorkerClosure": {
+    "receipt": "receipts/native-dialog-worker-closure-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Direct worker close and pending window-close operations are joined; refused force termination retains ownership.",
+    "remaining": "Physical Windows, parent-death containment and native identifier reuse intervals remain open."
+  },
+  "posixIdentityObservation": {
+    "receipt": "receipts/posix-identity-observation-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Unknown per-identity observations reject; incorrect stat PID leaves enumeration incomplete. Existing complete-table terminal retention controls remain intact.",
+    "remaining": "Native synchronous inspection/control command deadlines and complete-range acceptance remain open."
+  },
+  "nativeProcessControlDeadlines": {
+    "finding": "B368",
+    "receipt": "receipts/native-process-control-deadlines-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Provider infrastructure helpers use their owning spawn graceMs and SIGKILL timeout, wait for helper closure and retain workload ownership. No recursive workload permit is requested for cleanup.",
+    "remaining": "Complete raw/native/helper/Python classification and physical platform acceptance remain open."
+  },
+  "memoryConsolidationCoalescing": {
+    "finding": "B369",
+    "receipt": "receipts/memory-consolidation-coalescing-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "One active exact-scope review; three total model reservations for two primary turns plus one auxiliary call, all acknowledged released. Different workspace/SSH scope identities remain independent.",
+    "remaining": "Complete model/process/helper inventory and platform/permission acceptance remain open."
+  },
+  "memoryRecallAddresses": {
+    "findings": [
+      "B370",
+      "B371",
+      "B372",
+      "B373"
+    ],
+    "receipt": "receipts/memory-recall-addresses-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Three actual Agent turns acquire9model admissions,3explicitly attributed to execution; all9physically released. Each selector input matches its durable request.",
+    "remaining": "Full model/process admission and helper inventory remains open."
+  },
+  "memoryToolScopes": {
+    "finding": "B374",
+    "receipt": "receipts/memory-tool-offered-scopes-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Tool scope admission precedes storage access; existing resource/request and SDK composition regressions remain green. No new admission provider or execution path is introduced.",
+    "remaining": "Whole allocation inventory and distributed/platform acceptance remain open."
+  },
+  "sdkRegistrationRecovery": {
+    "findings": [
+      "B375",
+      "B376"
+    ],
+    "receipt": "receipts/sdk-resource-registration-recovery-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Actual Loader/SDK/native execution observes9resource allocations and9acknowledged releases, including recovered unpublished grants and4cancelled registrations.0occupation remains, with exact parent Session attribution.",
+    "remaining": "Whole model/process/helper inventory, aggregate SDK deadlines and physical platform acceptance remain open."
+  },
+  "sdkPausedModelShutdown": {
+    "findings": [
+      "B377"
+    ],
+    "receipt": "receipts/sdk-paused-model-shutdown-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Actual Loader parent and SDK child stop a paused adapter before consumer closure, complete a normal turn and acknowledge all3original process/model permits.",
+    "remaining": "Aggregate SDK deadlines, model-span acknowledgement failures and the whole platform allocation inventory remain open."
+  },
+  "sdkCleanupDeadline": {
+    "findings": [
+      "B378"
+    ],
+    "receipt": "receipts/sdk-total-cleanup-deadline-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "One child cleanup attempt bounds model completion, pending admissions, consumer grace and final reports. Actual SDK/native example completes4original resource admissions and4releases; controlled timeout retains original identity.",
+    "remaining": "The whole allocation inventory, failed model acknowledgements and physical platform validation remain open."
+  },
+  "codexModelBodyDeadline": {
+    "findings": [
+      "B379"
+    ],
+    "receipt": "receipts/codex-model-body-deadline-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Incomplete authenticated input stops at the configured body deadline before native request logging or model admission; normal native requests retain parent attribution and all model/process permits settle.",
+    "remaining": "Full allocation/permission inventory, fresh PG acceptance and physical platform validation remain open."
+  },
+  "sdkModelAndCancellationCompletion": {
+    "findings": [
+      "B380",
+      "B381"
+    ],
+    "receipt": "receipts/sdk-model-and-cancellation-completion-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Original model closures and consecutive not-started reports recover before replacement admission. Queued older grants remain owned; actual SDK and native-process examples end with zero occupancy.",
+    "remaining": "Complete remaining transport, resource-only external governance, allocation and permission review."
+  },
+  "sdkControlRequestBody": {
+    "finding": "B382",
+    "receipt": "receipts/sdk-control-request-body-deadline-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Incomplete control uploads expire before registration; error responses close their incomplete connections. Valid subsequent resources retain their initiating parent Session, and all six admissions acknowledge release.",
+    "remaining": "Transport concurrency, remaining allocations and permission review remain open."
+  },
+  "sdkControlTransportConcurrency": {
+    "finding": "B383",
+    "receipt": "receipts/sdk-control-transport-concurrency-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "One model and one permit complete with both relay directions held during permit observation; genuine excessive HTTP concurrency still refuses. The actual SDK example ends with six successful release acknowledgements and zero occupancy.",
+    "remaining": "Resource-only external governance and remaining allocation/permission review remain open."
+  },
+  "opaqueMemberResourceAdmission": {
+    "finding": "B384",
+    "receipt": "receipts/opaque-member-resource-admission-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Governed opaque member execution does not request a model or process permit or enter a full model queue; late SDK queries without their managed process remain rejected and disposable.",
+    "remaining": "Valid resource-only managed native routing and remaining allocation/permission review remain open."
+  },
+  "modelResourceProviderOwnership": {
+    "finding": "B385",
+    "receipt": "receipts/model-resource-provider-ownership-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Queued or credential-delayed physical model work cannot dispatch under a withdrawn/replaced resource provider; original grants release once. Orchestration consumes no synthetic permit.",
+    "remaining": "Other allocation and business/permission paths remain open."
+  },
+  "processAdmissionAndSpillLifetime": {
+    "findings": [
+      "B386",
+      "B387"
+    ],
+    "receipt": "receipts/process-admission-and-spill-lifetime-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Both public allocations retain resource owner across queue/grant handoff; default spill exit cleanup belongs to created storage, not module import.",
+    "remaining": "Remote asynchronous physical start, other allocation and permission paths remain open."
+  },
+  "asynchronousSshAdmission": {
+    "finding": "B388",
+    "receipt": "receipts/ssh-asynchronous-admission-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Remote start keeps original host admission through helper prepare/connect waits. Known rollback reports completion; unknown cleanup retains accounting and both failures. Rejected ordinary handles retire after proven closure.",
+    "remaining": "Remaining quota classification, paused pipe consumption, remote execution permission and allocation cases remain open."
+  },
+  "modelAdmissionFailureCategories": {
+    "finding": "B389",
+    "receipt": "receipts/model-admission-failure-categories-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Local resource admission categories survive model normalization; cancellation selects aborted. No adapter or HTTP request starts in the four refused cases.",
+    "remaining": [
+      "Verify valid resource-only managed Codex routing and remaining resource/permission business logic.",
+      "Review remaining remote pipe consumers and completion semantics. The existing grace-bounded unread-output case passes; no indefinite wait has been established."
+    ]
+  },
+  "localResourceOnlyCodex": {
+    "receipt": "receipts/resource-only-native-codex-2026-10-31.json",
+    "status": "named_local_resource_only_compositions_verified_other_review_open",
+    "productionAllocationsAdded": 0,
+    "newCases": 9
+  },
+  "localPreflightResourceAccounting": {
+    "finding": "B390",
+    "receipt": "receipts/local-preflight-resource-accounting-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Known argv/grace and terminal empty-program rejection returns unused capacity; later real Node process starts under the same single slot.",
+    "remaining": "Review other prelaunch setup/native allocation failure accounting, remaining remote pipe consumers and resource-only remote execution."
+  },
+  "localTargetValidationAccounting": {
+    "finding": "B391",
+    "receipt": "receipts/local-target-validation-accounting-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "All ten OS-string validation refusals return unused permits and preserve their errors; next valid local processes start.",
+    "remaining": [
+      "Audit direct admission consumers: SDK private process startup, migration verifier, plugin-market parser Worker, browser Worker, independent model search and Inspector.",
+      "Review remaining remote pipe consumers and resource-only remote execution; continue nonconflicting business permissions."
+    ]
+  },
+  "sdkStartupAdmissionOwner": {
+    "finding": "B392",
+    "receipt": "receipts/sdk-startup-admission-owner-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Original initiating resource and execution owners survive startup waits; no stale process launches. Known rollback returns capacity; unconfirmed cleanup remains retained.",
+    "remaining": [
+      "Audit remaining direct resource consumers: migration verifier, plugin-market parser Worker, browser Worker, independent model search and Inspector; include authority-only SDK composition review.",
+      "Review remaining remote pipes, resource-only remote execution and nonconflicting business permissions."
+    ]
+  },
+  "migrationVerificationOwner": {
+    "finding": "B393",
+    "receipt": "receipts/migration-verification-resource-owner-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Verification retains the initiating resource provider across both queues; stale requests create no thread. Unused grants return to their original provider.",
+    "remaining": [
+      "Review remaining direct resource consumers: plugin-market parser Worker, browser Worker, independent model search and Inspector; include authority-only SDK composition review.",
+      "Continue remote pipes, resource-only remote execution and nonconflicting business permissions."
+    ]
+  },
+  "marketParserOwner": {
+    "finding": "B394",
+    "receipt": "receipts/market-parser-resource-owner-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "A stale market grant starts no parser thread and returns to its original owner; a fresh search recovers.",
+    "remaining": [
+      "Review browser and Inspector Worker admission, independent model-search resource identity and authority-only SDK composition.",
+      "Continue remote pipes, resource-only remote execution and nonconflicting business permissions."
+    ]
+  },
+  "inspectorStartupAndBootstrap": {
+    "findings": [
+      "B395",
+      "B396"
+    ],
+    "receipt": "receipts/inspector-startup-and-bootstrap-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "No stale Inspector Worker/readiness publication; original unused accounting remains retryable. Browser disconnect does not cancel shared startup.",
+    "remaining": [
+      "Review native browser Worker resource ownership, independent model-search admission and authority-only SDK composition.",
+      "Continue nonconflicting business permissions, remote pipes and resource-only remote execution.",
+      "Review Inspector debug endpoint authority for shared runtimes; startup verification does not complete its permission review."
+    ]
+  },
+  "modelSearchDispatchOwner": {
+    "finding": "B397",
+    "receipt": "receipts/model-search-dispatch-owner-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "No independent HTTP after resource ownership or policy changes during admission/credentials. Original grants and initiating Sessions remain retained.",
+    "remaining": [
+      "Review native browser Worker resource ownership, Chromium launch waits and authority-only SDK composition.",
+      "Continue shared-runtime debug endpoint authority, remote pipes, resource-only remote execution and nonconflicting business permissions."
+    ]
+  },
+  "browserStartupOwner": {
+    "finding": "B398",
+    "receipt": "receipts/browser-startup-resource-owner-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "No stale Worker allocation or publication across startup waits. Original completion and fresh reconnect admission retain their correct providers.",
+    "remaining": [
+      "Review reconnect acquisition rollback retention, shared-runtime debug authority and authority-only SDK composition.",
+      "Continue remote pipes, resource-only remote execution and nonconflicting business permissions."
+    ]
+  },
+  "browserReconnectCleanup": {
+    "finding": "B399",
+    "receipt": "receipts/browser-reconnect-cleanup-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "No new Worker allocation before failed reconnect cleanup settles. Shutdown joins pending reconnects and retains failed rollback ownership.",
+    "remaining": [
+      "Review native-browser startup deadlines, shared-runtime debug authority and authority-only SDK composition.",
+      "Continue remote pipes, resource-only remote execution and nonconflicting business permissions."
+    ]
+  },
+  "sdkAuthorityOnlyControl": {
+    "finding": "B400",
+    "receipt": "receipts/sdk-execution-authority-control-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Authority-only SDK children retain parent model guards and captured scope without requiring a resource budget or model-access service.",
+    "remaining": [
+      "Review opaque external runtimes with execution authority alone, shared-runtime debug authority and remaining allocation consumers.",
+      "Continue remote pipes, resource-only remote execution, native containment and nonconflicting business permissions."
+    ]
+  },
+  "sharedSubagentParentControl": {
+    "finding": "B401",
+    "receipt": "receipts/subagent-parent-model-control-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "No opaque allocation in authority-governed contexts; supported Codex uses parent control and SDK shares the predicate.",
+    "remaining": [
+      "Review shared-runtime debug authority, remaining direct allocation consumers and lifecycle changes to model control.",
+      "Continue remote pipes, resource-only remote execution, native containment and nonconflicting business permissions."
+    ]
+  },
+  "inspectorDebugAuthority": {
+    "finding": "B402",
+    "receipt": "receipts/inspector-managed-debugging-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Root/realm authority rejects Inspector allocation, cancels admission and closes live Workers; original accounting remains retryable.",
+    "remaining": [
+      "Review Session Inspector and remaining diagnostic consumers, remote pipes and resource-only remote execution.",
+      "Continue native containment, queued owner transitions and remaining business permission domains."
+    ]
+  },
+  "sshHelperCleanup": {
+    "finding": "B403",
+    "receipt": "receipts/ssh-helper-cleanup-ownership-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Native helper original permit, retryable process cleanup and dependent-provider lifetime; original result retention preserved.",
+    "remaining": [
+      "Continue SSH asynchronous pipe/stream allocation, resource-only remote execution and remaining allocation consumers.",
+      "Continue native containment and other business permissions; named Session Inspector binding consumers do not complete upstream identity or GUI acceptance."
+    ]
+  },
+  "sshStreamForwarding": {
+    "finding": "B404",
+    "receipt": "receipts/ssh-stream-forwarding-cancellation-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Late caller cancellation rolls back; unconfirmed mux or path cleanup invalidates and joins the native owner. Infrastructure permits complete once after observed range exit.",
+    "remaining": [
+      "Continue remaining SSH asynchronous pipe/stream allocation, resource-only remote execution and allocation consumers.",
+      "Continue cross-computer permissions and native containment outside peer-reserved paths; carrier tests do not establish physical Linux/Windows or production acceptance."
+    ]
+  },
+  "sshPartialStreamAllocation": {
+    "finding": "B405",
+    "receipt": "receipts/ssh-partial-stream-allocation-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "All sibling attempts and allocated sockets remain owned through rollback; remote termination alone does not release unfinished local startup. Actual native controller liveness and process permit retention are observed.",
+    "remaining": [
+      "Continue resource-only remote execution and remaining allocation consumers, native containment and cross-computer permissions outside peer-reserved paths.",
+      "Inspect the remaining allocation classification and application permission paths; named SSH lifecycle verification does not finish those domains."
+    ]
+  },
+  "webBrowserHelper": {
+    "finding": "B406",
+    "receipt": "receipts/web-browser-helper-ownership-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Administrative Node helper is cancelled and its native close joined; workload resource admission and OS-delegated browser lifetime remain separate.",
+    "remaining": [
+      "Continue remaining resource admission, native containment and cross-computer permission paths outside peer-reserved files.",
+      "Gateway index ensureStewardSpace remains peer-reserved. Browser platform handoff and physical Windows/Linux acceptance are separate from the verified Node helper."
+    ]
+  },
+  "memoryLiveAvailability": {
+    "finding": "B407",
+    "receipt": "receipts/memory-live-availability-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Disabling memory/recall cancels auxiliary requests including queued LLM admission; a late grant is released once without adapter dispatch. Existing attribution and quotas remain.",
+    "remaining": [
+      "Continue memory-curation switches, tool results and next model rounds across storage, model preparation and queued admission. Its current checks at pass/tool entry need separate delayed-completion verification.",
+      "Continue remaining resource admission, native containment and cross-computer permission paths outside peer reservations; Gateway ensureStewardSpace and production authorization/routing stay with the peer."
+    ]
+  },
+  "memoryCurationLiveAvailability": {
+    "finding": "B408",
+    "receipt": "receipts/memory-curation-live-availability-2026-10-31.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Committed feature edits cancel only their operation, including queued LLM admission and cursor writes. Cleanup retains original ownership; late permits release once and independent enabled work continues.",
+    "remaining": [
+      "Verify memory settings provider attach/detach: installSettingsSection onChange currently only changes the switch source; consumers use settings/updated for immediate queued-request cancellation. Check a disabled provider attachment while a model grant is held, including recall.",
+      "Verify project memory authority replacement/revocation during storage, model preparation and subsequent rounds; do not infer membership acceptance from feature-switch tests.",
+      "Keep all12 full business domains open and continue other non-reserved resource and permission paths."
+    ]
+  },
+  "memoryProviderAvailability": {
+    "finding": "B409",
+    "receipt": "receipts/memory-provider-availability-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Provider attachment/removal and namespace edits cancel queued memory operations when current own-service flags withdraw availability. Late grants and cleanup retain their existing owners.",
+    "remaining": [
+      "Verify project memory execution-authority replacement/revocation across storage reads, model preparation, queued admission and subsequent curation rounds; feature-switch evidence does not prove membership isolation.",
+      "Continue remaining resource admission and cross-computer permissions outside peer-reserved files; B04/B25 remain implementation_in_progress and all12 domains remain in_progress."
+    ]
+  },
+  "memoryCurationAuthority": {
+    "finding": "B410",
+    "receipt": "receipts/memory-curation-authority-2026-11-01.json",
+    "productionProcessOrModelAllocationsAdded": 0,
+    "operationContext": "One owned AsyncLocalStorage per plugin, disabled after captured task cleanup.",
+    "verified": "After-grant and physical dispatch permission rechecks reserve/bill no additional permits. Source/Node22/Node24 actual SDK processes release both primary+auxiliary permits; queued cursor authorization executes after the write queue waits.",
+    "remaining": [
+      "Review recall authorization through model admission and result publication, including issuer replacement and upstream account/project revocation. Read availability and curation write qualification remain distinct.",
+      "Continue other auxiliary and extension model operations, subprocess/terminal consumers, captured resource owners, quotas and cleanup; no whole-domain closure follows from these named curation cases."
+    ]
+  },
+  "memoryRecallAuthority": {
+    "finding": "B411",
+    "receipt": "receipts/memory-recall-authority-2026-11-01.json",
+    "productionProcessOrModelAllocationsAdded": 0,
+    "operationContext": "One owned AsyncLocalStorage per plugin, disabled after captured task cleanup.",
+    "verified": "Recall retains admitted execution identity and route, follows its primary signal and rechecks without additional model permits. Existing resource and curation cases pass across all3 runtime modes.",
+    "remaining": [
+      "Continue auxiliary model consumers and extension operations, especially auto-review/compaction, retained authorization issuers, resolved routes, resource ownership and publication after async work.",
+      "Continue account/session identity and project revocation across remaining model/tool/workflow/Inspector paths; B411 does not close the memory or identity domains."
+    ]
+  },
+  "autoReviewAuthority": {
+    "finding": "B412",
+    "receipt": "receipts/auto-review-authority-2026-11-01.json",
+    "productionProcessOrModelAllocationsAdded": 0,
+    "operationContext": "One plugin-owned asynchronous context, disabled after active review cleanup.",
+    "verified": "Reviewer retains one existing model permit and its original billing witnesses; pending invalid work cannot reach physical dispatch or tool body. Concurrent accounts settle both permits independently.",
+    "remaining": [
+      "Continue auxiliary model consumers, especially compaction and remaining extensions: original authorization issuer, scoped participants, resource ownership, and durable publication after asynchronous work. B412 closes only the named Auto scenarios.",
+      "Continue remaining account, Session, project and computer revocation through model/tool/workflow/Inspector consumers; all12 business domains remain in progress."
+    ]
+  },
+  "modelRequestExecution": {
+    "finding": "B413",
+    "receipt": "receipts/model-request-execution-2026-11-01.json",
+    "productionProcessOrModelAllocationsAdded": 0,
+    "operationContext": "One governance instance-owned async context; releases after final active iterator settles. No additional authorization query or resource permit for synchronous final identity confirmation.",
+    "verified": "Concurrent accounts cannot borrow identity; all3 per-request SDK permits settle; two pending usage streams settle independently after policy unload.",
+    "remaining": [
+      "Continue compaction and remaining auxiliary/extension model consumers: exact logged requests, asynchronous execution ownership, authorization and publication. B413 verifies only the named generic-governance scenarios.",
+      "Continue account, Session, project and computer revocation through model/tool/workflow/Inspector consumers. All12 business domains remain in_progress; B04/B25 remain implementation_in_progress."
+    ]
+  },
+  "accountFontPreferences": {
+    "finding": "B414",
+    "receipt": "receipts/account-font-preferences-2026-11-01.json",
+    "productionProcessOrModelAllocationsAdded": 0,
+    "testResources": "One task-owned local PostgreSQL database, removed after all pools and processes settled.",
+    "existingOwners": "Account row transaction and existing scalar preference queue; project Host authority unchanged."
+  },
+  "infrastructureModelActivity": {
+    "finding": "B415",
+    "receipt": "receipts/infrastructure-model-activity-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "existingOwners": "Runtime-origin title and execution-origin main request retain their existing separate permits; physical requests do not gain an extra permit or authorization call.",
+    "testResources": "Fixture-owned ephemeral loopback HTTP listeners and one task-owned local PostgreSQL database, all closed or removed."
+  },
+  "handoffCompletion": {
+    "finding": "B416",
+    "receipt": "receipts/session-handoff-completion-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "existingOwner": "No new model retries or permits. Existing extraction returns the local fallback after incomplete provider output; caller cancellation still settles the operation.",
+    "testResources": "SDK temporary runtimes close through their shared helper or context manager; SQLite stays inside the owned test workspace. No new PostgreSQL database or production resource was used."
+  },
+  "handoffInput": {
+    "findings": [
+      "B417",
+      "B418"
+    ],
+    "receipt": "receipts/session-handoff-input-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "owner": "Existing llm.stream captures execution before asynchronous preparation; logging failure creates no model operation or permit. Literal insertion avoids replacement-driven prompt expansion.",
+    "testResources": "Owned SDK processes and SQLite/JSONL test workspaces; persistence read handles close with Symbol.asyncDispose. No new PostgreSQL or production resource was used.",
+    "immutableSnapshotDedupe": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T225111Z/immutable-dedupe-result.json"
+  },
+  "nativeTranslationAdmission": {
+    "findings": [
+      "B419",
+      "B420"
+    ],
+    "receipt": "receipts/native-translation-admission-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "owner": "Existing per-call admission retains one guard and effective resource cancellation; final refusal returns unused permits. Metadata work stays translator-owned until settlement.",
+    "testResources": {
+      "newProductionAllocations": 0,
+      "processes": "Actual SDK runtimes, Node workers and ephemeral loopback listeners are owned and closed; temporary workspaces are removed.",
+      "resourcePermits": "Unused/quiescent model permits release once; queued owner changes dispatch no HTTP; revoked permits cancel asynchronous authorization.",
+      "paidRequests": 0,
+      "productionDeploymentsByRoot": 0,
+      "postgresTestDatabasesAdded": 0
+    },
+    "hostQuietWindow": "Root completed old checks and launched no new build/test from before00:49:26 through00:54:26 UTC for peer real acceptance."
+  },
+  "speechSettingsLifetime": {
+    "findings": [
+      "B421"
+    ],
+    "receipt": "receipts/speech-settings-provider-lifetime-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "owner": "One optional Settings fiber owns the namespace and watcher; parent speech shutdown joins tasks before releasing the binding.",
+    "testResources": {
+      "productionOsAllocationsAdded": 0,
+      "paidRequests": 0,
+      "recognitionInvocations": 0,
+      "postgresDatabasesAdded": 0,
+      "ownership": "SDK processes, nested Boot Host, optional injection, namespace watcher and observers are owned, canceled and joined; temporary files removed."
+    }
+  },
+  "speechRemovalQuiescence": {
+    "findings": [
+      "B422"
+    ],
+    "receipt": "receipts/speech-removal-quiescence-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "owner": "Registration retains a shared removal promise; the service tracks active and detached removal work until settlement.",
+    "testResources": {
+      "productionOsAllocationsAdded": 0,
+      "paidRequests": 0,
+      "recognitionInvocations": 0,
+      "postgresDatabasesAdded": 0,
+      "ownership": "Actual SDK processes, nested Boot Host and recognition gates are owned and joined. Fixture cleanup releases its gate before registry shutdown; temporary files removed."
+    }
+  },
+  "speechSettingsPersistence": {
+    "findings": [
+      "B423"
+    ],
+    "receipt": "receipts/speech-settings-persist-owner-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "owner": "Settings provider owns physical persistence; speech acknowledgement retains its logical scope through completion and refuses changed ownership.",
+    "testResources": {
+      "productionOsAllocationsAdded": 0,
+      "paidRequests": 0,
+      "recognitionInvocations": 0,
+      "postgresDatabasesAdded": 0,
+      "ownership": "Actual SDK processes, nested Boot Host and controlled FileSettings persistence gates are owned and joined; failure cleanup releases pending writes before Host shutdown and removes temporary files."
+    }
+  },
+  "nativeTranslationPurpose": {
+    "findings": [
+      "B424"
+    ],
+    "receipt": "receipts/native-translation-purpose-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "owner": "The prepared native translation dispatch carries model-hidden purpose; actual SDK fixture owns HTTP intake and joins all subprocess and loopback work.",
+    "interactiveAttribution": "not completed by purpose classification"
+  },
+  "interactivePrincipalResourceReview": {
+    "receipt": "receipts/interactive-resource-review-2026-11-01.json",
+    "sourcePaths": [
+      "gateway/tests/runtime-resource-provider.spec.ts"
+    ],
+    "newCases": 4,
+    "integrationCases": 34,
+    "verification": "named_cases_verified_on_node22_and_node25",
+    "wholeProviderCoverageComplete": false,
+    "productionOsAllocationsAdded": 0,
+    "resumedOwnedPostgresContainer": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/owned-postgres-resumed.json",
+    "testPort": 58151,
+    "originalDatabasePreserved": true,
+    "runtimeSourceChanged": false
+  },
+  "resourceRegistrationRetirement": {
+    "findings": [
+      "B425",
+      "B426"
+    ],
+    "receipt": "receipts/runtime-resource-registration-retirement-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "ownership": "Unsubmitted requests retire locally; attempted registrations retain exact completion accounting. Prepared ready entries use a removable bounded set and one drain.",
+    "newIntegrationCases": 3,
+    "scopeCoverage": {
+      "lines": {
+        "total": 245,
+        "covered": 218,
+        "skipped": 0,
+        "pct": 88.97
+      },
+      "statements": {
+        "total": 311,
+        "covered": 255,
+        "skipped": 0,
+        "pct": 81.99
+      },
+      "functions": {
+        "total": 55,
+        "covered": 48,
+        "skipped": 0,
+        "pct": 87.27
+      },
+      "branches": {
+        "total": 187,
+        "covered": 136,
+        "skipped": 0,
+        "pct": 72.72
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    }
+  },
+  "uncertainResourceCancellation": {
+    "findings": [
+      "B427"
+    ],
+    "receipt": "receipts/uncertain-resource-cancellation-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "ownership": "Cancellation lifetime independent of retired accounting metadata; uncertain occupancy persists until exact quiescence.",
+    "newIntegrationCases": 3,
+    "scopeCoverage": {
+      "lines": {
+        "total": 246,
+        "covered": 228,
+        "skipped": 0,
+        "pct": 92.68
+      },
+      "statements": {
+        "total": 312,
+        "covered": 269,
+        "skipped": 0,
+        "pct": 86.21
+      },
+      "functions": {
+        "total": 55,
+        "covered": 51,
+        "skipped": 0,
+        "pct": 92.72
+      },
+      "branches": {
+        "total": 189,
+        "covered": 147,
+        "skipped": 0,
+        "pct": 77.77
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    }
+  },
+  "compactionBrowserReview": {
+    "receipt": "receipts/compaction-browser-review-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "sourceChanges": 0,
+    "ownership": "Existing per-Agent browser cancellation and operation queues inspected; named resource and model tests passed. No physical browser acceptance claimed."
+  },
+  "boundedResponseCancellation": {
+    "findings": [
+      "B428"
+    ],
+    "receipt": "receipts/gateway-response-cancellation-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "ownership": "Read failure does not prove physical cleanup or free execution occupation; transport owners retain cancellation/closure obligations."
+  },
+  "workflowCleanupOwnership": {
+    "findings": [
+      "B429",
+      "B430"
+    ],
+    "receipt": "receipts/workflow-cleanup-ownership-2026-11-01.json",
+    "productionOsAllocationsAdded": 0,
+    "ownership": "Failed child cleanup retains its handle; live jobs preserve owner idle veto until confirmed release. No new execution capacity or timer.",
+    "realTestResources": "Normal Node PTC subprocesses, per-SDK owned loopback child transport, awaited body and server-response closure; no paid API or production process."
+  },
+  "subagentJobCleanup": {
+    "finding": "B431",
+    "receipt": "receipts/subagent-job-cleanup-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownedTestResources": "Loopback child HTTP response and SDK runtime, aborted/joined in owned finally and server effect cleanup",
+    "cleanupOwnership": "Job completion awaits confirmed disposal; failed attempts keep the exact published run and existing owner veto; explicit termination retries",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "gatewayRevocationResponse": {
+    "finding": "B432",
+    "receipt": "receipts/gateway-revocation-response-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownedTestResources": "Actual PTY Node child and loopback readiness endpoint, temporary query SQLite and shipped SDK runtime; normal terminal owner teardown and acknowledged fixture finally drain all children.",
+    "cleanupRule": "Permission revocation precedes response cancellation ACK; terminal owner still confirms physical process release. Response discard is never a process/model permit completion signal.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "workspacePublicationRevision": {
+    "finding": "B433",
+    "receipt": "receipts/workspace-publication-revision-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownedTestResources": "Owned loopback Gateway fixture, SDK subprocesses, temp Workspace SQLite/files and exact owned disposable PostgreSQL port58151/schema103. No production database mutation.",
+    "cleanupRule": "Each publisher cancels and settles its own request before disposal; root retains only sequence data. This repair does not alter response transport shutdown semantics.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "archiveRefusalResponse": {
+    "finding": "B434",
+    "receipt": "receipts/archive-response-cleanup-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownedTestResources": "Loopback HTTP listeners and sockets, SDK subprocesses, temporary SQLite, synthetic runtime credential files and JSONL sessions; all fixtures join closure. No production or PostgreSQL mutation.",
+    "cleanupRule": "Refusal cancels unread response data immediately; cancellation acknowledgement never becomes operation authorization or a process/model permit release. Scope disposal still aborts and joins current synchronization.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "subagentAdmissionCleanup": {
+    "findings": [
+      "B436",
+      "B437",
+      "B438"
+    ],
+    "receipt": "receipts/subagent-admission-cleanup-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownedTestResources": "Joined loopback HTTP listeners/transports, normal SDK child processes and temporary profile/session files; no production or database mutations.",
+    "cleanupRule": "A known failed foreground handle must be explicitly transferred to its original Service and exact parent; failed unpublished catalog rollback transfers automatically. Admission joins adopted cleanup without task replay. Holder-owned background runs retain their own retry authority.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "workflowProviderIdentity": {
+    "finding": "B439",
+    "receipt": "receipts/workflow-provider-identity-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownedTestResources": "Actual Node PTC subprocesses, real fork Agents, temporary SDK profiles and JSONL; holders and harness shutdown join cleanup. No production or database mutation.",
+    "admissionRule": "Each new child requires the admitted provider instance inside its captured authority callback; already admitted children retain holder-owned results/disposal.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "foregroundWorkflowCleanup": {
+    "finding": "B440",
+    "receipt": "receipts/workflow-foreground-recovery-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "cleanupRule": "Failed foreground cleanup transfers to its original exact-parent owner, with a non-rejecting release confirmation. Final workflow logging retains an exact-parent idle veto. Background work is not adopted.",
+    "ownedTestResources": "Joined native PTC processes, loopback HTTP responses/sockets/listeners, private SDK profiles and JSONL; no production or PostgreSQL mutation.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "queuedSubagentCleanup": {
+    "finding": "B441",
+    "receipt": "receipts/queued-subagent-cleanup-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "admissionRule": "Recheck the latest exact-parent handed-back failures after each cleanup wait, then dispatch without an intervening await. Never adopt holder-owned background failures.",
+    "ownedTestResources": "Joined loopback HTTP responses/sockets/listeners, SDK processes and temporary profiles/JSONL; no production or PostgreSQL mutation.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "drainingSubagentCleanup": {
+    "finding": "B442",
+    "receipt": "receipts/draining-subagent-cleanup-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownershipRule": "Drain late foreground hand-backs while scope cleanup is waiting; keep the exact idle-release listener in the same composed effect until that active drain settles. No automatic adoption of caller-owned background handles.",
+    "ownedTestResources": "Explicitly joined loopback response streams/sockets/listeners, SDK processes and temporary profiles; no production/paid-provider mutation.",
+    "remaining": "After-disposal hand-back, persistent shutdown failure and complete file coverage remain open.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "withdrawnSubagentAdmission": {
+    "finding": "B443",
+    "receipt": "receipts/withdrawn-subagent-admission-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownershipRule": "Withdrawn service references refuse; still-pending directory/provider starts are cancelled and joined; late provider publications roll back before refusal. Successful catalog commit releases runtime cancellation before observers, preserving holder control.",
+    "ownedTestResources": "Joined real loopback responses/sockets/listeners, SDK child processes and private profiles. No paid/provider or production mutation.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "foregroundSubagentWithdrawal": {
+    "finding": "B444",
+    "receipt": "receipts/foreground-subagent-withdrawal-2026-11-01.json",
+    "productionAllocationsAdded": 0,
+    "ownershipRule": "The ordinary foreground Consumer stays admitted through collection, disposal and failed cleanup transfer; withdrawal cancels/joins it before draining adopted failures. No task replay or new background Job is allocated.",
+    "ownedTestResources": "Joined real loopback response streams, sockets/listeners, SDK processes and private profiles. No paid/provider or production mutation.",
+    "remaining": "Other foreground Consumers, persistent failure recovery and complete entry coverage remain open.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "workflowRecordLifetime": {
+    "finding": "B445",
+    "receipt": "receipts/workflow-record-lifetime-2026-11-01.json",
+    "productionProcessAllocationsAdded": 0,
+    "ownershipRule": "Durable Workflow listeners belong to the original parent scope; background recorder teardown joins existing Job finalization without initiating duplicate cancellation. Full runtime ownership and transient mirrors remain open.",
+    "ownedTestResources": "Joined native loopback HTTP responses, SDK processes and private profiles. No paid/provider or production mutation.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "workflowProgressLifetime": {
+    "finding": "B446",
+    "receipt": "receipts/workflow-progress-lifetime-2026-11-01.json",
+    "productionProcessAllocationsAdded": 0,
+    "ownershipRule": "One original-parent scoped mirror per accepted background Job; finalization or cleanup notice stops it. Parent teardown joins stop; mirror never cancels the Job.",
+    "ownedTestResources": "Joined native loopback HTTP responses, SDK processes and temporary profiles. No provider payment or production mutation.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "workflowForegroundWithdrawal": {
+    "finding": "B447",
+    "receipt": "receipts/workflow-foreground-withdrawal-2026-11-01.json",
+    "productionProcessAllocationsAdded": 0,
+    "ownershipRule": "Engine foreground admission retains collection, disposal and cleanup transfer; PTC extends it into original Core. Withdrawal cancels/joins before Core retained cleanup retries. Raw/background holders retain controls.",
+    "ownedTestResources": "Joined actual Node PTC, native loopback responses, SDK processes and private profiles. No paid provider or production mutation.",
+    "status": "named_cases_verified_remaining_allocations_open"
+  },
+  "retiredSubagentCleanup": {
+    "finding": "B448",
+    "receipt": "receipts/retired-subagent-cleanup-2026-11-02.json",
+    "productionProcessAllocationsAdded": 0,
+    "ownershipRule": "Original live parent owns failed cleanup retry registrations and occupation across Core replacement; new allocation joins original operations without handle transfer.",
+    "ownedTestResources": "Closed private native loopback responses, Node PTC/SDK processes and temporary profiles. No paid provider or production mutation.",
+    "status": "named_cases_verified_complete_core_coverage_and_other_allocations_open"
+  },
+  "resourceDatabaseContention": {
+    "finding": "B449",
+    "receipt": "receipts/resource-contention-authority-2026-11-02.json",
+    "productionProcessAllocationsAdded": 0,
+    "ownershipRule": "Retain instance/accounting fences and unknown committed reservations; lock timeout never proves physical quiescence.",
+    "testResources": "Existing verified owned PostgreSQL parent with inspected loopback binding; uniquely allocated child databases all dropped, pools and private HTTP fixtures joined.",
+    "status": "local_named_cases_verified_matching_production_and_remaining_allocations_open"
+  },
+  "parentSubagentCleanup": {
+    "finding": "B450",
+    "receipt": "receipts/parent-subagent-cleanup-2026-11-02.json",
+    "productionProcessAllocationsAdded": 0,
+    "ownershipRule": "Parent exit joins retained original-owner cleanup; late transfer carries operations and confirmation without a new run owner or effect in a departing scope. Unconfirmed release remains occupied.",
+    "ownedTestResources": "Native loopback responses, actual Node PTC/SDK subprocesses and temporary profiles; finalizers join them. No paid provider or production mutation.",
+    "status": "named_cases_verified_other_allocations_and_complete_core_coverage_open"
+  },
+  "exactCentralRuntimeControl": {
+    "finding": "B451",
+    "receipt": "receipts/central-runtime-control-2026-11-02.json",
+    "productionProcessAllocationsAdded": 0,
+    "status": "named_source_and_built_cases_verified_production_and_global_open",
+    "ownershipRule": "Purpose changes administrator admission only. Exact generation, local node, Gateway process owner and durable stop operation remain required. Cleanup confirms physical response termination before release.",
+    "ownedTestResources": "Unique disposable PostgreSQL databases, private roots and ephemeral native loopback response streams; no production or paid provider changes."
+  },
+  "pendingBackgroundCleanup": {
+    "finding": "B452",
+    "receipt": "receipts/pending-background-cleanup-2026-11-02.json",
+    "productionProcessAllocationsAdded": 0,
+    "status": "named_cases_verified_complete_coverage_and_other_allocations_open",
+    "ownershipRule": "One explicit retry intent survives pending provider disposal; no new owner, timer or process. Unconfirmed release stays occupied; only physical release allows one durable Job ending.",
+    "ownedTestResources": "Native ephemeral loopback response, private SDK profiles, actual Node SDK processes and temporary test roots; finalizers join them."
+  },
+  "subagentModelPreflight": {
+    "finding": "B453",
+    "receipt": "receipts/subagent-model-preflight-2026-11-02.json",
+    "productionProcessAllocationsAdded": 0,
+    "status": "named_cases_verified_tool_entry_100_percent_core_and_other_allocations_open",
+    "ownershipRule": "Original Core owns metadata until physical cleanup or foreground/background handoff; cancellation cannot move preparation to a replacement Core. Published background control remains holder-owned.",
+    "ownedTestResources": "Native ephemeral loopback metadata responses, temporary SDK profiles and actual Node SDK processes. Fixture deadline bounds old failures; current success requires the actual Runtime signal."
+  },
+  "subagentControlAuthority": {
+    "finding": "B454",
+    "receipt": "receipts/subagent-control-authority-2026-11-02.json",
+    "productionProcessAllocationsAdded": 0,
+    "status": "named_cases_verified_core_and_other_allocations_open",
+    "ownershipRule": "The original collaboration provider cancels pending catalog and child-message admission; replacement cannot adopt old requests. Inbox acceptance ends carrier/provider cancellation ownership.",
+    "ownedTestResources": "Real continuable child Activations, temporary SDK profiles, Node SDK processes and ephemeral loopback authorization servers. Original behavior is proven on the retained normal Core bundle."
+  },
+  "jobCaptureCapacity": {
+    "finding": "B455",
+    "receipt": "receipts/job-capture-admission-2026-11-02.json",
+    "productionProcessAllocationsAdded": 0,
+    "status": "named_cases_verified_full_local_job_registry_100_percent_other_allocations_open",
+    "ownershipRule": "The existing exact-owner start reservation spans execution provenance capture and producer startup; failed capture releases only that reservation. Other owners remain independent.",
+    "ownedTestResources": "Native ephemeral loopback HTTP work responses and actual SDK runtimes. Both original extra producers and final admitted work are explicitly stopped and joined."
+  },
+  "httpLeaseRetirement": {
+    "finding": "B456",
+    "receipt": "receipts/http-lease-retirement-2026-11-02.json",
+    "status": "native_old_source_failure_normal_built_success_783_named_cases_global_open",
+    "ownerRule": "A released request borrower retains no authority to destroy the connection assigned to a successor.",
+    "rootProductionAllocationsAdded": 0,
+    "ownedTestPostgresDatabase": "dropped",
+    "rootProductionMutation": false
+  },
+  "draftRecoveryAndRouteReview": {
+    "findings": [
+      "B457",
+      "B458"
+    ],
+    "status": "peer_ui_work_pending_independent_acceptance",
+    "rootUiEdits": 0,
+    "productionIdentifiersOmitted": true
+  },
+  "commandRegistrationAdmission": {
+    "finding": "B459",
+    "receipt": "receipts/command-registration-admission-2026-11-02.json",
+    "status": "fixed_verified_command_registration_cutoff_normal_entry_100_percent_global_review_open",
+    "newProductionProcessAllocations": 0,
+    "ownedTestResources": "SDK application subprocesses and private fixture workspaces are closed by the maintained harness on both passing and expected failing runs.",
+    "rootProductionMutation": false
+  },
+  "crossBootRuntimeOwnerRecovery": {
+    "finding": "B460",
+    "status": "peer_fix_and_production_acceptance_pending",
+    "observation": "Two prior owner records have a new boot, stable lock inode and changed device; device rejection precedes recovery. Current peer report supersedes its pre-reboot readiness report.",
+    "rootRuntimeOwnerEdits": 0,
+    "rootProductionMutation": false
+  },
+  "commandCancellationAndPlanIdentity": {
+    "findings": [
+      "B461",
+      "B462"
+    ],
+    "receipt": "receipts/command-cancellation-plan-identity-2026-11-02.json",
+    "status": "fixed_verified_203_cases_command_and_plan_entries_100_percent_npm_layout_and_global_review_open",
+    "newProductionAllocations": 0,
+    "ownedTestPostgresDatabasesDropped": 5,
+    "rootProductionMutation": false
+  },
+  "latestPeerDirectoryAndTransportReport": {
+    "findings": [
+      "B463",
+      "B464"
+    ],
+    "r40": "reported_deployed",
+    "r41": "peer_reports_deployed_operational_safari_checks_passed",
+    "peerReportedClientCases": 144,
+    "reportedWaitersAfterEntry": 0,
+    "reportedRestoredDrafts": 2,
+    "reportedSuccessfulRoundUserSubmissions": 1,
+    "reportedSuccessfulRoundReplies": 1,
+    "rootIndependentAcceptance": false,
+    "remaining": "B Gateway list/history8-10seconds; three simple shared DB round trips456/457/461ms. Root/peer assembled acceptance and B451 remain open.",
+    "rootChangesIncludedInPeerRelease": false
+  },
+  "npmInstallLayoutGap": {
+    "finding": "B465",
+    "status": "fixed_verified_offline_metadata_and_dual_release_layout_global_review_open",
+    "receipt": "receipts/npm-registry-metadata-2026-11-02.json",
+    "liveRegistryQueriedForRecordingOnly": true,
+    "runtimeResolutionOffline": true,
+    "packagesInstalled": false
+  },
+  "commandCompactionAndGoalAdmission": {
+    "findings": [
+      "B466",
+      "B467"
+    ],
+    "receipt": "receipts/manual-compaction-goal-admission-2026-11-02.json",
+    "status": "fixed_verified_scoped_global_review_open",
+    "cases": 220,
+    "wholeProjectComplete": false
+  },
+  "pendingCommandOwnerReview": {
+    "finding": "B470",
+    "status": "fixed_verified_command_service_withdrawal_and_cleanup_344_cases_global_review_open",
+    "receipt": "receipts/command-service-withdrawal-2026-11-02.json",
+    "previousExactAgentAdmissionReceipt": "receipts/command-caller-lifetime-2026-11-02.json",
+    "differentNamedCases": 344,
+    "normalCoverageStatements": 667,
+    "normalCoverageBranches": 491,
+    "wholeProjectComplete": false
+  },
+  "continuedQuestionOwnerReview": {
+    "finding": "B469",
+    "status": "fixed_verified_continued_reply_identity_and_cancellation_210_cases_global_review_open",
+    "receipt": "receipts/continued-question-execution-identity-2026-11-02.json",
+    "differentNamedCases": 210,
+    "normalCoverageStatements": 209,
+    "normalCoverageBranches": 198,
+    "wholeProjectComplete": false
+  },
+  "retainedSubagentCleanupCoverage": {
+    "finding": "B436",
+    "kind": "verification_followup",
+    "receipt": "receipts/subagent-complete-entry-coverage-2026-11-02.json",
+    "differentNamedCases": 754,
+    "normalCoverageStatements": 379,
+    "normalCoverageBranches": 198,
+    "normalEntryCoverageExemptionRemoved": true,
+    "wholeProjectComplete": false
+  },
+  "publishedMigrationUpgradeAcceptance": {
+    "finding": "B348",
+    "receipt": "receipts/published-migration61-upgrade-2026-11-02.json",
+    "schemaBefore": 61,
+    "schemaAfter": 103,
+    "sourceProductFilesChanged": false,
+    "status": "fixed_verified_released_migration_identities_and_schema61_to103_owned_postgres_upgrade_production_acceptance_open",
+    "wholeProjectComplete": false
+  },
+  "continuedQuestionParticipantReview": {
+    "finding": "B471",
+    "status": "fixed_verified_project_question_participant_and_model_attribution_439_cases_global_review_open",
+    "receipt": "receipts/project-question-participant-attribution-2026-11-02.json",
+    "differentNamedCases": 439,
+    "normalCoveredStatements": 240,
+    "normalCoveredBranches": 239,
+    "wholeProjectComplete": false
+  },
+  "accountLookupResourceReview": {
+    "finding": "B472",
+    "status": "fixed_verified_async_bounded_account_lookup_and_native_closure_85_cases_global_review_open",
+    "receipt": "receipts/gateway-account-lookup-ownership-2026-11-02.json",
+    "differentUnitAndSourceCases": 85,
+    "sourceNode22": true,
+    "builtNode24": true,
+    "realLinuxAccounts": true,
+    "wholeProjectComplete": false
+  },
+  "currentAllocationSourceReview": {
+    "at": "2026-11-02T07:37:34.588562+00:00",
+    "receipt": "receipts/gateway-account-lookup-ownership-2026-11-02.json",
+    "scannerReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/allocation-scan-final.json",
+    "rawScan": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/current-allocation-scan-final.json",
+    "productionSourceFiles": 2877,
+    "allocationSites": 36,
+    "sites": [
+      {
+        "path": "gateway/src/child-command.ts",
+        "line": 20,
+        "module": "node:child_process",
+        "method": "execFile",
+        "expression": "execute",
+        "owner": "runGatewayChildCommand",
+        "classification": "administrative_native_command_environment_deadline_cancellation_and_close_verified",
+        "findings": [
+          "B128",
+          "B314",
+          "B316",
+          "B319"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "gateway/src/local-runtime-supervisor.ts",
+        "line": 118,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "supervise",
+        "classification": "one_runtime_under_inherited_owner_lease_posix_scope_verified",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "gateway/src/tunnel-process.ts",
+        "line": 67,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "spawnTunnelProcess",
+        "classification": "owned_native_connector_registration_close_and_cancellation_verified",
+        "findings": [
+          "B106",
+          "B107",
+          "B109",
+          "B110",
+          "B117"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "apps/plugin-market-generator/src/fetchers.ts",
+        "line": 152,
+        "module": "node:child_process",
+        "method": "execFile",
+        "expression": "run",
+        "owner": "git",
+        "classification": "development_cli_git_named_transport_and_objects_cases_verified_product_admission_not_applicable",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "gateway/src/deployment-commands.ts",
+        "line": 156,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "run",
+        "classification": "maintenance_child_environment_and_named_pipe_closure_verified_argument_transport_and_wrapper_owner_review_open",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "gateway/src/index.ts",
+        "line": 752,
+        "module": "node:child_process",
+        "method": "execFileSync",
+        "expression": "execFileSync",
+        "owner": null,
+        "classification": "pending_review_peer_index_composition_ownership_respected",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "gateway/src/launcher.ts",
+        "line": 166,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "start",
+        "classification": "runtime_cold_start_and_exact_generation_handoff_verified",
+        "findings": [
+          "B25",
+          "B104",
+          "B105"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "native/system/packages/entry/src/index.ts",
+        "line": 120,
+        "module": "node:child_process",
+        "method": "spawnSync",
+        "expression": "spawnSync",
+        "owner": "probe",
+        "classification": "public_native_capability_probe_source_and_node22_node24_client_closure_verified",
+        "findings": [
+          "B322"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/boot/plugin-market/src/parse-thread.ts",
+        "line": 79,
+        "module": "node:worker_threads",
+        "method": "Worker",
+        "expression": "Worker",
+        "owner": "runParser",
+        "classification": "current_source_and_rebuilt_worker_admission_verified",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/bundle/web-app/src/index.ts",
+        "line": 136,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "spawnBrowserLauncher",
+        "classification": "administrative_browser_helper_cancellation_and_native_close_verified_os_delegation_external",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
+        "line": 64,
+        "module": "node:worker_threads",
+        "method": "Worker",
+        "expression": "Worker",
+        "owner": "openBrowserWorker",
+        "classification": "admission_integrated_targeted_verified",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
+        "line": 68,
+        "module": "node:worker_threads",
+        "method": "Worker",
+        "expression": "Worker",
+        "owner": "openBrowserWorker",
+        "classification": "admission_integrated_targeted_verified",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/experimental/inspector/src/host/bridge/controller.ts",
+        "line": 359,
+        "module": "node:worker_threads",
+        "method": "Worker",
+        "expression": "Worker",
+        "owner": "spawnWorker",
+        "classification": "current_real_worker_completion_retry_and_native_bundles_verified_whole_inventory_open",
+        "findings": [
+          "B04",
+          "B297"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/experimental/inspector/src/host/bridge/controller.ts",
+        "line": 368,
+        "module": "node:worker_threads",
+        "method": "Worker",
+        "expression": "Worker",
+        "owner": "spawnWorker",
+        "classification": "current_real_worker_completion_retry_and_native_bundles_verified_whole_inventory_open",
+        "findings": [
+          "B04",
+          "B297"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/host/directory-picker-native/src/win32-dialog-host.ts",
+        "line": 29,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "spawnDialogWorker",
+        "classification": "driver_lifetime_verified_native_windows_platform_acceptance_open",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/host/directory-picker-native/src/win32-dialog-host.ts",
+        "line": 31,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "spawnDialogWorker",
+        "classification": "driver_lifetime_verified_native_windows_platform_acceptance_open",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/host/open-in-app/src/resolver.ts",
+        "line": 76,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": null,
+        "classification": "desktop_http_current_authorization_and_per_handoff_admission_verified_native_lifetime_review_open",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/sandbox/sandbox-local/src/index.ts",
+        "line": 70,
+        "module": "node:child_process",
+        "method": "spawnSync",
+        "expression": "spawnSync",
+        "owner": "defaultProbeBwrap",
+        "classification": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
+        "findings": [
+          "B322"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/sandbox/sandbox-local/src/index.ts",
+        "line": 88,
+        "module": "node:child_process",
+        "method": "spawnSync",
+        "expression": "spawnSync",
+        "owner": "defaultProbeSeatbelt",
+        "classification": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
+        "findings": [
+          "B322"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/sandbox/sandbox-local/src/index.ts",
+        "line": 106,
+        "module": "node:child_process",
+        "method": "spawnSync",
+        "expression": "spawnSync",
+        "owner": "defaultProbeWindowsAcl",
+        "classification": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
+        "findings": [
+          "B322"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/sdk/client/src/client.ts",
+        "line": 297,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "start",
+        "classification": "managed_sdk_parent_admission_and_original_child_cleanup_retry_source_native_artifact_verified_whole_inventory_open",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/session/session-persistence-jsonl/src/migration-verifier.ts",
+        "line": 257,
+        "module": "node:worker_threads",
+        "method": "Worker",
+        "expression": "Worker",
+        "owner": "runVerificationWorker",
+        "classification": "admission_integrated_targeted_verified",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/index.ts",
+        "line": 339,
+        "module": "node-pty",
+        "method": "spawn",
+        "expression": "requireNodePty().spawn",
+        "owner": "spawnTerminalProcess",
+        "classification": "provider_payload_called_below_subprocess_runtime_admission_native_platform_scope_retained",
+        "findings": [
+          "B386",
+          "B368",
+          "B313"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
+        "line": 91,
+        "module": "node:child_process",
+        "method": "execFile",
+        "expression": "execFile",
+        "owner": "querySystemctl",
+        "classification": "native_query_probe_and_signal_deadlines_named_real_clients_verified_complete_inventory_open",
+        "findings": [
+          "B313",
+          "B320"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
+        "line": 140,
+        "module": "node:child_process",
+        "method": "spawnSync",
+        "expression": "(internals.spawnSync ?? spawnSync)",
+        "owner": "probeLinuxScope",
+        "classification": "administrative_native_probe_explicit_deadline_and_force_close_reviewed_no_workload_permit_recursion",
+        "findings": [
+          "B320",
+          "B322"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
+        "line": 185,
+        "module": "node:child_process",
+        "method": "spawnSync",
+        "expression": "(internals.spawnSync ?? spawnSync)",
+        "owner": "probeLinuxManager",
+        "classification": "administrative_native_probe_explicit_deadline_and_force_close_reviewed_no_workload_permit_recursion",
+        "findings": [
+          "B320",
+          "B322"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
+        "line": 705,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "(internals.spawn ?? spawn)",
+        "owner": "launchLinuxScope",
+        "classification": "provider_payload_called_below_subprocess_runtime_admission_native_platform_scope_retained",
+        "findings": [
+          "B386",
+          "B368",
+          "B313"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/process-inspector.ts",
+        "line": 129,
+        "module": "node:child_process",
+        "method": "execFileSync",
+        "expression": "execFileSync",
+        "owner": "defaultProcessInspectorInternals",
+        "classification": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/spawn.ts",
+        "line": 121,
+        "module": "node:child_process",
+        "method": "spawnSync",
+        "expression": "spawnSync",
+        "owner": "taskkillProcessTree",
+        "classification": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/spawn.ts",
+        "line": 470,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "(internals.spawn ?? spawn)",
+        "owner": "spawnSubprocess",
+        "classification": "provider_payload_called_below_subprocess_runtime_admission_native_platform_scope_retained",
+        "findings": [
+          "B386",
+          "B368",
+          "B313"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/windows-inspector.ts",
+        "line": 157,
+        "module": "node:child_process",
+        "method": "spawnSync",
+        "expression": "spawnSync",
+        "owner": "taskkillTree",
+        "classification": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/subprocess/subprocess-local/src/windows-job.ts",
+        "line": 135,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "(internals.spawn ?? spawn)",
+        "owner": "launchWindowsJob",
+        "classification": "provider_payload_called_below_subprocess_runtime_admission_native_platform_scope_retained",
+        "findings": [
+          "B386",
+          "B368",
+          "B313"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/test-support/session-snapshot/src/launcher.ts",
+        "line": 137,
+        "module": "node:child_process",
+        "method": "spawn",
+        "expression": "spawn",
+        "owner": "launchAcpTestAgent",
+        "classification": "test_only_acp_named_stdio_callback_and_refused_fallback_closure_verified_product_admission_not_applicable",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/typert/generator/src/tsdown-plugin.ts",
+        "line": 194,
+        "module": "node:worker_threads",
+        "method": "Worker",
+        "expression": "Worker",
+        "owner": "spawnWorker",
+        "classification": "build_only_worker_named_success_and_failure_closure_verified_product_admission_not_applicable",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/typert/generator/src/tsdown-plugin.ts",
+        "line": 202,
+        "module": "node:worker_threads",
+        "method": "Worker",
+        "expression": "Worker",
+        "owner": "spawnWorker",
+        "classification": "build_only_worker_named_success_and_failure_closure_verified_product_admission_not_applicable",
+        "findings": [],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      },
+      {
+        "path": "packages/util/native-command/src/runner.ts",
+        "line": 31,
+        "module": "node:child_process",
+        "method": "execFile",
+        "expression": "execFile",
+        "owner": null,
+        "classification": "direct_native_helper_cancellation_source_and_public_node22_node24_verified_native_desktop_acceptance_open",
+        "findings": [
+          "B312"
+        ],
+        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
+      }
+    ],
+    "historicalCandidateKeysUnmatchedBeforeRepair": 11,
+    "omittedAccountSitesRemovedBySharedOwner": 3,
+    "remainingHistoricalKeyMismatches": 8,
+    "mismatchDisposition": "Seven existing provider/probe ownership keys are classified; the peer-owned index bootstrap Git worktree call remains a named pending review. This is not an all-allocation completeness claim.",
+    "limitations": [
+      "Alias and namespace discovery is syntactic and may include shadowed bindings.",
+      "An unmatched key is a review candidate, not a confirmed allocation defect.",
+      "Dynamic and third-party process creation needs separate consumer inspection."
+    ],
+    "helperConsumersRepaired": [
+      {
+        "path": "gateway/src/document-storage.ts",
+        "owner": "account",
+        "helper": "runGatewayChildCommand",
+        "kind": "administrative_identity_query"
+      },
+      {
+        "path": "gateway/src/project-runtime-data.ts",
+        "owner": "executionOwner",
+        "helper": "runGatewayChildCommand",
+        "kind": "administrative_identity_query"
+      }
+    ],
+    "wholeProjectComplete": false
+  },
+  "resourceRequirementRefresh": {
+    "at": "2026-11-02T07:37:34.588562+00:00",
+    "receipt": "receipts/gateway-account-lookup-ownership-2026-11-02.json",
+    "matrix": [
+      {
+        "requirement": "Managed model/process/Worker requests retain exact admission and cancellation through physical completion",
+        "namedEvidence": [
+          "B386",
+          "B388",
+          "B393",
+          "B394",
+          "B395",
+          "B398",
+          "B399",
+          "B448",
+          "B470"
+        ],
+        "status": "named_cases_verified_remaining_consumer_inventory_open"
+      },
+      {
+        "requirement": "Sub-runtimes retain original actor, per-request model authorization/quota and usage ownership",
+        "namedEvidence": [
+          "B92",
+          "B144",
+          "B147",
+          "B400",
+          "B401",
+          "B469",
+          "B471"
+        ],
+        "status": "supported_sdk_codex_named_local_and_ssh_cases_verified_opaque_backends_refuse"
+      },
+      {
+        "requirement": "Node pressure, fair user/project queues and exact computer/runtime/generation registration",
+        "sources": [
+          "gateway/src/node-resource-budget.ts",
+          "packages/context/resource-budget/src/wire.ts"
+        ],
+        "status": "current_policy_and_owner_code_revisited_existing_acceptance_retained_new_topology_independent_acceptance_open"
+      },
+      {
+        "requirement": "Bound administrative native helper work without recursive workload admission",
+        "namedEvidence": [
+          "B322",
+          "B368",
+          "B472"
+        ],
+        "status": "named_helpers_verified_remaining_wrapper_and_native_platform_acceptance_open"
+      },
+      {
+        "requirement": "Recover original Runtime ownership after Gateway SIGKILL without releasing uncertain occupation",
+        "namedEvidence": [
+          "B25",
+          "B313",
+          "B337"
+        ],
+        "status": "original_failure_verified_escaped_descendant_and_remaining_platform_scope_open"
+      },
+      {
+        "requirement": "Whole-project function and business-rule completeness",
+        "status": "all_12_domains_in_progress_no_global_completion_claim"
+      }
+    ]
+  },
+  "failedSpawnCancellationReview": {
+    "finding": "B473",
+    "receipt": "receipts/failed-native-spawn-cancellation-2026-11-02.json",
+    "status": "fixed_verified_failed_spawn_cancellation_process_group_isolation_390_cases_global_review_open",
+    "differentNamedCases": 390,
+    "wholeCoveredStatements": 107,
+    "wholeCoveredBranches": 58,
+    "globalReviewComplete": false
+  },
+  "failedSpawnSignalClassification": {
+    "receipt": "receipts/failed-native-spawn-cancellation-2026-11-02.json",
+    "evidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-signal-classification.json",
+    "directNodeCalls": 27,
+    "directNodeSignalOptions": 0,
+    "wholeProjectComplete": false
+  },
+  "lspCleanupRetry": {
+    "finding": "B488",
+    "receipt": "receipts/lsp-cleanup-retry-2026-11-03.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Retain failed native owner in its workspace slot, share each disposal attempt, retry confirmed cleanup before replacement and preserve failure ownership through provider cleanup. Real local native servers and normal Node24 artifact verified.",
+    "remaining": [
+      "Remaining LSP registration/protocol/source semantics, remote providers and other allocation Consumers remain open.",
+      "No Linux/Windows containment, forced Host death, production deployment or automatic Runtime stopping acceptance."
+    ]
+  },
+  "terminalBackendWithdrawal": {
+    "finding": "B490",
+    "receipt": "receipts/terminal-backend-withdrawal-2026-11-03.json",
+    "productionAllocationsAdded": 0,
+    "verified": "Hold actual native PTY after ready but before Terminal publication; backend stop aborts setup and all disposal observers join rollback and physical process exit. Failed cleanup retained as exact-Agent activity and replacement registration kept independent.",
+    "remaining": [
+      "Whole-Host forced death, Linux/Windows native containment, other allocator Consumers and cross-computer resource admission remain open."
+    ]
+  },
+  "postgresMaintenanceArgumentPrivacy": {
+    "finding": "B491",
+    "receipt": "receipts/postgres-command-argument-privacy-2026-11-03.json",
+    "status": "confirmed_native_process_argument_exposure_fix_design_open",
+    "actualNativePasswordArgumentVisible": true,
+    "syntheticOnly": true,
+    "cancelledClientJoined": true,
+    "sourceFixed": false
+  }
+}

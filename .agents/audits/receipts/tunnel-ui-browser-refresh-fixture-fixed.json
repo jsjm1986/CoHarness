@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-browser-refresh-fixture-fixed",
+  "cwd": ".",
+  "command": "env DSH_SNAPSHOT=refresh node_modules/.bin/vitest run --config vitest.web.config.ts apps/web/tests/admin-form-values.e2e.ts -t 'cancels an unregistered connector' --retry=0",
+  "startedAt": "2026-10-24T23:12:37.587718+00:00",
+  "seconds": 4.783,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bb6b5039da9f0d989564216ca8a9a3d13d45cc7da2ccdc6ecc21c249f1967f90",
+  "inputsAfter": "bb6b5039da9f0d989564216ca8a9a3d13d45cc7da2ccdc6ecc21c249f1967f90",
+  "postgresToolDirectory": null,
+  "outputSha256": "798fab81adb2c1d902e8e502ca8c73c40f38274f5baa092416217ca38401a712",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed | 2 skipped (3)\n   Start at  07:12:38\n   Duration  3.92s (transform 726ms, setup 0ms, import 1.12s, tests 2.72s, environment 0ms)\n\n"
+}

@@ -31,6 +31,7 @@ export interface WorkspaceFileTextPage {
   offset: number
   limit: number
   text: string
+  /** True when no text follows this page, including an exact line-limit boundary. */
   eof: boolean
   version: string
 }
@@ -101,7 +102,9 @@ export interface WorkspaceFilesApi {
     version?: string
   }>, signal: AbortSignal): Promise<RpcResponse<WorkspaceFileTextPage>>
   /** Read a raw byte window without UTF-8 decoding.
-   * @param request - Session, relative file, zero-based offset, length, and optional version guard.
+   * @param request - Session, relative file, zero-based offset, length, optional version guard,
+   *   and optional inclusive complete-file size cap. A reported size above the cap fails before
+   *   provider content I/O; absent cap leaves the ordinary window limit unchanged.
    * @param signal - caller cancellation.
    * @returns Base64 bytes, freshness token, and EOF status.
    */
@@ -111,5 +114,6 @@ export interface WorkspaceFilesApi {
     offset?: number
     length?: number
     version?: string
+    maxFileBytes?: number
   }>, signal: AbortSignal): Promise<RpcResponse<WorkspaceFileByteWindow>>
 }

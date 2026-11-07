@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.md
+document:
+  en: ecf587f0b3d07824f438c74e34df1d9a034e0ac5
+  zh: 6c260286fd1d7c1b742625643c69db89cb6dce5c
+/:
+  en: b8f8b77cd280eeb1
+  zh: b67a058580312d65
+/handle-model-resource-ownership-and-admission-failures:
+  en: f884178e19e7a545
+  zh: 0157cf6f9404f211
+/handle-model-resource-ownership-and-admission-failures/change:
+  en: 8b66c43ac7b92183
+  zh: d4ae541179ecd0c2
+/handle-model-resource-ownership-and-admission-failures/migration:
+  en: 4076a76c9afe27d5
+  zh: d91c4cfbd9beffda

@@ -173,9 +173,9 @@ export interface MemoryCursor {
   /** Consolidation: content digest of the scope when the last run committed. */
   readonly lastDigest?: string | undefined
   /**
-   * Consolidation: writes committed to the scope since the last run. The
-   * service increments this inside the same serialized write as the entry
-   * mutation, so the count survives restarts and plugin reloads.
+   * Consolidation: conservative count of admitted mutations since the last
+   * run. Persisted before each entry mutation, it can include a failed entry
+   * write but never omits a committed one. The content digest detects no-op reviews.
    */
   readonly changedSince?: number | undefined
 }

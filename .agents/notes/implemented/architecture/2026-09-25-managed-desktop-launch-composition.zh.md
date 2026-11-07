@@ -12,6 +12,8 @@ Gateway 启动的运行时只加载组合补丁中列出的插件。管理员授
 
 Gateway 通过节点配置管理驱动准入。`HGW_DESKTOP_ID` 声明本节点的交互桌面标识。设置后，启动组合把已配置的 Cua Driver MCP 包物化进运行时 profile，向托管补丁追加 `dsh-computer-use` 与驱动条目，并写入 `gateway-execution` 的 `config.desktop`，由其为该标识发布托管策略。未设置时，运行时不挂载驱动、不发布策略，也不会读取驱动包。
 
+每个受管组合独立挂载只读桌面可用性观察器，并等待其初始化。环境事实说明本机缺少图形会话，不预留驱动，也不发布授权。已注册提供方负责报告实际可用性，因此可工作的外部桌面优先于本机回退信息。Host 摘要为连接恢复保留这些不授予权限的信息；个人确认仍须通过 Session 授权，并在连接丢失时清除。
+
 驱动包与 model-governance、directory-guard 包走同一套原子暂存物化机制：`HGW_DESKTOP_DRIVER_PACKAGE` 指向绝对包目录，只复制其中的 `package.json`、`lib/` 和 `cordis.patch.yml`，绝不符号链接到源码检出。发布部署把默认路径钉在 `HGW_RELEASE_ROOT` 下；包缺失或不完整时运行时挂载大声失败。`HGW_DESKTOP_DRIVER_COMMAND` 与 `HGW_DESKTOP_DRIVER_ARGS` 用字面量命令和 JSON 参数列表替换提供者的 `cua-driver` 可执行文件查找与 `mcp` 参数向量，不经过 shell。
 
 `dsh-computer-use` 通过安装模块回退解析，因为 `gateway-execution` 已把它声明为 peer；只有驱动包需要物化。补丁只发出一行驱动条目，保持服务的单提供者不变量。`HGW_DESKTOP_ID` 接受 1 到 256 个字符，与运行时 `desktop` schema 的上界一致。

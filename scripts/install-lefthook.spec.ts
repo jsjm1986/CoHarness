@@ -20,6 +20,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { removeFixtureSafely } from './test-fixture-cleanup.ts'
 
 const installer = fileURLToPath(new URL('./install-lefthook.mjs', import.meta.url))
+const scriptsDirectory = fileURLToPath(new URL('.', import.meta.url))
+const tsxPackageDirectory = dirname(fileURLToPath(import.meta.resolve('tsx/package.json')))
 const fixtures: string[] = []
 // Multi-worktree cases spawn several Git and Node subprocesses; native Windows
 // coverage concurrency can delay them without changing installer behavior.
@@ -124,6 +126,12 @@ function installFakeLefthook(root: string): void {
   chmodSync(shim, 0o755)
 }
 
+function installPairingProbeFixture(root: string): void {
+  const linkType = process.platform === 'win32' ? 'junction' : 'dir'
+  symlinkSync(scriptsDirectory, join(root, 'scripts'), linkType)
+  symlinkSync(tsxPackageDirectory, join(root, 'node_modules/tsx'), linkType)
+}
+
 function createFixture(names: { main?: string; linked?: string } = {}): Fixture {
   const container = mkdtempSync(join(tmpdir(), 'dsh-lefthook-'))
   fixtures.push(container)
@@ -153,6 +161,8 @@ function createFixture(names: { main?: string; linked?: string } = {}): Fixture 
   write(join(linked, 'lefthook.yml'), 'linked-worktree-config\n')
   installFakeLefthook(main)
   installFakeLefthook(linked)
+  installPairingProbeFixture(main)
+  installPairingProbeFixture(linked)
   return fixture
 }
 
@@ -292,6 +302,7 @@ describe('worktree-local Lefthook installer', { timeout: 90_000 }, () => {
     git(fixture, fixture.main, ['worktree', 'add', '-b', 'late-linked', lateLinked])
     write(join(lateLinked, 'lefthook.yml'), 'late-linked-worktree-config\n')
     installFakeLefthook(lateLinked)
+    installPairingProbeFixture(lateLinked)
     expect(git(fixture, lateLinked, ['config', '--worktree', '--get', 'core.hooksPath'])).toBe(mainHooks)
 
     const linkedInstall = await runInstaller(fixture, lateLinked)

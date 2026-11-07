@@ -1,0 +1,20 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "call_steward_plan", "name": "steward_query", "argumentsDelta": "{\"sql\":\"UPDATE harness.projects SET status = 'active' WHERE false\",\"dry_run\":true,\"row_limit\":1}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_steward_plan", "name": "steward_query", "arguments": "{\"sql\":\"UPDATE harness.projects SET status = 'active' WHERE false\",\"dry_run\":true,\"row_limit\":1}" } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "text" },
+      { "type": "text-delta", "index": 0, "text": "The dry-run plan is truncated. Narrow the statement before inspecting the complete plan." },
+      { "type": "block-end", "index": 0, "block": { "type": "text", "text": "The dry-run plan is truncated. Narrow the statement before inspecting the complete plan." } },
+      { "type": "finish", "reason": { "kind": "stop" } }
+    ]
+  }
+]

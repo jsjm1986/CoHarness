@@ -1,0 +1,295 @@
+{
+  "finding": "B342",
+  "status": "fixed_and_verified_for_named_failure_scope",
+  "updatedAt": "2026-10-30T10:11:50.326661+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T094655Z",
+  "sourcePaths": [
+    "packages/subprocess/subprocess-local/src/windows-inspector.ts",
+    "packages/subprocess/subprocess-local/src/process-inspector.ts",
+    "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts",
+    "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts",
+    "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+    "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+    "packages/subprocess/subprocess-local/tests/fixtures/windows-observation-input.mjs",
+    "packages/subprocess/subprocess-local/tests/expected/terminal-clock.expected.md",
+    "packages/subprocess/subprocess-local/README.md",
+    "packages/subprocess/subprocess-local/README.zh.md",
+    "packages/subprocess/subprocess-local/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subprocess/subprocess-local/src/windows-inspector.ts": "988bc561aecbf5795e70c1b5242db134c9dfce4e1ad0ca350f0814e3c1a09e77",
+    "packages/subprocess/subprocess-local/src/process-inspector.ts": "f93b00586182e85ebd8063a1a6371a4116c5fd92d36a8f78a50b682929902891",
+    "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts": "cb0ca62c9fc2e803643ae7b3ca58b64e45374e1d1345cd315b8762e0d8460058",
+    "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts": "fa0b7a24c236a1f1fdba516ae26563b5ff59f36ac8be85dc0c37f39fc66ad4c7",
+    "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts": "3ccad327dcbb99fd03f338dfc75c939ee8af89a9d4296db2b560133de37595c2",
+    "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs": "4421a39a5d74bf09234fd6c7372e835ad0e154753aaa480f6a6cbfcb293a00e8",
+    "packages/subprocess/subprocess-local/tests/fixtures/windows-observation-input.mjs": "b61211f25d7ad8d91db0e24965289b49cca4beb92ef26fb15d0a6825715b5e06",
+    "packages/subprocess/subprocess-local/tests/expected/terminal-clock.expected.md": "ac63f8661d8a38c9f7b307d96f05f714d3d82738d8a867142dd3de28317be59b",
+    "packages/subprocess/subprocess-local/README.md": "7a1dbdcf30497214ee255adbc13938e5810cd9662497e8635c44145ecc3fa28d",
+    "packages/subprocess/subprocess-local/README.zh.md": "49f3d4abb3f375b692092fc9ea494a368cc7a8f1679924698a4216721705b73a",
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7f750a5c67c6bd60352d5c050e140d1709eca2d353d4cd818e0348e55204793a",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md": "aa42f01b0c96a557a6d29353a7fe74dd7b5bf04da34f7dddbd398c7794877e51",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.zh.md": "4768f4844f01c22bfadea832fb68c187462176fb3767d4562ad6c058c022436b",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.i18n.yaml": "6315821f8ffddce03fa8656ce28386ce3b5740022cd8c155e5fbc99e6beebf1a",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.md": "9b991aafbb0db838a93937ec97f67aa95ca6e6449abdcd290c6e801bf1d50744",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.zh.md": "a644cb1962f7b53583125eab9ed29ba86a5b122fbadfbd409b9b081022affe1d",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.i18n.yaml": "e12dd65acecff5646c80b525633a8f46ee3bb1731a13705c6202b8889f53d800"
+  },
+  "problem": "OpenProcess, creation-time, wait and Toolhelp32 failures are collapsed into absent process identity or an empty table, authorizing terminal cleanup while a previously captured descendant survives.",
+  "causalNegative": {
+    "correctedSource": "windows-observation-causal-prior-source-negative.json",
+    "failures": 12,
+    "controlPassed": 1,
+    "actualPriorCompiledLoader": "windows-observation-prior-compiled-loader-negative.json",
+    "compiledFailure": "Missing expected rejection after the first4existing scenarios pass; the real TERM-resistant child survives the false cleanup acknowledgement.",
+    "workingTreeRollback": false
+  },
+  "repair": [
+    "Only OpenProcess ERROR_INVALID_PARAMETER denotes an absent process for its fixed valid access flags.",
+    "Unreadable exact identities and failed creation-time or wait queries throw Win32Error with the native API and captured code.",
+    "Failed Toolhelp32 enumeration throws; only ERROR_NO_MORE_FILES completes iteration.",
+    "Existing terminal ownership retains known identities, retryable cleanup and disposed-provider exit protection until a successful retry stops the descendant."
+  ],
+  "verification": {
+    "sourceUniqueTests": 86,
+    "sourceFiles": 4,
+    "unitTests": 85,
+    "existingPhysicalWindowsCasesSkippedOnMac": 2,
+    "loaderTestsIncludedIn86": 1,
+    "loaderTranscriptScenarios": 5,
+    "newWin32InputScenario": 1,
+    "actualHost": "macOS",
+    "actualLoaderProviderAndPty": true,
+    "win32ApiInputsSimulatedUsingRealPosixIdentities": true,
+    "physicalWindowsExecution": false,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledRuntimeNoTypeScriptLoader": true,
+    "compiledRepeatsSourceScenario": true,
+    "fullBuildGates": 8,
+    "checks": {
+      "windows-observation-measured-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:57:06.488923+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/vitest",
+          "run",
+          "--config",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T094655Z/windows-coverage.config.mjs",
+          "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts",
+          "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/windows-inspector.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T094655Z/windows-observation-measured-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:57:16.389553+00:00"
+      },
+      "windows-observation-source-loader": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:55:30.125674+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:55:34.017198+00:00"
+      },
+      "windows-observation-complete-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:58:45.345688+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:03:08.605589+00:00"
+      },
+      "windows-observation-compiled-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:05:05.923129+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "./node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:05:11.075945+00:00"
+      },
+      "windows-observation-compiled-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:05:05.933668+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "./node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:05:11.063765+00:00"
+      },
+      "windows-observation-final-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:10:15.471223+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:10:20.835407+00:00"
+      },
+      "windows-observation-typescript-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:01:50.686091+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "packages/subprocess/subprocess-local/src/windows-inspector.ts",
+          "packages/subprocess/subprocess-local/src/process-inspector.ts",
+          "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:02:12.143322+00:00"
+      },
+      "windows-observation-own-document-pairs": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:05:05.928044+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "packages/subprocess/subprocess-local/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:05:07.571924+00:00"
+      }
+    }
+  },
+  "coverage": {
+    "path": "packages/subprocess/subprocess-local/src/windows-inspector.ts",
+    "summary": {
+      "total": {
+        "lines": {
+          "total": 106,
+          "covered": 106,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 120,
+          "covered": 120,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 51,
+          "covered": 51,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/windows-inspector.ts": {
+        "lines": {
+          "total": 106,
+          "covered": 106,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 120,
+          "covered": 120,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 51,
+          "covered": 51,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "thresholdsLowered": false,
+    "privateConfig": "windows-coverage.config.mjs",
+    "measurementSelection": "The first standard invocation measured0files because the repository excludes the Windows module on non-Windows hosts. The private config removes only that exact exclusion and retains all100percent thresholds; only the second measured result is acceptance evidence."
+  },
+  "documentation": {
+    "aggregate": "windows-observation-documentation.json",
+    "passed": 19,
+    "failed": 1,
+    "remainingFailure": "Peer-owned deployment-topology Chinese pairing was changing during the check. Own3pairs pass.",
+    "updatedExistingNote": ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false
+  },
+  "fixtureCorrections": [
+    "A root-exited Win32 table includes the surviving orphan, so Process32Next failure is exercised.",
+    "Prior-source selection is applied to each Vitest project; an initial root-only alias did not replace the tested implementation and is not causal evidence.",
+    "The private older-source import explicitly maps its lazy dependency; the earlier import-only failure is not defect evidence.",
+    "Only owned PIDs may receive emulated taskkill. Negative cleanup independently stops every owned child before removing exit callbacks."
+  ],
+  "limits": [
+    "Physical Windows native API/PTY acceptance remains open; this is no whole-platform claim.",
+    "This covers known identities and observation failure, not complete discovery of unobserved or escaped descendants.",
+    "Native command deadlines and the remaining allocation consumers remain under review.",
+    "All12original business domains and B04/B25remain open.",
+    "Real paid model success and public push remain human-deferred."
+  ]
+}

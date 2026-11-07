@@ -39,6 +39,8 @@ A run surface can answer a pending host request — approving it, optionally cov
 
 Loading is idempotent: asking to load a revision this page already runs changes nothing, a newer revision replaces the loaded one, and the same revision after a retract loads afresh. Operations on a definition serialize. A refresh starts clean by design — the host still holds the definition, this page does not run it until asked again.
 
+Runners, approvals and Host calls are isolated by Runtime. Browser module, view and theme contribution keys add a Runtime prefix while Host Plugin and Run IDs remain unchanged. Dynamic plugins read Remote and Connection services from their captured Runtime through their own fiber. Inspect query IDs are scoped by Host; manifest publication and reconnects do not wait for another Runtime.
+
 -----
 
 <a id="understand-the-implementation"></a>

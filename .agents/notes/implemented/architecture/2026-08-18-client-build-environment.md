@@ -20,6 +20,8 @@ The `DSH_CLIENT_*` prefix itself declares that a value is public. Credentials, p
 
 The root build wrapper supplies one exact public environment to both bundlers. It derives `DSH_CLIENT_COMMIT_HASH` as the seven-character prefix of the source Git HEAD for every complete build; an explicit value supports build environments without repository metadata. `pnpm run build` otherwise inherits the caller's `DSH_CLIENT_*` values, while `pnpm run build:official` selects the repository's official artifact profile without shell-specific environment syntax and sets `DSH_CLIENT_BUILD_PROFILE=official` for deployment-specific business registrations. A successful complete build writes the exact public environment and a digest covering the Vite output and every dynamic client bundle. Partial build commands do not replace that record.
 
+The modules package’s Node build substitutes only its exact `process.env.DSH_CLIENT_COMMIT_HASH` read, so the Host boot graph identifies the built release even when its launch environment omits or changes that value. An unversioned local build publishes the package version alone. Other Node environment reads remain runtime configuration; the browser’s empty `process.env` substitution must not apply to this Node artifact. TypeScript source launches continue to read their launch environment.
+
 ## Alternatives considered
 
 **Replace values only in Vite.** A dynamic plugin's `lib/client.js` is loaded as an independent script and never enters Vite's module graph, so the expression would remain in a browser that has no `process`.

@@ -73,7 +73,7 @@ describe('CI workflow', () => {
     expect(consumer.services).toMatchObject({
       'execution-postgres': {
         image: "${{ needs.pr-scope.outputs.gateway_mode == 'full' && 'postgres:16' || '' }}",
-        env: { POSTGRES_USER: 'hgw', POSTGRES_PASSWORD: 'hgw', POSTGRES_DB: 'hgw_execution' },
+        env: { POSTGRES_USER: 'hgw', POSTGRES_PASSWORD: 'hgw', POSTGRES_DB: 'hgw_execution_test' },
         ports: ['5432/tcp'],
       },
     })
@@ -88,9 +88,29 @@ describe('CI workflow', () => {
     expect(steps[execution]).toMatchObject({
       if: "needs.pr-scope.outputs.gateway_mode == 'full'",
       run: 'pnpm run test:gateway:execution',
-      env: { HGW_TEST_DATABASE_URL: "postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution" },
+      env: { HGW_TEST_DATABASE_URL: "postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution_test" },
     })
     expect(steps[execution]?.['continue-on-error']).toBeUndefined()
+    const consumers = steps.findIndex(step => step.run === 'pnpm run check:ci:consumers:scoped')
+    const web = steps.findIndex(step => step.name === 'Test compiled Gateway and Web lifecycle')
+    expect(web).toBeGreaterThan(consumers)
+    expect(steps[web]).toMatchObject({
+      if: "needs.pr-scope.outputs.gateway_mode == 'full'",
+      run: 'npm --prefix gateway run test:built-web-assembly\nnode gateway/tests/run-built-node-agent.mjs\n',
+      env: { HGW_TEST_DATABASE_URL: "postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution_test" },
+    })
+    expect(steps[web]?.['continue-on-error']).toBeUndefined()
+    const control = steps.findIndex(step => step.name === 'Test compiled Gateway control ownership')
+    expect(control).toBeGreaterThan(web)
+    expect(steps[control]).toMatchObject({
+      if: "needs.pr-scope.outputs.gateway_mode == 'full'",
+      run: 'node gateway/tests/run-built-local-supervision.mjs\n'
+        + 'node gateway/tests/run-built-systemd-control.mjs\n'
+        + 'node gateway/tests/fixtures/node-configuration-health.mjs lib\n'
+        + 'node gateway/tests/fixtures/local-boot-identity.mjs lib\n'
+        + 'node gateway/tests/fixtures/runtime-readiness-lifecycle.mjs lib\n',
+    })
+    expect(steps[control]?.['continue-on-error']).toBeUndefined()
     expect(steps[record]).toMatchObject({
       if: "always() && needs.pr-scope.outputs.gateway_mode == 'full'",
       run: 'node scripts/gate-evidence.ts',
@@ -106,6 +126,7 @@ describe('CI workflow', () => {
     const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> }
     expect(manifest.scripts['test:gateway:execution']).toBe(
       'node -e "if (!process.env.HGW_TEST_DATABASE_URL) throw new Error(\'HGW_TEST_DATABASE_URL must select a disposable test database\')"'
+      + ' && npm --prefix gateway run test:built-resource-admission'
       + ' && vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts --retry=0',
     )
   })
@@ -173,7 +194,9 @@ describe('CI workflow', () => {
     expect(windowsNative.if).toContain("github.event_name == 'schedule'")
     expect(windowsNative.if).toContain("github.ref == 'refs/heads/master'")
     expect(windowsNative.if).toContain("needs.pr-scope.outputs.proof_native_windows == 'true'")
-    expect(windowsNative.needs).toBe('pr-scope')
+    expect(windowsNative.needs).toEqual(['pr-scope', 'node-24'])
+    expect(windowsNative.if).toContain("needs.node-24.result != 'failure'")
+    expect(windowsNative.if).toContain("needs.node-24.result != 'cancelled'")
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })
@@ -685,10 +708,10 @@ describe('CI workflow', () => {
     expect(aggregate.needs).toContain('node-24-bench')
   })
 
-  it('bounds the complete benchmark job to fifteen minutes', () => {
+  it('bounds the complete benchmark job to twenty minutes', () => {
     const benchmark = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-24-bench')
 
-    expect(benchmark['timeout-minutes']).toBe(15)
+    expect(benchmark['timeout-minutes']).toBe(20)
     expect(benchmark.steps).toContainEqual({
       name: 'Run performance benchmarks',
       env: { DSH_GATE_VERBOSE: '1' },
@@ -699,7 +722,7 @@ describe('CI workflow', () => {
   it('always restores the hosted benchmark pnpm cache', () => {
     const benchmark = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-24-bench')
     if (!Array.isArray(benchmark.steps)) throw new TypeError('benchmark job must define steps')
-    const caches = benchmark.steps.filter(step => isRecord(step) && step.uses === 'actions/cache/restore@v4')
+    const caches = benchmark.steps.filter(step => isRecord(step) && step.uses === 'actions/cache/restore@v6.1.0')
 
     expect(caches).toHaveLength(1)
     expect(caches[0]).not.toHaveProperty('if')

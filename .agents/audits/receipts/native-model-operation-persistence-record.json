@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-persistence-record",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/persistence-changes.ts --record 2026-10-24-prepared-model-operations --decision same-version --prose .agents/audits/.local/native-model-operation-prose.json",
+  "startedAt": "2026-10-24T07:18:56.116974+00:00",
+  "seconds": 10.844,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6309e4be7142e47d47c15386c8fb023d090853a59f6fe0378120a3c5a6ca856d",
+  "inputsAfter": "6309e4be7142e47d47c15386c8fb023d090853a59f6fe0378120a3c5a6ca856d",
+  "postgresToolDirectory": null,
+  "outputSha256": "ed2adb05cd5732405d733763c6cc2dd84f0baf5eb4417af5ffb00414a0a25a1c",
+  "outputTail": "Created docs/persistence-changes/2026-10-24-prepared-model-operations.md; schema artifacts and bilingual pairing are current.\n"
+}

@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-02T18:03:43.223045+00:00",
+  "status": "named_current_equal_user_project_round_robin_durable_owner_and_native_pressure_cases_verified",
+  "passedCases": 64,
+  "failedCases": 0,
+  "skippedCases": 0,
+  "files": [
+    {
+      "path": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/node-resource-budget-postgres.spec.ts",
+      "passed": 56,
+      "skipped": 0
+    },
+    {
+      "path": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/node-resource-pressure-native.spec.ts",
+      "passed": 1,
+      "skipped": 0
+    },
+    {
+      "path": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/node-resource-pressure.spec.ts",
+      "passed": 7,
+      "skipped": 0
+    }
+  ],
+  "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T174027Z/node-resource-fairness-and-pressure-current.json",
+  "sourceSha256": {
+    "gateway/src/node-resource-budget.ts": "5390c1f1c573b7a9bb75c8d1091bdcf738154012fc009ac648b51cee5d1108c2",
+    "gateway/src/node-resource-pressure.ts": "b8da1a48e0de850485dfcafbab1cc0e8004a147926052ced9200968f029ad051"
+  },
+  "productionWrites": false,
+  "wholeProjectComplete": false,
+  "limitations": [
+    "These named local/native/PostgreSQL scenarios do not replace every computer, operating system, resource consumer or production acceptance path.",
+    "Review policy refresh across a surviving Runtime and deployment changes before declaring all resource settings behavior complete."
+  ]
+}

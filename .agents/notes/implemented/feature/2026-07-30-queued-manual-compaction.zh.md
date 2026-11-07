@@ -20,6 +20,8 @@ Status: implemented
 
 `@deepseek-ai/dsh-command-compact` 通过 `ctx.commands` 注册一个无参数、面向用户的命令。它调用第三个抽象 `CompactionEngine` 操作 `compactNow(agent, signal)`，并把封闭的 `ManualCompactionError` 分类体系（`busy | changed | summary | commit | persistence`）映射为直接 UI 结果。`command/run` 和 `command/done` 保留命令生命周期，同时不进入模型历史，也不消耗模型循环轮次。
 
+手动压缩是一项新的用户操作：历史贡献者限制其执行，但不决定发起者。命令在调用引擎前携带确切的命令输入进入 `ExecutionAuthority.runRequest()`，因此授权、资源许可与摘要用量在异步摘要期间始终保留当前调用者。托管部署不能省略必需的授权服务。授权结束后、进入引擎前会重新检查取消与提供者身份；独立本地组合可以直接调用引擎。
+
 命令插件会独立跟踪每个实际处理器 promise，不依赖命令执行器的中止感知等待。其复合生命周期 effect 先注销 `/compact`，再异步等待所有已开始的处理器结算，因此根级 teardown 只有在后端的闭合与 flush 工作结算后才会完全停稳。
 
 该 seam 的 `ManualCompactAgentContext` 只在压缩已需使用的会话与路由事实之上增加 `runMaintenance()`。保留、平衡、摘要、标记排序、替换与持久性仍由后端负责。

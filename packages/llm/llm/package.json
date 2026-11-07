@@ -47,9 +47,11 @@
     "./discovery": {
       "types": "./lib/types/discovery.d.ts",
       "default": "./lib/types/discovery.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts",
@@ -60,7 +62,9 @@
   ],
   "license": "Apache-2.0",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:~"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*",
+    "@deepseek-ai/dsh-model-access": "workspace:*"
   },
   "dependencies": {
     "@deepseek-ai/dsh-util-crypto": "workspace:*",
@@ -73,6 +77,8 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-attachment": "workspace:*",
-    "@deepseek-ai/cordis": "workspace:~"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*",
+    "@deepseek-ai/dsh-model-access": "workspace:*"
   }
 }

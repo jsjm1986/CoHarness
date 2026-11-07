@@ -1,4 +1,7 @@
 import { SettingsDescribeMirror } from '../../../packages/client/ui-settings/src/client/settings-mirror.ts'
+import type { SettingsDescribeFace } from '../../../packages/client/ui-settings/src/client/settings-mirror.ts'
+import { ModelsSettingsStore } from '../../../packages/client/ui-settings-models/src/client/store.ts'
+import type { SettingsSchemaOperations } from '../../../packages/client/ui-settings-models/src/client/schema-operations.ts'
 import {
   AdminRequestError,
   describeOrganizationCredentials,
@@ -86,12 +89,13 @@ function modelRows(profile: Record<string, unknown>): Array<{ id: string; name: 
   return rows
 }
 
-function settingsFailure(
+async function settingsFailure(
   error: unknown,
   expectedRevision: number | undefined,
-): Promise<RpcEnvelope<never>> | RpcEnvelope<never> {
-  if (error instanceof AdminRequestError && error.status === 409 && error.message === 'settings-conflict') {
-    return describeOrganizationModelSettings().then((current) => rejected<never>(
+  readSettings: () => Promise<OrganizationModelSettingsView>,
+): Promise<RpcEnvelope<never>> {
+  if (error instanceof AdminRequestError && error.status === 409 && error.code === 'settings-conflict') {
+    return Promise.resolve().then(readSettings).then((current) => rejected<never>(
       'settings-conflict',
       error.message,
       {
@@ -108,18 +112,42 @@ function settingsFailure(
   return rejected<never>('settings-rejected', messageOf(error), { ns: 'llm-pi-ai' })
 }
 
-/** Optional notification after a successful organization model write. */
+/** Page lifetime and successful-write notification for one organization editor. */
 export interface OrganizationModelsApiOptions {
+  /** Called after a successful write; omission sends no notification. */
   onChanged?: () => void
+  /** Page-owned lifetime; omission leaves pending reads uncancelled by a page owner. */
+  signal?: AbortSignal
 }
 
-/** REST-backed wire facade consumed by the shared Models settings plugin. */
+/**
+ * REST facade sharing only pending settings reads; writes and settlement release the shared slot.
+ * @param options - optional page lifetime and successful-write notification.
+ * @returns independent readers sharing this facade's pending settings request.
+ */
 export function createOrganizationModelsApi(options: OrganizationModelsApiOptions = {}) {
+  let settingsRead: Promise<OrganizationModelSettingsView> | undefined
+  const readSettings = (): Promise<OrganizationModelSettingsView> => {
+    options.signal?.throwIfAborted()
+    if (settingsRead !== undefined) return settingsRead
+    const reading = describeOrganizationModelSettings(options.signal).then(view => {
+      options.signal?.throwIfAborted()
+      return view
+    })
+    settingsRead = reading
+    const release = (): void => { if (settingsRead === reading) settingsRead = undefined }
+    void reading.then(release, release)
+    return reading
+  }
   return {
+    /** Begin a fresh page-read round without cancelling earlier consumers. */
+    beginRead(): void { settingsRead = undefined },
     settings: {
       async describe() {
         try {
-          return accepted(await describeOrganizationModelSettings())
+          const view = await readSettings()
+          options.signal?.throwIfAborted()
+          return accepted(view)
         } catch (error) {
           return rejected('internal', messageOf(error), {})
         }
@@ -132,41 +160,53 @@ export function createOrganizationModelsApi(options: OrganizationModelsApiOption
         if (payload.ns !== 'llm-pi-ai') {
           return rejected('settings-not-exposed', `settings namespace ${payload.ns} is not exposed`, { ns: payload.ns })
         }
+        settingsRead = undefined
         try {
           const view = await mutateOrganizationModelSettings({
             ops: payload.ops,
             ...payload.expectedRevision === undefined ? {} : { expectedRevision: payload.expectedRevision },
           })
+          settingsRead = undefined
           options.onChanged?.()
           return accepted(namespaceOf(view))
         } catch (error) {
-          return await settingsFailure(error, payload.expectedRevision)
+          settingsRead = undefined
+          return await settingsFailure(error, payload.expectedRevision, readSettings)
         }
       },
     },
     credentials: {
       async describe(payload: { refs: string[] }) {
         try {
-          return accepted(await describeOrganizationCredentials(payload.refs))
+          options.signal?.throwIfAborted()
+          const view = await describeOrganizationCredentials(payload.refs, options.signal)
+          options.signal?.throwIfAborted()
+          return accepted(view)
         } catch (error) {
           return rejected('internal', messageOf(error), {})
         }
       },
       async set(payload: { ref: string; value: string }) {
+        settingsRead = undefined
         try {
           await setOrganizationCredential(payload.ref, payload.value)
+          settingsRead = undefined
           options.onChanged?.()
           return accepted({})
         } catch (error) {
+          settingsRead = undefined
           return rejected('credential-rejected', messageOf(error), { ref: payload.ref })
         }
       },
       async unset(payload: { ref: string }) {
+        settingsRead = undefined
         try {
           await unsetOrganizationCredential(payload.ref)
+          settingsRead = undefined
           options.onChanged?.()
           return accepted({})
         } catch (error) {
+          settingsRead = undefined
           return rejected('credential-rejected', messageOf(error), { ref: payload.ref })
         }
       },
@@ -175,9 +215,10 @@ export function createOrganizationModelsApi(options: OrganizationModelsApiOption
       async providers() {
         try {
           const [view, rows] = await Promise.all([
-            describeOrganizationModelSettings(),
-            listModelProviders(),
+            readSettings(),
+            listModelProviders(options.signal),
           ])
+          options.signal?.throwIfAborted()
           const active = new Map(rows
             .filter(row => row.source === 'managed')
             .map(row => [row.provider, row.status === 'enabled']))
@@ -199,7 +240,9 @@ export function createOrganizationModelsApi(options: OrganizationModelsApiOption
       },
       async models() {
         try {
-          const profiles = profilesOf(await describeOrganizationModelSettings())
+          const view = await readSettings()
+          options.signal?.throwIfAborted()
+          const profiles = profilesOf(view)
           return accepted({
             groups: Object.entries(profiles).map(([provider, profile]) => ({
               id: provider,
@@ -229,8 +272,11 @@ export function createOrganizationModelsApi(options: OrganizationModelsApiOption
           )
         }
         try {
+          options.signal?.throwIfAborted()
           const { settingsNs: _settingsNs, ...request } = payload
-          return accepted(await discoverOrganizationModels(request))
+          const view = await discoverOrganizationModels(request, options.signal)
+          options.signal?.throwIfAborted()
+          return accepted(view)
         } catch (error) {
           return rejected<never>(
             'model-discovery-failed',
@@ -245,6 +291,28 @@ export function createOrganizationModelsApi(options: OrganizationModelsApiOption
 
 /** Structural facade type used by the admin editor wrapper and its tests. */
 export type OrganizationModelsApi = ReturnType<typeof createOrganizationModelsApi>
+
+/** Organization page reads keep each explicit refresh independent of an earlier pending read. */
+export class OrganizationModelsStore extends ModelsSettingsStore {
+  /**
+   * @param rest - facade owned by the mounted organization editor.
+   * @param schema - synchronous schema operations used to build rows.
+   * @param describeFace - existing settings mirror, including its queued refresh semantics.
+   */
+  constructor(
+    private readonly rest: OrganizationModelsApi,
+    schema: SettingsSchemaOperations,
+    describeFace: SettingsDescribeFace,
+  ) {
+    super(rest as never, schema, describeFace)
+  }
+
+  /** @returns settlement after the latest refresh publishes its ready or error snapshot. */
+  override load(): Promise<void> {
+    this.rest.beginRead()
+    return super.load()
+  }
+}
 
 /**
  * Settings mirror plus folded facade pair for the organization editor.

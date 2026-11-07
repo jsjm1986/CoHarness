@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-focused-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-25T15:17:22.499115+00:00",
+  "seconds": 3.261,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "93ab95681197b57cb5e02f9fc00abddaf891085666318d3b347185f5f6bf1873",
+  "inputsAfter": "93ab95681197b57cb5e02f9fc00abddaf891085666318d3b347185f5f6bf1873",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

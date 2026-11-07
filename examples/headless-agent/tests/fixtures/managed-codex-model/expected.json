@@ -1,0 +1,20 @@
+{
+  "finalResponse": "PARENT_CODEX_DONE",
+  "requests": [
+    { "provider": "parent-responses", "model": "codex-fixture", "protocol": "openai-responses", "bodyModel": "codex-fixture" },
+    { "provider": "parent-responses", "model": "codex-fixture", "protocol": "openai-responses", "bodyModel": "codex-fixture" }
+  ],
+  "completion": {
+    "nativeRequests": 2,
+    "persistedBeforeHttp": 2,
+    "usage": [
+      { "inputTokens": 8, "outputTokens": 5, "totalTokens": 15, "cacheReadTokens": 2, "reasoningTokens": 0 },
+      { "inputTokens": 8, "outputTokens": 1, "totalTokens": 11, "cacheReadTokens": 2, "reasoningTokens": 0 }
+    ],
+    "modelPermits": 4,
+    "processPermits": 1,
+    "allPermitsSettled": true,
+    "allOwnersMatch": true,
+    "bodyTimeouts": [504]
+  }
+}

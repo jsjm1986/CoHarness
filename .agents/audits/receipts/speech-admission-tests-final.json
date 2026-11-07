@@ -1,0 +1,13 @@
+{
+  "name": "speech-admission-tests-final",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/speech-to-text-sensevoice/tests --retry=0",
+  "startedAt": "2026-10-23T13:13:47.061019+00:00",
+  "seconds": 11.235,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1251d6ad967930c8b9eb452b4a75c60f47a88d10c3a8bc9743e4cce6fec6409e",
+  "inputsAfter": "1251d6ad967930c8b9eb452b4a75c60f47a88d10c3a8bc9743e4cce6fec6409e",
+  "outputSha256": "3cf8b2a8759695fda2d6d94c4c3f8a9c8fb67c6ee27ffb8f0a3acdd6859b0cb4",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  10 passed (10)\n      Tests  104 passed (104)\n   Start at  21:13:51\n   Duration  6.61s (transform 6.44s, setup 988ms, import 7.89s, tests 6.26s, environment 2ms)\n\n"
+}

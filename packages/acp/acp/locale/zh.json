@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "ACP 服务",
+    "description": "仅自动化的 Agent Client Protocol 服务，通过 JSON-RPC stdio 驱动智能体。"
+  }
+}

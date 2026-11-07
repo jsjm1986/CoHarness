@@ -1,0 +1,14 @@
+{
+  "name": "sdk-configured-reasoning-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts -t 'forwards the configured reasoning effort' --retry=0",
+  "startedAt": "2026-10-24T09:55:49.596715+00:00",
+  "seconds": 6.062,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "383be913ce1c3fa621f137972fa54d3d8a637473c0cabcb8f1b27a9c31b4124c",
+  "inputsAfter": "383be913ce1c3fa621f137972fa54d3d8a637473c0cabcb8f1b27a9c31b4124c",
+  "postgresToolDirectory": null,
+  "outputSha256": "8a04e29e5673d3f25cd65f91179cade138fd38190d06424ee1f97aa88e8890d3",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts (41 tests | 1 failed | 39 skipped) 158ms\n     × forwards the configured reasoning effort with request override undefined 88ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts > dsh-subagent-dsh-sdk provider > forwards the configured reasoning effort with request override undefined\nAssertionError: expected [ { …(3) } ] to deeply equal [ ObjectContaining{…} ]\n\n- Expected\n+ Received\n\n  [\n    {\n-     \"reasoningEffort\": \"high\",\n+     \"cwd\": \"/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\",\n+     \"model\": \"fake-model\",\n+     \"provider\": \"fake-provider\",\n    },\n  ]\n\n ❯ packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts:132:21\n    130|       await run.result\n    131|       const lines = readFileSync(record, 'utf8').trim().split('\\n').ma…\n    132|       expect(lines).toEqual([expect.objectContaining({ reasoningEffort…\n       |                     ^\n    133|     } finally { await run.dispose() }\n    134|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed | 39 skipped (41)\n   Start at  17:55:53\n   Duration  1.93s (transform 1.33s, setup 41ms, import 1.63s, tests 158ms, environment 0ms)\n\n"
+}

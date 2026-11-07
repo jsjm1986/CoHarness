@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-25T21:44:44.772471+00:00",
+  "seconds": 3.314,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9552e79e098b31feb8618163265e93a3d9adecfe1339ae9c80f286ff9d1fa286",
+  "inputsAfter": "9552e79e098b31feb8618163265e93a3d9adecfe1339ae9c80f286ff9d1fa286",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

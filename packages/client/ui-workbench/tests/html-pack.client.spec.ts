@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /** Static dependency discovery has an injected file reader and never exposes it to the iframe. */
 import { describe, expect, it, vi } from 'vitest'
-import { packHtml } from '../src/client/contract/html/pack.ts'
+import { MAX_ASSET_BYTES, MAX_TOTAL_BYTES, packHtml } from '../src/client/contract/html/pack.ts'
 import type { ReadHtmlRelative } from '../src/client/contract/html/pack.ts'
 
 const source = '<link rel="stylesheet" href="./main.css"><script src="./main.js"></script>'
@@ -13,7 +13,9 @@ describe('packHtml', () => {
     const read = vi.fn<ReadHtmlRelative>().mockResolvedValue(utf8('/* 你好 */'))
     const signal = new AbortController().signal
     const bundle = await packHtml(utf8(source + '<script defer src="./main.js"></script>'), read, signal)
-    expect(read.mock.calls).toEqual([['./main.css', signal], ['./main.js', signal]])
+    expect(read.mock.calls.map(([reference]) => reference)).toEqual(['./main.css', './main.js'])
+    expect(read.mock.calls[0]![1]).toBe(read.mock.calls[1]![1])
+    expect(signal.aborted).toBe(false)
     expect(bundle.assets.map(asset => [asset.kind, asset.reference])).toEqual([['stylesheet', './main.css'], ['script', './main.js']])
     expect(document.querySelector('script,link')).toBeNull()
   })
@@ -24,7 +26,7 @@ describe('packHtml', () => {
     const signal = new AbortController().signal
     const html = '<img src="logo.png"><img src="shots/cover.JPEG"><img src="logo.png"><img src="icon.svg?v=2">'
     const bundle = await packHtml(utf8(html), read, signal)
-    expect(read.mock.calls).toEqual([['logo.png', signal], ['shots/cover.JPEG', signal], ['icon.svg?v=2', signal]])
+    expect(read.mock.calls.map(([reference]) => reference)).toEqual(['logo.png', 'shots/cover.JPEG', 'icon.svg?v=2'])
     expect(bundle.assets.map(asset => [asset.kind, asset.reference, asset.type])).toEqual([
       ['image', 'logo.png', 'image/png'],
       ['image', 'shots/cover.JPEG', 'image/jpeg'],
@@ -94,11 +96,16 @@ describe('packHtml', () => {
     const aggregate = Array.from({ length: 8 }, (_, index) => `<script src="${index}.js"></script>`).join('')
     const read = vi.fn<ReadHtmlRelative>().mockResolvedValue(new Uint8Array(4 * mebibyte))
     await expect(packHtml(utf8(aggregate), read, new AbortController().signal)).rejects.toThrow('total byte limit')
+    expect(read).toHaveBeenCalledTimes(8)
 
+    read.mockClear().mockResolvedValue(new Uint8Array())
+    const accepted = Array.from({ length: 64 }, (_, index) => `<script src="${index}.js"></script>`).join('')
+    expect((await packHtml(utf8(accepted + '<script src="0.js"></script>'), read, new AbortController().signal)).assets).toHaveLength(64)
+    expect(read).toHaveBeenCalledTimes(64)
     const count = Array.from({ length: 65 }, (_, index) => `<script src="${index}.js"></script>`).join('')
-    read.mockResolvedValue(new Uint8Array())
+    read.mockClear().mockResolvedValue(new Uint8Array())
     await expect(packHtml(utf8(count), read, new AbortController().signal)).rejects.toThrow('asset count limit')
-    expect(read).toHaveBeenCalledTimes(8 + 64)
+    expect(read).not.toHaveBeenCalled()
   })
 
   it('propagates read errors and rejects malformed resource text instead of returning a partial package', async () => {
@@ -113,12 +120,62 @@ describe('packHtml', () => {
     const read = vi.fn<ReadHtmlRelative>().mockReturnValue(pending.promise)
     const controller = new AbortController()
     const packing = packHtml(utf8(source), read, controller.signal)
-    expect(read).toHaveBeenCalledOnce()
+    expect(read).toHaveBeenCalledTimes(2)
     const rejected = expect(packing).rejects.toMatchObject({ name: 'AbortError' })
     controller.abort()
     pending.resolve(utf8('body{}'))
     await rejected
     await expect(packHtml(utf8(source), read, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads independent assets within the remaining byte reservation and retains document order', async () => {
+    const references = Array.from({ length: 8 }, (_, index) => `${index}.js`)
+    const html = utf8(references.map(reference => `<script src="${reference}"></script>`).join(''))
+    const pending = references.map(() => Promise.withResolvers<Uint8Array<ArrayBuffer>>())
+    const read = vi.fn<ReadHtmlRelative>(reference => pending[references.indexOf(reference)]!.promise)
+    const packing = packHtml(html, read, new AbortController().signal)
+    try {
+      expect(read).toHaveBeenCalledTimes(7)
+      expect(html.byteLength + read.mock.calls.length * MAX_ASSET_BYTES).toBeLessThanOrEqual(MAX_TOTAL_BYTES)
+      for (let index = 6; index > 0; index--) pending[index]!.resolve(utf8(`/* ${index} */`))
+      pending[0]!.resolve(utf8('/* 0 */'))
+      await vi.waitFor(() => { expect(read).toHaveBeenCalledTimes(8) })
+      pending[7]!.resolve(utf8('/* 7 */'))
+      const bundle = await packing
+      expect(bundle.assets.map(asset => asset.reference)).toEqual(references)
+      expect(bundle.assets.map(asset => new TextDecoder().decode(asset.data))).toEqual(references.map((_, index) => `/* ${index} */`))
+    } finally {
+      for (const item of pending) item.resolve(utf8(''))
+      await packing
+    }
+  })
+
+  it('cancels sibling reads and drains late completions before reporting a read failure', async () => {
+    const references = Array.from({ length: 9 }, (_, index) => `${index}.js`)
+    const pending = references.map(() => Promise.withResolvers<Uint8Array<ArrayBuffer>>())
+    const read = vi.fn<ReadHtmlRelative>(reference => pending[references.indexOf(reference)]!.promise)
+    const parent = new AbortController()
+    const packing = packHtml(utf8(references.map(reference => `<script src="${reference}"></script>`).join('')), read, parent.signal)
+    const failure = new Error('permission removed')
+    let settled = false
+    const rejected = expect(packing.finally(() => { settled = true })).rejects.toBe(failure)
+    try {
+      expect(read).toHaveBeenCalledTimes(7)
+      pending[2]!.reject(failure)
+      await vi.waitFor(() => { expect(read.mock.calls.every(([, signal]) => signal.aborted)).toBe(true) })
+      expect(parent.signal.aborted).toBe(false)
+      expect(settled).toBe(false)
+    } finally {
+      for (const item of pending) item.resolve(utf8(''))
+      await rejected
+    }
+    expect(read).toHaveBeenCalledTimes(7)
+  })
+
+  it('stops admission when a reader throws before returning its promise', async () => {
+    const read = vi.fn<ReadHtmlRelative>(() => { throw new Error('read unavailable') })
+    await expect(packHtml(utf8(source), read, new AbortController().signal)).rejects.toThrow('read unavailable')
     expect(read).toHaveBeenCalledOnce()
   })
 })

@@ -122,6 +122,8 @@ export interface PluginAddActionsProps {
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /** Captured Host identity and environment navigation beside the Plugins page title. */
+    'plugins.context': { kind: 'list'; scope: 'root'; owner: Record<never, never> }
     /** Additional MenuItemButton rows after installation: 72px high, with a title and a description capped at two lines. */
     'plugins.add.actions': { kind: 'list'; scope: 'root'; owner: PluginAddActionsProps }
     /**
@@ -133,13 +135,21 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Optional guidance after the user enables a bundle from the list, keyed by npm package name. */
     'plugins.bundle.activation': { kind: 'keyed'; scope: 'root'; owner: PluginActivationOwnerProps }
     /**
-     * One official plugin the Plugins page lists in its Official group after
-     * the official bundles: `label` is the card's title and `order` its place.
-     * The page renders the entry as the card's one-liner (`view: 'summary'`)
-     * and, once the card is opened, as the body of the plugin's own page
+     * One official plugin the Plugins page lists in its built-in features
+     * group: `label` is the card's title and `order` its place. The page
+     * renders the entry as the card's one-liner (`view: 'summary'`) and, once
+     * the card is opened, as the body of the plugin's own page
      * (`view: 'page'`). OCCUPIED by the official settings pages, one companion
      * package per host-plane namespace; a bundle's configuration belongs in
      * `plugins.bundle.config` or `plugins.row.config` instead.
+     *
+     * An entry binds the cordis row it configures by naming the row's patch id
+     * as its entry `id`: the card then carries the row's live state and its
+     * switch, and stays listed while the row is off so the switch can turn it
+     * back on. Entries that share a display label merge into one card bound
+     * to the group's live member — the idiom for a row whose id changes with
+     * the platform. An `id` no patch row owns stays a plain configuration
+     * card, shown only while the Host serves a settings namespace of that id.
      */
     'plugins.item': { kind: 'list'; scope: 'root'; owner: PluginConfigViewProps }
     /**

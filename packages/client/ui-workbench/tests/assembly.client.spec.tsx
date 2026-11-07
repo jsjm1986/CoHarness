@@ -36,11 +36,14 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('assembled workbench', () => {
   it('binds two independent composers and preserves the first pane on focus changes', async () => {
     const runtime = await SlotTestRuntime.create()
+    runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
     runtime.provide('connection', { api: { settings: {} }, isLoopback: false, hostDescription: createSnapshotStore({ executionAuthorityRequired: false }) })
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
     runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
-    runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
+    runtime.provide('layout', {
+      openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn(), selectPanel: vi.fn(),
+    })
     runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
     runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
     runtime.provide('shortcuts', {
@@ -103,6 +106,7 @@ function SidebarFrame({ renderSlot }: PropsRenderSlots<'sidebar.workspaces' | 'm
 describe('assembled workbench sidebar panel', () => {
   it('renders the pane roster, actions, and display controls through the real slot chain', async () => {
     const runtime = await SlotTestRuntime.create()
+    runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
     const scope = stubSettingsScope()
     runtime.provide('connection', {
       api: { settings: {} },
@@ -112,7 +116,10 @@ describe('assembled workbench sidebar panel', () => {
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
     runtime.provide('settingsScope', { bind: () => scope.scope, developerTools: stubDeveloperTools().preference } as never)
-    runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
+    const selectPanel = vi.fn()
+    runtime.provide('layout', {
+      openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn(), selectPanel,
+    })
     runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
     runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
     runtime.provide('shortcuts', {
@@ -156,7 +163,7 @@ describe('assembled workbench sidebar panel', () => {
     viewport.add(B)
     scope.publish({
       status: 'ready', writable: true,
-      value: { chatFontSize: 16, chatContentWidth: 720, chatFullWidth: false },
+      value: { chatContentWidth: 720, chatFullWidth: false },
     } as never)
     const view = runtime.renderRoot()
     await waitFor(() => { expect(view.getByRole('region', { name: '工作台' })).toBeTruthy() })
@@ -166,20 +173,22 @@ describe('assembled workbench sidebar panel', () => {
     expect(beta.getAttribute('aria-current')).toBe('true')
     fireEvent.click(panel.getByRole('button', { name: /Alpha.*就绪.*个人空间 · Alpha/ }))
     expect(viewport.snapshot.getSnapshot().activePaneId).toBe(A)
+    expect(selectPanel).toHaveBeenLastCalledWith(null)
     // Equalize writes equal weights through the viewport capability.
     fireEvent.click(panel.getByRole('button', { name: '等宽' }))
     expect(viewport.snapshot.getSnapshot().paneRatios).toEqual([0.5, 0.5])
     // The display hole hosts the shared settings face's sidebar variant.
-    fireEvent.click(panel.getByRole('button', { name: '减小字号' }))
-    expect(scope.set).toHaveBeenCalledWith('chatFontSize', 15)
     fireEvent.click(panel.getByRole('button', { name: '宽松' }))
     expect(scope.set).toHaveBeenCalledWith('chatContentWidth', 960)
+    fireEvent.click(panel.getByRole('button', { name: '占满' }))
+    expect(scope.set).toHaveBeenCalledWith('chatFullWidth', true)
     // Add opens the shared picker store → the toolbar's picker dialog.
     fireEvent.click(panel.getByRole('button', { name: '添加对话' }))
     await waitFor(() => { expect(view.getByRole('dialog')).toBeTruthy() })
     fireEvent.click(view.getByRole('button', { name: '关闭选择器' }))
     // Exit restores the single-conversation surface and the session list.
     fireEvent.click(panel.getByRole('button', { name: '退出工作台' }))
+    expect(selectPanel).toHaveBeenLastCalledWith(null)
     await waitFor(() => { expect(viewport.snapshot.getSnapshot().mode).toBe('single') })
     await waitFor(() => { expect(view.queryByRole('region', { name: '工作台' })).toBeNull() })
     await runtime.dispose()

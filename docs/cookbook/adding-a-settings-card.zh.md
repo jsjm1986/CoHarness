@@ -2,7 +2,7 @@
 
 [English](adding-a-settings-card.md) | 中文
 
-插件如何把自己的配置放上 Web「插件」页。这条路径上没有任何一步需要改动本仓库：Host 服务每一个已注册的 settings 命名空间，而该页的「插件配置」分组以条目所编辑的命名空间为键，因此同时注册了两个半侧的插件会被自动配对。
+插件如何把自己的配置放上 Web「插件」页。这条路径上没有任何一步需要改动本仓库：Host 服务每一个已注册的 settings 命名空间，而该页的「内置功能」分组把每个 `plugins.item` id 配对到它命名的 Host 行或已服务命名空间，因此同时注册了两个半侧的插件会被自动配对。
 
 两个半侧住在同一个包里——Host 半侧在 `src/`，浏览器半侧在 `src/client/`，以 `./client` 导出并用 `dsh.client` 声明。[`packages/client/ui-theme`](../../packages/client/ui-theme) 是这种打包方式的现成例子；本页自带的条目在 [`packages/client/ui-settings-plugins`](../../packages/client/ui-settings-plugins)。
 
@@ -45,7 +45,7 @@ export function apply(ctx: Context, config: Config) {
 
 ## 2. 注册条目（浏览器半侧）
 
-条目以自己的命名空间为键注册进 `plugins.item`，并拥有页面标题之下的一切——控件与文案。页面在卡片上向条目请求 `view: 'summary'`、在条目自己的页面上请求 `view: 'page'`。它通过 `ctx.settingsScope` 读写，后者用读取时的 revision 为每次写入设栅：
+条目以一个稳定的 id 注册进 `plugins.item`，并拥有页面标题之下的一切——控件与文案。普通配置卡片命名它所编辑的 settings 命名空间；需要卡片携带行的实时状态与开关时，命名该功能运行所在的 cordis patch 行。页面在卡片上向条目请求 `view: 'summary'`、在条目自己的页面上请求 `view: 'page'`。它通过 `ctx.settingsScope` 读写，后者用读取时的 revision 为每次写入设栅：
 
 ```ts ignore-check
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
@@ -73,7 +73,7 @@ scope 快照携带表单所需的一切：解析后的 `value`、组装层 `base
 
 ## 3. 分组拿它做什么
 
-「插件配置」分组读取 Host 服务了哪些命名空间，只保留 id 恰为其中之一名的 `plugins.item` 条目。当 Host 服务了某条目的命名空间时它被渲染，否则被跳过，因此从未组装过 Host 半侧的部署不会留下该条目的任何痕迹。被服务却无人认领的命名空间什么都不渲染——归其他表面所有的那些命名空间（`ui-theme`、`permission`、`llm-*`）正是这样留在本分组之外的。
+「内置功能」分组把每个 `plugins.item` id 解析到 Host 的 running-profile 条目。id 命名 patch 行时绑定该行：卡片携带行的实时状态与开关，并在行关闭时保持列出，使开关能把它开回来；共享 `label` 的条目合并到组内活着的成员上。没有任何行认领的 id 只在它同时命名一个 Host 所服务的 settings 命名空间时保留，因此从未组装过 Host 半侧的部署不会留下该条目的任何痕迹。被服务却无人认领的命名空间什么都不渲染——归其他表面所有的那些命名空间（`ui-theme`、`permission`、`llm-*`）正是这样留在本分组之外的。
 
 条目遵循各自的注册 `order`。
 

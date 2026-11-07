@@ -1,0 +1,14 @@
+{
+  "name": "ordinary-model-dispatch-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm-pi-ai/src/adapter.ts packages/llm/llm-pi-ai/src/provider.ts packages/llm/llm-pi-ai/src/index.ts packages/llm/llm-pi-ai/tests/native-stream.spec.ts packages/llm/llm-deepseek/src/adapter.ts packages/llm/llm-deepseek/src/file-store.ts packages/llm/llm-deepseek/src/files-api.ts packages/llm/llm-deepseek/src/request-files.ts packages/llm/llm-deepseek/tests/search-operation.spec.ts packages/llm/llm-deepseek/tests/files-api.spec.ts packages/llm/llm-deepseek/tests/files.spec.ts packages/llm/llm-deepseek/tests/file-store.spec.ts examples/headless-agent/tests/ordinary-model-revocation.snapshot.ts",
+  "startedAt": "2026-10-25T05:27:18.135407+00:00",
+  "seconds": 3.739,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "inputsAfter": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

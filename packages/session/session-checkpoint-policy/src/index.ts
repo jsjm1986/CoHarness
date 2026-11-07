@@ -23,7 +23,7 @@ export const inject = ['llm', 'sessionPersistence', 'sessions', 'tools']
  *
  * @param ctx - plugin context that owns the session store.
  * @param session - live session named by the model request.
- * @param next - downstream `llm/stream` chain.
+ * @param next - downstream model or orchestration stream.
  * @returns a stream that checkpoints before requesting its first chunk.
  */
 function afterCheckpoint(
@@ -61,11 +61,13 @@ function abortedBeforeDispatchResult(): ToolExecutionResult {
  * @param ctx - plugin context that owns the listeners.
  */
 export function apply(ctx: Context): void {
-  ctx.on('llm/stream', (options, next): AsyncIterable<StreamChunk> => {
-    if (options.sessionId === undefined) return next()
-    const session = ctx.sessions.get(options.sessionId)
-    return session === undefined ? next() : afterCheckpoint(ctx, session, next)
-  })
+  for (const event of ['llm/stream', 'llm/orchestration'] as const) {
+    ctx.on(event, (options, next): AsyncIterable<StreamChunk> => {
+      if (options.sessionId === undefined) return next()
+      const session = ctx.sessions.get(options.sessionId)
+      return session === undefined ? next() : afterCheckpoint(ctx, session, next)
+    })
+  }
 
   ctx.on('tools/execute', async (exec, next): Promise<ToolExecutionResult> => {
     if (exec.agent === undefined || exec.parent !== undefined) return next()

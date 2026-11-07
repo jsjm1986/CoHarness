@@ -103,11 +103,10 @@ export function ReadBlock({
 }: ReadBlockProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const highlighting = useViewportHighlighting(rootRef, lang)
-  // The raw text the copy control writes and the highlighter tokenizes: the
-  // window's lines joined by newlines, without the file numbers or any chrome.
-  // Highlighting the whole window in one call (not line by line) keeps grammar
-  // context across lines — a multi-line string or comment stays one construct.
-  const raw = useMemo(() => lines.map(line => line.text).join('\n'), [lines])
+  // Grammar context includes the complete window, including collapsed lines.
+  // Plain and offscreen cards assemble that text only when the user copies it.
+  const raw = useMemo(() => highlighting ? lines.map(line => line.text).join('\n') : undefined,
+    [highlighting, lines])
   // Re-render when a lazy grammar finishes loading, so a read card that showed
   // plain text while its language's grammar imported picks up highlighting. The
   // snapshot value is opaque; only its change across renders drives the memo.
@@ -116,8 +115,8 @@ export function ReadBlock({
   // unknown/absent (or not-yet-loaded) language, when every line renders as
   // bare text.
   const highlighted = useMemo(
-    () => highlighting ? highlightLines(raw, lang) : undefined,
-    [highlighting, raw, lang, loaded],
+    () => raw === undefined ? undefined : highlightLines(raw, lang),
+    [raw, lang, loaded],
   )
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -127,12 +126,12 @@ export function ReadBlock({
     if (copied) return
     // The window's raw text, never the rendered tree: the gutter numbers and the
     // banner are chrome the file does not contain.
-    void writeClipboard(raw).then((ok) => {
+    void writeClipboard(raw ?? lines.map(line => line.text).join('\n')).then((ok) => {
       if (!ok) return
       setCopied(true)
       window.setTimeout(() => { setCopied(false) }, 1000)
     })
-  }, [copied, raw])
+  }, [copied, raw, lines])
 
   const onToggle = useCallback(() => { setExpanded(value => !value) }, [])
 
@@ -147,24 +146,24 @@ export function ReadBlock({
   const windowed = lines.length < totalLines
 
   /**
-   * Render a slice of the line array as gutter-numbered rows.
-   * @param slice - the lines to draw, each with its aligned run array.
+   * Render the visible range with its original source-line indexes.
+   * @param start - inclusive index of the first visible source line.
+   * @param end - exclusive index of the last visible source line.
    * @returns the row elements.
    */
-  const rows = (slice: readonly (readonly [ReadBlockLine, readonly HighlightSpan[] | undefined])[]) =>
-    slice.map(([line, spans]) => (
-      <div key={line.number} className={css.line}>
-        <span className={css.gutter} aria-hidden>{line.number}</span>
-        <span className={css.content}>{spans === undefined ? line.text : renderSpans(spans)}</span>
-      </div>
-    ))
+  const rows = (start: number, end: number) =>
+    lines.slice(start, end).map((line, offset) => {
+      const spans = highlighted?.[start + offset]
+      return (
+        <div key={line.number} className={css.line}>
+          <span className={css.gutter} aria-hidden>{line.number}</span>
+          <span className={css.content}>{spans === undefined ? line.text : renderSpans(spans)}</span>
+        </div>
+      )
+    })
 
-  // Pair each line with its aligned run array up front, so head/tail slicing
-  // keeps the two in step without re-indexing.
-  const paired = lines.map((line, index): readonly [ReadBlockLine, readonly HighlightSpan[] | undefined] =>
-    [line, highlighted?.[index]])
-
-  const gutterDigits = lines.reduce((digits, line) => Math.max(digits, String(line.number).length), 3)
+  const gutterDigits = useMemo(
+    () => lines.reduce((digits, line) => Math.max(digits, String(line.number).length), 3), [lines])
   const gutterStyle = { '--dsl-read-gutter': `${gutterDigits}ch` } as CSSProperties
 
   return (
@@ -179,9 +178,9 @@ export function ReadBlock({
         onCopy={lines.length > 0 ? onCopy : undefined} onWrap={() => { setWrapped(value => !value) }}
       />
       <div className={cardCss.body}>
-        {rows(capped ? paired.slice(0, headLines) : paired)}
+        {rows(0, capped ? headLines : lines.length)}
         <ExpandButton hidden={hidden} expanded={expanded} onToggle={onToggle} copy={copy} className={css.expand} />
-        {capped && rows(paired.slice(paired.length - tailLines))}
+        {capped && rows(lines.length - tailLines, lines.length)}
       </div>
     </div>
   )

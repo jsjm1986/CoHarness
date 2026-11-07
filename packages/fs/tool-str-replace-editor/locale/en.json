@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "File editor tool",
+    "description": "Model-facing view, create, literal replace, and line insert tool over the filesystem service"
+  }
+}

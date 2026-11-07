@@ -1,0 +1,14 @@
+{
+  "name": "trash-integrity-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/trash.ts packages/attachment/userdoc-local/tests/trash-integrity.spec.ts examples/headless-agent/tests/fixtures/userdoc-migration-driver.ts examples/headless-agent/tests/userdoc-migration.snapshot.ts",
+  "startedAt": "2026-10-24T04:43:08.864458+00:00",
+  "seconds": 3.88,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7bb03df0ae902ce2f3f2df5639cbab393e9001a0cf1835163ed8ba0ac2e3f781",
+  "inputsAfter": "4cd397b1c28f7356995c3320c1cab2f2ac1fdedec7e407ec0cbcd1207d19e5a4",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

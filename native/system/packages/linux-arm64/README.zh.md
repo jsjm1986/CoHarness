@@ -1,5 +1,5 @@
 ---
-description: "为 Linux arm64 提供预编译 Landlock 启动器和 POSIX flock addon。"
+description: "为 Linux arm64 提供预编译 Landlock 启动器，以及 POSIX 锁与目录扩展。"
 kind: "package-library"
 ---
 # @deepseek-ai/node-addon-system-linux-arm64

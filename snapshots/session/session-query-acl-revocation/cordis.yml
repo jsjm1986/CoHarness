@@ -1,0 +1,5 @@
+- insert:
+    - id: tool-session-query
+      name: '@deepseek-ai/dsh-tool-session-query'
+    - id: acl-revocation-fixture
+      name: ./acl-revocation.mjs

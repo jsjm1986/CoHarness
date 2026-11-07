@@ -64,7 +64,7 @@ async function setup(config: Config = {}) {
     writes.add(write)
   }
   const resolveExecutable = vi.spyOn(ctx.subprocess, 'resolveExecutable').mockResolvedValue(process.execPath)
-  const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(handle)
+  const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue(handle)
   onTestFinished(async () => {
     peer.close()
     control.destroy()
@@ -227,7 +227,7 @@ describe('persistent PTC host protocol', () => {
     const h = await setup()
     expect((await h.start(request, { type: 'other' })).error?.kind).toBe('protocol')
     const missing = await setup()
-    missing.spawn.mockReturnValue({ ...missing.handle, control: undefined })
+    missing.spawn.mockResolvedValue({ ...missing.handle, control: undefined })
     expect((await missing.start(request, NO_INITIAL_FRAME)).error?.message).toContain('did not supply')
   })
 
@@ -552,7 +552,7 @@ it.each([true, false])('classifies confined process spawn failure with runner ev
   const confine = vi.spyOn(h.ctx.sandbox, 'confine').mockResolvedValue({
     argv: [runner], enforcement: 'partial', denialSignatures: [], runnerFailureRules: [],
   })
-  h.spawn.mockImplementation(() => {
+  h.spawn.mockImplementation(async () => {
     throw Object.assign(new Error('spawn failed'), { code: 'ENOENT', path: runnerFailure ? runner : '/other', syscall: `spawn ${runner}` })
   })
   try {

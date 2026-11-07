@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.md
 document:
-  en: 7ff6529bb8e445f63343b1019ac520f56b19d5e4
-  zh: ba2bb4424416557b119accc7df14fab4c94ddebf
+  en: e5f7fbd5b2fa259eaf8d7132a1d64797ea7cd7db
+  zh: 44b625fc650e966915c871e4b28138e7088d1ba4
 /agent-note-adaptive-default-for-the-directory-picker-interaction:
   en: e02bced6761bd7fc
   zh: 53db8706ddd2f980
@@ -18,5 +18,5 @@ document:
   en: d8962ac06541bb79
   zh: 2ec79794da381516
 /agent-note-adaptive-default-for-the-directory-picker-interaction/consequences:
-  en: 28d2e70a641b1c35
-  zh: e659131f944d7c6e
+  en: e09e9c0d4646cc69
+  zh: 17f412a6de739ec5

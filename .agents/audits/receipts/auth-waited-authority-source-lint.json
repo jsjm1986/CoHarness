@@ -1,0 +1,14 @@
+{
+  "name": "auth-waited-authority-source-lint",
+  "cwd": "gateway",
+  "command": "npx oxlint --deny-warnings src/auth.ts src/postgres/auth-service.ts src/services.ts tests/auth.spec.ts tests/auth-postgres.spec.ts tests/runtime-resource-provider.spec.ts tests/runtime-resource-api.spec.ts",
+  "startedAt": "2026-10-24T01:56:28.275968+00:00",
+  "seconds": 2.758,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "930b748d29b9eabf377278f6909fd2c101fa3de0e0edba0850e8388c104bc85c",
+  "inputsAfter": "930b748d29b9eabf377278f6909fd2c101fa3de0e0edba0850e8388c104bc85c",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

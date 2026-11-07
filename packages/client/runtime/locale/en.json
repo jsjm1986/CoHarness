@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Client runtime",
+    "description": "Client core services: SlotRegistry, SessionRuntime, and the object layer"
+  }
+}

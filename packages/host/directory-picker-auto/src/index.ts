@@ -18,7 +18,7 @@ import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
 // the reads below.
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { launchedThroughSsh, launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
+import { launchedByGateway, launchedThroughSsh, launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { canExecute, hasLinuxChooserBinary } from './probe.ts'
 import type { DirectoryPickerBackendKind } from './resolve.ts'
 import { resolveDirectoryPickerBackend } from './resolve.ts'
@@ -70,11 +70,13 @@ export const SURFACE_PACKAGES: Record<DirectoryPickerBackendKind, string> = {
  * @param ctx - cordis context carrying the injected `webServer` and `loader`.
  */
 export async function apply(ctx: Context): Promise<void> {
+  const environment = launchEnvironmentOf(ctx)
   const backend = resolveDirectoryPickerBackend({
+    gatewayRuntime: launchedByGateway(environment),
     bindHost: ctx.webServer.host,
     allowsRemoteAuthorities: ctx.connection.allowsRemoteAuthorities,
     platform: process.platform,
-    ssh: launchedThroughSsh(launchEnvironmentOf(ctx)),
+    ssh: launchedThroughSsh(environment),
     env: process.env,
     linuxChooser: hasLinuxChooserBinary(process.env.PATH, canExecute),
   })

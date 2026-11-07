@@ -1,0 +1,42 @@
+{
+  "account": {
+    "status": 200,
+    "entries": 1,
+    "hasMore": true,
+    "cache": "no-store"
+  },
+  "admin": {
+    "status": 200,
+    "entries": 4,
+    "local": 3,
+    "remote": 1
+  },
+  "invalid": {
+    "status": 400,
+    "body": {
+      "error": "runtime-catalog/invalid-limit"
+    }
+  },
+  "unauthenticated": 401,
+  "runtimeStarts": 0,
+  "localRouting": {
+    "personal": 200,
+    "project": 200,
+    "conflictingTarget": 400
+  },
+  "webSocketRouting": {
+    "personal": {
+      "status": 101,
+      "scope": "personal",
+      "environmentBound": true
+    },
+    "project": {
+      "status": 101,
+      "scope": "project",
+      "environmentBound": true
+    },
+    "remote": 503,
+    "unknown": 404,
+    "conflictingTarget": 400
+  }
+}

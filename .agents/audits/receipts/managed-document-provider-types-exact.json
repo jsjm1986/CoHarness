@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-provider-types-exact",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsc -b packages/attachment/userdoc-gateway/tsconfig.json",
+  "startedAt": "2026-10-26T16:22:39.570128+00:00",
+  "seconds": 3.775,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8ba4da946e0e7d664a1a0036804f817a45075087d727fff356dea5e441a41028",
+  "inputsAfter": "8ba4da946e0e7d664a1a0036804f817a45075087d727fff356dea5e441a41028",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

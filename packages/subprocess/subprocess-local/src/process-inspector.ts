@@ -53,6 +53,7 @@ export interface ProcessSnapshot {
    * Return whether the exact identity was a non-quiescent process.
    * @param identity - PID plus start identity to match.
    * @returns Whether that exact identity — not merely that PID — was running.
+   * @throws when the platform cannot distinguish an unreadable process from an exited one.
    */
   alive(identity: ProcessIdentity): boolean
 }
@@ -84,6 +85,7 @@ export interface ProcessInspector {
    *
    * @param identity - PID plus start identity to match.
    * @returns Whether that exact identity — not merely that PID — is running.
+   * @throws when the platform cannot determine that identity's state.
    */
   isAlive(identity: ProcessIdentity): boolean
   signalGroup(pgid: number, signal: SubprocessTerminalSignal): void
@@ -115,22 +117,25 @@ export interface ProcessInspectorInternals {
 }
 
 /* v8 ignore start -- thin OS bindings; injected logic is unit-tested and real platform composition exercises them. */
-const DEFAULT_INTERNALS: ProcessInspectorInternals = {
-  readFile: path => readFileSync(path, 'utf8'),
-  readDir: path => readdirSync(path),
-  readLink: path => readlinkSync(path, 'utf8'),
-  stat: path => statSync(path),
-  open: path => openSync(path, 'r'),
-  read: (fd, buffer, length, position) => readSync(fd, buffer, 0, length, position),
-  close: closeSync,
-  exec: (file, args) => execFileSync(file, args, { encoding: 'utf8' }),
-  kill: (pid, signal) => process.kill(pid, signal),
+function defaultProcessInspectorInternals(commandTimeoutMs: number): ProcessInspectorInternals {
+  return {
+    readFile: path => readFileSync(path, 'utf8'),
+    readDir: path => readdirSync(path),
+    readLink: path => readlinkSync(path, 'utf8'),
+    stat: path => statSync(path),
+    open: path => openSync(path, 'r'),
+    read: (fd, buffer, length, position) => readSync(fd, buffer, 0, length, position),
+    close: closeSync,
+    exec: (file, args) => execFileSync(file, args, { encoding: 'utf8', timeout: Math.ceil(commandTimeoutMs), killSignal: 'SIGKILL' }),
+    kill: (pid, signal) => process.kill(pid, signal),
+  }
 }
 /* v8 ignore stop */
 
 function readLinuxStat(internals: ProcessInspectorInternals, pid: number): ReturnType<typeof parseProcStat> {
   try {
-    return parseProcStat(internals.readFile(`/proc/${pid}/stat`))
+    const stat = parseProcStat(internals.readFile(`/proc/${pid}/stat`))
+    return stat?.pid === pid ? stat : undefined
   } catch (_unreadableProcEntry) {
     return undefined
   }
@@ -323,6 +328,12 @@ function quiescent(state: string | undefined): boolean {
   return state !== undefined && /^[ZXx]$/.test(state)
 }
 
+/** Incomplete enumeration cannot establish absence; a present row still carries its own identity. */
+function observedAlive(row: ProcessRow | undefined, identity: ProcessIdentity, complete: boolean): boolean {
+  if (row === undefined && !complete) throw new Error('Cannot inspect process identity: process observation is incomplete')
+  return row?.started === identity.started && !quiescent(row.state)
+}
+
 class PosixProcessSnapshot implements ProcessSnapshot {
   private readonly byPid: Map<number, ProcessRow>
 
@@ -340,8 +351,7 @@ class PosixProcessSnapshot implements ProcessSnapshot {
   }
 
   alive(identity: ProcessIdentity): boolean {
-    const row = this.byPid.get(identity.pid)
-    return row?.started === identity.started && !quiescent(row.state)
+    return observedAlive(this.byPid.get(identity.pid), identity, this.complete)
   }
 }
 
@@ -401,8 +411,16 @@ class LinuxProcessInspector extends PosixProcessInspector {
   }
 
   isAlive(identity: ProcessIdentity): boolean {
-    const stat = readLinuxStat(this.internals, identity.pid)
-    return stat?.started === identity.started && !quiescent(stat.state)
+    let contents: string
+    try {
+      contents = this.internals.readFile(`/proc/${identity.pid}/stat`)
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'ESRCH')) return false
+      throw error
+    }
+    const stat = parseProcStat(contents)
+    if (stat === undefined || stat.pid !== identity.pid) throw new Error('Cannot inspect process identity: process stat is invalid')
+    return stat.started === identity.started && !quiescent(stat.state)
   }
 
   snapshot(): ProcessSnapshot {
@@ -461,8 +479,8 @@ class MacProcessInspector extends PosixProcessInspector {
   }
 
   isAlive(identity: ProcessIdentity): boolean {
-    return macProcessTable(this.internals).rows
-      .some(entry => entry.pid === identity.pid && entry.started === identity.started)
+    const table = macProcessTable(this.internals)
+    return observedAlive(table.rows.find(entry => entry.pid === identity.pid), identity, table.complete)
   }
 
   snapshot(): ProcessSnapshot {
@@ -474,18 +492,20 @@ class MacProcessInspector extends PosixProcessInspector {
 
 /**
  * Create the supported platform inspector or fail at plugin load.
+ * @param commandTimeoutMs - owning spawn's grace period, bounding each native helper independently.
  * @param platform - target Node platform.
  * @param arch - target CPU architecture for Linux syscall numbers.
  * @param internals - filesystem/process boundary, injectable for deterministic tests.
  * @returns Platform process inspector.
  */
 export function createProcessInspector(
+  commandTimeoutMs: number,
   platform: NodeJS.Platform = process.platform,
   arch: NodeJS.Architecture = process.arch,
-  internals: ProcessInspectorInternals = DEFAULT_INTERNALS,
+  internals: ProcessInspectorInternals = defaultProcessInspectorInternals(commandTimeoutMs),
 ): ProcessInspector {
   if (platform === 'linux') return new LinuxProcessInspector(arch, internals)
   if (platform === 'darwin') return new MacProcessInspector(internals)
-  if (platform === 'win32') return createWindowsProcessInspector()
+  if (platform === 'win32') return createWindowsProcessInspector(commandTimeoutMs)
   throw new Error(`subprocess-local: terminal inspection is unsupported on platform ${platform}`)
 }

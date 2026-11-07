@@ -31,8 +31,13 @@ test('the real Landlock subpath imports without platform packages or dlopen, whi
         throw new Error('Landlock import attempted dlopen');
       };
       const api = await import('@deepseek-ai/node-addon-system/landlock-run');
+      const { DirectoryHandle } = await import('@deepseek-ai/node-addon-system/directory');
       assert.equal(api.LAUNCHER_BIN, 'landlock-run');
       assert.deepEqual(api.grantArgs({}), []);
+      assert.equal(dlopenCalls, 0);
+      await assert.rejects(DirectoryHandle.open('/'), {
+        code: process.platform === 'linux' || process.platform === 'darwin' ? 'MODULE_NOT_FOUND' : 'ERR_DIRECTORY_UNSUPPORTED_PLATFORM',
+      });
       assert.equal(dlopenCalls, 0);
       await assert.rejects(import('@deepseek-ai/node-addon-system'), {
         code: 'ERR_PACKAGE_PATH_NOT_EXPORTED',
@@ -154,7 +159,8 @@ test('rejects a symbolic-link payload', { skip: process.platform === 'win32' }, 
   assert.throws(() => verifyPlatformBinaries(f.dir), /not a regular file/);
 });
 
-test('entry prepack rejects a missing exported flock file even when the Landlock entry exists', (t) => {
+for (const capability of ['flock', 'directory']) {
+test(`entry prepack rejects a missing exported ${capability} file even when the Landlock entry exists`, (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'system-entry-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.mkdirSync(path.join(dir, 'lib'));
@@ -162,10 +168,10 @@ test('entry prepack rejects a missing exported flock file even when the Landlock
     name: 'entry-fixture',
     exports: {
       './landlock-run': { types: './lib/index.d.ts', default: './lib/index.js' },
-      './flock': { types: './lib/flock.d.ts', default: './lib/flock.js' },
+      [`./${capability}`]: { types: `./lib/${capability}.d.ts`, default: `./lib/${capability}.js` },
     },
   }));
-  for (const file of ['index.js', 'index.d.ts', 'flock.d.ts']) fs.writeFileSync(path.join(dir, 'lib', file), '');
+  for (const file of ['index.js', 'index.d.ts', `${capability}.d.ts`]) fs.writeFileSync(path.join(dir, 'lib', file), '');
   const script = fileURLToPath(new URL('../scripts/verify-entry-lib.mjs', import.meta.url));
   const options = {
     cwd: dir,
@@ -177,10 +183,11 @@ test('entry prepack rejects a missing exported flock file even when the Landlock
   assert.equal(missing.error, undefined);
   assert.equal(missing.signal, null);
   assert.equal(missing.status, 1);
-  assert.match(missing.stderr, /lib\/flock\.js/);
-  fs.writeFileSync(path.join(dir, 'lib/flock.js'), '');
+  assert.ok(missing.stderr.includes(`lib/${capability}.js`));
+  fs.writeFileSync(path.join(dir, `lib/${capability}.js`), '');
   const complete = spawnSync(process.execPath, [script], options);
   assert.equal(complete.error, undefined);
   assert.equal(complete.signal, null);
   assert.equal(complete.status, 0, complete.stderr);
 });
+}

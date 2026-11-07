@@ -1,0 +1,25 @@
+{
+  "id": "host-export-dependency-policy-2026-11-03",
+  "findings": [
+    "B492"
+  ],
+  "status": "fixed_mechanical_classification_verified_global_review_open",
+  "verifiedAt": "2026-11-02T21:42:35.765122+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T213310Z",
+  "delivery": {
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T213310Z/B492-host-export-policy.delta.tar.gz",
+    "archiveSha256": "d25a02595100c2f1cb8492bc0af710f794c14aedf689337503b2efb4e7757841",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T213310Z/B492-host-export-policy",
+    "manifestSha256": "11e0b26c6d75744660b5b49dc18d5e875d130ac2de8e1a6e6a24b3abd50ff12b",
+    "ownedChanges": 1
+  },
+  "checks": {
+    "originalGate": "exact5violations",
+    "normalGate": "70packages pass",
+    "existingPolicyCases": 44,
+    "scopedLint": "passed",
+    "patchAndWhitespace": "passed"
+  },
+  "sharedIdentity": "CollaborationError/collaborationOf/collaborationRemoteRefusal and ResourceAdmissionError require shared peer instances; no duplicate-safe exception added. Unused resourceBudgetOf policy entry removed without removing its public implementation.",
+  "wholeProjectComplete": false
+}

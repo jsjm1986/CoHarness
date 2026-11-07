@@ -27,6 +27,12 @@
       "path": "../ui-sidebar"
     },
     {
+      "path": "../ui-plugin-manager/tsconfig.client.json"
+    },
+    {
+      "path": "../ui-settings"
+    },
+    {
       "path": "../ui-slots"
     },
     {

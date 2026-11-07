@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-10-26-optional-document-identity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-26-optional-document-identity.md
+document:
+  en: e9df41d306138146cd79c9b383929d96e0c86992
+  zh: 5bc4b3a88ca0e7b39ec12f53ea4a4483b7a7cd8d
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-26-optional-document-identity:
+  en: 81f4c2017debd107
+  zh: b783afb7e50881ad
+/2026-10-26-optional-document-identity/summary:
+  en: b87d55fddb4ad656
+  zh: 9ce5b163d05d3a8a
+/2026-10-26-optional-document-identity/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-26-optional-document-identity/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-26-optional-document-identity/compatibility:
+  en: e2bbefc5d5fb73c1
+  zh: 2d94e0fc11d4cd49
+/2026-10-26-optional-document-identity/verification:
+  en: f6ea9b073db5882f
+  zh: 273d5dd07ff309b2
+/2026-10-26-optional-document-identity/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

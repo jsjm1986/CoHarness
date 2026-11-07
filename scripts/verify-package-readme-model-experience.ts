@@ -46,6 +46,7 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  * blocks. A package moves on or off this list with its context behavior.
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+  'packages/context/resource-budget': { kind: 'none', reason: 'The admission Service Definition constructs no model input; concrete execution consumers own model-visible results.' },
   'packages/api/remote-desktop-controller': { kind: 'none', reason: 'The BFF namespace serves human operators; no method result enters a model request.' },
   'packages/client/ui-remote-desktop': { kind: 'none', reason: 'The desktop viewer and attach flow are human-operated surfaces.' },
   'packages/remote-desktop/remote-desktop-stream': { kind: 'none', reason: 'The transport mount relays human screen and input frames.' },
@@ -134,7 +135,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-sidebar': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-brand-official': { kind: 'none', reason: 'Browser-side presentation occupants; registers nothing model-facing.' },
   'packages/client/ui-conversation': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
-  'packages/client/ui-message-feedback': { kind: 'none', reason: 'Browser controls over message-feedback sidecars and log-only Session remarks; neither enters model context.' },
   'packages/client/ui-tool': { kind: 'none', reason: 'Browser-side Tool presentation layer; renders logged calls without changing model context.' },
   'packages/client/ui-jobs': { kind: 'none', reason: 'Browser-side read-only projection of ctx.jobs records; dsh-tool-jobs owns the model-facing behavior.' },
   'packages/client/ui-schedule': { kind: 'none', reason: 'Browser-side catalog, editing, and deletion of Host Schedule records; dsh-schedule owns the model-facing tools and delivery.' },
@@ -212,7 +212,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/context/collaboration-gateway': { kind: 'indirect', reason: 'The provider authorizes operations; dsh-collaboration-context owns model-visible participant attribution.' },
   'packages/context/archive-gateway': { kind: 'none', reason: 'The provider synchronizes archived session records and serves administrator-only history; it contributes no model input.' },
   'packages/context/execution-authority': { kind: 'none', reason: 'The Service Definition registers no prompt or tool.' },
-  'packages/context/gateway-execution': { kind: 'none', reason: 'The Gateway provider controls execution admission without adding identity metadata to model content.' },
   'packages/context/gateway-runtime': { kind: 'none', reason: 'The request context authenticates Host operations and contributes no model input.' },
   'packages/util/atomic-write': { kind: 'none', reason: 'Pure filesystem write primitive; registers nothing model-facing.' },
   'packages/session/session-telemetry': { kind: 'none', reason: 'The seam observes the session stream and hands redacted copies outward; it registers nothing model-facing.' },

@@ -28,6 +28,16 @@ export interface DirLevel {
   readonly truncated: boolean
 }
 
+/** Compare the complete directory metadata used by file navigation and freshness checks. */
+function sameLevel(left: DirLevel, right: DirLevel): boolean {
+  return left.truncated === right.truncated && left.entries.length === right.entries.length
+    && left.entries.every((entry, index) => {
+      const other = right.entries[index] as WorkspaceFileEntry
+      return entry.name === other.name && entry.path === other.path && entry.type === other.type
+        && entry.version === other.version && entry.bytes === other.bytes
+    })
+}
+
 /** What one directory level is doing right now. */
 export type LevelState =
   | { readonly kind: 'loading' }
@@ -124,6 +134,10 @@ export function createFilesStore(): EngineStoreHandle<FilesState, FilesActions> 
       loaded: (d, tabId: TabId, path: string, level: DirLevel) => {
         const state = bucket(d, tabId)
         const previous = state.levels[path]
+        if (previous?.kind === 'ready' && sameLevel(previous.level, level)) {
+          if (previous.failure !== undefined) state.levels[path] = { kind: 'ready', level: previous.level }
+          return
+        }
         if (previous?.kind === 'ready') {
           const directories = new Set(level.entries.filter(entry => entry.type === 'directory').map(entry => entry.name))
           for (const entry of previous.level.entries) {

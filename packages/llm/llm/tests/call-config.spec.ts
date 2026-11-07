@@ -5,7 +5,9 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { callConfigEquals, deepFreeze, isAgentLoopRequest, markAgentLoopRequest } from '../src/call-config.ts'
+import { Context } from '@deepseek-ai/cordis'
+import LlmRuntime from '../src/index.ts'
+import { callConfigEquals, deepFreeze } from '../src/call-config.ts'
 import { ReasoningEffortId } from '../src/brand.ts'
 import type { GenerateOptions } from '../src/types.ts'
 
@@ -85,17 +87,29 @@ describe('deepFreeze', () => {
 })
 
 describe('agent-loop request identity', () => {
-  it('marks only the exact request object and preserves its identity', () => {
-    const request: GenerateOptions = {
+  it('recognizes frozen requests only in their live owning service', async () => {
+    const first = new Context(), second = new Context()
+    await first.plugin(LlmRuntime)
+    await second.plugin(LlmRuntime)
+    const owner = first.llm
+    const request: GenerateOptions = Object.freeze({
       provider: 'mock',
       model: 'model',
       messages: [],
-    }
+    })
     const copy = { ...request }
-
-    expect(isAgentLoopRequest(request)).toBe(false)
-    expect(markAgentLoopRequest(request)).toBe(request)
-    expect(isAgentLoopRequest(request)).toBe(true)
-    expect(isAgentLoopRequest(copy)).toBe(false)
+    try {
+      expect(owner.isAgentLoopRequest(request)).toBe(false)
+      expect(owner.markAgentLoopRequest(request)).toBe(request)
+      expect(owner.isAgentLoopRequest(request)).toBe(true)
+      expect(owner.isAgentLoopRequest(copy)).toBe(false)
+      expect(second.llm.isAgentLoopRequest(request)).toBe(false)
+      await first.fiber.dispose()
+      expect(owner.isAgentLoopRequest(request)).toBe(false)
+      expect(() => owner.markAgentLoopRequest(request)).toThrow('request marker was withdrawn')
+    } finally {
+      await first.fiber.dispose()
+      await second.fiber.dispose()
+    }
   })
 })

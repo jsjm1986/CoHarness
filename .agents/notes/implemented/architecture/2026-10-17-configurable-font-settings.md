@@ -20,6 +20,8 @@ The settings UI is one `settings.general.item` entry: a font-size row for text w
 
 **Scope decode resolves the raw account layer.** `account-or-host` binds declare `decode: decodeThemeSection`, which resolves each section through `ThemeSettingsSchema`. The account preference mirror can publish a section that predates the font fields (its `ui-theme` whitelist holds only `preference`), and the composite merge can surface that raw section while the Host layer is still loading; schema resolution fills the absent fields so `getSnapshot().value` keeps the documented "schema-resolved section" contract on both lanes ([field routing](../bug-fix/2026-10-03-account-or-host-field-routing.md)).
 
+Gateway connections persist the six fields through the [account font preference store](../bug-fix/2026-11-01-account-font-preferences.md). The selected settings scope owns that account transport; standalone deployments retain Host persistence. Font normalization, presentation, shortcuts and pending-write fencing remain with the theme plugin.
+
 ## Alternatives considered
 
 **Tolerate missing fields at the consumer.** Reading `section.textFontFamily ?? ''` in `durableFontFamilies` and `sectionFontSizes` duplicates the schema's default table at the read site and leaves every future consumer to rediscover the same gap; resolving at the scope boundary is the contract the scope already documents.

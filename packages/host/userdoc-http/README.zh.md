@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "用户上传文档的流式浏览器 HTTP 消费方"
 kind: "package-reference"
 ---
 
@@ -13,11 +13,15 @@ kind: "package-reference"
 
 上传使用版本化可续传会话协议：`POST /api/documents/uploads` 创建或复用会话，`PUT /api/documents/uploads/<uploadId>/chunks/<index>` 接收带 SHA-256 的原始 `Content-Range` 分片，`POST /api/documents/uploads/<uploadId>/complete` 启动最终校验，`GET` 查询进度，`DELETE` 取消会话。每个分片都小于公网入口限制，因此不再依赖单个请求承载整个文件。已移除的单请求 `POST /api/documents` 返回 `426 UPLOAD_PROTOCOL_REQUIRED`。`GET` 或 `HEAD /api/documents/content?id=<docId>` 以 `nosniff` 和附件 disposition 流式下载。`DELETE /api/documents?id=<docId>` 会幂等地把文档移入可恢复回收站；`DELETE /api/documents/purge?id=<docId>` 永久清理已在回收站中的文档。响应只公开稳定的 `UserDocError.code`，绝不包含文档字节或失败的绝对路径。
 
+身份模式的作用域对每次变更授权精确的发布修订号，包括管理员操作和完整文件夹清单。恢复与清除通过唯一 `trashId` 选择条目；路径存在歧义时必须明确选择。按路径寻址的独立提供方仍会在保留条目与活动文件同路径时返回 `409 DOCUMENT_TRASH_CONFLICT`。幂等结果不能证明替代文件已被删除。
+
 `POST /api/documents/transfer` 是带版本号的 Gateway 快照复制操作。请求声明任意个人或项目源、目标及文档 id；支持项目到项目和管理员多目标分发。项目读取要求成员身份，写入要求 `rw`（组织管理员隐式拥有 `rw`）。Gateway 把源响应直接流式写入目标运行时上传端点，沿用目标命名策略，返回逐文件安全元数据，并在元数据目录和审计轨迹中保存来源身份。浏览器不会收到源字节或绝对路径。runtime JSON 元数据响应会先经过 8 MiB 字节上限再校验，活动的合并列表读取为每个等待方独立处理取消。没有 `gatewayRuntime` 的 standalone composition 返回 `DOCUMENT_TRANSFER_UNAVAILABLE`。
 
 `GET /api/documents/transfer/capabilities` 只返回当前安全作用域名称和可写目标，不会列出或打开任何文档。
 
 `POST /api/documents/transfer/list` 接受一个已授权的源作用域，并为 composer 选择器返回安全文档元数据；不会返回路径或文件字节。
+
+分片和内容处理器在响应关闭时取消存储信号，包括先前异步查询期间发生的关闭。每次上传操作都会在 collaboration 服务存在时捕获其已认证参与者。没有 collaboration 的受管个人运行时使用已验证的 Gateway 请求 principal。受管项目必须有 collaboration 授权；请求身份缺失或项目授权丢失时，在调用存储前返回 `503 COLLABORATION_UNAVAILABLE`。两个身份服务均不存在的独立运行请求继续使用无所有者会话。浏览器字段不能指定所有者，项目写权限不允许操作其他成员的临时上传；已发布文档沿用普通授权策略。
 
 在 Gateway 部署中，Gateway 还负责 `/api/documents/transfer/uploads` 及其可续传子路由。每个请求通过经过校验的 `scope` query 指定个人或项目目标，Gateway 重新检查写权限后直接对目标作用域的文档根提供会话；仅在未配置本地文档 broker 时才转发到目标运行时。Standalone composition 仍然只提供当前运行时上传路由。
 
@@ -27,7 +31,11 @@ kind: "package-reference"
 
 Gateway 的 `document-admin` principal 只被回收、恢复和永久清理路由接受；普通文档读写仍要求运行时用户拥有对应作用域权限。
 
-`POST /api/documents/transfer/plan` 执行只读元数据预检并返回五分钟有效的计划令牌；`/commit` 和 `/retry` 在开始流式复制前重新校验源和目标权限，成功与失败文件分别提交。
+`POST /api/documents/transfer/plan` 执行只读元数据预检并返回五分钟有效的计划令牌。浏览器复制预览只对选中文件（含嵌套文件）请求 `HEAD`，不遍历其文件夹。内容响应提供 `Content-Length`、`Content-Type`、`Content-Disposition`、`Last-Modified` 和文档身份头；`HEAD` 不发送文件正文。`/commit` 和 `/retry` 在开始流式复制前重新校验源和目标权限，成功与失败文件分别提交。
+
+Cordis 插件与 Gateway broker 各自持有 `UserDocHttpScope`，在释放存储依赖前等待已接纳的处理器与延后投递。必需的生命周期投递失败会返回给调用方；独立模式的建议性同步仍没有崩溃恢复凭据。受管 Gateway 提供方将权威身份变更持久化到私有有序日志，仅确认目录索引已提交的前缀。内容响应以 base64url JSON 编码的 `x-dsh-document-identity` 携带已打开文件的身份，使延迟复制登记仍关联精确的源实例。
+
+作用域可通过 `admitCatalogWrite` 在投递入队时申请准入，并在等待前序投递期间保留写入计数。拒绝准入会跳过该次投递，但仍保留对前序队列和关闭排空的等待。宿主还必须为读取触发的即时目录索引写入提供准入。
 
 ## 概述
 
@@ -50,12 +58,13 @@ Gateway 的 `document-admin` principal 只被回收、恢复和永久清理路�
 
 无；本包从不组装或发送提供方请求。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与待完成工作
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **自身不提供认证** —— route 继承 Connection 的可达性与同源策略；把 Web server 暴露到回环之外的部署必须在网关提供认证。
 - **旧的当前运行时列表未建立索引** —— 提供方可能为了完整响应扫描整个根目录；Gateway 的作用域列表对大型工作区使用有界分页。
-- **下载默认使用附件 disposition** —— `inline=1` 只对图片、PDF 和文本媒体生效，并为预览 viewer 附带严格的内容策略。
+- **下载默认使用 attachment disposition** — `inline=1` 只允许图片、PDF 与文本媒体。只有内联 `application/pdf` 响应允许同源 frame 祖先；其他内联类型保留 `frame-ancestors 'none'`。所有内联响应保留 `default-src 'none'`、原有图片策略及不带许可项的 CSP `sandbox`，并继续通过带 `nosniff`、私有且不缓存的响应流式传输。根据存储文件名推导的媒体类型不会验证 PDF 结构；浏览器 PDF 阅读器负责解析这些字节。[PDF 嵌入决策](../../../.agents/notes/implemented/bug-fix/2026-10-23-native-document-pdf-framing.zh.md)记录依据与浏览器验证。
 - **临时上传会话有保留期限，已发布文档没有自动过期** —— 未完成会话按本地后端策略清理，已完成文档仍需用户删除。
 
 <a id="dev-note"></a>

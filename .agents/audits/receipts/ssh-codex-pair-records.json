@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-pair-records",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/ssh/ssh/README.md packages/subagent/subagent-codex/README.md packages/preset/agent-preset-registry/README.md docs/subsystems/ssh.md docs/config-catalog.md docs/module-graph.md .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md .agents/notes/implemented/architecture/2026-10-25-managed-codex-ssh-model-requests.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md",
+  "startedAt": "2026-10-25T12:34:01.685145+00:00",
+  "seconds": 2.648,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4ec14dcb9a48d99a3fd4a789051b7db2011757e8a0daaed8efe02ca7ed7b0cd5",
+  "inputsAfter": "a52e09d2ba8047ee4b0ae2c14fd603695c6f2f738834ebdc9281d14daf20b2d4",
+  "postgresToolDirectory": null,
+  "outputSha256": "4e82f9fc35b705bf496eac23fd7efb35fae4082a17ee9cf26cb1b0fd245039b4",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-25-managed-codex-ssh-model-requests.i18n.yaml\nverify-translation-pairing: recorded docs/subsystems/ssh.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.i18n.yaml\nverify-translation-pairing: recorded packages/preset/agent-preset-registry/README.i18n.yaml\nverify-translation-pairing: recorded packages/ssh/ssh/README.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-codex/README.i18n.yaml\nverify-translation-pairing: 7 record(s) written; run the check to validate the pairs.\n"
+}

@@ -4,7 +4,7 @@ import {
   workspaceResourceAddress, workspacePathForResource, workspaceResourceProvider,
 } from '../src/client/workspace-resources.ts'
 import type { WorkspaceResourceOpenRequest, WorkspaceResourceValue } from '../src/client/workspace-resources.ts'
-import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import { ApiTransportError, type ConnectionRuntimeTarget, type SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import { FakeApiClient, err } from './fake-api.client.ts'
 
 const sessionId = 'session-1' as SessionId
@@ -45,6 +45,37 @@ describe('Workspace resource addresses', () => {
 })
 
 describe('Workspace resource lifetime', () => {
+  it('isolates personal Runtime providers, identical file addresses, observations and disconnections', async () => {
+    const registry = new WorkspaceResourceRegistry()
+    const first: ConnectionRuntimeTarget = { kind: 'personal', runtimeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as never }
+    const second: ConnectionRuntimeTarget = { kind: 'personal', runtimeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' as never }
+    const statA = vi.fn(async () => value('a1')), statB = vi.fn(async () => value('b1'))
+    const removeA = registry.register(first, { stat: statA }, 10)
+    const removeB = registry.register(second, { stat: statB }, 10)
+    const a = registry.source({ ...resource(), runtimeTarget: first })
+    const b = registry.source({ ...resource(), runtimeTarget: second })
+    const stopA = a.subscribe(() => {}), stopB = b.subscribe(() => {})
+    try {
+      await vi.waitFor(() => {
+        expect(a.getSnapshot().value?.version).toBe('a1')
+        expect(b.getSnapshot().value?.version).toBe('b1')
+      })
+      const before = a.getSnapshot()
+      registry.handleChange(second, { sessionId, path: resource().path, version: 'b2' })
+      expect(b.getSnapshot().value?.changed).toBe(true)
+      expect(a.getSnapshot()).toBe(before)
+      registry.disconnect(second, new WorkspaceResourceError('access-revoked', 'B grant revoked'))
+      expect(b.getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } })
+      expect(b.getSnapshot().value).toBeUndefined()
+      expect(a.getSnapshot()).toBe(before)
+      expect(statA).toHaveBeenCalledOnce()
+      expect(statB).toHaveBeenCalledOnce()
+      removeB()
+      expect(registry.hasProvider(first)).toBe(true)
+      expect(registry.hasProvider(second)).toBe(false)
+    } finally { stopA(); stopB(); removeA(); removeB() }
+  })
+
   it('coalesces loads and preserves observations arriving before stat', async () => {
     const pending = deferred<WorkspaceResourceValue>()
     const stat = vi.fn(() => pending.promise)
@@ -152,6 +183,33 @@ describe('Workspace resource lifetime', () => {
     expect(source.getSnapshot().value).toBeUndefined()
   })
 
+  it.each([401, 403])('clears retained metadata after an HTTP %s authorization failure', async (status) => {
+    const registry = new WorkspaceResourceRegistry()
+    const stat = vi.fn(async () => value())
+    const dispose = registry.register(base, { stat }, 10)
+    const source = registry.source(resource())
+    try {
+      await source.reload()
+      stat.mockRejectedValueOnce(new ApiTransportError(status, '/api/workspaceFiles.stat'))
+      await source.reload()
+      expect(source.getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } })
+      expect(source.getSnapshot().value).toBeUndefined()
+    } finally { dispose() }
+  })
+
+  it.each([0, 429, 503])('retains metadata when the transport reports status %s', async (status) => {
+    const registry = new WorkspaceResourceRegistry()
+    const stat = vi.fn(async () => value())
+    const dispose = registry.register(base, { stat }, 10)
+    const source = registry.source(resource())
+    try {
+      await source.reload()
+      stat.mockRejectedValueOnce(new ApiTransportError(status, '/api/workspaceFiles.stat'))
+      await source.reload()
+      expect(source.getSnapshot()).toMatchObject({ status: 'failed', value: { version: 'v1' } })
+    } finally { dispose() }
+  })
+
   it('ignores old-generation completion and revalidates without clearing retained content', async () => {
     const registry = new WorkspaceResourceRegistry()
     const old = deferred<WorkspaceResourceValue>()
@@ -172,6 +230,53 @@ describe('Workspace resource lifetime', () => {
     registry.connected(base)
     await vi.waitFor(() => { expect(registry.source(request).getSnapshot()).toMatchObject({ value: { version: 'v2', changed: true } }) })
     release()
+  })
+
+  it.each(['subscribe', 'pin'] as const)('revalidates an idle disconnected resource when %s retains it after recovery', async (retention) => {
+    const registry = new WorkspaceResourceRegistry()
+    const stat = vi.fn(async () => value())
+    const dispose = registry.register(base, { stat }, 10)
+    const request = resource()
+    const source = registry.source(request)
+    await source.reload()
+    registry.disconnect(base)
+    registry.connected(base)
+    expect(stat).toHaveBeenCalledTimes(1)
+    expect(source.getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'connection-unavailable' } })
+    const pending = deferred<WorkspaceResourceValue>()
+    stat.mockImplementationOnce(() => pending.promise)
+    const release = retention === 'subscribe' ? source.subscribe(vi.fn()) : registry.pin(request)
+    try {
+      expect(source.getSnapshot()).toMatchObject({ status: 'loading', value: { version: 'v1' } })
+      const settled = source.reload()
+      pending.resolve(value('v2'))
+      await settled
+      expect(stat).toHaveBeenCalledTimes(2)
+      expect(source.getSnapshot()).toMatchObject({ status: 'live', value: { version: 'v2', changed: true } })
+      expect(source.getSnapshot().error).toBeUndefined()
+    } finally {
+      release()
+      dispose()
+    }
+  })
+
+  it.each(['subscribe', 'pin'] as const)('keeps access denial and ordinary failures explicit when %s retains metadata', async (retention) => {
+    for (const failure of [new WorkspaceResourceError('collaboration-forbidden', 'denied'), new Error('read failed')]) {
+      const registry = new WorkspaceResourceRegistry()
+      const stat = vi.fn(async () => { throw failure })
+      const dispose = registry.register(base, { stat }, 10)
+      const request = resource()
+      const source = registry.source(request)
+      await source.reload()
+      const release = retention === 'subscribe' ? source.subscribe(vi.fn()) : registry.pin(request)
+      try {
+        expect(stat).toHaveBeenCalledTimes(1)
+        expect(source.getSnapshot()).toMatchObject({ status: 'failed', error: failure })
+      } finally {
+        release()
+        dispose()
+      }
+    }
   })
 
   it('evicts idle metadata while old source handles can subscribe again', async () => {

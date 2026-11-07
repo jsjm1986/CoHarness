@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-config-catalog",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run gen-config-catalog",
+  "startedAt": "2026-10-23T18:39:47.925318+00:00",
+  "seconds": 6.097,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "inputsAfter": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "outputSha256": "41ad6290228a3b07488c09515fb79c4c459c420aeee846d59f00b7e2d416f2c2",
+  "outputTail": "$ tsx scripts/gen-config-catalog.ts\ngen-config-catalog: 3 artifact(s) computed, 3 written.\n"
+}

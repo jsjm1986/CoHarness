@@ -43,6 +43,8 @@ export class SessionWriteBehind {
   private barrier: Promise<void> | undefined
   private deadlineExpired = false
   private automaticPaused = false
+  /** A refused live event leaves a sequence gap that this controller cannot repair. */
+  private admissionFailure: Error | undefined
 
   /**
    * @param options - fixed scheduling policy and durable batch sink.
@@ -63,28 +65,32 @@ export class SessionWriteBehind {
     this.maxPendingBytes = maxPendingBytes
   }
 
-  /** Whether this controller owns queued events or an active durable write. */
+  /** Whether queued writes or an unrecoverable admission failure still own this lifecycle. */
   get hasWork(): boolean {
-    return this.pending.length > 0 || this.active !== undefined
+    return this.admissionFailure !== undefined || this.pending.length > 0 || this.active !== undefined
   }
 
   /**
    * Copy one event into the persistence-owned queue and start a fixed deadline
    * when the automatic path is idle.
-  * @param event - frozen live event to retain independently of its producer.
-  */
+   * @param event - frozen live event to retain independently of its producer.
+   * @throws the first retention failure on this and every later admission; flush retains that failure.
+   */
   enqueue(event: SessionEvent): void {
+    if (this.admissionFailure !== undefined) throw this.admissionFailure
     // Measure before cloning so an event that cannot fit is rejected without
     // first allocating another copy of a potentially very large payload.
     const eventBytes = serializedBytes(event)
     if (this.pending.length + this.activeBatchSize >= this.maxPendingEvents) {
       const error = new Error(`session write-behind pending-event limit exceeded (${String(this.maxPendingEvents)})`)
+      this.admissionFailure = error
       this.options.reportBackgroundFailure(error)
       throw error
     }
     const available = this.maxPendingBytes - this.pendingBytes - this.activeBatchBytes
     if (eventBytes > available) {
       const error = new Error(`session write-behind pending-byte limit exceeded (${String(this.maxPendingBytes)})`)
+      this.admissionFailure = error
       this.options.reportBackgroundFailure(error)
       throw error
     }
@@ -105,7 +111,7 @@ export class SessionWriteBehind {
   /**
    * Cancel the batching wait and durably drain through a quiescent point.
    * Concurrent callers join the same barrier.
-   * @returns a promise that rejects if the barrier's durable retry fails.
+   * @returns a promise that rejects if durability fails or any event admission left a sequence gap.
    */
   flush(): Promise<void> {
     if (this.barrier !== undefined) return this.barrier
@@ -170,6 +176,7 @@ export class SessionWriteBehind {
         this.automaticPaused = false
       }
       while (this.pending.length > 0) await this.startWrite(false)
+      if (this.admissionFailure !== undefined) throw this.admissionFailure
     } catch (error: unknown) {
       this.barrier = undefined
       reject(error)

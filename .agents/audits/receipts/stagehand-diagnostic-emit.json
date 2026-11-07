@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-diagnostic-emit",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc -b packages/experimental/browser-use-stagehand-native",
+  "startedAt": "2026-10-23T13:47:54.190901+00:00",
+  "seconds": 7.317,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "942f919fd99daa35501fd967b9780471c93be62a3e4587bef39c65a4358fdf91",
+  "inputsAfter": "942f919fd99daa35501fd967b9780471c93be62a3e4587bef39c65a4358fdf91",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

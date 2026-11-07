@@ -112,7 +112,7 @@ interface AskUserQuestionRequestEvent {
   questions: AskUserQuestionItem[]
   /** Agent identity projected to the corresponding Client Context in transit. */
   agent?: Agent
-  /** Cancellation lifetime of the pending request. */
+  /** Cancellation of this question; the service combines caller, service and Agent lifetimes for answerers. */
   signal?: AbortSignal
   /**
    * Tool call the Client card is keyed by. Timed answerers attach to the
@@ -184,7 +184,7 @@ interface UserQuestionProjectionView {
 }
 ```
 
-开放中的问题只能通过 waterfall 回答。问题变为 `continued` 后，`answer` Remote 方法向所属 agent 排入一条用户消息，并在其空闲时唤醒它。消息的 source 为 `user-question-reply`，outcome 为 `answered`，正文是 `answer_to_pending_question` 载荷。开放或未知调用返回 `false`；回复仍在排队时的第二次提交以 `REPLY_QUEUED` 拒绝，Host 重启后也一样；遗漏或重复问题的回答批次以 `BAD_ANSWER` 拒绝。`user-question-reply` 来源也接受 `outcome: 'dismissed'`，projection 与 Client 对话节点仍会为记录过它的会话读取；当前没有调用方产生它。
+开放中的问题只能通过 waterfall 回答。问题变为 `continued` 后，`answer` Remote 方法向所属 agent 排入一条用户消息，并在其空闲时唤醒它。消息的 source 为 `user-question-reply`，outcome 为 `answered`，正文是 `answer_to_pending_question` 载荷。 托管项目回复还可以带有已验证的 `participant` 快照；[协作上下文](../../packages/context/collaboration-context/README.zh.md#runtime-contract) 将其转换为模型可见的归属提示。开放或未知调用返回 `false`；回复仍在排队时的第二次提交以 `REPLY_QUEUED` 拒绝，Host 重启后也一样；遗漏或重复问题的回答批次以 `BAD_ANSWER` 拒绝。`user-question-reply` 来源也接受 `outcome: 'dismissed'`，projection 与 Client 对话节点仍会为记录过它的会话读取；当前没有调用方产生它。
 
 收起 Client 面板不会发送内容。前台超时只结束工具等待。已继续的问题没有期限；在回复进入会话前，问题仍可回答。
 
@@ -226,13 +226,14 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
  * @param agent - Live root agent for the owning Session.
  * @param callId - Continued question identity.
  * @param answer - Complete structured answer batch, one item per question of the call.
- * @returns Whether the question is still continued; an accepted reply stays
+ * @param signal - Answer submission cancellation, including Client disconnect.
+ * @returns Whether the question is still continued after caller attestation; an accepted reply stays
  *   queued until the agent admits its user message.
  * @throws {UserQuestionError} `BAD_ANSWER` when the batch does not name each
  *   question of the call exactly once, or `REPLY_QUEUED` when a reply is
  *   already waiting for admission.
  */
-@Remote answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean
+@Remote async answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer, signal: AbortSignal): Promise<boolean>
 
 /**
  * Let one answer UI hold a live timed wait. Closing the stream releases its claim.
@@ -265,11 +266,15 @@ async askTimed( request: AskUserQuestionRequest & { agent: Agent }, callId: Tool
  * decides this boundary: an owned child has no human answerer and would
  * block forever, while a lineage-bearing session resumed as a new runtime
  * root may ask normally.
+ * Answerers receive a signal linked to caller cancellation, service withdrawal
+ * and disposal of that exact Agent. Pending questions prevent idle retirement.
+ * Each continuation and accepted answer rechecks the current caller; late
+ * answers cannot restore a cancelled question.
  *
  * @param request Questions, owner agent, and abort signal.
  * @returns The answer chosen or typed by the human.
  * @throws {UserQuestionError} code `ASK_ABORTED` when the supplied signal
- *   is already or becomes aborted, `CALLER_NOT_LIVE` when a supplied agent
+ *   is already or becomes aborted, or the service is withdrawn; `CALLER_NOT_LIVE` when a supplied agent
  *   is not the registry's exact live instance, or `DELEGATED_CALLER` when
  *   that live agent is owned by another agent.
  */

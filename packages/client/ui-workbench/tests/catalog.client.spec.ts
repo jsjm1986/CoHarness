@@ -30,6 +30,16 @@ describe('workbench account catalog', () => {
       activeRuntime: { kind: 'personal' }, projects: [], items: [{ sessionId: 'x' }],
     })).toThrow('invalid workbench catalog')
   })
+
+  it('retains an empty project computer and rejects invalid computer identifiers', () => {
+    const nodeId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const project = { projectId: 7, name: 'Empty project', mode: 'rw', nodeId, nodeName: 'Ubuntu' }
+    const catalog = { personalComplete: true, personal: { id: 1, name: 'Me' },
+      activeRuntime: { kind: 'personal' }, projects: [project], items: [] }
+    expect(parseWorkbenchCatalog(catalog).projects).toEqual([project])
+    expect(() => parseWorkbenchCatalog({ ...catalog, projects: [{ ...project, nodeId: '../other' }] }))
+      .toThrow('invalid workbench environment')
+  })
 })
 
 const valid = () => ({ personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [] })
@@ -75,6 +85,14 @@ describe('catalog wire validation', () => {
 })
 
 describe('loadWorkbenchCatalog', () => {
+  it('keeps this tab\'s explicit Runtime selection instead of an account-wide scope cookie', async () => {
+    vi.stubGlobal('location', { search: '?dshRuntime=11111111-1111-4111-8111-111111111111&other=private' })
+    const fetch = vi.fn(async () => okResponse)
+    vi.stubGlobal('fetch', fetch)
+    await loadWorkbenchCatalog()
+    expect(fetch).toHaveBeenCalledWith('/account/api/workbench/catalog?dshRuntime=11111111-1111-4111-8111-111111111111',
+      { headers: { accept: 'application/json' } })
+  })
   it('fetches and parses the catalog without a signal', async () => {
     const fetch = vi.fn(async () => okResponse)
     vi.stubGlobal('fetch', fetch)
@@ -83,13 +101,37 @@ describe('loadWorkbenchCatalog', () => {
     expect(catalog.activeRuntime).toEqual({ kind: 'personal' })
   })
 
-  it('forwards an abort signal and rejects on a failed status', async () => {
-    const signal = new AbortController().signal
-    const fetch = vi.fn(async () => okResponse)
+  it('lets a caller abandon its own wait while the shared pull completes for others', async () => {
+    let release!: (response: Response) => void
+    const gate = new Promise<Response>((resolve) => { release = resolve })
+    const fetch = vi.fn(() => gate)
     vi.stubGlobal('fetch', fetch)
-    await loadWorkbenchCatalog(signal)
-    expect(fetch).toHaveBeenCalledWith('/account/api/workbench/catalog', { headers: { accept: 'application/json' }, signal })
+    const controller = new AbortController()
+    const abandoned = loadWorkbenchCatalog(controller.signal)
+    const kept = loadWorkbenchCatalog()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith('/account/api/workbench/catalog', { headers: { accept: 'application/json' } })
+    controller.abort()
+    await expect(abandoned).rejects.toThrow()
+    release(okResponse)
+    await expect(kept).resolves.toMatchObject({ activeRuntime: { kind: 'personal' } })
+  })
+  it('rejects every waiter on a failed status', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503 }) as Response))
-    await expect(loadWorkbenchCatalog(signal)).rejects.toThrow('workbench catalog unavailable (503)')
+    await expect(loadWorkbenchCatalog()).rejects.toThrow('workbench catalog unavailable (503)')
+    await expect(loadWorkbenchCatalog(new AbortController().signal)).rejects.toThrow('workbench catalog unavailable (503)')
+  })
+})
+
+describe('personal Runtime allocation metadata', () => {
+  const runtime = { kind: 'personal', runtimeId: '11111111-1111-4111-8111-111111111111',
+    nodeId: '22222222-2222-4222-8222-222222222222', nodeName: 'Computer A' }
+  it('retains an allocated Runtime even when its conversation catalog is unknown', () => {
+    expect(parseWorkbenchCatalog({ ...valid(), personalWorkspaces: [{ runtime, syncedAt: null, items: [] }] }).personalRuntimes)
+      .toEqual([runtime])
+  })
+  it.each([null, {}, [{ runtime: { ...runtime, runtimeId: 'invalid' } }], [{ runtime: { ...runtime, kind: 'project' } }],
+    [{ runtime: { ...runtime, nodeId: undefined } }]])('refuses malformed personal allocations (%j)', (personalWorkspaces) => {
+    expect(() => parseWorkbenchCatalog({ ...valid(), personalWorkspaces })).toThrow()
   })
 })

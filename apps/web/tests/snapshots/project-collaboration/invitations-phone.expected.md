@@ -1,0 +1,28 @@
+- dialog "Invitation center":
+  - banner:
+    - heading "Invitation center" [level=2]
+    - paragraph: Invitations visible to this account
+    - button "Close":
+      - img
+  - heading "Project members and invitations" [level=3]
+  - button "Current project"
+  - button "All visible" [pressed]
+  - checkbox "Pending only" [checked]
+  - text: Pending only
+  - tablist "Invitation direction":
+    - tab "Received invitations" [selected]
+    - tab "Sent invitations"
+  - tabpanel "Received invitations":
+    - article:
+      - img
+      - strong: Payments migration
+      - text: Zhou invited you to join
+      - button "Accept"
+      - text: Can edit
+      - time: 10/1/2026
+  - paragraph: Accepting joins the project without switching your current space.
+  - contentinfo:
+    - text: The pending count includes valid invitations sent to you.
+    - button "Invite a member":
+      - img
+      - text: Invite a member

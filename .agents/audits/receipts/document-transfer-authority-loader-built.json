@@ -1,0 +1,14 @@
+{
+  "name": "document-transfer-authority-loader-built",
+  "cwd": "gateway",
+  "command": "env DSH_EXAMPLE_MODE=lib ./node_modules/.bin/vitest run tests/document-transfer-loader.spec.ts",
+  "startedAt": "2026-10-26T02:10:17.541781+00:00",
+  "seconds": 4.091,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6aec206465dd891f26070a0b9540bb22c66582f2cc0e54c9d2601a553d06c77f",
+  "inputsAfter": "6aec206465dd891f26070a0b9540bb22c66582f2cc0e54c9d2601a553d06c77f",
+  "postgresToolDirectory": null,
+  "outputSha256": "f6dc8425d385917a43b8936cf3cbf8cb9bf0947cb2319d5b33c3555655580e7e",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:10:20\n   Duration  1.35s (transform 19ms, setup 0ms, import 39ms, tests 1.13s, environment 0ms)\n\n"
+}

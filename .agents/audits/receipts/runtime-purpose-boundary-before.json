@@ -1,0 +1,14 @@
+{
+  "name": "runtime-purpose-boundary-before",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/vitest run packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts -t 'confines every purpose assertion'",
+  "startedAt": "2026-10-26T14:33:57.867034+00:00",
+  "seconds": 7.593,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "78e94178fe828ad86803a23082abae5dc1290c453e10b1a75a0e3550d55390dd",
+  "inputsAfter": "78e94178fe828ad86803a23082abae5dc1290c453e10b1a75a0e3550d55390dd",
+  "postgresToolDirectory": null,
+  "outputSha256": "4946b985da2226ac9a9ba18b63804c60ef6abb0b923000e82e228c6dd48c868d",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts (7 tests | 1 failed | 6 skipped) 89ms\n     × confines every purpose assertion to HTTP and its declared endpoints 87ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts > gateway runtime admission > confines every purpose assertion to HTTP and its declared endpoints\nAssertionError: expected [ 'archive-read', 404 ] to deeply equal [ 'archive-read', 401 ]\n\n- Expected\n+ Received\n\n  [\n    \"archive-read\",\n-   401,\n+   404,\n  ]\n\n ❯ packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts:252:36\n    250|           ...headers,\n    251|           'content-type': 'application/json',\n    252|         }, 'POST', '{}')).status]).toEqual([purpose, 401])\n       |                                    ^\n    253|         expect([purpose, (await call(gateway.origin, '/api/probe/ping'…\n    254|           ...headers, 'content-type': 'application/json',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 6 skipped (7)\n   Start at  22:34:02\n   Duration  3.10s (transform 2.24s, setup 46ms, import 2.86s, tests 89ms, environment 0ms)\n\n"
+}

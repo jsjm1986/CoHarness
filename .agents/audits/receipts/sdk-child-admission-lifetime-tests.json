@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-admission-lifetime-tests",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts --retry=0",
+  "startedAt": "2026-10-24T09:47:04.632656+00:00",
+  "seconds": 7.119,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6afe72e6cb842af6a67aae0a45c2869446f0f20aa872c7fed1f2de6dc2ef91a1",
+  "inputsAfter": "6afe72e6cb842af6a67aae0a45c2869446f0f20aa872c7fed1f2de6dc2ef91a1",
+  "postgresToolDirectory": null,
+  "outputSha256": "acbab759513c5018bd631e6747cf6b500fabcc9f9cfa2a64c0dd79225c4b0c26",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts (11 tests | 1 failed) 22ms\n   × refuses an absent required provider and an already cancelled caller before constructing a client 4ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts > refuses an absent required provider and an already cancelled caller before constructing a client\nError: service \"resourceBudget\" has been registered at <root>\n ❯ Fiber.<anonymous> vendor/cordis/src/reflect.ts:290:15\n    288|       const impl: Impl = { name, value, fiber: this.ctx.fiber, check }\n    289|       if (this.store[key]) {\n    290|         throw new Error(`service \"${name}\" has been registered at <${t…\n       |               ^\n    291|       }\n    292|       this.store[key] = impl\n ❯ vendor/cordis/src/fiber.ts:366:45\n ❯ Proxy.provide vendor/cordis/src/reflect.ts:278:27\n ❯ packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts:53:9\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 10 passed (11)\n   Start at  17:47:09\n   Duration  2.05s (transform 1.54s, setup 50ms, import 1.87s, tests 22ms, environment 0ms)\n\n"
+}

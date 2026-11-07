@@ -46,7 +46,7 @@ files:
 <a id="ordinary-remote-metadata"></a>
 ### 普通 Remote 元数据
 
-发射器为每个端点写入一份静态 `TypertRemoteMethodSpec`，并将 spec 和产物自身导入的 Zod 运行时传给纯 `createTypertRemoteInfo` factory。普通消费方 `./remote` 产物保留默认导出和 `TYPERT_REMOTE`，其类型为 `TypertRemoteInfo`，`TYPERT_REMOTE.methods` 中的条目具有精确的 `TypertRemoteMethod<Input, Output, Mode, Uplink, DecodedOutput>` 类型。每个条目就是 `TYPERT_REMOTE.descriptors` 中同一个直接方法描述符对象；仅使用 Context 接收器的方法保留在描述符和作用域声明中。不存在独立的 `REMOTE_METHODS` 导出、嵌套 `metadata` 或第二份 `output` codec。[协议](<../protocol/README.zh.md>)负责 factory 和方法 API。
+发射器为每个端点写入一份静态 `TypertRemoteMethodSpec`，并将 spec 和产物自身 Zod 导入中的 `{ strictObject: z.strictObject }`传给纯 `createTypertRemoteInfo` factory。普通消费方 `./remote` 产物保留默认导出和 `TYPERT_REMOTE`，其类型为 `TypertRemoteInfo`，`TYPERT_REMOTE.methods` 中的条目具有精确的 `TypertRemoteMethod<Input, Output, Mode, Uplink, DecodedOutput>` 类型。每个条目就是 `TYPERT_REMOTE.descriptors` 中同一个直接方法描述符对象；仅使用 Context 接收器的方法保留在描述符和作用域声明中。不存在独立的 `REMOTE_METHODS` 导出、嵌套 `metadata` 或第二份 `output` codec。[协议](<../protocol/README.zh.md>)负责 factory 和方法 API。
 
 factory 返回类实例，并保留 spec，直到 `descriptors` 或 `methods` getter 构建两者共享的索引。消费方选择的每种输入策略视图、解析器和投影都独立惰性求值并缓存，生成的独立 Zod factory 同样在首次使用时物化并缓存。普通 Host `./typert` 创建私有 info 实例，由 `TYPERT.invocations` getter 暴露其描述符。Host 与消费方产物共享定义，不承诺跨 Program 或进程的对象身份。
 
@@ -75,6 +75,8 @@ JSON、YAML、SVG、PNG、JPEG 和 WebP 资源导出不提供 TypeScript 声明�
 `writeWorkspaceArtifacts()` 与 `writePackageArtifacts()` 是插件的写盘函数：每个产物写成 `lib/typert.<face>.{js,d.ts}`，带 Remote 方法时另写 `lib/typert.remote-client.{js,d.ts,d.ts.map}`，没有 Remote 方法的 Host 产物会删除残留的 Remote client 文件。把 `WorkspaceTypertGenerator.generateContributors()` 的结果交给它们写盘，得到的字节与 `workspace` 模式插件相同；`findWorkspaceRoot()` 采用插件的工作区根目录规则。仓库的 `tsdown --env.DSH_BUILD_FACE host` 打包就以这种方式为读取它的类型检查生成 Host face。
 
 设置 `rejectBuildOutputs: true` 后，若 face program 载入了工作区包 `lib/` 目录下的文件，或无法解析对工作区包的 import（例如包尚未编译的工作区），分析会以 `TypertAnalysisError` 失败。错误信息列出每个这样的 import 说明符，以及应由 `paths` 别名映射到的源文件；因此通过的生成只依赖工作区源码，可以在包编译之前或与之并行运行。若某个 face 的源码 import 生成产物（例如 Client face import `/remote`），则不要开启它。
+
+
 
 -----
 

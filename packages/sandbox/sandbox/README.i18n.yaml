@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sandbox/sandbox/README.md
 document:
-  en: f971d9b46b85f6934f5a89b359f77924757b1306
-  zh: 4fbfef05cfc22f4b2a50e82c8fbc1ebb6631966c
+  en: 7c298c1a2c980d640e651c412ce07dafd78d9b0a
+  zh: 07f95c19eb09082485d8afa0065ca45234371f76
 /:
   en: 4308065a46738364
   zh: 2eb6ab7314e74976
@@ -51,8 +51,8 @@ document:
   en: 956d3195cf7a35f8
   zh: f83d8342e22bb7cd
 /deepseek-ai-dsh-sandbox/further-exploration:
-  en: cdd62ca5c7dd8392
-  zh: 15c49ac960c960df
+  en: 33d09277fb15d59f
+  zh: e846ce4ad1f05bf2
 /deepseek-ai-dsh-sandbox/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -90,5 +90,5 @@ document:
   en: cc273320f6a1beaf
   zh: 5c57a312ddc50651
 /deepseek-ai-dsh-sandbox/known-limitations-and-deferred-work/dev-note/future-consumers-and-environments:
-  en: 37c2999d1e625485
-  zh: 1541877abd2eaedf
+  en: f5fb77e6f7fd03ed
+  zh: 478fcc4d8c8c33bb

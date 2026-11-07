@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-assertions",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/verify-no-unknown-casts.ts",
+  "startedAt": "2026-10-26T21:31:36.115984+00:00",
+  "seconds": 15.389,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55106eac52c480d0bc432b23e51467b67a142fdf7bccf5aac3d7aa81871e8e80",
+  "inputsAfter": "55106eac52c480d0bc432b23e51467b67a142fdf7bccf5aac3d7aa81871e8e80",
+  "postgresToolDirectory": null,
+  "outputSha256": "9f013069a93536df06a502be5ad25189668eab01f45b387ba8c264d9dd88e2e8",
+  "outputTail": "verify-no-unknown-casts: no new assertions; 1863 existing assertions remain.\n"
+}

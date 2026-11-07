@@ -1,0 +1,13 @@
+{
+  "name": "browser-lifecycle-pairing",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/experimental/browser-use-runtime/README.md packages/experimental/browser-use-stagehand-native/README.md .agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.md docs/subsystems/browser-use.md",
+  "startedAt": "2026-10-23T14:25:54.739617+00:00",
+  "seconds": 3.087,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "67cb465a8a3c29f425c7a0bc085ed5d3b91f542ba81109976db5d0bb123fbde4",
+  "inputsAfter": "17363c336cb7c63f63b69d29f313a83857252f5f7ad4f3a24b80479929719938",
+  "outputSha256": "08fd75910daa4fa85738ce70e0c55c6e1b8197673bafeb3c0729deaa0b76b23c",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/experimental/browser-use-runtime/README.md packages/experimental/browser-use-stagehand-native/README.md .agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.md docs/subsystems/browser-use.md\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.i18n.yaml\nverify-translation-pairing: recorded docs/subsystems/browser-use.i18n.yaml\nverify-translation-pairing: recorded packages/experimental/browser-use-runtime/README.i18n.yaml\nverify-translation-pairing: recorded packages/experimental/browser-use-stagehand-native/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

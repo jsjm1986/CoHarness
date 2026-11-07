@@ -42,6 +42,7 @@ Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every cal
 - `ctx.agentPresets.composedPreset(agentCtx): string | undefined` The preset one LIVE agent runs on, read from its scope chain rather than from its session — the only answer available for an agent whose durable header is still being built.
 - `ctx.agentPresets.recompose(agentCtx, id): Promise<AgentPreset>` Re-link one agent to a different preset's standing composition. Valid only while the agent has produced nothing — **the caller owns that check**; the new mount is ensured before the link moves, so a failure leaves the agent as it was. Refuses a broken preset like `mount()`.
 - `ctx.agentPresets.standingKeyFor(id?): Promise<ScopeKey>` The standing scope key a host reader with no agent (a cold transcript read) resolves preset registrations in; ensures the mount without starting an agent, session, or turn. Refuses a broken preset like `mount()`.
+- `ctx.agentPresets.acquireScope(id?): Promise<{ key: ScopeKey; dispose(): Promise<void> }>` Hold a declared generation for a cold read; release it when the read finishes. Repeated disposal awaits the same release.
 - `ctx.agentPresets.roots: readonly PresetRoot[]` The roots this roster scans — every configured root in order, then the derived harness-home root. Not `config.roots`: read this to answer whether a roster is composed at all, so one derivation decides it.
 - `ctx.agentPresets.authorable: boolean` Whether any of those roots has `user` trust, and therefore whether a preset can be created at all.
 - `ctx.agentPresets.read(id): Promise<string>` One preset's composition text, exactly as stored.
@@ -54,7 +55,9 @@ Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every cal
 
 ### Where to call `mount()`
 
-The agent factory's `setup(agentCtx)` hook is the one supported call site. Only there is the join installed while the agent is still unpublished, so a rejected composition rolls the whole creation back rather than leaving a half-composed session. The standing subtree is owned by the roster service's own fiber — deliberately its UNTRACED context, because a subtree minted from a traced `this.ctx` resolves every service through the caller's shadow fiber instead of each entry's own inject store — so it survives every agent and unwinds only with the whole tree. Each generation records its composition file's stamp (mtime and size): a session that finds the stamp stale starts the next generation, while every session already joined keeps the one it runs on — the composition a running session joined outlives its file changing or disappearing underneath it, and files are the only composition editor, so the stamp is what carries an edit to later sessions.
+The agent factory's `setup(agentCtx)` hook is the one supported call site. Only there is the join installed while the agent is still unpublished, so a rejected composition rolls the whole creation back rather than leaving a half-composed session. A file-backed standing subtree is owned by the roster service's own fiber — deliberately its UNTRACED context, because a subtree minted from a traced `this.ctx` resolves every service through the caller's shadow fiber instead of each entry's own inject store — so it survives every agent and unwinds only with the whole tree. Each generation records its composition file's stamp (mtime and size): a session that finds the stamp stale starts the next generation, while every session already joined keeps the one it runs on — the composition a running session joined outlives its file changing or disappearing underneath it, and files are the only composition editor, so the stamp is what carries an edit to later sessions.
+
+Declared generations remain available to joined agents and cold-read leases after unregistration, then release their plugins and environment when the last user leaves. A mounted agent contributes one reference to its current generation, including after repeated selection or a switch between file-backed and declared presets. A pending mount reservation is released after binding or rollback.
 
 ### Composing a child agent
 
@@ -156,6 +159,8 @@ A directly-plugged subtree is absent from `ctx.loader.entries()`, so no boot aud
 
 Mounting rejects a preset whose rows leaked a root-realm service; the check runs once at mount, so a row that publishes from a timer or an asynchronous continuation afterward escapes it.
 
+`environmentForAgent()` addresses the services installed by a standing realm hook using the mount’s recorded `environment` fiber. File presets and declared presets share this lookup even though their Loader trees have different parents. A missing environment service remains absent; host implementations do not satisfy SSH execution.
+
 <a id="a-preset-file-is-an-input-never-a-persistence-target"></a>
 ## A preset file is an input, never a persistence target
 
@@ -167,6 +172,8 @@ The mounted subtree therefore overrides `write()` as a no-op. Nothing in this pa
 ## Trust
 
 Presets are compositions, so a preset is exactly as privileged as the plugins it names. A `user` preset — authored by a person or by an agent — carries the same trust as shell access; the `trust` field exists so consumers can present that difference, not to enforce it.
+
+Member roster reads and authoring hints follow the [application authorization requirement](../../context/collaboration/README.md#application-authorization).
 
 <a id="model-experience"></a>
 ## Model Experience

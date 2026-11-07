@@ -1,0 +1,14 @@
+{
+  "name": "native-search-usage-postgres-verified",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/postgres.spec.ts -t 'native search usage' --retry=0",
+  "startedAt": "2026-10-24T07:24:01.781893+00:00",
+  "seconds": 3.936,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "400e0e4dd0d568bdc4165b9f04bb00beec3e12cb2edd9161d598523c4d4e677a",
+  "inputsAfter": "400e0e4dd0d568bdc4165b9f04bb00beec3e12cb2edd9161d598523c4d4e677a",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "40a34926a99656c7d962706c64b8da92b5a5a844c48bc2f79ba6178136daed24",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/postgres.spec.ts (41 tests | 1 failed | 39 skipped) 1072ms\n     × prices and deduplicates proved native search usage for the user subject 136ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > prices and deduplicates proved native search usage for the user subject\nAssertionError: expected [ …(2) ] to deeply equal [ …(2) ]\n\n- Expected\n+ Received\n\n@@ -1,17 +1,17 @@\n  [\n    {\n-     \"actor_user_id\": \"5de532fa-e8cb-4fb3-87c1-4314f9109126\",\n+     \"actor_user_id\": null,\n      \"company_cost_micros\": \"0\",\n      \"credential_class\": \"personal\",\n      \"credential_source\": \"file\",\n      \"estimated_cost_micros\": \"7\",\n      \"purpose\": \"web-search\",\n      \"user_id\": \"5de532fa-e8cb-4fb3-87c1-4314f9109126\",\n    },\n    {\n-     \"actor_user_id\": \"5de532fa-e8cb-4fb3-87c1-4314f9109126\",\n+     \"actor_user_id\": null,\n      \"company_cost_micros\": \"7\",\n      \"credential_class\": \"company\",\n      \"credential_source\": \"organization\",\n      \"estimated_cost_micros\": \"7\",\n      \"purpose\": \"web-search\",\n\n ❯ tests/postgres.spec.ts:357:27\n    355|           (company_cost*1000000)::bigint::text AS company_cost_micros\n    356|         FROM harness.model_usage WHERE organization_id=$1 ORDER BY cre…\n    357|       expect(result.rows).toEqual([\n       |                           ^\n    358|         { purpose: 'web-search', credential_source: 'file', credential…\n    359|           user_id: kind === 'user' ? f.primary.uuid : null, estimated_…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed | 39 skipped (41)\n   Start at  15:24:02\n   Duration  3.14s (transform 1.62s, setup 0ms, import 1.98s, tests 1.07s, environment 0ms)\n\n"
+}

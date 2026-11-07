@@ -585,7 +585,6 @@ export class ProcessFlowProjector {
     store: ChatNodeStore,
     timeline: ConversationTimelineSnapshot,
   ): void {
-    const visible = new Set(order)
     const regroup = new Set<number>()
     const added = new Set<string>()
     const changed = new Map<number, Set<string>>()
@@ -617,24 +616,27 @@ export class ProcessFlowProjector {
       if (!this.closedTurns.has(turn)) touch(turn)
     }
 
-    const lastIndexes = lastTurnIndexes(order, store)
     const upserts: ChatGroupSnapshot[] = []
     const removes: string[] = []
-    for (const turn of regroup) {
-      const turnKeys = locations.getTurn(turn).filter(member => visible.has(member))
-      const groups = this.turns.get(turn) ?? new TurnProcessGroups(turn)
-      const last = lastIndexes.get(turn) ?? -1
-      const update = groups.rebuild(
-        store,
-        turnKeys,
-        timeline.turns.get(turn)?.status === 'closed',
-        last >= 0 && last < order.length - 1,
-        added,
-      )
-      upserts.push(...update.upserts)
-      removes.push(...update.removes)
-      if (turnKeys.length === 0) this.turns.delete(turn)
-      else this.turns.set(turn, groups)
+    if (regroup.size > 0) {
+      const visible = new Set(order)
+      const lastIndexes = lastTurnIndexes(order, store)
+      for (const turn of regroup) {
+        const turnKeys = locations.getTurn(turn).filter(member => visible.has(member))
+        const groups = this.turns.get(turn) ?? new TurnProcessGroups(turn)
+        const last = lastIndexes.get(turn) ?? -1
+        const update = groups.rebuild(
+          store,
+          turnKeys,
+          timeline.turns.get(turn)?.status === 'closed',
+          last >= 0 && last < order.length - 1,
+          added,
+        )
+        upserts.push(...update.upserts)
+        removes.push(...update.removes)
+        if (turnKeys.length === 0) this.turns.delete(turn)
+        else this.turns.set(turn, groups)
+      }
     }
     for (const [turn, keys] of changed) {
       if (regroup.has(turn)) continue

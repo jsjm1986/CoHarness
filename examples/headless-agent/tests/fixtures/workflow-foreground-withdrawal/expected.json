@@ -1,0 +1,25 @@
+{
+  "reply": "WORKFLOW_WITHDRAWAL_OK",
+  "workflow": {
+    "mode": "workflow",
+    "liveAtWithdrawal": true,
+    "cancelled": true,
+    "busy": true,
+    "closedBeforeWithdrawal": true,
+    "attempts": 4,
+    "starts": 1,
+    "responseClosed": true,
+    "sawCleanupFailure": true
+  },
+  "ralph": {
+    "mode": "ralph",
+    "liveAtWithdrawal": true,
+    "cancelled": true,
+    "busy": true,
+    "closedBeforeWithdrawal": true,
+    "attempts": 4,
+    "starts": 1,
+    "responseClosed": true,
+    "sawCleanupFailure": true
+  }
+}

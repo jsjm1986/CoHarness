@@ -75,8 +75,8 @@ export class GitRunner {
   async run(args: readonly string[], options: GitRunOptions): Promise<GitRunResult> {
     const timeout = AbortSignal.timeout(this.limits.timeoutMs)
     const signal = AbortSignal.any([options.signal, timeout])
-    const handle = this.subprocess.spawn({
-      argv: [this.executable, ...args],
+    const handle = await this.subprocess.spawn({
+      argv: [this.executable, ...args], resourceOrigin: 'infrastructure',
       cwd: options.cwd,
       stdio: {
         stdin: options.stdin === undefined ? 'ignore' : { data: options.stdin },

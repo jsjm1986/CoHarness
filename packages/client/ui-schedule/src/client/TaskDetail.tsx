@@ -187,6 +187,8 @@ export type TaskDetailProps = TaskDetailInjected
     readonly task: ScheduleCatalogEntry
     /** Whether an authoritative catalog row backs the shown task; a draft alone disables deletion. */
     readonly authoritative: boolean
+    /** False after the captured Runtime leaves the entry's authorized destinations; drafts remain visible. */
+    readonly available?: boolean
     /** Element id shared by the detail panels and any control that points at them. */
     readonly id: string
     /** Catalog query state; loading keeps every action visible and disabled. */
@@ -291,6 +293,7 @@ export function useTaskDetail(
 export function TaskDetail({
   task, authoritative, id, status, deleting, onDelete, onRetry, onUpdateTiming, loadHistory, onOpenSession,
   onEditState, tab, onTabChange, confirmId, onConfirm, onDeleted, onClose, withinSession, useSessions, useWorkspaces, t,
+  available = true,
 }: TaskDetailProps): ReactNode {
   const sessions = useSessions(snapshot => snapshot)
   const workspaces = useWorkspaces(snapshot => snapshot)
@@ -303,7 +306,7 @@ export function TaskDetail({
   // The next-run line states how long remains, so the panel reads the same
   // ticking clock the task list does.
   const now = useRelativeClock()
-  const busy = deleting.includes(task.id) || status === 'loading'
+  const busy = !available || deleting.includes(task.id) || status === 'loading'
   const confirming = authoritative && confirmId === task.id
   const sessionLink = sessionLinkState(task.sessionId, sessions, workspaces)
   const linkedSession = sessionLabel(task.sessionId, sessions)
@@ -632,6 +635,7 @@ export function TaskDetail({
     setFailure(undefined)
   }
   const saveDraft = async (): Promise<void> => {
+    if (!available || pending) return
     const invalid = draftError(shown)
     if (invalid !== undefined) {
       setFailure(invalid)
@@ -684,6 +688,7 @@ export function TaskDetail({
   }
 
   const confirmDelete = (): void => {
+    if (!available || busy) return
     // Confirming retains the task before the acknowledgement-driven refresh can
     // drop its row, so this detail and its saved records stay reachable.
     setDeletionConfirmed(true)
@@ -896,7 +901,7 @@ export function TaskDetail({
       {dirty && !deleted && task.status !== 'inactive' && <footer className={css.saveFooter}>
         <span className={css.saveNotice}>{t('rule.unsaved')}</span>
         <Button disabled={pending} onClick={cancelDraft}>{t('rule.cancel')}</Button>
-        <Button variant="primary" disabled={pending || !dirty} onClick={() => { void saveDraft() }}>
+        <Button variant="primary" disabled={!available || pending || !dirty} onClick={() => { void saveDraft() }}>
           {t(pending ? 'rule.saving' : 'rule.save')}
         </Button>
       </footer>}

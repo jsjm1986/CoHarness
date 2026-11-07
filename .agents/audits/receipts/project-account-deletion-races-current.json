@@ -1,0 +1,14 @@
+{
+  "name": "project-account-deletion-races-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T23:47:00.081118+00:00",
+  "seconds": 4.343,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0d808cdfc256eb51241ff9e2391a0875d4f09d540a586f229980215f5d01c6f3",
+  "inputsAfter": "0d808cdfc256eb51241ff9e2391a0875d4f09d540a586f229980215f5d01c6f3",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "e2c1445be496be7f67e13466c93906cc90ce925961cb5fc91a0c79e1763ef321",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  13 passed (13)\n   Start at  07:47:01\n   Duration  2.72s (transform 872ms, setup 0ms, import 1.16s, tests 1.45s, environment 0ms)\n\n"
+}

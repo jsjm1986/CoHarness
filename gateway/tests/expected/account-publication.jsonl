@@ -1,0 +1,3 @@
+{"operation":"project-profile","runtimeCanRead":true,"otherAccountRead":false,"contentsRetained":true}
+{"operation":"document-personal","runtimeCanRead":true,"otherAccountRead":false,"privateMode":true}
+{"operation":"document-project","runtimeCanRead":true,"otherAccountRead":false,"privateMode":true}

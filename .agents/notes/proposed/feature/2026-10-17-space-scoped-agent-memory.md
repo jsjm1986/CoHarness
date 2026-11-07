@@ -66,6 +66,8 @@ A `scope` parameter appears only when the space offers more than one scope. A st
 
 ## Write authorization
 
+The implemented [member authority lifetime](../../implemented/bug-fix/2026-10-23-memory-member-authority.md) and [durable mutation outcomes](../../implemented/bug-fix/2026-10-23-memory-mutation-outcomes.md) records own request expiry, provider invalidation, and cursor-versus-entry commit ordering.
+
 `ctx.memory.save()` and `ctx.memory.delete()` enforce every rule before mutating, because the model tools, curation, and the browser all reach memory through these two operations:
 
 - **Personal and workspace scopes.** Agent writers may address only their own session's workspace. No grant beyond the already-authorized execution is required.
@@ -89,7 +91,7 @@ When the `recall` switch is on, `dsh-memory-context` starts an auxiliary selecto
 
 ## Earlier-session lookup
 
-ZCode's `ReadSessionContext` corresponds to the existing `tool-session-query` tools. They authorize a target session by working-directory equality, which in a project runtime would expose other members' private conversations, so enabling them in project space requires filtering every target through `CollaborationAuthority.readableSessionIds()` in addition to the directory check.
+ZCode's `ReadSessionContext` corresponds to the existing `tool-session-query` tools. They combine working-directory equality with participant-readable ACL checks in project runtimes, including final revocation checks; the [participant-readable ACL decision](../../implemented/bug-fix/2026-10-17-session-query-participant-acl.md) owns that behavior.
 
 ## Browser surface
 

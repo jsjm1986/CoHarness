@@ -63,11 +63,6 @@
     - id: memory
       name: '@deepseek-ai/dsh-memory'
 
-    - id: message-feedback
-      name: '@deepseek-ai/dsh-message-feedback'
-      config:
-        maxNoteBytes: 8192
-
     - id: workspace
       name: '@deepseek-ai/dsh-workspace'
 
@@ -103,17 +98,35 @@
     - id: plugin-inventory
       name: '@deepseek-ai/dsh-host-plugin-inventory'
 
+    - id: plugin-manager-catalog
+      name: '@deepseek-ai/dsh-plugin-manager/catalog'
+
     # The API gateway: the transport-agnostic dispatch face every client shape
     # shares. The base layer's agent-default-model service owns the default model.
     - id: api-gateway
       name: '@deepseek-ai/dsh-host-apiproxy'
 
 
-    # User-uploaded documents are ordinary files below the user's home. The
-    # HTTP consumer registers its streaming subtree through Connection, so the
-    # shared Host/Origin trust check runs without buffering upload bodies.
+    # Storage mode follows the inherited credential channel before concurrent
+    # plugins mount. Environment-file values cannot select managed storage.
+    # The HTTP consumer registers streaming routes through Connection.
     - id: userdoc-local
       name: '@deepseek-ai/dsh-userdoc-local'
+      disabled: !!js >-
+        ['DSH_GATEWAY_CREDENTIAL_FD', 'DSH_GATEWAY_CREDENTIAL_FILE'].some(name => {
+          const launch = ctx.get('launchEnvironment');
+          return launch === undefined ? process.env[name] : launch.getFrom(name, ['process'])?.value;
+        })
+
+    # Gateway-launched runtimes keep the same document API while all filesystem
+    # access and lifecycle authorization run in the Gateway process.
+    - id: userdoc-gateway
+      name: '@deepseek-ai/dsh-userdoc-gateway'
+      disabled: !!js >-
+        !['DSH_GATEWAY_CREDENTIAL_FD', 'DSH_GATEWAY_CREDENTIAL_FILE'].some(name => {
+          const launch = ctx.get('launchEnvironment');
+          return launch === undefined ? process.env[name] : launch.getFrom(name, ['process'])?.value;
+        })
 
     - id: userdoc-context
       name: '@deepseek-ai/dsh-userdoc-context'
@@ -150,8 +163,10 @@
         host: !!js ctx.webStartup.host ?? '127.0.0.1'
         port: !!js ctx.webStartup.port ?? 3080
         tls: !!js ctx.webStartup.tls
-        compression: gzip
-        compressionLevel: 1
+        compression: auto
+        compressionLevel: 6
+        compressionBrotliQuality: 5
+        compressionBrotliWindowBits: 19
         compressionThresholdBytes: 1024
 
     # Web glue owned by this bundle: resolves the built frontend dist (an
@@ -205,6 +220,7 @@
       name: '@deepseek-ai/dsh-client-connection'
       inject: [webStartup]
       config:
+        historyPageTargetBytes: 262144
         # Keep invocation authorities (each --trusted-host value) when adding
         # deployment values, for example: ['app.internal', ...ctx.webStartup.trustedHosts].
         # The listener's bind IP is accepted separately from this list.
@@ -388,13 +404,8 @@
     - id: ui-memory
       name: '@deepseek-ai/dsh-client-ui-memory'
 
-    # Per-message feedback: Like/Dislike plus an optional note in the
-    # assistant-message action strip, over the messageFeedback Remote.
     - id: workspace-changes
       name: '@deepseek-ai/dsh-workspace-changes'
-
-    - id: ui-message-feedback
-      name: '@deepseek-ai/dsh-client-ui-message-feedback'
 
     # Model selection: the /model popupSelect + composer seat over session.models.
     - id: ui-model-selection

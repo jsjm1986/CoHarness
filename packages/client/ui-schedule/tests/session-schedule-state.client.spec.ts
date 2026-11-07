@@ -42,14 +42,17 @@ describe('Session schedule state', () => {
       .mockResolvedValue({ ok: true, value: [row] })
     const remove = vi.fn<(value: ScheduleId) => Promise<RemoteResult<ScheduleDeleteResult>>>()
       .mockResolvedValue({ ok: true, value: { id, deleted: true } })
+    const remote = {
+      schedule: { list, delete: remove },
+      $on: vi.fn((_event: 'schedule/changed', listener: () => void) => {
+        changed = listener
+        return changedDisposed
+      }),
+    }
     const ctx = {
-      remote: {
-        schedule: { list, delete: remove },
-        $on: vi.fn((_event: 'schedule/changed', listener: () => void) => {
-          changed = listener
-          return changedDisposed
-        }),
-      },
+      sessions: { runtimeTargetFor: () => undefined },
+      get: () => undefined,
+      remote: { ...remote, $forTarget: () => remote },
       on: vi.fn((_event: 'connection/reset', listener: () => void) => {
         reset = listener
         return resetDisposed

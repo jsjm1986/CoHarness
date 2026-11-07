@@ -1,0 +1,55 @@
+{
+  "reply": "WITHDRAWAL_ADMISSION_OK",
+  "withdrawn": {
+    "mode": "withdrawn",
+    "starts": 0,
+    "rejected": true,
+    "liveAtBarrier": true,
+    "scopeCancellation": null,
+    "busyDuringWithdrawal": null,
+    "closedAtWithdrawal": true,
+    "callerCancellationPreserved": null,
+    "attempts": 0,
+    "startEvents": 0,
+    "allClosed": true
+  },
+  "publishing": {
+    "mode": "publishing",
+    "starts": 1,
+    "rejected": true,
+    "liveAtBarrier": true,
+    "scopeCancellation": true,
+    "busyDuringWithdrawal": true,
+    "closedAtWithdrawal": true,
+    "callerCancellationPreserved": null,
+    "attempts": 1,
+    "startEvents": 0,
+    "allClosed": true
+  },
+  "rollback-retry": {
+    "mode": "rollback-retry",
+    "starts": 1,
+    "rejected": true,
+    "liveAtBarrier": true,
+    "scopeCancellation": true,
+    "busyDuringWithdrawal": true,
+    "closedAtWithdrawal": true,
+    "callerCancellationPreserved": null,
+    "attempts": 2,
+    "startEvents": 0,
+    "allClosed": true
+  },
+  "holder": {
+    "mode": "holder",
+    "starts": 1,
+    "rejected": false,
+    "liveAtBarrier": true,
+    "scopeCancellation": false,
+    "busyDuringWithdrawal": null,
+    "closedAtWithdrawal": false,
+    "callerCancellationPreserved": true,
+    "attempts": 1,
+    "startEvents": 1,
+    "allClosed": true
+  }
+}

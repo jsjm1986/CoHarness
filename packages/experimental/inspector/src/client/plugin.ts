@@ -3,7 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { InspectorClientBootstrap } from '../shared/bridge/messages/control.ts'
-import { INSPECTOR_BOOTSTRAP_ROUTE } from '../shared/web.ts'
+import { INSPECTOR_BOOTSTRAP_ROUTE, isInspectorClientOriginAllowed } from '../shared/client-bootstrap.ts'
 import { parseInspectorClientBootstrap } from '../shared/bridge/control-codec.ts'
 import { createInspectorService, type InspectorService as SharedInspectorService } from '../shared/service.ts'
 import { publishCordisTree } from './inspection/cordis.ts'
@@ -43,7 +43,7 @@ export const name = 'experimental-inspector'
 export const inject: string[] = []
 
 /**
- * Mount the Client source, including when the plugin activates after the page loads.
+ * Mount the page's Inspector panel and an admitted Client source, including late activation.
  * @param ctx - Client Cordis context whose page identity and lifecycle own the source.
  * @throws Invalid bootstrap data or a failed service registration; transport setup failures retain reconnect recovery.
  */
@@ -61,7 +61,7 @@ export async function apply(ctx: Context): Promise<void> {
 }
 
 /**
- * Owns each source and its tree publisher until replacement or the outer lifetime effect disposes it.
+ * Owns the panel and any admitted Client source until replacement or outer-lifetime disposal.
  * Cordis owns service/listener effects; transport setup failures retain the reset listener for retry.
  * Invalid bootstrap data and registration errors reject startup after rollback.
  */
@@ -113,29 +113,36 @@ class InspectorClientSession {
 
   private async replace(bootstrap: InspectorClientBootstrap): Promise<void> {
     this.lifetime.signal.throwIfAborted()
-    if (this.bootstrap?.endpoint === bootstrap.endpoint && this.bootstrap.protocol === bootstrap.protocol) return
+    const admitted = isInspectorClientOriginAllowed(location.origin, bootstrap.clientOrigins)
+    if (this.bootstrap?.endpoint === bootstrap.endpoint && this.bootstrap.protocol === bootstrap.protocol
+      && isInspectorClientOriginAllowed(location.origin, this.bootstrap.clientOrigins) === admitted) return
     await this.release?.()
     this.release = undefined
     this.bootstrap = undefined
-    let source: Awaited<ReturnType<typeof startInspectorClient>>
-    try {
-      source = await startInspectorClient(bootstrap)
-    } catch (error) {
-      this.connectionFailed(error)
-      return
+    let source: Awaited<ReturnType<typeof startInspectorClient>> | undefined
+    if (admitted) {
+      try {
+        source = await startInspectorClient(bootstrap)
+      } catch (error) {
+        this.connectionFailed(error)
+        return
+      }
     }
     const disposers: Array<() => unknown> = []
-    const dispose = () => disposeInspectorResources(disposers, () => { source.close() }, 'experimental-inspector: Client disposal failed')
+    const dispose = () => disposeInspectorResources(disposers, () => { source?.close() }, 'experimental-inspector: Client disposal failed')
     try {
       this.lifetime.signal.throwIfAborted()
-      disposers.push(publishCordisTree(this.ctx, source, {
-        maxNodes: bootstrap.maxCordisNodes,
-        maxBytes: bootstrap.maxFrameBytes - 4_096,
-      }))
-      disposers.push(this.ctx.provide('inspector', createInspectorService(source)))
+      if (source !== undefined) {
+        disposers.push(publishCordisTree(this.ctx, source, {
+          maxNodes: bootstrap.maxCordisNodes,
+          maxBytes: bootstrap.maxFrameBytes - 4_096,
+        }))
+        disposers.push(this.ctx.provide('inspector', createInspectorService(source)))
+      }
+      const sourceId = source?.sourceId ?? null
       const panel = this.ctx.inject(['slots', 'shortcuts', 'locale'], async (ctx) => {
         const { registerInspectorPage } = await import('./bottom/page.tsx')
-        registerInspectorPage(ctx, source.sourceId)
+        registerInspectorPage(ctx, sourceId)
       })
       disposers.push(() => panel.dispose())
     } catch (error) {

@@ -43,7 +43,7 @@ function fakeInternals() {
   const internals: ProcessInspectorInternals = {
     readFile(path) {
       const value = files.get(path)
-      if (value === undefined) throw new Error(`missing ${path}`)
+      if (value === undefined) throw Object.assign(new Error(`missing ${path}`), { code: 'ENOENT' })
       return value
     },
     readDir(path) {
@@ -89,11 +89,50 @@ function fakeInternals() {
 }
 
 describe('Linux process inspector', () => {
+  it.each(['ENOENT', 'ESRCH'])('reports an absent identity after a %s stat lookup', (code) => {
+    const fake = fakeInternals()
+    fake.internals.readFile = () => { throw Object.assign(new Error('Process is absent'), { code }) }
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
+    const identity = { pid: 10, started: '500' }
+    expect(inspector.isAlive(identity)).toBe(false)
+    inspector.signalProcess(identity, 'SIGKILL')
+    expect(fake.kills).toEqual([])
+  })
+
+  it.each([
+    ['malformed', 'incomplete process stat'],
+    ['wrong-pid', stat(11, 10, 10, 10, '500')],
+  ])('refuses %s stat data as identity evidence', (_name, contents) => {
+    const fake = fakeInternals()
+    fake.dirs.set('/proc', ['10'])
+    fake.files.set('/proc/10/stat', contents)
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
+    const identity = { pid: 10, started: '500' }
+    expect(() => inspector.isAlive(identity)).toThrow('stat is invalid')
+    const observed = inspector.snapshot()
+    expect(observed.complete).toBe(false)
+    expect(() => observed.alive(identity)).toThrow('incomplete')
+    expect(() => { inspector.signalProcess(identity, 'SIGKILL') }).toThrow('stat is invalid')
+    expect(fake.kills).toEqual([])
+  })
+
+  it.each(['EACCES', 'EMFILE', 'EIO'])('does not report a known identity as exited when its stat read fails with %s', (code) => {
+    const fake = fakeInternals()
+    fake.dirs.set('/proc', ['10'])
+    fake.internals.readFile = () => { throw Object.assign(new Error('Process stat unavailable'), { code }) }
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
+    const identity = { pid: 10, started: '500' }
+    expect(() => inspector.isAlive(identity)).toThrow('Process stat unavailable')
+    expect(() => inspector.snapshot().alive(identity)).toThrow('incomplete')
+    expect(() => { inspector.signalProcess(identity, 'SIGKILL') }).toThrow('Process stat unavailable')
+    expect(fake.kills).toEqual([])
+  })
+
   it.each(['EACCES', 'EMFILE'])('refuses to publish an empty snapshot when /proc enumeration fails with %s', (code) => {
     const fake = fakeInternals()
     const readDir = fake.internals.readDir.bind(fake.internals)
     fake.internals.readDir = () => { throw Object.assign(new Error('Enumeration failed'), { code }) }
-    const inspector = createProcessInspector('linux', 'x64', fake.internals)
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
     expect(() => inspector.snapshot()).toThrow('/proc directory is unreadable')
     fake.internals.readDir = readDir
     fake.dirs.set('/proc', ['10'])
@@ -107,7 +146,7 @@ describe('Linux process inspector', () => {
     fake.files.set('/proc/10/stat', stat(10, 10, 10, 10, '500'))
     fake.links.set('/proc/10/fd/0', '/dev/pts/1')
     fake.devices.set('/proc/10/fd/0', { character: true, rdev: 99 })
-    const inspector = createProcessInspector('linux', 'x64', fake.internals)
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
     expect(inspector.isStdinWaiting(10, 10)).toBe(false)
     fake.dirs.set('/proc', ['10'])
     expect(inspector.isStdinWaiting(10, 10)).toBe(false)
@@ -131,6 +170,30 @@ describe('Linux process inspector', () => {
     expect(linuxProcessGroupHasLiveMembers(77, fake.internals)).toBe(true)
   })
 
+  it.each(['EACCES', 'EMFILE', 'ENOENT', 'ESRCH'])('retains uncertain group ownership when a zombie is visible but another process read fails with %s', (code) => {
+    const fake = fakeInternals()
+    fake.dirs.set('/proc', ['10', '11'])
+    fake.files.set('/proc/10/stat', stat(10, 77, 10, -1, '500', 1, 'Z'))
+    fake.internals.readFile = (path) => {
+      if (path === '/proc/11/stat') throw Object.assign(new Error('Process observation incomplete'), { code })
+      return fake.files.get(path)!
+    }
+    expect(linuxProcessGroupHasLiveMembers(77, fake.internals)).toBeUndefined()
+    fake.files.set('/proc/10/stat', stat(10, 77, 10, -1, '500'))
+    fake.dirs.set('/proc', ['11', '10'])
+    expect(linuxProcessGroupHasLiveMembers(77, fake.internals)).toBe(true)
+  })
+
+  it('does not infer a zombie-only group from malformed process rows', () => {
+    const fake = fakeInternals()
+    fake.dirs.set('/proc', ['10', '11'])
+    fake.files.set('/proc/10/stat', stat(10, 77, 10, -1, '500', 1, 'Z'))
+    fake.files.set('/proc/11/stat', 'incomplete stat data')
+    expect(linuxProcessGroupHasLiveMembers(77, fake.internals)).toBeUndefined()
+    fake.files.set('/proc/11/stat', stat(11, 77, 10, -1, '501'))
+    expect(linuxProcessGroupHasLiveMembers(77, fake.internals)).toBe(true)
+  })
+
   it('parses stat safely, captures only the rooted process tree, and signals identities', () => {
     expect(parseProcStat('bad')).toBeUndefined()
     expect(parseProcStat('1 () ')).toBeUndefined()
@@ -144,7 +207,7 @@ describe('Linux process inspector', () => {
     fake.files.set('/proc/11/stat', stat(11, 21, 30, -1, '501'))
     fake.files.set('/proc/12/stat', stat(12, 22, 30, -1, '502', 10))
     fake.files.set('/proc/13/stat', stat(13, 23, 30, -1, '503', 12))
-    const inspector = createProcessInspector('linux', 'x64', fake.internals)
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
     expect(inspector.foregroundPgid(10)).toBe(40)
     expect(inspector.foregroundPgid(11)).toBeUndefined()
     expect(inspector.foregroundPgid(99)).toBeUndefined()
@@ -188,7 +251,7 @@ describe('Linux process inspector', () => {
     fake.devices.set('/proc/100/fd/0', { character: true, rdev: 99 })
     fake.links.set('/proc/101/task/102/fd/0', '/dev/pts/1')
     fake.devices.set('/proc/101/task/102/fd/0', { character: true, rdev: 99 })
-    const inspector = createProcessInspector('linux', 'x64', fake.internals)
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
 
     fake.files.set('/proc/100/task/100/syscall', 'running')
     fake.files.set('/proc/101/task/101/syscall', '-1 0x0')
@@ -228,7 +291,7 @@ describe('Linux process inspector', () => {
     fake.devices.set('/proc/100/fd/0', { character: true, rdev: 99 })
     fake.links.set('/proc/100/task/100/fd/0', 'pipe:[123]')
     fake.devices.set('/proc/100/task/100/fd/0', { character: false, rdev: 0 })
-    const inspector = createProcessInspector('linux', 'x64', fake.internals)
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
 
     expect(inspector.isStdinWaiting(77, 99)).toBe(false)
     fake.links.delete('/proc/100/task/100/fd/0')
@@ -250,29 +313,29 @@ describe('Linux process inspector', () => {
     fake.links.set('/proc/100/task/100/fd/0', '/dev/pts/1')
     fake.devices.set('/proc/100/task/100/fd/0', { character: true, rdev: 99 })
     fake.files.set('/proc/100/task/100/syscall', syscall(0, 2))
-    expect(createProcessInspector('linux', 'mips', fake.internals).isStdinWaiting(77, 100)).toBe(false)
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'mips', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
 
     fake.files.set('/proc/100/task/100/syscall', syscall(270, 1, 0))
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
     fake.files.set('/proc/100/task/100/syscall', syscall(7, 0, 0))
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
     fake.files.set('/proc/100/task/100/syscall', syscall(7, 0, 1))
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
     fake.files.set('/proc/100/task/100/syscall', syscall(7, 0x20, 1))
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
     fake.files.set('/proc/100/task/100/syscall', syscall(232, 9, 0, 1))
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
     fake.files.set('/proc/100/task/100/syscall', syscall(999))
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
 
     fake.files.set('/proc/100/task/100/syscall', 'not-a-number 0x0')
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
     fake.dirs.delete('/proc/100/task')
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
     fake.dirs.set('/proc', ['100', '200'])
     fake.files.set('/proc/200/stat', stat(200, 88, 200, 88, '2'))
-    expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
+    expect(createProcessInspector(1000, 'linux', 'x64', fake.internals).isStdinWaiting(77, 100)).toBe(false)
   })
 
   it('contains unreadable syscall, memory, and fdinfo boundaries', () => {
@@ -280,7 +343,7 @@ describe('Linux process inspector', () => {
     fake.dirs.set('/proc', ['100'])
     fake.files.set('/proc/100/stat', stat(100, 77, 100, 77, '1'))
     fake.dirs.set('/proc/100/task', ['100'])
-    const inspector = createProcessInspector('linux', 'x64', fake.internals)
+    const inspector = createProcessInspector(1000, 'linux', 'x64', fake.internals)
     fake.files.delete('/proc/100/stat')
     expect(inspector.isStdinWaiting(77, 100)).toBe(false)
     fake.files.set('/proc/100/stat', stat(100, 77, 100, 77, '1', 1, 'S', 0))
@@ -309,11 +372,24 @@ describe('Linux process inspector', () => {
 })
 
 describe('macOS process inspector', () => {
+  it('does not infer identity absence from an incomplete process table', () => {
+    const fake = fakeInternals()
+    fake.setPs(' 10 1 Mon Jul 21 10:00:00 2026\nunreadable row\n')
+    const inspector = createProcessInspector(1000, 'darwin', 'arm64', fake.internals)
+    const identity = { pid: 11, started: 'Mon Jul 21 10:00:01 2026' }
+    expect(() => inspector.isAlive(identity)).toThrow('incomplete')
+    expect(() => inspector.snapshot().alive(identity)).toThrow('incomplete')
+    expect(() => { inspector.signalProcess(identity, 'SIGKILL') }).toThrow('incomplete')
+    expect(fake.kills).toEqual([])
+    expect(inspector.isAlive({ pid: 10, started: 'Mon Jul 21 10:00:00 2026' })).toBe(true)
+    expect(inspector.isAlive({ pid: 10, started: 'different start' })).toBe(false)
+  })
+
   it('reads tpgid and process trees, contains cycles, and identity-fences signals', () => {
     const fake = fakeInternals()
     fake.setTpgid('55\n')
     fake.setPs(' 10 1 Mon Jul 21 10:00:00 2026\n 11 10 Mon Jul 21 10:00:01 2026\n 12 11 Mon Jul 21 10:00:02 2026\n 13 99 Mon Jul 21 10:00:03 2026\nmalformed\n')
-    const inspector = createProcessInspector('darwin', 'arm64', fake.internals)
+    const inspector = createProcessInspector(1000, 'darwin', 'arm64', fake.internals)
     expect(inspector.foregroundPgid(10)).toBe(55)
     expect(inspector.isStdinWaiting(55, 10)).toBe(false)
     const observed = inspector.snapshot()
@@ -340,7 +416,7 @@ describe('macOS process inspector', () => {
   it('re-reads the process table before signalling instead of trusting an earlier observation', () => {
     const fake = fakeInternals()
     fake.setPs(' 11 10 Mon Jul 21 10:00:01 2026\n')
-    const inspector = createProcessInspector('darwin', 'arm64', fake.internals)
+    const inspector = createProcessInspector(1000, 'darwin', 'arm64', fake.internals)
     inspector.snapshot()
     // The member exits after that observation; a recycled pid would otherwise
     // inherit the observed identity and take the signal meant for the original.
@@ -354,10 +430,10 @@ describe('macOS process inspector', () => {
   it('returns undefined for missing or invalid foreground groups and dispatches platform inspectors', () => {
     const fake = fakeInternals()
     fake.setTpgid('-1')
-    expect(createProcessInspector('darwin', 'arm64', fake.internals).foregroundPgid(1)).toBeUndefined()
+    expect(createProcessInspector(1000, 'darwin', 'arm64', fake.internals).foregroundPgid(1)).toBeUndefined()
     fake.internals.exec = () => { throw new Error('gone') }
-    expect(createProcessInspector('darwin', 'arm64', fake.internals).foregroundPgid(1)).toBeUndefined()
-    expect(createProcessInspector('win32', 'x64', fake.internals)).toBeInstanceOf(WindowsProcessInspector)
-    expect(() => createProcessInspector('freebsd', 'x64', fake.internals)).toThrow('unsupported on platform freebsd')
+    expect(createProcessInspector(1000, 'darwin', 'arm64', fake.internals).foregroundPgid(1)).toBeUndefined()
+    expect(createProcessInspector(1000, 'win32', 'x64', fake.internals)).toBeInstanceOf(WindowsProcessInspector)
+    expect(() => createProcessInspector(1000, 'freebsd', 'x64', fake.internals)).toThrow('unsupported on platform freebsd')
   })
 })

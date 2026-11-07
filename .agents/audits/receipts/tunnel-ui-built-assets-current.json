@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-built-assets-current",
+  "cwd": "gateway/admin-ui",
+  "command": "node_modules/.bin/vite build",
+  "startedAt": "2026-10-24T23:11:49.625014+00:00",
+  "seconds": 3.452,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "inputsAfter": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "postgresToolDirectory": null,
+  "outputSha256": "77fdd3e090a4a7a81db27d1af252b5b334b1c7323d8e7212c7d71fa8d4f8d44c",
+  "outputTail": "vite v7.3.6 building client environment for production...\ntransforming...\n✓ 2192 modules transformed.\nrendering chunks...\ncomputing gzip size...\n../public/admin/index.html                         0.42 kB │ gzip:   0.29 kB\n../public/admin/assets/PluginsPage-CCnrrwq1.css   34.22 kB │ gzip:   6.43 kB\n../public/admin/assets/index-LV_7sxNr.css         81.95 kB │ gzip:  15.01 kB\n../public/admin/assets/PluginsPage-BwMcfrad.js   500.06 kB │ gzip: 121.22 kB\n../public/admin/assets/index-C05klc6U.js         797.27 kB │ gzip: 240.34 kB\n\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n✓ built in 1.79s\n"
+}

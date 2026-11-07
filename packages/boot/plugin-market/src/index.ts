@@ -1,15 +1,17 @@
 /** Host reader of configured plugin market indexes for the Discover page and the `plugin_market` tool. */
 
-import type { Context, Volatile } from '@deepseek-ai/cordis'
+import { symbols, type Context, type Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import semver from 'semver'
 import { evaluatePluginCompatibility, getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import { marketInstallTarget, type MarketIndex, type MarketPlugin, type MarketVersion } from '@deepseek-ai/dsh-plugin-market-index'
 import type { BundleInfo } from '@deepseek-ai/dsh-plugin-manager/types'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+import { ResourceAdmissionError, resourceBudgetOf, type ResourceBudget } from '@deepseek-ai/dsh-resource-budget'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { normalizeIndexUrl } from './index-url.ts'
 import { parseIndexInWorker } from './parse-thread.ts'
+import type { IndexParseResult } from './parse.ts'
 import { MarketSearch } from './search.ts'
 // Type-only: the `pluginManager` service, the `settings` `plugin-market` scope that persists `setIndexes`, and the
 // Loader's `loader/volatile-update` event.
@@ -36,7 +38,7 @@ export interface Config {
    * without remounting the service.
    */
   indexes: Volatile<string[]>
-  /** Deadline for one index fetch, including the body. */
+  /** Deadline for one index fetch, body, process admission and parsing. */
   fetchTimeoutMs: number
   /** Largest accepted index body in bytes. */
   maxBytes: number
@@ -307,9 +309,19 @@ export default class PluginMarket extends TypertRemoteService {
       throw failed(`HTTP ${String(response.status)}`)
     }
     const bytes = await this.readBody(response, failed)
-    const result = await parseIndexInWorker(bytes, url, this.lifetime.signal).catch((error: unknown) => {
+    let result: IndexParseResult
+    try {
+      const budget = resourceBudgetOf(this.ctx)
+      const original = (value: ResourceBudget | undefined): ResourceBudget | undefined =>
+        (value as (ResourceBudget & { [symbols.original]?: ResourceBudget }) | undefined)?.[symbols.original] ?? value
+      result = await parseIndexInWorker(bytes, url, signal, budget, () => {
+        if (original(resourceBudgetOf(this.ctx)) !== original(budget)) {
+          throw new ResourceAdmissionError('unavailable', 'Index parser resource owner changed; retry with its current provider.')
+        }
+      })
+    } catch (error) {
       throw failed(messageOf(error), error)
-    })
+    }
     if (result.ok) return result.index
     throw new RemoteError('plugin-market/invalid-index', `${url}: ${result.message}`, { url, path: result.path, reason: result.reason })
   }

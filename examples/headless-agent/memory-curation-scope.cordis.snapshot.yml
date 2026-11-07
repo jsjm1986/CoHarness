@@ -1,0 +1,9 @@
+- id: scope-isolation
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ./memory-curation-race.cordis.snapshot.yml
+    patches:
+      - id: curation-race-model
+        name: './tests/fixtures/memory-curation-race-model.ts'
+        config:
+          scenario: scope-isolation

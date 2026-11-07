@@ -1,0 +1,14 @@
+{
+  "name": "jobs-durable-recording-persistence-history",
+  "cwd": ".",
+  "command": "pnpm run verify-persistence-changes",
+  "startedAt": "2026-10-26T07:54:02.698305+00:00",
+  "seconds": 19.554,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "112b78da09df5931367efdb76a87a19c33c6342bfcbf2bd74d6cfda498d35783",
+  "inputsAfter": "112b78da09df5931367efdb76a87a19c33c6342bfcbf2bd74d6cfda498d35783",
+  "postgresToolDirectory": null,
+  "outputSha256": "d5c50083ffc6e0a8a8324953dd9a1b371adbb6849b505d9c1fbba2abd5bd1f7b",
+  "outputTail": "$ tsx scripts/persistence-changes.ts --check\nunacknowledged persistence type changes:\n  event:agent/inbox/spliced.data.inserted[].source[kind=\"user\"].documents[].ref.identity: optional property added (same-version allowed)\n  event:auto-review/request.data.request.messages[].source[kind=\"user\"].documents[].ref.identity: optional property added (same-version allowed)\n  event:browser-use/stagehand-llm-request.data.request.messages[].source[kind=\"user\"].documents[].ref.identity: optional property added (same-version allowed)\n  event:developer/message.data.message.source[kind=\"user\"].documents[].ref.identity: optional property added (same-version allowed)\n  event:memory/curation-request.data.request.messages[].source[kind=\"user\"].documents[].ref.identity: optional property added (same-version allowed)\n  event:memory/recall-request.data.request.messages[].source[kind=\"user\"].documents[].ref.identity: optional property added (same-version allowed)\n  event:session/title-llm-request.data.messages[].source[kind=\"user\"].documents[].ref.identity: optional property added (same-version allowed)\n  event:user/message.data.source[kind=\"user\"].documents[].ref.identity: optional property added (same-version allowed)\n  event:userdoc/attached.data.ref.identity: optional property added (same-version allowed)\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

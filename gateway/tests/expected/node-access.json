@@ -1,0 +1,32 @@
+{
+  "anonymous": 401,
+  "member": 403,
+  "issued": 201,
+  "enrolled": 200,
+  "connected": 200,
+  "stale": {
+    "status": 409,
+    "body": {
+      "error": "node-access/lease-lost"
+    }
+  },
+  "runtime": 401,
+  "directory": {
+    "status": 200,
+    "cache": "no-store",
+    "nodes": [
+      {
+        "status": "connected",
+        "executionReady": false
+      }
+    ]
+  },
+  "revoked": 200,
+  "denied": {
+    "status": 401,
+    "body": {
+      "error": "node-access/unauthorized"
+    }
+  },
+  "runtimeStarts": 0
+}

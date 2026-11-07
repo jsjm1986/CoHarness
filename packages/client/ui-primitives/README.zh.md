@@ -9,7 +9,9 @@ kind: "package-library"
 
 纯 React 原子组件（零 cordis）：StateDot、DisclosureRow、ic_ds_* 图标、Button/Pill/Menu/Modal/Input/Switch、`ConnectionIndicator` 连接恢复控件、手机 Sheet 的 `MobileSheetBackdrop` 关闭遮罩、Toast 短时横幅、OnboardingSurface 首次使用接管层（portal 到 body 的遮罩加不透明展示层，在且仅在自身生命周期内保持 `#root` 为 `inert`）、markdown 家族（MarkdownText/JsonBlock）、共享的 `ImageLightbox` 图片模态、单行文件路径 `PathLabel`（目录弱化色、文件名主色、悬停显示完整路径；放得下时靠左对齐，溢出时在左边缘裁剪渐隐以保留文件名尾缀，路径或尺寸变化时重新测量）、自动聚焦的多行行内编辑器 `InlineEditor`（随文本与宽度增高，最多六行后滚动；Enter 保存，Shift+Enter 换行，输入法组合中的 Enter 不生效，Escape 取消）、只读 JsonTree 检查器、用于 portal presenter 的 `useMediaQuery` 视口钩子、`useAnchoredMaxHeight` 钩子（把底部锚定的浮层高度收敛到锚点上方的视口空间，并在 resize、scroll 与调用方提供的依赖变化时重新测量）、`useAnchoredPosition` 钩子（让固定定位的浮动面板跟住锚点：测量、偏移、按视口边距钳制，并在捕获阶段滚动、窗口缩放与面板自身尺寸变化时重新定位），以及支持可选 portal 面板 ref 的 `useDismissOnOutsidePointer`。代码块与 Read 块都会在进入视口前延迟语法高亮；首次进入后在本次挂载中保持语法启用。流式代码块只标记新完成的行，并保留有界的 React 行分组；未改变的围栏在定稿时复用流式树。可选择中的单行命令或参数文本 `CommandText` 保持该行逐字呈现并横向滚动，仅在溢出时携带本地化 `label` 以具名 group 进入 Tab 顺序。TerminalBlock、DiffBlock、ReadBlock、SearchBlock，以及 WebBlock 补齐原语集合。`rankByName` 是 `/` 菜单命令源与 skill 源共享的候选排序器：查询必须是名字的不区分大小写的有序子序列；前缀命中排最前，其次按对齐分数，再按来源顺序（[排名决策](../../../.agents/notes/implemented/feature/2026-08-04-web-slash-command-fuzzy-discovery.zh.md)）。`projectUserText` 将已发送的用户文本投影为内联纯文本片段与引用 chip，供消息气泡与命令输入回显使用：`@` token 按会话标签、文件或目录形状装饰，`/name` token 仅在调用方提供该步骤实际解析出的名字时才装饰，slash chip 以代码字体呈现并沿用使用方的字号，以及 `SecretText` 凭据脱敏行内节点：`projectUserText` 对识别到的密钥、令牌与带密码地址输出它，提供逐值揭示开关且脱敏不改动日志原文。
 
-`Menu` 主列表在桌面使用锚点位置；可选的 `header` 固定在可滚动条目视口上方，可选的 `footer` 固定在下方；`listClassName` 允许消费方设置产品自己的列表几何约束，例如高度上限。768px 以下会使用 `--dsw-mobile-sheet-*` 变为遵守安全区的手机 Sheet，并统一提供遮罩和拖拽提示；可滚动菜单会把 header 和 footer 留在条目滚动区外，条目仍是可选择的 menu item，并保留相同的外部按下关闭和 Escape 行为。`Modal` 使用相同的 Sheet 呈现，并在打开期间把键盘焦点保持在对话框内。portal presenter 如果信息层级需要手机专属分支，应使用 `useMediaQuery('(max-width: 767px)')`；外壳内部组件继续使用 `data-viewport` 标记。
+`Button` 将强调程度与尺寸分开。`soft` 变体为日常工具栏入口提供中性浅底和主文字色，并提供随主题变化的悬停和按下填充。`size="toolbar"` 统一使用 32px 高度、13/20 字体、6px 图标间距、12px 水平内边距和 8px 控件圆角；粗指针与紧凑布局保留 44px 点击区域和 14/22 字体。`primary` 继续用于更强的确认或提交操作。既有 `md` 和 `sm` 尺寸保持原有几何规格。
+
+`Menu` 主列表在桌面使用锚点位置；可选的 `header` 固定在可滚动条目视口上方，可选的 `footer` 固定在下方；`listClassName` 允许消费方设置产品自己的列表几何约束，例如高度上限。768px 以下会使用 `--dsw-mobile-sheet-*` 变为遵守安全区的手机 Sheet，并统一提供遮罩和拖拽提示；可滚动菜单会把 header 和 footer 留在条目滚动区外，条目仍是可选择的 menu item，并保留相同的外部按下关闭和 Escape 行为。`Modal` 使用相同的 Sheet 呈现，并在打开期间把键盘焦点保持在对话框内。portal presenter 如果信息层级需要手机专属分支，应使用 `useMediaQuery('(max-width: 767px)')`；外壳内部组件继续使用 `data-viewport` 标记。共享弹窗焦点循环包含内嵌菜单内容，仅向通过 portal 挂载在弹窗之外的菜单让出遍历控制。 菜单和触发器拥有的弹层会在所属区域隐藏时关闭，包括通过键盘切换面板；关闭时保留新目标的焦点。前景弹窗取得焦点时，已打开的菜单会关闭，不会将焦点移回弹窗后方。
 
 ## 概述
 
@@ -25,6 +27,7 @@ kind: "package-library"
 - [Diff 渲染](#diff-rendering)
 - [搜索结果](#search-results)
 - [Web 检索](#web-retrieval)
+- [JSON 检查](#json-inspection)
 - [兼容性](#compatibility)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
@@ -63,7 +66,7 @@ kind: "package-library"
 <a id="read-rendering"></a>
 ## Read 渲染
 
-`ReadBlock` 将返回的文件窗口渲染为带行号、语法高亮的代码表层：一个粗体路径（或 presenter 提供的标题）横幅加复制控件，其下是内容行，行号槽里是文件自身的行号（窗口化的 read 保留文件本身的编号，因此偏移之后的 read 从大于 1 处起始）。`totalLines` 超过窗口行数时画出 `showing N of M` 提示；超过 `maxLines`（默认 16，与 TerminalBlock 相同的切分算法）时折叠为头部切片加尾部切片，由展开按钮控制。高亮走与 `CodeBlock` 相同的 shiki 路径，并在首次进入视口前延迟。原理：[Web read 卡片笔记](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card.zh.md)。
+`ReadBlock` 将返回的文件窗口渲染为带行号、语法高亮的代码表层：一个粗体路径（或 presenter 提供的标题）横幅加复制控件，其下是内容行，行号槽里是文件自身的行号（窗口化的 read 保留文件本身的编号，因此偏移之后的 read 从大于 1 处起始）。`totalLines` 超过窗口行数时画出 `showing N of M` 提示；超过 `maxLines`（默认 16，与 TerminalBlock 相同的切分算法）时折叠为头部切片加尾部切片，由展开按钮控制。折叠时仅为可见头尾准备行节点；展开与复制使用完整返回窗口。高亮走与 `CodeBlock` 相同的 shiki 路径，在首次进入视口前延迟，并保留跨折叠行的语法上下文。原理：[Web read 卡片笔记](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card.zh.md)。
 
 <a id="diff-rendering"></a>
 ## Diff 渲染
@@ -82,10 +85,17 @@ kind: "package-library"
 
 `WebBlock` 渲染一次已完成的 web 检索，用一个组件绘制 `web` 渲染意图的两种 kind（由 `kind` 判别）。`search` 在有序引用列表上方显示可选的提供方回答（通过 `MarkdownText`）：每个 source 是一个安全外链，以其标题为标签，或以其主机名为标签，当 URL 无法解析或没有主机名（`file:`/`data:` URL）时回退到原始 URL，因此标签绝不为空；其下渲染 snippet 与发布日期。只有 http(s) URL 会成为锚点（设置 `target`/`rel`）——这是 `MarkdownText` 对不受信任链接所用 allowlist 的 http(s) 子集（该 allowlist 还允许 `mailto:`，此处排除）；任何其他 URL 渲染为纯文本。整份列表渲染在一个定高滚动容器里（`max-height: 320px`、`overflow-y: auto`），因此超出该高度的列表在原地纵向滚动，而不是把卡片撑高；`<li value>` 固定每个 source 的引用编号，从 1 起连续，而不依赖 `<ol>` 的隐式计数。当一次 search 合法地返回无 answer 且无 source 时，卡片显示一个明确的空状态提示，而不是空的 `<ol>`（chat 行不呈现原始 result content）。`fetch` 显示一个紧凑摘要：带链接的最终 URL 及其 HTTP 状态。两者都会标记一次被截断的检索。原理：[Web result 卡片笔记](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.zh.md)与[来源滚动笔记](../../../.agents/notes/implemented/feature/2026-08-03-web-search-source-scroll.zh.md)。
 
+<a id="json-inspection"></a>
+## JSON 检查
+
+`JsonTree` 提供只读 JSON、键盘导航，以及值、JSON 与属性路径复制。折叠预览最多显示两层，每层最多四个对象字段或五个数组项；更深的容器以省略号呈现，不读取其子项值。展开容器会显示所有条目，复制始终包含选中值的完整内容，不受预览限制。
+
 <a id="compatibility"></a>
 ## 兼容性
 
 `useMediaQuery` 为每个查询复用一个原生监听器，并在旧版 WebView 中回退到 `addListener`／`removeListener`。`holdInert` 在可用时使用原生 `HTMLElement.inert`，同时在浮层占有页面期间保持 `aria-hidden` 与 tab 停靠点安全。主题样式会先定义 `100vh` 视口回退，待 layout 插件发布可视视口高度后再覆盖。`relativeTime` 把某个时刻归入紧凑的"单位＋数量"桶，使所有为会话标注时间的界面对同一时刻给出一致读数；具体文案保留在各插件自己的词典中。
+
+`ComputerBadge` 以弱化的电脑图标和名称呈现归属。纯展示不产生按钮、卡片背景或额外键盘停靠点；调用方明确提供详情或操作时才增加传送菜单。调用方提供已验证的资源归属，菜单操作保留固定目标。菜单保持在所属对话框内，使焦点仍能访问其条目。交互控件保留共享触控尺寸；纯名称截断时通过完整可访问文本和提示展示全名。
 
 <a id="model-experience"></a>
 ## 模型体验

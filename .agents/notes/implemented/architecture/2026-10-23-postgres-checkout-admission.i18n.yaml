@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-postgres-checkout-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-postgres-checkout-admission.md
+document:
+  en: a5b1ba4b475b1055a6b215aac7a8f38ba70073c9
+  zh: f74e6c6bced54526626d5829077064be3b7271ea
+/agent-note-enforce-admission-at-every-postgresql-checkout:
+  en: 8f2abbeee2d8eb0d
+  zh: b28f4d09f1c676f8
+/agent-note-enforce-admission-at-every-postgresql-checkout/problem:
+  en: 0c3d47f80ebead9e
+  zh: 3f69409f9a0bc2b4
+/agent-note-enforce-admission-at-every-postgresql-checkout/decision:
+  en: f6410bbfd534b5e8
+  zh: 90dc4f68b1b492d6
+/agent-note-enforce-admission-at-every-postgresql-checkout/alternatives-considered:
+  en: 59fe978b419eef35
+  zh: 6d897d838938b7c5
+/agent-note-enforce-admission-at-every-postgresql-checkout/consequences:
+  en: 7954842254f1ffc6
+  zh: 1dca9b233e252310
+/agent-note-enforce-admission-at-every-postgresql-checkout/verification:
+  en: 670fd3e12e30e981
+  zh: 3700d90611a65438

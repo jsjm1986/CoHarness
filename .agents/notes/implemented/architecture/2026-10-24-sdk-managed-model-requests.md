@@ -1,0 +1,47 @@
+# Agent Note: Managed SDK child model and process requests
+
+Status: implemented
+
+English | [中文](2026-10-24-sdk-managed-model-requests.zh.md)
+
+## Problem
+
+An SDK child is a complete runtime. Reserving its process does not admit its individual model calls or child-owned subprocesses, and its independent profile cannot infer the initiating parent's current permissions and billing witnesses.
+
+## Decision
+
+A per-run authenticated loopback connection binds control operations to the initiating parent. The CLI installs its private child plugin before profile entries, including startup probes. The child confirms activation before publication. Control credentials remain outside ordinary process inheritance, launch-environment lookup and durable configuration. An execution authority requires this connection even without a resource budget or model-policy service: their absence does not authorize bypassing the parent’s execution-scoped model guards.
+
+Each child resource operation uses a separate parent permit. Model authorization requires a delivered permit and a live middleware scope; closing the model span withdraws its model permits. Processes retain their own caller cancellation independently of the model call that created them. Monotonic registration ids bound retry history without reallocating completed operations. Completion messages carry the last settled registration attempt as private `settledRegistration` metadata. The parent discards early cancellations through that id because later registration cannot reuse them, even when consecutive attempts never reached the parent. Already registered operations and pending grants remain owned. Pending cancellation joins late grants; missing cleanup acknowledgement retains uncertain occupancy. The same monotonic cleanup deadline covers admitted operations, model middleware and HTTP cleanup handlers; a pending report cannot reopen an unbounded wait. Model inputs, native prepared operations, adapters, credentials and durable request checkpoints remain in the child.
+
+Parent and child completion retain the original permit across rejected acknowledgements. Reports serialize and preserve proven quiescence; acknowledged uncertainty can advance to released after later cleanup, and a late uncertainty report cannot reverse that proof. Parent and child retain uncertain operations until quiescence is acknowledged; the parent counts them within its configured operation capacity. Child cancellation observation remains active for the original permit during uncertainty and stops only on final release or provider closure. A parent withdrawal therefore still reaches native execution whose cleanup is unconfirmed. A rejected parent close can retry accounting without reopening its HTTP listener. Child report ownership begins before lease publication. A cancelled, unpublished grant retains its original completion after acknowledgement failure; later admission retries pending reports before allocating another operation, and shutdown refuses unacknowledged cleanup. Model-span closure also retains its original id until acknowledged, including a response lost after parent completion. Model and process admission recover retained closures before new registration; persistent failures refuse admission. Provider withdrawal joins these reports and exposes failed acknowledgements alongside resource cleanup failures. No background retry or replacement permit is required.
+
+The [SDK process owner](2026-10-24-sdk-subagent-process-ownership.md) retains retryable disposal through the published run's provider and shared subagent handles.
+
+Model policy, resource admission, LLM middleware and execution authority resolve from the initiating Agent’s Context. The registration context owns provider cleanup. Parent policy identity is captured before request waits. The serial `llm/authorize` event runs every authorization owner before adapter I/O; a waterfall cannot omit mandatory ownership. Parent execution scope is captured synchronously and restored for control callbacks, retaining the initiating actor through later parent activity. Cordis tracing proxies compare by their underlying provider identity.
+
+`llm/delegated-stream` applies the parent governance meter while preserving separate conversation replay. Global guards and metering include isolated LLM services. Single-item input/output rendezvous provide backpressure and return parent-transformed output to the child. Parent short circuits can avoid child adapter execution. Provider withdrawal closes admission, joins child cleanup and leaves mandatory child guards closed until root disposal. Adapter cancellation and model-span completion are owned independently of output consumption; a consumer paused at a yielded chunk cannot prevent cleanup. Completion waits for startup to settle before joining the captured adapter pump. The child control client owns one deadline per cleanup attempt, inherited by nested model/resource cleanup and its HTTP requests. Consumer grace reserves a request interval for final reports. Timeout cancels scoped requests and rejects cleanup; exact completion records survive for later attempts with a new deadline.
+
+## Alternatives considered
+
+**One model permit per SDK process.** A runtime can issue concurrent model calls and create additional processes.
+
+**Reuse parent conversation replay.** Child calls would share a parent cursor despite owning independent logged history.
+
+**Release all permits after runtime exit.** Process exit alone does not acknowledge cleanup of remote inference or escaped child processes.
+
+## Consequences
+
+Managed SDK children use the parent capacity and authorization services. Independent compositions can retain standalone execution. The private control protocol has validated byte, operation and timing limits. Model request content is observed for guarding and metering without being appended to the parent conversation.
+
+Authenticated request bodies have an explicit deadline using the configured control request timeout. Expiry returns a bounded error and frees the request slot before registration; owner closure aborts pending body reads. Incomplete request connections close after the response, including traffic rejected before parsing. Node HTTP timeout scans do not own this deadline. Oversized partial bodies also preserve the connection long enough to return their bounded refusal.
+
+The HTTP request limit allows two simultaneous exchanges per configured control operation, bounded by the maximum safe integer. Input/output relay directions and resource observation/completion are independent exchanges. Sharing their request limit with the operation count can reject permit observation during an otherwise admitted model call. Logical operation capacity remains independently enforced at registration.
+
+## Verification
+
+Loopback service tests cover separate permits, concurrent capacity, nested ownership, policy replacement while queued, permit withdrawal, early consumer return, bounded cleanup, native operation input, token-source forwarding, transformed output and parent short circuits. A Loader-composed Agent factory verifies isolated model and process refusals independently of provider registration. Runnable source and built TypeScript SDKs and the Python SDK execute actual nested runtimes with Messages and Sonar loopback inference and preserve the exact durable input before HTTP. PostgreSQL Gateway composition retains the initiating billing actor during a later parent request, refuses queued model or execution revocation before HTTP, and admits child-owned native processes through the parent node budget.
+
+The [resource completion example](../../../../packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs) boots a Loader parent and actual SDK child, expires an authenticated incomplete control upload before resource registration, observes an existing permit while two uploads remain pending, stops native grandchildren, recovers unpublished and rejected completions, and upgrades acknowledged uncertainty. Consecutive dropped registration exchanges followed by exact not-started reports exercise cancellation recovery without intermediate admission. The [model shutdown example](../../../../packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs) recovers a rejected model closure before admitting another model, closes an actual SDK runtime with an unconsumed stream, verifies adapter cleanup before consumer closure, then stops an independently admitted native child and reports its completion. Controlled clocks cover final-report timeout, nested deadlines and exact retry. Channel barriers prove permit observation overlaps both model relay directions; held requests also exercise the transport ceiling. A loopback accountant observes one admission per resource and one successful release; focused parent and child reporting modules meet the per-file coverage gate. This evidence does not replace real model-provider or Windows process validation.
+
+The [startup ownership example](../../../../packages/subagent/subagent-dsh-sdk/tests/fixtures/startup-owner.mjs) also runs actual SDK children with execution authority alone. It verifies one parent authorization per model request, permits the authorized child adapter, and refuses its dispatch when the parent guard denies execution without a model-policy service or resource budget.

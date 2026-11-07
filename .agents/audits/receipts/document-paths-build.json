@@ -1,0 +1,14 @@
+{
+  "name": "document-paths-build",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 node_modules/.bin/tsx scripts/build.ts",
+  "startedAt": "2026-10-25T20:12:29.946676+00:00",
+  "seconds": 22.281,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4020544754b93ee95669f9027be2886874198e7cf57f574924733a5e11b858f0",
+  "inputsAfter": "4020544754b93ee95669f9027be2886874198e7cf57f574924733a5e11b858f0",
+  "postgresToolDirectory": null,
+  "outputSha256": "c58a82773c09ccb42291946383366a4e46de0dc3f0c9a90cdf122ab9c3023821",
+  "outputTail": "run-gates: build running 8 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start native addon\nrun-gates: PASS native addon (1.66s)\nrun-gates: start host compiler\n\n== FAILED host compiler (17.41s) ==\ncommand: tsc -b <tsconfig.host.json references>\noutcome: exit 2\npackages/attachment/userdoc-local/src/upload.ts(292,45): error TS2322: Type 'number' is not assignable to type 'string'.\n\n== SKIPPED Host bundle (0.00s) ==\ncommand: pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE host\noutcome: dependency failed or skipped: host-src\n\n== SKIPPED client compiler (0.00s) ==\ncommand: tsc -b <tsconfig.client.json references>\noutcome: dependency failed or skipped: host-bundle\n\n== SKIPPED Client bundle (0.00s) ==\ncommand: pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE client\noutcome: dependency failed or skipped: client-src\n\n== SKIPPED Web build (0.00s) ==\ncommand: pnpm run build:web\noutcome: dependency failed or skipped: client-bundle\n\n== SKIPPED host aggregate check (0.00s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: dependency failed or skipped: host-src\n\n== SKIPPED client aggregate check (0.00s) ==\ncommand: tsc -p tsconfig.client.json\noutcome: dependency failed or skipped: client-src\n\nrun-gates: 1 passed, 1 failed, 6 skipped in 19.07s.\nrun-gates: unsuccessful gates:\n  - FAILED host compiler (17.41s, exit 2)\n    tsc -b <tsconfig.host.json references>\n  - SKIPPED Host bundle (0.00s, dependency failed or skipped: host-src)\n    pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE host\n  - SKIPPED client compiler (0.00s, dependency failed or skipped: host-bundle)\n    tsc -b <tsconfig.client.json references>\n  - SKIPPED Client bundle (0.00s, dependency failed or skipped: client-src)\n    pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE client\n  - SKIPPED Web build (0.00s, dependency failed or skipped: client-bundle)\n    pnpm run build:web\n  - SKIPPED host aggregate check (0.00s, dependency failed or skipped: host-src)\n    tsc -p tsconfig.host.json\n  - SKIPPED client aggregate check (0.00s, dependency failed or skipped: client-src)\n    tsc -p tsconfig.client.json\n"
+}

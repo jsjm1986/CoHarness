@@ -1,0 +1,14 @@
+{
+  "name": "document-short-write-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/short-writes.spec.ts --retry=0 --maxWorkers=1 --coverage --coverage.include=packages/attachment/userdoc-local/src/write.ts --coverage.reportsDirectory=.agents/audits/.local/document-short-write-coverage",
+  "startedAt": "2026-10-25T10:33:09.177308+00:00",
+  "seconds": 13.718,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6edf9bc7b09699846535d63bcf86728581903b8c2ab32732814ff095c6c0c3bb",
+  "inputsAfter": "6edf9bc7b09699846535d63bcf86728581903b8c2ab32732814ff095c6c0c3bb",
+  "postgresToolDirectory": null,
+  "outputSha256": "496a6023a06d27a8b9a83b528bf9e43880fda5955688fd72ddaed7ee30b5a6dd",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  18:33:22\n   Duration  522ms (transform 149ms, setup 35ms, import 156ms, tests 87ms, environment 0ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|-------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n----------|---------|----------|---------|---------|-------------------\n----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 8/8 )\nBranches     : 100% ( 4/4 )\nFunctions    : 100% ( 1/1 )\nLines        : 100% ( 7/7 )\n================================================================================\n"
+}

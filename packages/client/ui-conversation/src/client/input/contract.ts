@@ -15,6 +15,12 @@ import type {
 import type { QueueRow } from '../contract/queue.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 
+declare module '@deepseek-ai/dsh-client-runtime/client' {
+  interface SessionReferenceSourceMap {
+    composer: true
+  }
+}
+
 /** Browser-runtime identity of one unsent image draft. */
 export type DraftAttachmentId = Branded<'DraftAttachmentId'>
 
@@ -111,6 +117,11 @@ export interface DraftInitializationOptions {
 
 /** Session-addressed access to the per-session input facade. */
 export interface SessionInputResolver {
+  /**
+   * Identify input that must remain mounted when opening another work environment.
+   * @returns true for transient attachments, submission work, or text without tab-owned recovery.
+   */
+  hasUnsavedDrafts(): boolean
   /** Resolve the facade for one session-scope ctx. */
   for(actx: ClientContext): SessionInput
   /**

@@ -1,0 +1,689 @@
+{
+  "finding": "B229",
+  "status": "named_business_acceptance_verified_coverage_incomplete",
+  "updatedAt": "2026-10-27T20:15:53.156346+00:00",
+  "scope": "Managed directory source-object replacement, capture/publication recovery, schema2 migration and retired marker backup/restore; no complete domain or whole-project claim.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "fetchExitCode": 0,
+    "ahead": 139,
+    "behind": 0,
+    "existingDirtyWorkPreserved": true
+  },
+  "fixes": [
+    "Exclusive public-to-private capture pins both managed roots; private verification checks the selected directory object and complete authorized file inventory before destination publication.",
+    "Private SQLite schema3 persists verified capture before possible publication. Schema2 readers used by immutable backup verification do not migrate original bytes; writable restores migrate transactionally. Unknown legacy directory locations preserve the journal.",
+    "Exclusive rollback preserves an occupied source, private original bytes and independent failure causes. Prepared cancellation cleanup is restartable; an externally moved committed publication is not silently cancelled.",
+    "Retired control markers are removed only through protected private file-object evidence; ordinary similarly named files remain intact and unchanged reads require no write admission. Verified restores rebuild marker hard links, including Unicode case aliases."
+  ],
+  "acceptance": {
+    "provider": {
+      "passed": 580,
+      "skipped": 5,
+      "filesPassed": 29,
+      "filesSkipped": 1,
+      "command": "document-directory-provider-post-alias-coverage",
+      "functionalFailures": 0,
+      "coverageCommandExitCode": 1
+    },
+    "gateway": {
+      "passed": 73,
+      "skipped": 0,
+      "files": 4,
+      "externalCatalog": "stateful test service; no new PostgreSQL acceptance claimed"
+    },
+    "compiledHttp": {
+      "initialBuiltCases": 3,
+      "latestDirectoryTranscriptCases": 1,
+      "latestAfterCatalogWireCorrection": true
+    },
+    "linux": {
+      "versions": [
+        "v22.22.1",
+        "v24.19.0"
+      ],
+      "observationsPerVersion": 17,
+      "ordinaryRuntimeUid": 65534,
+      "sourceSubstitutionPerformedByRuntimeUid": true,
+      "ordinaryReadAndWriteAfterRename": true,
+      "metadataAndRetainedObjectReadsDenied": true
+    },
+    "publishedBackup": {
+      "plainNodeVersions": [
+        "v22.22.1",
+        "v24.19.0"
+      ],
+      "schema2VerificationBytesUnchanged": true,
+      "restoredSchema": 3,
+      "unicodeMarkerImported": false,
+      "creatorAndIncarnationPreserved": true,
+      "schema3DirectlyQueriedBeforeReopen": true
+    },
+    "build": {
+      "latestRootGates": 8,
+      "passed": 8,
+      "skipped": 0,
+      "gatewayBuildAndNoEmit": "passed"
+    },
+    "documentation": {
+      "quickGatesPassed": 20,
+      "quickGatesSkipped": 0,
+      "persistenceCatalog": "current after final source edit",
+      "persistenceHistory": "75 roots match26 history records",
+      "exportJSDoc": "passed"
+    },
+    "ancillaryTestFix": {
+      "path": "packages/client/ui-jobs/tests/job-list-action.client.spec.tsx",
+      "change": "Complete the ResizeObserver test double and remove its unlisted assertion to unknown; no product UI change.",
+      "testsPassed": 35,
+      "clientNoEmit": "passed",
+      "unknownCastGate": "passed with unchanged baseline"
+    },
+    "scopedLintAndWhitespace": "passed; named tracked and untracked paths checked"
+  },
+  "coverage": {
+    "report": "coverage/document-directory-capture-post-alias-20261028/coverage-final.json",
+    "metrics": {
+      "total": {
+        "statements": 90.63,
+        "branches": 87.08,
+        "functions": 98.16,
+        "lines": 93.98
+      },
+      "packages/attachment/userdoc-local/src/backup.ts": {
+        "statements": 94.52,
+        "branches": 95.74,
+        "functions": 100,
+        "lines": 96.66
+      },
+      "packages/attachment/userdoc-local/src/directory-move-win32.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "packages/attachment/userdoc-local/src/directory-move.ts": {
+        "statements": 89.65,
+        "branches": 77.04,
+        "functions": 100,
+        "lines": 96.38
+      },
+      "packages/attachment/userdoc-local/src/identity-fs.ts": {
+        "statements": 88.62,
+        "branches": 79.04,
+        "functions": 94.84,
+        "lines": 90.83
+      },
+      "packages/attachment/userdoc-local/src/identity.ts": {
+        "statements": 91.54,
+        "branches": 91.07,
+        "functions": 100,
+        "lines": 95.9
+      },
+      "packages/attachment/userdoc-local/src/mutation.ts": {
+        "statements": 88.34,
+        "branches": 85.4,
+        "functions": 100,
+        "lines": 91.74
+      }
+    },
+    "thresholdsChanged": false,
+    "exclusionsChanged": false,
+    "verdict": "FAIL: five measured production modules remain below the existing per-file100percent gate. Windows adapter reaches100percent under adapter tests only."
+  },
+  "performance": {
+    "runtime": "Linux Node v24.19.0",
+    "dataset": "20 files of1024 bytes;2 warmup renames then25 renames, each followed by a real identity list. Separate root-owned disposable processes, same filesystem.",
+    "results": {
+      "baseline": {
+        "fileCount": 20,
+        "fileBytes": 1024,
+        "warmupRenames": 2,
+        "renames": 25,
+        "durationMs": 6728.141878,
+        "heapBefore": 6542800,
+        "peakHeap": 12191824,
+        "heapAfter": 6849968,
+        "maxRssKiB": 97064
+      },
+      "current": {
+        "fileCount": 20,
+        "fileBytes": 1024,
+        "warmupRenames": 2,
+        "renames": 25,
+        "durationMs": 8065.65161,
+        "heapBefore": 7189664,
+        "peakHeap": 17295344,
+        "heapAfter": 7614152,
+        "maxRssKiB": 101200
+      }
+    },
+    "durationIncreasePercent": 19.88,
+    "limit": "One bounded sample, not a general performance guarantee. The extra protected rename and synchronization have measured cost."
+  },
+  "notes": {
+    "keptActive": [
+      ".agents/notes/implemented/feature/2026-08-19-document-workspace-folders.md",
+      ".agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md",
+      ".agents/notes/proposed/architecture/2026-10-25-document-incarnations-and-trash-actions.md"
+    ],
+    "archived": [],
+    "deleted": [],
+    "reason": "Folder safety and private capture extend the existing no-overwrite decision. Trash lifecycle and the still-open identity proposal retain independent decisions and remaining platform/ownership obligations."
+  },
+  "limitations": [
+    "Native Windows was not executed; adapter evidence does not establish real Win32 filesystem behavior.",
+    "Strict source coverage is incomplete; all12 business domains remain in progress.",
+    "Private capture does not revoke already-open ordinary file descriptors. Further retained-root and directory-handle concurrency review remains open.",
+    "Real model API verification remains explicitly deferred by the user."
+  ],
+  "cleanup": {
+    "linuxOwnedToolsRemoved": true,
+    "receipt": "document-directory-linux-cleanup",
+    "unrelatedServicesModified": false,
+    "subagentsUsed": false,
+    "commitsOrPushes": false
+  },
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "sourceSha256": {
+    "packages/attachment/userdoc-local/src/directory-move.ts": "574c48128d0d469298ba27829ebba1ce4f5b54dfe95b0d1f4d191cf162be7834",
+    "packages/attachment/userdoc-local/src/directory-move-win32.ts": "8093cab1dcc8229cc640514ed81201fd7dac4e4d2aa2d812f710b4d8812298c8",
+    "packages/attachment/userdoc-local/src/identity.ts": "01157b3c80bade72bf0552bba46a11060d85670a4c7233d2a7ecc546da1049fe",
+    "packages/attachment/userdoc-local/src/mutation.ts": "40559847d18ee8799df2d1ff67dc5c5ee56e7c6d10655402356fe824c2a4c4aa",
+    "packages/attachment/userdoc-local/src/identity-fs.ts": "dc36d862158f43d0bd19601b0acdbf78e680b6d4f2774a4321402584090b3d45",
+    "packages/attachment/userdoc-local/src/backup.ts": "fe70a91c69446b6c7777a88d6157a17f0007c29dfd51180a1c73e18e628434f2",
+    "packages/attachment/userdoc-local/tests/mutation.spec.ts": "5266eb92fec5fd5127fae005eaf0df7689008396f1b99eff3b188c1990469f5a",
+    "packages/attachment/userdoc-local/tests/identity.spec.ts": "53c75ee6c4d0500d8d0185e449cfcc3707758b923704e6f68e764f8a5ae60d5a",
+    "packages/attachment/userdoc-local/tests/identity-fs.spec.ts": "c595a51b4a8da061e5f18c4f2d882fc390ff05a187703e15bdd6cc9dce43c9cb",
+    "packages/attachment/userdoc-local/tests/backup.spec.ts": "326e401f4e3a725dc7a41b615aad6e624d59be2f9c1b00470d06ae5c492ecd3a",
+    "packages/attachment/userdoc-local/tests/projection.spec.ts": "00355f17590a86a50966ba168a61fc695d24213d663e9c8e273804207ef9cd9a",
+    "packages/attachment/userdoc-local/tests/directory-move.spec.ts": "68e3ae338fe23cfb138a9f36fc28da932bb7d2bbc2b69519c043debc613fa21d",
+    "packages/attachment/userdoc-local/tests/directory-move-win32.spec.ts": "22fe153e9426224e649b2bfe8ad7a6b1c2859c4a93588ab3a23e810eef7fd862",
+    "packages/attachment/userdoc-local/tests/fixtures/directory-native-interleave.mjs": "48671df7f074f082e0b2437426be5aa53c3111895317cc4e4a58a169cc873991",
+    "packages/attachment/userdoc-local/tests/fixtures/directory-native-interleave.d.mts": "75461c891c120be3738c69cd742f10535f772035379f8ec3682f9071bd247874",
+    "packages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts": "b03e33de6717081bc1fa87f7a5445eafa41ba4b784fba2413aec2afeb7d9f9fa",
+    "gateway/tests/document-directory-capture.spec.ts": "97df5520daae72154d48c15b745099ebd55e1a260572477010cc4b1ae1cc07b2",
+    "gateway/tests/fixtures/document-directory-capture.mjs": "f1b722c410652e587211d4f59210943136fc9cc05fd15b2cc7102a2d3ce2675b",
+    "packages/client/ui-jobs/tests/job-list-action.client.spec.tsx": "11807d6bffdd3493f7c8cf0f4f688d097de461bc5b3c65712221edfa917db4c0"
+  },
+  "artifactSha256": {
+    "packages/attachment/userdoc-local/lib/index.js": "2e5d362c31d5d4843dccec9f01788da9fbdbab6f8cf56e68eea32609b32562b8",
+    "gateway/lib/documents-local.js": "74b755ced0f0e5d68d0f2b76097338884472a805f1031fe772c5d314e9f51ed0"
+  },
+  "checks": [
+    {
+      "name": "document-directory-native-leaf-negative",
+      "status": "failed",
+      "exitCode": 1,
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/mutation.spec.ts",
+        "-t",
+        "replacement source directory at the native rename boundary",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:07:03.508629+00:00",
+      "finishedAt": "2026-10-27T19:07:05.460178+00:00",
+      "outputSha256": "abf4de339495997d35efe0ea5ea943074098eab43e3410461a00ad75a170971f"
+    },
+    {
+      "name": "document-directory-private-stage-recovery",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/mutation.spec.ts",
+        "packages/attachment/userdoc-local/tests/identity.spec.ts",
+        "packages/attachment/userdoc-local/tests/projection.spec.ts",
+        "packages/attachment/userdoc-local/tests/identity-fs.spec.ts",
+        "packages/attachment/userdoc-local/tests/backup.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:22:09.778358+00:00",
+      "finishedAt": "2026-10-27T19:22:14.930689+00:00",
+      "outputSha256": "98d0cf7f31a1f6504cd24ba6d08203696ad11de234e9d6ce4f17fc92b1c8b452"
+    },
+    {
+      "name": "document-directory-private-stage-legacy",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/mutation.spec.ts",
+        "packages/attachment/userdoc-local/tests/identity.spec.ts",
+        "packages/attachment/userdoc-local/tests/backup.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:25:14.047685+00:00",
+      "finishedAt": "2026-10-27T19:25:17.693093+00:00",
+      "outputSha256": "aed26a818a79379161bbd4d530c9a7e6540aa4098a19b6cb575149564af68e56"
+    },
+    {
+      "name": "document-directory-native-stage-types",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/mutation.spec.ts",
+        "packages/attachment/userdoc-local/tests/directory-move.spec.ts",
+        "packages/attachment/userdoc-local/tests/directory-move-win32.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:33:14.107187+00:00",
+      "finishedAt": "2026-10-27T19:33:18.398964+00:00",
+      "outputSha256": "d938d6c62c88f7f4e9c10ae6ff917f846862ffc0ad2b0db52e55f61ada9a40f5"
+    },
+    {
+      "name": "document-directory-backup-alias-negative",
+      "status": "failed",
+      "exitCode": 1,
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/backup.spec.ts",
+        "-t",
+        "retired marker evidence: unicode-alias",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:56:12.638426+00:00",
+      "finishedAt": "2026-10-27T19:56:14.774670+00:00",
+      "outputSha256": "e1cd3ad94ef7b265f3e3d2f744a90fba9c1e08752472c5948bf2969f207a074e"
+    },
+    {
+      "name": "document-directory-backup-alias-fixed",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/backup.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:56:41.765691+00:00",
+      "finishedAt": "2026-10-27T19:56:45.074575+00:00",
+      "outputSha256": "501613b03ed8502de747dfcd9ab687f9eaef5d5276112ebd19cdb65dc132826d"
+    },
+    {
+      "name": "document-directory-provider-post-alias-coverage",
+      "status": "failed",
+      "exitCode": 1,
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests",
+        "--maxWorkers=2",
+        "--coverage",
+        "--coverage.include=packages/attachment/userdoc-local/src/mutation.ts",
+        "--coverage.include=packages/attachment/userdoc-local/src/identity.ts",
+        "--coverage.include=packages/attachment/userdoc-local/src/identity-fs.ts",
+        "--coverage.include=packages/attachment/userdoc-local/src/directory-move.ts",
+        "--coverage.include=packages/attachment/userdoc-local/src/directory-move-win32.ts",
+        "--coverage.include=packages/attachment/userdoc-local/src/backup.ts",
+        "--coverage.exclude=**/node_modules/**",
+        "--coverage.reportsDirectory=coverage/document-directory-capture-post-alias-20261028",
+        "--coverage.reporter=json",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text"
+      ],
+      "startedAt": "2026-10-27T20:03:00.068168+00:00",
+      "finishedAt": "2026-10-27T20:03:20.959104+00:00",
+      "outputSha256": "0cadf0f21b2c8f953869fc597cd2f02c8189260cf5ca5ffe0005583dd5857b1a"
+    },
+    {
+      "name": "document-directory-final-build",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "startedAt": "2026-10-27T20:01:06.572898+00:00",
+      "finishedAt": "2026-10-27T20:01:38.537340+00:00",
+      "outputSha256": "0b277e46a5fbb9f435af361e8c9a5140f92848473781c180a75c8da758b18bc2"
+    },
+    {
+      "name": "document-directory-final-host",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.host.json",
+        "--noEmit"
+      ],
+      "startedAt": "2026-10-27T19:52:11.285924+00:00",
+      "finishedAt": "2026-10-27T19:52:19.208524+00:00",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "document-directory-final-gateway-build",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.build.json"
+      ],
+      "startedAt": "2026-10-27T19:52:19.252318+00:00",
+      "finishedAt": "2026-10-27T19:52:21.822777+00:00",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "document-directory-final-gateway-types",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "startedAt": "2026-10-27T19:52:21.852667+00:00",
+      "finishedAt": "2026-10-27T19:52:25.803072+00:00",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "document-directory-built-http",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/document-directory-capture.spec.ts",
+        "tests/document-transfer-loader.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:52:25.837782+00:00",
+      "finishedAt": "2026-10-27T19:52:27.918029+00:00",
+      "outputSha256": "b82c3afb122214e46901762bd394a125eb0a2b0faad2354a60faacdbef66eb2f"
+    },
+    {
+      "name": "document-directory-gateway-regression",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/documents-local.spec.ts",
+        "tests/document-transfer.spec.ts",
+        "tests/document-transfer-loader.spec.ts",
+        "tests/document-directory-capture.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:52:27.945738+00:00",
+      "finishedAt": "2026-10-27T19:52:31.854295+00:00",
+      "outputSha256": "e71528a818502137974f2a428107127ad164d6633f42bbbedba0d2fe2ec961fc"
+    },
+    {
+      "name": "document-directory-source-http-authority",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/document-directory-capture.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T19:33:29.654728+00:00",
+      "finishedAt": "2026-10-27T19:33:30.976797+00:00",
+      "outputSha256": "3bcf14caa4b1f05daf08f78ca54fa7242dfb6916442a36b9fd82a0c30fd8dd1f"
+    },
+    {
+      "name": "document-directory-linux-isolated-runtime",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-directory-linux-uid.py"
+      ],
+      "startedAt": "2026-10-27T19:47:01.808237+00:00",
+      "finishedAt": "2026-10-27T19:47:04.296770+00:00",
+      "outputSha256": "5da32e141791fcd5153fe47792c4bc46375fd47e5919342b50b1eea35ad3059c"
+    },
+    {
+      "name": "document-directory-performance",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-directory-performance.py"
+      ],
+      "startedAt": "2026-10-27T19:47:55.544049+00:00",
+      "finishedAt": "2026-10-27T19:48:12.978988+00:00",
+      "outputSha256": "cc21899acf75a7bfcc69d13c21cc99be6490fe2c501f33d1230a0549d60b4dbc"
+    },
+    {
+      "name": "document-directory-current-docs",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-directory-docs.py"
+      ],
+      "startedAt": "2026-10-27T19:48:13.081124+00:00",
+      "finishedAt": "2026-10-27T19:50:44.037342+00:00",
+      "outputSha256": "ee2e7e8c6af5927400a921cad924bf6274888967947a507b5e0a5140a88ac5da"
+    },
+    {
+      "name": "document-directory-final-lint",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-directory-lint-final.py"
+      ],
+      "startedAt": "2026-10-27T20:06:00.248291+00:00",
+      "finishedAt": "2026-10-27T20:06:10.488177+00:00",
+      "outputSha256": "b397be5c5682cdc645cf4e4551d33bb50e7119a20b9fc17bf6727db49623721e"
+    },
+    {
+      "name": "document-directory-final-unknown-casts",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/verify-no-unknown-casts.ts"
+      ],
+      "startedAt": "2026-10-27T20:06:10.537979+00:00",
+      "finishedAt": "2026-10-27T20:06:15.738894+00:00",
+      "outputSha256": "9f013069a93536df06a502be5ad25189668eab01f45b387ba8c264d9dd88e2e8"
+    },
+    {
+      "name": "document-directory-ancillary-client-test",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/client/ui-jobs/tests/job-list-action.client.spec.tsx",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T20:06:15.774291+00:00",
+      "finishedAt": "2026-10-27T20:06:19.983188+00:00",
+      "outputSha256": "54191ab78fc1382562ec5e868ca123918405d6137cb5fb9b0c1913b9136040f4"
+    },
+    {
+      "name": "document-directory-ancillary-client-types",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.client.json",
+        "--noEmit"
+      ],
+      "startedAt": "2026-10-27T20:06:20.024582+00:00",
+      "finishedAt": "2026-10-27T20:06:23.430134+00:00",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "document-directory-emitted-backup-node22",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/directory-built-backup.mjs",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+      ],
+      "startedAt": "2026-10-27T20:02:29.266054+00:00",
+      "finishedAt": "2026-10-27T20:02:29.578751+00:00",
+      "outputSha256": "3d60b23bfec6e9764640f8b5fa0c29d1a1d3d06101cd0424f25e5646971b9dc9"
+    },
+    {
+      "name": "document-directory-emitted-backup-node24",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/directory-built-backup.mjs",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+      ],
+      "startedAt": "2026-10-27T20:06:23.462722+00:00",
+      "finishedAt": "2026-10-27T20:06:23.876775+00:00",
+      "outputSha256": "8f6281c9e85c56e20ec8dda435fa9b462920a69bb654961f7e1a7c540cf47faf"
+    },
+    {
+      "name": "document-directory-http-post-alias",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/document-directory-capture.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "startedAt": "2026-10-27T20:06:23.911908+00:00",
+      "finishedAt": "2026-10-27T20:06:24.862976+00:00",
+      "outputSha256": "4e6df219c7a40f163d034f4e38e87baa0fe2e611774bae65c9d487d8be8138f4"
+    },
+    {
+      "name": "document-directory-persistence-post-alias",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/gen-persistence-catalog.ts",
+        "--check"
+      ],
+      "startedAt": "2026-10-27T20:06:24.892763+00:00",
+      "finishedAt": "2026-10-27T20:06:35.660283+00:00",
+      "outputSha256": "77e6881234c83cc2a0cbefb2fa9e91202caeb703866d01368925d4e40042f05c"
+    },
+    {
+      "name": "document-directory-references-final",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/verify-repository-references.ts"
+      ],
+      "startedAt": "2026-10-27T20:06:35.707068+00:00",
+      "finishedAt": "2026-10-27T20:06:51.854206+00:00",
+      "outputSha256": "548b2f0b6f1fdc9dc2b083adf1ca3fa6d1ef62ec5d8a642e9f8ed6b63b48181d"
+    },
+    {
+      "name": "document-directory-linux-cleanup",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "limactl",
+        "shell",
+        "redroid",
+        "--",
+        "python3",
+        "-"
+      ],
+      "startedAt": "2026-10-27T19:53:20.140164+00:00",
+      "finishedAt": "2026-10-27T19:53:20.402811+00:00",
+      "outputSha256": "d90b39bbc22620662406160304082114fd1978b00bbc08f5e83202ab65bbeb66"
+    },
+    {
+      "name": "document-directory-backup-version-node22",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/directory-built-backup.mjs",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+      ],
+      "startedAt": "2026-10-27T20:13:56.194541+00:00",
+      "finishedAt": "2026-10-27T20:13:56.843073+00:00",
+      "outputSha256": "aaf846911406731b812a06e4107b59a5380db042171c8a436c2ab03929e27ee8"
+    },
+    {
+      "name": "document-directory-backup-version-node24",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/directory-built-backup.mjs",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+      ],
+      "startedAt": "2026-10-27T20:13:56.900014+00:00",
+      "finishedAt": "2026-10-27T20:13:57.186345+00:00",
+      "outputSha256": "8f6281c9e85c56e20ec8dda435fa9b462920a69bb654961f7e1a7c540cf47faf"
+    },
+    {
+      "name": "document-directory-readme-pair-final",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/verify-translation-pairing.ts",
+        "--write",
+        "packages/attachment/userdoc-local/README.md"
+      ],
+      "startedAt": "2026-10-27T20:13:57.229434+00:00",
+      "finishedAt": "2026-10-27T20:13:57.976614+00:00",
+      "outputSha256": "c991b01f4a1cd19872077a27cb9bcdb3c15432340351dcaf6138b0ae439d208c"
+    },
+    {
+      "name": "document-directory-pair-check-final",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/verify-translation-pairing.ts",
+        "packages/attachment/userdoc-local/README.md"
+      ],
+      "startedAt": "2026-10-27T20:13:58.014011+00:00",
+      "finishedAt": "2026-10-27T20:13:58.442006+00:00",
+      "outputSha256": "f648fd21b531eda386e17f4ce365d5cff34872447cccc4aa4cb2b2e905022290"
+    },
+    {
+      "name": "document-directory-receipt-references",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/verify-repository-references.ts"
+      ],
+      "startedAt": "2026-10-27T20:13:58.475483+00:00",
+      "finishedAt": "2026-10-27T20:14:20.563028+00:00",
+      "outputSha256": "548b2f0b6f1fdc9dc2b083adf1ca3fa6d1ef62ec5d8a642e9f8ed6b63b48181d"
+    },
+    {
+      "name": "document-directory-receipt-whitespace",
+      "status": "passed",
+      "exitCode": 0,
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "startedAt": "2026-10-27T20:14:20.615543+00:00",
+      "finishedAt": "2026-10-27T20:14:21.345367+00:00",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "orchestration-cordis-catalog",
+  "cwd": ".",
+  "command": "pnpm run verify-cordis-catalog",
+  "startedAt": "2026-10-25T07:07:17.092698+00:00",
+  "seconds": 8.548,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ce2343a15ec32f7e49529f5f1f6a8091303d72eeba912e031852e378431efdbd",
+  "inputsAfter": "ce2343a15ec32f7e49529f5f1f6a8091303d72eeba912e031852e378431efdbd",
+  "postgresToolDirectory": null,
+  "outputSha256": "8408fcd7595160a53de594bcca863f60704cb26abc843d5d8a76b21d2a1f3ae7",
+  "outputTail": "$ tsx scripts/gen-cordis-catalog.ts --check\ngen-cordis-catalog: 127 generated file(s)/region(s) are up to date.\n"
+}

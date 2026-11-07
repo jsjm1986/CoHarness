@@ -15,6 +15,7 @@ import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
 import { assertTrustedAuthority } from './api-request-trust.ts'
 import { bindRequestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/request-scope'
 import { BrowserAuth } from './browser-auth.ts'
+import { DEFAULT_BROWSER_RPC_TIMEOUT_MS } from './browser-timing.ts'
 import { HostConnectionService } from './rpc-host.ts'
 import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
 
@@ -49,6 +50,8 @@ export interface ConnectionRequestBoundary {
   pathname?: string
   /** Full request URL as sent by the client; carriers that cannot set headers declare credentials and modes in its query. */
   url?: string
+  /** Socket-owned close/error lifetime on upgrades; absent on carriers without a retained socket. */
+  signal?: AbortSignal
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -108,6 +111,10 @@ export const inject = ['credentials']
 
 /** Plugin config: the deployment's non-loopback serving authorities. */
 export interface ConnectionConfig {
+  /** Include runtime dispatch and unary processing durations in Server-Timing; disabled by default. */
+  serverTiming?: boolean
+  /** Deadline for bounded browser unary RPC calls in milliseconds. */
+  rpcTimeoutMs?: number
   /** Browser generation recovery timing delivered through the served index. */
   recovery?: {
     /** First retry delay cap in milliseconds. */
@@ -145,6 +152,8 @@ export interface ConnectionConfig {
 }
 
 export const Config: z<ConnectionConfig> = z.object({
+  serverTiming: z.boolean().default(false),
+  rpcTimeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_BROWSER_RPC_TIMEOUT_MS),
   recovery: z.object({
     backoffBaseMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(500),
     backoffFactor: z.number().min(1).default(2),
@@ -241,10 +250,15 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   const trustedHosts = config?.trustedHosts ?? []
   const cookieMaxAgeDays = config?.cookieMaxAgeDays ?? 30
   const maxRequestBodyBytes = config?.maxRequestBodyBytes ?? DEFAULT_MAX_REQUEST_BODY_BYTES
+  const serverTiming = config?.serverTiming ?? false
   const historyPageTargetBytes =
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const websocketHeartbeatIntervalMs = config?.websocketHeartbeatIntervalMs ?? 30_000
   const recovery = config?.recovery ?? {}
+  const rpcTimeoutMs = config?.rpcTimeoutMs ?? DEFAULT_BROWSER_RPC_TIMEOUT_MS
+  if (!Number.isSafeInteger(rpcTimeoutMs) || rpcTimeoutMs < 1 || rpcTimeoutMs > MAX_TIMER_DELAY_MS) {
+    throw new Error(`client-connection rpcTimeoutMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
+  }
   if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes < 1) {
     throw new Error('client-connection maxRequestBodyBytes must be a positive safe integer')
   }
@@ -280,6 +294,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     assertImageBodyCapacity(webCtx, maxRequestBodyBytes)
     webCtx.on('webserver/index-inject', (table: IndexInjection[]) => {
       table.push({ kind: 'global', name: '__DSH_CONNECTION_RECOVERY__', value: recovery })
+      table.push({ kind: 'global', name: '__DSH_CONNECTION_RPC_TIMEOUT_MS__', value: rpcTimeoutMs })
     })
     const fetchHandler = connection.createSharedFetchHandler(API_PATH, {
       async fetch(request) {
@@ -298,6 +313,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
         let carrier = fetchHandlers.get(apiProxy)
         if (carrier === undefined) {
           carrier = toFetchHandler(apiProxy, {
+            serverTiming,
             historyPageTargetBytes,
             requestBodyMaxBytes: maxRequestBodyBytes,
           })
@@ -316,6 +332,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
           return
         }
+        const startedAt = serverTiming && req.method === 'POST' ? performance.now() : undefined
         await webCtx.waterfall('connection/request', {
           kind: 'http',
           headers: req.headers,
@@ -324,7 +341,14 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           ...(req.url === undefined ? {} : { url: req.url }),
         }, async () => {
           if (await connection.dispatchHttp(req, res)) return
-          await bridge(req, res, fetchHandler, maxRequestBodyBytes)
+          const handler = startedAt === undefined ? fetchHandler : {
+            async fetch(request: Request): Promise<Response> {
+              const response = await fetchHandler.fetch(request)
+              response.headers.append('server-timing', `dsh_conn;dur=${(performance.now() - startedAt).toFixed(2)}`)
+              return response
+            },
+          }
+          await bridge(req, res, handler, maxRequestBodyBytes)
         })
       },
     }
@@ -344,15 +368,25 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
             rejectWebSocketUpgrade(socket)
             return
           }
+          const lifetime = new AbortController()
+          const close = (): void => {
+            socket.removeListener('close', close)
+            socket.removeListener('error', close)
+            lifetime.abort()
+          }
+          socket.once('close', close)
+          socket.once('error', close)
+          if (socket.destroyed) close()
           return apiCtx.waterfall('connection/request', {
             kind: 'upgrade',
+            signal: lifetime.signal,
             headers: req.headers,
             ...(req.method === undefined ? {} : { method: req.method }),
             pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
             ...(req.url === undefined ? {} : { url: req.url }),
           }, async () => {
             await handle(req, socket, head)
-          })
+          }).catch((error: unknown) => { close(); throw error })
         },
       }), `client-connection: ${path} WebSocket`)
     }

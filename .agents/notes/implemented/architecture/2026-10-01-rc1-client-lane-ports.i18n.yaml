@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-01-rc1-client-lane-ports.md
 document:
-  en: a83566958192b8b450f580060b056c3ffae0c3a6
-  zh: 2b4ff60d5d0d8fc4ba5b4c2ba26d04dc38eaf721
+  en: cff7117d140ec96229b0b9e5bfcf9c14e3fe106a
+  zh: 14d6c19ec591b5f63dfef3c31a0888d06ba2dbb3
 /agent-note-upstream-rc-1-client-lane-behavior-ports:
   en: b95903ba7b7332c1
   zh: 1feb4b0b656a0cbb
@@ -15,8 +15,8 @@ document:
   en: 8b62747d064ec84c
   zh: 9a495b719bb56a6a
 /agent-note-upstream-rc-1-client-lane-behavior-ports/alternatives-considered:
-  en: 29fb7103edacd2af
-  zh: 8fa5e068fdcf0ad3
+  en: 8b7f12c78bbb2251
+  zh: f14b6984a95ceb34
 /agent-note-upstream-rc-1-client-lane-behavior-ports/consequences:
   en: 1ffa59137ff84f80
   zh: bddbc6d16705ceae

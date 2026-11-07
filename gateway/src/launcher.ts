@@ -1,136 +1,29 @@
 /**
  * Instance launch drivers behind one seam. `LocalLauncher` (macOS dev) spawns
- * plain subprocesses that die with the gateway; `SystemdLauncher` (Linux
+ * independently recoverable POSIX process groups; `SystemdLauncher` (Linux
  * production) renders one per-user confinement unit per start — grants become
  * kernel mount-namespace binds — and drives it through systemctl. A start
  * returns an {@link InstanceProc} handle; readiness stays the
  * InstanceManager's HTTP poll. systemctl runs through the injectable `run`
  * option so the driver's command sequence is unit-tested off a Linux host.
- * Per-user system accounts and directory ownership are provisioning concerns
- * (deploy/provision-user.sh), not launch-time work.
+ * System accounts are deployment provisioning concerns (deploy/provision-user.sh).
+ * InstanceManager prepares assigned Linux project-profile ownership before invoking the driver.
  */
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
-import { execFile } from 'node:child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Writable } from 'node:stream'
-import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
 import type { GatewayConfig } from './config.ts'
-import { RuntimeLog } from './runtime-log.ts'
+import { scrubbedGatewayChildEnv } from './child-environment.ts'
+import { runGatewayChildCommand } from './child-command.ts'
+import { LocalRuntimeControl } from './local-runtime-control.ts'
+import { LocalRuntimeOwnerStore } from './local-runtime-owner.ts'
+import { probeLocalLinuxScope } from './local-runtime-linux.ts'
+import { LOCAL_BOOTSTRAP_BYTES, localBootstrapSchema, localKernelBootId } from './local-runtime-protocol.ts'
+import { nodeControlPaths } from './node-control-paths.ts'
+import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { renderUserUnit, unitName, type GrantEntry, type SystemdOptions } from './systemd.ts'
-
-const localChildren = new Set<ChildProcess>()
-let localChildCleanupInstalled = false
-const SENSITIVE_ENV = /KEY|PASSWORD|SECRET|TOKEN/i
-const PROCESS_TREE_POLL_MS = 25
-const PROCESS_TREE_HARD_TIMEOUT_MS = 10_000
-
-/** Copy the parent environment without ambient credentials or stale DSH state. */
-function scrubbedParentEnv(): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(process.env).filter(([name, value]) =>
-    value !== undefined && !SENSITIVE_ENV.test(name) && !name.startsWith('DSH_')))
-}
-
-function installLocalChildCleanup(): void {
-  if (localChildCleanupInstalled) return
-  localChildCleanupInstalled = true
-  process.once('exit', () => {
-    // `exit` is synchronous; kill every tracked local runtime before launchd
-    // can start a replacement Gateway with the same runtime ports.
-    for (const child of localChildren) {
-      if (child.pid !== undefined && process.platform !== 'win32') {
-        try { process.kill(-child.pid, 'SIGKILL') } catch { child.kill('SIGKILL') }
-      } else if (child.pid !== undefined && process.platform === 'win32') {
-        // Node does not keep asynchronous child processes alive during the
-        // synchronous `exit` event. Use the blocking taskkill invocation so a
-        // detached descendant tree receives the final signal before the
-        // Gateway process disappears.
-        spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
-      } else {
-        child.kill('SIGKILL')
-      }
-    }
-  })
-}
-
-function processExited(child: ChildProcess): boolean {
-  return child.exitCode !== null || child.signalCode !== null
-}
-
-/** Wait for the direct child and every process in its detached POSIX group. */
-async function waitForPosixGroupExit(child: ChildProcess, deadline: number): Promise<void> {
-  const exited = new Promise<void>(resolve => {
-    if (processExited(child)) resolve()
-    else child.once('exit', () => resolve())
-  })
-  await exited
-  const pid = child.pid
-  if (pid === undefined) return
-  for (;;) {
-    try {
-      process.kill(-pid, 0)
-    } catch (error) {
-      if ((error as { code?: unknown } | null)?.code === 'ESRCH') return
-      // EPERM means the group still exists but is not probeable by this user.
-      if ((error as { code?: unknown } | null)?.code !== 'EPERM') return
-    }
-    if (Date.now() >= deadline) throw new Error(`process group ${String(pid)} did not exit before the termination deadline`)
-    await new Promise(resolve => setTimeout(resolve, PROCESS_TREE_POLL_MS))
-  }
-}
-
-/** Ask Windows to terminate a process tree and wait for its root exit event. */
-async function terminateWindowsTree(child: ChildProcess, force: boolean): Promise<void> {
-  const pid = child.pid
-  if (pid === undefined) {
-    if (!processExited(child)) child.kill(force ? 'SIGKILL' : 'SIGTERM')
-    return
-  }
-  await new Promise<void>((resolve) => {
-    execFile(
-      'taskkill',
-      ['/PID', String(pid), '/T', ...(force ? ['/F'] : [])],
-      { windowsHide: true },
-      () => resolve(),
-    )
-  })
-}
-
-/** Terminate one local runtime and wait until its whole process tree is gone. */
-async function terminateLocalTree(child: ChildProcess, graceMs: number): Promise<void> {
-  const deadline = Date.now() + Math.max(0, graceMs) + PROCESS_TREE_HARD_TIMEOUT_MS
-  if (process.platform === 'win32') {
-    const exited = new Promise<void>(resolve => {
-      if (processExited(child)) resolve()
-      else child.once('exit', () => resolve())
-    })
-    await terminateWindowsTree(child, false)
-    const forceTimer = setTimeout(() => {
-      void terminateWindowsTree(child, true)
-    }, Math.max(0, graceMs))
-    try {
-      await exited
-    } finally {
-      clearTimeout(forceTimer)
-    }
-    return
-  }
-
-  const pid = child.pid
-  if (pid === undefined) {
-    if (!processExited(child)) child.kill('SIGTERM')
-    return
-  }
-  try { process.kill(-pid, 'SIGTERM') } catch { child.kill('SIGTERM') }
-  const forceTimer = setTimeout(() => {
-    try { process.kill(-pid, 'SIGKILL') } catch { child.kill('SIGKILL') }
-  }, Math.max(0, graceMs))
-  try {
-    await waitForPosixGroupExit(child, deadline)
-  } finally {
-    clearTimeout(forceTimer)
-  }
-}
 
 /** Stable process identity and filesystem facts for one runtime. */
 export interface RuntimeProcessIdentity {
@@ -160,14 +53,25 @@ export interface RuntimePolicyIdentity extends RuntimeProcessIdentity {
   generation: number
 }
 
+/** Supervisor identity remains distinct when a database restore reuses a generation number. */
+export interface RuntimeSupervisorIdentity extends RuntimePolicyIdentity {
+  /** SHA-256 of the issued bearer; null denotes a stopped or pre-credential legacy assignment. */
+  credentialHash: string | null
+}
+
 /** Launch-only facts, including the credential delivered through a private channel. */
-export interface LaunchRuntime extends RuntimePolicyIdentity {
+export interface LaunchRuntime extends RuntimeSupervisorIdentity {
+  credentialHash: string
   gatewayCredential: string
+  /** Await node admission immediately before process allocation; absent in independent compositions. */
+  beforeAllocation?: () => Promise<void>
+  /** Cancellation remains live through asynchronous preparation and supervisor handoff. */
+  signal?: AbortSignal
 }
 
 /** Handle over one launched instance. */
 export interface InstanceProc {
-  /** Ask the instance to stop; escalate after `graceMs`. Resolves when the request completed. */
+  /** Resolve after the generation's complete process range stops and any delayed allocation is fenced; escalate after `graceMs`. */
   terminate(graceMs: number): Promise<void>
   /**
    * Whether the underlying process is known to have exited. A systemd unit is
@@ -175,113 +79,142 @@ export interface InstanceProc {
    * prefer {@link isAlive} when the launcher supplies one.
    */
   hasExited(): boolean
+  /** Process-owner exit notification; callers still await termination of any remaining descendants. */
+  exited?: Promise<void>
   /** Optional supervisor-backed liveness probe for processes not owned directly. */
   isAlive?(): Promise<boolean>
 }
 
+/** A failed launch whose process termination still needs confirmation by the lifecycle owner. */
+export class RuntimeLaunchCleanupError extends Error {
+  /**
+   * @param process - handle retained until its termination succeeds.
+   * @param cause - launch or cleanup failure.
+   */
+  constructor(readonly process: InstanceProc, cause: unknown) {
+    super('Runtime launch cleanup could not be confirmed', { cause })
+  }
+}
+
 /** One instance launch driver. */
 export interface Launcher {
-  /** Launch (or restart) one instance and return its handle. */
+  /** Launch one instance. Rejection confirms cleanup, or carries a RuntimeLaunchCleanupError retaining the handle. */
   start(runtime: LaunchRuntime): Promise<InstanceProc>
   /**
-   * Re-attach to an instance this gateway process did not start (present
-   * after a gateway restart under systemd). Absent on drivers whose
-   * instances cannot outlive the gateway.
+   * Re-attach to an exact generation this gateway process did not start (present
+   * after a Gateway failure). Recovery support is independent of graceful
+   * shutdown retention.
    */
-  attach?(runtime: RuntimeProcessIdentity): InstanceProc
-  /** Whether instances survive a gateway shutdown (systemd) or must be stopped with it (local). */
+  attach?(runtime: RuntimeSupervisorIdentity): InstanceProc
+  /** Whether graceful Gateway shutdown retains supervisor-owned instances for later reattachment. */
   readonly instancesOutliveGateway: boolean
 }
 
-/** macOS dev driver: plain subprocesses tracked by their ChildProcess. */
+/** Local POSIX driver with independently recoverable generation ownership. */
 export class LocalLauncher implements Launcher {
   readonly instancesOutliveGateway = false
-  private readonly logDrains = new Map<string, { child: ChildProcess; done: Promise<void> }>()
+  private readonly homes = new Map<string, LocalRuntimeControl>()
 
   constructor(private readonly cfg: GatewayConfig) {}
 
+  attach(runtime: RuntimeSupervisorIdentity): InstanceProc {
+    return this.control(runtime)
+  }
+
+  private control(runtime: RuntimeSupervisorIdentity): LocalRuntimeControl {
+    if (runtime.credentialHash === null) throw new Error('Legacy local runtime ownership cannot be recovered automatically')
+    return new LocalRuntimeControl(new LocalRuntimeOwnerStore(nodeControlPaths(this.cfg.stateRoot).localRuntime, {
+      node: this.cfg.computeNodeName, kind: runtime.kind, ownerId: runtime.ownerId, runtimeKey: runtime.runtimeKey,
+      generation: runtime.generation, credentialHash: runtime.credentialHash,
+    }), this.cfg.readinessTimeoutMs)
+  }
+
   async start(runtime: LaunchRuntime): Promise<InstanceProc> {
-    const previous = this.logDrains.get(runtime.dshHome)
-    if (previous !== undefined) {
-      // A crashed parent can leave descendants holding its output pipes.
-      await terminateLocalTree(previous.child, 0)
-      await previous.done
-    }
-    const argv = this.cfg.dshCommand.map(a => a.replaceAll('{port}', String(runtime.port)))
-    const child = spawn(argv[0] ?? 'node', argv.slice(1), {
-      cwd: runtime.homePath,
-      env: {
-        ...scrubbedParentEnv(),
-        HOME: runtime.homePath,
-        DSH_HOME: runtime.dshHome,
-        DSH_MANAGED_DATA_MANIFEST: join(runtime.dshHome, 'managed-data.jsonl'),
-        DSH_GATEWAY_CREDENTIAL_FD: '3',
-        // Source-run instances load TypeScript through tsx, which resolves
-        // the workspace `paths` map from tsconfig — discovered from cwd,
-        // which is the user home, OUTSIDE the repo. Point tsx at the repo
-        // tsconfig explicitly; the pinned-npm production command has no tsx
-        // and ignores the variable.
-        TSX_TSCONFIG_PATH: join(this.cfg.dshRepoRoot, 'tsconfig.base.json'),
-      },
-      stdio: ['ignore', 'pipe', 'pipe', 'pipe'],
-      detached: process.platform !== 'win32',
+    if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
+    const previous = this.homes.get(runtime.dshHome)
+    if (previous !== undefined) { await previous.terminate(0); this.homes.delete(runtime.dshHome) }
+    const bootId = await localKernelBootId(runtime.signal).catch((error: unknown) => {
+      if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
+      throw error
     })
-    installLocalChildCleanup()
-    localChildren.add(child)
-    // Runtime application logs go to stdout; persist them under the instance's
-    // own dsh home with a two-generation cap. stderr additionally keeps its
-    // central path to the supervisor log so crashes stay visible in one place.
-    const runtimeLog = new RuntimeLog(
-      join(runtime.dshHome, 'logs', 'runtime.log'),
-      this.cfg.runtimeLogCapBytes,
-    )
-    child.stdio[1]?.pipe(runtimeLog, { end: false })
-    child.stdio[2]?.pipe(runtimeLog, { end: false })
-    child.stdio[2]?.pipe(process.stderr, { end: false })
-    const logDrained = new Promise<void>(resolve => {
-      child.once('close', () => {
-        void runtimeLog.close()
-          .catch(() => { console.error('[gateway] runtime log stream failed to close') })
-          .finally(resolve)
-      })
-    })
-    this.logDrains.set(runtime.dshHome, { child, done: logDrained })
-    void logDrained.then(() => {
-      if (this.logDrains.get(runtime.dshHome)?.done === logDrained) this.logDrains.delete(runtime.dshHome)
-    })
-    // Keep the handle until the entire detached group is gone. The direct
-    // child can exit while a grandchild still owns the runtime port.
-    child.once('exit', () => {
-      if (process.platform === 'win32' || child.pid === undefined) {
-        localChildren.delete(child)
-        return
-      }
-      void waitForPosixGroupExit(child, Date.now() + PROCESS_TREE_HARD_TIMEOUT_MS)
-        .catch(() => {})
-        .finally(() => { localChildren.delete(child) })
-    })
-    const credentialPipe = child.stdio[3] as Writable | null | undefined
-    if (credentialPipe === null || credentialPipe === undefined) {
-      child.kill('SIGKILL')
-      throw new Error(`runtime credential pipe unavailable for ${runtime.runtimeKey}`)
-    }
+    const control = this.control(runtime)
+    const lease = await control.store.acquire()
+    let allocationAttempted = false
+    let supervisor: ChildProcess | undefined
     try {
-      await new Promise<void>((resolve, reject) => {
-        credentialPipe.once('error', reject)
-        credentialPipe.end(runtime.gatewayCredential, resolve)
+      const linuxScopeMode = await probeLocalLinuxScope(this.cfg.upstreamTimeoutMs, runtime.signal)
+      const record = await lease.create(bootId, linuxScopeMode === undefined ? undefined : 'linux-slice')
+      const spec = localBootstrapSchema.parse({
+        kind: 'start', directory: control.store.directory, identity: control.store.identity, record,
+        ...linuxScopeMode === undefined ? {} : { linuxScopeMode },
+        command: this.cfg.dshCommand.map(a => a.replaceAll('{port}', String(runtime.port))),
+        cwd: runtime.homePath, dshHome: runtime.dshHome, credential: runtime.gatewayCredential,
+        logCapBytes: this.cfg.runtimeLogCapBytes, controlTimeoutMs: this.cfg.upstreamTimeoutMs,
+        env: {
+          ...scrubbedGatewayChildEnv(), HOME: runtime.homePath, DSH_HOME: runtime.dshHome,
+          DSH_DIRECTORY_GRANTS: join(runtime.dshHome, 'directory-grants.json'),
+          DSH_MANAGED_DATA_MANIFEST: join(runtime.dshHome, 'managed-data.jsonl'), DSH_GATEWAY_CREDENTIAL_FD: '3',
+          TSX_TSCONFIG_PATH: join(this.cfg.dshRepoRoot, 'tsconfig.base.json'),
+        },
       })
+      if (Buffer.byteLength(JSON.stringify(spec)) > LOCAL_BOOTSTRAP_BYTES) throw new Error('Local runtime bootstrap exceeds its byte limit')
+      const source = import.meta.url.endsWith('.ts')
+      const entry = fileURLToPath(new URL(`./local-runtime-supervisor.${source ? 'ts' : 'js'}`, import.meta.url))
+      await runtime.beforeAllocation?.()
+      if (await control.store.cancelled() || runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
+      allocationAttempted = true
+      const child = supervisor = spawn(process.execPath, [...(source ? ['--import', import.meta.resolve('tsx/esm')] : []), entry, String(this.cfg.readinessTimeoutMs)], {
+        cwd: this.cfg.dshRepoRoot, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc', lease.fd],
+        env: { ...scrubbedGatewayChildEnv(), TSX_TSCONFIG_PATH: fileURLToPath(new URL('../tsconfig.run.json', import.meta.url)) },
+      })
+      const exited = new Promise<void>(resolve => child.once('exit', () => resolve()))
+      await new Promise<void>((resolve, reject) => {
+        const aborted = () => failed(new RuntimeCapacityError('cancelled'))
+        const settled = () => { clearTimeout(timer); runtime.signal?.removeEventListener('abort', aborted) }
+        const failed = (error: unknown) => { settled(); reject(error) }
+        const timer = setTimeout(() => failed(new Error('Local runtime supervisor startup timed out')), this.cfg.readinessTimeoutMs)
+        child.once('error', failed)
+        child.once('exit', () => failed(new Error('Local runtime supervisor exited during startup')))
+        child.on('message', (message: unknown) => {
+          if (typeof message === 'object' && message !== null && 'kind' in message && message.kind === 'ready'
+            && 'nonce' in message && message.nonce === record.nonce) { settled(); resolve() }
+        })
+        runtime.signal?.addEventListener('abort', aborted, { once: true })
+        if (runtime.signal?.aborted) aborted()
+        else child.send(spec, error => { if (error !== null) failed(error) })
+      })
+      if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
+      child.unref()
+      await lease.close()
+      this.homes.set(runtime.dshHome, control)
+      return Object.assign(control, { exited })
     } catch (error) {
-      await terminateLocalTree(child, 0).catch(() => {})
-      await logDrained
-      throw new Error(`runtime credential delivery failed for ${runtime.runtimeKey}: ${String(error)}`)
+      const failures: unknown[] = [error]
+      try { if (supervisor?.connected) supervisor.disconnect() } catch (failure) { failures.push(failure) }
+      try { await lease.close() } catch (failure) { if (failure !== error) failures.push(failure) }
+      if (allocationAttempted) {
+        try { await control.terminate(0) } catch (cleanupError) {
+          throw new RuntimeLaunchCleanupError(control, new AggregateError([...failures, cleanupError], 'Local runtime startup and cleanup failed'))
+        }
+      }
+      if (failures.length > 1) throw new AggregateError(failures, 'Local runtime startup and descriptor cleanup failed')
+      throw error
     }
-    return {
-      hasExited: () => child.exitCode !== null || child.signalCode !== null,
-      terminate: async (graceMs: number) => {
-        await terminateLocalTree(child, graceMs)
-        await logDrained
-      },
-    }
+  }
+}
+
+/** Safe provisioning diagnostics for a Runtime that has not allocated a process. */
+export class RuntimeAccountError extends Error {
+  readonly code: 'RUNTIME_ACCOUNT_NOT_PROVISIONED' | 'RUNTIME_ACCOUNT_VERIFICATION_UNAVAILABLE'
+  readonly status: 409 | 503
+
+  constructor(account: string, reason: 'missing' | 'unavailable', options?: ErrorOptions) {
+    super(reason === 'missing'
+      ? `Linux runtime account "${account}" is not provisioned on this computer. Complete the configured runtime-account provisioning before starting this Runtime.`
+      : `Linux runtime account "${account}" could not be verified. Check this computer's runtime-account provisioning.`, options)
+    this.name = 'RuntimeAccountError'
+    this.code = reason === 'missing' ? 'RUNTIME_ACCOUNT_NOT_PROVISIONED' : 'RUNTIME_ACCOUNT_VERIFICATION_UNAVAILABLE'
+    this.status = reason === 'missing' ? 409 : 503
   }
 }
 
@@ -295,70 +228,119 @@ export interface SystemdLauncherOptions {
   credentialDir: string
   /** Unit directory the per-user unit files are written into. */
   unitDir?: string
-  /** systemctl arguments runner; injectable for tests. */
-  run?: (args: string[]) => Promise<void>
-}
-
-const runSystemctl = async (args: string[]): Promise<void> => {
-  await promisify(execFile)('systemctl', args)
+  /** Validated deadline for each native systemctl client. */
+  commandTimeoutMs: number
+  /** Override systemctl execution; cancellation must join owned command closure. */
+  run?: (args: string[], signal?: AbortSignal) => Promise<void>
+  /** Verify the configured system account before writing credentials or allocating a process. */
+  verifySystemUser?: (account: string, signal?: AbortSignal) => Promise<void>
 }
 
 /**
  * Linux production driver: render the user's confinement unit from the
- * current grants, write it, `daemon-reload`, and `restart`. Restarting is
- * required because every launch rotates the runtime generation and credential.
+ * current grants and drives its generation-specific unit. Stopped generations
+ * retain an empty unit file, which systemd treats as masked, so delayed launch
+ * commands cannot reactivate a process whose termination was confirmed.
+ * Private credential sources remain available for service restarts until the
+ * exact generation has confirmed stopped.
  */
 export class SystemdLauncher implements Launcher {
   readonly instancesOutliveGateway = true
   private readonly unitDir: string
-  private readonly run: (args: string[]) => Promise<void>
+  private readonly run: (args: string[], signal?: AbortSignal) => Promise<void>
+  private readonly verifySystemUser: (account: string, signal?: AbortSignal) => Promise<void>
 
   constructor(private readonly options: SystemdLauncherOptions) {
     this.unitDir = options.unitDir ?? '/etc/systemd/system'
-    this.run = options.run ?? runSystemctl
+    this.run = options.run ?? (async (args, signal) => {
+      await runGatewayChildCommand('systemctl', ['--no-ask-password', '--no-pager', ...args], options.commandTimeoutMs, signal)
+    })
+    this.verifySystemUser = options.verifySystemUser ?? (async (account, signal) => {
+      try { await runGatewayChildCommand('id', ['-u', '--', account], options.commandTimeoutMs, signal, 1024) }
+      catch (error) {
+        if (signal?.aborted) throw new RuntimeCapacityError('cancelled')
+        const missing = error instanceof Error && 'code' in error && error.code === 1
+        throw new RuntimeAccountError(account, missing ? 'missing' : 'unavailable', { cause: error })
+      }
+    })
   }
 
   async start(user: LaunchRuntime): Promise<InstanceProc> {
+    if (user.signal?.aborted) throw new RuntimeCapacityError('cancelled')
+    await this.verifySystemUser(user.systemUser, user.signal)
+    if (user.signal?.aborted) throw new RuntimeCapacityError('cancelled')
     // $DSH_HOME sits under the TemporaryFileSystem mask like the home, so it
     // must be re-bound writable too (session logs, settings, grants file);
     // the renderer itself only auto-binds the home.
-    const { gatewayCredential, ...policyIdentity } = user
+    const { gatewayCredential, credentialHash, beforeAllocation, signal, ...policyIdentity } = user
     const grants: GrantEntry[] = [
       { path: user.dshHome, mode: 'rw' },
       ...await this.options.grantsProvider(policyIdentity),
     ]
+    if (signal?.aborted) throw new RuntimeCapacityError('cancelled')
     mkdirSync(this.options.credentialDir, { recursive: true, mode: 0o700 })
-    const credentialPath = join(
-      this.options.credentialDir,
-      `${user.runtimeKey}.${String(user.generation)}.${String(process.pid)}.credential`,
-    )
+    const credentialPath = this.credentialPath(user)
     writeFileSync(credentialPath, gatewayCredential, { mode: 0o600, flag: 'wx' })
+    let restartAttempted = false
     try {
       writeFileSync(
-        join(this.unitDir, unitName(user.runtimeKey)),
+        join(this.unitDir, unitName(user.runtimeKey, user.generation, credentialHash)),
         renderUserUnit(user, grants, this.options.systemd, credentialPath),
+        { flag: 'wx' },
       )
-      await this.run(['daemon-reload'])
-      await this.run(['restart', unitName(user.runtimeKey)])
-    } finally {
-      rmSync(credentialPath, { force: true })
+      await this.run(['daemon-reload'], signal)
+      await beforeAllocation?.()
+      if (signal?.aborted) throw new RuntimeCapacityError('cancelled')
+      restartAttempted = true
+      await this.run(['restart', unitName(user.runtimeKey, user.generation, credentialHash)], signal)
+    } catch (error: unknown) {
+      if (restartAttempted) throw new RuntimeLaunchCleanupError(this.attach(user), error)
+      try { rmSync(credentialPath, { force: true }) } catch (cleanupError: unknown) {
+        throw new AggregateError([error, cleanupError], 'Systemd preparation and credential cleanup failed')
+      }
+      throw error
     }
     return this.attach(user)
   }
 
-  attach(user: RuntimeProcessIdentity): InstanceProc {
+  private credentialPath(user: RuntimeSupervisorIdentity & { credentialHash: string }): string {
+    unitName(user.runtimeKey, user.generation, user.credentialHash)
+    return join(this.options.credentialDir, `${user.runtimeKey}.${String(user.generation)}.${user.credentialHash}.credential`)
+  }
+
+  attach(user: RuntimeSupervisorIdentity): InstanceProc {
+    const unit = user.credentialHash === null ? unitName(user.runtimeKey) : unitName(user.runtimeKey, user.generation, user.credentialHash)
+    const legacy = unitName(user.runtimeKey)
+    const units = [...new Set([unit, legacy])]
     return {
       hasExited: () => false,
       isAlive: async () => {
-        try {
-          await this.run(['is-active', '--quiet', unitName(user.runtimeKey)])
-          return true
-        } catch {
-          return false
-        }
+        if (await this.unitIsActive(unit)) return true
+        return existsSync(join(this.unitDir, legacy)) && await this.unitIsActive(legacy)
       },
-      terminate: async () => { await this.run(['stop', unitName(user.runtimeKey)]) },
+      terminate: async () => {
+        // Legacy units are never launched by this driver.
+        for (const name of units) this.maskGeneration(name)
+        await this.run(['daemon-reload'])
+        await this.run(['stop', ...units])
+        if (user.credentialHash !== null) rmSync(this.credentialPath({ ...user, credentialHash: user.credentialHash }), { force: true })
+      },
     }
+  }
+
+  private async unitIsActive(unit: string): Promise<boolean> {
+    try { await this.run(['is-active', '--quiet', unit]); return true } catch (error) {
+      // systemctl reserves 3 for an inactive unit and 4 for a missing unit.
+      const code = (error as { code?: unknown }).code
+      if (code === 3 || code === 4) return false
+      throw error
+    }
+  }
+
+  private maskGeneration(unit: string): void {
+    const temporary = join(this.unitDir, `.${unit}.${randomUUID()}.tmp`)
+    writeFileSync(temporary, '', { flag: 'wx' })
+    try { renameSync(temporary, join(this.unitDir, unit)) } finally { rmSync(temporary, { force: true }) }
   }
 }
 

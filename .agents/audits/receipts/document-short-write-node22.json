@@ -1,0 +1,14 @@
+{
+  "name": "document-short-write-node22",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node ../node_modules/vitest/vitest.mjs run tests/document-upload-postgres.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T10:40:24.226026+00:00",
+  "seconds": 4.542,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bc45a9dc20b46848c7b7a727302822ee25d9ecbecc478da96be1a4ee47a15d3b",
+  "inputsAfter": "bc45a9dc20b46848c7b7a727302822ee25d9ecbecc478da96be1a4ee47a15d3b",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "d5e8e7b0c5a36d9a5da8409cf505fec590efd625bf77ce805c51450ce9728532",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  18:40:26\n   Duration  2.50s (transform 1.19s, setup 0ms, import 1.53s, tests 832ms, environment 0ms)\n\n"
+}

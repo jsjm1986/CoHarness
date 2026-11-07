@@ -18,6 +18,14 @@ const libraryWheel = Buffer.from('UEsDBAoAAAAAAASeLl0sYMPjDAAAAAwAAAAJAAAAc2FtcG
 const relocatedWheel = Buffer.from('UEsDBAoAAAAAAASeLl3x0Nj9FAAAABQAAAAeAAAAc2FtcGxlLTEuMC5kYXRhL3NjcmlwdHMvc2FtcGxlcmVxdWlyZXMgcmVsb2NhdGlvbgpQSwECHgMKAAAAAAAEni5d8dDY/RQAAAAUAAAAHgAAAAAAAAABAAAApIEAAAAAc2FtcGxlLTEuMC5kYXRhL3NjcmlwdHMvc2FtcGxlUEsFBgAAAAABAAEATAAAAFAAAAAAAA==', 'base64')
 const externalLibraryWheel = Buffer.from('UEsDBBQAAAAAAAAAIVyBOE8OHAAAABwAAAAhAAAAc2FtcGxlLTEuMC5kYXRhL3B1cmVsaWIvc2FtcGxlLnB5cmVxdWlyZXMgbGlicmFyeSByZWxvY2F0aW9uClBLAQIUAxQAAAAAAAAAIVyBOE8OHAAAABwAAAAhAAAAAAAAAAAAAACAAQAAAABzYW1wbGUtMS4wLmRhdGEvcHVyZWxpYi9zYW1wbGUucHlQSwUGAAAAAAEAAQBPAAAAWwAAAAAA', 'base64')
 
+function zipWithEntryMode(path: string, contents: string, mode: number): Buffer {
+  const archive = Buffer.from(zipSync({ [path]: Buffer.from(contents) }))
+  const centralDirectory = archive.indexOf(Buffer.from('504b0102', 'hex'))
+  if (centralDirectory < 0) throw new Error('fixture ZIP is missing its central directory')
+  archive.writeUInt32LE((mode << 16) >>> 0, centralDirectory + 38)
+  return archive
+}
+
 declareRuntimeLockContract(lock, primaryRuntimePayloadDigest)
 
 it('reports missing distribution metadata before trying to execute a stale native payload', async () => {
@@ -101,6 +109,58 @@ it('rejects library files requiring an unsupported installation scheme', async (
     const archive = join(root, 'relocated.whl')
     await writeFile(archive, externalLibraryWheel)
     await expect(unpackPrimaryRuntimeWheel(archive, join(root, 'site-packages'))).rejects.toThrow('unsupported installation paths')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('rejects symlinks and traversal paths before writing outside the extraction root', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'desktop-unsafe-zip-'))
+  try {
+    const destination = join(root, 'site-packages')
+    const outside = join(root, 'outside.txt')
+    const symlinkArchive = join(root, 'symlink.whl')
+    await writeFile(symlinkArchive, zipWithEntryMode('link', '../../outside.txt', 0o120777))
+    await expect(unpackPrimaryRuntimeWheel(symlinkArchive, destination)).rejects.toThrow('unsupported ZIP entry type')
+    await expect(readFile(outside)).rejects.toMatchObject({ code: 'ENOENT' })
+
+    const traversalArchive = join(root, 'traversal.whl')
+    await writeFile(traversalArchive, zipSync({ '../outside.txt': Buffer.from('escaped') }))
+    await expect(unpackPrimaryRuntimeWheel(traversalArchive, destination)).rejects.toThrow(/unsafe ZIP path|invalid relative path/u)
+    await expect(readFile(outside)).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('rejects duplicate ZIP paths instead of replacing an earlier entry', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'desktop-duplicate-zip-'))
+  try {
+    const archive = join(root, 'duplicate.whl')
+    const file = Buffer.from(zipSync({ 'sample.py': Buffer.from('first = 1\n') }))
+    const duplicate = Buffer.from(file)
+    const centralDirectory = duplicate.indexOf(Buffer.from('504b0102', 'hex'))
+    if (centralDirectory < 0) throw new Error('fixture ZIP is missing its central directory')
+    const nameLength = duplicate.readUInt16LE(centralDirectory + 28)
+    const extraLength = duplicate.readUInt16LE(centralDirectory + 30)
+    const commentLength = duplicate.readUInt16LE(centralDirectory + 32)
+    const entryLength = 46 + nameLength + extraLength + commentLength
+    const endRecord = duplicate.indexOf(Buffer.from('504b0506', 'hex'))
+    const firstEntry = duplicate.subarray(centralDirectory, centralDirectory + entryLength)
+    const repeatedEntry = Buffer.from(firstEntry)
+    const originalLocalOffset = repeatedEntry.readUInt32LE(42)
+    repeatedEntry.writeUInt32LE(originalLocalOffset, 42)
+    const central = Buffer.concat([duplicate.subarray(centralDirectory, centralDirectory + entryLength), repeatedEntry])
+    const prefix = duplicate.subarray(0, centralDirectory)
+    const suffix = duplicate.subarray(endRecord)
+    const result = Buffer.concat([prefix, central, suffix])
+    result.writeUInt16LE(2, result.length - 14)
+    result.writeUInt16LE(2, result.length - 12)
+    result.writeUInt32LE(central.length, result.length - 10)
+    result.writeUInt32LE(prefix.length, result.length - 6)
+    await writeFile(archive, result)
+    await expect(unpackPrimaryRuntimeWheel(archive, join(root, 'site-packages'))).rejects.toThrow('duplicate ZIP path')
+    await expect(readFile(join(root, 'site-packages/sample.py'), 'utf8')).resolves.toBe('first = 1\n')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

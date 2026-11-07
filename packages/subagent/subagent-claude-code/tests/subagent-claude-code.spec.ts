@@ -439,7 +439,7 @@ describe('named persistent member routes', () => {
       }
       const hostSpawn = remote ? vi.spyOn(ctx.subprocess, 'spawn') : undefined
       const child = fakeChild()
-      const spawn = vi.spyOn(target.subprocess, 'spawn').mockImplementation(() => child.handle)
+      const spawn = vi.spyOn(target.subprocess, 'spawn').mockImplementation(async () => child.handle)
       await ctx.plugin(claudeCode, { stateDir: dir, ...remote ? { model: 'chosen-claude' } : {}, memberCwd: dir, env: { APPROVED: 'yes' } })
 
       const provider = ctx.subagents.getProvider('claude-code')!
@@ -488,12 +488,13 @@ describe('named persistent member routes', () => {
       // The plugin-built transport spawns through the shared subprocess seam,
       // and the member session reaps that child when the turn settles.
       expect(spawn).toHaveBeenCalledOnce()
+      await Promise.resolve()
       expect(child.terminate).toHaveBeenCalledOnce()
       if (remote) {
         expect(Object.keys(spawn.mock.calls[0]![0].env ?? {})).toEqual(['APPROVED'])
         expect(spawn.mock.calls[0]![0].env?.APPROVED).toBe('yes')
         const once = fakeChild()
-        spawn.mockImplementationOnce(() => once.handle)
+        spawn.mockImplementationOnce(async () => once.handle)
         const run = await ctx.subagents.start('claude-code', withExecutionContext(ctx, request()))
         expect((await run.result).stopReason).toBe('completed')
         await run.dispose()
@@ -562,11 +563,21 @@ describe('task admission and package contracts', () => {
     const rows = Array.isArray(parsed)
       ? (parsed as Array<{ insert?: Array<{ id?: string; name?: string }> }>).flatMap(entry => entry.insert ?? [])
       : []
-    expect(rows).toEqual([{
-      id: 'subagent-claude-code',
-      name: '@deepseek-ai/dsh-subagent-claude-code',
-    }])
-    expect(JSON.stringify(rows)).not.toContain('tool-subagent')
+    expect(rows).toEqual([
+      {
+        id: 'subagent-claude-code',
+        name: '@deepseek-ai/dsh-subagent-claude-code',
+      },
+      {
+        id: 'tool-subagent-claude-code',
+        name: '@deepseek-ai/dsh-tool-subagent',
+        config: {
+          provider: 'claude-code',
+          toolName: 'subagent_claude_code',
+          maxDepth: 'provider-managed',
+        },
+      },
+    ])
   })
 
   it('preserves text sequences and rejects empty, blank, and non-text tasks', () => {
@@ -620,7 +631,7 @@ describe('task admission and package contracts', () => {
     const safeChild = fakeChild()
     const bypassChild = fakeChild()
     const spawnSpecs: SubprocessSpawnSpec[] = []
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation((spec) => {
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async (spec) => {
       spawnSpecs.push(spec)
       return spec.env?.DSH_CLAUDE_INSTANCE === 'safe'
         ? safeChild.handle
@@ -754,7 +765,7 @@ describe('task admission and package contracts', () => {
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
-    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(child.handle)
+    vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue(child.handle)
     queryMock.mockImplementation(({ options }) => {
       expect(options).not.toHaveProperty('model')
       expect(options.permissionMode).toBe(DEFAULT_CLAUDE_CODE_PERMISSION_MODE)
@@ -779,7 +790,7 @@ describe('task admission and package contracts', () => {
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
     const spawn = vi.spyOn(ctx.subprocess, 'spawn')
-      .mockImplementation(() => child.handle)
+      .mockImplementation(async () => child.handle)
     const resolveExecutable = vi.spyOn(ctx.subprocess, 'resolveExecutable')
       .mockResolvedValue('/host/bin/claude')
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
@@ -855,7 +866,7 @@ describe('task admission and package contracts', () => {
     // A dedicated child: the earlier inherited-directory run already consumed
     // the first fixture's one-shot process outcome.
     const runChild = fakeChild()
-    spawn.mockReturnValueOnce(runChild.handle)
+    spawn.mockResolvedValueOnce(runChild.handle)
     const run = await ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, request()))
     runChild.settle({ exitCode: 9, signal: null })
     runChild.stdout.end()
@@ -954,8 +965,7 @@ describe('official spawn projection', () => {
   it('projects streams, exit facts, listeners, and idempotent tree termination', async () => {
     const child = fakeChild({ exitOnTerminate: false })
     const process = new ManagedClaudeCodeProcess(child.handle)
-    expect(process.stdin).toBe(child.stdin)
-    expect(process.stdout).toBe(child.stdout)
+    expect(await process.ready).toBe(child.handle)
     expect(process.killed).toBe(false)
     expect(process.exitCode).toBeNull()
     expect(process.signalCode).toBeNull()
@@ -971,6 +981,7 @@ describe('official spawn projection', () => {
     expect(process.kill('SIGTERM')).toBe(true)
     expect(process.killed).toBe(true)
     expect(process.kill('SIGKILL')).toBe(false)
+    await Promise.resolve()
     expect(child.terminate).toHaveBeenCalledOnce()
 
     child.settle({ exitCode: null, signal: 'SIGTERM' })
@@ -1018,7 +1029,7 @@ describe('query options and result mapping', () => {
     vi.stubEnv('DSH_INTERNAL', 'must-not-leak')
     const child = fakeChild()
     const spawn = vi.fn(() => child.handle)
-    const captured: SubprocessHandle[] = []
+    const captured: ManagedClaudeCodeProcess[] = []
     const diagnostics: string[] = []
     const spec: ClaudeCodeRunSpec = {
       cwd: '/workspace',
@@ -1100,7 +1111,7 @@ describe('query options and result mapping', () => {
 
     const spawned = options.spawnClaudeCodeProcess!(sdkSpawnOptions())
     expect(spawned).toBeInstanceOf(ManagedClaudeCodeProcess)
-    expect(captured).toEqual([child.handle])
+    expect(await captured[0]!.ready).toBe(child.handle)
     expect(spawn).toHaveBeenCalledWith(expect.objectContaining({
       argv: ['/sdk/claude', '--output-format', 'stream-json'],
       cwd: '/workspace',
@@ -1748,6 +1759,7 @@ describe('query and process disposal', () => {
     const close = vi.fn()
     await disposeClaudeCodeChild({ close }, child.handle)
     expect(close).toHaveBeenCalledOnce()
+    await Promise.resolve()
     expect(child.terminate).toHaveBeenCalledOnce()
     expect(child.waitForExit).toHaveBeenCalledOnce()
     expect(child.waitForExit).toHaveBeenCalledWith()

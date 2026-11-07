@@ -52,6 +52,8 @@ A successful package operation is not rolled back when publication is rejected a
 
 In HMR's change dispatch, a changed file named `package.json` outside `node_modules` goes to `PackageManifests.invalidate()`. A manifest in the host dependency graph still requests a host reload; one loaded as a JSON module still reloads its consumers. A configuration-only manifest schedules no module reload. Configuration-owned paths stay with their dedicated watcher. Source changes in the same batch reload afterwards.
 
+Node package-method layers belong to the HMR instance that installs them. A retired layer delegates to its predecessor without invoking released package caches or reinstalling hooks. Restoration skips retired predecessors, so overlapping instances may dispose in either order and the final owner restores the original Node methods. Revocation metadata stays on each scoped function; a process-wide registry does not own these instances.
+
 `invalidate(manifest)` records the directory as expired. Afterwards:
 
 - package.json reads, scope lookups, type lookups, and nearest-manifest lookups below that directory read the current file. Ownership follows the real directory when a consumer reaches the package through a link.

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-coverage-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/sdk-child-coverage.config.mts --coverage --retry=0",
+  "startedAt": "2026-10-24T10:02:35.173186+00:00",
+  "seconds": 18.964,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "71b4a4b64fba601b29c2c651f337d745931696aa7f0c46431453b1e75df08162",
+  "inputsAfter": "71b4a4b64fba601b29c2c651f337d745931696aa7f0c46431453b1e75df08162",
+  "postgresToolDirectory": null,
+  "outputSha256": "6b0fa4d2207a54963ec710318aadbf24f074555e6363cd3564e4c568f7756cf5",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  2 passed (2)\n      Tests  58 passed (58)\n   Start at  18:02:50\n   Duration  3.85s (transform 2.60s, setup 0ms, import 3.44s, tests 1.96s, environment 0ms)\n\n % Coverage report from v8\n--------------|---------|----------|---------|---------|-------------------\nFile          | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n--------------|---------|----------|---------|---------|-------------------\nAll files     |     100 |    98.79 |     100 |     100 |                   \n index.ts     |     100 |    96.29 |     100 |     100 | 145               \n--------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 195/195 )\nBranches     : 98.79% ( 82/83 )\nFunctions    : 100% ( 42/42 )\nLines        : 100% ( 172/172 )\n================================================================================\nERROR: Coverage for branches (96.29%) does not meet global threshold (100%) for packages/subagent/subagent-dsh-sdk/src/index.ts\n"
+}

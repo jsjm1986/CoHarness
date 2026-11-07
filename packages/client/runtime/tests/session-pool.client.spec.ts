@@ -1,19 +1,22 @@
-import { clientSessionKey } from '@deepseek-ai/dsh-client-connection/client'
 // @vitest-environment node
 import { Context } from '@deepseek-ai/cordis'
+import { clientSessionKey, installConnection } from '@deepseek-ai/dsh-client-connection/client'
 import { describe, expect, it, vi } from 'vitest'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
 import { SessionRuntime } from '../src/client/sessions/service.ts'
 import { SessionRuntimePool } from '../src/client/sessions/pool.ts'
+import { WorkspaceRuntime } from '../src/client/workspaces/service.ts'
+import type { WorkspaceArchiveSnapshot } from '../src/client/workspaces/manager.ts'
 import { WorkspaceResourceRegistry, workspaceResourceAddress } from '../src/client/workspace-resources.ts'
 import { PermissionCatalogDirectory } from '../src/client/permission-catalog.ts'
 import { createSnapshotStore } from '../src/client/contract/store.ts'
 import type { WorkspaceResourceTarget } from '../src/client/workspace-resources.ts'
-import { FakeApiClient, fakeRemote, ok } from './fake-api.client.ts'
+import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
 
 function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionHandle['start']>[0]) => void): ConnectionHandle {
   return {
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 },
     api,
     isLoopback: true,
     interactions: 'none',
@@ -29,6 +32,336 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
 }
 
 describe('SessionRuntimePool', () => {
+  it('keeps initial Workspace history selection through the first project identity', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const description = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
+    const sessionList = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const workspaceList = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const connected = deferred<undefined>()
+    api.onDescribe = () => description.promise
+    api.onList = () => sessionList.promise
+    api.onWorkspaceList = () => workspaceList.promise
+    installConnection(ctx, { transport: {
+      createApiClient: () => api,
+      rpc: { call: () => Promise.reject(new Error('unexpected rpc')) },
+    } })
+    const handle = ctx.get('connection') as ConnectionHandle | undefined
+    if (handle === undefined) throw new Error('Client connection was not installed')
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false, persistSelection: false })
+    const pool = new SessionRuntimePool(ctx, base, handle, fakeRemote())
+    const workspaces = new WorkspaceRuntime(ctx, handle.api, pool)
+    const stopSelection = workspaces.startInitialSelection()
+    const loop = handle.start({
+      onConnected: (value) => {
+        const baseline = workspaces.handleConnected()
+        pool.handleConnected(value, baseline)
+        connected.resolve(undefined)
+      },
+    })
+    const target = { kind: 'project' as const, projectId: 7 }
+    const id = 'project-history' as SessionId
+    const key = clientSessionKey(target, id)
+    try {
+      description.resolve(ok({ version: 'test', cwd: '/project', home: '/home', attachedSessions: 0, canOpenPath: false,
+        executionAuthorityRequired: true, runtimeTarget: target }))
+      await connected.promise
+      expect(api.callsOf('workspace.list')).toHaveLength(1)
+      expect(api.callsOf('session.list')).toHaveLength(1)
+      sessionList.resolve(ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false, cwd: '/project' }] }))
+      await pool.refresh()
+      expect(workspaces.list.getSnapshot().baselinesReady).toBe(false)
+      expect(pool.list.getSnapshot().current).toBeUndefined()
+      workspaceList.resolve(ok({ items: [{ workspaceId: 'project-workspace' as WorkspaceId, path: '/project', title: 'Project',
+        sessionIds: [id], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }] }))
+      await workspaces.refresh()
+      await vi.waitFor(() => { expect(pool.list.getSnapshot().current).toBe(key) })
+      expect(pool.binding(key)?.session.getSnapshot().openState).toBe('open')
+      expect(api.callsOf('session.history')).toHaveLength(1)
+      expect(api.callsOf('session.create')).toEqual([])
+    } finally {
+      stopSelection()
+      loop.stop()
+      description.resolve(ok({ version: 'test', cwd: '/', home: '/', attachedSessions: 0, canOpenPath: false }))
+      sessionList.resolve(ok({ items: [] }))
+      workspaceList.resolve(ok({ items: [] }))
+      await ctx.fiber.dispose()
+      await vi.waitFor(() => { expect(api.openMuxCount).toBe(0) })
+    }
+  })
+
+  it.each(['clear before identity', 'clear while opening', 'navigate while opening', 'account withdrawal'] as const)(
+    'lets %s supersede project startup selection', async (action) => {
+      const ctx = new Context()
+      const api = new FakeApiClient()
+      const target = { kind: 'project' as const, projectId: 7 }
+      const recent = 'recent-history' as SessionId
+      const manual = 'manual-history' as SessionId
+      const recentKey = clientSessionKey(target, recent)
+      const manualKey = clientSessionKey(target, manual)
+      const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+      const requested = deferred<undefined>()
+      api.onHistory = ({ sessionId }) => {
+        if (sessionId !== recent) return Promise.resolve(ok({ events: [], hasMore: false }))
+        requested.resolve(undefined)
+        return history.promise
+      }
+      api.onList = async () => ok({ items: [recent, manual].map((sessionId, index) => ({
+        sessionId, updatedAt: 2 - index, running: false, blank: false, cwd: '/project',
+      })) })
+      api.onWorkspaceList = async () => ok({ items: [{
+        workspaceId: 'project-workspace' as WorkspaceId, path: '/project', title: 'Project', sessionIds: [recent, manual],
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      }] })
+      const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false, persistSelection: false })
+      const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+      const workspaces = new WorkspaceRuntime(ctx, api, pool)
+      const stopSelection = workspaces.startInitialSelection()
+      try {
+        if (action === 'clear before identity') pool.clear()
+        pool.setBaseRuntimeTarget(target)
+        await Promise.all([pool.refresh(), workspaces.refresh()])
+        expect(workspaces.list.getSnapshot().baselinesReady).toBe(true)
+        if (action === 'clear before identity') {
+          expect(api.callsOf('session.history')).toEqual([])
+        } else {
+          await requested.promise
+          const signal = api.lastHistorySignal
+          if (action === 'account withdrawal') pool.invalidateAccount()
+          else if (action === 'navigate while opening') pool.open(manualKey)
+          else pool.clear()
+          await vi.waitFor(() => { expect(signal?.aborted).toBe(true) })
+          history.resolve(ok({ events: [], hasMore: false }))
+          await vi.waitFor(() => { expect(base.binding(recent)).toBeUndefined() })
+        }
+        expect(pool.list.getSnapshot().current).toBe(action === 'navigate while opening' ? manualKey : undefined)
+        expect(pool.binding(recentKey)).toBeUndefined()
+        if (action === 'account withdrawal') expect(pool.list.getSnapshot().ids).toEqual([])
+      } finally {
+        stopSelection()
+        history.resolve(ok({ events: [], hasMore: false }))
+        await ctx.fiber.dispose()
+      }
+    },
+  )
+
+  it('keeps the personal bootstrap intent and supersedes it on a later target change', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false, persistSelection: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      const initial = pool.beginNavigation()
+      pool.setBaseRuntimeTarget({ kind: 'personal' })
+      expect(initial.aborted).toBe(false)
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 7 })
+      expect(initial.aborted).toBe(true)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('projects current-space failures and withdraws their late retries with the account', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const first = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const retry = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    const operations: Promise<void>[] = []
+    const failure = { code: 'internal' as const, message: 'synthetic current-space failure', details: {} }
+    try {
+      expect(pool.currentScopeList.getSnapshot()).toMatchObject({ phase: 'pending', state: 'idle', error: null })
+      api.onList = () => first.promise
+      operations.push(pool.refresh(), pool.refresh())
+      await vi.waitFor(() => {
+        expect(pool.currentScopeList.getSnapshot()).toMatchObject({ state: 'loading', error: null })
+      })
+      expect(api.callsOf('session.list')).toHaveLength(1)
+      first.resolve(err(failure))
+      await Promise.all(operations)
+      expect(pool.currentScopeList.getSnapshot()).toMatchObject({ state: 'error', error: failure })
+      expect(pool.list.getSnapshot()).toMatchObject({ state: 'error', error: failure })
+      api.onList = () => retry.promise
+      operations.push(pool.refresh())
+      pool.invalidateAccount()
+      const withdrawn = pool.currentScopeList.getSnapshot()
+      expect(withdrawn).toMatchObject({ ids: [], byId: {}, phase: 'pending', state: 'idle', error: null })
+      retry.resolve(ok({ items: [{ sessionId: 'late' as SessionId, updatedAt: 1, running: false, blank: false }] }))
+      await Promise.all(operations)
+      expect(pool.currentScopeList.getSnapshot()).toBe(withdrawn)
+      expect(pool.list.getSnapshot()).toEqual(withdrawn)
+      await pool.refresh()
+      expect(api.callsOf('session.list')).toHaveLength(2)
+    } finally {
+      first.resolve(ok({ items: [] }))
+      retry.resolve(ok({ items: [] }))
+      await Promise.allSettled(operations)
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each(['account', 'target'] as const)('cancels the unshown saved window on %s withdrawal without adopting its late reply', async (cause) => {
+    const storage = new Map([['dsh.sessions.current', JSON.stringify({ sessionId: 'saved' })]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    api.onList = () => list.promise
+    api.onHistory = () => history.promise
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      pool.handleConnected()
+      const oldSignal = api.lastHistorySignal
+      expect(api.callsOf('session.history')).toHaveLength(1)
+      expect(pool.list.getSnapshot().current).toBeUndefined()
+      if (cause === 'account') pool.invalidateAccount()
+      else pool.setBaseRuntimeTarget({ kind: 'project', projectId: 9 })
+      expect(oldSignal?.aborted).toBe(true)
+      api.onHistory = async () => ok({ events: [], hasMore: false })
+      list.resolve(ok({ items: [{ sessionId: 'saved' as SessionId, updatedAt: 1, running: false, blank: true }] }))
+      await base.refresh()
+      history.resolve(ok({ events: [], hasMore: false }))
+      await history.promise
+      expect(pool.binding(clientSessionKey({ kind: 'personal' }, 'saved' as SessionId))).toBeUndefined()
+      if (cause === 'account') {
+        expect(pool.list.getSnapshot().current).toBeUndefined()
+        expect(pool.list.getSnapshot().ids).toEqual([])
+        expect(api.callsOf('session.history')).toHaveLength(1)
+      } else {
+        const key = clientSessionKey({ kind: 'project', projectId: 9 }, 'saved' as SessionId)
+        expect(pool.list.getSnapshot().current).toBe(key)
+        expect(pool.binding(key)?.session.getSnapshot().openState).toBe('open')
+        expect(api.callsOf('session.history')).toHaveLength(2)
+      }
+    } finally {
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      await ctx.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('merges legacy shared archive facts with frames until a versioned snapshot replaces them', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const ids = ['baseline-a', 'frame-b', 'late-c'].map(id => id as SessionId)
+    api.onList = async () => ok({ items: ids.map(sessionId => ({ sessionId, updatedAt: 1, running: false, blank: false })) })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    const baseline = deferred<WorkspaceArchiveSnapshot | undefined>()
+    try {
+      pool.handleConnected(undefined, baseline.promise)
+      await base.refresh()
+      pool.handleHostEnvelope({ rpcId: 'legacy-b' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [ids[1]!],
+      } })
+      baseline.resolve({ archivedSessionIds: [ids[1]!, ids[0]!], archiveRevision: 0 })
+      pool.handleHostEnvelope({ rpcId: 'legacy-c' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [ids[2]!],
+      } })
+      await baseline.promise
+      expect(new Set(Object.keys(pool.list.getSnapshot().archivedById))).toEqual(
+        new Set(ids.map(id => clientSessionKey({ kind: 'personal' }, id))),
+      )
+      pool.handleHostEnvelope({ rpcId: 'versioned-clear' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 1,
+      } })
+      expect(pool.list.getSnapshot().archivedById).toEqual({})
+    } finally { baseline.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
+  it('keeps newer archive frames when a shared baseline settles after them', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const id = 'shared-archive' as SessionId
+    const key = clientSessionKey({ kind: 'personal' }, id)
+    api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    const baseline = deferred<WorkspaceArchiveSnapshot | undefined>()
+    try {
+      pool.handleConnected(undefined, baseline.promise)
+      await base.refresh()
+      pool.handleHostEnvelope({ rpcId: 'newer' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2,
+      } })
+      baseline.resolve({ archivedSessionIds: [id], archiveRevision: 1 })
+      await baseline.promise
+      expect(pool.list.getSnapshot().ids).toEqual([key])
+      pool.handleHostEnvelope({ rpcId: 'newest' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [id], archiveRevision: 3,
+      } })
+      pool.handleHostEnvelope({ rpcId: 'stale' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2,
+      } })
+      expect(pool.list.getSnapshot().archivedById[key]?.id).toBe(key)
+      expect(api.callsOf('workspace.list')).toHaveLength(0)
+    } finally { baseline.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
+  it('drops old-generation and old-target archive baselines without retaining their requests', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const id = 'colliding-archive' as SessionId
+    api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    const old = deferred<WorkspaceArchiveSnapshot | undefined>()
+    const next = deferred<WorkspaceArchiveSnapshot | undefined>()
+    try {
+      pool.handleConnected(undefined, old.promise)
+      pool.handleHostEnvelope({ rpcId: 'old-target-high-revision' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [id], archiveRevision: 8,
+      } })
+      pool.handleDisconnected()
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 7 })
+      pool.handleConnected(undefined, next.promise)
+      await base.refresh()
+      next.resolve({ archivedSessionIds: [], archiveRevision: 1 })
+      await next.promise
+      old.resolve({ archivedSessionIds: [id], archiveRevision: 9 })
+      await old.promise
+      expect(pool.list.getSnapshot().ids).toEqual([clientSessionKey({ kind: 'project', projectId: 7 }, id)])
+      expect(pool.list.getSnapshot().archivedById).toEqual({})
+      expect(api.callsOf('workspace.list')).toHaveLength(0)
+    } finally { old.resolve(undefined); next.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
+  it('keeps unrelated pooled summaries stable and refreshes renamed runtime labels', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const first = 'pool-first' as SessionId
+    const second = 'pool-second' as SessionId
+    api.onList = async () => ok({ items: [first, second].map(sessionId => ({
+      sessionId, updatedAt: 1, running: false, blank: false,
+    })) })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 7, projectName: 'Before' })
+      await base.refresh()
+      const firstKey = pool.keyFor(first)
+      const secondKey = pool.keyFor(second)
+      const before = pool.list.getSnapshot()
+      base.handleHostEnvelope({
+        rpcId: 'status' as never,
+        payload: { type: 'host/session-status', sessionId: first, running: true },
+      })
+      await Promise.resolve()
+      const after = pool.list.getSnapshot()
+      expect(after.byId[firstKey]?.running).toBe(true)
+      expect(after.byId[firstKey]).not.toBe(before.byId[firstKey])
+      expect(after.byId[secondKey]).toBe(before.byId[secondKey])
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 7, projectName: 'After' })
+      expect(pool.list.getSnapshot().byId[secondKey]?.workspaceName).toBe('After')
+      expect(pool.list.getSnapshot().byId[secondKey]).not.toBe(after.byId[secondKey])
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('loads a project session through a target runtime without merging its transport', async () => {
     const ctx = new Context()
     const baseApi = new FakeApiClient()
@@ -179,6 +512,39 @@ describe('SessionRuntimePool', () => {
     }
   })
 
+  it('keeps a management transport without creating or selecting a Session and releases only that view ownership', async () => {
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const baseApi = new FakeApiClient(), targetApi = new FakeApiClient()
+    const stop = vi.fn()
+    const start = vi.fn((sinks: Parameters<ConnectionHandle['start']>[0]) => {
+      queueMicrotask(() => sinks.onConnected?.({ version: 'management', cwd: '/target', home: '/target', attachedSessions: 0, canOpenPath: false }))
+      return { stop }
+    })
+    const target: ConnectionHandle = { ...connection(targetApi), start }
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => target }, fakeRemote())
+    const prepared = Promise.withResolvers<undefined>()
+    const viewClosed = Promise.withResolvers<undefined>()
+    const operation = pool.usingRuntime({ kind: 'project', projectId: 7 }, new AbortController().signal, async (signal) => {
+      await pool.prepareRuntime({ kind: 'project', projectId: 7 }, signal)
+      prepared.resolve(undefined)
+      await viewClosed.promise
+    })
+    try {
+      await Promise.race([prepared.promise, operation])
+      expect(start).toHaveBeenCalledOnce()
+      expect(pool.list.getSnapshot().current).toBeUndefined()
+      expect(targetApi.callsOf('session.create')).toHaveLength(0)
+      pool.setAdditionalStaged([])
+      expect(stop).not.toHaveBeenCalled()
+      viewClosed.resolve(undefined)
+      await operation
+      expect(stop).toHaveBeenCalledOnce()
+      expect(targetApi.callsOf('session.cancel')).toHaveLength(0)
+    } finally { viewClosed.resolve(undefined); await Promise.allSettled([operation]); await ctx.fiber.dispose() }
+  })
+
   it('retains an acquiring runtime through handshake and directory lookup while the base pane stage changes', async () => {
     const ctx = new Context()
     await ctx.plugin(() => {}).await()
@@ -206,6 +572,7 @@ describe('SessionRuntimePool', () => {
     try {
       pool.setAdditionalStaged([])
       expect(stop).not.toHaveBeenCalled()
+      await vi.waitFor(() => { expect(sinks).toBeDefined() })
       sinks?.onConnected?.({ version: 'fixture', cwd: '/project', attachedSessions: 0, home: '/fixture', canOpenPath: true })
       await vi.waitFor(() => { expect(projectApi.callsOf('workspace.list').length).toBeGreaterThan(0) })
       pool.setAdditionalStaged([])
@@ -230,12 +597,14 @@ describe('SessionRuntimePool', () => {
     const baseApi = new FakeApiClient(), projectApi = new FakeApiClient()
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
     const stop = vi.fn()
-    const target: ConnectionHandle = { ...connection(projectApi), start: () => ({ stop }) }
+    const started = vi.fn(() => ({ stop }))
+    const target: ConnectionHandle = { ...connection(projectApi), start: started }
     const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => target }, fakeRemote())
     const cancel = new AbortController()
     const pending = pool.usingRuntime({ kind: 'project', projectId: 7 }, cancel.signal,
       signal => pool.ensureSession({ kind: 'project', projectId: 7 }, 'pending' as SessionId, signal))
     const rejection = expect(pending).rejects.toThrow(kind === 'cancel' ? 'cancelled intent' : 'identity was invalidated')
+    await vi.waitFor(() => { expect(started).toHaveBeenCalledOnce() })
     if (kind === 'cancel') cancel.abort(new Error('cancelled intent'))
     else pool.invalidateAccount()
     await rejection
@@ -266,6 +635,28 @@ describe('SessionRuntimePool', () => {
     expect(projectApi.callsOf('session.list')).toHaveLength(1)
   })
 
+  it('retains a slow target handshake within its configured ready window', async () => {
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const baseApi = new FakeApiClient(), projectApi = new FakeApiClient()
+    const id = 'slow-target' as SessionId
+    projectApi.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: true }] })
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    let sinks: Parameters<ConnectionHandle['start']>[0] | undefined
+    const target: ConnectionHandle = { ...connection(projectApi), metadataTiming: { requestTimeoutMs: 100_000, retryAfterMs: 1000 },
+      start: (next) => { sinks = next; return { stop: () => {} } } }
+    const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => target }, fakeRemote())
+    vi.useFakeTimers()
+    try {
+      const attempt = pool.ensureSession({ kind: 'project', projectId: 7 }, id)
+      const settled = attempt.then(value => ({ value }), (error: unknown) => ({ error }))
+      await vi.advanceTimersByTimeAsync(30_001)
+      expect(sinks).toBeDefined()
+      sinks?.onConnected?.({ version: 'slow', cwd: '/project', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+      expect(await settled).toEqual({ value: true })
+    } finally { vi.useRealTimers(); await ctx.fiber.dispose() }
+  })
+
   it('releases a target runtime that stays unready past the ready window', async () => {
     const ctx = new Context()
     const baseApi = new FakeApiClient()
@@ -285,6 +676,7 @@ describe('SessionRuntimePool', () => {
       expect(pool.runtimeTargetFor('project-session' as SessionId)).toBeUndefined()
     } finally {
       vi.useRealTimers()
+      await ctx.fiber.dispose()
     }
   })
 
@@ -360,7 +752,8 @@ describe('SessionRuntimePool', () => {
     baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [id] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
     const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
-    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true },
+      new WorkspaceRuntime(ctx, baseApi, pool).handleConnected())
     await vi.waitFor(() => { expect(pool.list.getSnapshot().archivedById[clientSessionKey({ kind: 'personal' }, id)]?.id).toBe(clientSessionKey({ kind: 'personal' }, id)) })
     expect(pool.list.getSnapshot().byId[id]).toBeUndefined()
     expect(pool.list.getSnapshot().ids).not.toContain(id)
@@ -380,7 +773,8 @@ describe('SessionRuntimePool', () => {
     const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
     base.open(id)
     expect(base.list.getSnapshot().current).toBe(id)
-    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true },
+      new WorkspaceRuntime(ctx, baseApi, pool).handleConnected())
     // The mask alone hides the row; the owner must also deselect or the
     // persisted selection remounts the archived session on the next reload.
     await vi.waitFor(() => { expect(base.list.getSnapshot().current).toBeUndefined() })
@@ -399,14 +793,15 @@ describe('SessionRuntimePool', () => {
     baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
     const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
-    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true },
+      new WorkspaceRuntime(ctx, baseApi, pool).handleConnected())
     await vi.waitFor(() => { expect(pool.list.getSnapshot().ids).toEqual([key]) })
 
-    pool.handleHostEnvelope({ rpcId: 'frame-1' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [id] } })
+    pool.handleHostEnvelope({ rpcId: 'frame-1' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [id], archiveRevision: 1 } })
     expect(pool.list.getSnapshot().ids).toEqual([])
     expect(pool.list.getSnapshot().archivedById[key]?.id).toBe(key)
 
-    pool.handleHostEnvelope({ rpcId: 'frame-2' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [] } })
+    pool.handleHostEnvelope({ rpcId: 'frame-2' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2 } })
     expect(pool.list.getSnapshot().ids).toEqual([key])
     expect(pool.list.getSnapshot().archivedById[key]).toBeUndefined()
   })
@@ -458,6 +853,12 @@ describe('SessionRuntimePool Workspace resources', () => {
       await vi.waitFor(() => { expect(pool.list.getSnapshot().ids).toEqual([key]) })
       pool.open(key)
       expect(pool.binding(key)).toBeDefined()
+      pool.handleConnectionFailure({ kind: 'transport', error: new Error('Connection downlink ended'), diagnostic: {
+        clientGeneration: 1, source: 'mux', cause: 'stream-eof', phase: 'connected', elapsedMs: 100,
+      } })
+      expect(pool.binding(key)).toBeDefined()
+      expect(pool.list.getSnapshot().ids).toEqual([key])
+      expect(invalidate).not.toHaveBeenCalled()
       pool.handleConnectionFailure({ kind: 'transport', error: Object.assign(new Error('temporary'), { status: 503 }) })
       pool.handleDisconnected()
       expect(pool.binding(key)).toBeDefined()
@@ -507,6 +908,14 @@ describe('SessionRuntimePool Workspace resources', () => {
     const release = registry.pin(request)
     const source = registry.source(request)
     await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('live') })
+    const retained = source.getSnapshot()
+    sinks.onFailure?.({ kind: 'transport', error: new Error('Connection downlink ended'), diagnostic: {
+      clientGeneration: 1, source: 'host', cause: 'stream-eof', phase: 'connected', elapsedMs: 100,
+      closeCode: 1000, wasClean: true,
+    } })
+    expect(source.getSnapshot()).toBe(retained)
+    expect(registry.hasProvider(target)).toBe(true)
+    expect(pool.list.getSnapshot().ids).toContain(key)
 
     sinks.onHostEnvelope?.({ rpcId: 'frame-1' as never, payload: { type: 'host/workspace-file-changed', sessionId, path: 'a.txt', present: true, version: 'v9' } })
     expect(source.getSnapshot()).toMatchObject({ value: { changed: true } })
@@ -547,7 +956,8 @@ it('retains four colliding Host IDs with independent scopes, payloads, holds, an
     return api
   })
   const dispatch = vi.fn()
-  ctx.provide('remote', { $dispatch: dispatch } as never)
+  const forTarget = vi.fn(() => ({ $dispatch: dispatch }))
+  ctx.provide('remote', { $dispatch: dispatch, $forTarget: forTarget } as never)
   const handles = apis.map(api => connection(api, (sinks) =>{  queueMicrotask(() => sinks.onConnected?.({
     version: 'test', cwd: '/workspace', home: '/home/test', attachedSessions: 0, canOpenPath: true,
   })) }))
@@ -576,6 +986,7 @@ it('retains four colliding Host IDs with independent scopes, payloads, holds, an
       expect(apis[index]!.callsOf('session.rename').at(-1)).toMatchObject({ sessionId: id, title: `renamed ${index}` })
     }
     pool.dispatchRemoteEvent('agent-preset/selected', [id, 'plain'], targets[2])
+    expect(forTarget).toHaveBeenLastCalledWith(targets[2])
     expect(dispatch).toHaveBeenLastCalledWith('agent-preset/selected', [keys[2], 'plain'])
     const activation = { sessionId: id, goal: { id: 'g-1', revision: 1, activation: 'disarmed' } }
     for (const [index, target] of targets.entries()) {

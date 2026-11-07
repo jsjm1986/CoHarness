@@ -10,7 +10,7 @@ install-lefthook 与 translation-pairing 的 fixture 把仓库真实的 `scripts
 
 ## 决策
 
-`scripts/test-fixture-cleanup.ts` 拥有 junction 安全的 fixture 拆除：`unlinkFixtureLinks` 先遍历并解链所有重解析点，`removeFixtureSafely` 再删除已无链接的树（带 Windows 异步句柄重试）。所有受影响的 `afterEach` 和 `worktree remove` 前的钩子都调用它。通用规则记录在 `docs/defensive-patterns.md`：链接形态的路径用 unlink 删除，递归 `rmSync` 只留给确知为真实目录的路径。
+`scripts/test-fixture-cleanup.ts` 拥有 junction 安全的 fixture 拆除：`unlinkFixtureLinks` 先遍历并解链所有重解析点，`removeFixtureSafely` 再删除已无链接的树（带 Windows 异步句柄重试）。所有受影响的 `afterEach` 和 `worktree remove` 前的钩子都调用它。通用规则记录在 `docs/defensive-patterns/general.md`：链接形态的路径用 unlink 删除，递归 `rmSync` 只留给确知为真实目录的路径。
 
 ## 考虑过的替代方案
 

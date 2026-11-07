@@ -1,0 +1,315 @@
+{
+  "findings": [
+    "B477",
+    "B478"
+  ],
+  "updatedAt": "2026-11-02T14:47:40.418061+00:00",
+  "status": "fixed_verified_1002_named_cases_four_complete_files_100_percent_frozen_shared_catalog_integration_and_global_review_open",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z",
+  "baseline": {
+    "headRef": "codex/business-logic-audit-2026-10-23",
+    "remoteRef": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "evidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/latest-baseline.json"
+  },
+  "problems": {
+    "B477": "A module-wide loop-request marker lets a foreign LLM instance consume another Runtime pending title revision when Session id and route coincide.",
+    "B478": "Real AgentLoop enters user input after step/start, so sequence-order matching misses the next title revision when the header is unchanged."
+  },
+  "fixes": {
+    "B477": "The dispatching LlmRuntime owns exact request markers and discards them on service withdrawal. Title waterfall listeners check their emitting LLM service; frozen objects remain supported and copies inherit no marker.",
+    "B478": "Pending title work records the human message id and checks membership in the actual marked request together with the open step and logged route. Both input orders work; old requests cannot consume later revisions."
+  },
+  "originalCounterproofs": [
+    {
+      "finding": "B477",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/request-origin-before.json",
+      "observable": "A real frozen foreign AgentLoop request invokes the destination title provider twice instead of once."
+    },
+    {
+      "finding": "B478",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/title-step-membership-before.json",
+      "observable": "The real two-Loader composition reaches the local second turn with one unchanged header, but the title provider still has only one call."
+    }
+  ],
+  "verification": {
+    "normalCases": 991,
+    "functionalUnitCases": 979,
+    "coverageRosterCases": 12,
+    "typescriptSdkCases": 5,
+    "pythonSdkCases": 5,
+    "deterministicAutoReviewCases": 1,
+    "autoReviewInnerScenarios": 8,
+    "differentNamedCases": 1002,
+    "sourceNode22": "passed",
+    "normallyBuiltNode24Loader": "passed",
+    "wholeHostTypes": "passed",
+    "normalThresholdsEnforced": true,
+    "removedBaselineExemptions": [
+      "packages/llm/llm/src/index.ts",
+      "packages/core/agent-loop/src/agent.ts",
+      "packages/session/session-title/src/index.ts"
+    ],
+    "newCoverageExclusion": "only the standard closed-union assertNever guard in streamEvent; no threshold or baseline expansion",
+    "newSessionEvents": false,
+    "sessionFormatChanged": false,
+    "api": "free request marker exports become LlmRuntime instance methods",
+    "modelApiCalls": 0
+  },
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 983,
+        "covered": 983,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 1112,
+        "covered": 1112,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 206,
+        "covered": 206,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 778,
+        "covered": 778,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/core/agent-loop/src/agent.ts": {
+      "lines": {
+        "total": 303,
+        "covered": 303,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 49,
+        "covered": 49,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 339,
+        "covered": 339,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 210,
+        "covered": 210,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/src/call-config.ts": {
+      "lines": {
+        "total": 22,
+        "covered": 22,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 3,
+        "covered": 3,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 28,
+        "covered": 28,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 23,
+        "covered": 23,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/src/index.ts": {
+      "lines": {
+        "total": 369,
+        "covered": 369,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 94,
+        "covered": 94,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 417,
+        "covered": 417,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 333,
+        "covered": 333,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/session/session-title/src/index.ts": {
+      "lines": {
+        "total": 289,
+        "covered": 289,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 60,
+        "covered": 60,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 328,
+        "covered": 328,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 212,
+        "covered": 212,
+        "skipped": 0,
+        "pct": 100
+      }
+    }
+  },
+  "frozenDelivery": {
+    "findings": [
+      "B477",
+      "B478"
+    ],
+    "status": "fixed_verified_1002_named_cases_four_complete_files_100_percent_frozen_shared_catalog_integration_and_global_review_open",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/B477-B478-request-ownership.delta.tar.gz",
+    "archiveSha256": "70b24bef943d3bc1d4068f5ac556e54737a69af23684f0912a774f303ce67353",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/B477-B478-capsule-ka8b5q_3",
+    "manifestSha256": "d78229d2694826338c3f73902883090d9ecedf2c5a14abe3c4de362fa08232b3",
+    "ownedChanges": 43,
+    "archiveBytes": 1132415,
+    "verification": {
+      "normalCases": 991,
+      "functionalUnitCases": 979,
+      "coverageRosterCases": 12,
+      "typescriptSdkCases": 5,
+      "pythonSdkCases": 5,
+      "deterministicAutoReviewCases": 1,
+      "autoReviewInnerScenarios": 8,
+      "differentNamedCases": 1002,
+      "sourceNode22": "passed",
+      "normallyBuiltNode24Loader": "passed",
+      "wholeHostTypes": "passed",
+      "normalThresholdsEnforced": true,
+      "removedBaselineExemptions": [
+        "packages/llm/llm/src/index.ts",
+        "packages/core/agent-loop/src/agent.ts",
+        "packages/session/session-title/src/index.ts"
+      ],
+      "newCoverageExclusion": "only the standard closed-union assertNever guard in streamEvent; no threshold or baseline expansion",
+      "newSessionEvents": false,
+      "sessionFormatChanged": false,
+      "api": "free request marker exports become LlmRuntime instance methods",
+      "modelApiCalls": 0
+    },
+    "pendingSharedIntegration": [
+      "Peer-owned connection Host aggregate reference remains in verify-cordis-config.",
+      "Normal Cordis catalog projection refuses the new unclassified ConnectionAuthenticationRequest event type in packages/client/connection/src/index.ts. Owning generated LLM subsystem pair and runtime API catalog need the peer matching projection; no generated catalog was hand-edited."
+    ]
+  },
+  "paths": [
+    ".agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md",
+    ".agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.zh.md",
+    ".agents/notes/implemented/simplification/2026-09-06-agent-request-freeze-evidence.i18n.yaml",
+    ".agents/notes/implemented/simplification/2026-09-06-agent-request-freeze-evidence.md",
+    ".agents/notes/implemented/simplification/2026-09-06-agent-request-freeze-evidence.zh.md",
+    "docs/architecture.i18n.yaml",
+    "docs/architecture.md",
+    "docs/architecture.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.zh.md",
+    "packages/core/agent-loop/src/agent.ts",
+    "packages/core/agent-loop/tests/request-freeze.spec.ts",
+    "packages/experimental/auto-review/tests/auto-review.e2e.ts",
+    "packages/llm/llm/README.i18n.yaml",
+    "packages/llm/llm/README.md",
+    "packages/llm/llm/README.zh.md",
+    "packages/llm/llm/src/call-config.ts",
+    "packages/llm/llm/src/index.ts",
+    "packages/llm/llm/tests/call-config.spec.ts",
+    "packages/llm/llm/tests/service.spec.ts",
+    "packages/session/session-title/README.i18n.yaml",
+    "packages/session/session-title/README.md",
+    "packages/session/session-title/README.zh.md",
+    "packages/session/session-title/src/index.ts",
+    "packages/session/session-title/tests/provider.spec.ts",
+    "packages/session/session-title/tests/service-contracts.spec.ts",
+    "packages/session/session-title-llm/tests/llm.spec.ts",
+    "packages/session/session-title/tests/request-owner.spec.ts",
+    "packages/session/session-title/tests/request-owner-loader.spec.ts",
+    "packages/session/session-title/tests/fixtures/request-owner-driver.mjs",
+    "packages/session/session-title/tests/expected/request-owner.jsonl",
+    "packages/llm/llm/tests/dispatch-settlement.spec.ts",
+    "packages/core/agent-loop/tests/stream-settlement.spec.ts",
+    "examples/headless-agent/tests/fixtures/interaction/request-origin/cordis.yml",
+    "examples/headless-agent/tests/fixtures/interaction/request-origin/model.mjs",
+    ".agents/notes/implemented/bug-fix/2026-11-02-scoped-model-request-origin.md",
+    ".agents/notes/implemented/bug-fix/2026-11-02-scoped-model-request-origin.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-11-02-scoped-model-request-origin.i18n.yaml",
+    "packages/session/session-title/package.json",
+    "pnpm-lock.yaml",
+    "scripts/coverage-baseline.ts"
+  ],
+  "documentation": {
+    "differentDirectGates": 23,
+    "passed": 22,
+    "peerOwnedRemaining": "verify-cordis-config requires the final client-connection compiler aggregate reference.",
+    "generatedReferences": "Standard projection is blocked by the new peer-owned ConnectionAuthenticationRequest type classification; owned subsystem pair and runtime API catalog are handed off for matching generation.",
+    "wholeDocSyncClaimed": false,
+    "newNote": ".agents/notes/implemented/bug-fix/2026-11-02-scoped-model-request-origin.md",
+    "scopedSupersessionReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/note-supersession-review.json",
+    "archived": [],
+    "deleted": []
+  },
+  "intermediateCorrections": [
+    "Removed an unused type import after replacing the free marker API.",
+    "The first actual Loader positive check exposed the independent B478 input-order defect; it was fixed rather than changing the real loop fixture order.",
+    "Coverage measurement initially restored baseline files privately and failed on uncovered real failure/cancellation/restore scenarios; those scenarios now pass normal 100% repository policy after three exact exemptions were removed.",
+    "A recovery fixture initially exhausted its one scripted successful reply; it now supplies a separate reply for each actual adapter call.",
+    "Typed serial authorization callbacks return Promise<void>, and the incomplete extension block is declared through ContentBlockMap.",
+    "Concrete terminology checks required exact request identity wording; baseline identifiers stay in private evidence and maintained references remain in the canonical receipt."
+  ],
+  "rootProductionWrites": false,
+  "productionIntegration": "Not in peer live R44; source and normally built acceptance only.",
+  "officialResponsesValidation": "Deferred at the user request.",
+  "globalReviewComplete": false,
+  "nextReview": "User question and plan-review lifetime, cancellation and exact calling Agent after asynchronous answers.",
+  "frozenCoverageConfirmation": {
+    "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/request-origin-frozen-coverage-confirmation.json",
+    "cases": 991,
+    "coverage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/frozen-normal-coverage/coverage-summary.json",
+    "wholeFourFilesFourMetrics100": true,
+    "frozenSourceDrift": []
+  }
+}

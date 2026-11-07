@@ -1,0 +1,4 @@
+- region "unopened.md":
+  - button "关闭预览"
+  - button "重新加载"
+  - alert: 未能加载预览，请检查连接后重新加载

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-curation-cancellation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-curation-cancellation.md
+document:
+  en: 751398485ced6d863eb54afb575e98f54cd9ad42
+  zh: c301f0c25f43575ee659685cf5d8383894a15938
+/agent-note-curation-cancellation-and-cleanup:
+  en: 107277a1e84a58dd
+  zh: a66635812c08ddf2
+/agent-note-curation-cancellation-and-cleanup/problem:
+  en: 8b9fce0cee1f04c8
+  zh: d667c7babe54694d
+/agent-note-curation-cancellation-and-cleanup/decision:
+  en: 0c6f6182399f26ba
+  zh: e51b2f997d0298e3
+/agent-note-curation-cancellation-and-cleanup/alternatives-considered:
+  en: a86f0c0bb8929f81
+  zh: 8daa797eb09f8bcd
+/agent-note-curation-cancellation-and-cleanup/consequences:
+  en: 73522e682b2daae4
+  zh: ad19dd3623a26d10
+/agent-note-curation-cancellation-and-cleanup/verification:
+  en: a6f9ac05da94fba1
+  zh: 1260809f8747813b

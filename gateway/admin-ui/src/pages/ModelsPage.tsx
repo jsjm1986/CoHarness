@@ -1,3 +1,4 @@
+import { usePendingEdits, useProtectedNavigation } from '../pending-edits.tsx'
 import { ClipboardList, Filter, Pencil, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { decimalToMicros, microsToDecimal } from '../../../src/money.ts'
@@ -8,6 +9,9 @@ import {
   listUsers,
   saveModel,
   setModelAccess,
+  getDigestModelSettings,
+  setDigestModel,
+  type DigestModelSettings,
   type AdminUser,
   type ModelGovernanceRow,
   type ModelRegistrationAction,
@@ -83,7 +87,12 @@ function registrationDate(value: string, endOfDay: boolean): number | undefined 
 
 export function ModelsPage() {
   const t = useMemo(() => modelsPageT(), [])
+  const navigation = useProtectedNavigation()
   const [view, setView] = useState<ModelsView>('catalog')
+  const changeView = (next: ModelsView): void => {
+    if (next === view || !navigation.canReplace()) return
+    setView(next)
+  }
   const [models, setModels] = useState<ModelGovernanceRow[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,6 +103,7 @@ export function ModelsPage() {
   const [modelDraft, setModelDraft] = useState<ModelGovernanceRow | null>(null)
   const [prices, setPrices] = useState(['0', '0', '0', '0'])
   const [modelSaving, setModelSaving] = useState(false)
+  usePendingEdits(modelSaving || editingModel !== null && modelDraft !== null)
 
   const [selectedUser, setSelectedUser] = useState('')
   const [overrides, setOverrides] = useState(new Map<string, boolean>())
@@ -234,9 +244,9 @@ export function ModelsPage() {
   const actions = (
     <div className="pageToolbar modelPageToolbar">
       <div className="segmented modelViewTabs" role="group" aria-label={t('viewTabsAria')}>
-        <button type="button" aria-pressed={view === 'catalog'} onClick={() => setView('catalog')}>{t('tabCatalog')}</button>
-        <button type="button" aria-pressed={view === 'governance'} onClick={() => setView('governance')}>{t('tabGovernance')}</button>
-        <button type="button" aria-pressed={view === 'personal'} onClick={() => setView('personal')}>{t('tabPersonal')}</button>
+        <button type="button" aria-pressed={view === 'catalog'} onClick={() => changeView('catalog')}>{t('tabCatalog')}</button>
+        <button type="button" aria-pressed={view === 'governance'} onClick={() => changeView('governance')}>{t('tabGovernance')}</button>
+        <button type="button" aria-pressed={view === 'personal'} onClick={() => changeView('personal')}>{t('tabPersonal')}</button>
       </div>
     </div>
   )
@@ -246,15 +256,18 @@ export function ModelsPage() {
       <PageHeader
         title={t('pageTitle')}
         description={t('pageDescription')}
-        meta={loading ? undefined : t('pageMeta', { count: String(models.length) })}
+        meta={loading || (models.length === 0 && error !== '') ? undefined : t('pageMeta', { count: String(models.length) })}
         actions={actions}
       />
       <ErrorBanner message={error} />
       {view === 'catalog'
         ? <OrganizationModelsEditor onChanged={modelSettingsChanged} />
         : view === 'governance' ? (
-          <ModelDirectory
+          <>
+            <DigestModelSection />
+            <ModelDirectory
             loading={loading}
+            failed={error !== ''}
             models={models}
             users={users}
             selectedUser={selectedUser}
@@ -266,11 +279,13 @@ export function ModelsPage() {
             onEdit={openGovernanceEditor}
             onOverride={changeOverride}
           />
+          </>
         ) : (
           <PersonalRegistrationAudit
             users={users}
             report={registrationReport}
             loading={registrationLoading}
+            failed={error !== ''}
             draft={registrationDraft}
             onDraft={setRegistrationDraft}
             onApply={applyRegistrationFilters}
@@ -339,6 +354,7 @@ function PersonalRegistrationAudit({
   users,
   report,
   loading,
+  failed,
   draft,
   onDraft,
   onApply,
@@ -348,6 +364,7 @@ function PersonalRegistrationAudit({
   users: AdminUser[]
   report: ModelRegistrationReport | null
   loading: boolean
+  failed: boolean
   draft: RegistrationFilters
   onDraft: (value: RegistrationFilters) => void
   onApply: (event: FormEvent<HTMLFormElement>) => void
@@ -397,7 +414,7 @@ function PersonalRegistrationAudit({
           <Button type="submit" variant="primary" icon={Filter}>{t('filterApply')}</Button>
         </div>
       </form>
-      {loading ? <LoadingState label={t('personalLoading')} /> : report === null || report.rows.length === 0 ? (
+      {loading ? <LoadingState label={t('personalLoading')} /> : failed && report === null ? null : report === null || report.rows.length === 0 ? (
         <EmptyState icon={ClipboardList} title={t('personalEmptyTitle')} detail={t('personalEmptyDetail')} />
       ) : (
         <>
@@ -459,6 +476,7 @@ function formatRegistrationTime(value: number): string {
 
 function ModelDirectory({
   loading,
+  failed,
   models,
   users,
   selectedUser,
@@ -471,6 +489,7 @@ function ModelDirectory({
   onOverride,
 }: {
   loading: boolean
+  failed: boolean
   models: ModelGovernanceRow[]
   users: AdminUser[]
   selectedUser: string
@@ -488,7 +507,7 @@ function ModelDirectory({
       flush
       className="responsiveSection"
       title={t('directoryTitle')}
-      meta={loading ? undefined : t('directoryMeta', { count: String(models.length) })}
+      meta={loading || (failed && models.length === 0) ? undefined : t('directoryMeta', { count: String(models.length) })}
       actions={users.length === 0 ? undefined : (
         <div className="modelUserPicker">
           <span>{t('userException')}</span>
@@ -498,7 +517,7 @@ function ModelDirectory({
         </div>
       )}
     >
-      {loading ? <LoadingState label={t('directoryLoading')} /> : models.length === 0 ? (
+      {loading ? <LoadingState label={t('directoryLoading')} /> : failed && models.length === 0 ? null : models.length === 0 ? (
         <EmptyState
           icon={Sparkles}
           title={t('directoryEmptyTitle')}
@@ -592,4 +611,65 @@ function PriceSummary({ row }: { row: ModelGovernanceRow }) {
 
 function messageFrom(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
+}
+
+/** Organization-level default route for the project progress digest. */
+function DigestModelSection() {
+  const t = useMemo(() => modelsPageT(), [])
+  const [settings, setSettings] = useState<DigestModelSettings | null>(null)
+  const [draft, setDraft] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [sectionError, setSectionError] = useState('')
+  usePendingEdits(saving || settings !== null && draft !== (settings.model ?? ''))
+
+  useEffect(() => {
+    let active = true
+    void getDigestModelSettings().then(result => {
+      if (!active) return
+      setSettings(result)
+      setDraft(result.model ?? '')
+    }).catch(cause => {
+      if (active) setSectionError(messageFrom(cause))
+    })
+    return () => { active = false }
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    setSaved(false)
+    try {
+      const result = await setDigestModel(draft === '' ? null : draft)
+      setSettings(result)
+      setDraft(result.model ?? '')
+      setSaved(true)
+      setSectionError('')
+    } catch (cause) {
+      setSectionError(messageFrom(cause))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Section title={t('digestTitle')} className="formSectionSpacing">
+      <ErrorBanner message={sectionError} />
+      {settings === null ? <LoadingState /> : (
+        <div className="formSectionSpacing">
+          <Field label={t('digestModelLabel')} hint={t('digestModelHint')}>
+            <select className="select" value={draft} onChange={event => { setDraft(event.target.value); setSaved(false) }}>
+              <option value="">{t('digestModelAuto')}</option>
+              {settings.candidates.map(candidate => {
+                const route = `${candidate.provider}/${candidate.model}`
+                return <option key={route} value={route}>{route}</option>
+              })}
+            </select>
+          </Field>
+          <Button type="button" variant="primary" loading={saving} disabled={draft === (settings.model ?? '')} onClick={() => { void save() }}>
+            {saved ? t('digestModelSaved') : t('digestModelSave')}
+          </Button>
+        </div>
+      )}
+    </Section>
+  )
 }

@@ -26,13 +26,19 @@ import type { ConversationRuntime } from './conversation-assembler.ts'
 import { SessionManager } from './manager.ts'
 import type { SessionRemotes } from './remotes.ts'
 import type { ObservedJob, SessionListPhase, SessionSearchResultItem, SubagentCatalogSnapshot } from './manager.ts'
+import type { SessionListEntry } from './lineage.ts'
 import type { PendingInteractionStatus } from './pending.ts'
 import { SessionProvideChannel } from './provide.ts'
 import type { Session } from './session.ts'
 
-/** Session list row projected from the host list RPC plus live stream increments. */
+/**
+ * Session list row projected from Host state. Runtime and pooled lists preserve
+ * an unchanged row's reference; a changed runtime descriptor replaces pooled rows.
+ */
 export interface SessionSummary {
   id: SessionId
+  /** Authenticated allocation and computer metadata for this browser presentation. */
+  runtime?: import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget
   /** Latest durable log-backed title, absent until the host projects one. */
   title?: string
   /** Human-facing label: durable title, project basename, then session id. */
@@ -96,8 +102,14 @@ export interface SessionListState {
    */
   archivedById: Record<SessionId, SessionSummary>
   current: SessionId | undefined
+  /** Originating composer held while a replacement Session is prepared; absent otherwise. */
+  navigationBlockedSessionId?: SessionId
   /** Arrival lifecycle projected 1:1 from the manager snapshot (see SessionListPhase): empty-with-ready means "truly no sessions". */
   phase: SessionListPhase
+  /** Current baseline operation, independent of the sticky arrival phase and retained rows. */
+  state: 'idle' | 'loading' | 'error'
+  /** Latest baseline failure; cleared when the next refresh starts. */
+  error: RpcError | null
   /** Direct durable catalogs keyed by their selected parent address. */
   subagentsByParent: Readonly<Record<SessionId, SubagentCatalogSnapshot>>
   /**
@@ -241,15 +253,20 @@ interface RetentionObserver {
   published: SessionRetainInfo
 }
 
-/** A cancelled waiter releases only its own reference, not the shared opening. */
-async function waitForOpen(opening: Promise<void>, signal?: AbortSignal): Promise<void> {
-  if (signal === undefined) return opening
+/** Follow replacement history reads without cancelling another consumer's shared loading. */
+async function waitForOpen(session: Session, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted()
   const aborted = Promise.withResolvers<never>()
   const onAbort = (): void => { aborted.reject(signal.reason) }
   signal.addEventListener('abort', onAbort, { once: true })
   try {
-    if (signal.aborted) onAbort()
-    await Promise.race([opening, aborted.promise])
+    let opening = session.open()
+    for (;;) {
+      await Promise.race([opening, aborted.promise])
+      signal.throwIfAborted()
+      if (session.getSnapshot().openState !== 'loading') return
+      opening = session.open()
+    }
   } finally {
     signal.removeEventListener('abort', onAbort)
   }
@@ -273,12 +290,12 @@ class ClientSessionReference implements SessionReference {
     return this.record.binding
   }
 
-  attachOpening(opening: Promise<void>, signal?: AbortSignal): void {
+  attachOpening(session: Session, signal?: AbortSignal): void {
     const signals = [this.released.signal]
     if (this.record !== undefined) signals.push(this.record.ended.signal)
     if (signal !== undefined) signals.push(signal)
     const waitSignal = AbortSignal.any(signals)
-    void waitForOpen(opening, waitSignal).then(
+    void waitForOpen(session, waitSignal).then(
       () => {
         try {
           waitSignal.throwIfAborted()
@@ -341,6 +358,7 @@ export class SessionRuntime implements ISessions {
   readonly list: SnapshotStore<SessionListState>
   /** The object-layer instance cluster and frame dispatch entry. */
   private readonly manager: SessionManager
+  private readonly summaryProjections = new WeakMap<SessionListEntry, SessionSummary>()
   /**
    * Atomic current-session provide projection: selection changes and
    * provider-roster changes publish through this one source (the renderer
@@ -348,6 +366,7 @@ export class SessionRuntime implements ISessions {
    * current id republishes the bundle instead of stranding mounted entries.
    */
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  readonly provideInfoRevision: HostObservable<number>
 
   /**
    * Persisted selection cell (the durable half of `list.current`). Private on
@@ -373,9 +392,11 @@ export class SessionRuntime implements ISessions {
   private readonly navigation = new NavigationController()
   /** Last selected id retained across a transient list mask on reconnect. */
   private watched: SessionId | undefined
-  /** Scope-fiber teardowns in progress; root disposal waits for every one. */
-  private readonly pendingScopeDisposals = new Set<Promise<void>>()
+  /** Scope cleanup and saved-window reads; root disposal waits for every one. */
+  private readonly disposalWaits = new Set<Promise<void>>()
   private readonly hostDescription: HostDescriptionSource | undefined
+  private restoredHistoryId: SessionId | undefined
+  private restoredHistory: { session: Session; opening: Promise<void> } | undefined
 
   /**
    * @param ctx - client root context (scope fibers mount under it).
@@ -389,14 +410,25 @@ export class SessionRuntime implements ISessions {
     api: IApiClient,
     remote: SessionRemotes,
     conversationRuntime?: ConversationRuntime,
-    options: { persistSelection?: boolean; provideService?: boolean; hostDescription?: HostDescriptionSource } = {},
+    options: {
+      persistSelection?: boolean
+      /** Storage name for this account and Runtime; omission retains the standalone selection name. */
+      selectionPersistenceKey?: string
+      provideService?: boolean
+      hostDescription?: HostDescriptionSource
+    } = {},
   ) {
     this.hostDescription = options.hostDescription
     rootCtx.effect(() => () => { this.navigation.dispose() }, 'sessions: navigation lifetime')
+    const tabRuntime = new URLSearchParams(typeof location === 'undefined' ? '' : location.search).get('dshRuntime')
     this.selection = createSnapshotStore<SessionSelection>(
       {},
-      options.persistSelection === false ? undefined : { persist: { name: 'dsh.sessions.current' } })
+      options.persistSelection === false ? undefined
+        : { persist: options.selectionPersistenceKey !== undefined
+          ? { name: options.selectionPersistenceKey }
+          : tabRuntime === null ? { name: 'dsh.sessions.current' } : { name: `dsh.sessions.current.v2.${tabRuntime}`, storage: 'session' } })
     const restored = this.selection.getSnapshot()
+    if (restored.subagentAddress === undefined) this.restoredHistoryId = restored.sessionId
     const conversationEvents = rootCtx.get('conversationEvents')
     const conversationViews = rootCtx.get('conversationViews')
     const conversation = conversationRuntime ?? (
@@ -425,7 +457,7 @@ export class SessionRuntime implements ISessions {
       conversation,
     )
     this.list = createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending', state: 'idle', error: null,
       subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     // The manager owns wire truth; the store is its projection. Manager
@@ -451,6 +483,7 @@ export class SessionRuntime implements ISessions {
       resolveCurrent: () => this.maybeProvideInfo(this.list.getSnapshot().current),
     })
     this.currentProvideInfo = this.provideChannel.currentProvideInfo
+    this.provideInfoRevision = this.provideChannel.provideInfoRevision
     let registryRebuildQueued = false
     const scheduleRegistryRebuild = (): void => {
       if (registryRebuildQueued) return
@@ -473,22 +506,25 @@ export class SessionRuntime implements ISessions {
     // Root shutdown invalidates references before draining generation teardown.
     rootCtx.effect(() => async () => {
       this.closed = true
+      this.cancelRestoredHistory()
       this.additionalStaged.clear()
       this.watched = undefined
       this.staged.clear()
+      const withdrewBundles = this.scopes.size > 0
       for (const [id, record] of this.scopes) {
         record.ended.abort(new Error(`Session generation "${id}" is disposed`))
         this.scopes.delete(id)
         this.publishRetention(id)
         this.scheduleDrop(id, record)
       }
-      while (this.pendingScopeDisposals.size > 0) {
-        const results = await Promise.allSettled([...this.pendingScopeDisposals])
+      if (withdrewBundles) this.provideChannel.publishRevision()
+      while (this.disposalWaits.size > 0) {
+        const results = await Promise.allSettled([...this.disposalWaits])
         const failures = results
           .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
           .map(result => result.reason as unknown)
         if (failures.length > 0) {
-          throw new AggregateError(failures, 'client session scope disposal failed')
+          throw new AggregateError(failures, 'client session disposal failed')
         }
       }
       for (const observer of this.retainObservers.values()) observer.listeners.clear()
@@ -505,6 +541,7 @@ export class SessionRuntime implements ISessions {
    */
   setPresentationKey(key: (id: SessionId) => SessionId, target?: import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget): void {
     if (this.scopes.size !== 0) throw new Error('Cannot change a runtime identity while Session scopes are retained')
+    this.cancelRestoredHistory()
     this.presentationKey = key
     this.runtimeTarget = target
   }
@@ -514,8 +551,22 @@ export class SessionRuntime implements ISessions {
    */
   unboundProvideInfo(): SessionMaybeProvideInfo { return this.provideChannel.maybeInfo }
 
-  beginNavigation(): AbortSignal {
-    return this.navigation.begin()
+  beginNavigation(options?: { readonly blockInputFor?: SessionId | undefined }): AbortSignal {
+    this.cancelRestoredHistory()
+    const previous = this.navigation.blockedSessionId
+    const signal = this.navigation.begin(options?.blockInputFor)
+    if (previous !== this.navigation.blockedSessionId) this.publishNavigation()
+    return signal
+  }
+
+  finishNavigation(signal: AbortSignal): void {
+    if (this.navigation.finish(signal)) this.publishNavigation()
+  }
+
+  private publishNavigation(): void {
+    const { navigationBlockedSessionId: _previous, ...state } = this.list.getSnapshot()
+    const blocked = this.navigation.blockedSessionId
+    this.list.set({ ...state, ...(blocked === undefined ? {} : { navigationBlockedSessionId: blocked }) })
   }
 
   retain(target: SessionTarget, options: SessionRetainOptions): SessionReference {
@@ -525,8 +576,9 @@ export class SessionRuntime implements ISessions {
     const id = typeof target === 'string' && this.scopes.has(target) ? target : this.manager.resolveTarget(target)
     const reference = this.retainScope(id, source)
     try {
-      this.manager.get(id).enterStage()
-      reference.attachOpening(this.manager.get(id).open(), signal)
+      const session = this.manager.get(id)
+      session.enterStage()
+      reference.attachOpening(session, signal)
       return reference
     } catch (error) {
       reference.release()
@@ -597,11 +649,27 @@ export class SessionRuntime implements ISessions {
 
   /**
    * Select a listed or retained catalog-addressed session as current.
+   * Explicit selection publishes the Session's live Agent on the Host;
+   * automatic selection paths (startup restore, retained panes) pass
+   * `activate: false` so their presentations stay cold.
    * @param id - listed or addressed session id.
+   * @param options - `activate: false` keeps the presented Session cold.
    */
-  open(id: SessionId): void {
+  open(id: SessionId, options?: { activate?: boolean }): void {
     this.beginNavigation()
     this.manager.select(id)
+    if (options?.activate !== false) this.manager.activate(id)
+  }
+
+  /**
+   * Whether an explicit open published this Session's Agent during this
+   * connection lifetime; ambient selection paths use it to yield to a
+   * user-committed selection.
+   * @param id - candidate Session identity.
+   * @returns `true` when the Session's Agent was published by an explicit open.
+   */
+  isActivated(id: SessionId): boolean {
+    return this.manager.isActivated(id)
   }
 
   /**
@@ -672,6 +740,7 @@ export class SessionRuntime implements ISessions {
    * still own the next selection.
    */
   releaseSelection(): void {
+    this.cancelRestoredHistory()
     this.watched = undefined
     this.manager.clearSelection()
   }
@@ -688,7 +757,7 @@ export class SessionRuntime implements ISessions {
 
   /**
    * Refresh the real Session baseline, reusing an in-flight pull.
-   * @returns completion of the current or newly started baseline pull.
+   * @returns completion of the current or newly started baseline pull; failures are published through list state/error.
    */
   refresh(): Promise<void> {
     return this.manager.refreshList()
@@ -727,10 +796,40 @@ export class SessionRuntime implements ISessions {
   /** Rebuild the Session baseline and every opened window after connection. */
   handleConnected(): void {
     this.manager.handleConnected()
+    this.prefetchRestoredHistory()
+  }
+
+  /** Read one saved root window without admitting a view or allocating its Client scope. */
+  private prefetchRestoredHistory(): void {
+    const id = this.restoredHistoryId
+    this.restoredHistoryId = undefined
+    if (this.closed || id === undefined || this.selection.getSnapshot().sessionId !== id
+      || this.scopes.has(id)) {
+      return
+    }
+    const session = this.manager.get(id)
+    const prefetch = { session, opening: session.open() }
+    this.restoredHistory = prefetch
+    this.trackDisposal(id, prefetch.opening)
+    // The baseline still admits the selection. A denied, missing, or failed
+    // baseline releases an unclaimed window after its projection publishes.
+    void this.manager.refreshList().then(() => {
+      if (this.restoredHistory === prefetch) this.cancelRestoredHistory()
+    })
+  }
+
+  /** Cancel only the unclaimed window; a real reference takes over its shared opening. */
+  private cancelRestoredHistory(): void {
+    const prefetch = this.restoredHistory
+    if (prefetch === undefined) return
+    this.restoredHistory = undefined
+    prefetch.session.dispose()
+    this.manager.drop(prefetch.session.sessionId, prefetch.session)
   }
 
   /** Drop generation-scoped live interaction state the moment a connection generation dies. */
   handleDisconnected(): void {
+    this.cancelRestoredHistory()
     this.manager.handleDisconnected()
   }
 
@@ -899,8 +998,8 @@ export class SessionRuntime implements ISessions {
 
   /**
    * Resolve one session's render-layer standard-props bundle (ctx never
-   * enters the render layer; the renderer subscribes to
-   * {@link SessionRuntime.currentProvideInfo}). Pure resolution — render-safe:
+   * enters the render layer; explicit selectors observe
+   * {@link SessionRuntime.provideInfoRevision}). Pure resolution — render-safe:
    * no staging, no window side effects (StrictMode double-invokes and
    * concurrent discarded passes must stay free).
    */
@@ -975,6 +1074,7 @@ export class SessionRuntime implements ISessions {
       else this.publishRetention(id)
     })
     this.publishRetention(id)
+    if (previous.referenceCount === 0) this.provideChannel.publishRevision()
     return reference
   }
 
@@ -995,18 +1095,21 @@ export class SessionRuntime implements ISessions {
   private retireScope(id: SessionId, record: ScopeRecord, disposeFiber = true): void {
     if (record.ended.signal.aborted) return
     record.ended.abort(new Error(`Session generation "${id}" is disposed`))
-    if (this.scopes.get(id) === record) this.scopes.delete(id)
+    const removed = this.scopes.get(id) === record
+    if (removed) this.scopes.delete(id)
     record.session.unbindScope()
     this.scheduleDrop(id, record, disposeFiber)
     if (!this.closed) this.projectList()
     this.publishRetention(id)
+    if (removed) this.provideChannel.publishRevision()
   }
 
   /** Materialize one validated local generation for its first reference. */
   private materializeScope(id: SessionId): ScopeRecord {
+    const session = this.manager.get(id)
+    if (this.restoredHistory?.session === session) this.restoredHistory = undefined
     const presentationId = this.presentationKey(id)
     const { fiber, ctx } = createScope(this.rootCtx, id, presentationId)
-    const session = this.manager.get(id)
     // The Session owns its scoped dispatch point (host Agent.loopCtx mirror);
     // mint and bind are one step so a live scope record implies a bound actx.
     session.bindScope(ctx)
@@ -1040,34 +1143,39 @@ export class SessionRuntime implements ISessions {
   /** Project the manager's list snapshot into the store (title derivation is display-only). */
   private projectList(): void {
     const {
-      items, current, phase, subagentsByParent, jobsBySession, observedJobs, currentAddress,
+      items, current, phase, state, error, subagentsByParent, jobsBySession, observedJobs, currentAddress,
     } = this.manager.getListSnapshot()
     const ids: SessionId[] = []
     const byId: Record<SessionId, SessionSummary> = {}
     for (const entry of items) {
       ids.push(entry.sessionId)
-      byId[entry.sessionId] = {
-        id: entry.sessionId,
-        displayTitle: displayTitleOf(entry.title, entry.cwd, entry.sessionId),
-        running: entry.running,
-        ...(entry.completed ? { completed: true } : {}),
-        blank: entry.blank,
-        updatedAt: entry.updatedAt,
-        ...(entry.pendingInteraction === undefined
-          ? {}
-          : { pendingInteraction: entry.pendingInteraction }),
-        ...(entry.projectionValues === undefined
-          ? {}
-          : { projectionValues: entry.projectionValues }),
-        ...(entry.title !== undefined ? { title: entry.title } : {}),
-        ...(entry.cwd !== undefined ? { cwd: entry.cwd } : {}),
-        ...(entry.workspaceId !== undefined ? { workspaceId: entry.workspaceId } : {}),
-        ...(entry.parentSessionId !== undefined ? { parentId: entry.parentSessionId } : {}),
-        ...(entry.origin !== undefined ? { origin: entry.origin } : {}),
-        ...(entry.agentPreset !== undefined ? { agentPreset: entry.agentPreset } : {}),
-        ...(entry.visibility !== undefined ? { visibility: entry.visibility } : {}),
-        ...(entry.projectId !== undefined ? { projectId: entry.projectId } : {}),
+      let summary = this.summaryProjections.get(entry)
+      if (summary === undefined) {
+        summary = {
+          id: entry.sessionId,
+          displayTitle: displayTitleOf(entry.title, entry.cwd, entry.sessionId),
+          running: entry.running,
+          ...(entry.completed ? { completed: true } : {}),
+          blank: entry.blank,
+          updatedAt: entry.updatedAt,
+          ...(entry.pendingInteraction === undefined
+            ? {}
+            : { pendingInteraction: entry.pendingInteraction }),
+          ...(entry.projectionValues === undefined
+            ? {}
+            : { projectionValues: entry.projectionValues }),
+          ...(entry.title !== undefined ? { title: entry.title } : {}),
+          ...(entry.cwd !== undefined ? { cwd: entry.cwd } : {}),
+          ...(entry.workspaceId !== undefined ? { workspaceId: entry.workspaceId } : {}),
+          ...(entry.parentSessionId !== undefined ? { parentId: entry.parentSessionId } : {}),
+          ...(entry.origin !== undefined ? { origin: entry.origin } : {}),
+          ...(entry.agentPreset !== undefined ? { agentPreset: entry.agentPreset } : {}),
+          ...(entry.visibility !== undefined ? { visibility: entry.visibility } : {}),
+          ...(entry.projectId !== undefined ? { projectId: entry.projectId } : {}),
+        }
+        this.summaryProjections.set(entry, summary)
       }
+      byId[entry.sessionId] = summary
     }
     if (current !== undefined && currentAddress !== undefined) {
       const seen = new Set<SessionId>()
@@ -1129,8 +1237,10 @@ export class SessionRuntime implements ISessions {
       })
     }
     this.list.set({
-      ids, byId, archivedById: NO_ARCHIVED_SUMMARIES, current, phase, subagentsByParent,
+      ids, byId, archivedById: NO_ARCHIVED_SUMMARIES, current, phase, state, error, subagentsByParent,
       jobsBySession, observedJobs, currentAddress,
+      ...(this.navigation.blockedSessionId === undefined ? {}
+        : { navigationBlockedSessionId: this.navigation.blockedSessionId }),
     })
   }
 
@@ -1142,16 +1252,19 @@ export class SessionRuntime implements ISessions {
    * durable truth, a reopen lazily rebuilds and backfills via open().
    */
   private scheduleDrop(id: SessionId, record: ScopeRecord, disposeFiber = true): void {
-    const disposal = this.dropScope(id, record, disposeFiber)
-    this.pendingScopeDisposals.add(disposal)
+    this.trackDisposal(id, this.dropScope(id, record, disposeFiber))
+  }
+
+  private trackDisposal(id: SessionId, disposal: Promise<void>): void {
+    this.disposalWaits.add(disposal)
     // Prunes are triggered from synchronous projection notifications and have
     // no caller to await. Observe failures here; root teardown still awaits
     // the same promise and reports an aggregate failure to its owner.
     void disposal.catch((error: unknown) => {
-      this.rootCtx.logger.error('client session scope disposal failed for "%s"', id)
+      this.rootCtx.logger.error('client session disposal failed for "%s"', id)
       this.rootCtx.logger.error(error)
     }).finally(() => {
-      this.pendingScopeDisposals.delete(disposal)
+      this.disposalWaits.delete(disposal)
     })
   }
 

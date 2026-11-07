@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-current-artifact-overhead",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/measure-local-owner.py",
+  "startedAt": "2026-10-24T20:00:02.434095+00:00",
+  "seconds": 3.667,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "19eba6a5ef00556143f7eda8dd1b81e947b4bfe787ad269d79ae007e1cb0e1d7",
+  "inputsAfter": "19eba6a5ef00556143f7eda8dd1b81e947b4bfe787ad269d79ae007e1cb0e1d7",
+  "postgresToolDirectory": null,
+  "outputSha256": "ae1a20bfd3212b5c2f8bfa4b0500e991dd59a9dfe8c0c7b075561a78329e3257",
+  "outputTail": "{\n  \"workload\": \"compiled LocalLauncher plus a real loopback Node HTTP runtime\",\n  \"artifacts\": {\n    \"gateway/lib/local-runtime-supervisor.js\": \"f2b7eb0c97b9a74090963db55aa14a0a1b4192ff0def6d60eee54a36a3a0f6ba\",\n    \"gateway/lib/local-runtime-control.js\": \"be6c64426b0c778919e9aebfea823980cca02156c95555811734b9721ddd0100\",\n    \"gateway/lib/local-runtime-owner.js\": \"01149e8ad3411a5ff16ddac40de68fd2bb13a9f6d831d87bfd8a0f40bfe29e6e\",\n    \"gateway/lib/local-runtime-protocol.js\": \"44ee83a021333cd6a243fb24ed361b2e507cb58ca1abeb30b1e8adffe43f80e2\",\n    \"gateway/lib/launcher.js\": \"0d59d69b4a141eef8831cb7c0e375d22e4763dd0b2d20f957817fd86d3386da1\"\n  },\n  \"samples\": [\n    {\n      \"readinessMs\": 278.69,\n      \"gatewayRssKiB\": 83728,\n      \"runtimeRssKiB\": 62288,\n      \"supervisorRssKiB\": 78288\n    },\n    {\n      \"readinessMs\": 213.39,\n      \"gatewayRssKiB\": 83760,\n      \"runtimeRssKiB\": 62432,\n      \"supervisorRssKiB\": 78448\n    },\n    {\n      \"readinessMs\": 270.18,\n      \"gatewayRssKiB\": 83552,\n      \"runtimeRssKiB\": 62560,\n      \"supervisorRssKiB\": 78624\n    },\n    {\n      \"readinessMs\": 224.97,\n      \"gatewayRssKiB\": 83488,\n      \"runtimeRssKiB\": 62624,\n      \"supervisorRssKiB\": 78128\n    },\n    {\n      \"readinessMs\": 217.79,\n      \"gatewayRssKiB\": 83760,\n      \"runtimeRssKiB\": 62480,\n      \"supervisorRssKiB\": 78256\n    }\n  ],\n  \"medians\": {\n    \"readinessMs\": 224.97,\n    \"gatewayRssKiB\": 83728,\n    \"runtimeRssKiB\": 62480,\n    \"supervisorRssKiB\": 78288\n  }\n}\n"
+}

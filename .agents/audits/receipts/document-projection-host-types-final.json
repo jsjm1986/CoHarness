@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-host-types-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-25T22:29:39.992246+00:00",
+  "seconds": 22.695,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a8473ddd6fe77d7cc2e060cae41e29fb93815cad514ad96a86bcc4f4aebb64fa",
+  "inputsAfter": "a8473ddd6fe77d7cc2e060cae41e29fb93815cad514ad96a86bcc4f4aebb64fa",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

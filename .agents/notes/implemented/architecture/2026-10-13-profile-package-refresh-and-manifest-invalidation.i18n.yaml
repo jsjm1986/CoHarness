@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-13-profile-package-refresh-and-manifest-invalidation.md
 document:
-  en: ba92f3ad4c9da3b07d6c0b8e98a286107cac36d3
-  zh: 059c7ebda77f1eb9f5ebb31d769bc12883ffcd94
+  en: e71069f300f67490b2c443d34faec151cfbea2e0
+  zh: 8b50e8bf92a83874ca019e9fb6e61a4c3c90e1b9
 /agent-note-refresh-runtime-resolution-after-package-operations-and-expire-hmr-package-configuration:
   en: 305f7f126f5c2bbc
   zh: d5bc173a3a224c92
@@ -24,8 +24,8 @@ document:
   en: a08e58093790887e
   zh: fb64e44d54be9928
 /agent-note-refresh-runtime-resolution-after-package-operations-and-expire-hmr-package-configuration/decision/hmr-package-configuration-expiry:
-  en: f064b54724adf5d4
-  zh: bbad3f3e0f836f20
+  en: 02790274370b6556
+  zh: 6858e4079497d44c
 /agent-note-refresh-runtime-resolution-after-package-operations-and-expire-hmr-package-configuration/alternatives-considered:
   en: 62d2c509cf842375
   zh: 4d9af29ed76fd149

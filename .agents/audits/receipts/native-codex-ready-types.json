@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-ready-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/llm/llm/tsconfig.json packages/llm/llm-pi-ai/tsconfig.json packages/llm/llm-deepseek/tsconfig.json packages/subagent/subagent-codex/tsconfig.json",
+  "startedAt": "2026-10-25T02:26:31.313338+00:00",
+  "seconds": 1.276,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ae5f8cfbaaa09048726312f5c118f44ba039b97373f6492397d4f58a30f6e96d",
+  "inputsAfter": "ae5f8cfbaaa09048726312f5c118f44ba039b97373f6492397d4f58a30f6e96d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

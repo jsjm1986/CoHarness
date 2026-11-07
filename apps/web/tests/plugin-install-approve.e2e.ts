@@ -2,6 +2,7 @@
  * Assembled plugin approval: a real built `dsh --profile web` serving the
  * management page, the profile's real pinned pnpm, a file-source bundle whose
  * install script pnpm blocks, and the allow-and-retry path through the browser.
+ * The private profile disables public registry probing for the offline file install.
  */
 
 import { existsSync } from 'node:fs'
@@ -16,7 +17,7 @@ import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
-import { captureStableAria, writeWelcomeNoticeAck } from './scaffold.ts'
+import { captureStableAria } from './scaffold.ts'
 import { REPO_ROOT, saveFailureShot, saveFailureDom } from './support.ts'
 import { expectSelectableTerminalCommand } from './terminal-command-browser.ts'
 
@@ -113,6 +114,12 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
     const addon = join(home, 'addon')
     const built = join(profileDir, 'node_modules', ADDON, 'built.txt')
     await mkdir(profileDir, { recursive: true })
+    await writeFile(join(home, 'cordis.patch.yml'), [
+      '- id: ui-plugin-manager',
+      '  config:',
+      '    registryProbeEnabled: false',
+      '',
+    ].join('\n'))
     await writeFile(join(profileDir, 'pnpm-workspace.yaml'), [
       'packages:',
       '  - .',
@@ -133,15 +140,12 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
     }))
     await writeFile(join(addon, 'build.cjs'), 'require("node:fs").writeFileSync("built.txt", "built")\n')
     await writeFile(join(addon, 'cordis.patch.yml'), '[]\n')
-    // The management page is the subject; a first-run home would paint the
-    // versioned welcome modal over it.
-    await writeWelcomeNoticeAck(home)
     await mkdir(SNAPSHOT_DIR, { recursive: true })
 
     signal.throwIfAborted()
     await subprocessCtx.plugin(LocalSubprocessRuntime)
     signal.throwIfAborted()
-    host = subprocessCtx.subprocess.spawn(spawnSpec(
+    host = await subprocessCtx.subprocess.spawn(spawnSpec(
       [process.execPath, binPath, '--profile', 'web', '--port', '0', '--no-open'],
       world,
       {

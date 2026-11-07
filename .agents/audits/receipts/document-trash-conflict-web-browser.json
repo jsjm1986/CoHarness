@@ -1,0 +1,14 @@
+{
+  "name": "document-trash-conflict-web-browser",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config vitest.web.config.ts apps/web/tests/document-manager.e2e.ts -t 'real reused-path|snapshot inventory' --retry=0",
+  "startedAt": "2026-10-25T05:07:37.272014+00:00",
+  "seconds": 4.895,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e32b3c4aae030757d029ff9aa23c0ff16dd80d99563a0dcc3b6079a45e0bc872",
+  "inputsAfter": "e32b3c4aae030757d029ff9aa23c0ff16dd80d99563a0dcc3b6079a45e0bc872",
+  "postgresToolDirectory": null,
+  "outputSha256": "de99cdc7632c8b353f24102755819ad96120131407eee30548b12063f0d6998c",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed | 9 skipped (11)\n   Start at  13:07:37\n   Duration  4.28s (transform 588ms, setup 0ms, import 912ms, tests 3.31s, environment 0ms)\n\n"
+}

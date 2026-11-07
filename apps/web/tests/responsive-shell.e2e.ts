@@ -14,7 +14,7 @@ import {
   captureStableAria, compareOrRefreshGolden, launchWebScaffold,
   watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/responsive-shell', import.meta.url))
 const DRAWER_EXPECTED = join(SNAPSHOT_DIR, 'compact-drawer.expected.md')
@@ -127,6 +127,32 @@ describe('web e2e: responsive shell modes', () => {
     }))
     expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth)
     expect(geometry.bodyWidth).toBeLessThanOrEqual(geometry.viewportWidth)
+  }, 60_000)
+
+  it('keeps terminal recovery feedback clear of the model and send controls', async () => {
+    page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'en-US' })
+    tripwire = watchConsole(page)
+    await page.route('**/api/terminal/list**', route => route.fulfill({ status: 503, body: 'Unavailable' }))
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await connectFreshWorkspace(page, scaffold.workspaceCwd)
+    const retry = page.getByRole('button', { name: 'Retry terminal recovery' })
+    await retry.waitFor({ timeout: 15_000 })
+    const box = await retry.boundingBox()
+    if (box === null) throw new Error('terminal recovery feedback has no box')
+    expect(box.height).toBeGreaterThanOrEqual(44)
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(390)
+    const trailing = page.locator('[data-composer-card] [class*="trailing"]').first()
+    const trailingBox = await trailing.boundingBox()
+    if (trailingBox === null) throw new Error('composer actions have no box')
+    expect(box.x + box.width).toBeLessThanOrEqual(trailingBox.x + 1)
+    for (const action of ['Add images or documents', 'Choose from Documents', 'Commands', 'Send message']) {
+      const control = page.getByRole('button', { name: action, exact: true })
+      const target = await control.boundingBox()
+      if (target === null) throw new Error(`missing composer control: ${action}`)
+      expect(target.width).toBeGreaterThanOrEqual(44)
+      expect(target.height).toBeGreaterThanOrEqual(44)
+    }
   }, 60_000)
 
   it('medium: rail column with two grid tracks and no drag handles while collapsed', async () => {

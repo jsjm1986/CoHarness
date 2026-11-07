@@ -8,15 +8,16 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { CollaborationError, collaborationRemoteRefusal, type CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
-import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import { CollaborationError, collaborationOf, collaborationRemoteRefusal, type CollaborationAuthority, type CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
+import { executionAuthorityOf, sameExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { Domain, KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { rankEntries, summaryOf } from './search.ts'
 import {
   memoryConsolidationCursorKey,
@@ -50,17 +51,24 @@ export * from './types.ts'
 /**
  * Who is writing. `agent` writes through the model tools under the
  * `memory` execution authorization; `member` writes through the browser
- * Remote methods under the captured collaboration participant — an absent
- * participant means a runtime with no collaboration provider, which keeps
- * owner semantics. `signal` is the agent operation's cancellation carried
- * into the project authorization call; `source` stamps `extraction` or
+ * Remote methods under captured collaboration authority. Absent authority
+ * is reserved for independent applications without a collaboration requirement.
+ * `signal` cancels agent writes before authorization and before the entry
+ * mutation; `source` stamps `extraction` or
  * `consolidation` on curation writes and defaults to `agent`. Host-only
  * vocabulary: it names the `Agent` runtime type, so it is exported from
  * the service entry rather than the client-safe `./types`.
  */
 export type MemoryWriter =
   | { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal; readonly source?: 'extraction' | 'consolidation' }
-  | { readonly kind: 'member'; readonly participant?: CollaborationParticipant }
+  | { readonly kind: 'member'; readonly authority?: CollaborationAuthority }
+
+/** Request-captured attribution and its pre-mutation authority check. */
+interface WriteAdmission {
+  readonly userId: number | undefined
+  readonly assertCurrent: () => void
+  readonly revalidate?: () => Promise<void>
+}
 export {
   memoryConsolidationCursorKey,
   memoryDomain,
@@ -74,6 +82,15 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Durable memory service registered as `memory`; see {@link MemoryService}. */
     memory: MemoryService
+  }
+  interface Events {
+    /**
+     * Recheck effective memory switches after a settings commit or provider source replacement.
+     * Subscribers read their own injected service and cancel unavailable work synchronously;
+     * asynchronous cleanup retains its existing owner. Provider wiring may notify more than once.
+     * @mode emit
+     */
+    'memory/switches-updated'(): void
   }
 }
 
@@ -173,8 +190,8 @@ export function memorySignalWordCount(text: string): number {
  * The `memory/*` Remote methods serve the browser surface: reads are
  * member-wide inside a project runtime, while member writes capture the
  * request's collaboration participant and require `rw` project
- * membership — a runtime with no collaboration provider keeps owner
- * semantics. The `memory` settings section switches the whole feature
+ * membership. Independent applications without a collaboration requirement
+ * keep owner semantics. The `memory` settings section switches the whole feature
  * off: scopes vanish for agents and every write refuses
  * `scope-unavailable`, while stored entries stay readable for the owner.
  */
@@ -204,7 +221,7 @@ export default class MemoryService extends TypertRemoteService {
     readonly searchMaxResults: number
   }
 
-  /** Domain open is asynchronous; every access resolves through `ready`. */
+  /** Every access awaits the domain; owned cleanup also joins a pending acquisition. */
   private readonly ready: Promise<Domain<typeof memoryDomain>>
 
   /** Head of the serialized write chain. */
@@ -229,31 +246,44 @@ export default class MemoryService extends TypertRemoteService {
       recall: config.recall,
     }
     this.switchSource = () => entry
+    ctx.on('settings/updated', (namespace) => {
+      if (namespace === MEMORY_SETTINGS_NAMESPACE) this.emitSwitchesUpdated()
+    })
     installSettingsSection(ctx, MEMORY_SETTINGS_NAMESPACE, MEMORY_SETTINGS_SCHEMA, entry, {
       label: { en: 'Memory', zh: '记忆' },
       owner: 'project',
       projectWrite: 'manager',
       setSource: (source) => {
         this.switchSource = source
+        this.emitSwitchesUpdated()
       },
       onChange: () => {
-        /* Reads are per-decision through {@link switches}; nothing memoizes. */
+        /* Commits notify synchronously; provider changes notify when their source is replaced. */
       },
     })
     this.ready = ctx.storageDomain.open(memoryDomain)
     ctx.effect(async () => {
       const domain = await this.ready
-      return ctx.effect(() => async () => { await domain.close() })
+      return async () => { await domain.close() }
     })
   }
 
   /**
-   * The resolved curation/recall switches. Consumers read this at each
-   * decision point so a live settings change takes effect on the next pass.
+   * The effective feature switches from composition or the attached settings provider.
+   * Consumers read them at each decision; `memory/switches-updated` also
+   * notifies in-flight consumers after commits or provider replacement.
    * @returns the active switch values.
    */
   switches(): MemorySwitches {
     return this.switchSource()
+  }
+
+  /** Notify every subscriber synchronously and report independent observer failures. */
+  private emitSwitchesUpdated(): void {
+    void this.ctx.parallel('memory/switches-updated').catch((error: unknown) => {
+      this.ctx.logger.warn('memory/switches-updated listener failed')
+      this.ctx.logger.warn(error)
+    })
   }
 
   /** The open `entries` table. */
@@ -372,8 +402,9 @@ export default class MemoryService extends TypertRemoteService {
       if (invalid !== undefined) return invalid
       const key = MemoryKey(request.key)
       const recordKey = memoryRecordKey(request.scope, key)
-      const userId = await this.authorizeWrite(request.scope, writer)
       const table = await this.entriesTable()
+      const admission = await this.authorizeWrite(request.scope, writer)
+      const userId = admission.userId
       const existing = table.get(recordKey) as MemoryEntry | undefined
       if (request.expectedRevision === undefined && existing !== undefined) {
         return { ok: false, code: 'memory_exists' }
@@ -409,9 +440,17 @@ export default class MemoryService extends TypertRemoteService {
         created: existing === undefined ? attribution : existing.created,
         updated: attribution,
       }
-      await table.put(recordKey, entry)
       await this.noteScopeChange(request.scope)
-      this.ctx.emit('memory/changed', memoryScopeId(request.scope), entry.key)
+      if (admission.revalidate !== undefined) {
+        const scopeError = this.scopeRefusal(request.scope, writer)
+        if (scopeError !== undefined) return scopeError
+        await admission.revalidate()
+      }
+      const finalScopeError = this.scopeRefusal(request.scope, writer)
+      if (finalScopeError !== undefined) return finalScopeError
+      admission.assertCurrent()
+      await table.put(recordKey, entry)
+      this.emitChanged(request.scope, entry.key)
       return existing === undefined
         ? { ok: true, operation: 'create', entry }
         : { ok: true, operation: 'update', entry, previous: existing }
@@ -434,16 +473,24 @@ export default class MemoryService extends TypertRemoteService {
         return { ok: false, code: 'memory_invalid', reason: 'key' }
       }
       const recordKey = memoryRecordKey(request.scope, MemoryKey(request.key))
-      await this.authorizeWrite(request.scope, writer)
       const table = await this.entriesTable()
+      const admission = await this.authorizeWrite(request.scope, writer)
       const existing = table.get(recordKey) as MemoryEntry | undefined
       if (existing === undefined) return { ok: false, code: 'memory_not_found' }
       if (request.expectedRevision !== undefined && existing.revision !== request.expectedRevision) {
         return { ok: false, code: 'memory_stale' }
       }
-      await table.delete(recordKey)
       await this.noteScopeChange(request.scope)
-      this.ctx.emit('memory/changed', memoryScopeId(request.scope), existing.key)
+      if (admission.revalidate !== undefined) {
+        const scopeError = this.scopeRefusal(request.scope, writer)
+        if (scopeError !== undefined) return scopeError
+        await admission.revalidate()
+      }
+      const finalScopeError = this.scopeRefusal(request.scope, writer)
+      if (finalScopeError !== undefined) return finalScopeError
+      admission.assertCurrent()
+      await table.delete(recordKey)
+      this.emitChanged(request.scope, existing.key)
       return { ok: true, operation: 'delete', entry: existing }
     })
   }
@@ -514,8 +561,8 @@ export default class MemoryService extends TypertRemoteService {
   /**
    * Create or replace one entry as the calling member. The service
    * captures the request's collaboration participant itself: `rw` project
-   * membership is required for the project scope, and a runtime with no
-   * collaboration provider keeps owner semantics. Validation, revision,
+   * membership is required for the project scope. Independent applications
+   * without a collaboration requirement keep owner semantics. Validation, revision,
    * and capacity refusals return in the ordinary write result; a missing
    * principal or read-only membership rejects with the shared
    * `collaboration-forbidden` refusal.
@@ -550,16 +597,14 @@ export default class MemoryService extends TypertRemoteService {
   }
 
   /**
-   * Resolve the member writer for one Remote write call. A runtime with no
-   * collaboration provider is the owner's, so the writer carries no
-   * participant; a capture failure means no verified caller stands behind
-   * the call and rejects with the shared refusal.
+   * Resolve the member writer for one Remote write call. Independent
+   * applications keep owner semantics. An unavailable required provider or
+   * failed capture rejects with the shared refusal.
    */
   private memberWriter(): MemoryWriter {
-    const collaboration = this.ctx.get('collaboration')
-    if (collaboration === undefined) return { kind: 'member' }
     try {
-      return { kind: 'member', participant: collaboration.capture().participant }
+      const authority = collaborationOf(this.ctx)?.capture()
+      return authority === undefined ? { kind: 'member' } : { kind: 'member', authority }
     } catch (error: unknown) {
       throw collaborationRemoteRefusal(error, 'write')
     }
@@ -567,16 +612,16 @@ export default class MemoryService extends TypertRemoteService {
 
   /**
    * Whether the member behind the current Remote call may write `scope`.
-   * Mirrors {@link memberWriter}: absent collaboration means the owner,
-   * a capture failure means no verified caller — not writable.
+   * Mirrors {@link memberWriter}: independent applications keep owner access,
+   * and an unavailable required provider or capture failure is not writable.
    */
   private memberWritable(scope: MemoryScope, enabled: boolean): boolean {
     if (!enabled) return false
-    const collaboration = this.ctx.get('collaboration')
-    if (collaboration === undefined) return true
     let participant: CollaborationParticipant
     try {
-      participant = collaboration.capture().participant
+      const collaboration = collaborationOf(this.ctx)
+      if (collaboration === undefined) return true
+      participant = this.memberParticipant(collaboration.capture())
     } catch {
       // No verified request principal: the caller is not entitled to write.
       return false
@@ -584,6 +629,17 @@ export default class MemoryService extends TypertRemoteService {
     return scope.kind === 'project'
       ? participant.scope.kind === 'project' && participant.scope.mode === 'rw'
       : participant.scope.kind === 'personal'
+  }
+
+  /** Resolve a captured member only while its assertion and provider are active. */
+  private memberParticipant(authority: CollaborationAuthority): CollaborationParticipant {
+    if (authority.signal.aborted) {
+      throw collaborationRemoteRefusal(new CollaborationError('gateway-unavailable'), 'write')
+    }
+    if (Date.now() >= authority.expiresAt) {
+      throw collaborationRemoteRefusal(new CollaborationError('forbidden'), 'write')
+    }
+    return authority.participant
   }
 
   /**
@@ -604,22 +660,68 @@ export default class MemoryService extends TypertRemoteService {
    * writes so an interleaved save cannot lose the advancement.
    * @param key - Cursor record key.
    * @param cursor - The complete next cursor record.
+   * @param signal - Optional curation cancellation, checked before persistence after queueing.
+   * @param beforeCommit - Optional live authorization after queue and storage waits, returning the final synchronous check.
+   *   Rejection prevents commit. Must not enqueue memory writes or cursors.
    */
-  async writeCursor(key: string, cursor: MemoryCursor): Promise<void> {
+  async writeCursor(key: string, cursor: MemoryCursor, signal?: AbortSignal, beforeCommit?: () => Promise<() => void>): Promise<void> {
     await this.serialize(async () => {
-      await (await this.cursorsTable()).put(key, { ...cursor })
+      const table = await this.cursorsTable()
+      signal?.throwIfAborted()
+      const assertCurrent = await beforeCommit?.()
+      signal?.throwIfAborted()
+      assertCurrent?.()
+      await table.put(key, { ...cursor })
     })
   }
 
   /**
-   * Bump the consolidation `changedSince` counter for one scope inside the
-   * current serialized write. Runs only after the entry mutation commits.
+   * Commit a curation cursor only while its observed record is unchanged.
+   * Comparison and persistence serialize with entry mutations.
+   * @param key - Cursor record key.
+   * @param expected - Previously observed record; undefined requires an absent record.
+   * @param cursor - Complete next cursor record.
+   * @param signal - Optional curation cancellation, checked before persistence after queueing.
+   * @param beforeCommit - Optional live authorization after queue and storage waits, returning the final synchronous check.
+   *   Rejection prevents commit. Must not enqueue memory writes or cursors.
+   * @returns true after commit, or false when a newer record is retained.
+   */
+  writeCursorIfUnchanged(
+    key: string, expected: MemoryCursor | undefined, cursor: MemoryCursor,
+    signal?: AbortSignal, beforeCommit?: () => Promise<() => void>,
+  ): Promise<boolean> {
+    return this.serialize(async () => {
+      const table = await this.cursorsTable()
+      signal?.throwIfAborted()
+      const assertCurrent = await beforeCommit?.()
+      signal?.throwIfAborted()
+      assertCurrent?.()
+      if (!isDeepStrictEqual(table.get(key), expected)) return false
+      await table.put(key, { ...cursor })
+      return true
+    })
+  }
+
+  /**
+   * Mark one admitted mutation before publishing its authoritative entry.
+   * A later entry failure can overcount changes; a committed entry never loses
+   * its consolidation marker because of a failed cursor write.
    */
   private async noteScopeChange(scope: MemoryScope): Promise<void> {
     const key = memoryConsolidationCursorKey(scope)
     const cursors = await this.cursorsTable()
     const existing = cursors.get(key)
     await cursors.put(key, { ...existing, changedSince: (existing?.changedSince ?? 0) + 1 })
+  }
+
+  /** Notify observers after commit without changing the mutation's outcome. */
+  private emitChanged(scope: MemoryScope, key: MemoryKey): void {
+    try {
+      this.ctx.emit('memory/changed', memoryScopeId(scope), key)
+    } catch (error) {
+      // Only synchronous observer failures reach this post-commit notification.
+      this.ctx.logger.warn(`memory/changed listener failed: ${String(error)}`)
+    }
   }
 
   /** Queue `work` behind the in-flight write; failures never wedge the chain. */
@@ -673,9 +775,10 @@ export default class MemoryService extends TypertRemoteService {
   }
 
   /**
-   * Authorize one write and return the user id recorded in attribution.
+   * Authorize one write and retain its attribution and pre-mutation check.
    * An agent's project write runs the `memory` execution-authority check —
-   * a missing provider under `executionAuthorityRequired` throws
+   * before and after the durable marker; the execution state must stay
+   * unchanged. A missing provider under `executionAuthorityRequired` throws
    * `execution/forbidden`, and a policy denial (a member who lost the
    * grant, or a private conversation, which is read-only for project
    * memory) propagates the authority's `RemoteError` unchanged. A member
@@ -686,21 +789,49 @@ export default class MemoryService extends TypertRemoteService {
    * shared `collaboration-forbidden` refusal rather than a refusal result,
    * because the caller is not entitled to the write at all.
    */
-  private async authorizeWrite(scope: MemoryScope, writer: MemoryWriter): Promise<number | undefined> {
+  private async authorizeWrite(scope: MemoryScope, writer: MemoryWriter): Promise<WriteAdmission> {
     if (writer.kind === 'agent') {
-      if (scope.kind !== 'project') return undefined
-      const state = await executionAuthorityOf(this.ctx)
-        ?.authorize('memory', writer.agent, writer.signal)
-      return state?.primaryActorUserId
+      writer.signal?.throwIfAborted()
+      const authority = scope.kind === 'project' ? executionAuthorityOf(this.ctx) : undefined
+      const state = await authority?.authorize('memory', writer.agent, writer.signal)
+      const assertCurrent = () => {
+        writer.signal?.throwIfAborted()
+        if (scope.kind === 'project' && !sameExecutionAuthority(executionAuthorityOf(this.ctx), authority)) {
+          throw new RemoteError('execution/forbidden', 'Memory authorization changed before persistence.', { capability: 'memory' })
+        }
+      }
+      assertCurrent()
+      return { userId: state?.primaryActorUserId, assertCurrent,
+        ...(authority === undefined ? {} : { revalidate: async () => {
+          assertCurrent()
+          const current = await authority.authorize('memory', writer.agent, writer.signal)
+          assertCurrent()
+          if (!isDeepStrictEqual(current, state)) {
+            throw new RemoteError('execution/forbidden', 'Memory execution changed before persistence.', { capability: 'memory' })
+          }
+        } }),
+      }
     }
-    const participant = writer.participant
-    if (participant === undefined) return undefined
+    if (writer.authority === undefined) {
+      const assertCurrent = () => {
+        try {
+          if (collaborationOf(this.ctx) === undefined) return
+        } catch (error: unknown) {
+          throw collaborationRemoteRefusal(error, 'write')
+        }
+        throw collaborationRemoteRefusal(new CollaborationError('forbidden'), 'write')
+      }
+      assertCurrent()
+      return { userId: undefined, assertCurrent }
+    }
+    const authority = writer.authority
+    const participant = this.memberParticipant(authority)
     if (scope.kind === 'project'
       ? participant.scope.kind !== 'project' || participant.scope.mode !== 'rw'
       : participant.scope.kind !== 'personal') {
       throw collaborationRemoteRefusal(new CollaborationError('forbidden'), 'write')
     }
-    return participant.userId
+    return { userId: participant.userId, assertCurrent: () => { this.memberParticipant(authority) } }
   }
 
   /** Count live records of one scope (creates compare against the cap). */

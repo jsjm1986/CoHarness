@@ -24,6 +24,7 @@ export type PluginsSettingsLocaleKey =
   | 'subagentDepthOverride' | 'subagentMaxActive' | 'subagentCapacityHelpLabel' | 'subagentCapacityHelp' | 'subagentDepthInvalid' | 'subagentCapacityInvalid'
   | 'webSearchTitle' | 'webSearchDescription'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeyManaged' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
+  | 'webSearchApiKeyChecking' | 'webSearchApiKeyUnknown'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
   | 'webSearchUseSearchApi' | 'webSearchUseSearchApiHint' | 'webSearchSearchGuide' | 'webSearchSearchGuideUrl'
   | 'webSearchApiBaseUrl' | 'webSearchApiBaseUrlHint' | 'webSearchCount' | 'webSearchCountHint' | 'webSearchInvalidCount'
@@ -92,6 +93,8 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchApiKeyManaged: 'This key is managed by the deployment administrator and cannot be changed in the project scope.',
   webSearchApiKeySet: 'A key is configured.',
   webSearchApiKeyUnset: 'No key is configured; only conversations using a DeepSeek Account model can search, through the default endpoint.',
+  webSearchApiKeyChecking: 'Checking key status…',
+  webSearchApiKeyUnknown: 'Key status is unavailable. Reopen this page to retry.',
   webSearchBaseUrl: 'Messages API base URL',
   webSearchBaseUrlHint: 'Include the API prefix, such as https://api.deepseek.com/anthropic/v1. The provider appends /messages. Leave blank to restore the default.',
   webSearchMaxUses: 'Max searches per request',
@@ -171,6 +174,8 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   webSearchApiKeyManaged: '此密钥由部署管理员管理，项目空间中不能修改。',
   webSearchApiKeySet: '已配置密钥。',
   webSearchApiKeyUnset: '未配置密钥；仅使用 DeepSeek 账号模型的对话可以通过默认接口地址搜索。',
+  webSearchApiKeyChecking: '正在查询密钥状态…',
+  webSearchApiKeyUnknown: '暂时无法获取密钥状态，重新打开此页面可重试',
   webSearchBaseUrl: 'Messages API 基础地址',
   webSearchBaseUrlHint: '填写含 API 前缀的地址，例如 https://api.deepseek.com/anthropic/v1；程序追加 /messages，留空恢复默认。',
   webSearchMaxUses: '单次请求最多搜索次数',

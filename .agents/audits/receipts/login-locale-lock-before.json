@@ -1,0 +1,13 @@
+{
+  "name": "login-locale-lock-before",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/auth-postgres.spec.ts --no-file-parallelism --retry=0",
+  "startedAt": "2026-10-23T19:18:21.073818+00:00",
+  "seconds": 2.731,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4f8e271d2f8ebc4dc2ae9f6eff4fe8d8e92fd353e9744c4d28d9d96962e0e15a",
+  "inputsAfter": "4f8e271d2f8ebc4dc2ae9f6eff4fe8d8e92fd353e9744c4d28d9d96962e0e15a",
+  "outputSha256": "48606cab31908a2759f33ca86982fd3205c989df823515959265a16d220b2785",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/auth-postgres.spec.ts (2 tests | 1 failed) 420ms\n     × serializes 'PostgreSQL locale' case variants across Gateway instances before counting failures 166ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/auth-postgres.spec.ts > PostgreSQL login admission > serializes 'PostgreSQL locale' case variants across Gateway instances before counting failures\nAssertionError: expected true to be false // Object.is equality\n\n- Expected\n+ Received\n\n- false\n+ true\n\n ❯ tests/auth-postgres.spec.ts:67:28\n     65|         return Number(waiting.rows[0]!.n) === 2 || upperSettled\n     66|       }).toBe(true)\n     67|       expect(upperSettled).toBe(false)\n       |                            ^\n     68|     } finally {\n     69|       await blocker.query('ROLLBACK')\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed (2)\n   Start at  03:18:23\n   Duration  612ms (transform 64ms, setup 0ms, import 112ms, tests 420ms, environment 0ms)\n\n"
+}

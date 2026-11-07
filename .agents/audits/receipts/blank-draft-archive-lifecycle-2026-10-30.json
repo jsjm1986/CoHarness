@@ -1,0 +1,237 @@
+{
+  "recordedAt": "2026-10-30T04:07:23.760339+00:00",
+  "finding": "B334",
+  "status": "fixed_and_verified_for_named_scope",
+  "wholeProjectComplete": false,
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z",
+  "negativeControl": "blank-draft-lifecycle-negative.json",
+  "sourceBefore": {
+    "archive": "9edcdf0eedb59a6d6e24713dfd6a42543992481023cc5cde9c6dbe1eee290dbe",
+    "repository": "d4bf2f7d0dbf021b5cd9bdb36fee73719449dba68db11c112d0223d4b8ddf67b"
+  },
+  "implementation": "Canonical Session lifecycle is checked before the reservation row is locked or changed. Concurrent release requires a new attempt. Archived, trash, purged and recently restored roots are excluded from maintenance both before and after waits.",
+  "sourcePaths": [
+    "gateway/src/postgres/conversation-repository.ts",
+    "gateway/src/postgres/conversation-archive-service.ts",
+    "gateway/tests/blank-draft-archive-lifecycle-postgres.spec.ts",
+    "gateway/tests/archive-administration-postgres.spec.ts",
+    "gateway/tests/fixtures/archive-runtime-namespace.mjs",
+    "gateway/tests/fixtures/archive-administration.mjs",
+    "gateway/tests/expected/archive-runtime-namespace.jsonl",
+    "gateway/tests/expected/archive-runtime-namespace-browser.jsonl",
+    "gateway/package.json",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-30-archive-runtime-namespace.md",
+    ".agents/notes/implemented/architecture/2026-10-30-archive-runtime-namespace.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-30-archive-runtime-namespace.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.i18n.yaml"
+  ],
+  "checks": [
+    {
+      "name": "blank-draft-final-coverage",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-final-coverage.json"
+    },
+    {
+      "name": "blank-draft-real-http",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-real-http.json"
+    },
+    {
+      "name": "blank-draft-private-build",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-private-build.json"
+    },
+    {
+      "name": "blank-draft-compiled-node22",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-compiled-node22.json"
+    },
+    {
+      "name": "blank-draft-compiled-node24",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-compiled-node24.json"
+    },
+    {
+      "name": "blank-draft-final-types",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-final-types.json"
+    },
+    {
+      "name": "blank-draft-final-lint",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-final-lint.json"
+    },
+    {
+      "name": "blank-draft-fixture-lint",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-fixture-lint.json"
+    },
+    {
+      "name": "blank-draft-pairing-final",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-pairing-final.json"
+    },
+    {
+      "name": "blank-draft-docs",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-docs.json"
+    },
+    {
+      "name": "blank-draft-administrator-adjacent",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-administrator-adjacent.json"
+    },
+    {
+      "name": "blank-draft-administrator-lint",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-administrator-lint.json"
+    },
+    {
+      "name": "blank-draft-existing-business-concurrency",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-existing-business-concurrency.json"
+    },
+    {
+      "name": "blank-draft-existing-admin-http",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-existing-admin-http.json"
+    },
+    {
+      "name": "blank-draft-admin-private-build",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-admin-private-build.json"
+    },
+    {
+      "name": "blank-draft-built-browser",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-built-browser.json"
+    }
+  ],
+  "negativeControls": [
+    "blank-draft-lifecycle-negative.json",
+    "blank-draft-canonical-negative-live.json"
+  ],
+  "interruptionEvidence": "blank-draft-canonical-negative.json failed before tests with ECONNREFUSED; the same owned container and volume were verified and restarted, with its new private loopback port recorded. The subsequent negative control exercised and failed the actual canonical retry assertion.",
+  "validation": {
+    "selectedSourceCases": 88,
+    "databaseAndUnitCases": 86,
+    "assembledHttpTranscripts": 2,
+    "transcriptFacts": 8,
+    "compiledPlainNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "raceBarriers": [
+      "Real root-row lock plus pg_stat_activity proves retry waits before reservation release.",
+      "Real archive-row lock plus pg_stat_activity proves cleanup waits before restoration commit."
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 1076,
+          "covered": 770,
+          "skipped": 0,
+          "pct": 71.56
+        },
+        "statements": {
+          "total": 1251,
+          "covered": 837,
+          "skipped": 0,
+          "pct": 66.9
+        },
+        "functions": {
+          "total": 188,
+          "covered": 152,
+          "skipped": 0,
+          "pct": 80.85
+        },
+        "branches": {
+          "total": 1208,
+          "covered": 701,
+          "skipped": 0,
+          "pct": 58.02
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-archive-service.ts": {
+        "lines": {
+          "total": 456,
+          "covered": 397,
+          "skipped": 0,
+          "pct": 87.06
+        },
+        "functions": {
+          "total": 97,
+          "covered": 89,
+          "skipped": 0,
+          "pct": 91.75
+        },
+        "statements": {
+          "total": 545,
+          "covered": 434,
+          "skipped": 0,
+          "pct": 79.63
+        },
+        "branches": {
+          "total": 466,
+          "covered": 303,
+          "skipped": 0,
+          "pct": 65.02
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-repository.ts": {
+        "lines": {
+          "total": 620,
+          "covered": 373,
+          "skipped": 0,
+          "pct": 60.16
+        },
+        "functions": {
+          "total": 91,
+          "covered": 63,
+          "skipped": 0,
+          "pct": 69.23
+        },
+        "statements": {
+          "total": 706,
+          "covered": 403,
+          "skipped": 0,
+          "pct": 57.08
+        },
+        "branches": {
+          "total": 742,
+          "covered": 398,
+          "skipped": 0,
+          "pct": 53.63
+        }
+      }
+    },
+    "coverageLimit": "Partial two-file coverage from the41database/unit cases. The real child-process HTTP transcript is checked separately; no whole-file100% or whole-project coverage claim.",
+    "docs": "20passed0failed0skipped",
+    "realProvider": "Human-deferred; no external model or public push verification.",
+    "browser": "Current private Gateway/Admin builds pass real Chrome at1280,390,320 with no errors or horizontal overflow. The browser snapshot contains only rendered observations; the HTTP transcript separately checks lifecycle facts."
+  },
+  "noteReview": {
+    "updatedExisting": "implemented/architecture/2026-10-30-archive-runtime-namespace.md",
+    "retainedActive": true,
+    "newNotes": 0,
+    "archivedNotes": 0,
+    "reason": "Archive identity and lifecycle coordination remain one active decision; canonical retry and restoration eligibility extend the current mechanism."
+  },
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/blank-draft-final-source-artifact-hashes.json",
+  "remaining": "Session099 remains isolated and unpublished; all12original review domains and B04/B25 remain open.",
+  "sourceNamespaceSuccessor": {
+    "receipt": "receipts/postgres-session-runtime-namespace-2026-10-30.json",
+    "currentRootValidation": "All9draft lifecycle cases pass after Runtime-scoped storage publication."
+  }
+}

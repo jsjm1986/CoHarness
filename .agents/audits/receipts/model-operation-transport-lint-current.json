@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-transport-lint-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm/src/operation-call.ts packages/llm/llm/src/operations.ts packages/llm/llm/tests/operations.spec.ts packages/web/web-search-deepseek/src/provider.ts packages/web/web-search-deepseek/src/types.ts packages/web/web-search-deepseek/src/usage.ts packages/web/web-search-deepseek/tests/usage.spec.ts packages/web/web-search-deepseek/tests/prepared.spec.ts",
+  "startedAt": "2026-10-24T06:14:31.749654+00:00",
+  "seconds": 3.426,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4035f56f1c49a2fdcd7556f3c17d580c4d7e84131e905250b1b17c898b0f64d2",
+  "inputsAfter": "4035f56f1c49a2fdcd7556f3c17d580c4d7e84131e905250b1b17c898b0f64d2",
+  "postgresToolDirectory": null,
+  "outputSha256": "4de820fc57b2e81f392b47c56b1daa022ad46af22e890c0e17ddd55f5a5d4ff3",
+  "outputTail": "packages/web/web-search-deepseek/src/provider.ts:228:1: error @stylistic(max-len): This line has a length of 170. Maximum allowed is 140.\npackages/llm/llm/src/operation-call.ts:14:54: error typescript(no-redundant-type-constituents): 'never' is overridden by other types in this union type.\npackages/llm/llm/src/operation-call.ts:14:95: error typescript(no-redundant-type-constituents): 'never' is overridden by other types in this union type.\npackages/web/web-search-deepseek/tests/usage.spec.ts:20:42: error typescript(no-deprecated): `toThrowError` is deprecated. Use `toThrow` instead\n"
+}

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -43,6 +44,7 @@ const sessionState = (items: readonly SessionSummary[], overrides: Partial<Sessi
   archivedById: {},
   current: undefined,
   phase: 'ready',
+  state: 'idle', error: null,
   subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
   currentAddress: undefined,
   ...overrides,
@@ -86,6 +88,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     expandSidebar: vi.fn(),
     useSessions: baseSessions,
     useCurrentSessions: selector => baseSessions(selector),
+    useInputDraftSessions: hook<readonly SessionId[]>([]),
     useWorkspaces: hook(workspaceState([])),
     usePanelInfo: hook({ activePanelId: null }),
     useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }),
@@ -93,6 +96,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     actions: store.actions,
     startSession: vi.fn(),
     open: vi.fn(),
+    retryLists: vi.fn(),
     searchSessions: vi.fn(async () => ({ items: [], hasMore: false })),
     searchResultLimit: 20,
     requestSessionRename: controls.rename,
@@ -130,6 +134,18 @@ function rerender(b: ReturnType<typeof mount>, overrides: Partial<WorkspaceBrows
 }
 
 describe('WorkspaceBrowser', () => {
+  it('returns focus to search when Escape collapses the input', () => {
+    mount()
+    const search = screen.getByRole('button', { name: '搜索会话' })
+    fireEvent.click(search)
+    const input = screen.getByPlaceholderText('搜索会话…')
+    expect(document.activeElement).toBe(input)
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(document.activeElement).toBe(search)
+    expect(search.getAttribute('aria-expanded')).toBe('false')
+    expect(input.getAttribute('aria-hidden')).toBe('true')
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
   it('shows localized fork failures and dismisses them', () => {
     vi.useFakeTimers()
     try {
@@ -207,7 +223,7 @@ describe('WorkspaceBrowser', () => {
     const b = mount({ useWorkspaces: hook(pending) })
     act(() => {
       b.store.actions.setGroupExpanded('deleted', true)
-      b.store.actions.syncSessionOrderAccount('deleted', ['session'], { session: 1 })
+      b.store.actions.syncSessionOrderAccounts([{ accountKey: 'deleted', order: ['session'], updatedAt: { session: 1 } }])
     })
     expect(b.store.getSnapshot().groupExpansion).toEqual({ deleted: true })
 
@@ -851,6 +867,25 @@ describe('WorkspaceBrowser', () => {
     expect(screen.queryByText('新会话')).toBeNull()
   })
 
+  it('keeps an inactive input blank discoverable in grouped and flat views without exposing parked blanks', () => {
+    const current = summary('history', 3), draft = summary('held-draft', 2, { blank: true })
+    const parked = summary('parked', 1, { blank: true })
+    const drafts = createSnapshotStore<readonly SessionId[]>([])
+    const b = mount({
+      useSessions: hook(sessionState([current, draft, parked], { current: current.id })),
+      useWorkspaces: hook(workspaceState([workspace('alpha', [current.id, draft.id, parked.id])])),
+      useInputDraftSessions: bindSnapshotSelector(drafts),
+    })
+    expect(screen.queryByText('新会话')).toBeNull()
+    act(() => { drafts.set([draft.id]) })
+    fireEvent.click(screen.getByText('新会话'))
+    expect(b.props.open).toHaveBeenCalledExactlyOnceWith(draft.id)
+    act(() => { b.store.actions.setGroupBy('flat') })
+    expect(screen.getAllByText('新会话')).toHaveLength(1)
+    act(() => { drafts.set([]) })
+    expect(screen.queryByText('新会话')).toBeNull()
+  })
+
   it('keeps a newly reserved blank draft in its hinted Workspace and exposes its add action', () => {
     const draft = summary('alpha-draft', 9, { blank: true, workspaceId: wid('alpha') })
     const startSession = vi.fn()
@@ -967,6 +1002,36 @@ describe('WorkspaceBrowser', () => {
       fireEvent.click(input.parentElement as HTMLElement)
       expect(document.activeElement).toBe(input)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels workbench-hidden content search and resumes the retained query when the browser returns', async () => {
+    vi.useFakeTimers()
+    const pending: (() => void)[] = []
+    const searchSessions = vi.fn<WorkspaceBrowserProps['searchSessions']>((_query, _signal) =>
+      new Promise((resolve) => { pending.push(() => { resolve({ items: [], hasMore: false }) }) }))
+    let b: ReturnType<typeof mount> | undefined
+    try {
+      b = mount({ searchSessions })
+      const input = screen.getByPlaceholderText<HTMLInputElement>('搜索会话…')
+      fireEvent.change(input, { target: { value: 'retained query' } })
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledOnce()
+      const firstSignal = searchSessions.mock.calls[0]![1]
+      rerender(b, { useViewport: hook({ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }) })
+      expect(firstSignal.aborted).toBe(true)
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledOnce()
+      rerender(b, { useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }) })
+      expect(input.value).toBe('retained query')
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledTimes(2)
+      expect(searchSessions.mock.calls[1]![0]).toBe('retained query')
+      expect(searchSessions.mock.calls[1]![1].aborted).toBe(false)
+    } finally {
+      b?.view.unmount()
+      await act(async () => { for (const resolve of pending) resolve() })
       vi.useRealTimers()
     }
   })
@@ -1836,4 +1901,99 @@ describe('WorkspaceBrowser', () => {
     const row = screen.getByText('Needle A').closest('[role="treeitem"]') as HTMLElement
     expect(row.hasAttribute('draggable')).toBe(false)
   })
+})
+
+
+describe('personal computer groups', () => {
+  const target = (n: number) => ({ kind: 'personal' as const, runtimeId: `runtime-${n}` as never,
+    nodeId: `computer-${n}` as never, nodeName: `电脑 ${n}` })
+  const directory = (count: number): WorkspaceListState => ({ ...workspaceState([]), directoryState: 'ready',
+    computerGroups: Array.from({ length: count }, (_, i) => ({ runtime: target(i + 1), status: 'active', observedState: 'stopped', syncedAt: null, items: [] })) })
+
+  it('bounds twenty computers, searches the directory, and expands without creating any conversation', () => {
+    const start = vi.fn(async () => {}), refresh = vi.fn(async () => {})
+    mount({ useWorkspaces: hook(directory(20)), startRuntimeSession: start, refreshComputers: refresh })
+    expect(screen.getAllByRole('region')).toHaveLength(5)
+    fireEvent.click(screen.getByRole('button', { name: '电脑 2' }))
+    expect(screen.getAllByText('目录尚未同步，打开此环境后可查看工作区')).toHaveLength(1)
+    expect(screen.queryByText('暂无会话')).toBeNull()
+    expect(start).not.toHaveBeenCalled()
+    expect(refresh).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: '全部电脑（20）' }))
+    expect(screen.getAllByRole('region')).toHaveLength(20)
+    fireEvent.click(screen.getByRole('button', { name: '收起电脑列表' }))
+    expect(screen.getAllByRole('region')).toHaveLength(5)
+    fireEvent.click(screen.getByRole('button', { name: '搜索会话' }))
+    fireEvent.change(screen.getByPlaceholderText('搜索电脑、工作区或对话…'), { target: { value: '电脑 20' } })
+    expect(screen.getAllByRole('region')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '电脑 20' })).toBeTruthy()
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('disables a pending new-conversation action and sends it to only the chosen Runtime', async () => {
+    let settle!: () => void
+    const start = vi.fn(() => new Promise<void>((resolve) => { settle = resolve }))
+    mount({ useWorkspaces: hook(directory(2)), startRuntimeSession: start })
+    const heading = screen.getByRole('button', { name: '电脑 2' })
+    fireEvent.click(heading)
+    expect(heading.getAttribute('aria-controls')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '新对话' }))
+    const pending = screen.getByRole('button', { name: '正在打开…' }) as HTMLButtonElement
+    expect(pending.disabled).toBe(true)
+    fireEvent.click(pending)
+    expect(start).toHaveBeenCalledExactlyOnceWith(target(2), undefined)
+    await act(async () => { settle() })
+    expect(screen.getByRole('button', { name: '新对话' })).toHaveProperty('disabled', false)
+  })
+
+  it('computer new-conversation opens its only Workspace and asks when several Workspaces are available', async () => {
+    const a = workspace('same-on-a', [], 'A only'), b = workspace('one-on-b', [], 'B only')
+    const state = { ...directory(2), items: [a, b], workspaceRuntimeIds: {
+      [a.workspaceId]: target(1).runtimeId, [b.workspaceId]: target(2).runtimeId,
+    } }
+    const start = vi.fn(async () => {})
+    const view = mount({ useWorkspaces: hook(state), startRuntimeSession: start })
+    fireEvent.click(screen.getByRole('button', { name: '电脑 2' }))
+    fireEvent.click(screen.getByRole('button', { name: '新对话' }))
+    await waitFor(() => { expect(start).toHaveBeenCalledExactlyOnceWith(target(2), b.workspaceId) })
+    view.view.unmount()
+    start.mockClear()
+    const second = workspace('second-on-b', [], 'B second')
+    mount({ useWorkspaces: hook({ ...state, items: [a, b, second], workspaceRuntimeIds: {
+      ...state.workspaceRuntimeIds, [second.workspaceId]: target(2).runtimeId,
+    } }), startRuntimeSession: start })
+    fireEvent.click(screen.getByRole('button', { name: '电脑 2' }))
+    fireEvent.click(screen.getByRole('button', { name: '新对话' }))
+    expect(start).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menuitem', { name: 'A only' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'B second' }))
+    await waitFor(() => { expect(start).toHaveBeenCalledExactlyOnceWith(target(2), second.workspaceId) })
+  })
+
+  it('retains independent loose-session orders for two personal Runtimes', async () => {
+    const rows = [summary('a', 2, { runtime: target(1) }), summary('b', 1, { runtime: target(2) })]
+    const b = mount({ useWorkspaces: hook(directory(2)), useSessions: hook(sessionState(rows)) })
+    fireEvent.click(screen.getByRole('button', { name: '电脑 1' }))
+    fireEvent.click(screen.getByRole('button', { name: '电脑 2' }))
+    expect(screen.queryByText('目录尚未同步，打开此环境后可查看工作区')).toBeNull()
+    await waitFor(() => {
+      const orders = b.store.getSnapshot().sessionOrderByAccount
+      expect(orders['runtime:runtime-1:']).toEqual(['a'])
+      expect(orders['runtime:runtime-2:']).toEqual(['b'])
+    })
+    expect(b.store.getSnapshot().sessionOrderByAccount[UNGROUPED_KEY]).toBeUndefined()
+  })
+})
+
+
+it('shows pending navigation without replacing the current Workspace list', async () => {
+  let finish!: () => void
+  const open = vi.fn(() => new Promise<void>((resolve) => { finish = resolve }))
+  const b = mount({ useSessions: hook(sessionState([summary('slow-computer-conversation', 1)])), open })
+  act(() => { b.store.actions.setGroupBy('flat') })
+  fireEvent.click(screen.getByText('slow-computer-conversation', { exact: true }))
+  expect(screen.getByRole('status', { name: '正在打开对话' })).toBeTruthy()
+  expect(screen.getByText('slow-computer-conversation', { exact: true })).toBeTruthy()
+  await act(async () => { finish() })
+  expect(screen.queryByRole('status', { name: '正在打开对话' })).toBeNull()
 })

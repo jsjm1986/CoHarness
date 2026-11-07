@@ -54,7 +54,7 @@ describe.skipIf(process.platform === 'win32')('POSIX snapshot execution storage'
     await mkdir(targetTemp)
     const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
     const env = { HOME: root, TMPDIR: targetTemp }
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(spec => spawn({ ...spec, env: { ...spec.env, ...env } }))
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async spec => spawn({ ...spec, env: { ...spec.env, ...env } }))
     const paths = await execution.paths(signal)
     expect(paths).toMatchObject({ cwd: root, home: root, scratchRoot: targetTemp })
     expect(paths.temporaryRoots).toEqual(expect.arrayContaining([targetTemp, '/tmp']))
@@ -72,7 +72,7 @@ describe.skipIf(process.platform === 'win32')('POSIX snapshot execution storage'
     await writeFile(join(bin, 'mktemp'), '#!/bin/sh\nprintf /unexpected-target')
     await chmod(join(bin, 'mktemp'), 0o700)
     const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(spec => spawn({ ...spec, env: { PATH: bin } }))
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async spec => spawn({ ...spec, env: { PATH: bin } }))
     await expect(execution.temporary(join(root, 'scratch-'), signal)).rejects.toThrow('Invalid workspace snapshot directory')
     await expect(execution.remove('/unexpected-target')).rejects.toThrow('unowned')
   })

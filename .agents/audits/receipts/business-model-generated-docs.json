@@ -1,0 +1,13 @@
+{
+  "name": "business-model-generated-docs",
+  "cwd": ".",
+  "command": "python3 -",
+  "startedAt": "2026-10-23T19:28:19.506737+00:00",
+  "seconds": 22.237,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "060d33a894e47ae15e3c636c11a5c8ce3ca3947a485cae7f6aa8cb17355c5a3b",
+  "inputsAfter": "060d33a894e47ae15e3c636c11a5c8ce3ca3947a485cae7f6aa8cb17355c5a3b",
+  "outputSha256": "514a8d5d4df20f1b7bbe68cebfba434be79ca96bb954281674fa4a67afa57374",
+  "outputTail": "$ tsx scripts/gen-doc-graphs.ts\ngen-doc-graphs: wrote 9 graph doc(s).\n$ tsx scripts/gen-tool-catalog.ts\ngen-tool-catalog: wrote docs/tool-catalog.md.\n$ tsx scripts/gen-plugin-packages.ts\ngen-plugin-packages: wrote apps/cli/config/agent-presets/cordis/skills/cordis-composition-reference/references/packages.md.\ngen-plugin-packages: wrote packages/preset/agent-preset/skills/cordis-composition-reference/references/packages.md.\n"
+}

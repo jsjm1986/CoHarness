@@ -1,0 +1,14 @@
+{
+  "name": "sonar-pairing-check",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts",
+  "startedAt": "2026-10-24T09:32:59.336376+00:00",
+  "seconds": 17.042,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "3299a3430262b90a4bf583015c009b053d30246c30a4041afdf2818e46cb7fd8",
+  "outputTail": "verify-translation-pairing: 1894 pair(s) checked across all in-scope documentation, all consistent.\n"
+}

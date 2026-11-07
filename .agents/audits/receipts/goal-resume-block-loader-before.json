@@ -1,0 +1,14 @@
+{
+  "name": "goal-resume-block-loader-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/goal/tool-goal/tests/resume-block-loader.spec.ts",
+  "startedAt": "2026-10-26T03:13:01.535847+00:00",
+  "seconds": 5.247,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "18cb715de3d44b484040c76f9a312a8bfdb17efc6a7e1a148b2d2f14ddee3b14",
+  "inputsAfter": "18cb715de3d44b484040c76f9a312a8bfdb17efc6a7e1a148b2d2f14ddee3b14",
+  "postgresToolDirectory": null,
+  "outputSha256": "2857c158378e2598281ba578025eebbfeeba13ed66511550cd787efda0af412f",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/goal/tool-goal/tests/resume-block-loader.spec.ts (1 test | 1 failed) 578ms\n   × starts a fresh self-block interval after human resume through the Loader 577ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/goal/tool-goal/tests/resume-block-loader.spec.ts > starts a fresh self-block interval after human resume through the Loader\nError: Command failed: /Users/a1234/.nvm/versions/node/v25.8.1/bin/node --import file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/esm/index.mjs /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/goal/tool-goal/tests/fixtures/resume-block-driver.mjs src\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n4 !== 6\n\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/goal/tool-goal/tests/fixtures/resume-block-driver.mjs:66:10) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 4,\n  expected: 6,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  11:13:06\n   Duration  763ms (transform 50ms, setup 53ms, import 14ms, tests 578ms, environment 0ms)\n\n"
+}

@@ -248,6 +248,8 @@ export interface SlotRendererHost {
     provideInfo: HostObservable<SessionMaybeProvideInfo>
     /** Resolve a definite standard-props bundle for an explicit Session id. */
     provideInfoFor?: (id: string) => SessionProvideInfo | undefined
+    /** Bundle installation, removal and roster revision; hosts omitting it use current-bundle notifications. */
+    provideInfoRevision?: HostObservable<number>
   }
   /** Workspace-side standard-kit sources. */
   workspaces: {

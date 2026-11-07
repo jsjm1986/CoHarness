@@ -1,0 +1,9 @@
+- dialog "保留当前编辑":
+  - banner:
+    - heading "保留当前编辑" [level=2]
+    - paragraph: 当前页面有未结束的编辑或提交操作。请先保存或取消编辑；也可以在新标签页打开目标，当前页面和编辑内容会保留。
+    - button "关闭"
+  - contentinfo:
+    - button "留在当前页面"
+    - link "在新标签页打开":
+      - /url: /admin/models

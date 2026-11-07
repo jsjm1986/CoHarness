@@ -1,0 +1,14 @@
+{
+  "name": "document-upload-metadata-snapshot-fixed",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm run test:snapshot examples/headless-agent/tests/userdoc-migration.snapshot.ts",
+  "startedAt": "2026-10-26T22:40:00.173436+00:00",
+  "seconds": 9.434,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3a12509d182a8ca8af15e9c58ec5e68d2d7993243a817b393ddfb67d44d46955",
+  "inputsAfter": "3a12509d182a8ca8af15e9c58ec5e68d2d7993243a817b393ddfb67d44d46955",
+  "postgresToolDirectory": null,
+  "outputSha256": "54857b7a095181d09584c276c3f44b518838dea36e5c10a193f08cd8e37bc606",
+  "outputTail": "$ vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/userdoc-migration.snapshot.ts\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n"
+}

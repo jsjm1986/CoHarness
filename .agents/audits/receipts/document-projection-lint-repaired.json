@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-lint-repaired",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/projection.ts packages/attachment/userdoc-local/src/identity.ts packages/attachment/userdoc-local/src/identity-fs.ts packages/attachment/userdoc-local/src/mutation.ts packages/attachment/userdoc-local/tests/projection.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts",
+  "startedAt": "2026-10-25T21:52:41.269422+00:00",
+  "seconds": 6.306,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b327078db44ae699ce4ee7c46819c77c35626915d04e80973e9ee3e2615f2435",
+  "inputsAfter": "b327078db44ae699ce4ee7c46819c77c35626915d04e80973e9ee3e2615f2435",
+  "postgresToolDirectory": null,
+  "outputSha256": "6f776b31dbe91ccbc3dbd2364f79554d58adeb8ca5de94b93b893cacd487cf83",
+  "outputTail": "packages/attachment/userdoc-local/tests/projection.spec.ts:203:3: error @stylistic(quotes): Strings must use singlequote.\n"
+}

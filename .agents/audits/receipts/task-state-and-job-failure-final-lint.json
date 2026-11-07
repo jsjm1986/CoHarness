@@ -1,0 +1,14 @@
+{
+  "name": "task-state-and-job-failure-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/goal/goal/src packages/goal/goal/tests/projection.spec.ts packages/goal/goal/tests/lowered-cap-loader.spec.ts packages/goal/goal/tests/fixtures/lowered-cap-driver.mjs packages/jobs/jobs-local/src packages/jobs/jobs-local/tests/events.spec.ts packages/jobs/jobs-local/tests/failure-settlement.spec.ts packages/subagent/subagent/src/error.ts packages/subagent/subagent/src/lifecycle.ts packages/subagent/subagent/src/run-settlement.ts packages/subagent/subagent/tests/run-settlement.spec.ts packages/workflow/tool-workflow/src/index.ts packages/workflow/tool-workflow/tests",
+  "startedAt": "2026-10-26T07:28:25.831205+00:00",
+  "seconds": 7.462,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9dde9fe62ae78e5a62ba24d3bd9f99b05fd233dc9131806a9bd10553ea340e85",
+  "inputsAfter": "9dde9fe62ae78e5a62ba24d3bd9f99b05fd233dc9131806a9bd10553ea340e85",
+  "postgresToolDirectory": null,
+  "outputSha256": "1f9d599db2ffd7d171658ef47df16bc5433030a69afb1d04468269ba2d9c3c90",
+  "outputTail": "packages/jobs/jobs-local/tests/failure-settlement.spec.ts:16:46: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/jobs/jobs-local/tests/events.spec.ts:114:43: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/subagent/subagent/tests/run-settlement.spec.ts:108:96: error typescript(prefer-promise-reject-errors): Expected the Promise rejection reason to be an Error.\npackages/subagent/subagent/tests/run-settlement.spec.ts:109:89: error typescript(prefer-promise-reject-errors): Expected the Promise rejection reason to be an Error.\n"
+}

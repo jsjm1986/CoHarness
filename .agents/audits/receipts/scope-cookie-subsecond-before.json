@@ -1,0 +1,14 @@
+{
+  "name": "scope-cookie-subsecond-before",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/server.spec.ts -t 'retains a selected project for a sub-second' --retry=0",
+  "startedAt": "2026-10-24T02:10:51.136715+00:00",
+  "seconds": 2.642,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "69560b091c05bfeefe0b9ec073e7a298fc70b1b780d13129073da446087cffc5",
+  "inputsAfter": "69560b091c05bfeefe0b9ec073e7a298fc70b1b780d13129073da446087cffc5",
+  "postgresToolDirectory": null,
+  "outputSha256": "d108cfb7d21f396febcad3f6df14c22cd56d01faf99fb2ad584e19aa469741fc",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/server.spec.ts (39 tests | 1 failed | 38 skipped) 136ms\n     × retains a selected project for a sub-second session lifetime 135ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/server.spec.ts > gateway server > retains a selected project for a sub-second session lifetime\nAssertionError: expected 'hgw_scope=project:1; Path=/; HttpOnly…' to contain 'Max-Age=1'\n\nExpected: \"Max-Age=1\"\nReceived: \"hgw_scope=project:1; Path=/; HttpOnly; SameSite=Lax; Max-Age=0\"\n\n ❯ tests/server.spec.ts:627:21\n    625|       expect(selected.status).toBe(204)\n    626|       const scope = selected.headers.get('set-cookie') ?? ''\n    627|       expect(scope).toContain('Max-Age=1')\n       |                     ^\n    628|       const selectedCookie = `${cookie}; ${scope.split(';')[0]!}`, iss…\n    629|       vi.setSystemTime(issuedAt + 50)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 38 skipped (39)\n   Start at  10:10:52\n   Duration  1.39s (transform 921ms, setup 0ms, import 1.16s, tests 136ms, environment 0ms)\n\n"
+}

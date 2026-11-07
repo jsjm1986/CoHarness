@@ -123,6 +123,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--dsw-space-2);
+  min-width: 0;
   min-height: 44px;
   padding: 10px 12px;
   box-sizing: border-box;
@@ -153,6 +155,32 @@
 .readError {
   color: var(--dsw-alias-state-error-primary);
 }
+
+.queueAction,
+.readError button {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+  font: inherit;
+  cursor: pointer;
+}
+
+.queueAction {
+  margin: 4px 0 8px;
+}
+
+.readError button {
+  margin-left: 8px;
+}
+
+.queueAction:focus-visible,
+.readError button:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
 
 /* Session headings replace per-row ownership markers. */
 .group {

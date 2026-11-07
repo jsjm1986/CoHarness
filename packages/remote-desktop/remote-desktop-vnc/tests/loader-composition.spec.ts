@@ -5,7 +5,7 @@
  * enforces the view filter over a real TCP dial — no hand-built ctx.plugin.
  */
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -17,6 +17,8 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import { RemoteDesktopError } from '@deepseek-ai/dsh-remote-desktop'
 import VncRemoteDesktop from '../src/index.ts'
+import { VncGrantStore } from '../src/grants.ts'
+import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 
 const HANDSHAKE = Buffer.concat([Buffer.from('RFB 003.008\n', 'latin1'), Buffer.from([1, 1])])
 const KEY_EVENT = Buffer.from([3, 1, 0, 0, 0, 0, 0, 0x61])
@@ -105,6 +107,66 @@ async function loadComposition(): Promise<{ ctx: Context; grantsFile: string; en
 }
 
 describe('remote-desktop-vnc real composition', () => {
+  it('reloads removed endpoints when atomic replacement preserves the modification timestamp', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-composition-'))
+    const upstream = await fakeVnc()
+    const endpointsFile = join(root, 'endpoints.json'), timestamp = new Date('2020-01-01T00:00:00Z')
+    await writeFileAtomic(endpointsFile, JSON.stringify({ endpoints: [{ nodeId: 'n1', host: '127.0.0.1', port: upstream.port }] }), { mode: 0o600 })
+    await utimes(endpointsFile, timestamp, timestamp)
+    await writeFile(join(root, 'cordis.yml'), [
+      '- id: remote-desktop-vnc', "  name: '@deepseek-ai/dsh-remote-desktop-vnc'", '  config:',
+      `    endpointsFile: ${JSON.stringify(endpointsFile)}`,
+      `    grantsFile: ${JSON.stringify(join(root, 'grants.jsonl'))}`,
+    ].join('\n'))
+    const { ctx } = await loadComposition()
+    await ctx.remoteDesktop.grant({ target: { nodeId: 'n1' }, principal: 'alice', level: 'view',
+      scope: { kind: 'machine' }, recording: false, grantedBy: 'root' }, { principal: 'root', admin: true })
+    expect((await ctx.remoteDesktop.status({ principal: 'alice', admin: false }, { nodeId: 'n1' })).available).toBe(true)
+    await writeFileAtomic(endpointsFile, JSON.stringify({ endpoints: [] }), { mode: 0o600 })
+    await utimes(endpointsFile, timestamp, timestamp)
+    expect((await ctx.remoteDesktop.status({ principal: 'alice', admin: false }, { nodeId: 'n1' })).available).toBe(false)
+  })
+
+  it('keeps a committed revocation when another loaded runtime publishes a prepared grant', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-composition-'))
+    await writeFile(join(root, 'endpoints.json'), JSON.stringify({ endpoints: [{ nodeId: 'n1', host: '127.0.0.1', port: 5900 }] }))
+    await writeFile(join(root, 'cordis.yml'), [
+      '- id: remote-desktop-vnc', "  name: '@deepseek-ai/dsh-remote-desktop-vnc'", '  config:',
+      `    endpointsFile: ${JSON.stringify(join(root, 'endpoints.json'))}`,
+      `    grantsFile: ${JSON.stringify(join(root, 'grants.jsonl'))}`,
+      `    auditFile: ${JSON.stringify(join(root, 'audit.jsonl'))}`,
+    ].join('\n'))
+    await using first = { ctx: (await loadComposition()).ctx, async [Symbol.asyncDispose]() { await this.ctx.fiber.dispose() } }
+    const admin = { principal: 'root', admin: true }
+    const input = { target: { nodeId: 'n1' }, principal: 'alice', level: 'view' as const,
+      scope: { kind: 'machine' as const }, recording: false, grantedBy: 'root' }
+    const grant = await first.ctx.remoteDesktop.grant(input, admin)
+    const timestamp = new Date('2020-01-01T00:00:00Z')
+    await utimes(join(root, 'grants.jsonl'), timestamp, timestamp)
+    const second = await loadComposition()
+    let entered!: () => void, release!: () => void
+    const observed = new Promise<void>((resolve) => { entered = resolve }), gate = new Promise<void>((resolve) => { release = resolve })
+    const prepared = vi.spyOn(VncGrantStore.prototype, 'insert')
+    prepared.mockImplementationOnce(async function (this: VncGrantStore, row) {
+      entered(); await gate; prepared.mockRestore(); return this.insert(row)
+    })
+    const pending = second.ctx.remoteDesktop.grant({ ...input, principal: 'bob' }, admin).catch((error: unknown) => error)
+    try {
+      await Promise.race([observed, pending.then(() => { throw new Error('Prepared grant bypassed the writer barrier') })])
+      await first.ctx.remoteDesktop.revoke(grant.id, admin)
+      await utimes(join(root, 'grants.jsonl'), timestamp, timestamp)
+      await expect(second.ctx.remoteDesktop.resolve({ principal: 'alice', target: { nodeId: 'n1' }, level: 'view' }))
+        .rejects.toMatchObject({ code: 'REMOTE_DESKTOP_FORBIDDEN' })
+      release()
+      expect(await pending).not.toBeInstanceOf(Error)
+      const rows = await first.ctx.remoteDesktop.listGrants(admin, { includeRevoked: true })
+      expect(rows.map(row => row.principal).sort()).toEqual(['alice', 'bob'])
+      expect(rows.find(row => row.id === grant.id)?.revokedAt).toEqual(expect.any(Number))
+      await expect(second.ctx.remoteDesktop.resolve({ principal: 'alice', target: { nodeId: 'n1' }, level: 'view' }))
+        .rejects.toMatchObject({ code: 'REMOTE_DESKTOP_FORBIDDEN' })
+    } finally { release(); await pending; prepared.mockRestore() }
+  })
+
   it('boots from cordis.yml, converges on external file writes, and filters a real stream', async () => {
     root = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-composition-'))
     const upstream = await fakeVnc()

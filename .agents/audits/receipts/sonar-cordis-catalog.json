@@ -1,0 +1,14 @@
+{
+  "name": "sonar-cordis-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-cordis-catalog.ts",
+  "startedAt": "2026-10-24T09:26:35.919356+00:00",
+  "seconds": 9.336,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "inputsAfter": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "postgresToolDirectory": null,
+  "outputSha256": "749c7e835624f88d8d5e6d26016ba85bd57c1eef8fb46ef223be1e9b0b893909",
+  "outputTail": "gen-cordis-catalog: 127 artifact(s) computed, 0 written.\n"
+}

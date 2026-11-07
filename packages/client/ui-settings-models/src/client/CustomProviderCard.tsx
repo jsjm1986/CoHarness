@@ -19,7 +19,7 @@
  * canonical levels and any gateway-specific wire spellings.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { apiKeyFailure } from './apiKey.ts'
@@ -95,6 +95,7 @@ export interface CustomProviderCardProps {
  */
 export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const { taken, protocols, reasoningLevels, api, discoverModels, t } = props
+  const fieldDescriptionId = useId()
   // Captured at mount, like the editor's: the write must be judged against the
   // section this card was drafted over, not whatever it grew into meanwhile.
   const [openedAt] = useState(() => props.revision)
@@ -227,6 +228,8 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           value={route}
           placeholder="acme-gateway"
           aria-label={t('customRoute')}
+          aria-invalid={routeInvalid || routeTaken}
+          aria-describedby={`${fieldDescriptionId}-route`}
           disabled={profileDisabled}
           onChange={(event) => { setRoute(event.target.value) }}
         />
@@ -234,8 +237,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       {/* A rejected id reads as a fault, not as guidance — the same split the
           key field below already makes between its failure and its hint. */}
       {routeInvalid || routeTaken
-        ? <p className={styles['error']}>{t(routeReserved ? 'customRouteReserved' : routeInvalid ? 'customRouteInvalid' : 'customRouteTaken')}</p>
-        : <p className={styles['advancedHint']}>{t('customRouteHint')}</p>}
+        ? <p id={`${fieldDescriptionId}-route`} className={styles['error']}>
+          {t(routeReserved ? 'customRouteReserved' : routeInvalid ? 'customRouteInvalid' : 'customRouteTaken')}
+        </p>
+        : <p id={`${fieldDescriptionId}-route`} className={styles['advancedHint']}>{t('customRouteHint')}</p>}
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('customDisplayName')}</span>
         <input
@@ -259,11 +264,12 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
             : 'customBaseUrlPlaceholder')}
           aria-label={t('baseUrl')}
           aria-invalid={baseUrlInvalid}
+          aria-describedby={baseUrlInvalid ? `${fieldDescriptionId}-base-url` : undefined}
           disabled={profileDisabled}
           onChange={(event) => { setBaseURL(event.target.value) }}
         />
       </div>
-      {baseUrlInvalid ? <p className={styles['error']}>{t('customBaseUrlInvalid')}</p> : null}
+      {baseUrlInvalid ? <p id={`${fieldDescriptionId}-base-url`} className={styles['error']}>{t('customBaseUrlInvalid')}</p> : null}
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('customApi')}</span>
         <select
@@ -285,6 +291,8 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           value={keyDraft}
           placeholder={t('keyPlaceholder')}
           aria-label={t('keyInput')}
+          aria-invalid={keyFailure !== undefined}
+          aria-describedby={keyFailure === undefined ? undefined : `${fieldDescriptionId}-key`}
           disabled={disabled}
           onChange={(event) => { setKeyDraft(event.target.value) }}
         />
@@ -293,7 +301,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
             through the provider's own ambient discovery or OAuth. */}
         {keyFailure === undefined
           ? null
-          : <p className={styles['error']}>{t(keyFailure === 'keyBlank' ? 'keyBlankNew' : keyFailure)}</p>}
+          : <p id={`${fieldDescriptionId}-key`} className={styles['error']}>{t(keyFailure === 'keyBlank' ? 'keyBlankNew' : keyFailure)}</p>}
       </div>
       <ModelListEditor
         models={models}

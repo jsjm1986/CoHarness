@@ -84,6 +84,7 @@ Each published session is a record of its id, owner, optional name, backend type
 
 ### Ownership and cleanup rules
 
+- Backend withdrawal cancels unpublished setup with `NO_BACKEND` and waits for its rollback. Await the disposer returned by `registerBackend()` to observe cleanup completion or failure. Published sessions remain attached to their exact Agent across backend reloads.
 - Fencing uses the exact `Agent` object: `hasOwnerActivity(owner)` spans unpublished setup through final close with no publication gap, so lifecycle policy can fence the owner precisely.
 - A backend that cannot clean partial startup resources rejects with `TerminalBackendCleanupError`; the service retains that failure as tracked owner activity until owner or service disposal consumes and reports it.
 - Caller cancellation keeps its exact `AbortSignal.reason`; `kill()` and disposal resolve only after the backend's captured process tree is quiescent.

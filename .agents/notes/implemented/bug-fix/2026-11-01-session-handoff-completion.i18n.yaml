@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-session-handoff-completion.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-session-handoff-completion.md
+document:
+  en: 2cf19cc4479044da0736aad9e5b3b88082ee24cd
+  zh: 6707b68376619e222d961e7dc42ee717ddcc569f
+/agent-note-session-handoff-requires-completed-model-extraction:
+  en: e7195d155b63c3f8
+  zh: a54b6b10a76be155
+/agent-note-session-handoff-requires-completed-model-extraction/problem:
+  en: 8dd59888aecb9d37
+  zh: aab28f4b19175839
+/agent-note-session-handoff-requires-completed-model-extraction/decision:
+  en: f20a89efc3628423
+  zh: 8c98e9947fa6b9b3
+/agent-note-session-handoff-requires-completed-model-extraction/alternatives-considered:
+  en: 21682d8cbe8dffeb
+  zh: c9866f368a01e8df
+/agent-note-session-handoff-requires-completed-model-extraction/consequences:
+  en: b71427f2c3dd3705
+  zh: 5c769a11d352fc5a
+/agent-note-session-handoff-requires-completed-model-extraction/verification:
+  en: cbad7c5b2ccc9a59
+  zh: 710c2c68fc14d45e

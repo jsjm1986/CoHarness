@@ -3,16 +3,16 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/directory-picker-browse/README.md
 document:
-  en: 7abdbaa748b8e41bb5287421b8ca124cf651c24e
-  zh: 7193cbd41b3bbad1002a66df651b2dd7d2ed8b12
+  en: 8677ef3822c0489e5488bde16851c4907c644b9a
+  zh: 7a8ad65f31125ca8d02492b4b8bb5f2a3b9641de
 /:
   en: 3fde7a02f329ca1e
   zh: 61495d48365178df
 /deepseek-ai-dsh-host-directory-picker-browse:
-  en: 24053feb1ca36687
-  zh: 778f86c4367808ae
+  en: fb18e8d867d7cad7
+  zh: 835418c07489e841
 /deepseek-ai-dsh-host-directory-picker-browse/summary:
-  en: 49d1427956180353
+  en: d0f0315fb6c77e7e
   zh: 15955b505310295a
 /deepseek-ai-dsh-host-directory-picker-browse/table-of-contents:
   en: b4683d2a53256fda
@@ -24,8 +24,8 @@ document:
   en: ca75c51c89c2c9b0
   zh: 2026c1566df4f78c
 /deepseek-ai-dsh-host-directory-picker-browse/known-limitations-and-deferred-work:
-  en: d1ff6ca7bd238e23
-  zh: 22f36926d7267089
+  en: 6ed00782f790c7b8
+  zh: b470fe979451f962
 /deepseek-ai-dsh-host-directory-picker-browse/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

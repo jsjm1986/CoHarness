@@ -1,0 +1,13 @@
+{
+  "name": "ssh-transport-admission-before",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/ssh/ssh/tests/startup-behavior.spec.ts -t 'refuses managed SSH transport allocation' --retry=0",
+  "startedAt": "2026-10-23T14:54:10.885948+00:00",
+  "seconds": 1.797,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5f0565f352920c1b97674a53895c68a94a4b8fcf6e897513a1ea163cece21a87",
+  "inputsAfter": "5f0565f352920c1b97674a53895c68a94a4b8fcf6e897513a1ea163cece21a87",
+  "outputSha256": "e3db819b40e751c4b80786551f08e666b27db18870a02643b341b1e9c5eb59df",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/ssh/ssh/tests/startup-behavior.spec.ts (32 tests | 1 failed | 31 skipped) 9ms\n     × refuses managed SSH transport allocation when the node accountant denies admission 8ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/ssh/ssh/tests/startup-behavior.spec.ts > SSH connection startup > refuses managed SSH transport allocation when the node accountant denies admission\nAssertionError: expected 'ready' to be 'failed' // Object.is equality\n\nExpected: \"failed\"\nReceived: \"ready\"\n\n ❯ packages/ssh/ssh/tests/startup-behavior.spec.ts:145:28\n    143|     const test = setup({ budget: { acquire } })\n    144|     const outcome = await test.service.ready.then(() => ({ status: 're…\n    145|     expect(outcome.status).toBe('failed')\n       |                            ^\n    146|     expect(acquire).toHaveBeenCalledOnce()\n    147|     expect(transport.spawn).not.toHaveBeenCalled()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 31 skipped (32)\n   Start at  22:54:12\n   Duration  215ms (transform 94ms, setup 26ms, import 122ms, tests 9ms, environment 0ms)\n\n"
+}

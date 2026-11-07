@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-lint-final",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/memory/memory-curation/src/index.ts packages/memory/memory-context/src/index.ts packages/memory/memory-curation/tests/memory-curation.spec.ts packages/memory/memory-context/tests/memory-context.spec.ts packages/memory/memory-context/tests/loader-composition.spec.ts snapshots/sdk/memory-auxiliary.snapshot.ts snapshots/sdk/memory-auxiliary/model.mjs snapshots/sdk/memory-auxiliary/prepare.mjs",
+  "startedAt": "2026-10-24T01:35:31.624320+00:00",
+  "seconds": 5.579,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "inputsAfter": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

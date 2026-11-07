@@ -33,6 +33,11 @@ kind: "package-reference"
 
 投影事件保留原始持久消息与序号身份。`surface.contentGeneration` 在位置替换或内容变化时使派生消息缓存失效；`replaceGeneration` 仅统计位置替换。此机制不增加事件格式版本，也不改写已提交代次。由 provider 持有的图片事件仍是独立消费者。
 
+<a id="append-admission"></a>
+### 追加准入
+
+`ctx.sessions.registerAppendAdmission(admission)` 为已挂接的 Session 注册由 fiber 拥有的同步资源预留。回调在提交前接收冻结的候选事件，并可返回回滚函数。准入拒绝、表层校验失败或分发校验失败会按逆序运行先前的回滚函数，日志与事件流保持不变；成功的预留交给其 `session/event` 消费方处理。准入和发布期间拒绝同一 Session 重入。独立 Session 不运行这些回调。
+
 ### 公共 API
 
 - `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` 校验持久种子／头部数据并生成脱离副本，补齐版本和 id，在未提供 `createdAt` 时使用当前时间，发布会话并将其绑定到调用方 fiber。带种子的 header（`meta.isSeeded: true`）必须同时提供 `seed` 与精确的 `inheritedEventCount`，因为构造种子可能在继承前缀之后还包含子级自有的初始化事件；无种子的 header 拒绝非零切点。持久化重建会提供原始的 `createdAt`、谱系与 `delegationDepth`。
@@ -58,6 +63,8 @@ kind: "package-reference"
 `dsh-agent-loop` 使用这一拆分，以保证循环的最终刷新先于会话脱离；详见[所有权 Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-agent-lifecycle-and-ownership-contracts.zh.md)。
 
 ### 实时服务事件
+
+失败报告会隔离异常文本转换；无法渲染的观察者值不能阻止后续观察者，也不能替换已提交的结果。同步的 `session/created` 失败与提交前校验仍可否决发布。
 
 会话存储会将已通知的创建与释放配对，在提交后发布追加通知并逐个监听器收容失败，同时提供受等待的持久性检查点。确切签名和作用域行为见 [session.md](../../../docs/subsystems/session.zh.md#cordis-surface) 的生成区块；载荷见[持久化目录](../../../docs/persistence-catalog.zh.md)。
 

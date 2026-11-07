@@ -1,0 +1,13 @@
+{
+  "name": "organization-human-auth-before",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/postgres.spec.ts -t 'refuses human .* after the organization is disabled' --no-file-parallelism --retry=0",
+  "startedAt": "2026-10-23T18:53:01.901934+00:00",
+  "seconds": 9.461,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55effd266f8f8e4d27eebfa7e049d56ed0496f39337f3522bd8c52165af985d9",
+  "inputsAfter": "55effd266f8f8e4d27eebfa7e049d56ed0496f39337f3522bd8c52165af985d9",
+  "outputSha256": "2debaf706f838c7f868a9fe4a6f45cda30bf49c58b3685a5f27fe81a51cee30f",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/postgres.spec.ts (38 tests | 2 failed | 36 skipped) 1668ms\n     × refuses human new-login after the organization is disabled 306ms\n     × refuses human existing-cookie after the organization is disabled 182ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > refuses human new-login after the organization is disabled\nAssertionError: expected 302 to be 401 // Object.is equality\n\n- Expected\n+ Received\n\n- 401\n+ 302\n\n ❯ tests/postgres.spec.ts:2101:35\n    2099|       const denied = kind === 'new-login' ? await login()\n    2100|         : await fetch(`${base}/admin/api/performance`, { headers: { co…\n    2101|       try { expect(denied.status).toBe(401) } finally { await denied.a…\n       |                                   ^\n    2102|     } finally {\n    2103|       if (server !== undefined) await new Promise<void>(resolveClose =…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > refuses human existing-cookie after the organization is disabled\nAssertionError: expected 200 to be 401 // Object.is equality\n\n- Expected\n+ Received\n\n- 401\n+ 200\n\n ❯ tests/postgres.spec.ts:2101:35\n    2099|       const denied = kind === 'new-login' ? await login()\n    2100|         : await fetch(`${base}/admin/api/performance`, { headers: { co…\n    2101|       try { expect(denied.status).toBe(401) } finally { await denied.a…\n       |                                   ^\n    2102|     } finally {\n    2103|       if (server !== undefined) await new Promise<void>(resolveClose =…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 36 skipped (38)\n   Start at  02:53:04\n   Duration  6.43s (transform 4.01s, setup 0ms, import 4.66s, tests 1.67s, environment 0ms)\n\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "document-purpose-gateway-build",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/tsc -p tsconfig.build.json",
+  "startedAt": "2026-10-26T14:44:28.507825+00:00",
+  "seconds": 10.643,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4d8c7ec4dcfc91a62eaf7722745d1632efb9222a674fffaa0374c12fb2c81a43",
+  "inputsAfter": "4d8c7ec4dcfc91a62eaf7722745d1632efb9222a674fffaa0374c12fb2c81a43",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

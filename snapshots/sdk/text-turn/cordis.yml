@@ -27,26 +27,3 @@
     backgroundMode: one-shot
     enableRunInBackground: false
     maxDepth: 1
-
-- insert:
-    - id: snapshot-storage
-      name: '@deepseek-ai/dsh-storage'
-      disabled: !!js "process.env.DSH_SNAPSHOT_FEEDBACK !== '1'"
-    - id: snapshot-storage-json
-      name: '@deepseek-ai/dsh-storage-json'
-      disabled: !!js "process.env.DSH_SNAPSHOT_FEEDBACK !== '1'"
-      config:
-        root: !!js dshHomePath('storages')
-    - id: snapshot-storage-domain
-      name: '@deepseek-ai/dsh-storage-domain'
-      disabled: !!js "process.env.DSH_SNAPSHOT_FEEDBACK !== '1'"
-      config:
-        backend: json
-    - id: snapshot-message-feedback
-      name: '@deepseek-ai/dsh-message-feedback'
-      disabled: !!js "process.env.DSH_SNAPSHOT_FEEDBACK !== '1'"
-      config:
-        maxNoteBytes: 1024
-    - id: snapshot-feedback-producer
-      name: './feedback-producer.mjs'
-      disabled: !!js "process.env.DSH_SNAPSHOT_FEEDBACK !== '1'"

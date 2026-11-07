@@ -15,15 +15,15 @@ import {
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import {
-  useSessionScheduleFacts, type SessionScheduleCatalogObservable,
+  useRuntimeScheduleFacts, type SessionScheduleCatalogObservable,
 } from './session-schedule-state.ts'
 import { NS } from './locales.ts'
 import css from './SessionScheduleMark.module.css'
 
 /** Injected share of the Session-row clock mark: the shared Host task catalog. */
 export interface SessionScheduleMarkInjected {
-  /** One catalog shared by every row; the renderer binds it to the `useCatalog` selector hook. */
-  readonly hooks: { readonly catalog: SessionScheduleCatalogObservable }
+  /** Runtime catalog resolved by the row's qualified Session identity. */
+  readonly keyedHooks: { readonly runtimeCatalog: (sessionId: string) => SessionScheduleCatalogObservable }
 }
 
 /** Full props of the Session-row clock mark. */
@@ -33,14 +33,14 @@ export type SessionScheduleMarkProps =
 /**
  * Render the clock mark while this Session's active tasks are non-empty.
  * @param props.sessionId - Session this row shows.
- * @param props.useCatalog - selector hook over the shared Host task catalog.
+ * @param props.useRuntimeCatalog - keyed selector over the owning Runtime catalog.
  * @param props.t - Schedule catalog locale seat.
  * @returns the mark, or nothing while the read is unresolved, failed, ended, or empty.
  */
 export function SessionScheduleMark({
-  sessionId, useCatalog, t,
+  sessionId, useRuntimeCatalog, t,
 }: SessionScheduleMarkProps) {
-  const facts = useSessionScheduleFacts(useCatalog, sessionId)
+  const facts = useRuntimeScheduleFacts(useRuntimeCatalog, sessionId)
   if (!facts.hasActive) return null
   return (
     <span

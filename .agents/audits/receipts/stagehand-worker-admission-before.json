@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-worker-admission-before",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts -t 'returns a cancelled late grant' --retry=0",
+  "startedAt": "2026-10-23T13:31:14.069441+00:00",
+  "seconds": 4.282,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d4323c53fe6d9e5731dffd64361201da480e10edee977aeef780718b736efa7b",
+  "inputsAfter": "d4323c53fe6d9e5731dffd64361201da480e10edee977aeef780718b736efa7b",
+  "outputSha256": "ac815b7d2d4088c45d4feb9aa1ffa755466eabad737587b670b80a2c6b493b16",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts (14 tests | 1 failed | 13 skipped) 29ms\n   × returns a cancelled late grant before allocating a browser Worker 28ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts > returns a cancelled late grant before allocating a browser Worker\nAssertionError: expected 'allocated' to be 'waiting' // Object.is equality\n\nExpected: \"waiting\"\nReceived: \"allocated\"\n\n ❯ packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts:75:114\n     73|   })\n     74|   try {\n     75|     expect(await Promise.race([owner.requested.promise.then(() => 'wai…\n       |                                                                                                                  ^\n     76|     expect(await owner.requested.promise).toMatchObject({ kind: 'proce…\n     77|     expect(state.workers).toEqual([])\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 13 skipped (14)\n   Start at  21:31:17\n   Duration  434ms (transform 85ms, setup 44ms, import 257ms, tests 29ms, environment 0ms)\n\n"
+}

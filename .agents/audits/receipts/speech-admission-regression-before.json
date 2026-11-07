@@ -1,0 +1,13 @@
+{
+  "name": "speech-admission-regression-before",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/experimental/speech-to-text-sensevoice/tests/provider-queue.spec.ts -t 'cancels worker admission' --retry=0",
+  "startedAt": "2026-10-23T13:10:02.593401+00:00",
+  "seconds": 6.579,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b961d4ac348ca4ef12cf20ef1fb84e02e8c0993cada024985a52b811613d3f65",
+  "inputsAfter": "b961d4ac348ca4ef12cf20ef1fb84e02e8c0993cada024985a52b811613d3f65",
+  "outputSha256": "4e397f3d2d029df0fb2403337dc5cdcc7500f91e6f0c102120ee4b3fb30e93f9",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/experimental/speech-to-text-sensevoice/tests/provider-queue.spec.ts (3 tests | 1 failed | 2 skipped) 1034ms\n   × cancels worker admission before native allocation and preserves later readiness 1033ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/experimental/speech-to-text-sensevoice/tests/provider-queue.spec.ts > cancels worker admission before native allocation and preserves later readiness\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ packages/experimental/speech-to-text-sensevoice/tests/provider-queue.spec.ts:48:62\n     46|     expect(allocations).toBe(0)\n     47|     controller.abort(new Error('cancel recording before worker allocat…\n     48|     await vi.waitFor(() => { expect(request.signal?.aborted).toBe(true…\n       |                                                              ^\n     49|     grant.resolve(lease)\n     50|     expect(await active).toHaveProperty('error')\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 2 skipped (3)\n   Start at  21:10:07\n   Duration  1.46s (transform 233ms, setup 43ms, import 293ms, tests 1.03s, environment 0ms)\n\n"
+}

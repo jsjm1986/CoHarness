@@ -11,4 +11,4 @@ The stable Node-API v8 addon is built once per platform/libc and exercised by CI
 
 Landlock additionally requires an enforcing Linux kernel. The functional probe determines full, partial, or unusable enforcement; kernel version alone is not an availability guarantee.
 
-Windows has neither a Landlock launcher nor this POSIX addon. The Harness retains its existing Windows semaphore implementation. Other CPU/OS combinations have no published platform package: Landlock probes unusable, and flock acquisition rejects. New platform support requires a native builder and installed-artifact verification.
+Windows has neither a Landlock launcher nor this POSIX addon. The Harness retains its Windows semaphore and separate directory implementation. Other CPU/OS combinations have no published platform package: Landlock probes unusable, and lock or directory calls reject. New platform support requires a native builder and installed-artifact verification.

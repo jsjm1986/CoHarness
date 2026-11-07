@@ -134,6 +134,8 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 ## Known Limitations and Deferred Work
 
+- **Managed model control** — persistent member routes are LLM orchestrations; external starts and member turns follow the [shared parent-control restriction](../subagent/README.md#delegated-policy).
+
 - **A fresh process per run** — persistent-process pooling is a future optimization ([the seam Agent Note](../../../.agents/notes/implemented/feature/2026-06-21-subagent-capability-seam.md)).
 - **Remote prerequisites** — SSH targets need a preinstalled compatible ACP program with `loadSession`; this package never installs it or falls back to the Host.
 - **No optional start-time capabilities** — this provider cannot apply `agentPreset`, `agentOptions`, `outputSchema`, or a depth cap inside the remote process, so it advertises none and the service rejects requests that require them.

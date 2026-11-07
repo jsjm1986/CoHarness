@@ -1,0 +1,27 @@
+{
+  "reply": "FOREGROUND_WITHDRAWAL_OK",
+  "completed": {
+    "mode": "completed",
+    "liveAtWithdrawal": true,
+    "cancelled": true,
+    "busy": true,
+    "closedBeforeWithdrawal": true,
+    "attempts": 2,
+    "starts": 1,
+    "responseClosed": true,
+    "sawCleanupFailure": true,
+    "sawResultFailure": false
+  },
+  "rejected": {
+    "mode": "rejected",
+    "liveAtWithdrawal": true,
+    "cancelled": true,
+    "busy": true,
+    "closedBeforeWithdrawal": true,
+    "attempts": 2,
+    "starts": 1,
+    "responseClosed": true,
+    "sawCleanupFailure": true,
+    "sawResultFailure": true
+  }
+}

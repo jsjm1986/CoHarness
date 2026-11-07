@@ -55,7 +55,7 @@ it('aborts model admission on unload, restores caller cancellation, and closes t
   ctx.llm.registerAdapter(['visual'], new BlockingModel())
   const harness = await mountAgentLoopTestHarness(ctx)
   const agent = await harness.create(SessionId('native-admission'), { provider: 'visual', model: 'vision' })
-  const fiber = ctx.plugin(NativeProvider)
+  const fiber = ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
   await fiber
   let dispatch: ToolExecution | undefined
   ctx.on('tools/pre-execute', async (exec, next) => {

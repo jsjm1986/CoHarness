@@ -1,0 +1,631 @@
+{
+  "finding": "B493",
+  "title": "Linux musl exclusive directory moves without a libc renameat2 wrapper",
+  "status": "fixed_named_scenarios_verified_global_review_open",
+  "updatedAt": "2026-11-02T23:05:33.570770+00:00",
+  "sourceFixed": true,
+  "normalDifferentNamedCases": 673,
+  "platformSkippedCases": 5,
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 87,
+        "covered": 87,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 119,
+        "covered": 119,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 27,
+        "covered": 27,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 59,
+        "covered": 59,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/attachment/userdoc-local/src/directory-move.ts": {
+      "lines": {
+        "total": 87,
+        "covered": 87,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 27,
+        "covered": 27,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 119,
+        "covered": 119,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 59,
+        "covered": 59,
+        "skipped": 0,
+        "pct": 100
+      }
+    }
+  },
+  "delivery": {
+    "finding": "B493",
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "at": "2026-11-02T23:04:44.190395+00:00",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T215143Z/B493-linux-exclusive-directory-moves.delta.tar.gz",
+    "archiveSha256": "53c53f2cd02ae8c290b2e7861f6b4b7b890b51102bacb534e72d4a5a55b0c482",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T215143Z/B493-linux-exclusive-directory-moves",
+    "manifestSha256": "5daf1eb0cff9c785a45daabd93456385869df926c05b8a166f233860a06eabe3",
+    "ownedChanges": 15,
+    "normalDifferentNamedCases": 673,
+    "platformSkippedCases": 5,
+    "wholeProjectComplete": false
+  },
+  "counterproof": {
+    "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T215143Z/linux-arm64-musl-userdoc-directory-move.json",
+    "actualOriginalCases": 12,
+    "failedMissingLibcWrapper": 9,
+    "passed": 3
+  },
+  "nativeValidation": {
+    "linuxArm64Musl": {
+      "realFilesystemCases": 13,
+      "nativeAdapterCases": 17,
+      "uid": 10001,
+      "emulated": false
+    },
+    "linuxX64Glibc": {
+      "realFilesystemCases": 13,
+      "nativeAdapterCases": 17,
+      "uid": 10001,
+      "emulated": true
+    },
+    "addonDirectoryHandleCases": 9,
+    "normalBundledLinuxLoaderSnapshotSteps": 10,
+    "normalBundledMacNode24Loader": true
+  },
+  "sourceSha256": {
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-directory-capture/guide.i18n.yaml": "03f4c80f729df03021fbf730026b140357d638edff5ab025eb47d964893be9c5",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-directory-capture/guide.md": "74b5fe01800cce23b661260481cd9d372029e4af4c4b2a0fdf232988e36e53ce",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-directory-capture/guide.zh.md": "68a9e657fe7b3aa73407a8f573c75f02cac72ee936840cffc3d831436067ac01",
+    "packages/attachment/userdoc-local/README.i18n.yaml": "05ef83949322416739ac91259ebfc7aed9af253cff9cff81871428954b0f070e",
+    "packages/attachment/userdoc-local/README.md": "3e2913b6231a9adee57a47474c7f0f7f20786c2a599c13c2d1167cbf6cc8bab7",
+    "packages/attachment/userdoc-local/README.zh.md": "7fa04b95b69b1721af7e400d64fbe7801b7110ea9f05ddbf1bdc5901718bea21",
+    "packages/attachment/userdoc-local/src/directory-move.ts": "176ad961fa4a5ae347a28e0e599dcb38ea693082cae2af59737877b6ea727e32",
+    "packages/attachment/userdoc-local/tests/directory-move.spec.ts": "a98a36b704bf7a1f755d08a9edc4d0d2ef80487fc3a5b0d276289ea97e0cd22c",
+    "packages/attachment/userdoc-local/tests/expected/parts-private-paths.jsonl": "cc5ca50fc840dfcf43ae977129362d69cb98fd8d16931cb4ad8a290e13ba3dd0",
+    "packages/attachment/userdoc-local/tests/fixtures/directory-native-interleave.mjs": "b9d8a1859d4237022f47de5dc60b48f7039a9ffaa92bcf49d9a2c9c4b374418b",
+    "packages/attachment/userdoc-local/tests/fixtures/parts-driver.mjs": "45e273ba2119e0bccd506fa552115dfef1281a20c8b899c56c1821137b145b41",
+    "packages/attachment/userdoc-local/tests/directory-move-native.spec.ts": "da969f0115bf0c057a1b446b256adcdf5b297c7eec2e7e5c766f1be4c3e6f1a3",
+    ".agents/notes/implemented/bug-fix/2026-11-03-linux-exclusive-directory-moves.md": "98f716600213bbf53f763a23a1cd6f51a868cb276d7cea4d8272df2250776224",
+    ".agents/notes/implemented/bug-fix/2026-11-03-linux-exclusive-directory-moves.zh.md": "566dbd6f1c38cb35a67ea8ca118a8a3b54d470cc925b468d52bd07fef7f204e8",
+    ".agents/notes/implemented/bug-fix/2026-11-03-linux-exclusive-directory-moves.i18n.yaml": "0fee75140b0159137c639b2bd1a3e2ab3b897e53f77ff1a183441bd9907f4e14"
+  },
+  "artifactSha256": {
+    "packages/attachment/userdoc-local/lib/index.js": "e26d06f688e5bcedef46483614bbe825bb48a5ced699a44736df69a59268239a",
+    "packages/attachment/userdoc-local/lib/tsconfig.tsbuildinfo": "e307e477a50c44346182c4e56bccb7e05b81209c2fa3a7ac447b87d4bcf13ae2",
+    "packages/attachment/userdoc-local/lib/types/admission.d.ts": "4eef9ab57503ceb48bf3f6a21adafe896a86cef27acce274ea12bbc7834d3aa0",
+    "packages/attachment/userdoc-local/lib/types/admission.d.ts.map": "2f39322ff405c5f058519eee173f7a031693d00fe3da62c46468134486f024f4",
+    "packages/attachment/userdoc-local/lib/types/admission.js": "9b501831a8ddb6cac71dcfe5793bcb7dab56c2c8de0896c517281dfa5b010886",
+    "packages/attachment/userdoc-local/lib/types/admission.js.map": "c939b4d5b44d9c8c3a45e97d0be8cb239e517502521da03bb9670364720bbd7d",
+    "packages/attachment/userdoc-local/lib/types/backup.d.ts": "6e201a914a8a48d5eb342adf46ffa1a65d90063c010fc4ae73b80baec6fb364b",
+    "packages/attachment/userdoc-local/lib/types/backup.d.ts.map": "ff9a3a98baa5a377d37a23f86d98a89a0aee90867009253538df6b3501818389",
+    "packages/attachment/userdoc-local/lib/types/backup.js": "bee7a72cee13d3bd5829afc0afa509e6243b0cd2e880abfa49a83069f1e49065",
+    "packages/attachment/userdoc-local/lib/types/backup.js.map": "91a132b374cd4644420827fb19e69b7a65c1194ad7f83665b39ac02922d286ae",
+    "packages/attachment/userdoc-local/lib/types/body.d.ts": "72f073c946e279db2fbde7880c441b4bed0edaf5b520a8df86bbd0cc88347af3",
+    "packages/attachment/userdoc-local/lib/types/body.d.ts.map": "eb728f0557b0e1c505e014d5cdba6c5cd6d215d2ce9d4f943fd7214d0e6ab0de",
+    "packages/attachment/userdoc-local/lib/types/body.js": "70a1632eb987b5ac46935677f3fe46f03fa04993cc408fc073434bb80ba0f4ad",
+    "packages/attachment/userdoc-local/lib/types/body.js.map": "7278d09e086d5358e5aaa302caea53febe77aaf5097451aca25857a5ed6da967",
+    "packages/attachment/userdoc-local/lib/types/directory-move-win32.d.ts": "5d69eaa253634dfdfda21108b12645dfe477e3e6f355f177dc889527837b37b2",
+    "packages/attachment/userdoc-local/lib/types/directory-move-win32.d.ts.map": "e62600b67ed93c617f7cce0be71bde0b214326e1c6c2586dbbd334b08907085b",
+    "packages/attachment/userdoc-local/lib/types/directory-move-win32.js": "d7a8d9ef8609a87b5dc3e83503054951b1579119b009d2091c899a3f004c157e",
+    "packages/attachment/userdoc-local/lib/types/directory-move-win32.js.map": "480b16a18e49d7aefcd8ecd950ee4c7d86b157b7c79793ded5111b0be0536dcc",
+    "packages/attachment/userdoc-local/lib/types/directory-move.d.ts": "739f192544e926e028112a4092367f02a96e305e692d6545d2f5004f67b675db",
+    "packages/attachment/userdoc-local/lib/types/directory-move.d.ts.map": "5886e20c59cdbb3aa0e7b804a09660ce42edac9f53259f93c93439e8011b1821",
+    "packages/attachment/userdoc-local/lib/types/directory-move.js": "13051d9f20e0b2aa7a8b58c0c6a67e6ececb77c3b6251f08ab6ec0aa072bbd9c",
+    "packages/attachment/userdoc-local/lib/types/directory-move.js.map": "85fb3243b7b8e276ab185ccb10c3865688714a3b8b77b913f8817410921f7bbc",
+    "packages/attachment/userdoc-local/lib/types/file-object.d.ts": "0174e1d52b7a6dff8d0ea913a80bf44b15a43e9810e27888ae8f6361de42ca85",
+    "packages/attachment/userdoc-local/lib/types/file-object.d.ts.map": "2c6394c0d6da0870efc07c11e5e09439a755e5a719a6fbf93676f01b981efc26",
+    "packages/attachment/userdoc-local/lib/types/file-object.js": "78fe1c5f02a7f0d0befc43754db248e1fcf7400075d3fb015d2aef19b80348ec",
+    "packages/attachment/userdoc-local/lib/types/file-object.js.map": "af9d03f69541ff623b8d8f4488f48226be3ca5fc5a7872ac5cea6366b18647c3",
+    "packages/attachment/userdoc-local/lib/types/handle.d.ts": "fd287d8e333b484ca326f3be9099d94aa0eff9ac58e30344f4226f558cbad5e2",
+    "packages/attachment/userdoc-local/lib/types/handle.d.ts.map": "7dc71910cde4171635842f47a9e36b896591b08e12181ad7b84b3d1752eb0bb0",
+    "packages/attachment/userdoc-local/lib/types/handle.js": "07b97342fc18b699c5094c51c440cac361bec84285254efc9d9ad8bed3739753",
+    "packages/attachment/userdoc-local/lib/types/handle.js.map": "93a3e141c9d57a123893638c54c3e60cc43512821b19849982116917b2f3ef17",
+    "packages/attachment/userdoc-local/lib/types/identity-fs.d.ts": "90fbafb30ea8d7f963f3764ec1ab95856cc7a31f4ec91e217ec5d01d9766925a",
+    "packages/attachment/userdoc-local/lib/types/identity-fs.d.ts.map": "b83299b71d8b002469ed9766fe9d0ab6293b2757c1544b60dd1b9f7aa38d9fe7",
+    "packages/attachment/userdoc-local/lib/types/identity-fs.js": "365d1cdaba9949f131120921e26d46e238631392a20a4ef5c042dfd83e165479",
+    "packages/attachment/userdoc-local/lib/types/identity-fs.js.map": "3f011b5dd7854ed45158a3cc6b200ce61a6c8d0dec857ae8feecdfc95792418c",
+    "packages/attachment/userdoc-local/lib/types/identity-storage.d.ts": "e20d66c512a240765aa5079ad3c9f26ae647d61dba1907678cd73f5d1df0f288",
+    "packages/attachment/userdoc-local/lib/types/identity-storage.d.ts.map": "acc2f0687567d4d3f39938c9d06b0974622effc4eacb3ed33feec4b3b88f4407",
+    "packages/attachment/userdoc-local/lib/types/identity-storage.js": "3178d3c23f8195c3c8e6c489bbd45f57cc404215a185eb611fd068cf08e127d9",
+    "packages/attachment/userdoc-local/lib/types/identity-storage.js.map": "1a3d5347352d1b08845e73f70c4c334865610f5e93d6deb83982041e9849a971",
+    "packages/attachment/userdoc-local/lib/types/identity.d.ts": "66002f56f2879e969cc9d1301f97a67c26b2f2549f37baed640112350d710a45",
+    "packages/attachment/userdoc-local/lib/types/identity.d.ts.map": "657c027f61ec2827c547c553cdabd5dc7ee835bec7769530a87200cc6c81836b",
+    "packages/attachment/userdoc-local/lib/types/identity.js": "a154509acdd4024cd01bcf0bd086763d857e117535c15a44a80d01e02b6e5dd6",
+    "packages/attachment/userdoc-local/lib/types/identity.js.map": "ec4e83c4933ff8415cfee65975b5cb09969f628cf663146d74168c5b8bcb4fa9",
+    "packages/attachment/userdoc-local/lib/types/index.d.ts": "fa320836ca95c7829254774f374a5d72348cff0b29028aa65a90d9aaf429df09",
+    "packages/attachment/userdoc-local/lib/types/index.d.ts.map": "4b4f7a61ece1d94d7393aba7bd49619ce14b6bb77d9ed6cab4016f47db2f84fc",
+    "packages/attachment/userdoc-local/lib/types/index.js": "2c23146629414545fdd749ea222c280501355ac8d9acd42064fa3b200e5ae7f0",
+    "packages/attachment/userdoc-local/lib/types/index.js.map": "9d20ed523dbcc31564c06845c51f1e76b3d2670be199b7096bee3f5f9f6b413a",
+    "packages/attachment/userdoc-local/lib/types/local-fs.d.ts": "7116e9a3867e0a21ac79b21381348d404eec9487631c2bc9749973c2251b49b9",
+    "packages/attachment/userdoc-local/lib/types/local-fs.d.ts.map": "a2b766bf3985556402ff71132f59ff37cc698ba5eb46667e9a3fc6ee59812a6a",
+    "packages/attachment/userdoc-local/lib/types/local-fs.js": "8fca8b89517530878f3d6c4426c68a9ab56625e6a470d12d5261418341b2e309",
+    "packages/attachment/userdoc-local/lib/types/local-fs.js.map": "8bf1574d91537f4d925b407aafb88537250e58b7b6f09beaf05a3b0081af83dd",
+    "packages/attachment/userdoc-local/lib/types/media-type.d.ts": "c90125f615fcf25098320f13265d4c1ce49e41d8a29a124d1b82a37abe6b4646",
+    "packages/attachment/userdoc-local/lib/types/media-type.d.ts.map": "c2c52b203b7fb0b49bc017a9d7e35a22e0e28bac4cbfc6221b7c895c6a94cc0e",
+    "packages/attachment/userdoc-local/lib/types/media-type.js": "c3502dddad0608e56eb931acf7b429f2488f58e87eb19faa1585749bc6ec6ab3",
+    "packages/attachment/userdoc-local/lib/types/media-type.js.map": "26a656df2ffc4f9c146fe567b65f97d1b0f36c0e886a05870e0200d2476b6dbc",
+    "packages/attachment/userdoc-local/lib/types/migration.d.ts": "549d92589ecb5682e71d60d6cb80040ebcec1518227d70ac6cab484eae90b1fe",
+    "packages/attachment/userdoc-local/lib/types/migration.d.ts.map": "fc801a365ad463c616ce73a3577321138a9ea0aaa51c7f16ef36a16b12c0df42",
+    "packages/attachment/userdoc-local/lib/types/migration.js": "8af3d61cdccafde970d4a6ec04c7b03ed77bff6ac8dbae162b055e11746bb6e5",
+    "packages/attachment/userdoc-local/lib/types/migration.js.map": "c32c864a723c9baa1cafda6845930da5530940466aa8b5ccae48d66fe690aef9",
+    "packages/attachment/userdoc-local/lib/types/mutation.d.ts": "944bae0181974f43838bc1afcb7961985697c99bad37f89dede54a63fe2e5d08",
+    "packages/attachment/userdoc-local/lib/types/mutation.d.ts.map": "7c09258a3284724713c5ed636711a9c031bac3de94058eec3aa74d31d5c013ee",
+    "packages/attachment/userdoc-local/lib/types/mutation.js": "a40bbcf317e4c4890e06f81cf58ad6e7c33fa6142f067d252e9836be3ac87694",
+    "packages/attachment/userdoc-local/lib/types/mutation.js.map": "59ef3093e1a2f9a03c578002484dc716aaf00c9a625bb96a924e6c273cba5d87",
+    "packages/attachment/userdoc-local/lib/types/name.d.ts": "d9ec30b380035fc5c96cd58fd4cd903cb55d3458d977f5166d7eaaa8df9e4093",
+    "packages/attachment/userdoc-local/lib/types/name.d.ts.map": "a7131bb1737267e73ff8657024b66dbb62590ba2a12418291632411710d3b66b",
+    "packages/attachment/userdoc-local/lib/types/name.js": "a1bdd0a6aae1ead7b38227c62e3a47050013d90e97d3c509727015773da71feb",
+    "packages/attachment/userdoc-local/lib/types/name.js.map": "e66f883de9ce624cd360d063af02c071af86eb787c8b44a7dd71c4a468d7996e",
+    "packages/attachment/userdoc-local/lib/types/ownership.d.ts": "8bc65c1f56e3db031026325b8080281689a439c8a32db5cef18e6004f32db4f3",
+    "packages/attachment/userdoc-local/lib/types/ownership.d.ts.map": "8d557303d28a6fa25432f4645adefc91c7bf84e82f155291960cd07d6bd3aafa",
+    "packages/attachment/userdoc-local/lib/types/ownership.js": "78b1f98486d947cb1bd54accb328735c8fb9fe9561d00ffcb76ee070a1019599",
+    "packages/attachment/userdoc-local/lib/types/ownership.js.map": "769e974c97910955d63e462e250ed45e79801288ddcdc00be4ba7e5c6776e91b",
+    "packages/attachment/userdoc-local/lib/types/projection.d.ts": "04c5be6953ad87a42123cef43490ab9136c2c18b54e761363e80fcb241d80ae3",
+    "packages/attachment/userdoc-local/lib/types/projection.d.ts.map": "ac611c4d26a83867a7da157c87fd768430fb9a9cf5f13a9435d171a959cc094e",
+    "packages/attachment/userdoc-local/lib/types/projection.js": "78d13f2738dfd09df29d69b1426bcf8370bebd8363fbbcd3e9f3524002221c56",
+    "packages/attachment/userdoc-local/lib/types/projection.js.map": "531ca779dde95a5a551eb84280bd9425be994ac5c91cae486144ea92f8b60b0d",
+    "packages/attachment/userdoc-local/lib/types/rooted-fs.d.ts": "cda3eb15c668b20e0f50cb0add796af7f30ecd41005ec0fb41736aecfcc2e2c0",
+    "packages/attachment/userdoc-local/lib/types/rooted-fs.d.ts.map": "6ce10618b38188e4af936179c0a364b71f62b5f5ba569a75235e5bfed576948f",
+    "packages/attachment/userdoc-local/lib/types/rooted-fs.js": "51f59c5c18ce85ccd331d910c2d42ac61e37ff58bbdc2b3098c84e3e351b008f",
+    "packages/attachment/userdoc-local/lib/types/rooted-fs.js.map": "cf1f429729fd6146d76fcf9eb7467da3ef6277597286129dd648542641abc4e8",
+    "packages/attachment/userdoc-local/lib/types/store.d.ts": "f9732ed05d65953d5180d1b7482209d215c2b605e4d13eebca45d16c6a31bb09",
+    "packages/attachment/userdoc-local/lib/types/store.d.ts.map": "765886ea8903198e38f880fb08e3e6a32dbc133acc6c6ed2647e03f01e16f7bd",
+    "packages/attachment/userdoc-local/lib/types/store.js": "990a971800a60fa7c974630c485ea2acb2d9803b5ee827d522bea1821311868c",
+    "packages/attachment/userdoc-local/lib/types/store.js.map": "9c3cde6421bbef5e2992940fa425abaeab74c9d957ce64410d4304124e927cc2",
+    "packages/attachment/userdoc-local/lib/types/trash.d.ts": "815e85b140f997674b66e335bad535f2dceaa723a143629d68f3fbb97ef790ae",
+    "packages/attachment/userdoc-local/lib/types/trash.d.ts.map": "3063f11a31fda63dcbe697c14e29f738b490841d77fd33d5f36cbf28554d9cef",
+    "packages/attachment/userdoc-local/lib/types/trash.js": "d9aa11fb081bbf19bc197eefabb3354dccf921910800509517df553c0f6529fb",
+    "packages/attachment/userdoc-local/lib/types/trash.js.map": "4ad106931558c7ddb979ee5e98215e8e7ab248826bfd3b9ac8b6c8092d7d54e5",
+    "packages/attachment/userdoc-local/lib/types/upload.d.ts": "a66aa58d39d797d828dc3a41002425373883352ad00e0ec3f0e6673f5335143c",
+    "packages/attachment/userdoc-local/lib/types/upload.d.ts.map": "4a7bf080947e5068d453b1c559b2781c86156ba4ef6fafaacbafca2889d52e3a",
+    "packages/attachment/userdoc-local/lib/types/upload.js": "08bd8fd0212332923a7e6a599592e6c9d5847d24817f4bc0036bddc2a9807e3c",
+    "packages/attachment/userdoc-local/lib/types/upload.js.map": "7fa7cad71c986386f7fd5f3b1d5318e0ab346570d89d210cbdd6b53c902fad65",
+    "packages/attachment/userdoc-local/lib/types/write.d.ts": "eae5785b2bbbf547f3278b8b2c57810303682d0f81e15fc5bc381c42d5c3c3be",
+    "packages/attachment/userdoc-local/lib/types/write.d.ts.map": "5ffa9b98479fa76676a16be77472c7e3a621b8fcdb013109661950fb77ae5ceb",
+    "packages/attachment/userdoc-local/lib/types/write.js": "fc82d5c70a0fb47017756fd2a5aa9345a1d71fd27b6b2be3941a49b7cc2e45af",
+    "packages/attachment/userdoc-local/lib/types/write.js.map": "b68a99cdda4654d98ff45b9c680a4e7659cacd290c07f16b9e90ac928eb3f93c"
+  },
+  "checks": {
+    "userdoc-local-final-behavior-and-directory-coverage": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:57:55.643934+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/attachment/userdoc-local/tests",
+        "--maxWorkers=1",
+        "--coverage",
+        "--coverage.include=packages/attachment/userdoc-local/src/directory-move.ts",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=json",
+        "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T215143Z/coverage-final",
+        "--reporter=json",
+        "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T215143Z/userdoc-local-final-behavior-and-directory-coverage-cases.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:58:38.986274+00:00"
+    },
+    "directory-final-declarations": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:55:35.956256+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/typescript/bin/tsc",
+        "-b",
+        "packages/attachment/userdoc-local"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:55:36.579331+00:00"
+    },
+    "directory-final-normal-bundle": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:56:22.512668+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "node_modules/tsdown/dist/run.mjs",
+        "--filter",
+        "@deepseek-ai/dsh-userdoc-local",
+        "--concurrency",
+        "1"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:56:27.096184+00:00"
+    },
+    "directory-whole-host-strict-types": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:56:56.230141+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "tsconfig.host.json",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:57:07.093087+00:00"
+    },
+    "directory-source-lint-final": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:55:36.626742+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/run-oxlint.ts",
+        "packages/attachment/userdoc-local/src/directory-move.ts",
+        "packages/attachment/userdoc-local/tests/directory-move.spec.ts",
+        "packages/attachment/userdoc-local/tests/directory-move-native.spec.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:55:42.215179+00:00"
+    },
+    "linux-arm64-musl-directory-verified": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:59:55.050835+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--platform",
+        "linux/arm64",
+        "--network",
+        "none",
+        "--read-only",
+        "--user",
+        "10001:10001",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "128",
+        "--cpus",
+        "2",
+        "--memory",
+        "1g",
+        "--tmpfs",
+        "/tmp:rw,size=128m,mode=1777",
+        "--label",
+        "com.openai.codex.audit=01a16450-5b0a-7661-a0d9-79e9d8d2cae0",
+        "codex-audit-directory:20261102t215143z-userdoc-verified-musl",
+        "node",
+        "/opt/directory-tools/node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/directory-move.spec.ts",
+        "tests/directory-move-native.spec.ts",
+        "--maxWorkers=1",
+        "--no-cache"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:59:55.890450+00:00"
+    },
+    "linux-amd64-glibc-directory-verified": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:59:55.041522+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--platform",
+        "linux/amd64",
+        "--network",
+        "none",
+        "--read-only",
+        "--user",
+        "10001:10001",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "128",
+        "--cpus",
+        "2",
+        "--memory",
+        "1g",
+        "--tmpfs",
+        "/tmp:rw,size=128m,mode=1777",
+        "--label",
+        "com.openai.codex.audit=01a16450-5b0a-7661-a0d9-79e9d8d2cae0",
+        "codex-audit-directory:20261102t215143z-userdoc-verified-glibc",
+        "node",
+        "/opt/directory-tools/node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/directory-move.spec.ts",
+        "tests/directory-move-native.spec.ts",
+        "--maxWorkers=1",
+        "--no-cache"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:59:57.441707+00:00"
+    },
+    "linux-musl-normal-artifact-loader-reservation-sized": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:58:36.831945+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--platform",
+        "linux/arm64",
+        "--network",
+        "none",
+        "--read-only",
+        "--user",
+        "10001:10001",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "128",
+        "--cpus",
+        "2",
+        "--memory",
+        "1g",
+        "--tmpfs",
+        "/tmp:rw,size=1g,mode=1777",
+        "--label",
+        "com.openai.codex.audit=01a16450-5b0a-7661-a0d9-79e9d8d2cae0",
+        "codex-audit-directory:20261102t215143z-userdoc-artifact"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:58:37.347807+00:00"
+    },
+    "directory-final-node24-built-loader": {
+      "status": "passed",
+      "startedAt": "2026-11-02T23:00:54.987651+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/attachment/userdoc-local/tests/parts-loader.spec.ts",
+        "--maxWorkers=1",
+        "--reporter=json",
+        "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T215143Z/directory-final-node24-built-loader-cases.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T23:00:57.324714+00:00"
+    },
+    "directory-doc-pairs-corrected": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:59:55.041580+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-translation-pairing.ts",
+        "packages/attachment/userdoc-local/README.md",
+        ".agents/notes/implemented/bug-fix/2026-11-03-linux-exclusive-directory-moves.md",
+        "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-directory-capture/guide.md"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:59:55.366038+00:00"
+    },
+    "directory-final-doc-targeted": {
+      "status": "passed",
+      "at": "2026-11-02T23:00:56.511Z",
+      "files": [
+        "packages/attachment/userdoc-local/README.md",
+        "packages/attachment/userdoc-local/README.zh.md",
+        ".agents/notes/implemented/bug-fix/2026-11-03-linux-exclusive-directory-moves.md",
+        ".agents/notes/implemented/bug-fix/2026-11-03-linux-exclusive-directory-moves.zh.md",
+        "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-directory-capture/guide.md",
+        "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-directory-capture/guide.zh.md"
+      ],
+      "relativeLinksAndAnchors": "passed",
+      "guideFieldsSectionsAndWordLimit": "passed",
+      "noteReview": {
+        "newNote": "keep active: Linux ABI choice and no-overwrite fallback remain security-relevant",
+        "retainedIndependentNote": "document-private-paths-and-staging-names",
+        "fullSupersessions": 0,
+        "archivedOrDeletedTriplets": 0
+      }
+    },
+    "linux-arm64-musl-directory-behavior": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:11:24.739889+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--platform",
+        "linux/arm64",
+        "--network",
+        "none",
+        "--read-only",
+        "--user",
+        "10001:10001",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "128",
+        "--cpus",
+        "2",
+        "--memory",
+        "1g",
+        "--tmpfs",
+        "/tmp:rw,size=128m,mode=1777",
+        "--label",
+        "com.openai.codex.audit=01a16450-5b0a-7661-a0d9-79e9d8d2cae0",
+        "codex-audit-directory:20261102t215143z-offline-musl"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:11:25.342970+00:00"
+    },
+    "directory-doc-verify-agent-note-format": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:57:56.907367+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-agent-note-format.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:57:57.327366+00:00"
+    },
+    "directory-doc-verify-agent-note-classification": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:57:57.361589+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-agent-note-classification.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:57:57.494537+00:00"
+    },
+    "directory-doc-verify-concrete-terms": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:57:57.524856+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-concrete-terms.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:58:01.507339+00:00"
+    },
+    "directory-doc-verify-md-wrap": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:58:01.538135+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-md-wrap.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:58:14.403540+00:00"
+    },
+    "directory-doc-verify-doc-refs": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:58:14.447991+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-doc-refs.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:58:15.492341+00:00"
+    },
+    "directory-doc-verify-doc-budgets": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:58:15.525233+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-doc-budgets.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:58:15.632944+00:00"
+    },
+    "directory-doc-verify-export-jsdoc": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:58:15.668504+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-export-jsdoc.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:58:21.800675+00:00"
+    },
+    "directory-doc-verify-md-links": {
+      "status": "passed",
+      "startedAt": "2026-11-02T22:58:21.840430+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-md-links.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-02T22:58:47.757384+00:00"
+    }
+  },
+  "preparatoryFailuresPreserved": [
+    "Original missing-symbol failure is the causal counterproof.",
+    "An initial 128MiB tmpfs correctly refused the default 512MiB upload disk reserve; the unchanged production policy passed with a 1GiB tmpfs.",
+    "The initial new coverage run failed at 87.90/75.38/96.29/94.38 percent; meaningful native fault cases bring the full source file to100percent.",
+    "A locale link and three lint diagnostics were corrected before final verification."
+  ],
+  "sourceOrArtifactExclusionsAdded": false,
+  "thresholdsLowered": false,
+  "newRuntimeDependencies": false,
+  "productionWrites": false,
+  "limitations": [
+    "Linux x64 runs through Docker amd64 emulation; no physical x64 host acceptance.",
+    "Linux Loader snapshot uses the standalone provider, not the complete Gateway identity topology.",
+    "No new physical Windows, whole-Host death, GUI or production deployment acceptance.",
+    "Other document engine files and all 12 project review domains remain open.",
+    "Official Responses verification remains deferred."
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T215143Z",
+  "wholeProjectComplete": false,
+  "supplementalReceipt": "receipts/linux-document-lifecycle-and-uid-2026-11-03.json",
+  "caseCounting": {
+    "normalPassedRegisteredInstances": 673,
+    "normalDistinctFileAndDisplayTitleKeys": 670,
+    "frozenArchiveRetainsOriginalFieldNames": true,
+    "linuxSupplementAddsFivePreviouslySkippedInstances": true
+  }
+}

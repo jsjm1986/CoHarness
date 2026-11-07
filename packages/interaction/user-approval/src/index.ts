@@ -152,8 +152,16 @@ export class ApprovalService extends Service {
     policy: z.union(['ask', 'never'] as const).default('ask'),
   })
 
+  private readonly lifetime = new AbortController()
+  private readonly pending = new Set<Promise<void>>()
+
   constructor(ctx: Context, public config: Config) {
     super(ctx, 'approval')
+
+    ctx.effect(() => async () => {
+      this.lifetime.abort(new Error('approval service was withdrawn'))
+      await Promise.all(this.pending)
+    }, 'approval: accepted requests')
 
     const effective = (agent: Agent): ApprovalPolicy => this.effectivePolicy(agent.session)
 
@@ -182,6 +190,7 @@ export class ApprovalService extends Service {
    * @param policy - the new effective policy.
    */
   setPolicy(agent: Agent, policy: ApprovalPolicy): void {
+    this.lifetime.signal.throwIfAborted()
     const previous = this.effectivePolicy(agent.session)
     if (previous === policy) return
     setApprovalPolicy(agent.session, policy)
@@ -209,28 +218,39 @@ export class ApprovalService extends Service {
    * audit event.
    * @param req - the pending decision (agent, tool identity, reason, signal).
    * @returns the closed outcome; `'allowed-once'` is the only grant.
-   * @throws when no turn is open or either audit event fails before the session
-   *   append commit point.
+   * Withdrawal cancels accepted decisions and joins their audit completion;
+   * a retired service cannot accept requests or policy writes.
+   * @throws when the service was withdrawn, no turn is open, or either audit
+   *   event fails before the session append commit point.
    */
   async request(req: ApprovalRequest): Promise<ApprovalOutcome> {
-    const session = req.agent.session
-    if (!hasOpenTurn(session)) {
-      throw new Error(
-        'approval.request() outside an open turn: the approval/asked + approval/decided audit pair '
-        + 'must be turn-enclosed (a bare event between turns is crash-tail garbage on reload). '
-        + 'Ask from inside the turn that needs the decision.',
-      )
+    this.lifetime.signal.throwIfAborted()
+    const completion = Promise.withResolvers<void>()
+    this.pending.add(completion.promise)
+    try {
+      const session = req.agent.session
+      if (!hasOpenTurn(session)) {
+        throw new Error(
+          'approval.request() outside an open turn: the approval/asked + approval/decided audit pair '
+          + 'must be turn-enclosed (a bare event between turns is crash-tail garbage on reload). '
+          + 'Ask from inside the turn that needs the decision.',
+        )
+      }
+      const id = ApprovalRequestId(randomUUID())
+      session.append('approval/asked', {
+        id,
+        toolName: req.toolName,
+        ...req.callId !== undefined ? { callId: req.callId } : {},
+        ...req.reason !== undefined ? { reason: req.reason } : {},
+      })
+      const decided = await this.decide(req, session)
+      const outcome = this.lifetime.signal.aborted || req.signal?.aborted === true ? 'cancelled' : decided
+      session.append('approval/decided', { id, outcome })
+      return outcome
+    } finally {
+      this.pending.delete(completion.promise)
+      completion.resolve()
     }
-    const id = ApprovalRequestId(randomUUID())
-    session.append('approval/asked', {
-      id,
-      toolName: req.toolName,
-      ...req.callId !== undefined ? { callId: req.callId } : {},
-      ...req.reason !== undefined ? { reason: req.reason } : {},
-    })
-    const outcome = await this.decide(req, session)
-    session.append('approval/decided', { id, outcome })
-    return outcome
   }
 
   /**
@@ -265,8 +285,8 @@ export class ApprovalService extends Service {
    * @returns the normalized closed outcome.
    */
   private async decide(req: ApprovalRequest, session: Session): Promise<ApprovalOutcome> {
-    const signal = req.signal
-    if (signal?.aborted) return 'cancelled'
+    const signal = req.signal === undefined ? this.lifetime.signal : AbortSignal.any([req.signal, this.lifetime.signal])
+    if (signal.aborted) return 'cancelled'
     // The 'never' policy is decided HERE, before any dispatch: a listener
     // registered with `prepend: true` after this service mounts would sit
     // ahead of any gate LISTENER, so a listener-shaped gate cannot keep the
@@ -277,12 +297,21 @@ export class ApprovalService extends Service {
     // SYNCHRONOUSLY (before its first await) must land in the same rejection
     // path as an async one — `Promise.resolve(call())` would let it escape
     // the containment into the caller.
-    const answer: Promise<ApprovalOutcome> = Promise.resolve().then(
-      () => this.ctx.waterfall(
+    const answer: Promise<ApprovalOutcome> = Promise.resolve().then(() => {
+      if (signal.aborted) return 'cancelled' as const
+      const listeners = this.ctx.events.dispatch('waterfall', [
         scopeTarget(req.agent, req.agent), 'approval/request', req,
-        () => Promise.resolve<ApprovalOutcome>('unavailable'),
-      ),
-    ).then(
+      ]) as Array<(
+        request: ApprovalRequestEvent,
+        next: () => Promise<ApprovalOutcome>,
+      ) => Promise<ApprovalOutcome>>
+      const next = (): Promise<ApprovalOutcome> => {
+        if (signal.aborted) return Promise.resolve('cancelled')
+        const listener = listeners.shift()
+        return listener === undefined ? Promise.resolve('unavailable') : listener(req, next)
+      }
+      return next()
+    }).then(
       // Normalize a rogue (non-vocabulary) answerer return to the fail-closed
       // outcome instead of leaking it into callers' closed-union switches.
       outcome => OUTCOMES.includes(outcome) ? outcome : 'unavailable',
@@ -290,7 +319,6 @@ export class ApprovalService extends Service {
       // tool call open — the seam contains its callbacks.
       () => 'unavailable',
     )
-    if (signal === undefined) return answer
     return await new Promise<ApprovalOutcome>((resolve) => {
       const onAbort = () => {
         signal.removeEventListener('abort', onAbort)

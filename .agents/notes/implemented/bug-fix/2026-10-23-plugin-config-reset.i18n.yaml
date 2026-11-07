@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-plugin-config-reset.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-plugin-config-reset.md
+document:
+  en: 74bc76c082aed3cc9d92b063ae737392371d6bb6
+  zh: 457acdda3008a5d887c36eb697a4038c433e80b7
+/agent-note-plugin-configuration-reset:
+  en: 6f4c891b3ff1ad45
+  zh: 076550b3079b35f4
+/agent-note-plugin-configuration-reset/problem:
+  en: 66cfe0759d1dc022
+  zh: b6a9e8deb9667022
+/agent-note-plugin-configuration-reset/decision:
+  en: dce4e96308238062
+  zh: 602a80a3b1dd0cf7
+/agent-note-plugin-configuration-reset/alternatives-considered:
+  en: f3de30070999eca0
+  zh: f19ac015ee9ae7a2
+/agent-note-plugin-configuration-reset/consequences:
+  en: fa8ad162d0300a8e
+  zh: 2d6a70f7b35df50c
+/agent-note-plugin-configuration-reset/verification:
+  en: d5ec2147a4c0a2fb
+  zh: 2e0395d30b722e06

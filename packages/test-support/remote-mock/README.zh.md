@@ -79,6 +79,8 @@ await mock.streams.drained('session/follow')
 
 ### 连接客户端
 
+账户偏好传输包含有效的外观与字体默认值。测试可通过同一个带版本检查的传输设置或清除这些偏好。
+
 `mock.api` 是 `IApiClient` 面，`mock.rpc` 是 `ClientConnectionRpc` 面（一元用 `call`，打开流用 `stream`）。把 `{ api: mock.api, rpc: mock.rpc, ...mock.transports }` 交给 `installConnection`——或由 `TestClient` 绑定——使每个域调用到达 `dispatch`、每个生成流方法到达 `open`，中间没有信封。载荷携带 `{ args }`：全量客户端代理发送数组形式，Gateway 自身端点发送对象形式（作为一个位置参数交付）；signal 中止的调用以中止原因拒绝。`RemoteMock.create()` 应答启动期的 `host.describe` 读取（`host` 来自 `RemoteMockOptions.host`，默认 `/home/mock`），并保持 `events.mux` / `events.host` 打开，这正是组装后的客户端达到 `connected` 所需；规格可以像其他规则一样覆写或失败其中任何一个。
 
 ### 观察与断言
@@ -114,6 +116,8 @@ await mock.streams.drained('session/follow')
 | [`src/streams.ts`](src/streams.ts) | `frames` / `openStream` 脚本、`streamHandle` / `streamMethod` 桩类型、`MockStream`（句柄 + `AsyncIterable`） |
 | [`src/log.ts`](src/log.ts) | 带共享 `seq` 计数器的日志存储 |
 | [`src/transports.ts`](src/transports.ts) | `MockAccountPreferences` / `MockProjectModelSettings` 种子传输 |
+
+
 
 </details>
 

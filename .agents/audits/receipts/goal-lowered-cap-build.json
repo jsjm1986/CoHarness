@@ -1,0 +1,13 @@
+{
+  "name": "goal-lowered-cap-build",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run build",
+  "observedAt": "2026-10-26T07:14:43.292508+00:00",
+  "status": "interrupted_before_completion",
+  "exitCode": null,
+  "completionEvidence": "The previous exec session handle is absent; process inventory confirms no matching build/doc-sync or compiler process remains. No terminal receipt was produced. Partial output is retained and is not a passing check.",
+  "inputsBefore": null,
+  "inputsAfter": null,
+  "outputSha256": "ae4cae46f2d4925dc7c1256cefc9f3284dc21757c7f74fb17d25d74cc3037e85",
+  "outputTail": "$ tsx scripts/build.ts\nrun-gates: build running 8 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start native addon\nrun-gates: PASS native addon (3.48s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (42.01s)\nrun-gates: start Host bundle\nrun-gates: PASS Host bundle (167.03s)\nrun-gates: start client compiler\n"
+}

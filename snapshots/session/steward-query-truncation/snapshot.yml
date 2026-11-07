@@ -1,0 +1,10 @@
+version: 1
+scenario: steward-query-truncation
+profile: headless
+composition: steward-query-truncation
+recording: authored
+header:
+  class: steward-query-truncation
+  pin: true
+replay:
+  override: true

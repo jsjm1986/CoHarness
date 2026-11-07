@@ -1,0 +1,14 @@
+{
+  "name": "grant-application-deleted-account-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/apply-grants.spec.ts -t 'deleted account|recognizes deletion'",
+  "startedAt": "2026-10-23T23:50:03.627930+00:00",
+  "seconds": 2.758,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8cb95c1b8758119651bb0c9eded6e7f702d938b97016b12a9555b15a9cd8eb1c",
+  "inputsAfter": "8cb95c1b8758119651bb0c9eded6e7f702d938b97016b12a9555b15a9cd8eb1c",
+  "postgresToolDirectory": null,
+  "outputSha256": "dca5471564a96d14308da5f2c7f130dc409fed839a18df6763218a447d0c9580",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/apply-grants.spec.ts (5 tests | 2 failed | 3 skipped) 176ms\n     × reports a deleted account without rewriting its grants or restarting it 97ms\n     × recognizes deletion between reading the account and resolving its instance 79ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/apply-grants.spec.ts > applyGrantsToUser > reports a deleted account without rewriting its grants or restarting it\nAssertionError: promise rejected \"Error: no user 2\" instead of resolving\n ❯ tests/apply-grants.spec.ts:88:62\n     86|     const before = readFileSync(path, 'utf8')\n     87|     expect(deps.users.remove(alice.id)).toBe(true)\n     88|     await expect(applyGrantsToUser(deps, alice.id, admin.id)).resolves…\n       |                                                              ^\n     89|     expect(readFileSync(path, 'utf8')).toBe(before)\n     90|     await expect(applyGrantsToUser(deps, alice.id + 1000, admin.id)).r…\n\nCaused by: Error: no user 2\n ❯ applyGrantsToUser src/apply-grants.ts:108:28\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  tests/apply-grants.spec.ts > applyGrantsToUser > recognizes deletion between reading the account and resolving its instance\nAssertionError: expected 'written' to be 'deleted' // Object.is equality\n\nExpected: \"deleted\"\nReceived: \"written\"\n\n ❯ tests/apply-grants.spec.ts:100:62\n     98|       return stateOf(target)\n     99|     })\n    100|     await expect(applyGrantsToUser(deps, alice.id, admin.id)).resolves…\n       |                                                              ^\n    101|   })\n    102|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 3 skipped (5)\n   Start at  07:50:05\n   Duration  973ms (transform 555ms, setup 0ms, import 695ms, tests 176ms, environment 0ms)\n\n"
+}

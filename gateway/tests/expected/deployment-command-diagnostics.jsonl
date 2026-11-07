@@ -1,0 +1,4 @@
+{"case":"ascii-overflow","bytes":8192,"completePrefix":true}
+{"case":"utf8-overflow","bytes":8191,"completePrefix":true}
+{"case":"emoji-overflow","bytes":8191,"completePrefix":true}
+{"case":"utf8-exact","bytes":8192,"completePrefix":true}

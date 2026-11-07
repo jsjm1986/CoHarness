@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/interaction/user-approval/README.md
 document:
-  en: 699b8edc3eed2e20486a5930e7038727cf513e3f
-  zh: 9a371c3437e8f099ad7a320054e8661f15df105c
+  en: 9179f74a767fa6232b65b34a6ce2fc6ad3b467ce
+  zh: 7845a344894f94ca82fcc1ce33f1c894020aaa61
 /:
   en: 515e991a5671711d
   zh: 194d48a8da9b51b0
@@ -27,8 +27,8 @@ document:
   en: d4ef1901ac78b431
   zh: 822b97f8bed1b2c9
 /deepseek-ai-dsh-user-approval/use-this-package/requesting-a-decision:
-  en: add08f0d0dace4c8
-  zh: e45268e0f0ed2e95
+  en: 04d147db2ced6872
+  zh: 8991b336475de2f1
 /deepseek-ai-dsh-user-approval/use-this-package/what-the-model-and-user-see:
   en: 016bf3cd1891d3d7
   zh: 33e7e5ffaf95f5e7

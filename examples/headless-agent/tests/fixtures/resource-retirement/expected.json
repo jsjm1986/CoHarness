@@ -1,0 +1,32 @@
+{
+  "reply": "RESOURCE_RETIREMENT_OK",
+  "responseCancellation": {
+    "reply": "RESOURCE_RESPONSE_OK",
+    "proof": {
+      "mode": "response-cancellation",
+      "rejectedBeforeCleanup": true,
+      "preservedLimitError": true,
+      "transportClosed": true
+    }
+  },
+  "uncertainOwner": {
+    "reply": "RESOURCE_UNCERTAINTY_OK",
+    "proof": {
+      "mode": "uncertain-owner",
+      "resourceAborted": true,
+      "transportStopped": true,
+      "active": 0,
+      "requests": [{ "sequence": 1, "kind": "model" }],
+      "outcomes": ["uncertain", "quiescent"]
+    }
+  },
+  "proof": {
+    "earlyRejection": true,
+    "thirdRejectedBeforeRelease": false,
+    "requests": [
+      { "sequence": 1, "kind": "process" },
+      { "sequence": 2, "kind": "model" }
+    ],
+    "active": 0
+  }
+}

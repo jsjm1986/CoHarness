@@ -43,6 +43,11 @@ const snapshot = snapshotJsonValue(input) as JsonValue
 
 `WeakMapWithValues<Key, Value>` combines weak object-key lookup with a strongly retained, insertion-ordered `values` set. Each value belongs to one key. The owner must call `delete(key)` or `clear()` at the corresponding lifecycle boundary; the collection does not perform automatic cleanup.
 
+<a id="render-failure"></a>
+### Render a caught failure
+
+`formatThrownValue(value)` preserves ordinary `String(value)` text and returns `[unrenderable thrown value]` when conversion throws. Use it inside failure reports that must not interrupt cleanup, cancellation or non-vetoing event delivery.
+
 ### Close a discriminated union
 
 Use `assertNever(value, context?)` in the default branch of a closed discriminated union. A newly added variant then fails TypeScript compilation at every exhaustive switch, while a runtime value that escaped its declared type throws with the optional context label.

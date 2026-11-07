@@ -1,0 +1,14 @@
+{
+  "name": "native-prepared-transport-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/web/web-search-deepseek/src/provider.ts packages/web/web-search-deepseek/src/types.ts packages/web/web-search-deepseek/src/usage.ts packages/llm/llm/src/index.ts packages/llm/llm/tests/operations.spec.ts",
+  "startedAt": "2026-10-24T06:07:07.187261+00:00",
+  "seconds": 4.168,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fe29640861be3d4c4dab6acfaae8132bf74f9d8c0e1a485e85df3097e52ee525",
+  "inputsAfter": "fe29640861be3d4c4dab6acfaae8132bf74f9d8c0e1a485e85df3097e52ee525",
+  "postgresToolDirectory": null,
+  "outputSha256": "2997948f3d42c0268f4eb3b5c9bc0346d9d9e4b038537642468a5b3b5375307a",
+  "outputTail": "packages/web/web-search-deepseek/src/provider.ts:349:53: error typescript(no-non-null-assertion): Forbidden non-null assertion.\npackages/web/web-search-deepseek/src/provider.ts:228:1: error @stylistic(max-len): This line has a length of 170. Maximum allowed is 140.\npackages/web/web-search-deepseek/src/provider.ts:264:100: error typescript(no-unsafe-argument): Unsafe argument of type any assigned to a parameter of type AbortSignal | undefined.\npackages/web/web-search-deepseek/src/provider.ts:264:108: error typescript(no-unsafe-argument): Unsafe argument of type any assigned to a parameter of type ((usage: TokenUsage) => void) | undefined.\n"
+}

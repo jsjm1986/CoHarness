@@ -52,6 +52,7 @@ export interface SeatSessionSummary {
 
 interface StagedPreset {
   readonly id: string
+  readonly originSessionId?: SessionId
 }
 
 interface PresetSelectionAttempt {
@@ -157,18 +158,16 @@ export class AgentPresetSeatController {
   }
 
   /**
-   * Stage a pick WITHOUT the immediate apply, for a flow that starts the
-   * receiving session after the pick (the settings section's creator entry).
-   * `select()`'s immediate apply would meet the still-current running session
-   * and drop the stage as unservable; staging alone leaves it for the
-   * list-change applier, which fires when the started session becomes
-   * current.
+   * Stage a pick for the list-change applier without selecting a preset immediately.
    * @param id - the preset to stage.
    * @param introduce - true when the stage came from another screen and the
    * chip should announce itself on the session it lands on.
+   * @param options - `forNextSession` excludes the currently addressed Session;
+   * omission allows application to an existing blank Session.
    */
-  stage(id: string, introduce = false): void {
-    this.staged = { id }
+  stage(id: string, introduce = false, options?: { readonly forNextSession?: boolean }): void {
+    const originSessionId = options?.forNextSession === true ? this.currentSession()?.id : undefined
+    this.staged = { id, ...(originSessionId === undefined ? {} : { originSessionId }) }
     this.set({ current: id, error: null, introduce })
   }
 
@@ -214,6 +213,7 @@ export class AgentPresetSeatController {
   async apply(): Promise<string | undefined> {
     const choice = this.staged
     const session = this.currentSession()
+    if (choice?.originSessionId !== undefined && choice.originSessionId === session?.id) return undefined
     const active = this.pendingSelection
     if (active !== undefined) {
       if (choice !== undefined && session?.blank === true) {

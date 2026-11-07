@@ -13,7 +13,7 @@ import { MAX_ASSET_BYTES, MAX_TOTAL_BYTES, packHtml } from '../src/client/contra
 import { createHtmlDocument } from '../src/client/html/bootstrap.ts'
 import { createWorkspacePreviewReaders } from '../src/client/preview-readers.ts'
 import { en } from '../src/client/html/locales.ts'
-import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
+import { previewRecoveryLabels, PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 const translations: ReadonlyMap<string, string> = new Map(Object.entries(en))
 const htmlT = (key: string): string => translations.get(key) ?? key
@@ -58,7 +58,7 @@ function harness(read: ReadWorkspaceFileData, initialRenderer: RenderWorkspaceHt
   const mount = (renderer: RenderWorkspaceHtml) => <PreviewResourceBinding resources={resources} request={request}>{resource =>
     <WorkspaceHtmlPreview request={request} resource={resource} read={read}
       renderHtml={renderer} htmlT={htmlT} close={close}
-      labels={{ close: 'Close', reload: 'Reload', changed: 'File changed' }} />
+      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'File changed' }} />
   }</PreviewResourceBinding>
   const view = render(mount(initialRenderer))
   return { ...view, resources, close, change() {
@@ -233,6 +233,24 @@ describe('readFileBytes', () => {
   const { readFileBytes } = createWorkspacePreviewReaders(undefined)
   const signal = new AbortController().signal
 
+  it('starts with a bounded byte read and pins its returned version for continuation without a metadata RPC', async () => {
+    const stat = vi.fn(async () => ({ result: { ok: true as const,
+      value: { path: request.path, type: 'file' as const, bytes: 4, version: 'first-version' },
+    } }))
+    const readBytes = vi.fn(async (input: { offset: number }) => ({ result: { ok: true as const,
+      value: { path: request.path, offset: input.offset, bytes: btoa(input.offset === 0 ? 'ab' : 'cd'),
+        eof: input.offset !== 0, version: 'first-version' },
+    } }))
+    const connection = { api: { workspaceFiles: { stat, readBytes } } } as unknown as ConnectionHandle
+    const result = await createWorkspacePreviewReaders(connection).readFileBytes({ resource: request, maxBytes: 4 }, signal)
+    expect(stat).not.toHaveBeenCalled()
+    expect(readBytes.mock.calls.map(([input]) => input)).toEqual([
+      { sessionId: id, path: request.path, offset: 0, maxFileBytes: 4 },
+      { sessionId: id, path: request.path, offset: 2, maxFileBytes: 4, version: 'first-version' },
+    ])
+    expect(result).toEqual({ bytes: btoa('abcd'), version: 'first-version' })
+  })
+
   it('rejects a missing runtime before any RPC', async () => {
     await expect(readFileBytes({ resource: request, maxBytes: 1024 }, signal)).rejects.toMatchObject({ code: 'access-revoked' })
     const project: WorkspaceResourceOpenRequest = {
@@ -242,7 +260,7 @@ describe('readFileBytes', () => {
       .rejects.toMatchObject({ code: 'access-revoked' })
   })
 
-  it('stats then reads version-guarded windows until EOF on the owning target', async () => {
+  it('reads version-guarded windows until EOF on the owning target', async () => {
     const bytes = Array.from({ length: 9 }, (_, index) => index + 1)
     const encoded = btoa(String.fromCharCode(...bytes))
     const stat = vi.fn(async () => ({ result: { ok: true as const, value: { path: 'bin.dat', type: 'file' as const, bytes: 9, version: 'v9' } } }))
@@ -259,7 +277,7 @@ describe('readFileBytes', () => {
     }
     const result = await readers.readFileBytes({ resource, maxBytes: 1024 }, signal)
     expect(forTarget).toHaveBeenCalledWith({ kind: 'project', projectId: 4 })
-    expect(stat).toHaveBeenCalledWith({ sessionId: id, path: 'bin.dat' }, signal)
+    expect(stat).not.toHaveBeenCalled()
     expect(readBytes).toHaveBeenCalledTimes(2)
     expect(atob(result.bytes).split('').map(c => c.charCodeAt(0))).toEqual(bytes)
     expect(result.version).toBe('v9')
@@ -272,33 +290,29 @@ describe('readFileBytes', () => {
     const readers = createWorkspacePreviewReaders(connection)
     await expect(readers.readFileBytes({ resource: request, version: 'v9', maxBytes: 1024 }, signal)).rejects.toThrow('no progress')
     expect(stat).not.toHaveBeenCalled()
-    expect(readBytes).toHaveBeenCalledWith({ sessionId: id, path: request.path, offset: 0, version: 'v9' }, signal)
+    expect(readBytes).toHaveBeenCalledWith({ sessionId: id, path: request.path, offset: 0, version: 'v9', maxFileBytes: 1024 }, signal)
   })
 
-  it('preserves RPC failure categories and rejects non-file stat results', async () => {
-    type StatResult = {
-      result: { ok: true; value: { path: string; type: string; version: string; bytes?: number } }
-        | { ok: false; error: { code: string; message: string } }
-    }
-    const stat = vi.fn(async (): Promise<StatResult> => ({ result: { ok: false, error: { code: 'access-revoked', message: 'Permission removed' } } }))
-    const readBytes = vi.fn()
-    const connection = { api: { workspaceFiles: { stat, readBytes } } } as unknown as ConnectionHandle
+  it('preserves the content RPC failure categories', async () => {
+    const readBytes = vi.fn(async () => ({ result: { ok: false as const, error: { code: 'access-revoked', message: 'Permission removed' } } }))
+    const connection = { api: { workspaceFiles: { readBytes } } } as unknown as ConnectionHandle
     const readers = createWorkspacePreviewReaders(connection)
     await expect(readers.readFileBytes({ resource: request, maxBytes: 1024 }, signal)).rejects.toMatchObject({ code: 'access-revoked', message: 'Permission removed' })
-    stat.mockResolvedValueOnce({ result: { ok: true, value: { path: request.path, type: 'directory', version: 'v1' } } })
+    readBytes.mockResolvedValueOnce({ result: { ok: false, error: { code: 'workspace-file/not-regular-file', message: 'Not a file' } } })
     await expect(readers.readFileBytes({ resource: request, maxBytes: 1024 }, signal)).rejects.toMatchObject({ code: 'workspace-file/not-regular-file' })
-    stat.mockResolvedValueOnce({ result: { ok: true, value: { path: request.path, type: 'file', version: 'v1' } } })
     readBytes.mockResolvedValueOnce({ result: { ok: false, error: { code: 'workspace-file/stale-version', message: 'File changed' } } })
     await expect(readers.readFileBytes({ resource: request, maxBytes: 1024 }, signal)).rejects.toMatchObject({ code: 'workspace-file/stale-version' })
   })
 
-  it('rejects on the stat-reported size before any byte read', async () => {
-    const stat = vi.fn(async () => ({ result: { ok: true as const, value: { path: 'big.bin', type: 'file' as const, bytes: 2048, version: 'v1' } } }))
+  it('rejects an already cancelled read before making any request', async () => {
+    const stat = vi.fn()
     const readBytes = vi.fn()
     const connection = { api: { workspaceFiles: { stat, readBytes } } } as unknown as ConnectionHandle
     const readers = createWorkspacePreviewReaders(connection)
-    await expect(readers.readFileBytes({ resource: request, maxBytes: 1024 }, signal))
-      .rejects.toMatchObject({ code: 'workspace-file/too-large', message: 'Workspace file exceeds the preview byte limit' })
+    const abort = new AbortController()
+    abort.abort(new Error('preview closed'))
+    await expect(readers.readFileBytes({ resource: request, maxBytes: 1024 }, abort.signal)).rejects.toThrow('preview closed')
+    expect(stat).not.toHaveBeenCalled()
     expect(readBytes).not.toHaveBeenCalled()
   })
 

@@ -1,0 +1,14 @@
+{
+  "name": "document-parts-aliases-root-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/store.spec.ts packages/attachment/userdoc-local/tests/name.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts packages/attachment/userdoc-local/tests/mutation.spec.ts",
+  "startedAt": "2026-10-25T17:44:41.981255+00:00",
+  "seconds": 9.434,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8c85aca34fe6ffa7a646313d00d908000ecc4dc496169f2a108adb098b9cb348",
+  "inputsAfter": "8c85aca34fe6ffa7a646313d00d908000ecc4dc496169f2a108adb098b9cb348",
+  "postgresToolDirectory": null,
+  "outputSha256": "b36619a9f944b21667de5a2b9b2959dc73cb55509bf9cbdd1c475ccf2f92414e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/store.spec.ts (40 tests | 1 failed) 455ms\n     × refuses reading through a document root replaced by a directory link 7ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/store.spec.ts > listDocFiles > refuses reading through a document root replaced by a directory link\nAssertionError: expected UserDocError: Unable to list stored docum… { code: '…' } to match object { code: 'INVALID_DOCUMENT_DIRECTORY' }\n(1 matching property omitted from actual)\n\n- Expected\n+ Received\n\n- {\n-   \"code\": \"INVALID_DOCUMENT_DIRECTORY\",\n+ UserDocError {\n+   \"code\": \"DOCUMENT_READ_FAILED\",\n  }\n\n ❯ packages/attachment/userdoc-local/tests/store.spec.ts:329:43\n    327|     await symlink(outside, uploadRoot, process.platform === 'win32' ? …\n    328|     await expect(readDocFile(uploadRoot, UserDocId('private.txt'))).re…\n    329|     await expect(listDocFiles(uploadRoot)).rejects.toMatchObject({ cod…\n       |                                           ^\n    330|     expect(await readFile(join(outside, 'private.txt'), 'utf8')).toBe(…\n    331|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 3 passed (4)\n      Tests  1 failed | 118 passed (119)\n   Start at  01:44:49\n   Duration  2.30s (transform 1.40s, setup 503ms, import 1.40s, tests 2.90s, environment 0ms)\n\n"
+}

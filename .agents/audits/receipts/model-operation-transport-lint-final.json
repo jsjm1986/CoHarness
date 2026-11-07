@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-transport-lint-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm/src/operation-call.ts packages/llm/llm/src/operations.ts packages/llm/llm/tests/operations.spec.ts packages/web/web-search-deepseek/src/provider.ts packages/web/web-search-deepseek/src/types.ts packages/web/web-search-deepseek/src/usage.ts packages/web/web-search-deepseek/tests/usage.spec.ts packages/web/web-search-deepseek/tests/prepared.spec.ts scripts/gen-cordis-catalog.ts",
+  "startedAt": "2026-10-24T06:17:45.693797+00:00",
+  "seconds": 2.897,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c086fc41562b5b5ce293343172371665b827bd71f4b195503e2960bb8f459010",
+  "inputsAfter": "c086fc41562b5b5ce293343172371665b827bd71f4b195503e2960bb8f459010",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

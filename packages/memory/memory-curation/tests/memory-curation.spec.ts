@@ -1,11 +1,16 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { setImmediate } from 'node:timers/promises'
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage, ToolCallId, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
+import LlmRuntime, { createUserMessage, LlmAdapter, ToolCallId, type GenerateOptions, type LlmCallConfig, type LlmOperationDispatch, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionSeq, type Session } from '@deepseek-ai/dsh-session'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { memoryConsolidationCursorKey, memoryExtractionCursorKey } from '@deepseek-ai/dsh-memory'
-import { agentFor, memoryHarness } from '../../memory/tests/harness.ts'
+import { MEMORY_SETTINGS_NAMESPACE, memoryConsolidationCursorKey, memoryExtractionCursorKey } from '@deepseek-ai/dsh-memory'
+import type MemoryService from '@deepseek-ai/dsh-memory'
+import { agentFor, memoryHarness, settingsStub } from '../../memory/tests/harness.ts'
+import { MemorySettings } from '../../../settings/settings/tests/memory.ts'
 import * as MemoryCuration from '../src/index.ts'
 
 /** A fake `llm` service: records every request, replays canned chunk streams in call order. */
@@ -13,6 +18,9 @@ function fakeLlm(ctx: Context, scripts: readonly (StreamChunk[] | ((options: Gen
   const calls: GenerateOptions[] = []
   let next = 0
   ctx.provide('llm', {
+    async prepareCall(config: LlmCallConfig) {
+      return { config, stream: (options: GenerateOptions) => ctx.llm.stream({ ...options, ...config }) }
+    },
     stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
       calls.push(options)
       const script = scripts[Math.min(next, scripts.length - 1)] ?? []
@@ -26,17 +34,31 @@ function fakeLlm(ctx: Context, scripts: readonly (StreamChunk[] | ((options: Gen
 
 /** A fake `agents` registry resolving exactly the test agent. */
 function fakeAgents(ctx: Context, agent: Agent): void {
-  ctx.provide('agents', { get: (id: unknown) => (id === agent.session.id ? agent : undefined) } as never)
+  ctx.provide('agents', {
+    get: (id: unknown) => (id === agent.session.id ? agent : undefined), currentInitiator: () => undefined,
+  } as never)
+}
+
+/** Exercise teardown through the real stream cancellation and iterator cleanup. */
+async function actualLlm(ctx: Context, adapter: LlmAdapter): Promise<void> {
+  await ctx.plugin(LlmRuntime)
+  ctx.effect(() => ctx.llm.registerAdapter(['test-provider'], adapter))
 }
 
 /** A fake execution authority resolving a fixed state or rejecting. */
 function fakeAuthority(ctx: Context, state: { inputs: readonly string[]; primaryActorUserId?: number } | Error): void {
   ctx.provide('executionAuthority', {
+    ...localExecution,
     authorize: vi.fn(async () => {
       if (state instanceof Error) throw state
       return state
     }),
   } as never)
+}
+
+const localExecution = {
+  capture: (agent: Agent): ExecutionInheritance => ({ parentSessionId: agent.id, inputs: [], unverifiedHistory: false }),
+  runCaptured: <T>(_agent: Agent, _scope: ExecutionInheritance, work: () => T): T => work(),
 }
 
 /** Stream chunks of one text reply. */
@@ -123,11 +145,15 @@ interface HarnessOptions {
   /** Leave provider/model unset on the agent options to exercise no-route warns. */
   noRoute?: boolean
   cwd?: string
+  beforeService?: (ctx: Context) => void
 }
 
 /** Boot memory + curation over the in-memory domain with a routed, registered agent. */
 async function harness(options: HarnessOptions = {}) {
-  const h = await memoryHarness({ config: options.memory as never })
+  const h = await memoryHarness({
+    config: options.memory as never,
+    ...(options.beforeService === undefined ? {} : { beforeService: options.beforeService }),
+  })
   const curation = await h.ctx.plugin(MemoryCuration, (options.curation ?? {}) as MemoryCuration.Config)
   const agent = agentFor(h.ctx, 'curation-agent', { cwd: options.cwd ?? '/repo' })
   if (options.noRoute !== true) {
@@ -141,15 +167,555 @@ async function harness(options: HarnessOptions = {}) {
 
 const writer = (agent: Agent) => ({ kind: 'agent' as const, agent })
 
+function observeScopeDecisions(service: MemoryService, complete: (owner: Agent) => void): void {
+  const scopesFor = service.scopesFor.bind(service)
+  vi.spyOn(service, 'scopesFor').mockImplementation((owner) => {
+    const scopes = scopesFor(owner), observed = [...scopes]
+    // Iterator completion observes the whole scope decision, including a skipped review.
+    observed[Symbol.iterator] = function* () {
+      try { yield* scopes }
+      finally { complete(owner) }
+      return undefined
+    }
+    return observed
+  })
+}
+
 describe('memory-curation extraction', () => {
+  it('keeps parallel curation grants bound to their captured participants', async () => {
+    const h = await harness({ memory: { space: 'project', extraction: true } })
+    const other = agentFor(h.ctx, 'parallel-curator', { cwd: '/repo' })
+    other.options.provider = 'test-provider'; other.options.model = 'test-model'
+    vi.spyOn(h.ctx.agents, 'get').mockImplementation(id => id === h.agent.id ? h.agent : id === other.id ? other : undefined)
+    const actors = new AsyncLocalStorage<number>(), allowed = new Set([42, 43])
+    h.ctx.provide('executionAuthority', {
+      capture: (agent: Agent): ExecutionInheritance => ({
+        parentSessionId: agent.id, inputs: [], unverifiedHistory: false, primaryActorUserId: actors.getStore()!,
+      }),
+      runCaptured: <T>(_agent: Agent, scope: ExecutionInheritance, work: () => T): T => actors.run(scope.primaryActorUserId!, work),
+      authorize: async () => {
+        const actor = actors.getStore()!
+        if (!allowed.has(actor)) throw new Error('memory qualification revoked')
+        return { inputs: [], primaryActorUserId: actor }
+      },
+    } as never)
+    const queued = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    let admitted = 0, released = 0
+    h.ctx.provide('resourceBudget', { async acquire() {
+      if (++admitted === 2) queued.resolve(undefined)
+      await release.promise
+      return { signal: new AbortController().signal, release: async () => { released++ }, uncertain: async () => {} }
+    } } as never)
+    const billed: number[] = [], debug = vi.spyOn(h.ctx.logger, 'debug')
+    class Adapter extends LlmAdapter {
+      async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        billed.push(options.executionIdentity!.primaryActorUserId!)
+        yield* textTurn('done')
+      }
+    }
+    await actualLlm(h.ctx, new Adapter())
+    try {
+      actors.run(42, () => { humanTurn(h.agent) })
+      actors.run(43, () => { humanTurn(other) })
+      await queued.promise
+      allowed.delete(42); release.resolve(undefined)
+      await vi.waitFor(async () => {
+        expect((await h.service.getCursor(memoryExtractionCursorKey(other.id)))?.lastSeq).toBeDefined()
+        expect(debug.mock.calls.some(call => /memory curation.*failed/.test(String(call[0])))).toBe(true)
+      })
+      expect(billed).toEqual([43])
+      expect(released).toBe(2)
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['revocation', 'replacement'])('rechecks project qualification at physical dispatch after %s', async (change) => {
+    const h = await harness({ memory: { space: 'project', extraction: true } })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    let allowed = true, physical = 0, released = 0
+    const remove = h.ctx.provide('executionAuthority', { ...localExecution, authorize: async () => {
+      if (!allowed) throw new Error('memory qualification revoked')
+      return { inputs: [], primaryActorUserId: 42 }
+    } } as never)
+    h.ctx.provide('resourceBudget', { async acquire() {
+      return { signal: new AbortController().signal, release: async () => { released++ }, uncertain: async () => {} }
+    } } as never)
+    const debug = vi.spyOn(h.ctx.logger, 'debug')
+    class Adapter extends LlmAdapter {
+      async *stream(_options: GenerateOptions, dispatch?: LlmOperationDispatch): AsyncIterable<StreamChunk> {
+        entered.resolve(undefined); await release.promise
+        await dispatch!(async () => { physical++ })
+        yield* textTurn('done')
+      }
+    }
+    await actualLlm(h.ctx, new Adapter())
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      await entered.promise
+      if (change === 'revocation') allowed = false
+      else { remove(); fakeAuthority(h.ctx, { inputs: [], primaryActorUserId: 77 }) }
+      release.resolve(undefined)
+      await vi.waitFor(() => { expect(debug.mock.calls.some(call => /memory curation.*failed/.test(String(call[0])))).toBe(true) })
+      expect(physical).toBe(0)
+      expect(released).toBe(1)
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('refuses replacement while the captured project authorization is pending', async () => {
+    const h = await harness({ memory: { space: 'project', extraction: true } })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const remove = h.ctx.provide('executionAuthority', { ...localExecution, authorize: async () => {
+      entered.resolve(undefined); await release.promise; return { inputs: [], primaryActorUserId: 42 }
+    } } as never)
+    const debug = vi.spyOn(h.ctx.logger, 'debug'), calls = fakeLlm(h.ctx, [textTurn('done')])
+    try {
+      humanTurn(h.agent)
+      await entered.promise
+      remove(); fakeAuthority(h.ctx, { inputs: [], primaryActorUserId: 77 })
+      release.resolve(undefined)
+      await vi.waitFor(() => { expect(debug.mock.calls.some(call => String(call[0]).includes('authorization denied'))).toBe(true) })
+      expect(calls).toHaveLength(0)
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('leaves independent model requests outside the captured curation operation', async () => {
+    const h = await harness({ memory: { space: 'project', extraction: true } })
+    const authorize = vi.fn(async () => { throw new Error('Memory qualification denied') })
+    h.ctx.provide('executionAuthority', { ...localExecution, authorize } as never)
+    class Adapter extends LlmAdapter {
+      async *stream(): AsyncIterable<StreamChunk> { yield* textTurn('independent reply') }
+    }
+    await actualLlm(h.ctx, new Adapter())
+    try {
+      const chunks: StreamChunk[] = []
+      for await (const chunk of h.ctx.llm.stream({ provider: 'test-provider', model: 'test-model', messages: [] })) chunks.push(chunk)
+      expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } })
+      expect(authorize).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['catalog', 'grant', 'response'].flatMap(phase => ['revocation', 'replacement'].map(change => ({ phase, change }))))(
+    'rechecks project qualification after pending $phase work and $change', async ({ phase, change }) => {
+      const h = await harness({ memory: { space: 'project', extraction: true } })
+      let allowed = true, dispatched = 0, released = 0
+      const authority = { ...localExecution, authorize: vi.fn(async (capability: string) => {
+        if (capability === 'memory' && !allowed) throw new Error('memory qualification revoked')
+        return { inputs: [], primaryActorUserId: 42 }
+      }) }
+      const remove = h.ctx.provide('executionAuthority', authority as never)
+      const debug = vi.spyOn(h.ctx.logger, 'debug')
+      const entered = Promise.withResolvers<undefined>(), resume = Promise.withResolvers<undefined>()
+      const pause = async (): Promise<void> => { entered.resolve(undefined); await resume.promise }
+      if (phase === 'catalog') {
+        const entries = h.service.entries.bind(h.service)
+        vi.spyOn(h.service, 'entries').mockImplementation(async (scope) => { await pause(); return entries(scope) })
+      }
+      h.ctx.provide('resourceBudget', { async acquire() {
+        if (phase === 'grant') await pause()
+        return { signal: new AbortController().signal, release: async () => { released++ }, uncertain: async () => {} }
+      } } as never)
+      class Adapter extends LlmAdapter {
+        override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+          return { provider, id: model, name: model }
+        }
+        async *stream(): AsyncIterable<StreamChunk> {
+          dispatched++
+          if (phase === 'response') await pause()
+          yield* textTurn('nothing to save')
+        }
+      }
+      await actualLlm(h.ctx, new Adapter())
+      // The normal model permission stays available when only memory qualification changes.
+      h.ctx.on('llm/pre-dispatch', async (_options, next) => {
+        await h.ctx.executionAuthority.authorize('execute', h.agent)
+        await next()
+      }, { global: true })
+      try {
+        appendHeader(h.agent.session); humanTurn(h.agent)
+        await entered.promise
+        if (change === 'revocation') allowed = false
+        else {
+          remove()
+          h.ctx.provide('executionAuthority', { ...authority, authorize: vi.fn(async () => ({ inputs: [], primaryActorUserId: 77 })) } as never)
+        }
+        resume.resolve(undefined)
+        await vi.waitFor(async () => {
+          const cursor = await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))
+          const stopped = debug.mock.calls.some(call => /memory curation.*failed|authorization denied/.test(String(call[0])))
+          expect(cursor !== undefined || stopped).toBe(true)
+        })
+        expect(dispatched, change).toBe(phase === 'response' ? 1 : 0)
+        expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id)), change).toBeUndefined()
+        expect(released).toBe(phase === 'catalog' ? 0 : 1)
+      } finally { resume.resolve(undefined); await h.ctx.fiber.dispose() }
+    })
+
+  it('retains an independent provider failure when its feature is disabled at stream completion', async () => {
+    const switches = { enabled: true, extraction: true, consolidation: false, recall: false }
+    const h = await harness({ memory: { extraction: true },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) } })
+    const debug = vi.spyOn(h.ctx.logger, 'debug')
+    fakeLlm(h.ctx, [async function* () {
+      const previous = { ...switches }
+      switches.extraction = false
+      h.ctx.emit('settings/updated', MEMORY_SETTINGS_NAMESPACE, switches, previous, 'update')
+      yield { type: 'finish', reason: { kind: 'error', failure: { message: 'independent provider failure', code: 'PROVIDER' } } }
+    }])
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      await setImmediate()
+      expect(debug.mock.calls.flat().some(value => String(value).includes('independent provider failure'))).toBe(true)
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['metadata', 'preparation'] as const)('rechecks extraction after %s without logging or dispatching a withdrawn request', async (phase) => {
+    const switches = { enabled: true, extraction: true, consolidation: false, recall: false }
+    const h = await harness({ memory: { extraction: true },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) } })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(h.ctx, [textTurn('done')])
+    if (phase === 'metadata') {
+      h.ctx.llm.resolveModelInfo = async (provider, model) => {
+        entered.resolve(undefined); await release.promise
+        return { provider, id: model, name: model }
+      }
+    } else {
+      const prepare = h.ctx.llm.prepareCall.bind(h.ctx.llm)
+      vi.spyOn(h.ctx.llm, 'prepareCall').mockImplementation(async (...args) => {
+        const call = await prepare(...args)
+        entered.resolve(undefined); await release.promise
+        return call
+      })
+    }
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      await entered.promise
+      switches.extraction = false
+      release.resolve(undefined)
+      await setImmediate()
+      expect(calls).toEqual([])
+      expect(h.agent.session.snapshotEvents().filter(event => event.type === 'memory/curation-request')).toEqual([])
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('does not admit a queued extraction cursor after its feature is disabled', async () => {
+    const switches = { enabled: true, extraction: true, consolidation: false, recall: false }
+    const h = await harness({ memory: { extraction: true },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) } })
+    const entered = Promise.withResolvers<AbortSignal>(), release = Promise.withResolvers<undefined>()
+    fakeLlm(h.ctx, [textTurn('done')])
+    const writeCursor = h.service.writeCursor.bind(h.service)
+    vi.spyOn(h.service, 'writeCursor').mockImplementation(async (...args) => {
+      if (args[2] === undefined) throw new Error('Extraction cursor requires its pass lifetime')
+      entered.resolve(args[2]); await release.promise
+      return writeCursor(...args)
+    })
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      const signal = await entered.promise
+      const previous = { ...switches }
+      switches.extraction = false
+      h.ctx.emit('settings/updated', MEMORY_SETTINGS_NAMESPACE, switches, previous, 'update')
+      expect(signal.aborted).toBe(true)
+      release.resolve(undefined)
+      await setImmediate()
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['commit', 'attach', 'detach'] as const)('cancels queued extraction after settings %s', async (change) => {
+    const switches = { enabled: true, extraction: true, consolidation: false, recall: false }
+    const h = await harness({ memory: { extraction: change !== 'detach' },
+      beforeService: (owner) => { if (change === 'commit') owner.provide('settings', settingsStub(switches) as never) } })
+    let settingsFiber: ReturnType<Context['plugin']> | undefined
+    if (change === 'detach') {
+      settingsFiber = h.ctx.plugin(MemorySettings, { doc: { memory: switches } })
+      await settingsFiber
+      await vi.waitFor(() => { expect(h.service.switches().extraction).toBe(true) })
+    }
+    const requested = Promise.withResolvers<AbortSignal>(), grant = Promise.withResolvers<undefined>()
+    let invoked = false, released = 0
+    const budget: Pick<Context['resourceBudget'], 'acquire'> = { async acquire(request) {
+      if (request.signal === undefined) throw new Error('Curation admission requires its lifetime')
+      requested.resolve(request.signal)
+      await grant.promise
+      return { signal: new AbortController().signal, release: async () => { released++ }, uncertain: async () => {} }
+    } }
+    h.ctx.provide('resourceBudgetRequired', true)
+    h.ctx.provide('resourceBudget', budget as Context['resourceBudget'])
+    class Adapter extends LlmAdapter {
+      override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return { provider, id: model, name: model }
+      }
+      async *stream(): AsyncIterable<StreamChunk> { invoked = true; yield* textTurn('done') }
+    }
+    await actualLlm(h.ctx, new Adapter())
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      const signal = await requested.promise
+      h.ctx.emit('memory/switches-updated')
+      expect(signal.aborted).toBe(false)
+      const previous = { ...switches }
+      if (change === 'detach') await settingsFiber!.dispose()
+      else {
+        switches.extraction = false
+        if (change === 'commit') h.ctx.emit('settings/updated', MEMORY_SETTINGS_NAMESPACE, switches, previous, 'update')
+        else {
+          h.ctx.provide('settings', settingsStub(switches) as never)
+          await vi.waitFor(() => { expect(h.service.switches().extraction).toBe(false) })
+        }
+      }
+      expect(h.service.switches().extraction).toBe(false)
+      expect(signal.aborted).toBe(true)
+      grant.resolve(undefined)
+      await h.curation.dispose()
+      expect(invoked).toBe(false)
+      expect(released).toBe(1)
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { grant.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('continues enabled consolidation after cancelling extraction and waiting for its stream cleanup', async () => {
+    const switches = { enabled: true, extraction: true, consolidation: true, recall: true }
+    const h = await harness({ memory: { extraction: true, consolidation: true }, curation: { consolidationMinChanges: 1 },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) } })
+    h.ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
+    await h.service.memberSave({ scope: { kind: 'personal' }, key: 'release-rule', kind: 'guidance',
+      summary: 'release rule', content: 'PRIVATE_PENDING_BODY' })
+    const entered = Promise.withResolvers<AbortSignal>(), release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(h.ctx, [async function* (options) {
+      entered.resolve(options.signal!)
+      await release.promise
+      yield* textTurn('done')
+    }, textTurn('consolidated')])
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      const signal = await entered.promise
+      h.ctx.emit('settings/updated', 'unrelated-curation-test' as typeof MEMORY_SETTINGS_NAMESPACE, {}, {}, 'update')
+      switches.recall = false
+      h.ctx.emit('settings/updated', MEMORY_SETTINGS_NAMESPACE, switches, switches, 'update')
+      expect(signal.aborted).toBe(false)
+      const previous = { ...switches }
+      switches.extraction = false
+      h.ctx.emit('settings/updated', MEMORY_SETTINGS_NAMESPACE, switches, previous, 'update')
+      expect(signal.aborted).toBe(true)
+      expect(calls).toHaveLength(1)
+      expect(await h.service.getCursor(memoryConsolidationCursorKey({ kind: 'personal' }))).not.toHaveProperty('lastRunAt')
+      release.resolve(undefined)
+      await vi.waitFor(async () => {
+        expect((await h.service.getCursor(memoryConsolidationCursorKey({ kind: 'personal' })))?.lastRunAt).toBeDefined()
+      })
+      expect(calls).toHaveLength(2)
+      expect(calls[1]!.signal!.aborted).toBe(false)
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['enabled', 'extraction'] as const)('withdraws extraction during a pending catalog when %s is disabled', async (setting) => {
+    const switches = { enabled: true, extraction: true, consolidation: false, recall: false }
+    const h = await harness({ memory: { extraction: true },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) } })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(h.ctx, [textTurn('done')])
+    const entries = h.service.entries.bind(h.service)
+    vi.spyOn(h.service, 'entries').mockImplementation(async (...args) => {
+      const result = await entries(...args)
+      entered.resolve(undefined); await release.promise
+      return result
+    })
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      await entered.promise
+      switches[setting] = false
+      release.resolve(undefined)
+      await setImmediate()
+      expect(calls).toHaveLength(0)
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['memory_read', 'memory_search'] as const)('withdraws extraction after a pending %s before another model round', async (name) => {
+    const switches = { enabled: true, extraction: true, consolidation: false, recall: false }
+    const h = await harness({ memory: { extraction: true },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) } })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    await h.service.memberSave({ scope: { kind: 'personal' }, key: 'release-rule', kind: 'guidance',
+      summary: 'release rule', content: 'PRIVATE_PENDING_BODY' })
+    const calls = fakeLlm(h.ctx, [toolCall(name, { scope: 'personal', key: 'release-rule', query: 'release' }), textTurn('done')])
+    if (name === 'memory_read') {
+      const read = h.service.read.bind(h.service)
+      vi.spyOn(h.service, 'read').mockImplementation(async (...args) => {
+        const result = await read(...args)
+        entered.resolve(undefined); await release.promise
+        return result
+      })
+    } else {
+      const search = h.service.search.bind(h.service)
+      vi.spyOn(h.service, 'search').mockImplementation(async (...args) => {
+        const result = await search(...args)
+        entered.resolve(undefined); await release.promise
+        return result
+      })
+    }
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      await entered.promise
+      switches.enabled = false
+      release.resolve(undefined)
+      await setImmediate()
+      expect(calls).toHaveLength(1)
+      expect(await h.service.getCursor(memoryExtractionCursorKey(h.agent.id))).toBeUndefined()
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each([0, 0.5, Number.MAX_SAFE_INTEGER + 1])('rejects unsupported configured output limit %s', (maxOutputTokens) => {
+    expect(() => MemoryCuration.Config({ maxOutputTokens } as MemoryCuration.Config)).toThrow()
+  })
+
+  it('uses the configured independent model output cap', async () => {
+    const { ctx, agent } = await harness({ memory: { extraction: true }, curation: { maxOutputTokens: 32 } })
+    const calls = fakeLlm(ctx, [textTurn('no memories saved')])
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await vi.waitFor(() => { expect(calls).toHaveLength(1) })
+      expect(calls[0]!.maxTokens).toBe(32)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it.each(['acknowledgement', 'memory-write'])('retains pending extraction and its participant after a later %s turn', async (later) => {
+    const { ctx, agent, service } = await harness({ memory: { space: 'project', extraction: true } })
+    const identity = new AsyncLocalStorage<number>()
+    ctx.provide('executionAuthority', {
+      capture: (owner: Agent): ExecutionInheritance => ({
+        parentSessionId: owner.id, inputs: [], unverifiedHistory: false, primaryActorUserId: identity.getStore()!,
+      }),
+      runCaptured: <T>(_owner: Agent, scope: ExecutionInheritance, work: () => T): T => identity.run(scope.primaryActorUserId!, work),
+      authorize: async () => ({ inputs: [], primaryActorUserId: identity.getStore() }),
+    } as never)
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(ctx, [async function* () {
+      entered.resolve(undefined)
+      await release.promise
+      yield* textTurn('no memories saved')
+    }, textTurn('no memories saved')])
+    try {
+      identity.run(1, () => { humanTurn(agent, 'review the first participant', 1) })
+      await entered.promise
+      identity.run(2, () => { humanTurn(agent, 'review the second participant', 2) })
+      const pendingSeq = agent.session.seq - 1
+      identity.run(3, () => {
+        const session = agent.session
+        session.append('turn/start', { turn: 3 })
+        session.append('user/message', createUserMessage({
+          source: { kind: 'user' }, content: [{ type: 'text', text: later === 'acknowledgement' ? 'thanks' : 'remember this other fact' }],
+        }), { surfaceOp: 'append' })
+        if (later === 'memory-write') session.append('tool/call', { turn: 3, step: 0, callId: ToolCallId('later-write'), name: 'memory_save', arguments: '{}' })
+        session.append('turn/end', { turn: 3, reason: { kind: 'completed' } })
+      })
+      release.resolve(undefined)
+      await vi.waitFor(async () => {
+        expect((await service.getCursor(memoryExtractionCursorKey(agent.id)))?.lastSeq).toBe(pendingSeq)
+      })
+      expect(calls.map(call => call.executionIdentity?.primaryActorUserId)).toEqual([1, 2])
+      expect(JSON.stringify(calls[1]!.messages)).toContain('review the second participant')
+      expect(JSON.stringify(calls[1]!.messages)).not.toContain(later === 'acknowledgement' ? 'thanks' : 'remember this other fact')
+    } finally {
+      release.resolve(undefined)
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('retains each queued turn’s own execution identity', async () => {
+    const { ctx, agent, service } = await harness({ memory: { space: 'project', extraction: true } })
+    const identity = new AsyncLocalStorage<number>()
+    ctx.provide('executionAuthority', {
+      capture: (owner: Agent): ExecutionInheritance => ({
+        parentSessionId: owner.id, inputs: [], unverifiedHistory: false, primaryActorUserId: identity.getStore()!,
+      }),
+      runCaptured: <T>(_owner: Agent, scope: ExecutionInheritance, work: () => T): T => identity.run(scope.primaryActorUserId!, work),
+      authorize: async () => ({ inputs: [], primaryActorUserId: identity.getStore() }),
+    } as never)
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(ctx, [async function* () {
+      entered.resolve(undefined)
+      await release.promise
+      yield* textTurn('no memories saved')
+    }, textTurn('no memories saved')])
+    try {
+      identity.run(1, () => { humanTurn(agent, 'review the first participant', 1) })
+      await entered.promise
+      identity.run(2, () => { humanTurn(agent, 'review the second participant', 2) })
+      const completedSeq = agent.session.seq - 1
+      release.resolve(undefined)
+      await vi.waitFor(async () => {
+        expect((await service.getCursor(memoryExtractionCursorKey(agent.id)))?.lastSeq).toBe(completedSeq)
+      })
+      expect(calls.map(call => call.executionIdentity?.primaryActorUserId)).toEqual([1, 2])
+    } finally {
+      release.resolve(undefined)
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('leaves the primary turn intact when execution cannot be captured', async () => {
+    const { ctx, agent } = await harness({ memory: { extraction: true } })
+    ctx.provide('executionAuthority', { capture() { throw new Error('execution owner is unavailable') } } as never)
+    const calls = fakeLlm(ctx, [textTurn('no memories saved')])
+    try {
+      expect(() => { humanTurn(agent) }).not.toThrow()
+      expect(calls).toEqual([])
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('refuses a queued pass after its issuing execution provider is replaced', async () => {
+    const { ctx, agent, service } = await harness({ memory: { extraction: true } })
+    const remove = ctx.provide('executionAuthority', { ...localExecution } as never)
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const calls = fakeLlm(ctx, [async function* () {
+      entered.resolve(undefined)
+      await release.promise
+      yield* textTurn('no memories saved')
+    }])
+    const debug = vi.spyOn(ctx.logger, 'debug')
+    try {
+      humanTurn(agent, 'review the first participant', 1)
+      await entered.promise
+      humanTurn(agent, 'review the second participant', 2)
+      remove()
+      ctx.provide('executionAuthority', { ...localExecution } as never)
+      release.resolve(undefined)
+      await vi.waitFor(() => {
+        expect(debug.mock.calls.some(call => String(call[0]).includes('execution authority was replaced'))).toBe(true)
+      })
+      expect(calls).toHaveLength(1)
+      expect(await service.getCursor(memoryExtractionCursorKey(agent.id))).toBeUndefined()
+    } finally {
+      release.resolve(undefined)
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('runs one purpose:memory extraction call after a completed human turn and stamps the saved entry', async () => {
     const { ctx, agent, service } = await harness({ memory: { extraction: true } })
+    const recorded: MemoryCuration.MemoryCurationRequestEventData[] = []
+    ctx.on('session/event', (_session, event) => {
+      if (event.type === 'memory/curation-request') recorded.push(event.data)
+    })
     const calls = fakeLlm(ctx, [
       toolCall('memory_save', { key: 'release-window', kind: 'background', summary: 'release freeze on fridays', content: 'No deploys on Fridays.' }),
       textTurn('release-window'),
     ])
     appendHeader(agent.session)
     humanTurn(agent)
+    const endSeq = agent.session.seq - 1
     await vi.waitFor(() => { expect(calls).toHaveLength(2) })
     await vi.waitFor(async () => {
       expect(await service.read({ kind: 'personal' }, 'release-window')).toBeDefined()
@@ -162,6 +728,14 @@ describe('memory-curation extraction', () => {
     expect(calls[0]!.model).toBe('test-model')
     expect(calls[0]!.sessionId).toBe(agent.session.id)
     expect(calls[0]!.tools).toEqual(HEADER_TOOLS)
+    expect(recorded).toHaveLength(2)
+    expect(recorded).toEqual(calls.map((call, round) => {
+      const {
+        sessionId: _session, signal: _signal, purpose: _purpose,
+        resourceOrigin: _origin, executionIdentity: _identity, ...request
+      } = call
+      return { kind: 'extraction', round, request }
+    }))
     // The replayed prefix ends with the extraction instruction.
     const last = calls[0]!.messages.at(-1)!
     expect(last.role).toBe('user')
@@ -172,7 +746,7 @@ describe('memory-curation extraction', () => {
     expect(instruction).toContain('<saved_memory_catalog>')
     await vi.waitFor(async () => {
       expect((await service.getCursor(memoryExtractionCursorKey(agent.session.id)))?.lastSeq)
-        .toBe(agent.session.seq - 1)
+        .toBe(endSeq)
     })
     await ctx.fiber.dispose()
   })
@@ -367,6 +941,34 @@ describe('memory-curation extraction', () => {
 })
 
 describe('memory-curation consolidation', () => {
+  it.each(['enabled', 'consolidation'] as const)('withdraws consolidation during a pending scope read when %s is disabled', async (setting) => {
+    const switches = { enabled: true, extraction: false, consolidation: true, recall: false }
+    const h = await harness({ memory: { consolidation: true }, curation: { consolidationMinChanges: 1 },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) } })
+    h.ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
+    await h.service.memberSave({ scope: { kind: 'personal' }, key: 'release-rule', kind: 'guidance',
+      summary: 'release rule', content: 'PRIVATE_PENDING_BODY' })
+    const cursorKey = memoryConsolidationCursorKey({ kind: 'personal' })
+    const before = await h.service.getCursor(cursorKey)
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const entries = h.service.entries.bind(h.service)
+    vi.spyOn(h.service, 'entries').mockImplementation(async (...args) => {
+      const result = await entries(...args)
+      entered.resolve(undefined); await release.promise
+      return result
+    })
+    const calls = fakeLlm(h.ctx, [textTurn('done')])
+    try {
+      appendHeader(h.agent.session); humanTurn(h.agent)
+      await entered.promise
+      switches[setting] = false
+      release.resolve(undefined)
+      await setImmediate()
+      expect(calls).toHaveLength(0)
+      expect(await h.service.getCursor(cursorKey)).toEqual(before)
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
   /** Boot consolidation over a pre-seeded personal scope. */
   async function seeded(curation?: Partial<MemoryCuration.Config>) {
     const h = await harness({ memory: { consolidation: true }, curation: { consolidationMinChanges: 1, ...curation } })
@@ -405,6 +1007,133 @@ describe('memory-curation consolidation', () => {
       expect(cursor?.lastDigest).toBeDefined()
     })
     await ctx.fiber.dispose()
+  })
+
+  it.each(['memory_search', 'memory_read', 'memory_save', 'memory_delete'] as const)(
+    'keeps %s inside the scope selected for consolidation', async (name) => {
+      const { ctx, agent, service } = await seeded()
+      const workspace = { kind: 'workspace' as const, directory: '/repo' }
+      await service.memberSave({
+        scope: workspace, key: 'workspace-only', kind: 'guidance',
+        summary: 'private workspace fact', content: 'workspace-only-body',
+      })
+      const calls = fakeLlm(ctx, [
+        toolCall(name, {
+          scope: 'workspace', query: 'workspace-only', key: name === 'memory_save' ? 'cross-write' : 'workspace-only',
+          kind: 'guidance', summary: 'cross scope write', content: 'unreviewed change',
+        }),
+        textTurn('no changes'),
+      ])
+      try {
+        appendHeader(agent.session)
+        humanTurn(agent)
+        await vi.waitFor(() => { expect(calls.length).toBeGreaterThanOrEqual(2) })
+        const result = calls[1]!.messages.filter(message => message.role === 'tool')
+          .flatMap(message => message.content).flatMap(block => block.type === 'text' ? [block.text] : []).join('\n')
+        expect(result).toContain('scope is unavailable in this request')
+        expect(result).not.toContain('workspace-only-body')
+        expect((await service.read(workspace, 'workspace-only'))?.content).toBe('workspace-only-body')
+        expect(await service.read(workspace, 'cross-write')).toBeUndefined()
+      } finally { await ctx.fiber.dispose() }
+    },
+  )
+
+  it('searches only the selected consolidation scope when no filter is supplied', async () => {
+    const { ctx, agent, service } = await seeded()
+    await service.memberSave({
+      scope: { kind: 'workspace', directory: '/repo' }, key: 'workspace-only', kind: 'guidance',
+      summary: 'workspace-only fact', content: 'workspace-only-body',
+    })
+    const calls = fakeLlm(ctx, [toolCall('memory_search', { query: 'workspace-only' }), textTurn('no changes')])
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await vi.waitFor(() => { expect(calls.length).toBeGreaterThanOrEqual(2) })
+      const result = calls[1]!.messages.filter(message => message.role === 'tool')
+        .flatMap(message => message.content).flatMap(block => block.type === 'text' ? [block.text] : []).join('\n')
+      expect(result).toBe('No saved memory matches "workspace-only".')
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('uses the selected workspace scope when a consolidation tool omits its scope', async () => {
+    const { ctx, agent, service } = await harness({ memory: { consolidation: true }, curation: { consolidationMinChanges: 1 } })
+    ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
+    const workspace = { kind: 'workspace' as const, directory: '/repo' }
+    await service.memberSave({ scope: workspace, key: 'obsolete', kind: 'guidance', summary: 'old fact', content: 'old body' })
+    const calls = fakeLlm(ctx, [toolCall('memory_delete', { key: 'obsolete' }), textTurn('deleted obsolete')])
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await vi.waitFor(() => { expect(calls).toHaveLength(2) })
+      expect(await service.read(workspace, 'obsolete')).toBeUndefined()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('reviews a concurrent member change in the pending pass instead of clearing its marker', async () => {
+    const { ctx, agent, service } = await seeded()
+    let entered!: () => void
+    let release!: () => void
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    const held = new Promise<void>((resolve) => { release = resolve })
+    const calls = fakeLlm(ctx, [
+      async function* () { entered(); await held; yield* textTurn('no changes') },
+      textTurn('no changes'),
+    ])
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await started
+      await service.memberSave({
+        scope: { kind: 'personal' }, key: 'concurrent-member', kind: 'guidance',
+        summary: 'new member fact', content: 'This fact arrived after the first model request.',
+      })
+      humanTurn(agent, 'review the new member fact', 2)
+      release()
+      await vi.waitFor(() => { expect(calls).toHaveLength(2) })
+      expect(JSON.stringify(calls[0]!.messages)).not.toContain('concurrent-member')
+      expect(JSON.stringify(calls[1]!.messages)).toContain('concurrent-member')
+      await vi.waitFor(async () => {
+        expect((await service.getCursor(memoryConsolidationCursorKey({ kind: 'personal' })))?.changedSince).toBe(0)
+      })
+    } finally {
+      release()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('keeps a member change that arrives after an empty scope snapshot eligible for review', async () => {
+    const { ctx, agent, service } = await seeded()
+    for (const key of ['release-window', 'deploy-policy']) await service.memberDelete({ scope: { kind: 'personal' }, key })
+    let entered!: () => void
+    let release!: () => void
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    const held = new Promise<void>((resolve) => { release = resolve })
+    const entries = service.entries.bind(service)
+    vi.spyOn(service, 'entries').mockImplementationOnce(async (scope) => {
+      const snapshot = await entries(scope)
+      entered()
+      await held
+      return snapshot
+    })
+    const calls = fakeLlm(ctx, [textTurn('no changes')])
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await started
+      await service.memberSave({
+        scope: { kind: 'personal' }, key: 'arrived-after-empty', kind: 'guidance', summary: 'new', content: 'review this fact',
+      })
+      humanTurn(agent, 'review the new fact', 2)
+      release()
+      await vi.waitFor(() => { expect(calls).toHaveLength(1) })
+      expect(JSON.stringify(calls[0]!.messages)).toContain('arrived-after-empty')
+      await vi.waitFor(async () => {
+        expect((await service.getCursor(memoryConsolidationCursorKey({ kind: 'personal' })))?.changedSince).toBe(0)
+      })
+    } finally {
+      release()
+      await ctx.fiber.dispose()
+    }
   })
 
   it('is idempotent: a run commits a digest that suppresses repeats until content actually changes', async () => {
@@ -561,6 +1290,54 @@ describe('memory-curation tool dispatch', () => {
     await ctx.fiber.dispose()
   })
 
+  it.each([null, 'unknown', 'project', 0, {}])('refuses an explicit invalid extraction scope %j', async (scope) => {
+    const { ctx, agent, service } = await harness({ memory: { extraction: true } })
+    const calls = fakeLlm(ctx, [toolCall('memory_save', {
+      scope, key: 'wrong-scope', kind: 'guidance', summary: 'invalid scope', content: 'must not be saved',
+    }), textTurn('no memories saved')])
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await vi.waitFor(() => { expect(calls).toHaveLength(2) })
+      const results = calls[1]!.messages.filter(message => message.role === 'tool')
+        .flatMap(message => message.content).flatMap(block => block.type === 'text' ? [block.text] : [])
+      expect(results).toEqual(['The requested memory scope is unavailable in this request.'])
+      expect(await service.read({ kind: 'personal' }, 'wrong-scope')).toBeUndefined()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('stops tool execution and subsequent rounds when memory is disabled during a dispatched pass', async () => {
+    const switches = { enabled: true, extraction: true, consolidation: false, recall: false }
+    const { ctx, agent, service } = await harness({
+      memory: { extraction: true },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) },
+    })
+    await service.memberSave({
+      scope: { kind: 'personal' }, key: 'retained', kind: 'guidance', summary: 'private fact', content: 'retained private body',
+    })
+    const calls = fakeLlm(ctx, [async function* () {
+      switches.enabled = false
+      yield* [
+        ...rawCall('memory_search', '{"query":"retained"}', 'disabled-search', 0),
+        ...rawCall('memory_read', '{"key":"retained"}', 'disabled-read', 1),
+        ...rawCall('memory_save', '{"key":"new-entry","scope":"personal","kind":"guidance","summary":"new","content":"new body"}', 'disabled-save', 2),
+        ...rawCall('memory_delete', '{"key":"retained","scope":"personal"}', 'disabled-delete', 3),
+        ...rawCall('memory_read', '{"key":"retained","scope":"workspace"}', 'disabled-workspace', 4),
+        { type: 'finish', reason: { kind: 'stop' } } as const,
+      ]
+    }, textTurn('no memories saved')])
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await vi.waitFor(() => { expect(calls).toHaveLength(1) })
+      await setImmediate()
+      expect(calls).toHaveLength(1)
+      expect(await service.getCursor(memoryExtractionCursorKey(agent.id))).toBeUndefined()
+      expect((await service.read({ kind: 'personal' }, 'retained'))?.content).toBe('retained private body')
+      expect(await service.read({ kind: 'personal' }, 'new-entry')).toBeUndefined()
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('surfaces write refusals as model-facing error text', async () => {
     const { ctx, agent, service } = await harness({
       memory: { extraction: true, space: 'personal' },
@@ -617,18 +1394,16 @@ describe('memory-curation tool dispatch', () => {
     await ctx.fiber.dispose()
   })
 
-  it('turns a project write denial into an error result', async () => {
+  it('returns project write denials while pass qualification remains available', async () => {
     const { ctx, agent } = await harness({ memory: { space: 'project', extraction: true } })
-    ctx.provide('executionAuthority', {
-      authorize: vi.fn()
-        .mockResolvedValueOnce({ inputs: ['input-1'] })
-        .mockResolvedValueOnce({ inputs: ['input-1'] })
-        .mockRejectedValue(new RemoteError('execution/forbidden', 'denied', { capability: 'memory' })),
-    } as never)
-    await ctx.memory.save({
+    await ctx.memory.memberSave({
       scope: { kind: 'project' }, key: 'launch-date', kind: 'background',
       summary: 'launch on october thirtieth', content: 'Launch is 2026-10-30.',
-    }, writer(agent))
+    })
+    fakeAuthority(ctx, { inputs: ['input-1'] })
+    const denied = new RemoteError('execution/forbidden', 'denied', { capability: 'memory' })
+    vi.spyOn(ctx.memory, 'save').mockRejectedValue(denied)
+    vi.spyOn(ctx.memory, 'delete').mockRejectedValue(denied)
     const calls = fakeLlm(ctx, [
       [
         ...rawCall('memory_search', '{"query":"launch"}', 's-1', 0),
@@ -678,6 +1453,100 @@ describe('memory-curation tool dispatch', () => {
 })
 
 describe('memory-curation lanes and gating', () => {
+  it.each(['extraction', 'consolidation'].flatMap(kind => ['revocation', 'replacement'].map(change => ({ kind, change }))))(
+    'rechecks $kind authority when a queued cursor commits after $change', async ({ kind, change }) => {
+      const h = await harness({ memory: { space: 'project', extraction: kind === 'extraction', consolidation: kind === 'consolidation' },
+        curation: { consolidationMinChanges: 1 } })
+      h.ctx.provide('tools', { schemas: () => [...HEADER_TOOLS] } as never)
+      await h.service.memberSave({ scope: { kind: 'project' }, key: 'retained', kind: 'guidance', summary: 'Retained', content: 'Retained body' })
+      const hold = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+      const queued = Promise.withResolvers<undefined>()
+      let blocked = false, allowed = true
+      const authority = { ...localExecution, authorize: async () => {
+        if (blocked) { blocked = false; hold.resolve(undefined); await release.promise }
+        if (!allowed) throw new Error('memory qualification revoked')
+        return { inputs: [], primaryActorUserId: 42 }
+      } }
+      const remove = h.ctx.provide('executionAuthority', authority as never)
+      const debug = vi.spyOn(h.ctx.logger, 'debug')
+      let pending: Promise<unknown> | undefined
+      if (kind === 'extraction') {
+        const write = h.service.writeCursor.bind(h.service)
+        vi.spyOn(h.service, 'writeCursor').mockImplementation((...args) => { const result = write(...args); queued.resolve(undefined); return result })
+      } else {
+        const write = h.service.writeCursorIfUnchanged.bind(h.service)
+        vi.spyOn(h.service, 'writeCursorIfUnchanged').mockImplementation((...args) => { const result = write(...args); queued.resolve(undefined); return result })
+      }
+      fakeLlm(h.ctx, [async function* () {
+        blocked = true
+        pending = h.service.save({ scope: { kind: 'project' }, key: 'holding', kind: 'guidance', summary: 'Holding', content: 'Owned write' }, writer(h.agent))
+        await hold.promise
+        yield* textTurn('no changes')
+      }])
+      try {
+        appendHeader(h.agent.session); humanTurn(h.agent)
+        await queued.promise
+        if (change === 'revocation') allowed = false
+        else { remove(); fakeAuthority(h.ctx, { inputs: [], primaryActorUserId: 77 }) }
+        release.resolve(undefined)
+        const held = await pending!.then(value => ({ value }), (error: unknown) => ({ error }))
+        expect(held).toHaveProperty('error')
+        if ('error' in held) expect(String(held.error)).toMatch(/revoked|authorization changed/i)
+        const key = kind === 'extraction' ? memoryExtractionCursorKey(h.agent.id) : memoryConsolidationCursorKey({ kind: 'project' })
+        await vi.waitFor(async () => {
+          const cursor = await h.service.getCursor(key)
+          expect((kind === 'extraction' ? cursor?.lastSeq !== undefined : cursor?.lastRunAt !== undefined)
+            || debug.mock.calls.some(call => /memory curation.*failed/.test(String(call[0])))).toBe(true)
+        })
+        const cursor = await h.service.getCursor(key)
+        expect(kind === 'extraction' ? cursor?.lastSeq : cursor?.lastRunAt).toBeUndefined()
+      } finally { release.resolve(undefined); await pending?.catch(() => undefined); await h.ctx.fiber.dispose() }
+    })
+
+  it('does not publish extraction progress after cancellation while its cursor is queued', async () => {
+    const { ctx, agent, service, curation } = await harness({ memory: { space: 'project', extraction: true } })
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const queued = Promise.withResolvers<undefined>()
+    let holdAuthorization = false
+    let holding: ReturnType<typeof service.save> | undefined
+    ctx.provide('executionAuthority', {
+      ...localExecution,
+      authorize: async () => {
+        if (holdAuthorization) { holdAuthorization = false; entered.resolve(undefined); await release.promise }
+        return { inputs: [], primaryActorUserId: 7 }
+      },
+    })
+    const writeCursor = service.writeCursor.bind(service)
+    vi.spyOn(service, 'writeCursor').mockImplementation((...args) => {
+      const result = writeCursor(...args)
+      queued.resolve(undefined)
+      return result
+    })
+    fakeLlm(ctx, [async function* () {
+      holdAuthorization = true
+      holding = service.save({
+        scope: { kind: 'project' }, key: 'holding', kind: 'guidance', summary: 'independent write', content: 'another operation',
+      }, writer(agent))
+      await entered.promise
+      yield* textTurn('no memories saved')
+    }])
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await queued.promise
+      ctx.emit('session/disposed', agent.session)
+      const stopped = curation.dispose()
+      release.resolve(undefined)
+      await Promise.all([holding, stopped])
+      expect(await service.getCursor(memoryExtractionCursorKey(agent.id))).toBeUndefined()
+    } finally {
+      release.resolve(undefined)
+      if (holding !== undefined) await holding
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('ignores out-of-turn and non-human events in the turn fold', async () => {
     const { ctx, agent } = await harness({ memory: { extraction: true } })
     const calls = fakeLlm(ctx, [textTurn('done')])
@@ -704,7 +1573,7 @@ describe('memory-curation lanes and gating', () => {
     await ctx.fiber.dispose()
   })
 
-  it('coalesces a second completed turn into one pending pass', async () => {
+  it('coalesces successive completed turns into the latest eligible pending pass', async () => {
     const { ctx, agent } = await harness({ memory: { extraction: true } })
     let releaseFirst!: () => void
     const gate = new Promise<void>((resolve) => { releaseFirst = resolve })
@@ -715,12 +1584,15 @@ describe('memory-curation lanes and gating', () => {
     appendHeader(agent.session)
     humanTurn(agent, 'first real question', 1)
     await vi.waitFor(() => { expect(calls).toHaveLength(1) })
-    humanTurn(agent, 'second real question', 2)
+    humanTurn(agent, 'thanks', 2)
+    humanTurn(agent, 'second real question', 3)
+    humanTurn(agent, 'third real question', 4)
+    const completedSeq = agent.session.seq - 1
     releaseFirst()
     await vi.waitFor(() => { expect(calls).toHaveLength(2) })
     await vi.waitFor(async () => {
       expect((await ctx.memory.getCursor(memoryExtractionCursorKey(agent.session.id)))?.lastSeq)
-        .toBe(agent.session.seq - 1)
+        .toBe(completedSeq)
     })
     await ctx.fiber.dispose()
   })
@@ -841,6 +1713,162 @@ describe('memory-curation lanes and gating', () => {
 })
 
 describe('memory-curation consolidation gates', () => {
+  it.each(['model', 'cursor'] as const)('keeps a shared project scope within one consolidation interval across concurrent Sessions during %s', async (phase) => {
+    const { ctx, agent, service } = await harness({ memory: { space: 'project', consolidation: true },
+      curation: { consolidationMinChanges: 1 } })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const firstFinished = Promise.withResolvers<undefined>(), secondFinished = Promise.withResolvers<undefined>()
+    try {
+      const other = agentFor(ctx, 'curation-peer', { cwd: '/repo' })
+      other.options.provider = 'test-provider'; other.options.model = 'test-model'
+      vi.spyOn(ctx.agents, 'get').mockImplementation(id => id === agent.id ? agent : id === other.id ? other : undefined)
+      const actor = new AsyncLocalStorage<number>()
+      ctx.provide('executionAuthority', {
+        capture: (owner: Agent): ExecutionInheritance => ({ parentSessionId: owner.id, inputs: [], unverifiedHistory: false,
+          primaryActorUserId: owner === agent ? 1 : 2 }),
+        runCaptured: <T>(_owner: Agent, scope: ExecutionInheritance, work: () => T): T => actor.run(scope.primaryActorUserId!, work),
+        authorize: async () => ({ inputs: [], primaryActorUserId: actor.getStore() }),
+      } as never)
+      ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
+      await service.save({ scope: { kind: 'project' }, key: 'release', kind: 'guidance',
+        summary: 'Release schedule', content: 'Release on Friday.' }, writer(agent))
+      if (phase === 'cursor') {
+        const publish = service.writeCursorIfUnchanged.bind(service)
+        let first = true
+        vi.spyOn(service, 'writeCursorIfUnchanged').mockImplementation(async (...args) => {
+          if (first) { first = false; entered.resolve(undefined); await release.promise }
+          return publish(...args)
+        })
+      }
+      observeScopeDecisions(service, (owner) => { (owner === agent ? firstFinished : secondFinished).resolve(undefined) })
+      const calls = fakeLlm(ctx, [async function* () {
+        if (phase === 'model') { entered.resolve(undefined); await release.promise }
+        yield* textTurn('no changes')
+      }, textTurn('no changes')])
+      humanTurn(agent)
+      await entered.promise
+      humanTurn(other, 'PRIVATE_SECOND: this conversation stays private')
+      await secondFinished.promise
+      expect(calls).toHaveLength(1)
+      expect(calls[0]!.sessionId).toBe(agent.id)
+      expect(calls[0]!.executionIdentity?.primaryActorUserId).toBe(1)
+      expect(JSON.stringify(calls[0]!.messages)).not.toContain('PRIVATE_SECOND')
+      release.resolve(undefined)
+      await Promise.all([firstFinished.promise, secondFinished.promise])
+      expect(await service.getCursor(memoryConsolidationCursorKey({ kind: 'project' }))).toMatchObject({ changedSince: 0 })
+    } finally {
+      release.resolve(undefined)
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each([{ cwd: '/other' }, { cwd: '/repo', sshTarget: 7 }])('reviews independent workspace identities concurrently: %j', async (header) => {
+    const { ctx, agent, service } = await harness({ memory: { consolidation: true }, curation: { consolidationMinChanges: 1 } })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const firstFinished = Promise.withResolvers<undefined>(), secondFinished = Promise.withResolvers<undefined>()
+    try {
+      const other = agentFor(ctx, 'independent-curation', header)
+      other.options.provider = 'test-provider'; other.options.model = 'test-model'
+      vi.spyOn(ctx.agents, 'get').mockImplementation(id => id === agent.id ? agent : id === other.id ? other : undefined)
+      ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
+      for (const [owner, key] of [[agent, 'first-fact'], [other, 'second-fact']] as const) {
+        const scope = service.scopesFor(owner).find(scope => scope.kind === 'workspace')!
+        await service.save({ scope, key, kind: 'guidance', summary: key, content: key }, writer(owner))
+      }
+      observeScopeDecisions(service, (owner) => { (owner === agent ? firstFinished : secondFinished).resolve(undefined) })
+      const calls = fakeLlm(ctx, [async function* () {
+        entered.resolve(undefined)
+        await release.promise
+        yield* textTurn('no changes')
+      }, textTurn('no changes')])
+      humanTurn(agent)
+      await entered.promise
+      humanTurn(other)
+      await secondFinished.promise
+      expect(calls).toHaveLength(2)
+      expect(JSON.stringify(calls[0]!.messages)).toContain('first-fact')
+      expect(JSON.stringify(calls[1]!.messages)).toContain('second-fact')
+      release.resolve(undefined)
+      await firstFinished.promise
+    } finally { release.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
+  it.each(['failed', 'cancelled'] as const)('releases a %s scope review so a later Session can retry', async (outcome) => {
+    const { ctx, agent, service } = await harness({ memory: { space: 'project', consolidation: true }, curation: { consolidationMinChanges: 1 } })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    let finished = Promise.withResolvers<undefined>()
+    try {
+      const other = agentFor(ctx, 'retry-curation')
+      other.options.provider = 'test-provider'; other.options.model = 'test-model'
+      vi.spyOn(ctx.agents, 'get').mockImplementation(id => id === agent.id ? agent : id === other.id ? other : undefined)
+      ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
+      await service.save({ scope: { kind: 'project' }, key: 'retry-fact', kind: 'guidance', summary: 'Retry fact', content: 'Retained fact' }, writer(agent))
+      observeScopeDecisions(service, () => { finished.resolve(undefined) })
+      const calls = fakeLlm(ctx, [async function* () {
+        entered.resolve(undefined)
+        await release.promise
+        if (outcome === 'failed') throw new Error('Review storage is unavailable')
+        yield* textTurn('no changes')
+      }, textTurn('no changes')])
+      humanTurn(agent)
+      await entered.promise
+      if (outcome === 'cancelled') ctx.emit('session/disposed', agent.session)
+      release.resolve(undefined)
+      await finished.promise
+      expect((await service.getCursor(memoryConsolidationCursorKey({ kind: 'project' })))?.lastRunAt).toBeUndefined()
+      finished = Promise.withResolvers<undefined>()
+      humanTurn(other)
+      await finished.promise
+      expect(calls).toHaveLength(2)
+      expect(await service.getCursor(memoryConsolidationCursorKey({ kind: 'project' }))).toMatchObject({ changedSince: 0 })
+    } finally { release.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
+  it.each(['enabled', 'consolidation'] as const)('rechecks %s before starting another scope after an active review', async (disabled) => {
+    const switches = { enabled: true, extraction: false, consolidation: true, recall: false }
+    const { ctx, agent, service } = await harness({ memory: { consolidation: true }, curation: { consolidationMinChanges: 1 },
+      beforeService: (owner) => { owner.provide('settings', settingsStub(switches) as never) } })
+    const finished = Promise.withResolvers<undefined>()
+    try {
+      ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
+      for (const scope of service.scopesFor(agent)) await service.save({ scope, key: 'retained', kind: 'guidance', summary: 'Retained fact', content: 'Retained body' }, writer(agent))
+      observeScopeDecisions(service, () => { finished.resolve(undefined) })
+      const calls = fakeLlm(ctx, [async function* () {
+        switches[disabled] = false
+        yield* textTurn('no changes')
+      }])
+      humanTurn(agent)
+      await finished.promise
+      expect(calls).toHaveLength(1)
+      expect((await service.getCursor(memoryConsolidationCursorKey({ kind: 'workspace', directory: '/repo' })))?.lastRunAt).toBeUndefined()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('refuses later scopes after the captured execution provider is replaced', async () => {
+    const { ctx, agent, service } = await harness({ memory: { consolidation: true }, curation: { consolidationMinChanges: 1 } })
+    let finished = Promise.withResolvers<undefined>()
+    try {
+      const removeAuthority = ctx.provide('executionAuthority', { ...localExecution } as never)
+      ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
+      for (const scope of service.scopesFor(agent)) await service.save({ scope, key: 'retained', kind: 'guidance', summary: 'Retained fact', content: 'Retained body' }, writer(agent))
+      observeScopeDecisions(service, () => { finished.resolve(undefined) })
+      const calls = fakeLlm(ctx, [async function* () {
+        removeAuthority()
+        fakeAuthority(ctx, { inputs: ['replacement-input'] })
+        yield* textTurn('no changes')
+      }, textTurn('no changes')])
+      humanTurn(agent)
+      await finished.promise
+      expect(calls).toHaveLength(1)
+      expect((await service.getCursor(memoryConsolidationCursorKey({ kind: 'personal' })))?.lastRunAt).toBeUndefined()
+      expect((await service.getCursor(memoryConsolidationCursorKey({ kind: 'workspace', directory: '/repo' })))?.lastRunAt).toBeUndefined()
+      finished = Promise.withResolvers<undefined>()
+      humanTurn(agent, 'review with the current authority', 2)
+      await finished.promise
+      expect(calls.map(call => JSON.stringify(call.messages).includes('in the personal scope') ? 'personal' : 'workspace')).toEqual(['personal', 'personal', 'workspace'])
+    } finally { await ctx.fiber.dispose() }
+  })
+
   /** Boot consolidation with the change counter pre-armed. */
   async function armed(changedSince = 10) {
     const h = await harness({ memory: { consolidation: true }, curation: { consolidationMinChanges: 1 } })
@@ -960,10 +1988,91 @@ describe('memory-curation consolidation gates', () => {
 })
 
 describe('memory-curation teardown and remaining gates', () => {
+  it('stops the remaining memory tools when the plugin is disposed after the first write', async () => {
+    const { ctx, agent, service, curation } = await harness({ memory: { extraction: true } })
+    class Adapter extends LlmAdapter {
+      override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return { provider, id: model, name: model }
+      }
+      async *stream(): AsyncIterable<StreamChunk> {
+        yield* rawCall('memory_save', JSON.stringify({ key: 'first', kind: 'guidance', summary: 'first fact', content: 'first body' }), 'first', 0)
+        yield* rawCall('memory_save', JSON.stringify({ key: 'second', kind: 'guidance', summary: 'second fact', content: 'second body' }), 'second', 1)
+        yield { type: 'finish', reason: { kind: 'tool-calls' } }
+      }
+    }
+    await actualLlm(ctx, new Adapter())
+    const closed = Promise.withResolvers<undefined>()
+    let closing: Promise<void> | undefined
+    ctx.on('memory/changed', (_scope, key) => {
+      if (key !== 'first') return
+      closing = curation.dispose()
+      void closing.then(() => { closed.resolve(undefined) }, closed.reject)
+    })
+    try {
+      humanTurn(agent)
+      await closed.promise
+      expect((await service.entries({ kind: 'personal' })).map(entry => entry.key)).toEqual(['first'])
+      expect(await service.getCursor(memoryExtractionCursorKey(agent.id))).toBeUndefined()
+    } finally {
+      await closing
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('waits for the real model iterator cleanup even after session disposal removes its lane', async () => {
+    const { ctx, agent, curation } = await harness({ memory: { extraction: true } })
+    const entered = Promise.withResolvers<undefined>()
+    const cleanup = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    class Adapter extends LlmAdapter {
+      override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return { provider, id: model, name: model }
+      }
+      async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        entered.resolve(undefined)
+        try {
+          await new Promise<void>((_resolve, reject) => {
+            const signal = options.signal!
+            signal.addEventListener('abort', () => { reject(new Error('fixture stream aborted', { cause: signal.reason })) }, { once: true })
+          })
+        } finally {
+          cleanup.resolve(undefined)
+          await release.promise
+        }
+      }
+    }
+    await actualLlm(ctx, new Adapter())
+    let closing: Promise<void> | undefined
+    try {
+      humanTurn(agent)
+      await entered.promise
+      expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
+      ctx.emit('session/disposed', agent.session)
+      closing = curation.dispose()
+      let disposed = false
+      void closing.then(() => { disposed = true })
+      await cleanup.promise
+      await setImmediate()
+      expect(disposed).toBe(false)
+      expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
+      release.resolve(undefined)
+      await closing
+      expect(disposed).toBe(true)
+    } finally {
+      release.resolve(undefined)
+      await closing
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('aborts every live lane when the plugin unloads', async () => {
     const { ctx, agent, curation } = await harness({ memory: { extraction: true } })
     const calls = fakeLlm(ctx, [
-      () => (async function* (): AsyncIterable<StreamChunk> { await new Promise<void>(() => {}) })(),
+      options => (async function* (): AsyncIterable<StreamChunk> {
+        await new Promise<void>((resolve) => {
+          options.signal!.addEventListener('abort', () => { resolve() }, { once: true })
+        })
+      })(),
     ])
     appendHeader(agent.session)
     humanTurn(agent)
@@ -1003,24 +2112,27 @@ describe('memory-curation teardown and remaining gates', () => {
   })
 
   it('denies a seeded project consolidation quietly', async () => {
-    const { ctx, agent, service } = await harness({
+    const { ctx, agent, service, curation } = await harness({
       memory: { space: 'project', consolidation: true }, curation: { consolidationMinChanges: 1 },
     })
     ctx.provide('tools', { schemas: () => [...HEADER_TOOLS], get: () => undefined } as never)
-    ctx.provide('executionAuthority', {
-      authorize: vi.fn()
-        .mockResolvedValueOnce({ inputs: ['input-1'] })
-        .mockRejectedValue(new Error('memory writes denied')),
-    } as never)
-    await service.save({
+    await service.memberSave({
       scope: { kind: 'project' }, key: 'k', kind: 'background', summary: 's', content: 'c',
-    }, writer(agent))
+    })
+    const denied = Promise.withResolvers<undefined>()
+    ctx.provide('executionAuthority', {
+      ...localExecution,
+      authorize: async () => { denied.resolve(undefined); throw new Error('memory writes denied') },
+    } as never)
     const calls = fakeLlm(ctx, [textTurn('no changes')])
-    appendHeader(agent.session)
-    humanTurn(agent)
-    await new Promise(resolve => setTimeout(resolve, 30))
-    expect(calls).toHaveLength(0)
-    await ctx.fiber.dispose()
+    try {
+      appendHeader(agent.session)
+      humanTurn(agent)
+      await denied.promise
+      await curation.dispose()
+      expect(calls).toHaveLength(0)
+      expect((await service.getCursor(memoryConsolidationCursorKey({ kind: 'project' })))?.lastRunAt).toBeUndefined()
+    } finally { await ctx.fiber.dispose() }
   })
 
   it('routes consolidation at agent options when no request header exists', async () => {

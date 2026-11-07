@@ -15,7 +15,7 @@ const admin = { id: 1, role: 'admin', status: 'active', username: 'admin', displ
 const target = { kind: 'project' as const, id: 7 }
 const item = { ownerId: '00000000-0000-4000-8000-000000000001', sessionId: 'private-session', id: 'terminal-1', creatorUserId: 2, state: 'running' }
 
-async function fixture() {
+async function fixture(options: { beforeReply?: () => Promise<void>; beforeDispatch?: () => Promise<void> } = {}) {
   const signer = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'organization', 30_000)
   let live = true, generation = 4, output: unknown = [item], status = 200, allowed = true
   const requests: Array<{ path: string; args: unknown }> = []
@@ -28,6 +28,7 @@ async function fixture() {
       const claims = signer.verify(req.headers[PRINCIPAL_HEADER] as string)
       expect(claims).toMatchObject({ user: { id: 1 }, purpose: 'terminal-admin', runtime: { ...target, generation: 4 }, scope: { mode: 'ro' } })
       requests.push({ path: req.url!, args: body.payload.args })
+      await options.beforeReply?.()
       res.writeHead(status, { 'content-type': 'application/json' })
       res.end(JSON.stringify({ rpcId: body.rpcId, result: allowed ? { ok: true, value: req.url?.endsWith('adminList') ? output : undefined } : { ok: false, error: { code: 'terminal/forbidden', message: 'private runtime diagnostic' } } }))
     })().catch(error => { res.writeHead(500); res.end(String(error)) })
@@ -39,7 +40,7 @@ async function fixture() {
   const deps = {
     users, projects: { getById: async () => ({ name: 'Project' }) },
     instances: { isLive: async () => live, generationOf: async () => generation, operationRef,
-      portOf: async () => (server.address() as AddressInfo).port },
+      portOf: async () => { await options.beforeDispatch?.(); return (server.address() as AddressInfo).port } },
     cfg: { readinessTimeoutMs: 1000, upstreamResponseLimitBytes: 1_000_000 },
   } as unknown as GatewayDeps
   return { manager: new GatewayTerminalManagement(deps, signer, 'node-1'), users, operationRef, requests,
@@ -113,4 +114,32 @@ it('reports a failed lease release to diagnostics without masking the operation 
   }
   expect(f.requests).toHaveLength(2)
   expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4], [target, 1, 4], [target, -1, 4]])
+})
+
+it('refuses terminal metadata when administrator authority is withdrawn during the Runtime response', async () => {
+  let current = true
+  const f = await fixture({ beforeReply: async () => { current = false } })
+  f.users.getById.mockImplementation(async () => current ? admin : { ...admin, role: 'user' })
+  await expect(f.manager.list(admin, target)).rejects.toMatchObject({ status: 403 })
+  expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4]])
+})
+
+it.each(['list', 'close'] as const)('refuses %s dispatch after authority is withdrawn during port lookup', async method => {
+  let current = true
+  const f = await fixture({ beforeDispatch: async () => { current = false } })
+  f.users.getById.mockImplementation(async () => current ? admin : { ...admin, status: 'disabled' })
+  const result = method === 'list' ? f.manager.list(admin, target)
+    : f.manager.close(admin, target, { nodeId: 'node-1', generation: 4, ownerId: item.ownerId, id: item.id })
+  await expect(result).rejects.toMatchObject({ status: 403 })
+  expect(f.requests).toEqual([])
+  expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4]])
+})
+
+it('refuses inventory publication when authority is withdrawn during lease cleanup', async () => {
+  let current = true
+  const f = await fixture()
+  f.users.getById.mockImplementation(async () => current ? admin : { ...admin, role: 'user' })
+  f.operationRef.mockImplementation(async (_target, delta) => { if (delta === -1) current = false })
+  await expect(f.manager.list(admin, target)).rejects.toMatchObject({ status: 403 })
+  expect(f.requests).toHaveLength(1)
 })

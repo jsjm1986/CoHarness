@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-core-lint-current",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm/src/operations.ts packages/llm/llm/src/types.ts packages/llm/llm/tests/operations.spec.ts packages/web/web-search-deepseek/src/types.ts",
+  "startedAt": "2026-10-24T05:43:44.739798+00:00",
+  "seconds": 100.286,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "be0f255ddc6f4cbb46ad7ca688f672e2cdbbe59cfa6c2126a960ed282034014e",
+  "inputsAfter": "4096767d56645300216da117c9177d676bcdb6f9c7e4edf2eec5d04cc03cc879",
+  "postgresToolDirectory": null,
+  "outputSha256": "4e919b194a2dd248806b2823f2bff9a8da4b093edcb4e4f26e85053971540d8e",
+  "outputTail": "packages/llm/llm/src/index.ts:1037:13: error typescript(no-unnecessary-condition): Unnecessary comparison between literal values.\npackages/llm/llm/src/index.ts:1046:14: error typescript(no-unnecessary-condition): Unnecessary comparison between literal values.\npackages/llm/llm/src/index.ts:1110:11: error typescript(no-unnecessary-condition): Unnecessary comparison between literal values.\npackages/llm/llm/src/index.ts:1110:45: error typescript(no-unnecessary-condition): This condition will always return the same value since the types have no overlap.\n"
+}

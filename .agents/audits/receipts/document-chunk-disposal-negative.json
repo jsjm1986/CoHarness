@@ -1,0 +1,14 @@
+{
+  "name": "document-chunk-disposal-negative",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/local-fs.spec.ts -t 'cancels an accepted chunk body'",
+  "startedAt": "2026-10-25T20:41:54.690812+00:00",
+  "seconds": 4.059,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5064e47eb26121f08883fbc76350e5a436be9eee3d694e55160876e1070e9f25",
+  "inputsAfter": "5064e47eb26121f08883fbc76350e5a436be9eee3d694e55160876e1070e9f25",
+  "postgresToolDirectory": null,
+  "outputSha256": "504bd6a3be39873d3226e0f70af4cb2ba2ab93bf0dab8558626c1ce8060589cf",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/local-fs.spec.ts (34 tests | 1 failed | 33 skipped) 24ms\n   × cancels an accepted chunk body before disposal releases the filesystem engine 23ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/local-fs.spec.ts > cancels an accepted chunk body before disposal releases the filesystem engine\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ packages/attachment/userdoc-local/tests/local-fs.spec.ts:133:23\n    131|   try {\n    132|     await Promise.resolve()\n    133|     expect(cancelled).toBe(true)\n       |                       ^\n    134|     await disposed\n    135|     expect(await outcome).toEqual({ acknowledged: false })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 33 skipped (34)\n   Start at  04:41:58\n   Duration  336ms (transform 170ms, setup 45ms, import 175ms, tests 24ms, environment 0ms)\n\n"
+}

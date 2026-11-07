@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-server-source-corrected",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/vitest run packages/attachment/userdoc-gateway/tests/server.spec.ts",
+  "startedAt": "2026-10-26T17:44:38.266339+00:00",
+  "seconds": 12.124,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bce87baf477e57fa8adfcaea19b7c669577ec2a8271c17efb9b40952af1072da",
+  "inputsAfter": "bce87baf477e57fa8adfcaea19b7c669577ec2a8271c17efb9b40952af1072da",
+  "postgresToolDirectory": null,
+  "outputSha256": "c9d2878a464f6abf9a6066822b639d0d3bc10bddecb53099ebb95b46e00cd490",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-gateway/tests/server.spec.ts (4 tests | 1 failed) 5474ms\n   × sends a permission refusal before a raw upload source reaches EOF 5004ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-gateway/tests/server.spec.ts > sends a permission refusal before a raw upload source reaches EOF\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ packages/attachment/userdoc-gateway/tests/server.spec.ts:101:1\n     99| })\n    100|\n    101| it('sends a permission refusal before a raw upload source reaches EOF'…\n       | ^\n    102|   const server = await fixture(() => { throw new UserDocError('Documen…\n    103|   const abort = new AbortController(), source = new ReadableStream<Uin…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 3 passed (4)\n   Start at  01:44:43\n   Duration  7.13s (transform 1.02s, setup 162ms, import 1.21s, tests 5.47s, environment 0ms)\n\n"
+}

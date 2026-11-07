@@ -1,8 +1,33 @@
 /** User-document vocabulary. @module @deepseek-ai/dsh-userdoc/types */
 
-import type { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
+import type { UserDocDirectoryId, UserDocId, UserDocIncarnationId, UserDocTrashId, UserDocUploadId, UserDocUploadOwnerId } from './brand.ts'
+import type { Branded } from '@deepseek-ai/dsh-brand'
+
+/** Registered computer containing a document store; display names never select files. */
+export type UserDocComputerId = Branded<'RuntimeNodeId'>
 
 export type { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
+
+/** Version of one durable document incarnation, independent of its current path. */
+export interface UserDocIdentity {
+  readonly incarnationId: UserDocIncarnationId
+  readonly revision: number
+  /** Original publication actor, when the provider can identify it. */
+  readonly createdBy?: UserDocUploadOwnerId
+  readonly origin: 'upload' | 'transfer' | 'legacy' | 'admin'
+}
+
+/** Exact document version selected for a filesystem or ownership mutation. */
+export interface UserDocSelection {
+  readonly docId: UserDocId
+  readonly incarnationId: UserDocIncarnationId
+  readonly revision: number
+}
+
+/** One independently addressable trash action; restoring and retrashing produces another action id. */
+export interface UserDocTrashSelection extends UserDocSelection {
+  readonly trashId: UserDocTrashId
+}
 
 /** Wire protocol state for one resumable upload session. */
 export type UserDocUploadState = 'uploading' | 'verifying' | 'complete' | 'failed'
@@ -46,6 +71,8 @@ export interface UserDocRef {
   mediaType: string
   /** Storage modification time in epoch milliseconds. */
   modifiedAt: number
+  /** Durable publication identity; absent only on references serialized before identity-aware storage. */
+  readonly identity?: UserDocIdentity
 }
 
 /** Metadata for one ordinary directory below the document root. */
@@ -118,6 +145,10 @@ export interface UserDocTrashRef {
   readonly bytes: number
   readonly mediaType: string
   readonly modifiedAt: number
+  /** Durable publication identity; legacy serialized references can omit it. */
+  readonly identity?: UserDocIdentity
+  /** Unique action id; path reuse and retrashing cannot select another action. */
+  readonly trashId?: UserDocTrashId
 }
 
 /** One filtered page from a provider's recoverable trash. */
@@ -189,7 +220,7 @@ export interface UserDocUploadSession {
   readonly chunkBytes: number
   /** Contiguous bytes durably received from the beginning. */
   readonly receivedBytes: number
-  /** Session expiry timestamp in epoch milliseconds. */
+  /** Retention deadline in epoch milliseconds; accepted verification remains live until completion, failure or cancellation. */
   readonly expiresAt: number
   /** Current lifecycle state. */
   readonly state: UserDocUploadState
@@ -229,9 +260,24 @@ export interface StoredUserDoc {
 }
 
 /** Scope selector used by the Gateway's versioned snapshot-copy operation. */
-export type UserDocScope =
+export type UserDocScope = (
   | { readonly kind: 'personal' }
   | { readonly kind: 'project'; readonly projectId: number }
+) & { readonly nodeId?: UserDocComputerId; readonly nodeName?: string }
+
+/** Authorized document location, independent of Runtime allocation and process state. */
+export interface UserDocLocation {
+  readonly scope: UserDocScope
+  readonly name: string
+  readonly nodeName: string
+  readonly mode: 'ro' | 'rw'
+}
+
+/** Bounded account-owned location directory; absence from a page proves no deletion. */
+export interface UserDocLocationPage {
+  readonly items: readonly UserDocLocation[]
+  readonly nextCursor: string | null
+}
 
 /** One source document selected for a cross-scope copy. */
 export interface UserDocTransferSelection {
@@ -351,6 +397,7 @@ export interface UserDocCatalogRow {
     readonly id?: number
     readonly label: string
     readonly mode?: 'ro' | 'rw'
+    readonly nodeId?: UserDocComputerId
   }
   readonly docId: UserDocId
   readonly directoryId: string

@@ -1,0 +1,14 @@
+{
+  "name": "jobs-reentrant-event-order-probe-fixed",
+  "cwd": ".",
+  "command": "node --import tsx/esm .agents/audits/.local/jobs-reentrant-event-probe.mjs",
+  "startedAt": "2026-10-26T08:45:31.734168+00:00",
+  "seconds": 2.223,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "64102069e8561f320436c3adbfba6099b0d50037584c030022f623c74893f709",
+  "inputsAfter": "64102069e8561f320436c3adbfba6099b0d50037584c030022f623c74893f709",
+  "postgresToolDirectory": null,
+  "outputSha256": "e27bb49d0481185032c35f3444d7274a61eff91411bb51ad8ea2f0ac360cbb86",
+  "outputTail": "{\"observed\":[\"first:registered\",\"second:registered\",\"first:output\",\"second:output\"]}\n"
+}

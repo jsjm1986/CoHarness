@@ -1,0 +1,9 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, controlAuthorityReady]
+- insert:
+    - id: control-authority-runtime
+      name: './runtime.mjs'
+    - id: control-authority-model
+      name: './model.mjs'

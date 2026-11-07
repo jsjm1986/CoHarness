@@ -1,0 +1,14 @@
+{
+  "name": "document-io-ownership-build",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 node_modules/.bin/tsx scripts/build.ts",
+  "startedAt": "2026-10-25T21:06:45.305537+00:00",
+  "seconds": 71.34,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "76fe6cc6d3248a0b4ea7fdfb17ecec9fd473d20783c87bbea862d6f8f55a0906",
+  "inputsAfter": "76fe6cc6d3248a0b4ea7fdfb17ecec9fd473d20783c87bbea862d6f8f55a0906",
+  "postgresToolDirectory": null,
+  "outputSha256": "92a3be8fa1367b3a1bef6ef7fa179cfb3bdf5d3ce07f197c377e9f633eeb8e33",
+  "outputTail": "run-gates: build running 8 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start native addon\nrun-gates: PASS native addon (1.44s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (2.31s)\nrun-gates: start Host bundle\nrun-gates: PASS Host bundle (39.17s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (1.65s)\nrun-gates: start Client bundle\nrun-gates: PASS Client bundle (9.01s)\nrun-gates: start Web build\nrun-gates: PASS Web build (4.88s)\nrun-gates: start host aggregate check\nrun-gates: PASS host aggregate check (8.10s)\nrun-gates: start client aggregate check\nrun-gates: PASS client aggregate check (2.90s)\n\nrun-gates: 8 passed, 0 failed, 0 skipped in 69.48s.\nbuild: recorded 266 client artifact(s) with 3 public value(s)\n"
+}

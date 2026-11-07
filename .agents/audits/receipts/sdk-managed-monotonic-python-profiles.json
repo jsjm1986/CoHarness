@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-monotonic-python-profiles",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest -q python/sdk/tests/test_sdk_child_process_admission.py",
+  "startedAt": "2026-10-24T16:52:20.235062+00:00",
+  "seconds": 8.547,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c4c6b105b322e28444efa5a8d13d34b83f8b01c4064ef016b4df3941d4fad376",
+  "inputsAfter": "c4c6b105b322e28444efa5a8d13d34b83f8b01c4064ef016b4df3941d4fad376",
+  "postgresToolDirectory": null,
+  "outputSha256": "c4b808d34f4db00b333696dec1f3a43a2887d8bfe0cb7af07a3cb98ff43a7830",
+  "outputTail": "....                                                                     [100%]\n"
+}

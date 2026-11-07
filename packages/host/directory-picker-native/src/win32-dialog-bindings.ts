@@ -185,9 +185,13 @@ export async function loadWin32DialogBindings(): Promise<Win32DialogBindings> {
  * lever against the worker blocked inside `Show`, after which `Show` returns
  * `HRESULT_CANCELLED` and the worker unwinds normally.
  * @param threadId - the dialog thread's native id (from the `showing` notice).
+ * @param lifetime - worker lifetime; an exited worker must not receive delayed window messages.
+ * @throws the worker lifetime's abort reason when it ends before enumeration.
  */
-export async function closeThreadWindows(threadId: number): Promise<void> {
+export async function closeThreadWindows(threadId: number, lifetime: AbortSignal): Promise<void> {
+  lifetime.throwIfAborted()
   const koffi = (await import('koffi')).default as unknown as Koffi
+  lifetime.throwIfAborted()
   const user32 = koffi.load('user32.dll')
   const enumThreadWindows = user32.func('__stdcall', 'EnumThreadWindows', 'int', ['uint32', 'void *', 'intptr'])
   const postMessageW = user32.func('__stdcall', 'PostMessageW', 'int', ['void *', 'uint32', 'uintptr', 'intptr'])

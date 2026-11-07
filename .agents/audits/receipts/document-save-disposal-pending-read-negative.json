@@ -1,0 +1,14 @@
+{
+  "name": "document-save-disposal-pending-read-negative",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/local-fs.spec.ts -t 'accepted ordinary save'",
+  "startedAt": "2026-10-25T20:32:09.910280+00:00",
+  "seconds": 4.624,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "72a2b68de3498f3e172ac6a818020b198357b43c11285da0646dabd48846ce05",
+  "inputsAfter": "72a2b68de3498f3e172ac6a818020b198357b43c11285da0646dabd48846ce05",
+  "postgresToolDirectory": null,
+  "outputSha256": "0fa87be40d642dade20da9678161f8bab98bf09682e5fad1d79134da62f31c59",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/local-fs.spec.ts (31 tests | 1 failed | 30 skipped) 20ms\n   × cancels an accepted ordinary save before disposal releases the filesystem engine 19ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/local-fs.spec.ts > cancels an accepted ordinary save before disposal releases the filesystem engine\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ packages/attachment/userdoc-local/tests/local-fs.spec.ts:104:23\n    102|     await entered.promise\n    103|     await engine.dispose()\n    104|     expect(cancelled).toBe(true)\n       |                       ^\n    105|     expect(await outcome).toEqual({ stored: false })\n    106|     await expect(readFile(target.path)).rejects.toMatchObject({ code: …\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 30 skipped (31)\n   Start at  04:32:14\n   Duration  359ms (transform 188ms, setup 47ms, import 191ms, tests 20ms, environment 0ms)\n\n"
+}

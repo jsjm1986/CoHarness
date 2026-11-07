@@ -1,0 +1,11 @@
+{"restriction":"private","independentPermissionDenied":true,"ownerUploadAccepted":true,"ownerBytesVerified":true,"peerUploadAccepted":false,"refusal":"collaboration-forbidden"}
+{"restriction":"read-only","independentPermissionDenied":true,"ownerUploadAccepted":true,"ownerBytesVerified":true,"peerUploadAccepted":false,"refusal":"collaboration-forbidden"}
+{"scenario":"streamed","phase":"streaming","idleDisposal":false}
+{"scenario":"streamed","phase":"settled","accepted":true,"refusal":null,"disconnected":false,"stagingFiles":0}
+{"scenario":"revoked","phase":"streaming","idleDisposal":false}
+{"scenario":"revoked","phase":"settled","accepted":false,"refusal":"collaboration-forbidden","disconnected":false,"stagingFiles":0}
+{"scenario":"cancelled","phase":"streaming","idleDisposal":false}
+{"scenario":"cancelled","phase":"settled","accepted":false,"refusal":null,"disconnected":true,"stagingFiles":0}
+{"scenario":"service","phase":"streaming","idleDisposal":false}
+{"scenario":"service","phase":"withdrawn","stagingFiles":0}
+{"scenario":"service","phase":"settled","accepted":false,"refusal":null,"disconnected":true,"stagingFiles":0}

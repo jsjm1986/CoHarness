@@ -6,7 +6,7 @@ The project collaboration subsystem binds each browser operation to one authenti
 
 ## Runtime identity
 
-The Gateway allocates personal runtimes by user and shared runtimes by project. A runtime identity includes a monotonic generation so a principal issued for an earlier process cannot authorize a replacement process.
+The Gateway records account/project ownership separately from an allocated RuntimeId and its process generation. Managed credentials and principals require the same RuntimeId; legacy single-assignment compositions omit it in both. Matching an owner and generation cannot authorize another allocated environment.
 
 ```ts type-equiv
 /** Runtime identity bound into both the launch credential and every principal. */
@@ -14,6 +14,8 @@ interface GatewayRuntimeIdentity {
   readonly kind: 'user' | 'project'
   readonly id: number
   readonly generation: number
+  /** Stable allocated environment; absent only in legacy single-assignment compositions. */
+  readonly runtimeId?: Branded<'GatewayRuntimeId'>
 }
 ```
 
@@ -49,7 +51,7 @@ interface GatewayPrincipalClaims {
 }
 ```
 
-Each root-conversation authorization and readable-session filter queries the Gateway against the current PostgreSQL organization role and project membership. Removing a member, changing `rw` to `ro`, or removing administrator authority therefore affects the next Session ACL check. An operation without a Session ACL uses the scope mode captured in its principal; that mode cannot outlive `expiresAt`. The Gateway default is 30 seconds, proxied HTTP requests receive a new principal, and long-lived Host and Typert streams close at expiry before reconnecting.
+Each root-conversation authorization and readable-session filter queries the Gateway against the current PostgreSQL organization role and project membership. Removing a member, changing `rw` to `ro`, or removing administrator authority therefore affects the next Session ACL check. An operation without a Session ACL uses the scope mode captured in its principal; that mode cannot outlive `expiresAt`. The Gateway default is 30 seconds and proxied HTTP requests receive a new principal. Registered mux/host event sockets may receive another short signature through private requalification; other retained operations keep their original expiry. The [event-principal decision](../../.agents/notes/implemented/architecture/2026-10-23-event-stream-principal-renewal.md) owns renewal and cancellation.
 
 ## Private runtime channel
 
@@ -70,6 +72,18 @@ interface ConnectionRequestBoundary {
   pathname?: string
   /** Full request URL as sent by the client; carriers that cannot set headers declare credentials and modes in its query. */
   url?: string
+  /** Socket-owned close/error lifetime on upgrades; absent on carriers without a retained socket. */
+  signal?: AbortSignal
+}
+```
+
+```ts type-equiv
+/** Deployment-owned private renewal pacing; signed expiry always remains authoritative. */
+interface StreamPrincipalRenewalConfig {
+  enabled: true
+  intervalMs: number
+  requestTimeoutMs: number
+  maxBatchSize: number
 }
 ```
 
@@ -82,6 +96,8 @@ interface GatewayRuntimeCredential {
   runtime: GatewayRuntimeIdentity
   token: string
   principalPublicKey: string
+  /** Present only when this managed release enables private event-connection renewal. */
+  streamPrincipalRenewal?: StreamPrincipalRenewalConfig
 }
 ```
 
@@ -92,6 +108,8 @@ After signature, lifetime, organization, scope, runtime identity, and generation
 interface GatewayRequestPrincipal {
   assertion: string
   claims: GatewayPrincipalClaims
+  /** Finite socket authority for a renewable event connection; absent for fixed HTTP assertions. */
+  readonly signal?: AbortSignal
 }
 ```
 
@@ -100,6 +118,8 @@ Internal callers opt into principal forwarding. Omitting `principal` sends only 
 ```ts type-equiv
 /** Options for one authenticated call to the Gateway's internal runtime API. */
 interface GatewayRuntimeRequestInit extends RequestInit {
+  /** Node's half-duplex upload mode, required when the body is a ReadableStream. */
+  duplex?: 'half'
   /** Forward the current browser principal when this operation needs user authority. */
   principal?: boolean | GatewayRequestPrincipal
 }
@@ -164,7 +184,7 @@ interface CollaborationAccess {
 }
 ```
 
-Host Consumers classify every project-scoped operation before dispatch. Session reads and writes use `authorize()`, listings and publications use `readableSessionIds()`, and project-scoped Typert Remotes accept only the session-addressed allowlist: `commands/list`, `fileReferences/list`, and `sessionReferenceResolver/candidates` require `read`; `commands/execute`, `goals/*`, `messageFeedback/put`, and `messageFeedback/delete` require `write`; `messageFeedback/list` requires `read`. An unclassified or process-wide Remote is denied.
+Host Consumers classify every project-scoped operation before dispatch. Session reads and writes use `authorize()`, listings and publications use `readableSessionIds()`, and project-scoped Typert Remotes accept only the session-addressed allowlist: `commands/list`, `fileReferences/list`, and `sessionReferenceResolver/candidates` require `read`; `commands/execute` and `goals/*` require `write`. An unclassified or process-wide Remote is denied.
 
 New project roots carry one explicit visibility through the asynchronous creation operation. The PostgreSQL persistence provider materializes that choice with the authenticated creator; child registration copies the root ACL.
 
@@ -177,15 +197,15 @@ interface CollaborationSessionCreation {
 
 ## Captured authority
 
-Consumers capture authority while an authenticated request is current, then retain that immutable participant and provider lifetime for the operation. Authorization and readable-session filtering consult the Gateway; `signal` aborts when the issuing provider unloads. `claimInteraction()` returns `true` only for the first transaction that commits one approval or question outcome.
+Consumers capture authority while an authenticated request is current, then retain that immutable participant and provider lifetime for the operation. Authorization and readable-session filtering consult the Gateway; `signal` aborts when the issuing provider unloads or its retained event socket ends. `expiresAt` exposes the current verified signature deadline without changing participant permissions. `claimInteraction()` returns `true` only for the first transaction that commits one approval or question outcome.
 
 ```ts type-equiv
 /** Principal-bound collaboration operations safe to retain for one request or stream lifetime. */
 interface CollaborationAuthority {
   readonly participant: CollaborationParticipant
-  /** Assertion expiry; long-lived streams reconnect no later than this instant. */
+  /** Current signed expiry; only a verified socket-bound renewal may advance it. */
   readonly expiresAt: number
-  /** Aborts when the provider that issued this authority unloads. */
+  /** Aborts on provider disposal or when retained socket authority expires or closes. */
   readonly signal: AbortSignal
 
   /**
@@ -327,6 +347,47 @@ abstract withSessionCreation<T>( creation: CollaborationSessionCreation, operati
 
 Source: [`packages/context/collaboration/src/index.ts`](../../packages/context/collaboration/src/index.ts)
 
+<a id="ctxconnection--hostconnectionhandle"></a>
+
+### `ctx.connection` — `HostConnectionHandle`
+
+Host `ctx.connection` shape consumed by transport-independent adapters.
+
+```ts cordis-catalog
+/**
+ * Apply Connection's Host/Origin fence and browser authentication to one
+ * `/api` request. Registered `loopback` subtrees and endpoints keep their
+ * machine-caller fence as the complete admission.
+ * @param request - request headers and URL from the HTTP or upgrade request.
+ * @param kind - carrier the request arrived on; defaults to the `Upgrade`
+ *   header when the calling carrier cannot name itself.
+ * @returns rejection status, or undefined when the route may accept the request.
+ */
+requestRejection(request: ConnectionIndexRequest, kind?: 'http' | 'upgrade'): ConnectionRequestRejection
+
+/**
+ * Authenticate one frontend index request, owning a token redirect, 403, or
+ * 401. A mounted `connection/authenticate` provider answers first; its
+ * `'allow'` still passes the Host/Origin fence and its `'deny'` refuses
+ * before any token exchange. The cookie this mints is `Secure` when the
+ * mounted Web carrier serves TLS, which only that listener's protocol
+ * decides.
+ * @param request - root or configured-index HTTP request.
+ * @param response - response owned when the result is false.
+ * @returns true only when the frontend may serve index.html.
+ */
+authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean
+
+/**
+ * Add the fresh process token to an ordinary Web application URL.
+ * @param baseUrl - clean application URL whose authority and mount are preserved.
+ * @returns tokenized URL for initial login.
+ */
+authenticatedUrl(baseUrl: string): string
+```
+
+Source: [`packages/client/connection/src/rpc-host.ts`](../../packages/client/connection/src/rpc-host.ts)
+
 <a id="ctxexecutionauthority--executionauthority-abstract-seam"></a>
 
 ### `ctx.executionAuthority` — `ExecutionAuthority` (abstract seam)
@@ -379,6 +440,12 @@ abstract runRequest<T>(agent: Agent, input: unknown, work: () => T): Promise<Awa
 abstract capture(agent: Agent): ExecutionInheritance
 
 /**
+ * Read the execution captured by the current asynchronous callback.
+ * @returns immutable references for its live owner, or absence outside captured execution.
+ */
+abstract current(): ExecutionInheritance | undefined
+
+/**
  * Capture the current execution of a cold or live source for an explicit fork.
  * @param sessionId - source already authorized by the fork transport.
  * @returns current execution references, independently of the selected history cut.
@@ -408,7 +475,7 @@ abstract relay(session: Session, scope: ExecutionInheritance, messageId: Message
  * @param agent - actual executing Agent.
  * @param signal - operation-owned cancellation.
  * @param execution - exact tool call when authorization precedes other execution wrappers.
- * @returns verified participants for attribution; one call incurs one charge.
+ * @returns verified participants for attribution. Permission checks do not reserve or bill model requests.
  */
 abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal, execution?: ToolExecution): Promise<ExecutionState>
 
@@ -428,7 +495,7 @@ Source: [`packages/context/execution-authority/src/index.ts`](../../packages/con
 
 ### `ctx.gatewayRuntime` — `GatewayRuntime`
 
-Authenticated Gateway context for one launched Harness runtime.
+Authenticated Gateway context whose application retains launch identity across provider replacement.
 
 ```ts cordis-catalog
 /**
@@ -513,6 +580,54 @@ authorize(sessionId: SessionId, signal: AbortSignal): Promise<TerminalAuthority>
 Types: [SessionId](core.md)
 
 Source: [`packages/api/terminal-controller/src/authorization.ts`](../../packages/api/terminal-controller/src/authorization.ts)
+
+<a id="connection-events"></a>
+
+### `connection/*` events
+
+<a id="connectionauthenticate--bail"></a>
+
+#### `connection/authenticate` — bail
+
+Authenticate one index, `/api`, or upgrade request through a deployment provider. The first defined answer replaces the direct-browser token exchange and cookie entirely: `'allow'` admits the request without minting a runtime cookie, `'deny'` refuses it even when a cookie or launch token is present, and `undefined` defers to the direct-browser flow. `loopback` subtrees and endpoints keep their declared machine fence and never consult this event. A listener must only allow requests whose credentials it verified itself — a header seen but not verified is not an identity.
+
+```ts cordis-catalog
+/**
+ * Authenticate one index, `/api`, or upgrade request through a deployment
+ * provider. The first defined answer replaces the direct-browser token
+ * exchange and cookie entirely: `'allow'` admits the request without
+ * minting a runtime cookie, `'deny'` refuses it even when a cookie or
+ * launch token is present, and `undefined` defers to the direct-browser
+ * flow. `loopback` subtrees and endpoints keep their declared machine
+ * fence and never consult this event. A listener must only allow requests
+ * whose credentials it verified itself — a header seen but not verified
+ * is not an identity.
+ * @param request - request headers, method, URL, and arrival carrier.
+ * @mode bail
+ * @returns the provider's admission decision, or undefined to defer.
+ */
+'connection/authenticate'( request: ConnectionAuthenticationRequest, ): 'allow' | 'deny' | undefined
+```
+
+Source: [`packages/client/connection/src/index.ts`](../../packages/client/connection/src/index.ts)
+
+<a id="connectionrequest--waterfall"></a>
+
+#### `connection/request` — waterfall
+
+Wrap an accepted Connection request before any RPC dispatch or event-stream opening. Listeners must call `next()` so later authentication and request-context plugins run.
+
+```ts cordis-catalog
+/**
+ * Wrap an accepted Connection request before any RPC dispatch or event-stream opening.
+ * Listeners must call `next()` so later authentication and request-context plugins run.
+ * @param request - request kind and immutable-at-entry HTTP headers.
+ * @mode waterfall
+ */
+'connection/request'(request: ConnectionRequestBoundary, next: () => Promise<void>): Promise<void>
+```
+
+Source: [`packages/client/connection/src/index.ts`](../../packages/client/connection/src/index.ts)
 
 <a id="typert-gateway-events"></a>
 

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-01-workbench-spreadsheet-preview.md
 document:
-  en: f1175bff1b02ba2db63e286a0304f5c6fceed126
-  zh: 5affda18dfda7194e65a696c7f551a17581522e3
+  en: 9fd250251b4dc33e65d28e6892949c1d29ea1096
+  zh: 86b06d63853c5ac3c4cdf075aa96d845f2818177
 /agent-note-workbench-spreadsheet-preview:
   en: b6a5bf5efeb444ae
   zh: 4c2a8cf250a37610
@@ -12,17 +12,17 @@ document:
   en: 354220f05348b88d
   zh: af5816da38e73449
 /agent-note-workbench-spreadsheet-preview/decision:
-  en: 6adfef643ea80fe4
-  zh: c4c48de5c103c038
+  en: 644b836a52068c8d
+  zh: de7cd0969c0df7d1
 /agent-note-workbench-spreadsheet-preview/alternatives-considered:
-  en: 467cd064421d63ba
-  zh: be2fac967e8f8537
+  en: f0223c7c5e6b6083
+  zh: 485509d21f8907d6
 /agent-note-workbench-spreadsheet-preview/consequences:
-  en: 1f380cbf51705021
-  zh: 2acabb4a67276fcc
+  en: 12ac3987a454dcd8
+  zh: 0d99fb2748f6d012
 /agent-note-workbench-spreadsheet-preview/testing:
-  en: a97072160fadf4d7
-  zh: 523a0812ce6c9396
+  en: d5dc1aa3a6268d58
+  zh: dfb2c2ef9760ac98
 /agent-note-workbench-spreadsheet-preview/related:
-  en: 9396b143dc3546c7
-  zh: 4c1935d6ae207606
+  en: c633f28f2f7ae0be
+  zh: b4da18b01c349c81

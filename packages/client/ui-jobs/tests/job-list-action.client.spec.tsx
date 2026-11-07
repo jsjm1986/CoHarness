@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { JobView, ObservedJob, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
@@ -7,9 +7,14 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { JobListAction, type JobListActionProps } from '../src/client/JobListAction.tsx'
 import { zh } from '../src/client/locales.ts'
 
+beforeEach(() => {
+  vi.spyOn(HTMLButtonElement.prototype, 'getClientRects').mockReturnValue({ length: 1 } as DOMRectList)
+})
+
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   vi.useRealTimers()
 })
 
@@ -46,6 +51,7 @@ function props(
     archivedById: {},
     current: SESSION,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {},
     jobsBySession: jobs.length > 0 ? { [SESSION]: jobs } : {},
     // The pooled aggregate qualifies observed rows with the runtime scope;
@@ -285,39 +291,54 @@ describe('JobListAction observation', () => {
 
   it('shifts an overflowing popover back inside the viewport and follows resizes', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(440)
-    vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockReturnValue({ left: 344 } as DOMRect)
+    vi.spyOn(HTMLButtonElement.prototype, 'getBoundingClientRect').mockReturnValue({ left: 344, bottom: 52 } as DOMRect)
     const originalWidth = window.innerWidth
     Object.defineProperty(window, 'innerWidth', { value: 700, configurable: true, writable: true })
     try {
       render(<JobListAction {...props([outputJob()])} />)
       openList()
       const menu = screen.getByRole('list', { name: zh['list.aria'] })
-      // 700 - 12 - 440 - 344 = -96: the popover moves left to keep the margin.
-      expect(menu.style.left).toBe('-96px')
+      expect(menu.style.left).toBe('248px')
+      expect(menu.style.top).toBe('57px')
 
       window.innerWidth = 900
       fireEvent(window, new Event('resize'))
-      // 900 - 12 - 440 - 344 = 104 > 0: the anchored position fits again.
-      expect(menu.style.left).toBe('0px')
+      expect(menu.style.left).toBe('344px')
     } finally {
       Object.defineProperty(window, 'innerWidth', { value: originalWidth, configurable: true, writable: true })
     }
   })
 
-  it('never crosses the left viewport margin for an oversized popover', () => {
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(800)
-    vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockReturnValue({ left: 4 } as DOMRect)
-    const originalWidth = window.innerWidth
-    Object.defineProperty(window, 'innerWidth', { value: 700, configurable: true, writable: true })
-    try {
-      render(<JobListAction {...props([outputJob()])} />)
-      openList()
-      const menu = screen.getByRole('list', { name: zh['list.aria'] })
-      // max(12 - 4, min(0, 700 - 12 - 800 - 4)) = 8: clamped at the left margin.
-      expect(menu.style.left).toBe('8px')
-    } finally {
-      Object.defineProperty(window, 'innerWidth', { value: originalWidth, configurable: true, writable: true })
-    }
+  it('keeps the job menu outside a clipping conversation pane and accepts interactions inside it', () => {
+    const { container } = render(<div style={{ overflow: 'hidden', width: 280 }}><JobListAction {...props([outputJob()])} /></div>)
+    openList()
+    const menu = screen.getByRole('list', { name: zh['list.aria'] })
+    expect(container.contains(menu)).toBe(false)
+    fireEvent.pointerDown(menu)
+    expect(screen.getByRole('list', { name: zh['list.aria'] })).toBe(menu)
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('list', { name: zh['list.aria'] })).toBeNull()
+  })
+
+  it('dismisses the floating menu when its conversation hides the trigger', () => {
+    let checkTrigger: (() => void) | undefined
+    vi.stubGlobal('ResizeObserver', class implements ResizeObserver {
+      constructor(private callback: ResizeObserverCallback) {}
+      observe(target: Element): void {
+        if (target.tagName === 'BUTTON') checkTrigger = () => { this.callback([], this) }
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+    })
+    const rects = vi.spyOn(HTMLButtonElement.prototype, 'getClientRects').mockReturnValue({ length: 1 } as DOMRectList)
+    render(<JobListAction {...props([outputJob()])} />)
+    openList()
+    expect(checkTrigger).toBeTypeOf('function')
+    act(() => { checkTrigger!() })
+    expect(screen.getByRole('list', { name: zh['list.aria'] })).toBeDefined()
+    rects.mockReturnValue({ length: 0 } as DOMRectList)
+    act(() => { checkTrigger!() })
+    expect(screen.queryByRole('list', { name: zh['list.aria'] })).toBeNull()
   })
 
   it('ignores other keys while open and closes once the roster empties', () => {
@@ -362,10 +383,10 @@ describe('JobListAction observation', () => {
       gapBefore: false,
       streaming: true,
     }
-    const { container } = render(<JobListAction {...props([job()], undefined, { 'bash-1': view })} />)
+    render(<JobListAction {...props([job()], undefined, { 'bash-1': view })} />)
     openList()
     fireEvent.click(screen.getByRole('button', { name: zh['row.expandAria'].replace('{label}', 'pnpm run build') }))
-    expect(container.querySelector('[data-running]')).not.toBeNull()
+    expect(screen.getByRole('list', { name: zh['list.aria'] }).querySelector('[data-running]')).not.toBeNull()
     expect(screen.queryByText(zh['terminal.noOutput'])).toBeNull()
   })
 

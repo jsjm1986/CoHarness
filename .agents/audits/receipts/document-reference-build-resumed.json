@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-build-resumed",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm run build",
+  "startedAt": "2026-10-26T22:47:45.828088+00:00",
+  "seconds": 53.666,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b7bc2b77019cbf19dbf3e972dfa8b996388438e1822cb6d66998c873594ac666",
+  "inputsAfter": "b7bc2b77019cbf19dbf3e972dfa8b996388438e1822cb6d66998c873594ac666",
+  "postgresToolDirectory": null,
+  "outputSha256": "e0cd429b03158bdd2b3121b23dda68b670b79cd8cdb103ecf13a9873b216efd7",
+  "outputTail": "$ tsx scripts/build.ts\nrun-gates: build running 8 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s).\nrun-gates: start native addon\nrun-gates: PASS native addon (0.91s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (0.57s)\nrun-gates: start Host bundle\nrun-gates: start host aggregate check\nrun-gates: PASS Host bundle (6.70s)\nrun-gates: start client compiler\n\n== FAILED client compiler (17.38s) ==\ncommand: tsc -b <tsconfig.client.json references>\noutcome: exit 2\npackages/client/userdoc-upload/src/index.ts(393,36): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.\npackages/client/userdoc-upload/src/index.ts(393,48): error TS2322: Type 'unknown' is not assignable to type 'string'.\npackages/client/userdoc-upload/src/index.ts(393,64): error TS2322: Type 'unknown' is not assignable to type 'string'.\npackages/client/userdoc-upload/src/index.ts(393,80): error TS2322: Type 'unknown' is not assignable to type 'number'.\npackages/client/userdoc-upload/src/index.ts(394,7): error TS2322: Type 'unknown' is not assignable to type 'string'.\npackages/client/userdoc-upload/src/index.ts(394,33): error TS2322: Type 'unknown' is not assignable to type 'number'.\nrun-gates: PASS host aggregate check (47.68s)\n\n== SKIPPED Client bundle (0.00s) ==\ncommand: pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE client\noutcome: dependency failed or skipped: client-src\n\n== SKIPPED Web build (0.00s) ==\ncommand: pnpm run build:web\noutcome: dependency failed or skipped: client-bundle\n\n== SKIPPED client aggregate check (0.00s) ==\ncommand: tsc -p tsconfig.client.json\noutcome: dependency failed or skipped: client-src\n\nrun-gates: 4 passed, 1 failed, 3 skipped in 49.16s.\nrun-gates: unsuccessful gates:\n  - FAILED client compiler (17.38s, exit 2)\n    tsc -b <tsconfig.client.json references>\n  - SKIPPED Client bundle (0.00s, dependency failed or skipped: client-src)\n    pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE client\n  - SKIPPED Web build (0.00s, dependency failed or skipped: client-bundle)\n    pnpm run build:web\n  - SKIPPED client aggregate check (0.00s, dependency failed or skipped: client-src)\n    tsc -p tsconfig.client.json\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

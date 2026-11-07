@@ -1,0 +1,13 @@
+{
+  "name": "gateway-execution-oxlint-final",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts gateway/tests/execution-fixture-server.ts gateway/tests/run-built-resource-admission.mjs gateway/tests/fixtures/runtime-start-built.mjs packages/context/gateway-execution/tests/pg-composition.e2e.ts scripts/ci-workflow.spec.ts",
+  "startedAt": "2026-10-23T13:06:02.812531+00:00",
+  "seconds": 3.538,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9504be8cad3ef06e7d7ee92c90bb4ced818bfa41c7ea3becffc7c3c22b36728c",
+  "inputsAfter": "9504be8cad3ef06e7d7ee92c90bb4ced818bfa41c7ea3becffc7c3c22b36728c",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

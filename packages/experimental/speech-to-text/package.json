@@ -27,9 +27,11 @@
     "./wave": {
       "types": "./lib/types/wave.d.ts",
       "default": "./lib/types/wave.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts"

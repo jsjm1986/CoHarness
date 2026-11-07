@@ -20,6 +20,7 @@ class ScriptedJobRegistry extends JobRegistry {
   readonly rows: Row[] = []
   readonly kills: [JobId, SessionId | undefined, string | undefined][] = []
   refusing: string | undefined
+  cancelFailure: unknown = new Error('producer refuses cancel')
 
   readonly events: JobEvents = { subscribe: () => () => {} }
 
@@ -48,7 +49,7 @@ class ScriptedJobRegistry extends JobRegistry {
   }
 
   kill(id: JobId, caller?: SessionId, reason?: string): 'requested' | 'already-finished' {
-    if (id === this.refusing) throw new Error('producer refuses cancel')
+    if (id === this.refusing) throw this.cancelFailure
     this.kills.push([id, caller, reason])
     const row = this.rows.find(candidate => candidate.id === id)
     if (row !== undefined) row.status = 'stopping'
@@ -113,7 +114,10 @@ describe('Job archive admission', () => {
     expect(await ask(ctx, SessionId('nobody'))).toEqual([{ kind: 'turn' }])
   })
 
-  it('kills each owned live job with the archive reason and keeps going when one producer refuses', async () => {
+  it.each<{ kind: string; failure: unknown }>([
+    { kind: 'ordinary', failure: new Error('producer refuses cancel') },
+    { kind: 'unrenderable', failure: Object.create(null) },
+  ])('kills sibling jobs when a producer throws an $kind cancellation failure', async ({ failure }) => {
     const { ctx, jobs } = await harness()
     jobs.rows.push(
       { id: 'bash-1', label: 'stubborn', owner, status: 'running' },
@@ -121,6 +125,7 @@ describe('Job archive admission', () => {
       { id: 'bash-3', label: 'theirs', owner: other, status: 'running' },
     )
     jobs.refusing = 'bash-1'
+    jobs.cancelFailure = failure
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     await stop(ctx, owner)
     expect(jobs.kills).toEqual([[JobId('bash-2'), owner, 'session archived']])

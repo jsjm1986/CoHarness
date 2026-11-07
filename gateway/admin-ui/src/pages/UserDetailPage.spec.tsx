@@ -4,13 +4,17 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import * as api from '../api.ts'
+import { runtimeFixture, runtimePageFixture } from '../components/runtime-fixture.ts'
 import { UserDetailPage } from './UserDetailPage.tsx'
 
 vi.mock('../api.ts', () => ({
+  listUserComputerPermissions: vi.fn(), saveUserComputerPermission: vi.fn(),
+  getAdminComputerContext: vi.fn(), listRuntimeEnvironments: vi.fn(), listUserRuntimes: vi.fn(),
+  getRuntimeAllocationPolicy: vi.fn(), saveRuntimeAllocationPolicy: vi.fn(), allocateUserRuntime: vi.fn(), operateRuntime: vi.fn(),
   AdminRequestError: class AdminRequestError extends Error {
     constructor(readonly status: number, message: string) { super(message); this.name = 'AdminRequestError' }
   },
-  getUser: vi.fn(),
+  getUser: vi.fn(), getUserComputerProfile: vi.fn(),
   patchUser: vi.fn(),
   resetPassword: vi.fn(),
   deleteUser: vi.fn(),
@@ -123,6 +127,13 @@ describe('UserDetailPage', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+  vi.mocked(api.getUserComputerProfile).mockImplementation(async id => ({ ...alice, id }))
+  vi.mocked(api.listUserComputerPermissions).mockResolvedValue({ items: [], nextCursor: null })
+  vi.mocked(api.getAdminComputerContext).mockResolvedValue({ nodeId: 'node-a' as api.RuntimeNodeId, name: 'Computer A', forwardingEnabled: true })
+  vi.mocked(api.listUserRuntimes).mockImplementation(async id => runtimePageFixture('user', id))
+  vi.mocked(api.listRuntimeEnvironments).mockResolvedValue(runtimePageFixture('project', 7))
+  vi.mocked(api.getRuntimeAllocationPolicy).mockResolvedValue({ revision: '0', maxTotal: 8, maxPerNode: 4, source: 'organization' })
+
     vi.mocked(api.getUser).mockResolvedValue(alice)
     vi.mocked(api.getSshPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: true, revision: '3' })
     vi.mocked(api.getTerminalPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
@@ -135,6 +146,19 @@ describe('UserDetailPage', () => {
     vi.mocked(api.listUserMemberships).mockResolvedValue({ memberships: [{ projectId: 7, name: 'Shared', path: '/srv/shared', mode: 'ro' }] })
     vi.mocked(api.listProjects).mockResolvedValue([{ id: 7, name: 'Shared' } as api.Project, { id: 8, name: 'Second' } as api.Project])
     vi.mocked(api.getUserQuota).mockResolvedValue(quota)
+  })
+
+  it('keeps organization account controls available while the selected computer profile is pending or unavailable', async () => {
+    const profile = Promise.withResolvers<api.AdminUser>()
+    vi.mocked(api.getUserComputerProfile).mockReturnValue(profile.promise)
+    renderPage()
+    expect(await screen.findByText('用户 · Alice')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '编辑账号' })).toBeTruthy()
+    expect(screen.queryByText('/home/alice')).toBeNull()
+    await act(async () => { void profile.promise.catch(() => {}); profile.reject(new Error('selected computer unavailable')) })
+    expect(await screen.findByText('selected computer unavailable')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '编辑账号' })).toBeTruthy()
+    expect(screen.getByText('当前环境使用权限')).toBeTruthy()
   })
 
   it('renders account, qualification, model, membership, and quota sections for the user', async () => {

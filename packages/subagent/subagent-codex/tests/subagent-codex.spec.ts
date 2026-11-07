@@ -433,11 +433,21 @@ describe('task admission and package contracts', () => {
     const rows = Array.isArray(parsed)
       ? (parsed as Array<{ insert?: Array<{ id?: string; name?: string }> }>).flatMap(entry => entry.insert ?? [])
       : []
-    expect(rows).toEqual([{
-      id: 'subagent-codex',
-      name: '@deepseek-ai/dsh-subagent-codex',
-    }])
-    expect(JSON.stringify(rows)).not.toContain('tool-subagent')
+    expect(rows).toEqual([
+      {
+        id: 'subagent-codex',
+        name: '@deepseek-ai/dsh-subagent-codex',
+      },
+      {
+        id: 'tool-subagent-codex',
+        name: '@deepseek-ai/dsh-tool-subagent',
+        config: {
+          provider: 'codex',
+          toolName: 'subagent_codex',
+          maxDepth: 'provider-managed',
+        },
+      },
+    ])
   })
 
   it('accepts one or more text blocks and rejects empty or non-text tasks', () => {
@@ -514,7 +524,7 @@ describe('task admission and package contracts', () => {
     const safeChild = fakeChild()
     const bypassChild = fakeChild()
     const spawnSpecs: SubprocessSpawnSpec[] = []
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation((spec) => {
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async (spec) => {
       spawnSpecs.push(spec)
       return spec.env?.DSH_CODEX_INSTANCE === 'safe'
         ? safeChild.handle
@@ -651,7 +661,7 @@ describe('task admission and package contracts', () => {
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
-    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(child.handle)
+    vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue(child.handle)
     codex.apply(ctx, { env: {}, disposeGraceMs: 3_000 })
     expect(ctx.subagents.getProvider('codex')).toBeDefined()
     const starting = ctx.subagents.start('codex', withExecutionContext(ctx, request()))
@@ -746,7 +756,7 @@ describe('task admission and package contracts', () => {
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
-    const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(child.handle)
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue(child.handle)
     await ctx.plugin(codex, {})
 
     const starting = ctx.subagents.start('codex', withExecutionContext(ctx, {
@@ -2177,7 +2187,7 @@ describe('run lifecycle and quiescence', () => {
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
-    const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(child.handle)
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue(child.handle)
     const warnings: string[] = []
     ctx.logger.warn = ((message: unknown) => {
       warnings.push(String(message))

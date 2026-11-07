@@ -35,7 +35,8 @@ export interface SessionReference extends Disposable {
   readonly sessionId: SessionId
   /** Shared binding; access fails after reference release or generation disposal. */
   readonly binding: SessionBinding
-  /** This reference's cancellable wait for the shared initial `Session.open()` attempt to settle. */
+  /** Cancellable initial history settlement, following a reconnect's replacement read.
+   * A current read error remains observable in the binding. */
   readonly ready: Promise<SessionBinding>
   /** Release once; the final reference starts local scope and history teardown. */
   release(): void
@@ -59,9 +60,14 @@ export interface ISessions {
   /**
    * Begin an asynchronous navigation intent, superseding any earlier intent.
    * Selecting, clearing, scope changes, and owner disposal cancel it.
+   * @param options - Optional originating composer to hold until preparation settles.
    * @returns cancellation to check before publishing a late navigation result.
    */
-  beginNavigation(): AbortSignal
+  beginNavigation(options?: { readonly blockInputFor?: SessionId | undefined }): AbortSignal
+  /** Release this intent's composer hold; a superseding intent keeps its own hold.
+   * @param signal - Original intent returned by beginNavigation.
+   */
+  finishNavigation(signal: AbortSignal): void
   /**
    * Retain an exact Client generation and start its shared initial history opening.
    * @param target - known identity or durable direct-parent address.
@@ -89,8 +95,21 @@ export interface ISessions {
   readonly list: ObservableSnapshot<SessionListState>
   /** Current authenticated space list; unlike list, it excludes staged workbench targets. */
   readonly currentScopeList?: ObservableSnapshot<SessionListState>
+  /**
+   * Refresh the authenticated current space's Session baseline, sharing an in-flight pull.
+   * Additional workbench targets are unaffected. Failures remain in list state/error;
+   * the arrival phase and previously received rows stay available.
+   * @returns completion of the current or newly started attempt; account withdrawal completes without a read.
+   */
+  refresh(): Promise<void>
   /** Atomic current-session provide projection (the renderer host's `sessions.provideInfo` feed). */
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  /**
+   * Monotonic revision after bundle acquisition, final release, provider-roster changes,
+   * or runtime ownership changes. Explicit Session selectors reread `provideInfoFor`
+   * and retain an unchanged bundle's identity. Older hosts may omit this source.
+   */
+  readonly provideInfoRevision?: HostObservable<number>
   /** Resolve the standard-props bundle without selecting or staging a Session.
    * @param id - listed or retained Session identity.
    * @returns the bundle, or undefined when the identity cannot be resolved.
@@ -103,10 +122,13 @@ export interface ISessions {
    */
   readonly searchResultLimit: number
   /**
-   * Select a session as current.
+   * Select a session as current. Explicit selection publishes the Session's
+   * live Agent on the Host; automatic selection paths (startup restore,
+   * retained panes) pass `activate: false` so their presentations stay cold.
    * @param id - session id (must exist in the list; unknown ids fail loud).
+   * @param options - `activate: false` keeps the presented Session cold.
    */
-  open(id: SessionId): void
+  open(id: SessionId, options?: { activate?: boolean }): void
   /**
    * Open a healthy catalog child through its exact direct-parent address.
    * @param address - catalog-derived parent and child ids.
@@ -230,20 +252,31 @@ export interface ISessions {
    * @returns the operation result or failure; cancellation releases the runtime hold immediately.
    */
   usingRuntime?<T>(target: SessionRuntimeTarget, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T>
+  /** Prepare an explicitly selected Runtime for management without opening or creating a Session.
+   * The caller retains it through `usingRuntime` while its view remains mounted.
+   * @param target - captured account Runtime; directory browsing never calls this method.
+   * @param signal - management-view lifetime or superseding navigation.
+   * @returns completion after the exact target's initial connection and Session directory settle.
+   */
+  prepareRuntime?(target: SessionRuntimeTarget, signal: AbortSignal): Promise<void>
   /** Discover an account-visible Session in its target runtime before retaining history.
+   * Concurrent verification shares a pending Workspace read; later calls repull after settlement.
    * @param target - account runtime that owns the session's workbench binding.
    * @param id - listed session identity to materialize.
-   * @param signal - cancels discovery without releasing other consumers of the runtime.
+   * @param signal - cancels only this discovery; absent callers use the runtime lifetime.
    * @returns true for a listed, unarchived Session; metadata or authorization failures reject.
    */
   ensureSession?(target: SessionRuntimeTarget, id: SessionId, signal?: AbortSignal): Promise<boolean>
   /** Create a new conversation in an explicitly selected account runtime.
    * @param target - account runtime that hosts the new session.
    * @param signal - cancels discovery and prevents late selection; an accepted Host creation is not rolled back.
+   * @param options - captured Workspace and blank-conversation creation options.
    * @returns the created session identity.
    */
-  createSession?(target: SessionRuntimeTarget, signal?: AbortSignal): Promise<SessionId>
+  createSession?(target: SessionRuntimeTarget, signal?: AbortSignal, options?: import('./session-create.ts').SessionCreateOptions): Promise<SessionId>
   /** Reconcile the bootstrap connection with the account's current scope.
+   * The first declaration preserves startup navigation; later target changes supersede it.
+   * Previously cancelled user navigation remains cancelled.
    * @param target - runtime the account scope now resolves to.
    */
   setBaseRuntimeTarget?(target: SessionRuntimeTarget): void

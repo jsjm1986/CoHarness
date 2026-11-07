@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-admin-project-governance-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-admin-project-governance-ownership.md
+document:
+  en: 2fbac58a7f5d0dcb46c41caaa0f272d50e9fa7b8
+  zh: 916fed1dcbd508aa4e1d7fd2b20a86c6beae7484
+/agent-note-admin-project-governance-request-ownership:
+  en: b4b6bf42ae939ea9
+  zh: 0d76effcff8219a8
+/agent-note-admin-project-governance-request-ownership/problem:
+  en: 945dbed57cd84e33
+  zh: 429114394c730eea
+/agent-note-admin-project-governance-request-ownership/decision:
+  en: d00554e245e21e87
+  zh: e580464d21fdc26c
+/agent-note-admin-project-governance-request-ownership/alternatives-considered:
+  en: f0b7b30b9f0747a2
+  zh: 01e47192ad3612cf
+/agent-note-admin-project-governance-request-ownership/consequences:
+  en: f7803320ff064dfb
+  zh: 1a2868681bd6db33

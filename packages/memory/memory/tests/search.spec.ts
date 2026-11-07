@@ -70,6 +70,25 @@ it('produces a bounded excerpt around the matching term, falling back to the sum
   }
 })
 
+it.each([
+  { label: 'compatibility ligatures', prefix: 'ﬃ'.repeat(100) },
+  { label: 'compatibility units', prefix: '㎏'.repeat(100) },
+  { label: 'combining sequences', prefix: 'A\u030A'.repeat(200) },
+  { label: 'lowercase expansion', prefix: 'İ'.repeat(100) },
+  { label: 'compatibility Hangul', prefix: 'ㄱㅏ'.repeat(120) },
+  { label: 'canonical Hangul', prefix: '가'.repeat(120) },
+  { label: 'supplementary characters', prefix: '𐐀'.repeat(200) },
+])('retains the original match in bounded excerpts after $label', async ({ prefix }) => {
+  const test = await bootWith([{ key: 'normalized', summary: 'source excerpt', content: prefix + 'NEEDLE' + 'z'.repeat(300) }])
+  const hits = await test.service.search([PERSONAL], 'needle')
+  expect(Array.isArray(hits)).toBe(true)
+  if (!Array.isArray(hits)) throw new Error('search refused its valid query')
+  expect(hits).toHaveLength(1)
+  expect(hits[0]!.excerpt).toContain('NEEDLE')
+  expect(Array.from(hits[0]!.excerpt).length).toBeLessThanOrEqual(160)
+  expect(hits[0]!.excerpt.isWellFormed()).toBe(true)
+})
+
 it('returns a memory_invalid refusal on empty queries and drops zero-score entries', async () => {
   const test = await bootWith([{ key: 'a', summary: 'apple pie', content: 'tasty' }])
   expect(await test.service.search([PERSONAL], '   ')).toEqual({ ok: false, code: 'memory_invalid', reason: 'query' })

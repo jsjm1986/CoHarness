@@ -19,6 +19,10 @@ with DeepSeekHarness(dsh_home="./.harness") as harness:
 
 `DeepSeekHarness` 会保留其按需启动的运行时子进程，以便在多次调用之间复用。请像上例一样将其用作上下文管理器，或在使用完毕后显式调用 `close()`。
 
+关闭时先请求 JSON-RPC shutdown，再关闭 stdin，允许运行时完成 EOF 清理后才发送终止信号。设置 `shutdown_timeout_seconds` 时，它分别限制 shutdown 确认与各次退出等待，包括强制终止后的退出确认。并发 close 调用串行执行清理。终止或退出确认失败会抛出异常，并保留原进程供后续 `close()` 重试；首次开始关闭后，持续拒绝新启动、请求和通知。
+
+一个写入线程拥有 stdin 并保持帧顺序。`max_output_bytes` 同时限制排队与正在写入的输出；队列已满时拒绝准入。请求在排队前校验超时，等待响应不受原生管道写入阻塞。`notify()` 和 RPC 响应将帧加入队列；后续写入失败会终止传输消费者。关闭时将 EOF 排队，确认进程退出并等待写入线程结束；写入线程未结算时保留原进程供重试。通知过滤器可以关闭客户端，而不会等待自身读取线程。请求超时后，已准入请求的结果仍然未知；重试修改操作前，应先确认其实际效果。
+
 SDK 使用内置的 `dsh` 可执行文件和 `sdk` 运行 profile。必须显式设置 `dsh_home` 或非空 `DSH_HOME`；SDK 不会隐式选择个人目录。通过 `profile` 和有序 `patches` 配置发行应用。所选 profile 必须提供 stdio JSON-RPC 及其必需服务。独立目录会移除继承的 `DSH_MANAGED_DATA_MANIFEST`，同目录启动则保留。需要把子进程数据登记到备份范围时，通过 `HarnessConfig.env` 显式指定其自己的清单；该字段叠加到继承的环境。
 
 ```py
@@ -80,7 +84,11 @@ with DeepSeekHarness(
 
 `Session.run()` 的活动区间从提示词被持久 inbox 接收时开始，到整个 agent 下一次进入空闲状态时结束，并返回 `RunResult(session_id, final_response, finish_reason, events, notifications)`。`final_response` 是该区间内根会话最后提交的助手文本。`finish_reason` 是最后一个根会话 `turn/end` 的 `kind`，例如 `completed`、`max-tokens` 或 `error`；没有轮次结束时为 `None`。缺少字符串 `data.reason.kind` 的 `turn/end` 违反协议，并会抛出 `SdkProtocolError`。
 
-`HarnessClient` 会在每个子会话活动期间保留已发现的 subagent 谱系，在收到 `subagent.finished` 后释放对应边，并按通知队列上限限制谱系映射。在 `Session.run()` 期间，`RunResult.notifications` 与 `on_notification` 按协议顺序接收根会话和已知后代的通知。`RunResult.events` 只包含根会话事件，因此后代输出不会替换根响应。底层 `session_prompt()` 会立即返回已排队消息的 id；绕过 `Session.run()` 的调用方自行负责后续活动边界。
+所属后台任务会在根运行事件中发布 `job/registered` 与 `job/settled`，保留原始所有者、确切工具调用 id 与根调用 id。这些历史事实不会恢复实时控制；见[本地注册表生命周期](../../packages/jobs/jobs-local/README.zh.md#lifecycle)。
+
+`HarnessClient` 会在每个子会话活动期间保留已发现的 subagent 谱系，在收到 `subagent.finished` 后释放对应边，并通过 `max_session_relationships`（默认 10000）独立限制活跃谱系。超限时通过 `TransportClosedError` 明确终止通知交付，不淘汰仍活跃的祖先。在 `Session.run()` 期间，`RunResult.notifications` 与 `on_notification` 按协议顺序接收根会话和已知后代的通知。`RunResult.events` 只包含根会话事件，因此后代输出不会替换根响应。底层 `session_prompt()` 会立即返回已排队消息的 id；绕过 `Session.run()` 的调用方自行负责后续活动边界。
+
+底层通知订阅各自拥有有界队列。过滤器抛出异常时会移除该订阅，并将原异常交给下一次读取，即使队列已满；交付终止错误可能丢弃一条已排队通知。过滤器关闭自身订阅时，当前帧不会进入该队列；调用其他过滤器前会跳过已分离的订阅。其他订阅和 RPC 响应仍能继续处理。
 
 所选 home 保存 profile、插件与每个 profile 自有的持久资源。完整 `sdk` profile 使用其中的凭据、设置与会话存储；`sdk-minimal` 只使用自己的 JSONL 会话存储。需要隔离这些资源时应使用新的 home；独立工作应使用新的会话 ID。同时复用 harness 与会话 ID 会延续持久对话和会话资源。
 

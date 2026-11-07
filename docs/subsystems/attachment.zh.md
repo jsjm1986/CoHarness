@@ -167,6 +167,65 @@ interface RequestImageAttachment {
 
 `saveImage()` 校验字节并以原子方式提交一个对象，之后才返回其引用。`validateImage()` 执行相同的准入检查，但不持久化任何内容；批量调用方会在保存任何成员前通过它校验所有成员，因此校验拒绝不会留下部分对象。`admitEncodedImages()` 是面向 base64 上传的 wire 入口：强制执行规范 base64，随后把批量准入委托给 `saveImages()`，由后者负责张数与聚合字节上限以及先全量校验再保存的顺序。`readImage()` 接受来自已授权会话路径的引用，只在完整性校验通过后返回字节。该服务刻意不规定保留策略：恢复和 fork 后的会话可能共享对象，因此基于引用的垃圾回收会延期实现，而不是与任何一个会话的删除绑定。
 
+## 文档身份
+
+`UserDocId` 是普通文件地址。可选身份元数据区分该地址上的不同发布实例；选择类型携带预期修订号，回收站选择还携带指定操作。创建者来源不等于当前所有权授权。存储和传输消费方负责执行这些选择条件；类型本身不授权变更。
+
+```ts type-equiv
+/** Durable identity of one document root's metadata domain. */
+type UserDocRootId = Branded<'UserDocRootId'>
+```
+
+```ts type-equiv
+/** Durable identity of one document, independent of its current filesystem path. */
+type UserDocIncarnationId = Branded<'UserDocIncarnationId'>
+```
+
+```ts type-equiv
+/** Identity of one recoverable-trash action, independent of its original path. */
+type UserDocTrashId = Branded<'UserDocTrashId'>
+```
+
+```ts type-equiv
+/** Version of one durable document incarnation, independent of its current path. */
+interface UserDocIdentity {
+  readonly incarnationId: UserDocIncarnationId
+  readonly revision: number
+  /** Original publication actor, when the provider can identify it. */
+  readonly createdBy?: UserDocUploadOwnerId
+  readonly origin: 'upload' | 'transfer' | 'legacy' | 'admin'
+}
+```
+
+```ts type-equiv
+/** Exact document version selected for a filesystem or ownership mutation. */
+interface UserDocSelection {
+  readonly docId: UserDocId
+  readonly incarnationId: UserDocIncarnationId
+  readonly revision: number
+}
+```
+
+```ts type-equiv
+/** One independently addressable trash action; restoring and retrashing produces another action id. */
+interface UserDocTrashSelection extends UserDocSelection {
+  readonly trashId: UserDocTrashId
+}
+```
+
+## 上传授权
+
+```ts type-equiv
+/** Server-authenticated document actor key used by private uploads and retained as the original publication actor. */
+type UserDocUploadOwnerId = Branded<'UserDocUploadOwnerId'>
+```
+
+`defaultUserDocDirectoryPage` 与 `defaultUserDocTrashPage` 将服务默认行为应用于不依赖 Context 的列表实现。受管 Gateway 提供方在传输前计算分页，并传递可选的精确变更选择。其分帧协议将有界元数据与流式文件字节分开。服务端认证运行时令牌、解析当前参与者、选择受保护存储，并在确认成功前提交必需的目录索引投递；参见[提供方 README](../../packages/attachment/userdoc-gateway/README.zh.md)。
+
+## 文档 HTTP 所有权
+
+文档 HTTP 消费方通过 `UserDocHttpScope` 持有已接纳的处理器和延后目录索引投递；销毁会先等待两者，再释放存储依赖。Gateway broker 还会等待作用域授权。受管身份、回收站和投递记录位于运行时可写根之外，读取触发的持久化也必须经过维护准入。旧式独立目录索引同步仍是建议性的。
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -305,16 +364,17 @@ Host service owning upload storage and receipts keyed by each receiving Agent's 
 
 ```ts cordis-catalog
 /**
- * Persist one encoded upload and stage it under the Agent receiver selected by Typert.
+ * Persist one encoded upload and stage it after the captured caller retains Session write permission.
  * @param agent - receiving Agent resolved from the Remote Agent scope.
  * @param request - canonical base64 bytes and optional display name.
- * @param signal - caller cancellation before storage begins.
+ * @param signal - caller cancellation; completed immutable bytes may remain after cancellation.
  * @returns the staged receipt and durable file reference.
  */
-@Remote('upload') upload(agent: Agent, request: EncodedFileUploadRequest, signal: AbortSignal): Promise<FileUploadValue>
+@Remote('upload') async upload(agent: Agent, request: EncodedFileUploadRequest, signal: AbortSignal): Promise<FileUploadValue>
 
 /**
- * Persist raw chunks for one Session without aggregating the upload.
+ * Persist raw chunks after Session write authorization and recheck before returning a receipt.
+ * Active storage retains the exact Agent; cancellation closes Node streams and joins storage cleanup.
  * @param request - Session identity, ordered bytes, cancellation, and optional display name.
  * @returns the staged receipt and durable file reference.
  */
@@ -391,43 +451,48 @@ abstract save( target: UserDocTarget, body: ReadableStream<Uint8Array>, signal?:
 /**
  * Create or reuse a resumable upload session.
  * @param input - untrusted browser metadata validated by the provider.
+ * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
  * @returns the public upload session state.
  */
-abstract beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession>
+abstract beginUpload(input: BeginUserDocUpload, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession>
 
 /**
  * Read one upload session's public state.
  * @param uploadId - opaque provider-produced identifier.
  * @param signal - optional cancellation.
+ * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
  * @returns current upload state.
  */
-abstract inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession>
+abstract inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession>
 
 /**
  * Append one sequential chunk to an upload session.
  * @param uploadId - opaque provider-produced identifier.
  * @param chunk - validated range, digest, and raw body.
  * @param signal - optional cancellation.
+ * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
  * @returns updated public upload state.
  */
-abstract writeUploadChunk( uploadId: UserDocUploadId, chunk: UserDocUploadChunk, signal?: AbortSignal, ): Promise<UserDocUploadSession>
+abstract writeUploadChunk( uploadId: UserDocUploadId, chunk: UserDocUploadChunk, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId, ): Promise<UserDocUploadSession>
 
 /**
  * Start or repeat final verification and publication.
  * @param uploadId - opaque provider-produced identifier.
  * @param sha256 - final SHA-256 digest supplied by the browser.
  * @param signal - optional cancellation.
+ * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
  * @returns verifying, complete, or failed public state.
  */
-abstract completeUpload( uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal, ): Promise<UserDocUploadSession>
+abstract completeUpload( uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId, ): Promise<UserDocUploadSession>
 
 /**
  * Cancel and remove one incomplete upload session.
  * @param uploadId - opaque provider-produced identifier.
  * @param signal - optional cancellation.
+ * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
  * @returns after temporary data is removed.
  */
-abstract cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void>
+abstract cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId): Promise<void>
 
 /**
  * List every stored document, newest modification first.
@@ -473,11 +538,15 @@ async listTrashPage( query: UserDocListQuery = {}, signal?: AbortSignal, ): Prom
 
 /**
  * Move one document into recoverable trash.
+ * A retained earlier file does not establish removal of a current replacement.
  * @param docId - store-scoped document identifier.
  * @param signal - optional cancellation for the move.
+ * @param expected - optional exact active version; a mismatch refuses the mutation.
  * @returns the retained trash reference.
+ * @throws UserDocError with DOCUMENT_TRASH_CONFLICT when the provider cannot
+ * retain both an earlier trash entry and the active file at the same path.
  */
-abstract trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef>
+abstract trash(docId: UserDocId, signal?: AbortSignal, expected?: UserDocSelection): Promise<UserDocTrashRef>
 
 /**
  * Restore one trashed document, optionally choosing a destination directory.
@@ -487,16 +556,18 @@ abstract trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef>
  * @param directoryId - optional destination directory; omitted keeps the original directory.
  * @param name - optional replacement leaf name.
  * @param signal - optional cancellation for the restore.
+ * @param expected - optional exact recoverable trash action; a mismatch refuses restoration.
  * @returns the restored durable document reference.
  */
-abstract restore( docId: UserDocId, directoryId?: UserDocDirectoryId, name?: string, signal?: AbortSignal, ): Promise<UserDocRef>
+abstract restore( docId: UserDocId, directoryId?: UserDocDirectoryId, name?: string, signal?: AbortSignal, expected?: UserDocTrashSelection, ): Promise<UserDocRef>
 
 /**
  * Permanently remove one trashed document.
  * @param docId - store-scoped document identifier.
  * @param signal - optional cancellation for the purge.
+ * @param expected - optional exact recoverable trash action; a mismatch preserves its bytes.
  */
-abstract purge(docId: UserDocId, signal?: AbortSignal): Promise<void>
+abstract purge(docId: UserDocId, signal?: AbortSignal, expected?: UserDocTrashSelection): Promise<void>
 
 /**
  * List every directory below the document root.
@@ -518,10 +589,12 @@ abstract createDirectory( parentDirectoryId: UserDocDirectoryId, name: string, )
  * Rename one directory within its current parent.
  * @param directoryId - non-root directory to rename.
  * @param name - untrusted replacement leaf name.
+ * @param expected - optional complete authorized inventory checked before publication; omitted uses the provider's current selection.
+ *   Ordinary edits after that verified selection reconcile independently of the directory rename.
  * @returns the renamed directory reference.
  * @throws UserDocError when the directory is absent, the name is invalid, or the target exists.
  */
-abstract renameDirectory(directoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef>
+abstract renameDirectory( directoryId: UserDocDirectoryId, name: string, expected?: readonly UserDocSelection[], ): Promise<UserDocDirectoryRef>
 
 /**
  * Delete one empty, non-root directory.
@@ -535,10 +608,11 @@ abstract removeDirectory(directoryId: UserDocDirectoryId): Promise<void>
  * Move one document into an existing directory without replacing an entry.
  * @param docId - document to move.
  * @param directoryId - destination directory; the empty identifier selects the root.
+ * @param expected - optional exact active version; a mismatch preserves both paths.
  * @returns the moved document reference.
  * @throws UserDocError when either identifier is invalid or the destination is occupied.
  */
-abstract move(docId: UserDocId, directoryId: UserDocDirectoryId): Promise<UserDocRef>
+abstract move(docId: UserDocId, directoryId: UserDocDirectoryId, expected?: UserDocSelection): Promise<UserDocRef>
 
 /**
  * Resolve one identifier to its current reference.
@@ -577,11 +651,12 @@ abstract openRead(docId: UserDocId): Promise<{ ref: UserDocRef; body: ReadableSt
  * a client retrying a delete it already completed is not an error.
  * @param docId - identifier from a previous `save` or `list`.
  * @param signal - optional cancellation.
+ * @param expected - optional exact active version; a mismatch refuses deletion.
  * @returns after the entry is gone.
  * @throws UserDocError when the identifier is malformed or escapes the document
  * root, or the deletion fails for any reason other than absence.
  */
-abstract remove(docId: UserDocId, signal?: AbortSignal): Promise<void>
+abstract remove(docId: UserDocId, signal?: AbortSignal, expected?: UserDocSelection): Promise<void>
 ```
 
 Source: [`packages/attachment/userdoc/src/index.ts`](../../packages/attachment/userdoc/src/index.ts)

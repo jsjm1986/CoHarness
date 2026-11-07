@@ -1,0 +1,14 @@
+{
+  "name": "audit-baseline-document-projection",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/fetch-document-identity-baseline.py",
+  "startedAt": "2026-10-25T21:34:55.310843+00:00",
+  "seconds": 5.698,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "af1eec000bfcefbe225a715dd2e4a9c38b0db84f674cfb70e088bf633582a22b",
+  "inputsAfter": "af1eec000bfcefbe225a715dd2e4a9c38b0db84f674cfb70e088bf633582a22b",
+  "postgresToolDirectory": null,
+  "outputSha256": "3582eef6292ef3b558383fa7041aa6329a05f36da59e639c63cb6bca05cb361b",
+  "outputTail": "origin/master fetch exit 0\nahead/behind 139\t0 origin is ancestor True\n"
+}

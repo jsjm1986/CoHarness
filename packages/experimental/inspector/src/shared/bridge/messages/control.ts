@@ -58,6 +58,8 @@ export type InspectorWorkerControl = InspectorWorkerReady | InspectorWorkerFailu
 export interface InspectorClientBootstrap {
   readonly endpoint: string
   readonly protocol: string
+  /** Additional exact browser origins accepted alongside loopback origins. */
+  readonly clientOrigins: readonly string[]
   readonly maxQueuedRecords: number
   readonly maxQueuedBytes: number
   readonly maxRecordsPerFrame: number

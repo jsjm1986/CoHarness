@@ -1,0 +1,14 @@
+{
+  "name": "sonar-current-source-compile",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/llm/llm-pi-ai/tsconfig.json",
+  "startedAt": "2026-10-24T08:39:06.039678+00:00",
+  "seconds": 2.842,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2dc4f7a7f6f6e0c52f871310e64c1b3d62693232f99b8fd8c1badc0af1229613",
+  "inputsAfter": "2dc4f7a7f6f6e0c52f871310e64c1b3d62693232f99b8fd8c1badc0af1229613",
+  "postgresToolDirectory": null,
+  "outputSha256": "0bc4343cf9c3dc7227b5546f098532a3f7f9ffaeb6c524952efcd4366ed58fba",
+  "outputTail": "packages/web/web/src/model-search.ts(250,9): error TS2367: This comparison appears to be unintentional because the types 'false | undefined' and 'true' have no overlap.\npackages/web/web-search-perplexity/src/provider.ts(182,9): error TS2367: This comparison appears to be unintentional because the types 'false | undefined' and 'true' have no overlap.\npackages/web/web-search-perplexity/src/provider.ts(184,9): error TS2367: This comparison appears to be unintentional because the types 'false | undefined' and 'true' have no overlap.\npackages/web/web-search-perplexity/src/provider.ts(230,11): error TS2367: This comparison appears to be unintentional because the types 'false | undefined' and 'true' have no overlap.\n"
+}

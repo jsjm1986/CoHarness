@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DocumentsButton } from '../src/client/DocumentsButton.tsx'
 import buttonCss from '../src/client/DocumentsButton.module.css'
 import { DocumentsModal } from '../src/client/DocumentsModal.tsx'
+import { DocumentsOverlay } from '../src/client/DocumentsOverlay.tsx'
 import modalCss from '../src/client/DocumentsModal.module.css'
 import { zh, type DocumentsKey } from '../src/client/locales.ts'
 
@@ -19,8 +20,10 @@ vi.mock('../src/client/documents-client.ts', async (importOriginal) => {
 })
 import { UserDocHttpError, UserDocServiceUnavailableError } from '../src/client/documents-client.ts'
 import type {
-  UserDocDirectoryIdType, UserDocDirectoryRef, UserDocIdType, UserDocLimits, UserDocListQuery, UserDocTrashRef,
+  UserDocCatalogOverview, UserDocDirectoryIdType, UserDocDirectoryRef, UserDocIdType, UserDocLimits, UserDocListQuery,
+  UserDocScope, UserDocTrashRef, UserDocUploadPhase,
 } from '../src/client/documents-client.ts'
+import { UserDocIncarnationId, UserDocTrashId } from '@deepseek-ai/dsh-userdoc'
 
 function t(key: DocumentsKey, params?: Record<string, string>): string {
   let text = (zh as Record<string, string>)[key] ?? key
@@ -82,14 +85,14 @@ function makeClient() {
       _file: File,
       _directoryId?: string,
       _signal?: AbortSignal,
-      _onProgress?: (loaded: number, total: number) => void,
+      _onProgress?: (loaded: number, total: number, phase?: UserDocUploadPhase) => void,
     ) => doc()),
     uploadToScope: vi.fn(async (
       _scope: { kind: 'personal' } | { kind: 'project'; projectId: number },
       _file: File,
       _directoryId?: string,
       _signal?: AbortSignal,
-      _onProgress?: (loaded: number, total: number) => void,
+      _onProgress?: (loaded: number, total: number, phase?: UserDocUploadPhase) => void,
     ) => doc()),
     createDirectory: vi.fn(async (_parentDirectoryId?: string, name: string = '') => ({
       directoryId: name,
@@ -133,9 +136,16 @@ function makeClient() {
       current: { kind: 'personal' as const, label: 'Personal documents' },
       targets: [],
     })),
-    listScope: vi.fn(async () => ({
+    browseScope: vi.fn(async (
+      _scope: UserDocScope,
+      directoryId: UserDocDirectoryIdType,
+      _signal?: AbortSignal,
+      _query?: UserDocListQuery,
+    ) => ({
       version: 1,
-      scope: { kind: 'project' as const, label: 'Compiler' },
+      directoryId,
+      directories: [] as UserDocDirectoryRef[],
+      scope: { kind: 'project', label: 'Compiler' },
       documents: [{
         docId: 'project/report.pdf', name: 'report.pdf', bytes: 2048,
         mediaType: 'application/pdf', modifiedAt: 1,
@@ -146,9 +156,26 @@ function makeClient() {
   }
 }
 
-function renderModal() {
-  return render(<DocumentsModal open onClose={() => {}} t={t} />)
+function renderModal(showComputer = false) {
+  return render(<DocumentsModal showComputer={showComputer} open onClose={() => {}} t={t} />)
 }
+
+function renderPickerButton(wide = false, attachDocument?: () => boolean) {
+  const runtime = {
+    t: t as never,
+    useSessions: useNoCurrentSession as never,
+    useWorkspaces: undefined as never,
+    usePanelInfo: undefined as never,
+    useDeployment: ((selector: (value: unknown) => unknown) =>
+      selector({ phase: 'ready', showComputer: false, aggregateComputers: false })) as never,
+    ...(attachDocument === undefined ? {} : { attachDocument }),
+  }
+  return render(<>
+    <DocumentsButton {...runtime} wide={wide} />
+    <DocumentsOverlay {...runtime} />
+  </>)
+}
+
 
 function stubPhoneMedia(): void {
   const listeners = new Set<() => void>()
@@ -162,13 +189,29 @@ function stubPhoneMedia(): void {
   }) as unknown as MediaQueryList))
 }
 
+function stubMediumWidthMedia(): void {
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+    matches: query === '(max-width: 1100px)',
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => true,
+    media: query,
+    onchange: null,
+  }) as unknown as MediaQueryList))
+}
+
 function namedButton(action: 'attach' | 'preview' | 'move' | 'delete', name: string) {
   const key = action === 'preview'
     ? 'action.previewNamed'
     : action === 'attach'
       ? 'action.attachNamed'
       : action === 'move' ? 'action.moveNamed' : 'action.deleteNamed'
-  return screen.getByRole('button', { name: t(key, { name }) })
+  const direct = screen.queryByRole('button', { name: t(key, { name }) })
+  if (direct !== null) return direct
+  const existing = screen.queryByRole('menuitem', { name: t(`action.${action}`) })
+  if (existing !== null) return existing
+  fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name }) }))
+  return screen.getByRole('menuitem', { name: t(`action.${action}`) })
 }
 
 describe('DocumentsModal', () => {
@@ -181,10 +224,7 @@ describe('DocumentsModal', () => {
 
   it('renders a button with the document label, opens the modal on click, and closes on Escape', () => {
     createUserDocClient.mockReturnValue(makeClient())
-    render(<DocumentsButton
-      t={t as never} wide={false} useSessions={useNoCurrentSession as never}
-      useWorkspaces={undefined as never} usePanelInfo={undefined as never}
-    />)
+    renderPickerButton()
     expect(screen.getByRole('button', { name: '文档' }).className.split(/\s+/)).toContain(buttonCss.rail)
     fireEvent.click(screen.getByRole('button', { name: '文档' }))
     expect(screen.getByRole('dialog', { name: '文档管理' })).toBeTruthy()
@@ -192,12 +232,79 @@ describe('DocumentsModal', () => {
     expect(screen.queryByRole('dialog', { name: '文档管理' })).toBeNull()
   })
 
+  it('keeps a late history response closed and allows history on the next open', async () => {
+    let finish!: (value: { version: 1; items: [] }) => void
+    const history = vi.fn(() => new Promise<{ version: 1; items: [] }>((resolve) => { finish = resolve }))
+    const client = Object.assign(makeClient(), { history })
+    createUserDocClient.mockReturnValue(client)
+    const view = render(<DocumentsModal open onClose={() => {}} t={t} />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('history.button') }))
+    await waitFor(() => { expect(history).toHaveBeenCalledOnce() })
+    view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+    finish({ version: 1, items: [] })
+    await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
+    view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+    await screen.findByText('report.pdf')
+    expect(screen.getByRole('button', { name: t('history.button') })).toHaveProperty('disabled', false)
+    fireEvent.click(screen.getByRole('button', { name: t('history.button') }))
+    finish({ version: 1, items: [] })
+    expect(await screen.findByRole('dialog', { name: t('history.title') })).toBeTruthy()
+  })
+
+  it('waits for the selected copy scope directories before enabling confirmation', async () => {
+    let finish!: (value: { directories: UserDocDirectoryRef[] }) => void
+    const listScopeDirectories = vi.fn(() => new Promise<{ directories: UserDocDirectoryRef[] }>((resolve) => { finish = resolve }))
+    const client = Object.assign(makeClient(), { listScopeDirectories })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+    }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('scope.copy') }))
+    const copy = await screen.findByRole('dialog', { name: t('copy.title') })
+    expect(within(copy).getByRole('button', { name: t('copy.confirm') })).toHaveProperty('disabled', true)
+    expect(client.transfer).not.toHaveBeenCalled()
+    finish({ directories: [] })
+    await waitFor(() => { expect(within(copy).getByRole('button', { name: t('copy.confirm') })).toHaveProperty('disabled', false) })
+    expect(within(copy).getByRole('radio', { name: t('breadcrumb.root') })).toHaveProperty('checked', true)
+  })
+
+  it('ignores a created-folder response belonging to a cancelled copy dialog', async () => {
+    let finish!: (value: UserDocDirectoryRef) => void
+    const createScopeDirectory = vi.fn(() => new Promise<UserDocDirectoryRef>((resolve) => { finish = resolve }))
+    const client = Object.assign(makeClient(), { createScopeDirectory, listScopeDirectories: vi.fn(async () => ({ directories: [] })) })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+    }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    const openCopyDialog = async () => {
+      fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
+      fireEvent.click(screen.getByRole('menuitem', { name: t('scope.copy') }))
+      const copy = await screen.findByRole('dialog', { name: t('copy.title') })
+      await within(copy).findByRole('radio', { name: t('breadcrumb.root') })
+      return copy
+    }
+    const first = await openCopyDialog()
+    fireEvent.change(within(first).getByRole('textbox', { name: t('copy.directory.new') }), { target: { value: 'Old dialog folder' } })
+    fireEvent.click(within(first).getByRole('button', { name: t('folder.create') }))
+    expect(within(first).getByRole('button', { name: t('copy.confirm') })).toHaveProperty('disabled', true)
+    fireEvent.click(within(first).getByRole('button', { name: t('modal.cancel') }))
+    const next = await openCopyDialog()
+    finish(directory('old-dialog-folder', 'Old dialog folder'))
+    await waitFor(() => { expect(within(next).getByRole('button', { name: t('copy.confirm') })).toHaveProperty('disabled', false) })
+    expect(within(next).queryByRole('radio', { name: 'Old dialog folder' })).toBeNull()
+    expect(within(next).getByRole('radio', { name: t('breadcrumb.root') })).toHaveProperty('checked', true)
+    expect(client.transfer).not.toHaveBeenCalled()
+  })
+
   it('shows the document label beside the icon when the sidebar is wide', () => {
     createUserDocClient.mockReturnValue(makeClient())
-    render(<DocumentsButton
-      t={t as never} wide={true} useSessions={useNoCurrentSession as never}
-      useWorkspaces={undefined as never} usePanelInfo={undefined as never}
-    />)
+    renderPickerButton(true)
     expect(screen.getByRole('button', { name: '文档' }).textContent).toContain('文档')
   })
 
@@ -218,10 +325,7 @@ describe('DocumentsModal', () => {
       return { ok: true, json: async () => ({}) }
     }))
     createUserDocClient.mockReturnValue(client)
-    render(<DocumentsButton
-      t={t as never} wide={false} useSessions={useNoCurrentSession as never}
-      useWorkspaces={undefined as never} usePanelInfo={undefined as never}
-    />)
+    renderPickerButton()
     fireEvent.click(screen.getByRole('button', { name: '文档' }))
     expect(await screen.findByRole('dialog', { name: t('modal.title.project', { name: 'Compiler' }) })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -245,12 +349,63 @@ describe('DocumentsModal', () => {
     const project = screen.getByRole('button', { name: /Compiler/ })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     fireEvent.click(project)
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(screen.getByRole('dialog', { name: t('modal.title') })).toBe(manager)
     expect(screen.getByText(t('scope.viewing', { name: 'Compiler' }))).toBeTruthy()
     expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeTruthy()
+  })
+
+  it.each([
+    { mode: 'manage', runtime: 'personal' },
+    { mode: 'select', runtime: 'personal' },
+    { mode: 'manage', runtime: 'project' },
+    { mode: 'select', runtime: 'project' },
+  ] as const)('browses the captured attachment scope independently from the $runtime runtime in $mode mode', async ({ mode, runtime }) => {
+    const client = makeClient()
+    const attachmentScope: UserDocScope = runtime === 'personal'
+      ? { kind: 'project', projectId: 41 }
+      : { kind: 'personal' }
+    const targetLabel = runtime === 'personal' ? 'Compiler' : t('copy.target.personal')
+    const runtimeLabel = runtime === 'personal' ? t('copy.target.personal') : 'Compiler'
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: runtime === 'personal' ? { kind: 'personal' } : { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'rw' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      }),
+    })))
+    client.browseScope.mockImplementation(async (_scope, directoryId) => ({
+      version: 1,
+      directoryId,
+      directories: [],
+      scope: { kind: runtime === 'personal' ? 'project' : 'personal', label: targetLabel },
+      documents: [doc({ docId: 'alternate.txt', name: 'alternate.txt' })],
+    }))
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} mode={mode} attachmentScope={attachmentScope} />)
+    await screen.findByText('report.pdf')
+    const initialReads = client.browse.mock.calls.length
+    const manager = screen.getByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(targetLabel) }))
+    await screen.findByText('alternate.txt')
+    expect(client.browseScope).toHaveBeenCalledWith(attachmentScope, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 }))
+    expect(client.browse).toHaveBeenCalledTimes(initialReads)
+    expect(screen.getAllByText(t('scope.upload.target', { name: targetLabel })).length).toBeGreaterThan(0)
+    expect(screen.getByRole('dialog')).toBe(manager)
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(runtimeLabel) }))
+    await screen.findByText('report.pdf')
+    expect(screen.queryByText('alternate.txt')).toBeNull()
+    expect(client.browseScope).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'report.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: t('selection.copy') }))
+    const copyDialog = await screen.findByRole('dialog', { name: t('copy.title') })
+    const choices = within(copyDialog).getByRole('radiogroup', { name: t('copy.target') })
+    expect(within(choices).getAllByRole('radio').map(option => option.getAttribute('value')))
+      .toEqual([attachmentScope.kind === 'personal' ? 'personal' : 'project:41'])
+    fireEvent.click(within(copyDialog).getByRole('button', { name: t('modal.cancel') }))
+    expect(client.transfer).not.toHaveBeenCalled()
   })
 
   it('returns to the parent directory through an explicit navigation action', async () => {
@@ -474,6 +629,28 @@ describe('DocumentsModal', () => {
     expect(screen.getByRole('dialog', { name: t('modal.title.project', { name: 'Compiler' }) })).toBeTruthy()
   })
 
+  it('discards a fresh personal listing when the verified account changes across opens', async () => {
+    const client = makeClient()
+    client.browse
+      .mockResolvedValueOnce({ directoryId: '' as UserDocDirectoryIdType, directories: [],
+        documents: [doc({ docId: 'first.txt', name: 'first.txt' })], limits })
+      .mockResolvedValueOnce({ directoryId: '' as UserDocDirectoryIdType, directories: [],
+        documents: [doc({ docId: 'second.txt', name: 'second.txt' })], limits })
+    let accountId = 7
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => ({ ok: true, json: async () => input.startsWith('/account/api/document-locations')
+      ? { items: [], nextCursor: null } : { user: { id: accountId }, scope: { kind: 'personal' } },
+    })))
+    createUserDocClient.mockReturnValue(client)
+    const view = render(<DocumentsModal open onClose={() => {}} t={t} />)
+    await screen.findByText('first.txt')
+    view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+    accountId = 8
+    view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+    await screen.findByText('second.txt')
+    expect(screen.queryByText('first.txt')).toBeNull()
+    expect(client.browse).toHaveBeenCalledTimes(2)
+  })
+
   it('caches a legacy runtime listing that arrives before project scope discovery', async () => {
     const client = makeClient()
     client.browse.mockImplementationOnce(async () => ({
@@ -523,7 +700,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     const input = document.querySelector('input[type="file"]')
     if (!(input instanceof HTMLInputElement)) throw new Error('document upload input missing')
     fireEvent.change(input, { target: { files: [new File(['hello'], 'hello.txt', { type: 'text/plain' })] } })
@@ -561,12 +738,12 @@ describe('DocumentsModal', () => {
     fireEvent.click(screen.getByTestId('documents-scope-trigger'))
     const sheet = await screen.findByRole('dialog', { name: t('scope.switch.title') })
     const search = within(sheet).getByPlaceholderText(t('scope.switch.search'))
-    expect(within(sheet).getByRole('option', { name: /Compiler/ }).textContent).toContain(t('scope.project.mode.editable'))
+    expect(within(sheet).getByRole('button', { name: /Compiler/ }).textContent).toContain(t('scope.project.mode.editable'))
     fireEvent.change(search, { target: { value: 'Compiler' } })
-    expect(within(sheet).getByRole('option', { name: /Compiler/ })).toBeTruthy()
-    expect(within(sheet).queryByRole('option', { name: /Payments/ })).toBeNull()
-    fireEvent.click(within(sheet).getByRole('option', { name: /Compiler/ }))
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    expect(within(sheet).getByRole('button', { name: /Compiler/ })).toBeTruthy()
+    expect(within(sheet).queryByRole('button', { name: /Payments/ })).toBeNull()
+    fireEvent.click(within(sheet).getByRole('button', { name: /Compiler/ }))
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     expect(screen.queryByRole('dialog', { name: t('scope.switch.title') })).toBeNull()
   })
 
@@ -594,11 +771,43 @@ describe('DocumentsModal', () => {
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByTestId('documents-scope-trigger'))
     const scopeSheet = await screen.findByRole('dialog', { name: t('scope.switch.title') })
-    fireEvent.click(within(scopeSheet).getByRole('option', { name: /全部可访问文档/ }))
+    fireEvent.click(within(scopeSheet).getByRole('button', { name: /全部可访问文档/ }))
     await screen.findByRole('heading', { name: t('scope.all') })
     fireEvent.click(screen.getByRole('button', { name: t('scope.upload.choose') }))
     const uploadSheet = await screen.findByRole('dialog', { name: t('scope.upload.choose') })
-    expect(within(uploadSheet).getByRole('option', { name: /Compiler/ })).toBeTruthy()
+    expect(within(uploadSheet).getByRole('button', { name: /Compiler/ })).toBeTruthy()
+  })
+
+  it('filters cached foreign overview rows immediately and reads a fresh local page after a mode change', async () => {
+    const local = '10000000-0000-4000-8000-000000000001' as NonNullable<UserDocScope['nodeId']>
+    const remote = '10000000-0000-4000-8000-000000000002' as NonNullable<UserDocScope['nodeId']>
+    const documents = [local, remote].map((nodeId, index) => ({
+      catalogId: `catalog-${index}`, scope: { kind: 'personal' as const, id: 7, label: '个人文档', nodeId },
+      docId: `${index}.pdf` as UserDocIdType, directoryId: '', name: index === 0 ? 'local.pdf' : 'remote.pdf',
+      bytes: 4, mediaType: 'application/pdf', modifiedAt: 1, owner: null, ownerSource: 'upload' as const,
+      state: 'active' as const, legacy: false, lineageRootId: null,
+    }))
+    const result = { version: 1 as const, documents, totalDocuments: 2,
+      metrics: { total: 2, active: 2, deleted: 0, personal: 2, project: 0, bytes: 8, operations24h: 0, failures24h: 0 } }
+    const pending = Promise.withResolvers<UserDocCatalogOverview>()
+    const overview = vi.fn().mockResolvedValueOnce(result).mockReturnValueOnce(pending.promise)
+    createUserDocClient.mockReturnValue(Object.assign(makeClient(), { overview }))
+    const props = { open: true, onClose: () => {}, t }
+    const view = render(<DocumentsModal {...props} showComputer />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: /全部可访问文档/ }))
+    await screen.findByText('remote.pdf')
+    try {
+      view.rerender(<DocumentsModal {...props} allowedNodeId={local} />)
+      expect(screen.queryByText('remote.pdf')).toBeNull()
+      await waitFor(() => { expect(overview).toHaveBeenCalledTimes(2) })
+    } finally {
+      pending.resolve({ ...result, documents: documents.slice(0, 1), totalDocuments: 1,
+        metrics: { ...result.metrics, total: 1, active: 1, personal: 1, bytes: 4 } })
+    }
+    await waitFor(() => { expect(screen.queryByText(t('modal.loading'))).toBeNull() })
+    expect(await screen.findByText('local.pdf')).toBeTruthy()
+    expect(screen.queryByText('remote.pdf')).toBeNull()
   })
 
   it('adds a current-scope document directly from the all-scope picker', async () => {
@@ -667,8 +876,8 @@ describe('DocumentsModal', () => {
     const more = await screen.findByRole('dialog', { name: t('action.more') })
     fireEvent.click(within(more).getByRole('button', { name: t('copy.source') }))
     const source = await screen.findByRole('dialog', { name: t('copy.source.title') })
-    fireEvent.click(within(source).getByRole('option', { name: /Compiler/ }))
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    fireEvent.click(within(source).getByRole('button', { name: /Compiler/ }))
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
   })
 
@@ -682,7 +891,7 @@ describe('DocumentsModal', () => {
     fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
     const more = await screen.findByRole('dialog', { name: t('action.more') })
     fireEvent.change(within(more).getByLabelText(t('modal.type')), { target: { value: 'pdf' } })
-    fireEvent.change(within(more).getByLabelText(t('modal.sort')), { target: { value: 'name:asc' } })
+    fireEvent.click(within(more).getByRole('radio', { name: t('sort.field.name') }))
     expect(client.browse).toHaveBeenCalledTimes(browseCalls)
   })
 
@@ -722,13 +931,32 @@ describe('DocumentsModal', () => {
     expect(await screen.findByText('report.pdf')).toBeTruthy()
     expect(screen.getByText('2026-08-17')).toBeTruthy()
     expect(screen.getByText('2.0 KB')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: t('manager.info') }))
     expect(screen.getByText(t('modal.limits', { size: '10.0 MB', count: '5' }))).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(namedButton('attach', 'report.pdf')).toBeTruthy()
     expect(namedButton('preview', 'report.pdf')).toBeTruthy()
     expect(namedButton('delete', 'report.pdf')).toBeTruthy()
-    expect(screen.getByRole('link', { name: t('action.downloadNamed', { name: 'report.pdf' }) })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: t('action.download') })).toBeTruthy()
     expect(screen.getByRole('group', { name: t('modal.filters') })).toBeTruthy()
     expect(screen.getByRole('group', { name: t('modal.actions') })).toBeTruthy()
+  })
+
+  it('keeps preview and checkbox selection independent and closes the entire preview region', async () => {
+    createUserDocClient.mockReturnValue(makeClient())
+    renderModal()
+    await screen.findByText('report.pdf')
+    const check = screen.getByRole('checkbox', { name: 'report.pdf' }) as HTMLInputElement
+    fireEvent.click(namedButton('preview', 'report.pdf'))
+    const preview = screen.getByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })
+    expect(check.checked).toBe(false)
+    fireEvent.click(check)
+    expect(check.checked).toBe(true)
+    expect(within(preview).getByRole('button', { name: t('preview.attachOne') })).toBeTruthy()
+    fireEvent.click(within(preview).getByRole('button', { name: t('preview.close') }))
+    expect(screen.queryByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull()
+    expect(check.checked).toBe(true)
+    expect(document.activeElement).toBe(namedButton('preview', 'report.pdf'))
   })
 
   it('adds an existing document to the conversation and closes the manager', async () => {
@@ -778,6 +1006,7 @@ describe('DocumentsModal', () => {
     renderModal()
 
     await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('manager.info') }))
     expect(screen.getByText(t('modal.limits.unlimited', { count: '5' }))).toBeTruthy()
   })
 
@@ -897,6 +1126,345 @@ describe('DocumentsModal', () => {
     expect(alert.textContent).toContain(t('modal.upload.error'))
   })
 
+  it('reports published upload batch files without claiming an empty folder', async () => {
+    const client = makeClient()
+    const committed: ReturnType<typeof doc>[] = []
+    const release = Promise.withResolvers<undefined>()
+    client.browse.mockImplementation(async () => ({
+      directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [...committed], limits,
+    }))
+    client.upload.mockImplementation(async (file, _directory, _signal, report) => {
+      if (file.name === 'b.txt') {
+        report?.(1, 1, 'verifying')
+        await release.promise
+      }
+      const stored = doc({ docId: file.name, name: file.name, mediaType: 'text/plain' })
+      committed.push(stored)
+      return stored
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText(t('modal.empty'))
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      fireEvent.change(input, { target: { files: [new File(['a'], 'a.txt'), new File(['b'], 'b.txt')] } })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(2) })
+      expect(screen.getByText('已上传 1 / 2 个文件')).toBeTruthy()
+      expect(screen.queryByText(t('modal.empty'))).toBeNull()
+      expect(screen.queryByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeNull()
+      expect(input.disabled).toBe(true)
+      expect(client.browse).toHaveBeenCalledOnce()
+      expect(screen.queryByText('已上传 2 / 2 个文件')).toBeNull()
+    } finally {
+      await act(async () => { release.resolve(undefined); await release.promise })
+    }
+    await screen.findByText('b.txt')
+    expect(client.browse).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes a published upload batch prefix and names failed and unstarted files', async () => {
+    const client = makeClient()
+    const committed: ReturnType<typeof doc>[] = []
+    const listing = () => ({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [...committed], limits })
+    const refresh = Promise.withResolvers<ReturnType<typeof listing>>()
+    let refreshEntered = false
+    client.browse.mockImplementation(async () => {
+      if (committed.length > 0) { refreshEntered = true; return await refresh.promise }
+      return listing()
+    })
+    client.upload.mockImplementation(async (file) => {
+      if (file.name === 'b.txt') throw new Error('synthetic second file failure')
+      const stored = doc({ docId: file.name, name: file.name, mediaType: 'text/plain' })
+      committed.push(stored)
+      return stored
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText(t('modal.empty'))
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      fireEvent.change(input, { target: { files: ['a', 'b', 'c'].map(name => new File([name], `${name}.txt`)) } })
+      await waitFor(() => { expect(refreshEntered).toBe(true) })
+      expect(input.disabled).toBe(true)
+      expect(screen.getByText('已上传 1 / 3 个文件')).toBeTruthy()
+      expect(client.upload).toHaveBeenCalledTimes(2)
+    } finally {
+      await act(async () => { refresh.resolve(listing()); await refresh.promise })
+    }
+    await screen.findByText('a.txt')
+    const alert = screen.getByRole('alert')
+    expect(alert.textContent).toContain('b.txt')
+    expect(alert.textContent).toContain('1 个文件未开始')
+    expect(screen.getByText('已上传 1 / 3 个文件')).toBeTruthy()
+    expect(input.disabled).toBe(false)
+    expect(client.browse).toHaveBeenCalledTimes(2)
+    expect(client.remove).not.toHaveBeenCalled()
+  })
+
+  it('accepts one upload batch across same-tick drop and input events', async () => {
+    const client = makeClient()
+    const release = Promise.withResolvers<undefined>()
+    client.upload.mockImplementation(async (file) => { await release.promise; return doc({ docId: file.name, name: file.name }) })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    const panel = document.querySelector<HTMLElement>('[data-documents-panel]')!
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      act(() => {
+        fireEvent.drop(panel, { dataTransfer: { files: [new File(['1'], 'first.txt')] } })
+        fireEvent.drop(panel, { dataTransfer: { files: [new File(['2'], 'second.txt')] } })
+        fireEvent.change(input, { target: { files: [new File(['3'], 'third.txt')] } })
+      })
+      expect(client.upload).toHaveBeenCalledTimes(1)
+      expect(input.disabled).toBe(true)
+    } finally {
+      await act(async () => { release.resolve(undefined); await release.promise })
+    }
+    await waitFor(() => { expect(input.disabled).toBe(false) })
+  })
+
+  it('keeps a closed upload batch on its captured folder without republishing its old view', async () => {
+    const client = makeClient()
+    const releases = [Promise.withResolvers<undefined>(), Promise.withResolvers<undefined>()]
+    client.browse.mockImplementation(async (directoryId = '' as UserDocDirectoryIdType) => ({
+      directoryId, directories: directoryId === '' ? [directory('reports')] : [],
+      documents: [doc({ docId: `${directoryId || 'root'}/marker.txt`, name: directoryId === '' ? 'root-marker.txt' : 'folder-marker.txt' })],
+      limits,
+    }))
+    client.upload.mockImplementation(async (file) => {
+      await releases[file.name === 'a.txt' ? 0 : 1]!.promise
+      return doc({ docId: `reports/${file.name}`, name: file.name })
+    })
+    createUserDocClient.mockReturnValue(client)
+    const view = renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: t('folder.openNamed', { name: 'reports' }) }))
+    await screen.findByText('folder-marker.txt')
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      fireEvent.change(input, { target: { files: [new File(['a'], 'a.txt'), new File(['b'], 'b.txt')] } })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(1) })
+      view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+      view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+      await screen.findByText('folder-marker.txt')
+      const readsAfterReopen = client.browse.mock.calls.length
+      await act(async () => { releases[0]!.resolve(undefined); await releases[0]!.promise })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(2) })
+      expect(client.upload.mock.calls.map(call => call[1])).toEqual(['reports', 'reports'])
+      expect(screen.queryByRole('progressbar')).toBeNull()
+      expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
+      await act(async () => { releases[1]!.resolve(undefined); await releases[1]!.promise })
+      expect(screen.getByText('folder-marker.txt')).toBeTruthy()
+      expect(screen.queryByText('root-marker.txt')).toBeNull()
+      expect(client.browse).toHaveBeenCalledTimes(readsAfterReopen)
+    } finally {
+      await act(async () => {
+        for (const release of releases) release.resolve(undefined)
+        await Promise.all(releases.map(release => release.promise))
+      })
+    }
+  })
+
+  it.each(['ready', 'pending'] as const)(
+    'keeps the reopened paged view navigable after an old upload batch completes with %s scope', async (scopeState) => {
+      const client = makeClient()
+      const releaseUpload = Promise.withResolvers<undefined>()
+      const releaseScope = Promise.withResolvers<undefined>()
+      const documents = Array.from({ length: 21 }, (_, index) => doc({
+        docId: `root-${String(index + 1).padStart(2, '0')}.txt`,
+        name: `root-${String(index + 1).padStart(2, '0')}.txt`, mediaType: 'text/plain',
+      }))
+      client.browse.mockImplementation(async (directoryId = '' as UserDocDirectoryIdType, _signal, query) => ({
+        directoryId, directories: [], limits, totalDocuments: documents.length,
+        documents: query?.cursor === 'next-page' ? documents.slice(20) : documents.slice(0, 20),
+        ...(query?.cursor === undefined ? { nextCursor: 'next-page' } : {}),
+      }))
+      client.upload.mockImplementation(async (file) => {
+        await releaseUpload.promise
+        return doc({ docId: file.name, name: file.name })
+      })
+      let scopeReads = 0
+      vi.stubGlobal('fetch', vi.fn(async () => {
+        scopeReads += 1
+        if (scopeState === 'pending') await releaseScope.promise
+        return { ok: true, json: async () => ({
+          scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+        }) }
+      }))
+      createUserDocClient.mockReturnValue(client)
+      const view = renderModal()
+      try {
+        await screen.findByText('root-01.txt')
+        if (scopeState === 'ready') await screen.findByRole('button', { name: /Compiler/ })
+        const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+        fireEvent.change(input, { target: { files: [new File(['old'], 'old-upload.txt')] } })
+        expect(client.upload).toHaveBeenCalledOnce()
+        view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+        view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+        await screen.findByText('root-01.txt')
+        await waitFor(() => { expect(scopeReads).toBe(2) })
+        const reopenedInput = document.querySelector<HTMLInputElement>('input[type=file]')!
+        const readsAfterReopen = client.browse.mock.calls.length
+        await act(async () => { releaseUpload.resolve(undefined); await releaseUpload.promise })
+        await waitFor(() => { expect(reopenedInput.disabled).toBe(false) })
+        await act(async () => { releaseScope.resolve(undefined); await releaseScope.promise })
+        await screen.findByRole('button', { name: /Compiler/ })
+        expect(screen.queryByText('old-upload.txt')).toBeNull()
+        expect(screen.queryByRole('progressbar')).toBeNull()
+        expect(client.browse).toHaveBeenCalledTimes(readsAfterReopen)
+        fireEvent.click(screen.getByRole('button', { name: t('pager.next') }))
+        expect(client.browse.mock.calls.slice(readsAfterReopen).map(call => call[2]?.cursor)).toEqual(['next-page'])
+        await screen.findByText('root-21.txt')
+        const readsAfterNext = client.browse.mock.calls.length
+        fireEvent.click(screen.getByRole('button', { name: t('pager.prev') }))
+        expect(client.browse.mock.calls.slice(readsAfterNext).map(call => call[2]?.cursor)).toEqual([undefined])
+        await screen.findByText('root-01.txt')
+        expect(scopeReads).toBe(2)
+        expect(client.upload.mock.calls[0]?.[1]).toBe('')
+      } finally {
+        await act(async () => {
+          releaseUpload.resolve(undefined)
+          releaseScope.resolve(undefined)
+          await Promise.all([releaseUpload.promise, releaseScope.promise])
+        })
+      }
+    },
+  )
+
+  it('keeps a published upload batch summary when its authoritative listing fails', async () => {
+    const client = makeClient()
+    let published = false
+    client.browse.mockImplementation(async () => {
+      if (published) throw new Error('synthetic listing failure')
+      return { directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits }
+    })
+    client.upload.mockImplementation(async (file) => { published = true; return doc({ docId: file.name, name: file.name }) })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText(t('modal.empty'))
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    fireEvent.change(input, { target: { files: [new File(['a'], 'a.txt')] } })
+    await screen.findByRole('alert')
+    expect(screen.getByText('已上传 1 / 1 个文件')).toBeTruthy()
+    expect(screen.queryByText(t('modal.empty'))).toBeNull()
+    expect(screen.queryByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeNull()
+    expect(input.disabled).toBe(false)
+    expect(client.browse).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores completed upload batch callbacks while the next batch owns progress', async () => {
+    const client = makeClient()
+    const releases = [Promise.withResolvers<undefined>(), Promise.withResolvers<undefined>()]
+    const callbacks: Array<((loaded: number, total: number, phase?: UserDocUploadPhase) => void) | undefined> = []
+    client.upload.mockImplementation(async (file, _directory, _signal, report) => {
+      const index = callbacks.length
+      callbacks.push(report)
+      await releases[index]!.promise
+      return doc({ docId: file.name, name: file.name })
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      fireEvent.change(input, { target: { files: [new File(['a'], 'a.txt')] } })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(1) })
+      await act(async () => { releases[0]!.resolve(undefined); await releases[0]!.promise })
+      await waitFor(() => { expect(input.disabled).toBe(false) })
+      fireEvent.change(input, { target: { files: [new File(['b'], 'b.txt')] } })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(2) })
+      act(() => { callbacks[0]?.(90, 100) })
+      expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('0')
+      expect(input.disabled).toBe(true)
+    } finally {
+      await act(async () => {
+        for (const release of releases) release.resolve(undefined)
+        await Promise.all(releases.map(release => release.promise))
+      })
+    }
+  })
+
+  it('reconciles an upload batch through the selected project without returning to personal', async () => {
+    const client = makeClient()
+    let published = false
+    client.browseScope.mockImplementation(async (_scope, directoryId) => ({
+      version: 1, scope: { kind: 'project' as const, label: 'Compiler' }, directoryId, directories: [],
+      documents: published ? [doc({ docId: 'project/a.txt', name: 'a.txt' })] : [],
+    }))
+    client.uploadToScope.mockImplementation(async (_scope, file) => {
+      if (file.name === 'b.txt') throw new Error('synthetic project failure')
+      published = true
+      return doc({ docId: `project/${file.name}`, name: file.name })
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+    }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: /Compiler/ }))
+    await screen.findByText(t('scope.upload.target', { name: 'Compiler' }), { selector: 'strong' })
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    fireEvent.change(input, { target: { files: ['a', 'b', 'c'].map(name => new File([name], `${name}.txt`)) } })
+    await screen.findByText('a.txt')
+    expect(screen.getByRole('alert').textContent).toContain('b.txt')
+    expect(client.upload).not.toHaveBeenCalled()
+    expect(client.browse).toHaveBeenCalledOnce()
+    expect(client.browseScope).toHaveBeenCalledTimes(2)
+    expect(client.browseScope.mock.calls.every(call => call[0].kind === 'project' && call[0].projectId === 41)).toBe(true)
+    expect(screen.getByText(t('scope.upload.target', { name: 'Compiler' }), { selector: 'strong' })).toBeTruthy()
+  })
+
+  it('keeps upload batch reconciliation on the filtered server page without inserting upload refs', async () => {
+    const client = makeClient()
+    const documents = Array.from({ length: 21 }, (_, index) => doc({
+      docId: `keep-${String(index + 1).padStart(2, '0')}.txt`,
+      name: `keep-${String(index + 1).padStart(2, '0')}.txt`, mediaType: 'text/plain',
+    }))
+    client.browse.mockImplementation(async (_directory, _signal, request) => ({
+      directoryId: '' as UserDocDirectoryIdType, directories: [],
+      documents: request?.cursor === 'next-page' ? documents.slice(20) : documents.slice(0, 20), limits,
+      totalDocuments: 21, ...(request?.cursor === undefined ? { nextCursor: 'next-page' } : {}),
+    }))
+    client.upload.mockImplementation(async file => doc({ docId: file.name, name: file.name, mediaType: 'text/plain' }))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ scope: { kind: 'personal' } }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('keep-01.txt')
+    fireEvent.change(screen.getByPlaceholderText(t('modal.search')), { target: { value: 'keep' } })
+    fireEvent.change(screen.getByRole('combobox', { name: t('modal.type') }), { target: { value: 'text' } })
+    fireEvent.click(screen.getByRole('button', { name: t('modal.sort') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('sort.field.name') }))
+    await waitFor(() => { expect(client.browse.mock.lastCall?.[2]).toMatchObject({ query: 'keep', type: 'text', sort: 'name-asc' }) })
+    await waitFor(() => { expect(screen.queryByText(t('modal.refreshing'))).toBeNull() })
+    fireEvent.click(screen.getByRole('button', { name: t('pager.next') }))
+    await screen.findByText('keep-21.txt')
+    const before = client.browse.mock.calls.length
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    fireEvent.change(input, { target: { files: [new File(['new'], 'outside-filter.txt')] } })
+    await waitFor(() => { expect(client.browse.mock.calls.length).toBe(before + 2) })
+    await waitFor(() => { expect(input.disabled).toBe(false) })
+    expect(screen.getByText('keep-21.txt')).toBeTruthy()
+    expect(screen.getByText(t('pager.status', { page: '2', pages: '2' }))).toBeTruthy()
+    expect(screen.queryByText('outside-filter.txt')).toBeNull()
+    expect(screen.getByPlaceholderText(t('modal.search')).getAttribute('value')).toBe('keep')
+    expect(client.browse.mock.calls.slice(before).map(call => call[2])).toEqual([
+      expect.objectContaining({ query: 'keep', type: 'text', sort: 'name-asc' }),
+      expect.objectContaining({ query: 'keep', type: 'text', sort: 'name-asc', cursor: 'next-page' }),
+    ])
+  })
+  it('explains how to resume retained uploads when the receiving limit is reached', async () => {
+    const client = makeClient()
+    client.upload.mockRejectedValue(new UserDocHttpError(429, 'Too many document uploads are active.', 'DOCUMENT_UPLOAD_BUSY'))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    const input = document.querySelector('input[type=file]') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [new File(['x'], 'new.txt')], configurable: true })
+    fireEvent.change(input)
+    expect((await screen.findByRole('alert')).textContent).toContain('重新选择先前文件续传')
+    expect(screen.getByText('report.pdf')).toBeTruthy()
+  })
+
   it('uploads dropped files', async () => {
     const client = makeClient()
     createUserDocClient.mockReturnValue(client)
@@ -951,6 +1519,176 @@ describe('DocumentsModal', () => {
     expect(confirm.textContent).toContain(t('delete.confirm.project.extra'))
   })
 
+  it.each([false, true])('copies the named document independently of checkbox selection (%s)', async (hasSelection) => {
+    const client = makeClient()
+    const first = doc()
+    const other = doc({ docId: 'other.pdf', name: 'other.pdf' })
+    client.browse.mockResolvedValue({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [first, other], limits })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+    }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    if (hasSelection) fireEvent.click(screen.getByRole('checkbox', { name: 'other.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('scope.copy') }))
+    const dialog = await screen.findByRole('dialog', { name: t('copy.title') })
+    expect(within(dialog).getByText(t('copy.message', { count: '1' }))).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'other.pdf' })).toHaveProperty('checked', hasSelection)
+    fireEvent.click(within(dialog).getByRole('button', { name: t('copy.confirm') }))
+    await waitFor(() => { expect(client.transfer).toHaveBeenCalledOnce() })
+    expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({ documents: [{ docId: first.docId }] }))
+    await waitFor(() => { expect(screen.queryByRole('dialog', { name: t('copy.title') })).toBeNull() })
+  })
+
+  it('resumes the same computer, folder and search when the manager is reopened', async () => {
+    const client = makeClient()
+    const nodeA = '10000000-0000-4000-8000-000000000001'
+    const nodeB = '10000000-0000-4000-8000-000000000002'
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => ({ ok: true, json: async () => input.startsWith('/account/api/document-locations')
+      ? { items: [nodeA, nodeB].map((nodeId, index) => ({ scope: { kind: 'personal', nodeId }, name: 'Personal', nodeName: index === 0 ? 'Computer A' : 'Computer B', mode: 'rw' })), nextCursor: null }
+      : { user: { id: 7 }, scope: { kind: 'personal' }, environment: { nodeId: nodeB, nodeName: 'Computer B' } },
+    })))
+    client.browseScope.mockImplementation(async (target, directoryId) => ({
+      version: 1, directoryId, scope: { kind: target.kind, label: 'Computer A documents' },
+      directories: directoryId === '' ? [directory('folder-a')] : [],
+      documents: directoryId === '' ? [] : [doc({ docId: 'folder-a/report.pdf' })],
+    }))
+    createUserDocClient.mockReturnValue(client)
+    const view = render(<DocumentsModal showComputer open onClose={() => {}} t={t} mode="select"
+      attachmentScope={{ kind: 'personal', nodeId: nodeB as never, nodeName: 'Computer B' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /个人文档\s*Computer A/ }))
+    fireEvent.click(await screen.findByRole('button', { name: t('folder.openNamed', { name: 'folder-a' }) }))
+    await screen.findByText('report.pdf')
+    fireEvent.change(screen.getByRole('textbox', { name: t('modal.search') }), { target: { value: 'report' } })
+    const runtimeReads = client.browse.mock.calls.length
+    expect(screen.getByText(t('selection.destination', { name: '个人文档 · Computer B' }))).toBeTruthy()
+    view.rerender(<DocumentsModal showComputer open={false} onClose={() => {}} t={t} />)
+    view.rerender(<DocumentsModal showComputer open onClose={() => {}} t={t} />)
+    await waitFor(() => { expect(client.browseScope).toHaveBeenLastCalledWith(
+      expect.objectContaining({ nodeId: nodeA }), 'folder-a', expect.any(AbortSignal), expect.objectContaining({ query: 'report' }),
+    ) })
+    expect(client.browse.mock.calls.length).toBe(runtimeReads)
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: t('modal.search') }).value).toBe('report')
+    expect(screen.getByRole('navigation', { name: t('breadcrumb.label') }).textContent).toContain('folder-a')
+  })
+
+  it('applies a search entered during folder loading to the destination folder', async () => {
+    const client = makeClient()
+    const nodeA = '10000000-0000-4000-8000-000000000001'
+    const nodeB = '10000000-0000-4000-8000-000000000002'
+    let releaseFolder!: () => void
+    const folderReady = new Promise<void>((resolve) => { releaseFolder = resolve })
+    let folderSignal: AbortSignal | undefined
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => ({ ok: true, json: async () => input.startsWith('/account/api/document-locations')
+      ? { items: [{ scope: { kind: 'personal', nodeId: nodeA }, name: 'Personal', nodeName: 'Computer A', mode: 'rw' }], nextCursor: null }
+      : { user: { id: 7 }, scope: { kind: 'personal' }, environment: { nodeId: nodeB, nodeName: 'Computer B' } },
+    })))
+    client.browseScope.mockImplementation(async (_target, directoryId, signal, query) => {
+      if (directoryId === 'folder-a' && query?.query === '') {
+        folderSignal = signal
+        await folderReady
+      }
+      return { version: 1, directoryId, scope: { kind: 'personal', label: 'Computer A documents' },
+        directories: directoryId === '' ? [directory('folder-a')] : [],
+        documents: directoryId === '' ? [] : [doc({ docId: 'folder-a/report.pdf' })],
+        totalDocuments: directoryId === '' ? 0 : 1 }
+    })
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal showComputer open onClose={() => {}} t={t} />)
+    try {
+      fireEvent.click(await screen.findByRole('button', { name: /个人文档\s*Computer A/ }))
+      fireEvent.click(await screen.findByRole('button', { name: t('folder.openNamed', { name: 'folder-a' }) }))
+      await waitFor(() => { expect(folderSignal).toBeDefined() })
+      fireEvent.change(screen.getByRole('textbox', { name: t('modal.search') }), { target: { value: 'report' } })
+      expect(folderSignal?.aborted).toBe(false)
+      releaseFolder()
+      await screen.findByText('report.pdf')
+      await waitFor(() => { expect(client.browseScope).toHaveBeenLastCalledWith(
+        expect.objectContaining({ nodeId: nodeA }), 'folder-a', expect.any(AbortSignal), expect.objectContaining({ query: 'report' }),
+      ) })
+      expect(screen.getByRole('navigation', { name: t('breadcrumb.label') }).textContent).toContain('folder-a')
+      expect(client.browseScope.mock.calls.some(([, directoryId, , query]) => directoryId === '' && query?.query === 'report')).toBe(false)
+    } finally { releaseFolder() }
+  })
+
+  it('keeps another computer’s folder selected after copying a nested document into the current computer', async () => {
+    const client = makeClient()
+    const nodeA = '10000000-0000-4000-8000-000000000001'
+    const nodeB = '10000000-0000-4000-8000-000000000002'
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => ({ ok: true, json: async () => input.startsWith('/account/api/document-locations')
+      ? { items: [nodeA, nodeB].map((nodeId, index) => ({ scope: { kind: 'personal', nodeId }, name: 'Personal', nodeName: index === 0 ? 'Computer A' : 'Computer B', mode: 'rw' })), nextCursor: null }
+      : { scope: { kind: 'personal' }, environment: { nodeId: nodeB, nodeName: 'Computer B' } },
+    })))
+    client.browseScope.mockImplementation(async (target, directoryId) => ({
+      version: 1, directoryId, scope: { kind: target.kind, label: 'Computer A documents' },
+      directories: directoryId === '' ? [directory('folder-a')] : [],
+      documents: directoryId === '' ? [] : [doc({ docId: 'folder-a/report.pdf' })],
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal(true)
+    fireEvent.click(await screen.findByRole('button', { name: /个人文档\s*Computer A/ }))
+    fireEvent.click(await screen.findByRole('button', { name: t('folder.openNamed', { name: 'folder-a' }) }))
+    await screen.findByText('report.pdf')
+    const runtimeReads = client.browse.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('scope.copy') }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: t('copy.title') })).getByRole('button', { name: t('copy.confirm') }))
+    await waitFor(() => { expect(screen.queryByRole('dialog', { name: t('copy.title') })).toBeNull() })
+    expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({
+      source: expect.objectContaining({ nodeId: nodeA }) as object,
+      target: expect.objectContaining({ nodeId: nodeB }) as object,
+    }))
+    await waitFor(() => { expect(client.browseScope).toHaveBeenLastCalledWith(expect.objectContaining({ nodeId: nodeA }), 'folder-a', expect.any(AbortSignal), expect.anything()) })
+    expect(client.browse.mock.calls.length).toBe(runtimeReads)
+    expect(screen.getByRole('navigation', { name: t('breadcrumb.label') }).textContent).toContain('folder-a')
+  })
+
+  it('retains an open foreign copy target but blocks submission when this entry becomes local', async () => {
+    const client = makeClient()
+    const nodeA = '10000000-0000-4000-8000-000000000001' as NonNullable<UserDocScope['nodeId']>
+    const nodeB = '10000000-0000-4000-8000-000000000002' as NonNullable<UserDocScope['nodeId']>
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => ({ ok: true, json: async () => input.startsWith('/account/api/document-locations')
+      ? { items: [nodeA, nodeB].map((nodeId, index) => ({ scope: { kind: 'personal', nodeId }, name: 'Personal', nodeName: index === 0 ? 'Computer A' : 'Computer B', mode: 'rw' })), nextCursor: null }
+      : { scope: { kind: 'personal' }, environment: { nodeId: nodeB, nodeName: 'Computer B' } },
+    })))
+    client.browseScope.mockResolvedValue({ version: 1, directoryId: '' as UserDocDirectoryIdType, scope: { kind: 'personal', label: '个人文档' },
+      directories: [], documents: [doc()] })
+    createUserDocClient.mockReturnValue(client)
+    const props = { open: true, onClose: () => {}, t }
+    const view = render(<DocumentsModal {...props} showComputer />)
+    fireEvent.click(await screen.findByRole('button', { name: /个人文档\s*Computer A/ }))
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('scope.copy') }))
+    const dialog = await screen.findByRole('dialog', { name: t('copy.title') })
+    await waitFor(() => { expect(within(dialog).getByRole('button', { name: t('copy.confirm') })).toHaveProperty('disabled', false) })
+    const localReads = client.browse.mock.calls.length
+    view.rerender(<DocumentsModal {...props} showComputer={false} allowedNodeId={nodeB} />)
+    expect(within(dialog).getByRole('alert').textContent).toContain(t('scope.entryUnavailable'))
+    expect(within(dialog).getByRole('button', { name: t('copy.confirm') })).toHaveProperty('disabled', true)
+    expect(within(dialog).getByText('report.pdf')).toBeTruthy()
+    expect(within(dialog).queryByLabelText(t('computer.source'))).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: t('copy.confirm') }))
+    expect(client.transfer).not.toHaveBeenCalled()
+    expect(client.browse.mock.calls.length).toBe(localReads)
+  })
+
+  it('removes the preview actions after the previewed document is confirmed deleted', async () => {
+    const client = makeClient()
+    client.browse.mockResolvedValue({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits })
+    client.browse.mockResolvedValueOnce({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [doc()], limits })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(namedButton('preview', 'report.pdf'))
+    const preview = screen.getByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })
+    fireEvent.click(within(preview).getByRole('button', { name: t('action.delete') }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: t('delete.confirm.title') })).getByRole('button', { name: t('delete.confirm.button') }))
+    await waitFor(() => { expect(screen.queryByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull() })
+  })
+
   it('copies selected personal documents to a writable project without attaching a foreign-scope id', async () => {
     const client = makeClient()
     const attach = vi.fn(() => true)
@@ -980,6 +1718,60 @@ describe('DocumentsModal', () => {
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toContain(t('copy.success', { target: 'Compiler' }))
     })
+  })
+
+  it('does not copy when the captured conversation fails its live preflight', async () => {
+    const client = makeClient()
+    const attach = vi.fn(() => true)
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} mode="select"
+      attachmentScope={{ kind: 'project', projectId: 41 }} onAttachDocument={attach} canAttachDocument={() => false} />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(namedButton('attach', 'report.pdf'))
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', t('action.attach.error'))
+    expect(client.transfer).not.toHaveBeenCalled()
+    expect(attach).not.toHaveBeenCalled()
+  })
+
+  it('retains a completed copy if the target locks during transfer, and retries attachment without another transfer', async () => {
+    const client = makeClient()
+    const result = await client.transfer()
+    client.transfer.mockClear()
+    let finish!: (value: typeof result) => void
+    client.transfer.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    let ready = true
+    const attach = vi.fn(() => true)
+    const close = vi.fn()
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={close} t={t} mode="select" attachmentTargetId="conversation-A"
+      attachmentScope={{ kind: 'project', projectId: 41 }} onAttachDocument={attach} canAttachDocument={() => ready} />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(namedButton('attach', 'report.pdf'))
+    await waitFor(() => { expect(client.transfer).toHaveBeenCalledOnce() })
+    ready = false
+    finish(result)
+    const retry = await screen.findByRole('button', { name: t('copy.retryAttachment') })
+    expect(attach).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
+    fireEvent.click(retry)
+    expect(client.transfer).toHaveBeenCalledOnce()
+    ready = true
+    fireEvent.click(retry)
+    expect(attach).toHaveBeenCalledOnce()
+    expect(close).toHaveBeenCalledOnce()
+    expect(client.transfer).toHaveBeenCalledOnce()
+  })
+
+  it('keeps document management available without a target conversation and disables adding', async () => {
+    const client = makeClient()
+    createUserDocClient.mockReturnValue(client)
+    renderPickerButton(true, () => false)
+    fireEvent.click(screen.getByRole('button', { name: t('button.label') }))
+    await screen.findByText('report.pdf')
+    expect(screen.getByText(t('action.attach.noTarget'))).toBeTruthy()
+    expect(namedButton('attach', 'report.pdf')).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) })).toHaveProperty('disabled', false)
+    expect(client.transfer).not.toHaveBeenCalled()
   })
 
   it.each([false, true])('copies into the captured project pane before attaching, and preserves ACL refusal (%s)', async (refused) => {
@@ -1021,12 +1813,13 @@ describe('DocumentsModal', () => {
     createUserDocClient.mockReturnValue(client)
     render(<DocumentsModal open onClose={() => {}} t={t} onAttachDocument={attach} />)
     await screen.findByText('report.pdf')
-    fireEvent.click(screen.getByRole('button', { name: t('copy.source') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('copy.source') }))
     const sourceDialog = await screen.findByRole('dialog', { name: t('copy.source.title') })
     expect(sourceDialog.querySelectorAll('select')).toHaveLength(0)
-    expect(within(sourceDialog).getByRole('option', { name: /Compiler/ })).toBeTruthy()
+    expect(within(sourceDialog).getByRole('radio', { name: /Compiler/ })).toBeTruthy()
     fireEvent.click(within(sourceDialog).getByRole('button', { name: t('copy.source.open') }))
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('checkbox', { name: 'report.pdf' }))
     fireEvent.click(screen.getByRole('button', { name: t('selection.copy') }))
@@ -1051,11 +1844,13 @@ describe('DocumentsModal', () => {
     createUserDocClient.mockReturnValue(client)
     renderModal()
     await screen.findByText('report.pdf')
-    fireEvent.click(screen.getByRole('button', { name: t('copy.source') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('copy.source') }))
     const sourceDialog = await screen.findByRole('dialog', { name: t('copy.source.title') })
     fireEvent.click(within(sourceDialog).getByRole('button', { name: t('copy.source.open') }))
     await screen.findByText('report.pdf')
-    fireEvent.click(screen.getByRole('button', { name: t('copy.source.current') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('copy.source.current') }))
     await screen.findByText('report.pdf')
     expect(screen.queryByRole('button', { name: t('copy.source.current') })).toBeNull()
     expect(client.browse).toHaveBeenCalledOnce()
@@ -1079,6 +1874,8 @@ describe('DocumentsModal', () => {
       documents: [{
         docId: '2026-08-17/report.pdf' as UserDocIdType, directoryId: '' as UserDocDirectoryIdType, name: 'report.pdf', trashedAt: 1,
         purgeAfter: Date.now() + 86_400_000, bytes: 2048, mediaType: 'application/pdf', modifiedAt: 1,
+        identity: { incarnationId: UserDocIncarnationId('11111111-1111-4111-8111-111111111111'), revision: 2, origin: 'upload' },
+        trashId: UserDocTrashId('22222222-2222-4222-8222-222222222222'),
       }],
     })
     createUserDocClient.mockReturnValue(client)
@@ -1086,8 +1883,196 @@ describe('DocumentsModal', () => {
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('button', { name: t('trash.button') }))
     expect(await screen.findByText(t('trash.title'))).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: t('trash.restoreNamed', { name: 'report.pdf' }) }))
-    await waitFor(() => { expect(client.restore).toHaveBeenCalledWith('2026-08-17/report.pdf') })
+    fireEvent.click(await screen.findByRole('button', { name: t('trash.restoreNamed', { name: 'report.pdf' }) }))
+    await waitFor(() => { expect(client.restore).toHaveBeenCalledWith('2026-08-17/report.pdf', undefined, undefined, undefined,
+      '22222222-2222-4222-8222-222222222222') })
+  })
+
+  it('keeps a permanent-delete failure visible inside the confirmation dialog', async () => {
+    const client = makeClient()
+    const name = '一份包含完整长名称而且不能依赖鼠标悬停才能辨识的已删除项目资料.pdf'
+    client.listTrash.mockResolvedValue({ version: 1, documents: [{
+      docId: '2026-08-17/trashed.pdf' as UserDocIdType, directoryId: '' as UserDocDirectoryIdType,
+      name, trashedAt: 1, purgeAfter: Date.now() + 86_400_000, bytes: 2048, mediaType: 'application/pdf', modifiedAt: 1,
+    }] })
+    client.purge.mockRejectedValue(new Error('Please retry later'))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('trash.button') }))
+    fireEvent.click(await screen.findByRole('button', { name: t('trash.purgeNamed', { name }) }))
+    const confirmation = screen.getByRole('dialog', { name: t('trash.purge') })
+    expect(within(confirmation).getByText(name)).toBeTruthy()
+    fireEvent.click(within(confirmation).getByRole('button', { name: t('trash.purge') }))
+    expect((await within(confirmation).findByRole('alert')).textContent).toContain('Please retry later')
+    expect(screen.getByRole('button', { name: t('trash.restoreNamed', { name }) })).toBeTruthy()
+  })
+
+  it.each([
+    { compact: false, compactNavigation: false, target: 'personal' },
+    { compact: false, compactNavigation: false, target: 'project' },
+    { compact: true, compactNavigation: true, target: 'personal' },
+    { compact: true, compactNavigation: true, target: 'project' },
+    { compact: false, compactNavigation: true, target: 'personal' },
+    { compact: false, compactNavigation: true, target: 'project' },
+  ] as const)('returns from $target trash to its cached folder and restores focus (compact=$compact, compactNavigation=$compactNavigation)', async ({ compact, compactNavigation, target }) => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 23, 12))
+    if (compact) stubPhoneMedia()
+    else if (compactNavigation) stubMediumWidthMedia()
+    const client = makeClient()
+    let restored = false
+    const restoredDocument = doc({ docId: 'reports/restored.txt', name: 'restored.txt', mediaType: 'text/plain' })
+    const listing = (directoryId: UserDocDirectoryIdType) => ({
+      version: 1 as const,
+      directoryId,
+      directories: directoryId === '' ? [directory('reports')] : [],
+      documents: directoryId === 'reports' && restored ? [restoredDocument] : [],
+      limits,
+      scope: { kind: 'project' as const, label: 'Compiler' },
+    })
+    const restoredListing = Promise.withResolvers<ReturnType<typeof listing>>()
+    const restoredListingRequested = Promise.withResolvers<undefined>()
+    const browse = async (id: UserDocDirectoryIdType) => {
+      if (restored && id === 'reports') {
+        restoredListingRequested.resolve(undefined)
+        return await restoredListing.promise
+      }
+      return listing(id)
+    }
+    client.browse.mockImplementation(async (id = '' as UserDocDirectoryIdType) => await browse(id))
+    client.browseScope.mockImplementation(async (_scope, id) => await browse(id))
+    const trashDocument: UserDocTrashRef = {
+      ...restoredDocument, docId: restoredDocument.docId as UserDocIdType,
+      directoryId: 'reports' as UserDocDirectoryIdType,
+      trashedAt: 1, purgeAfter: Date.now() + 86_400_000,
+    }
+    client.listTrash.mockResolvedValue({ version: 1, documents: [trashDocument] })
+    client.listTrashInScope.mockResolvedValue({ version: 1, documents: [trashDocument] })
+    client.restore.mockImplementation(async () => { restored = true; return restoredDocument })
+    client.restoreInScope.mockImplementation(async () => { restored = true; return restoredDocument })
+    const context = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      }),
+    }))
+    vi.stubGlobal('fetch', context)
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByRole('button', { name: t('folder.openNamed', { name: 'reports' }) })
+    if (target === 'project') {
+      if (compactNavigation) {
+        fireEvent.click(screen.getByTestId('documents-scope-trigger'))
+        const scopes = await screen.findByRole('dialog', { name: t('scope.switch.title') })
+        fireEvent.click(within(scopes).getByRole('button', { name: /Compiler/ }))
+      } else fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
+      await waitFor(() => { expect(client.browseScope).toHaveBeenCalledTimes(1) })
+      await screen.findAllByText(t('scope.upload.target', { name: 'Compiler' }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: t('folder.openNamed', { name: 'reports' }) }))
+    const navigation = screen.getByRole('navigation', { name: t('breadcrumb.label') })
+    await waitFor(() => { expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true) })
+    const before = { local: client.browse.mock.calls.length, remote: client.browseScope.mock.calls.length }
+    const enterTrash = async () => {
+      if (compactNavigation) {
+        fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+        if (compact) {
+          const more = await screen.findByRole('dialog', { name: t('action.more') })
+          fireEvent.click(within(more).getByRole('button', { name: t('trash.button') }))
+        } else fireEvent.click(screen.getByRole('menuitem', { name: t('trash.button') }))
+      } else fireEvent.click(screen.getByRole('button', { name: t('trash.button') }))
+      return await screen.findByRole('region', { name: t('trash.title') })
+    }
+    const firstTrash = await enterTrash()
+    const back = within(firstTrash).getByRole('button', { name: t('trash.back') })
+    back.focus()
+    fireEvent.click(back)
+    await waitFor(() => { expect(screen.queryByRole('region', { name: t('trash.title') })).toBeNull() })
+    const returnTarget = screen.getByRole('button', { name: t(compactNavigation ? 'action.more' : 'trash.button') })
+    expect(document.activeElement).toBe(returnTarget)
+    expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true)
+    expect(client.browse).toHaveBeenCalledTimes(before.local)
+    expect(client.browseScope).toHaveBeenCalledTimes(before.remote)
+    if (target === 'project') expect(screen.getAllByText(t('scope.upload.target', { name: 'Compiler' })).length).toBeGreaterThan(0)
+    const secondTrash = await enterTrash()
+    fireEvent.click(within(secondTrash).getByRole('button', { name: t('trash.restoreNamed', { name: 'restored.txt' }) }))
+    await waitFor(() => { expect(within(secondTrash).queryByRole('button', { name: t('trash.restoreNamed', { name: 'restored.txt' }) })).toBeNull() })
+    expect(client.browse).toHaveBeenCalledTimes(before.local)
+    expect(client.browseScope).toHaveBeenCalledTimes(before.remote)
+    fireEvent.click(within(secondTrash).getByRole('button', { name: t('trash.back') }))
+    try {
+      await restoredListingRequested.promise
+      expect(screen.getAllByRole('status').filter(node => node.textContent === t('modal.loading'))).toHaveLength(1)
+      expect(screen.queryByText(t('modal.empty'))).toBeNull()
+      expect(screen.queryByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeNull()
+      expect(screen.queryByText(t('modal.refreshing'))).toBeNull()
+      expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true)
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compactNavigation ? 'action.more' : 'trash.button') }))
+    } finally { restoredListing.resolve(listing('reports' as UserDocDirectoryIdType)) }
+    await screen.findByText('restored.txt')
+    expect(client.browse).toHaveBeenCalledTimes(before.local + (target === 'personal' ? 1 : 0))
+    expect(client.browseScope).toHaveBeenCalledTimes(before.remote + (target === 'project' ? 1 : 0))
+    expect(context).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compactNavigation ? 'action.more' : 'trash.button') }))
+  })
+
+  it.each(['success', 'failure'] as const)('shows loading instead of an empty result until an empty-folder refresh settles: %s', async (outcome) => {
+    const client = makeClient()
+    const empty = { directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits }
+    const refresh = Promise.withResolvers<typeof empty>()
+    const requested = Promise.withResolvers<undefined>()
+    client.browse.mockResolvedValueOnce(empty).mockImplementationOnce(async () => {
+      requested.resolve(undefined)
+      return await refresh.promise
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText(t('modal.empty'))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('modal.refresh') }))
+    try {
+      await requested.promise
+      expect(screen.getAllByRole('status').filter(node => node.textContent === t('modal.loading'))).toHaveLength(1)
+      expect(screen.queryByText(t('modal.empty'))).toBeNull()
+      expect(screen.queryByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeNull()
+      expect(screen.queryByText(t('modal.refreshing'))).toBeNull()
+    } finally {
+      if (outcome === 'success') refresh.resolve(empty)
+      else refresh.reject(new Error('metadata unavailable'))
+    }
+    await screen.findByText(t('modal.empty'))
+    expect(screen.getByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeTruthy()
+    expect(screen.queryByText(t('modal.loading'))).toBeNull()
+    expect(client.browse).toHaveBeenCalledTimes(2)
+    if (outcome === 'failure') expect(screen.getByRole('alert').textContent).toContain('metadata unavailable')
+  })
+
+  it('keeps the cached folder after a failed restore and retains the trash document', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 23, 12))
+    const client = makeClient()
+    client.browse.mockResolvedValue({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits })
+    client.listTrash.mockResolvedValue({
+      version: 1,
+      documents: [{
+        ...doc(), docId: '2026-08-17/report.pdf' as UserDocIdType, directoryId: '' as UserDocDirectoryIdType,
+        trashedAt: 1, purgeAfter: Date.now() + 86_400_000,
+      }],
+    })
+    client.restore.mockRejectedValue(new Error('restore unavailable'))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ scope: { kind: 'personal' } }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByRole('button', { name: t('trash.button') })
+    await waitFor(() => { expect(client.browse).toHaveBeenCalledOnce() })
+    fireEvent.click(screen.getByRole('button', { name: t('trash.button') }))
+    const trash = await screen.findByRole('region', { name: t('trash.title') })
+    const restore = within(trash).getByRole('button', { name: t('trash.restoreNamed', { name: 'report.pdf' }) })
+    fireEvent.click(restore)
+    await screen.findByRole('alert')
+    expect(within(trash).getByRole('button', { name: t('trash.restoreNamed', { name: 'report.pdf' }) })).toBe(restore)
+    fireEvent.click(within(trash).getByRole('button', { name: t('trash.back') }))
+    await waitFor(() => { expect(screen.queryByRole('region', { name: t('trash.title') })).toBeNull() })
+    expect(client.browse).toHaveBeenCalledOnce()
   })
 
   it('reports a delete failure', async () => {
@@ -1103,7 +2088,22 @@ describe('DocumentsModal', () => {
     expect(alert.textContent).toContain(t('delete.error'))
   })
 
-  it('opens a text preview through the modal', async () => {
+  it('explains a trash conflict and retains the active document', async () => {
+    const client = makeClient()
+    client.trash.mockRejectedValue(new UserDocHttpError(409, 'An older item remains in trash.', 'DOCUMENT_TRASH_CONFLICT'))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(namedButton('delete', 'report.pdf'))
+    const confirm = screen.getByRole('dialog', { name: t('delete.confirm.title') })
+    fireEvent.click(within(confirm).getByRole('button', { name: t('delete.confirm.button') }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain(t('error.trashConflict'))
+    expect(screen.getByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeTruthy()
+    expect(client.browse).toHaveBeenCalledTimes(2)
+  })
+
+  it('opens a text preview alongside the list', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
       directoryId: '' as UserDocDirectoryIdType,
@@ -1122,7 +2122,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('readme.md')
     fireEvent.click(namedButton('preview', 'readme.md'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'readme.md' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'readme.md' }) })).toBeTruthy() })
     expect(await screen.findByText('# hello')).toBeTruthy()
   })
 
@@ -1138,7 +2138,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('photo.png')
     fireEvent.click(namedButton('preview', 'photo.png'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'photo.png' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'photo.png' }) })).toBeTruthy() })
     expect(screen.getByRole('img', { name: 'photo.png' })).toBeTruthy()
   })
 
@@ -1154,7 +2154,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('report.pdf')
     fireEvent.click(namedButton('preview', 'report.pdf'))
-    const preview = await screen.findByRole('dialog', { name: t('preview.title', { name: 'report.pdf' }) })
+    const preview = await screen.findByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })
     expect(within(preview).getByTitle('report.pdf')).toBeTruthy()
   })
 
@@ -1170,7 +2170,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('big.txt')
     fireEvent.click(namedButton('preview', 'big.txt'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'big.txt' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'big.txt' }) })).toBeTruthy() })
     expect(screen.getByText(t('preview.too.large'))).toBeTruthy()
   })
 
@@ -1186,7 +2186,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('data.bin')
     fireEvent.click(namedButton('preview', 'data.bin'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'data.bin' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'data.bin' }) })).toBeTruthy() })
     expect(screen.getByText(t('preview.not.supported'))).toBeTruthy()
   })
 
@@ -1207,7 +2207,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('broken.txt')
     fireEvent.click(namedButton('preview', 'broken.txt'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'broken.txt' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'broken.txt' }) })).toBeTruthy() })
     expect(screen.getByText(t('preview.not.supported'))).toBeTruthy()
   })
 
@@ -1255,12 +2255,13 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('button', { name: t('modal.upload') }))
-    fireEvent.click(screen.getByRole('button', { name: t('modal.refresh') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('modal.refresh') }))
     await waitFor(() => { expect(screen.getByText('report.pdf')).toBeTruthy() })
     fireEvent.click(namedButton('preview', 'report.pdf'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'report.pdf' }) })).toBeTruthy() })
-    fireEvent.keyDown(document, { key: 'Escape' })
-    await waitFor(() => { expect(screen.queryByRole('dialog', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })).toBeTruthy() })
+    fireEvent.click(screen.getByRole('button', { name: t('preview.close') }))
+    await waitFor(() => { expect(screen.queryByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull() })
     fireEvent.click(namedButton('delete', 'report.pdf'))
     const confirm = screen.getByRole('dialog', { name: t('delete.confirm.title') })
     fireEvent.click(within(confirm).getAllByRole('button', { name: t('modal.close') }).at(-1)!)
@@ -1272,7 +2273,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('report.pdf')
     expect(screen.getByText(t('modal.visibility.personal'))).toBeTruthy()
-    expect(screen.getByText(t('modal.count', { count: '1' }))).toBeTruthy()
+    expect(screen.getByText(t('listing.entries', { folders: '0', documents: '1' }))).toBeTruthy()
   })
 
   it('navigates folders with breadcrumbs and uploads into the current folder', async () => {
@@ -1318,13 +2319,15 @@ describe('DocumentsModal', () => {
     fireEvent.click(within(createDialog).getByRole('button', { name: t('folder.create.confirm') }))
     await waitFor(() => { expect(client.createDirectory).toHaveBeenCalledWith('', 'drafts') })
 
-    fireEvent.click(screen.getByRole('button', { name: t('folder.renameNamed', { name: 'reports' }) }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreFolderNamed', { name: 'reports' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('folder.rename') }))
     const renameDialog = screen.getByRole('dialog', { name: t('folder.rename.title') })
     fireEvent.change(within(renameDialog).getByLabelText(t('folder.name')), { target: { value: 'archive' } })
     fireEvent.click(within(renameDialog).getByRole('button', { name: t('folder.rename.confirm') }))
     await waitFor(() => { expect(client.renameDirectory).toHaveBeenCalledWith('reports', 'archive') })
 
-    fireEvent.click(screen.getByRole('button', { name: t('folder.deleteNamed', { name: 'reports' }) }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreFolderNamed', { name: 'reports' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('folder.delete') }))
     const deleteDialog = screen.getByRole('dialog', { name: t('folder.delete.title') })
     fireEvent.click(within(deleteDialog).getByRole('button', { name: t('folder.delete.confirm') }))
     await waitFor(() => { expect(client.removeDirectory).toHaveBeenCalledWith('reports') })
@@ -1339,9 +2342,9 @@ describe('DocumentsModal', () => {
 
     fireEvent.click(namedButton('move', 'report.pdf'))
     const moveDialog = await screen.findByRole('dialog', { name: t('move.title') })
-    await waitFor(() => { expect(within(moveDialog).getByLabelText(t('move.destination'))).toBeTruthy() })
-    expect(within(moveDialog).getByRole('option', { name: 'archive' })).toBeTruthy()
-    fireEvent.change(within(moveDialog).getByLabelText(t('move.destination')), { target: { value: 'archive' } })
+    await waitFor(() => { expect(within(moveDialog).getByRole('radiogroup', { name: t('move.destination') })).toBeTruthy() })
+    expect(within(moveDialog).getByRole('radio', { name: 'archive' })).toBeTruthy()
+    fireEvent.click(within(moveDialog).getByRole('radio', { name: 'archive' }))
     fireEvent.click(within(moveDialog).getByRole('button', { name: t('move.confirm') }))
     await waitFor(() => { expect(client.move).toHaveBeenCalledWith('2026-08-17/report.pdf', 'archive') })
   })
@@ -1538,7 +2541,8 @@ describe('DocumentsModal', () => {
     expect(screen.getByText('alpha.png')).toBeTruthy()
     expect(screen.queryByText('beta.txt')).toBeNull()
     fireEvent.change(screen.getByRole('combobox', { name: t('modal.type') }), { target: { value: 'all' } })
-    fireEvent.change(screen.getByRole('combobox', { name: t('modal.sort') }), { target: { value: 'name:asc' } })
+    fireEvent.click(screen.getByRole('button', { name: t('modal.sort') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('sort.field.name') }))
     expect(screen.queryByRole('group', { name: `${t('listing.date')} 2026-08-18` })).toBeNull()
     const names = screen.getAllByRole('listitem').map(row => row.textContent ?? '')
     expect(names[0]).toContain('alpha.png')
@@ -1628,20 +2632,24 @@ describe('DocumentsModal', () => {
       expect(screen.queryByText(t('selection.selected', { count: '1' }))).toBeNull()
     })
   })
-})
 
-it.each(['application/pdf', 'image/png'])('pins %s preview and download URLs to their account', async (mediaType) => {
-  const client = makeClient()
-  const name = mediaType === 'application/pdf' ? 'pinned.pdf' : 'pinned.png'
-  client.browse.mockImplementation(async () => ({ directoryId: '' as UserDocDirectoryIdType,
-    directories: [], documents: [doc({ docId: `2026-08-17/${name}`, name, mediaType })], limits }))
-  createUserDocClient.mockReturnValue(client)
-  const pin = (url: string): string => `${url}${url.includes('?') ? '&' : '?'}dshPrincipal=7`
-  render(<DocumentsModal open onClose={() => {}} t={t} privateResourceUrl={pin} />)
-  await screen.findByText(name)
-  expect(screen.getByRole('link', { name: t('action.downloadNamed', { name }) }).getAttribute('href')).toContain('dshPrincipal=7')
-  fireEvent.click(namedButton('preview', name))
-  const preview = await screen.findByRole('dialog', { name: t('preview.title', { name }) })
-  const content = mediaType === 'application/pdf' ? within(preview).getByTitle(name) : within(preview).getByRole('img', { name })
-  expect(content.getAttribute('src')).toContain('dshPrincipal=7')
+  it.each(['application/pdf', 'image/png'])('pins %s preview and download URLs to their account', async (mediaType) => {
+    const client = makeClient()
+    const name = mediaType === 'application/pdf' ? 'pinned.pdf' : 'pinned.png'
+    client.browse.mockImplementation(async () => ({ directoryId: '' as UserDocDirectoryIdType,
+      directories: [], documents: [doc({ docId: `2026-08-17/${name}`, name, mediaType })], limits }))
+    createUserDocClient.mockReturnValue(client)
+    const pin = (url: string): string => `${url}${url.includes('?') ? '&' : '?'}dshPrincipal=7`
+    render(<DocumentsModal open onClose={() => {}} t={t} privateResourceUrl={pin} />)
+    await screen.findByText(name)
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name }) }))
+    const download = vi.spyOn(window, 'open').mockImplementation(() => null)
+    fireEvent.click(screen.getByRole('menuitem', { name: t('action.download') }))
+    expect(download).toHaveBeenCalledWith(expect.stringContaining('dshPrincipal=7'), '_blank', 'noopener,noreferrer')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(namedButton('preview', name))
+    const preview = await screen.findByRole('complementary', { name: t('preview.title', { name }) })
+    const content = mediaType === 'application/pdf' ? within(preview).getByTitle(name) : within(preview).getByRole('img', { name })
+    expect(content.getAttribute('src')).toContain('dshPrincipal=7')
+  })
 })

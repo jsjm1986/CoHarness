@@ -1,0 +1,14 @@
+{
+  "name": "auth-waited-authority-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-browser-authentication-lock-waits.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.md",
+  "startedAt": "2026-10-24T01:53:50.739701+00:00",
+  "seconds": 2.828,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b51d366b36f3c9202639e34f6306d2e217e80cbfcff477bf489dcd9ef807e60b",
+  "inputsAfter": "a4d52d5cb5205db242ad6509546972618587ae1e459981470abdbb37ca3db91a",
+  "postgresToolDirectory": null,
+  "outputSha256": "3d8455a01c94e9646c5af82f369f7bb029a660bcf7ac423408f0c494bdf6bc2e",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/bug-fix/2026-10-24-browser-authentication-lock-waits.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-browser-authentication-lock-waits.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

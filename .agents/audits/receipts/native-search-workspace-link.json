@@ -1,0 +1,14 @@
+{
+  "name": "native-search-workspace-link",
+  "cwd": ".",
+  "command": "pnpm install --offline --ignore-scripts --filter @deepseek-ai/dsh-web-search-deepseek --no-frozen-lockfile",
+  "startedAt": "2026-10-24T03:20:18.282404+00:00",
+  "seconds": 1.211,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9743eb601ae2ff104412a2e25e6b03f3bca7ef32db2ef5cc0635de19669ab338",
+  "inputsAfter": "9743eb601ae2ff104412a2e25e6b03f3bca7ef32db2ef5cc0635de19669ab338",
+  "postgresToolDirectory": null,
+  "outputSha256": "df0b120219933c8ae456d07a97805e24850aaf69b7a7b25d91c5a407be8185d2",
+  "outputTail": "native/system/packages/darwin-x64        | [WARN] Unsupported platform: wanted: {\"cpu\":[\"x64\"],\"os\":[\"darwin\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nnative/system/packages/linux-arm64       | [WARN] Unsupported platform: wanted: {\"cpu\":[\"arm64\"],\"os\":[\"linux\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nnative/system/packages/linux-x64         | [WARN] Unsupported platform: wanted: {\"cpu\":[\"x64\"],\"os\":[\"linux\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nAlready up to date\nDone in 469ms using pnpm v11.28.5\n"
+}

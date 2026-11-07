@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-document-stream-cancellation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-document-stream-cancellation.md
+document:
+  en: a08809116cae1a8d934098fd5b7700679056547d
+  zh: d70de90ec72e44189eafaf951abe796757d3151d
+/agent-note-cancel-pending-document-stream-reads-before-releasing-upload-resources:
+  en: 7504f63036942ab6
+  zh: 8a713f9aff1457d5
+/agent-note-cancel-pending-document-stream-reads-before-releasing-upload-resources/problem:
+  en: 9ce7495a87483e54
+  zh: 24d70401d372af0f
+/agent-note-cancel-pending-document-stream-reads-before-releasing-upload-resources/decision:
+  en: 6dfb1f2a99a13290
+  zh: 3658ee1b99963ee9
+/agent-note-cancel-pending-document-stream-reads-before-releasing-upload-resources/alternatives-considered:
+  en: b7a2d7b655922804
+  zh: 6bf57c8e6ded1201
+/agent-note-cancel-pending-document-stream-reads-before-releasing-upload-resources/consequences:
+  en: 3d8a3fa3bbbb7dbf
+  zh: b97b54cfd9e62cfe
+/agent-note-cancel-pending-document-stream-reads-before-releasing-upload-resources/verification:
+  en: 6669433231727c15
+  zh: e28f88ffe724dcee

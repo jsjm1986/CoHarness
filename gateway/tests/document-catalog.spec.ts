@@ -27,7 +27,11 @@ function fixture() {
   const catalog = {
     sync: vi.fn(async () => {}),
     markDeleted: vi.fn(async () => {}),
-    authorize: vi.fn(async () => ({ allowed: true as const })),
+    authorize: vi.fn(async () => ({ allowed: true as const, selections: [
+      { docId: 'a.txt', incarnationId: '11111111-1111-4111-8111-111111111111', revision: 2, state: 'active' as const },
+    ] })),
+    projectionCursor: vi.fn(async () => ({ sequence: 0, ordinal: 0 })),
+    project: vi.fn(async (_actorUserId: number, _scope: unknown, batch: { next: { sequence: number; ordinal: number } }) => batch.next),
     overview: vi.fn(async () => ({ version: 1 as const, documents: [], metrics: {
       total: 0, active: 0, deleted: 0, personal: 0, project: 0, bytes: 0, operations24h: 0, failures24h: 0,
     } })),
@@ -62,9 +66,12 @@ describe('runtime document catalog handlers', () => {
     const runtime = fixture()
     await expect(runtime.handlers.authorize({
       subject, principal, payload: { version: 1, action: 'delete', docIds: ['a.txt'] },
-    })).resolves.toEqual({ version: 1, allowed: true })
+    })).resolves.toEqual({ version: 1, allowed: true, selections: [
+      { docId: 'a.txt', incarnationId: '11111111-1111-4111-8111-111111111111', revision: 2, state: 'active' },
+    ] })
     await expect(runtime.handlers.overview({ subject, principal })).resolves.toMatchObject({ version: 1, documents: [] })
-    expect(runtime.catalog.authorize).toHaveBeenCalledWith({ actorUserId: 7, scope: { kind: 'project', projectId: 41 }, action: 'delete', docIds: ['a.txt'] })
+    expect(runtime.catalog.authorize).toHaveBeenCalledWith({ actorUserId: 7, scope: { kind: 'project', projectId: 41 }, action: 'delete',
+      documents: [{ docId: 'a.txt' }], administrator: false })
   })
 
   it('uses the provider batch deletion path when a runtime sends removed ids', async () => {
@@ -75,7 +82,23 @@ describe('runtime document catalog handlers', () => {
       subject, principal,
       payload: { version: 1, documents: [], removed: ['a.txt', 'b.txt'] },
     })).resolves.toEqual({ version: 1, accepted: 0 })
-    expect(markDeletedBatch).toHaveBeenCalledWith(7, { kind: 'project', projectId: 41 }, ['a.txt', 'b.txt'])
+    expect(markDeletedBatch).toHaveBeenCalledWith(7, { kind: 'project', projectId: 41 }, [{ docId: 'a.txt' }, { docId: 'b.txt' }])
     expect(runtime.catalog.markDeleted).not.toHaveBeenCalled()
+  })
+
+  it('requires the exact lifecycle backend for permanent purge', async () => {
+    const runtime = fixture()
+    const payload = { version: 1, documents: [{ docId: 'a.txt', incarnationId: '11111111-1111-4111-8111-111111111111',
+      revision: 2, trashId: '22222222-2222-4222-8222-222222222222' }] }
+    await expect(runtime.handlers.purge({ subject, principal, payload }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_CATALOG_UNAVAILABLE', status: 503 })
+
+    const markDeletedBatch = vi.fn(async () => {})
+    ;(runtime.catalog as typeof runtime.catalog & { markDeletedBatch?: typeof markDeletedBatch }).markDeletedBatch = markDeletedBatch
+    await expect(runtime.handlers.purge({ subject, principal, payload })).resolves.toEqual({ version: 1, accepted: 1 })
+    expect(markDeletedBatch).toHaveBeenCalledWith(7, { kind: 'project', projectId: 41 }, [{
+      docId: 'a.txt', incarnationId: '11111111-1111-4111-8111-111111111111', revision: 3,
+      trashId: '22222222-2222-4222-8222-222222222222', state: 'purged',
+    }])
   })
 })

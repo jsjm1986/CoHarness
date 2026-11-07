@@ -1,0 +1,14 @@
+{
+  "name": "upload-actor-gateway-postgres-first",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/document-upload-postgres.spec.ts tests/documents-local.spec.ts tests/postgres-suite.spec.ts --retry=0 --maxWorkers=1 --no-file-parallelism",
+  "startedAt": "2026-10-25T10:15:10.876860+00:00",
+  "seconds": 3.627,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6d3dca1d15dda691fc9eb40f17c2f1d9be7df132f72aa353b5ba4c3f40565f2f",
+  "inputsAfter": "6d3dca1d15dda691fc9eb40f17c2f1d9be7df132f72aa353b5ba4c3f40565f2f",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "814b16ab7663f0d8326cc789f810c19c33132ab0c3d46970e30a62a8ab4e316e",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  18 passed (18)\n   Start at  18:15:11\n   Duration  2.73s (transform 864ms, setup 0ms, import 1.23s, tests 1.27s, environment 0ms)\n\n"
+}

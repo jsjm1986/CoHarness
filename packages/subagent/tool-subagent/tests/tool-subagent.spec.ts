@@ -35,9 +35,9 @@ const testToolSignal = new AbortController().signal
  */
 
 /** A minimal parent Agent passed through to the provider request. */
-function fakeAgent(id = 'parent-1'): Agent {
+function fakeAgent(ctx: Context, id = 'parent-1'): Agent {
   const sessionId = SessionId(id)
-  return { id: sessionId, options: {}, session: Session.create(sessionId) } as unknown as Agent
+  return { id: sessionId, options: {}, session: Session.create(sessionId), ctx: ctx.plugin(() => {}).ctx } as unknown as Agent
 }
 
 /** Create a package-test context with the tool's required projection seam. */
@@ -63,7 +63,7 @@ function callSubagent(ctx: Context, args: unknown, over: { agent?: Agent | undef
   // Distinguish "no override" (use a default agent) from an explicit
   // `{ agent: undefined }` (test the no-agent path). Under
   // exactOptionalPropertyTypes the key is omitted rather than set to undefined.
-  const agent = 'agent' in over ? over.agent : fakeAgent()
+  const agent = 'agent' in over ? over.agent : fakeAgent(ctx)
   return ctx.tools.execute({
     signal: testToolSignal,
     callId: ToolCallId(`call-${++callCounter}`),
@@ -238,8 +238,8 @@ describe('dsh-tool-subagent', () => {
     const names = ctx.tools.schemas().map(s => s.name).filter(n => n.startsWith('subagent')).sort()
     expect(names).toEqual(['subagent', 'subagent_acp'])
 
-    const viaSpawn = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('c-spawn'), name: 'subagent', arguments: { description: 'd', prompt: 'p' }, agent: fakeAgent() })
-    const viaAcp = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('c-acp'), name: 'subagent_acp', arguments: { description: 'd', prompt: 'p' }, agent: fakeAgent() })
+    const viaSpawn = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('c-spawn'), name: 'subagent', arguments: { description: 'd', prompt: 'p' }, agent: fakeAgent(ctx) })
+    const viaAcp = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('c-acp'), name: 'subagent_acp', arguments: { description: 'd', prompt: 'p' }, agent: fakeAgent(ctx) })
     expect(text(viaSpawn)).toBe('from spawn')
     expect(text(viaAcp)).toBe('from acp')
   })
@@ -549,6 +549,33 @@ describe('dsh-tool-subagent', () => {
     expect(disposed).toHaveBeenCalledTimes(1)
   })
 
+  it.each(['result', 'cleanup', 'both'] as const)('retains combined foreground failures when %s cannot render', async (mode) => {
+    const ctx = await projectedContext()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
+    await ctx.plugin(SubagentRuntime)
+    let allowCleanup = false
+    const resultFailure: unknown = mode === 'cleanup' ? new Error('result unavailable') : Object.create(null)
+    const cleanupFailure: unknown = mode === 'result' ? new Error('cleanup unavailable') : Object.create(null)
+    ctx.subagents.registerProvider({ name: 'spy', inheritsParentContext: false,
+      capabilities: { agentOptions: false, agentPreset: false, outputSchema: false, depthLimit: false },
+      start: async () => ({ id: SessionId('unrenderable-child'), localAgent: undefined,
+        result: Promise.resolve().then(() => { throw resultFailure }),
+        dispose: async () => { if (!allowCleanup) throw cleanupFailure } }) })
+    await ctx.plugin(tool, { provider: 'spy', maxDepth: 'provider-managed' })
+    try {
+      const result = await callSubagent(ctx, { description: 'd', prompt: 'p' })
+      expect(result.isError).toBe(true)
+      expect(text(result)).toContain('subagent run failed:')
+      expect(text(result)).toContain('dispose failed:')
+      expect(text(result)).toContain('<unrenderable thrown value>')
+      if (mode === 'cleanup') expect(text(result)).toContain('result unavailable')
+      if (mode === 'result') expect(text(result)).toContain('cleanup unavailable')
+      expect(text(result)).not.toContain('Cannot convert object')
+    } finally { allowCleanup = true; await ctx.fiber.dispose() }
+  })
+
   it('reports a foreground disposal failure after a completed result', async () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
@@ -578,6 +605,7 @@ describe('dsh-tool-subagent', () => {
 
   it('passes the tool abort signal as the provider cancellation channel', async () => {
     const cancelled = vi.fn()
+    const published = Promise.withResolvers<undefined>()
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -595,6 +623,7 @@ describe('dsh-tool-subagent', () => {
           cancelled()
           resolveResult({ output: [], stopReason: 'aborted' })
         }, { once: true })
+        published.resolve(undefined)
         return {
           id: SessionId('spy-child'),
           localAgent: undefined,
@@ -607,9 +636,7 @@ describe('dsh-tool-subagent', () => {
 
     const controller = new AbortController()
     const pending = callSubagent(ctx, { description: 'd', prompt: 'p' }, { signal: controller.signal })
-    // Let provider.start install its listener before aborting.
-    await Promise.resolve()
-    await Promise.resolve()
+    await published.promise
     controller.abort()
     const result = await pending
     expect(cancelled).toHaveBeenCalledTimes(1)
@@ -923,14 +950,17 @@ describe('dsh-tool-subagent background mode', () => {
     expect(text(result)).toBe('Error: tool call aborted before dispatch')
   })
 
-  it('settles an asynchronous provider-start failure as a failed task', async () => {
+  it.each<{ kind: string; failure: unknown; detail: string }>([
+    { kind: 'ordinary', failure: new Error('setup failed'), detail: 'Error: setup failed' },
+    { kind: 'unrenderable', failure: Object.create(null), detail: '<unrenderable thrown value>' },
+  ])('settles an $kind asynchronous provider-start failure as a failed task', async ({ failure, detail }) => {
     const ctx = await backgroundSetup({ provider: 'mock' })
     const parent = ownerAgent(ctx, 'sess-parent')
     ctx.subagents.registerProvider({
       name: 'broken-start',
       capabilities: { agentOptions: false, agentPreset: false, outputSchema: false, depthLimit: false },
       inheritsParentContext: false,
-      start: async () => { throw new Error('setup failed') },
+      start: async () => { throw failure },
     })
     await tool.apply(ctx, { maxDepth: 'provider-managed', provider: 'broken-start', toolName: 'subagent_broken' })
 
@@ -950,7 +980,9 @@ describe('dsh-tool-subagent background mode', () => {
       arguments: { job_id: jobId, wait: true },
       agent: parent,
     })
-    expect(text(output)).toContain('[status: failed, Error: setup failed]')
+    expect(text(output)).toContain(`[status: failed, ${detail}]`)
+    const settlement = parent.session.snapshotEvents().find(event => event.type === 'job/settled' && event.data.jobId === jobId)
+    expect(settlement?.data).toMatchObject({ producerReported: true })
   })
 
   it('kills a subagent task while provider readiness is still pending', async () => {
@@ -1191,7 +1223,7 @@ describe('dsh-tool-subagent continuable background mode', () => {
     const cancelled = new AbortController()
     let preparationCount = 0
     let cancelledChildId: ReturnType<typeof SessionId> | undefined
-    let survivingChildId: ReturnType<typeof SessionId> | undefined
+    const preparedChildIds = new Set<ReturnType<typeof SessionId>>()
     ctx.subagents.registerProvider({
       name: 'gated',
       capabilities: { agentOptions: false, agentPreset: false, outputSchema: true, depthLimit: true },
@@ -1199,11 +1231,14 @@ describe('dsh-tool-subagent continuable background mode', () => {
       start: async () => { throw new Error('continuable policy must not start a one-shot child') },
       prepareContinuable: async (request) => {
         preparationCount += 1
-        if (request.signal === cancelled.signal) cancelledChildId = request.sessionId
-        else survivingChildId = request.sessionId
-        if (preparationCount === 2) bothPreparing.resolve(undefined)
-        await releasePreparations.promise
-        return {}
+        preparedChildIds.add(request.sessionId)
+        const onAbort = () => { cancelledChildId = request.sessionId }
+        request.signal.addEventListener('abort', onAbort, { once: true })
+        try {
+          if (preparationCount === 2) bothPreparing.resolve(undefined)
+          await releasePreparations.promise
+          return {}
+        } finally { request.signal.removeEventListener('abort', onAbort) }
       },
     })
     await tool.apply(ctx, {
@@ -1228,6 +1263,8 @@ describe('dsh-tool-subagent continuable background mode', () => {
 
     const [failed, succeeded] = await Promise.all([cancelledResult, survivingResult])
     expect(preparationCount).toBe(2)
+    expect(preparedChildIds.size).toBe(2)
+    const survivingChildId = [...preparedChildIds].find(id => id !== cancelledChildId)
     expect(failed.isError).toBe(true)
     expect(succeeded.isError).toBe(false)
     expect(cancelledChildId).toBeDefined()

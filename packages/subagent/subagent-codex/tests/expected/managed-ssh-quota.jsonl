@@ -1,0 +1,1 @@
+{"mode":"quota","outcome":"error","nativeRequests":1,"modelAdmissions":2,"usageOwners":["ssh-model-parent"],"originalActor":true,"allPermitsSettled":true,"upstreamKeyStayedInParent":true,"nativeProcessesStopped":true,"remoteModelListenersClosed":true,"memberColdResume":false}

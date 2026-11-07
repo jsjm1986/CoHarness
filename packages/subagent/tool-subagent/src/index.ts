@@ -1,7 +1,8 @@
 /**
  * Model-facing delegation through one configured `ctx.subagents` provider.
  * Provider lifecycle controls tool registration and context-sensitive schema
- * wording. Foreground calls always dispose the run after collection.
+ * wording. Foreground calls dispose after collection and hand failed cleanup
+ * back to their originating runtime before reporting the failure.
  * Background policy is selected by this plugin's configuration: one-shot
  * calls own a plain Task, while continuable calls use
  * `ctx.subagents.startContinuable()`.
@@ -22,9 +23,11 @@ import {
   assertSubagentMaxDepth,
   delegationDepthOf,
   parentAgentOptionsForDelegation,
+  renderSubagentFailure,
   settleRun,
 } from '@deepseek-ai/dsh-subagent'
 import type { SubagentProvider, SubagentResult, SubagentRun } from '@deepseek-ai/dsh-subagent'
+import { withSubagentForeground } from '@deepseek-ai/dsh-subagent/internal'
 import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import {
@@ -36,7 +39,7 @@ import {
 } from './model-selection.ts'
 import type { DelegationModelRequest, ModelSelectionPolicy } from './model-selection.ts'
 import { registerListSubagentModels } from './list-models.ts'
-import { SubagentPresetSelection, type PresetSelectionConfig, type PresetSelectionRequest } from './preset-selection.ts'
+import { SubagentPresetSelection, type PresetSelectionConfig } from './preset-selection.ts'
 import type {} from './model-selection-settings.ts'
 import {
   recordSubagentModelSelection,
@@ -126,16 +129,40 @@ function outputValueText(values: JsonValue[]): string {
     .join('')
 }
 
-/** Settle pending startup without rejecting the task producer contract. */
-async function settleStart(start: Promise<SubagentRun>, signal: AbortSignal): Promise<JobOutcome> {
+/** Retain published resources through cleanup failure without rejecting the job's completion promise. */
+async function settleStart(
+  start: Promise<SubagentRun>,
+  signal: AbortSignal,
+  waitForCleanupRetry: (detail: string) => Promise<void>,
+): Promise<JobOutcome> {
   try {
-    return await settleRun(await start)
+    const run = await start
+    let cleanupFailure: string | undefined
+    const outcome = await settleRun({
+      id: run.id,
+      localAgent: run.localAgent,
+      result: run.result,
+      dispose: async () => {
+        for (;;) {
+          try {
+            await run.dispose()
+            return
+          } catch (error: unknown) {
+            cleanupFailure = renderSubagentFailure(error)
+            await waitForCleanupRetry(cleanupFailure)
+          }
+        }
+      },
+    })
+    if (cleanupFailure === undefined) return outcome
+    const prefix = outcome.detail === undefined ? '' : `${outcome.detail}; `
+    return { status: 'failed', detail: `${prefix}dispose failed: ${cleanupFailure}` }
   } catch (error: unknown) {
     // Product providers aggregate startup and rollback failures. Cancellation
     // must not turn a failed cleanup into a cleanly killed Job.
     return signal.aborted && !(error instanceof AggregateError)
       ? { status: 'killed' }
-      : { status: 'failed', detail: String(error) }
+      : { status: 'failed', detail: renderSubagentFailure(error) }
   }
 }
 
@@ -190,8 +217,10 @@ type ForegroundToolResult = {
 /**
  * Collect and release one foreground run without letting disposal replace an
  * independent result failure.
+ * @param run - published foreground child.
+ * @param retainFailure - hand unconfirmed cleanup back to its original runtime.
  */
-async function settleForegroundRun(run: SubagentRun): Promise<ForegroundToolResult> {
+async function settleForegroundRun(run: SubagentRun, retainFailure: () => void): Promise<ForegroundToolResult> {
   const [execution] = await Promise.allSettled([
     run.result.then((result): ForegroundToolResult => {
       const error = stopReasonError(result)
@@ -210,11 +239,12 @@ async function settleForegroundRun(run: SubagentRun): Promise<ForegroundToolResu
     }),
   ])
   const [disposal] = await Promise.allSettled([Promise.resolve().then(() => run.dispose())])
+  if (disposal.status === 'rejected') retainFailure()
   if (execution.status === 'rejected') {
     if (disposal.status === 'rejected') {
       throw new AggregateError(
         [execution.reason, disposal.reason],
-        `subagent run failed: ${String(execution.reason)}; dispose failed: ${String(disposal.reason)}`,
+        `subagent run failed: ${renderSubagentFailure(execution.reason)}; dispose failed: ${renderSubagentFailure(disposal.reason)}`,
       )
     }
     throw execution.reason
@@ -480,97 +510,111 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
             throw new Error('subagent tool requires a calling agent (exec.agent was undefined)')
           }
 
-          const agentPreset = presets.resolve(args as PresetSelectionRequest)
-          const modelRequest = args as DelegationModelRequest
-          const parentOptions = parentAgentOptionsForDelegation(parent)
-          const requiresRoutePreflight = hasDelegationModelRequest(modelRequest)
-            || hasConfiguredLlmSelection(config.agentOptions)
-          const configuredChildAgentOptions = requiresRoutePreflight && providerRouteDefaults !== undefined
-            ? { ...providerRouteDefaults, ...config.agentOptions }
-            : config.agentOptions
-          const requestedChildAgentOptions = requestedAgentOptions(
-            parentOptions,
-            configuredChildAgentOptions,
-            modelRequest,
-            modelSelectionEnabled,
-          )
-          assertAllowedModelSelection(
-            modelSelectionPolicy,
-            parentOptions,
-            requestedChildAgentOptions,
-            modelRequest,
-          )
-          if (requiresRoutePreflight) {
-            const llm = runtimeCtx.get('llm')
-            if (llm === undefined) {
-              throw new Error('cannot resolve the selected child LLM route because the `llm` service is unavailable')
-            }
-            await preflightChildLlmRoute(
-              llm,
+          const subagents = runtimeCtx.subagents
+          return withSubagentForeground(subagents, parent, exec.signal, async (signal) => {
+            const agentPreset = presets.resolve(args)
+            const modelRequest = args as DelegationModelRequest
+            const parentOptions = parentAgentOptionsForDelegation(parent)
+            const requiresRoutePreflight = hasDelegationModelRequest(modelRequest)
+              || hasConfiguredLlmSelection(config.agentOptions)
+            const configuredChildAgentOptions = requiresRoutePreflight && providerRouteDefaults !== undefined
+              ? { ...providerRouteDefaults, ...config.agentOptions }
+              : config.agentOptions
+            const requestedChildAgentOptions = requestedAgentOptions(
+              parentOptions,
+              configuredChildAgentOptions,
+              modelRequest,
+              modelSelectionEnabled,
+            )
+            assertAllowedModelSelection(
+              modelSelectionPolicy,
               parentOptions,
               requestedChildAgentOptions,
-              exec.signal,
-              providerRouteDefaults === undefined,
+              modelRequest,
             )
-            if (runtimeCtx.subagents.getProvider(config.provider) !== subagentProvider) {
-              throw new Error(`subagent provider "${config.provider}" changed while resolving the child LLM route; retry the delegation`)
+            if (requiresRoutePreflight) {
+              const llm = runtimeCtx.get('llm')
+              if (llm === undefined) {
+                throw new Error('cannot resolve the selected child LLM route because the `llm` service is unavailable')
+              }
+              await preflightChildLlmRoute(
+                llm,
+                parentOptions,
+                requestedChildAgentOptions,
+                signal,
+                providerRouteDefaults === undefined,
+              )
+              if (subagents.getProvider(config.provider) !== subagentProvider) {
+                throw new Error(`subagent provider "${config.provider}" changed while resolving the child LLM route; retry the delegation`)
+              }
             }
-          }
-          exec.signal.throwIfAborted()
-          const maxDepth = runtimeCtx.subagents.resolveMaxDepth(config.maxDepth)
-          const request = {
-            ...args.cwd === undefined ? {} : { cwd: args.cwd },
-            label: args.description,
-            prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
-            parent,
-            ...agentPreset === undefined ? {} : { agentPreset },
-            ...requestedChildAgentOptions !== undefined ? { agentOptions: requestedChildAgentOptions } : {},
-            ...maxDepth !== undefined ? { maxDepth } : {},
-          }
-
-          const runSpec = resolveDelegationRun(args, { backgroundEnabled, continuable })
-          if (runSpec.runInBackground) {
-            if (continuable) {
-              // Resolves at inbox acceptance: the child owns its own turns from
-              // there, so this call neither waits for nor collects a result.
-              const started = await runtimeCtx.subagents.startContinuable({
-                provider: config.provider,
-                label: args.description,
-                request,
-                signal: exec.signal,
-              })
-              return { kind: 'continuable' as const, subagentId: started.childId }
-            }
-            const jobs = runtimeCtx.get('jobs')
-            if (jobs === undefined) {
-              throw new Error('background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs')
-            }
-            // One-shot background child: job preflight finishes before the
-            // starter can spawn, and the task-owned signal covers startup.
-            const id = jobs.start({
-              kind: 'subagent',
+            signal.throwIfAborted()
+            const maxDepth = subagents.resolveMaxDepth(config.maxDepth)
+            const request = {
+              ...args.cwd === undefined ? {} : { cwd: args.cwd },
               label: args.description,
-              owner: parent.id,
-              run: () => {
-                const controller = new AbortController()
-                const start = runtimeCtx.subagents.start(config.provider, { ...request, signal: controller.signal })
-                return {
-                  cancel: (reason?: string) => {
-                    controller.abort(reason ?? 'background subagent task killed')
-                  },
-                  done: settleStart(start, controller.signal),
-                  // No output sources: the child session owns intermediate detail.
-                }
-              },
-            })
-            return { kind: 'background' as const, jobId: id }
-          }
+              prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
+              parent,
+              ...agentPreset === undefined ? {} : { agentPreset },
+              ...requestedChildAgentOptions !== undefined ? { agentOptions: requestedChildAgentOptions } : {},
+              ...maxDepth !== undefined ? { maxDepth } : {},
+            }
 
-          const run: SubagentRun = await runtimeCtx.subagents.start(config.provider, {
-            ...request,
-            signal: exec.signal,
+            const runSpec = resolveDelegationRun(args, { backgroundEnabled, continuable })
+            if (runSpec.runInBackground) {
+              if (continuable) {
+                // Resolves at inbox acceptance: the child owns its own turns from
+                // there, so this call neither waits for nor collects a result.
+                const started = await subagents.startContinuable({
+                  provider: config.provider,
+                  label: args.description,
+                  request,
+                  signal: signal,
+                })
+                return { kind: 'continuable' as const, subagentId: started.childId }
+              }
+              const jobs = runtimeCtx.get('jobs')
+              if (jobs === undefined) {
+                throw new Error('background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs')
+              }
+              // One-shot background child: job preflight finishes before the
+              // starter can spawn, and the task-owned signal covers startup.
+              const id = jobs.start({
+                kind: 'subagent',
+                label: args.description,
+                toolCall: { callId: exec.callId, rootCallId: exec.rootCallId },
+                owner: parent.id,
+                run: (job) => {
+                  const controller = new AbortController()
+                  const start = subagents.start(config.provider, { ...request, signal: controller.signal })
+                  let retryCleanup: (() => void) | undefined
+                  // Termination retains one retry even before an in-flight disposal fails.
+                  let cleanupRetryRequested = false
+                  const done = settleStart(start, controller.signal, (detail) => {
+                    const retry = Promise.withResolvers<void>()
+                    retryCleanup = () => { cleanupRetryRequested = false; retry.resolve() }
+                    job.updateProgress(`Subagent cleanup is unconfirmed; request termination again to retry. ${detail}`)
+                    runtimeCtx.logger.warn(`background subagent dispose failed: ${detail}`)
+                    if (cleanupRetryRequested) retryCleanup()
+                    return retry.promise.finally(() => { retryCleanup = undefined })
+                  })
+                  return {
+                    cancel: (reason?: string) => {
+                      cleanupRetryRequested = true
+                      controller.abort(reason ?? 'background subagent task killed')
+                      retryCleanup?.()
+                    },
+                    done,
+                    // No output sources: the child session owns intermediate detail.
+                  }
+                },
+              })
+              return { kind: 'background' as const, jobId: id }
+            }
+
+            const run: SubagentRun = await subagents.start(config.provider, { ...request, signal })
+            return settleForegroundRun(run, () => { void subagents.retainFailedCleanup(parent, run) })
           })
-          return settleForegroundRun(run)
         },
       })
       const disposeTool = runtimeCtx.tools.register(definition)
@@ -711,7 +755,7 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
     scopedInstalls.delete(candidate)
     /* v8 ignore next 3 -- Cordis Fiber disposal contains registration cleanup failures; this is the final diagnostic sink. */
     void fiber.dispose().catch((error: unknown) => {
-      ctx.logger.warn(`tool-subagent: failed to remove recomposed Agent "${candidate.id}" definitions: ${String(error)}`)
+      ctx.logger.warn(`tool-subagent: failed to remove recomposed Agent "${candidate.id}" definitions: ${renderSubagentFailure(error)}`)
     })
   }
   const reconcileComposedAgents = (): void => {

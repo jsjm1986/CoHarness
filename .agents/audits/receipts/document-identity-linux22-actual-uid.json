@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-linux22-actual-uid",
+  "cwd": ".",
+  "command": "limactl shell redroid -- sudo -n -- /tmp/coharness-document-audit.xhw1BMPE/node-v22.22.1-linux-arm64/bin/node /tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs --uid",
+  "startedAt": "2026-10-26T23:35:02.049774+00:00",
+  "seconds": 0.862,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1e019799aeb6d9b2697be1929e3c72bcbfdd24ec5145ba3e962cd4250a28e98e",
+  "inputsAfter": "1e019799aeb6d9b2697be1929e3c72bcbfdd24ec5145ba3e962cd4250a28e98e",
+  "postgresToolDirectory": null,
+  "outputSha256": "470b2755622d43d00cff38d1d6a94640683a2c5b983f498e7e702889b2126ed8",
+  "outputTail": "(node:44668) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n{\"operation\":\"legacy-cross-uid\",\"ordinary\":\"EACCES\",\"actor\":\"EACCES\"}\n{\"operation\":\"publish\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":true}\n{\"operation\":\"capture\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":true}\n{\"operation\":\"detach\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":true}\n{\"operation\":\"identified-lifecycle\",\"renamed\":true,\"moved\":true,\"restored\":true,\"purged\":true}\n"
+}

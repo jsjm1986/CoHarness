@@ -1,0 +1,394 @@
+{
+  "finding": "B369",
+  "status": "fixed_named_shared_scope_consolidation_cases",
+  "updatedAt": "2026-10-30T21:42:16.447939+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T210813Z",
+  "sourcePaths": [
+    "packages/memory/memory-curation/src/index.ts",
+    "packages/memory/memory-curation/tests/memory-curation.spec.ts",
+    "examples/headless-agent/memory-consolidation-sessions.cordis.snapshot.yml",
+    "examples/headless-agent/tests/fixtures/memory-consolidation-sessions-model.ts",
+    "examples/headless-agent/tests/fixtures/memory-consolidation-sessions-driver.ts",
+    "examples/headless-agent/tests/memory-consolidation-sessions.snapshot.ts",
+    "examples/headless-agent/tests/snapshots/memory-curation-race/concurrent-sessions.expected.jsonl",
+    "packages/memory/memory-curation/README.md",
+    "packages/memory/memory-curation/README.zh.md",
+    "packages/memory/memory-curation/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-23-consolidation-cursor-concurrency.md",
+    ".agents/notes/implemented/bug-fix/2026-10-23-consolidation-cursor-concurrency.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-23-consolidation-cursor-concurrency.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-consolidation-coalescing.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-consolidation-coalescing.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-consolidation-coalescing.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/memory/memory-curation/src/index.ts": "a2449ba2d900b5ffa0c3f51320d8002e14b3919c65b3cef7efe279032494a2c8",
+    "packages/memory/memory-curation/tests/memory-curation.spec.ts": "21add86f9aa9d425e6f3e0b5d274ab0984e4d12b11d1a73350f13671f7765f2f",
+    "examples/headless-agent/memory-consolidation-sessions.cordis.snapshot.yml": "6da24250ee09b3191a9996e8948e7e12771e4478996b800335b4196b66c0fa1d",
+    "examples/headless-agent/tests/fixtures/memory-consolidation-sessions-model.ts": "a99cab3c93fe386d2537c3c6294f18e148d93091dfab51367fb87613b987cbe5",
+    "examples/headless-agent/tests/fixtures/memory-consolidation-sessions-driver.ts": "c33db40c963f5914431f32d2bedf6e3c3550a01a3c747043da90c7bce78ea625",
+    "examples/headless-agent/tests/memory-consolidation-sessions.snapshot.ts": "c29204dd24ca33a9814acfe35d022a93d0f1d19a0f6500de4fcb463b66c70ec8",
+    "examples/headless-agent/tests/snapshots/memory-curation-race/concurrent-sessions.expected.jsonl": "1cb76031e0711d9bb4f93214c933119bdd4074f0ec6af34effd28326925f8366",
+    "packages/memory/memory-curation/README.md": "e3c119961f07b7dd01494066aef169bf55c092e32f6fee325f1893c7a031a4ee",
+    "packages/memory/memory-curation/README.zh.md": "addf7a6f5872ff8d7cb8fee912386fe543eed406f165bb5f53b67d2f5435130d",
+    "packages/memory/memory-curation/README.i18n.yaml": "ddbb889a904d0cb0e935b025c9665d4a981c7b18b34905aca51022806409912f",
+    ".agents/notes/implemented/bug-fix/2026-10-23-consolidation-cursor-concurrency.md": "abd7b6dc08bbe74c172a9e47f116974df6376845d99bb5d736d2e8a2ebc46f50",
+    ".agents/notes/implemented/bug-fix/2026-10-23-consolidation-cursor-concurrency.zh.md": "1548cf71de1948f1844da4de0a8ef616b53beec3ca6c9f7488a2f37efab79631",
+    ".agents/notes/implemented/bug-fix/2026-10-23-consolidation-cursor-concurrency.i18n.yaml": "013b236c0b795d30e572417142d34a05ccc360f01ee3010db395eb2f03511ecc",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-consolidation-coalescing.md": "18a0f3d978d657363db9c3fabbf77e1baa450d0aca5c5d2f73aa11ffaa4e7e07",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-consolidation-coalescing.zh.md": "2fb585c019a79f3c2535392d888352952740e456e0744789b9bdc37294796fdf",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-consolidation-coalescing.i18n.yaml": "c54b04ad6d82e2b27088abcbd2da44e69a7b820c29615b4e5c92caee95fc18a9"
+  },
+  "compiledArtifactHashes": {
+    "packages/memory/memory-curation/lib/index.js": "9f3b2db80ab1d8c150a74195abbfbfb4943ee4cadb8bc742be31163220a17b15"
+  },
+  "repair": "The curation plugin coalesces simultaneous triggers for one exact memory scope before eligibility, model dispatch and conditional cursor publication. Scope exclusion survives model completion while cursor persistence waits and releases in every exit path. Directory/SSH identities remain independent. Subsequent scopes recheck current feature switches and the triggering execution provider.",
+  "causalEvidence": {
+    "shared-scope-consolidation-source-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T21:08:13.795769+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/memory/memory-curation/tests/memory-curation.spec.ts",
+        "-t",
+        "one consolidation interval across concurrent",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T21:08:15.872746+00:00"
+    },
+    "shared-scope-consolidation-queued-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T21:13:08.822285+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/memory/memory-curation/tests/memory-curation.spec.ts",
+        "-t",
+        "one consolidation interval across concurrent",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T21:13:10.804995+00:00"
+    },
+    "shared-scope-consolidation-loader-controlled-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T21:25:28.011641+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T210813Z/run-loader-scope-negative.py"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T21:25:28.556105+00:00"
+    }
+  },
+  "negativeWitness": "The source regression dispatches two requests for one project scope. An evidence-local copy omitting only scope exclusion runs the real Loader/two Agents/JSON storage/model runtime and returns requests2, maximumConcurrent2, modelAdmissions4. Shared source stays repaired during this controlled negative. The maintained transcript requires requests1, maximumConcurrent1, admissions3 and all3released.",
+  "verification": {
+    "uniqueRelatedCases": 272,
+    "memoryPackageCases": 256,
+    "composedGatewayExecutionAndSdkCases": 15,
+    "pythonSdkCases": 1,
+    "repeatedEnginesAndSourceSdkAreNotAdditionalCases": true,
+    "curationCases": 78,
+    "newConcurrencyCases": 9,
+    "coverage": {
+      "file": "packages/memory/memory-curation/src/index.ts",
+      "statements": [
+        339,
+        339
+      ],
+      "branches": [
+        249,
+        249
+      ],
+      "functions": [
+        41,
+        41
+      ],
+      "lines": [
+        281,
+        281
+      ],
+      "allFourMetrics": 100,
+      "newExemptions": 0
+    },
+    "compiledMacNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "sdk": "Real TypeScript SDK source and compiled Node24 transcript plus Python SDK built-runtime transcript retain the existing golden. They use keyless providers and do not verify a paid API.",
+    "controls": [
+      "coalesce while first model waits",
+      "retain scope while first conditional cursor commit waits",
+      "preserve original Session and actor without adding another Session conversation to the review",
+      "independent directory and SSH target identities still run concurrently",
+      "failure and cancellation release the scope for a later turn",
+      "master/consolidation switches stop later scope reviews",
+      "replacement execution provider refuses later scopes; a new captured turn can use the replacement",
+      "conditional cursor/member-edit and allowed-scope Loader transcripts remain intact"
+    ],
+    "checks": {
+      "shared-scope-final-memory-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:36:15.079300+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/memory",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/memory/memory-curation/src/index.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T210813Z/curation-final-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:36:31.252092+00:00"
+      },
+      "shared-scope-final-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:36:15.079304+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:36:20.885554+00:00"
+      },
+      "shared-scope-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:38:11.927248+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/memory/memory-curation/src/index.ts",
+          "packages/memory/memory-curation/tests/memory-curation.spec.ts",
+          "examples/headless-agent/tests/fixtures/memory-consolidation-sessions-model.ts",
+          "examples/headless-agent/tests/fixtures/memory-consolidation-sessions-driver.ts",
+          "examples/headless-agent/tests/memory-consolidation-sessions.snapshot.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:38:13.816792+00:00"
+      },
+      "shared-scope-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:34:59.907210+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:35:28.563248+00:00"
+      },
+      "shared-scope-cordis-config": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:38:11.929162+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-cordis-config.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:38:13.722699+00:00"
+      },
+      "shared-scope-entrypoint-gate": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:38:11.928527+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-application-entrypoints.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:38:12.529075+00:00"
+      },
+      "shared-scope-loader-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:30:35.244028+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/memory-consolidation-sessions.snapshot.ts",
+          "examples/headless-agent/tests/memory-curation-race.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:30:36.990787+00:00"
+      },
+      "shared-scope-loader-sdk-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:32:30.792482+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/memory-consolidation-sessions.snapshot.ts",
+          "examples/headless-agent/tests/memory-curation-race.snapshot.ts",
+          "examples/headless-agent/tests/memory-execution.snapshot.ts",
+          "examples/headless-agent/tests/gateway-memory.snapshot.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:32:34.956739+00:00"
+      },
+      "shared-scope-sdk-typescript-source": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:30:35.244027+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:30:37.618306+00:00"
+      },
+      "shared-scope-sdk-python-existing-env": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:32:56.161737+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_memory_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:32:57.398476+00:00"
+      },
+      "shared-scope-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:29:54.883008+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:29:59.382710+00:00"
+      }
+    },
+    "pythonEnvironment": "The offline full test group could not find the unrelated Pillow wheel in cache. The existing project environment runs the targeted pytest without synchronization and passes; no skipped test or dependency failure is counted as a pass."
+  },
+  "build": {
+    "firstCompleteInvocation": {
+      "status": "failed",
+      "startedAt": "2026-10-30T21:27:46.939473+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/build.ts"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T21:28:32.726012+00:00"
+    },
+    "firstFailure": "Only Host aggregate: new fixture readiness callback had explicit void instead of its event return. Fixture now observes published roots directly.",
+    "failedGateRetest": {
+      "status": "passed",
+      "startedAt": "2026-10-30T21:36:15.079304+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "tsconfig.host.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T21:36:20.885554+00:00"
+    },
+    "result": "Eight required gates converge across the complete build and successful Host aggregate retest; the first complete invocation is not represented as passing."
+  },
+  "noteReview": {
+    "newNote": ".agents/notes/implemented/bug-fix/2026-10-31-memory-consolidation-coalescing.md",
+    "newNotes": 1,
+    "archivedOrDeleted": 0,
+    "retainedActive": {
+      ".agents/notes/implemented/bug-fix/2026-10-23-consolidation-cursor-concurrency.md": "Conditional publication remains necessary for unrelated member mutations and other cursor writers. Updated with a scheduler cross-link; no full supersession.",
+      ".agents/notes/implemented/bug-fix/2026-10-28-memory-curation-scope.md": "The four tool executors still own allowed-scope enforcement.",
+      ".agents/notes/implemented/bug-fix/2026-10-23-curation-execution-identity.md": "Capture and per-pass execution restoration still own participant attribution.",
+      ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md": "Exact request logging and model resource ownership remain current.",
+      ".agents/notes/implemented/bug-fix/2026-10-23-curation-cancellation.md": "Lane cancellation, tool checks and physical cleanup joins remain current."
+    },
+    "frozenNotesEdited": false,
+    "upgradeGuide": "No external configuration, public SDK/wire API, Session event or durable schema changes. The correction reduces duplicate auxiliary work; no migration action is required."
+  },
+  "additionalSourceReview": {
+    "paths": [
+      "packages/memory/memory/src/index.ts",
+      "packages/memory/memory/src/storage.ts",
+      "packages/memory/memory/src/types.ts"
+    ],
+    "scope": "Read current memory service, schemas and vocabulary; named storage/write/cursor/member controls run in the256case package regression. This does not complete every consumer or the memory domain.",
+    "remaining": [
+      "Finish current memory-context and tool-memory source/business review.",
+      "Review remaining background jobs and shared/multi-computer resource decisions."
+    ]
+  },
+  "peerRealAcceptance": {
+    "source": ".agents/audits/full-real-task-2026-10-31/ledger.json",
+    "observedStatus": "inventory_in_progress",
+    "coverage": {
+      "inventoried": 180,
+      "executed": 29,
+      "passed": 26,
+      "failed": 3,
+      "blocked": 0,
+      "unsupported": 0,
+      "pending": 151
+    },
+    "reportedRelease": "coharness-full-real-20261031-r2",
+    "rootDidNotDeployOrRepeatRealModels": true,
+    "scope": "Peer owns NoGUI, launcher and dual-host real tasks. Its29executed/151pending report is separate from root keyless regression evidence and is not complete project acceptance."
+  },
+  "limits": [
+    "Scope exclusion is local to one curation plugin, not a distributed or cross-process lock.",
+    "Busy duplicate triggers coalesce into the active review without a new pre-admission queue. Failed or conflicted reviews retain durable change markers; consolidation retries on a later completed turn.",
+    "No claim is made that every failed review advances the interval or that unrelated member changes are already reviewed.",
+    "Linux/Windows native acceptance for the new composed scenario is not executed by root this turn; Mac source and Node22/24 artifacts are verified.",
+    "B04/B25 and all12original domains remain open. Provider-specific real Responses validation stays human-deferred; no paid/root real API request is made."
+  ]
+}

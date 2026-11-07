@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-worker-final-oxlint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/browser-use-stagehand-native/src/index.ts packages/experimental/browser-use-stagehand-native/src/worker-client.ts packages/experimental/browser-use-stagehand-native/tests/provider.spec.ts packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts packages/experimental/browser-use-stagehand-native/tests/native.e2e.ts packages/experimental/browser-use-stagehand-native/tests/fixtures/built-attachment.mjs",
+  "startedAt": "2026-10-23T13:34:59.678404+00:00",
+  "seconds": 3.891,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d067dce0976a48a235d41a1fb8a07cd51a7fec16d8d13dafcadabdb07224f2c3",
+  "inputsAfter": "d067dce0976a48a235d41a1fb8a07cd51a7fec16d8d13dafcadabdb07224f2c3",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

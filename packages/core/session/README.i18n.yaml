@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/session/README.md
 document:
-  en: 77cc97ac6ade7aa791655b1359607fcc3aec73ca
-  zh: 4b31ba5931dce6b257f00ab9e537c643a3ea5315
+  en: e06e4133cdb1df0d95c4b5fc97ccf4e8f4285e84
+  zh: 0da2e57cb13af91deff82bdad7dbc1bc84f1d8f1
 /:
   en: 1c8be05e4c02cbd0
   zh: 61495d48365178df
@@ -21,8 +21,11 @@ document:
   en: 41fd14b47f2dd796
   zh: 52378708b1bdf921
 /dsh-session/service-sessionstore-ctx-key-sessions/message-projections:
-  en: 636067728d20e32e
-  zh: 91640a5faedf4d58
+  en: 79fc8229b0ea359f
+  zh: 21d11272eb63de94
+/dsh-session/service-sessionstore-ctx-key-sessions/append-admission:
+  en: f9b1ca96aa30e56e
+  zh: 27eec0fd054f643b
 /dsh-session/service-sessionstore-ctx-key-sessions/public-api:
   en: e071dc5d911fde36
   zh: 9349467848dd927f
@@ -30,8 +33,8 @@ document:
   en: 7b9c4b4c811c8fc1
   zh: c86261fafc4ba806
 /dsh-session/service-sessionstore-ctx-key-sessions/live-service-events:
-  en: edbec19a7b97e5a0
-  zh: 3495313a3f9ad3e5
+  en: 95c3def8eaf41d84
+  zh: be0c22a91a0188d8
 /dsh-session/service-sessionstore-ctx-key-sessions/class-session:
   en: 20cd567e87e1cb2a
   zh: 3363ef7ade51d214

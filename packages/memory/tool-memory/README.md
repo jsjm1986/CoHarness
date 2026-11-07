@@ -37,6 +37,8 @@ The four model-facing memory tools — `memory_search`, `memory_read`, `memory_s
 
 The `scope` parameter exists only when `ctx.memory.space === 'personal'` (the two-scope space). The executor resolves the argument through `ctx.memory.scopesFor(exec.agent)`: `workspace` maps to the session's own workspace scope (a session with no `cwd` gets `memory_invalid`/`scope-unavailable`), `personal` maps to the personal scope, and an omitted scope on `memory_search` searches every available scope. A call without an agent throws `memory tools require a calling agent`. Write admission itself lives in the service — schema presence is never the enforcement.
 
+Every tool resolves its scope from the live offered set at execution entry, including personal and implicit project scopes. With `memory.enabled: false`, read, search, save and delete return `memory_invalid` before storage access; owner-facing member reads keep stored entries inspectable. A read or search that loses its offered scope while storage is pending waits for storage to settle, then returns `memory_invalid` without exposing the result. Re-enabling restores access without recreating records. See the [tool scope decision](../../../.agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.md).
+
 <a id="refusal-codes"></a>
 ## Refusal codes
 
@@ -45,7 +47,7 @@ Stable `code` values on thrown `MemoryToolError`s: `memory_exists`, `memory_not_
 <a id="invariants"></a>
 ## Invariants
 
-**Runtime invariant:** No companion is published. Each tool call delegates to `ctx.memory` inside the tool executor's own lifecycle; the plugin registers schemas and guidance only, so it owns no relation that could diverge.
+**Runtime invariant:** No companion is published. The tool executor owns each invocation's lifetime. This plugin checks current offered scopes and delegates storage to `ctx.memory`; it caches neither entries nor feature switches.
 
 <a id="model-experience"></a>
 ## Model Experience

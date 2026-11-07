@@ -1,0 +1,14 @@
+{
+  "name": "ssh-reverse-native-feasibility",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/probe-native-ssh-forward.py",
+  "startedAt": "2026-10-25T11:42:02.163406+00:00",
+  "seconds": 2.482,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "inputsAfter": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "postgresToolDirectory": null,
+  "outputSha256": "d9777affbd6fd524ed4a5d94d52c64f05210179294030445a25ef59f9941059b",
+  "outputTail": "Private native SSH forward probe failed: \nOwned SSH daemon diagnostic: BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted\n\nTraceback (most recent call last):\n  File \"/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/probe-native-ssh-forward.py\", line 57, in <module>\n    assert missing.returncode!=0\n           ^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "mcp-managed-protocol-unit",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests/resource-admission.spec.ts packages/mcp/mcp-client/tests/protocol.spec.ts packages/mcp/mcp-client/tests/negotiation-lifecycle.spec.ts packages/mcp/mcp-client/tests/apply.spec.ts packages/mcp/mcp-client/tests/reconnect.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T16:20:50.873116+00:00",
+  "seconds": 3.931,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4f28839886edaa1e6b9e0c310d43119230afa319b810f3e2b97c7370a03927d5",
+  "inputsAfter": "4f28839886edaa1e6b9e0c310d43119230afa319b810f3e2b97c7370a03927d5",
+  "outputSha256": "a55304455fa9a904471df89a97af3f5766919f4f096f21e75a2b49e8d4a2e107",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n(node:40498) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n Test Files  5 passed (5)\n      Tests  69 passed (69)\n   Start at  00:20:52\n   Duration  2.07s (transform 633ms, setup 76ms, import 979ms, tests 2.52s, environment 0ms)\n\n"
+}

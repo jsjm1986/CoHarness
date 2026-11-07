@@ -1,0 +1,362 @@
+{
+  "recordedAt": "2026-10-29T11:03:27.617943+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B311"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z",
+  "baseline": {
+    "identityEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/baseline-receipt.json",
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "headRef": "HEAD",
+    "upstreamRef": "origin/master",
+    "headAheadOriginBehind": [
+      139,
+      0
+    ],
+    "sharedWorktreeRebasedOrReset": false
+  },
+  "negativeEvidence": [
+    {
+      "name": "execution-runtime-identity-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T10:21:31.089931+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/execution-runtime-isolation-postgres.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T10:21:33.089012+00:00",
+      "observedFailure": "Second independent same-account Runtime receives HTTP404 registering the same original Host Session ID."
+    }
+  ],
+  "repair": {
+    "migration": 96,
+    "scope": "Exact durable Runtime qualifies Session registration, lineage, inputs and edits, relays, scopes, question answers, desktop confirmations, delayed usage and resource ancestry. Host Session IDs are preserved.",
+    "historicalData": "Backfill preserves immutable original fields and uses recorded Session Runtime only. Unassigned history remains unassigned; new Runtime registration cannot acquire it.",
+    "physicalResource": "Desktop exclusion remains per physical node and desktop; disjoint owner/node generations continue to use migration082, while migration093 admits sibling allocations.",
+    "keylessSnapshot": "The real two-computer three-Runtime usage transcript deliberately repeats Host Session and message IDs. Existing public output stays byte-identical; own reports succeed and foreign witnesses are denied."
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "execution-runtime-complete-owned-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T10:59:30.304108+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/execution.spec.ts",
+          "tests/execution-scopes.spec.ts",
+          "tests/execution-runtime-isolation-postgres.spec.ts",
+          "tests/execution-runtime-migration-postgres.spec.ts",
+          "tests/node-resource-budget-postgres.spec.ts",
+          "tests/runtime-resource-api.spec.ts",
+          "tests/runtime-resource-provider.spec.ts",
+          "tests/runtime-usage-attribution-transcript.spec.ts",
+          "tests/runtime-catalog-postgres.spec.ts",
+          "tests/runtime-personal-policy-postgres.spec.ts",
+          "tests/runtime-stop-lease-postgres.spec.ts",
+          "tests/model-policy-account-postgres.spec.ts",
+          "tests/model-policy-authority-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--coverage",
+          "--coverage.include=src/execution-identity.ts",
+          "--coverage.include=src/node-resource-budget.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-coverage-complete"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:00:01.793803+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-complete-owned-coverage.log"
+      },
+      {
+        "name": "execution-runtime-history-migration-recheck",
+        "status": "passed",
+        "startedAt": "2026-10-29T10:49:14.609312+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/execution-runtime-migration-postgres.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T10:49:16.167237+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-history-migration-recheck.log"
+      },
+      {
+        "name": "execution-runtime-final-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:00:01.829424+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:00:06.549592+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-final-types.log"
+      },
+      {
+        "name": "execution-runtime-private-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T10:55:18.200018+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/gateway-artifact",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/gateway-artifact.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T10:55:21.310715+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-private-build.log"
+      },
+      {
+        "name": "execution-runtime-built-node22-installed-dependencies",
+        "status": "passed",
+        "startedAt": "2026-10-29T10:59:25.370994+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/runtime-usage-attribution-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T10:59:28.854956+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-built-node22-installed-dependencies.log"
+      },
+      {
+        "name": "execution-runtime-built-node24-installed-dependencies",
+        "status": "passed",
+        "startedAt": "2026-10-29T10:59:28.885445+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/runtime-usage-attribution-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T10:59:30.273284+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-built-node24-installed-dependencies.log"
+      },
+      {
+        "name": "execution-runtime-backup-restore-tools",
+        "status": "passed",
+        "startedAt": "2026-10-29T10:57:43.994824+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/deployment-backups.spec.ts",
+          "tests/deployment-restore.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T10:58:02.262097+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-backup-restore-tools.log"
+      },
+      {
+        "name": "execution-runtime-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T10:57:02.596050+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/execution-identity.ts",
+          "gateway/src/node-resource-budget.ts",
+          "gateway/tests/execution-runtime-isolation-postgres.spec.ts",
+          "gateway/tests/execution-runtime-migration-postgres.spec.ts",
+          "gateway/tests/execution-scopes.spec.ts",
+          "gateway/tests/execution.spec.ts",
+          "gateway/tests/execution-fixture.ts",
+          "gateway/tests/postgres.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T10:57:03.895425+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-scoped-lint.log"
+      },
+      {
+        "name": "execution-runtime-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-29T10:58:05.122007+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T10:59:45.484360+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/execution-runtime-doc-quick.log"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 687,
+          "covered": 675,
+          "skipped": 0,
+          "pct": 98.25
+        },
+        "statements": {
+          "total": 890,
+          "covered": 832,
+          "skipped": 0,
+          "pct": 93.48
+        },
+        "functions": {
+          "total": 173,
+          "covered": 170,
+          "skipped": 0,
+          "pct": 98.26
+        },
+        "branches": {
+          "total": 702,
+          "covered": 629,
+          "skipped": 0,
+          "pct": 89.6
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "gateway/src/execution-identity.ts": {
+        "lines": {
+          "total": 453,
+          "covered": 447,
+          "skipped": 0,
+          "pct": 98.67
+        },
+        "functions": {
+          "total": 112,
+          "covered": 111,
+          "skipped": 0,
+          "pct": 99.1
+        },
+        "statements": {
+          "total": 585,
+          "covered": 551,
+          "skipped": 0,
+          "pct": 94.18
+        },
+        "branches": {
+          "total": 496,
+          "covered": 453,
+          "skipped": 0,
+          "pct": 91.33
+        }
+      },
+      "gateway/src/node-resource-budget.ts": {
+        "lines": {
+          "total": 234,
+          "covered": 228,
+          "skipped": 0,
+          "pct": 97.43
+        },
+        "functions": {
+          "total": 61,
+          "covered": 59,
+          "skipped": 0,
+          "pct": 96.72
+        },
+        "statements": {
+          "total": 305,
+          "covered": 281,
+          "skipped": 0,
+          "pct": 92.13
+        },
+        "branches": {
+          "total": 206,
+          "covered": 176,
+          "skipped": 0,
+          "pct": 85.43
+        }
+      }
+    },
+    "coverageThresholdsLowered": false,
+    "coverageIgnoresAdded": false,
+    "postgres": "Real isolated PostgreSQL17; migration tested from pre085 through095 then096 in a separately created disposable database.",
+    "schemaAndMaintenance": "Two files and49cases passed in the wider74case run; that aggregate failed because pg_dump was not on PATH. The25 backup/restore cases then passed with installed PostgreSQL18.6 clients. Aggregate failure is retained in external execution-runtime-schema-and-maintenance.json.",
+    "initialArtifactAssembly": "The first external Node22 run failed to locate pg because its node_modules linked only root dependencies. Installed Gateway dependencies and the workspace ancestor directory were restored in the private artifact, then both Node22 and24 passed. No product behavior was changed to mask that fixture setup error."
+  },
+  "ownedPostgresCleanup": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T11:01:57.564658+00:00",
+    "container": "hgw-execution-runtime-7e8741d7d2",
+    "volume": "hgw-execution-runtime-7e8741d7d2-data",
+    "port": 56494,
+    "nonObserverDatabaseClients": 0,
+    "unexpectedDisposableDatabases": 0,
+    "appliedMigration": 96,
+    "removedOwnedContainer": true,
+    "removedOwnedVolume": true,
+    "excluded": [
+      "production5432",
+      "peer58773"
+    ]
+  },
+  "coordination": {
+    "scope": "One concrete shared-file handoff reserved096 and execution identity production to this audit; peer owns Admin/UI work. No recurring messages.",
+    "excludedDatabasePorts": [
+      5432,
+      58773
+    ]
+  },
+  "paths": [
+    "gateway/src/execution-identity.ts",
+    "gateway/src/node-resource-budget.ts",
+    "gateway/deploy/postgres/migrations/096_execution_runtime_namespace.sql",
+    "gateway/tests/execution-runtime-isolation-postgres.spec.ts",
+    "gateway/tests/execution-runtime-migration-postgres.spec.ts",
+    "gateway/tests/execution-scopes.spec.ts",
+    "gateway/tests/execution.spec.ts",
+    "gateway/tests/execution-fixture.ts",
+    "gateway/tests/postgres.spec.ts",
+    "gateway/tests/fixtures/runtime-usage-attribution.mjs",
+    "gateway/package.json",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    "gateway/deploy/postgres/README.md",
+    "gateway/deploy/postgres/README.zh.md",
+    "gateway/deploy/postgres/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md",
+    ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.zh.md",
+    ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.i18n.yaml"
+  ],
+  "limitations": [
+    "Coverage remains partial across the complete two source modules: uncovered branches remain reported without new ignores.",
+    "B04 complete raw/helper/native/Python allocation inventory and B25 Linux/systemd/escaped-descendant integration remain open.",
+    "All12 audit domains and remaining multi-computer feature acceptance remain in progress.",
+    "Real provider API and public-cloud push validation remain human-deferred."
+  ]
+}

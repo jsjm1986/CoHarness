@@ -145,7 +145,7 @@ describe('AuthorizationService.begin', () => {
     await ctx.authorization.begin({ key: KEY, interaction: ui })
 
     expect(ui.notices).toEqual([{ message: 'Continue in your browser', url: 'https://auth.example/start' }])
-    expect(ui.prompts).toEqual([{ kind: 'text', message: 'Paste the code' }])
+    expect(ui.prompts).toEqual([{ kind: 'text', message: 'Paste the code', signal: expect.any(AbortSignal) as unknown }])
     expect(answers).toEqual(['code-123'])
   })
 

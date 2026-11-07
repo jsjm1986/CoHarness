@@ -1,0 +1,22 @@
+{
+  "pending": "pending",
+  "connected": "connected",
+  "executionReady": false,
+  "sameIdentityOnReissue": true,
+  "revisions": [
+    1,
+    2,
+    3
+  ],
+  "staleStatus": 409,
+  "reconnected": "connected",
+  "revoked": "revoked",
+  "deniedStatus": 403,
+  "writes": [
+    "issue",
+    "issue-enrollment",
+    "revoke",
+    "revoke"
+  ],
+  "runtimeStarts": 0
+}

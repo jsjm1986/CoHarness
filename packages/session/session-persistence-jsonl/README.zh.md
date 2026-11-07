@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "DeepSeek Harness 的 JSONL 持久会话存储后端"
 kind: "package-reference"
 ---
 
@@ -35,12 +35,12 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 <root>/
   --<normalized-cwd>--/          # readable project directory (or _no-cwd/)
     <encoded-id>/                # session-owned directory
-      session.v5.jsonl.zstd      # default: checksummed header frame + append frames
-      session.v5.jsonl           # only with compression: 'none'
+      session.v<version>.jsonl.zstd      # default: checksummed header frame + append frames
+      session.v<version>.jsonl           # only with compression: 'none'
 ```
 
-- 当前 artifact 为 `session.v5.jsonl.zstd` 或 `session.v5.jsonl`；已提交的旧 generation 保留各自的版本名称。第一个逻辑行是标记为 `{ type: 'session', version: 5, id, cwd?, createdAt, parentSession?, isSeeded, origin?, delegationDepth, agentPreset?, draft? }` 的 header。`isSeeded` 必须显式提供；继承前缀长度由带继承标记的 `session/end-seed` 记录携带。`delegationDepth` 在磁盘上必需，顶层 Session 为 `0`。可选 `draft` 字段只接受布尔值，两个显式取值都会在列表、检查和冷读取时保留；省略仍保持缺失。未知 header 字段仍然无效。`agentPreset` 必须持久化，因为它决定恢复后的工具与提示词。当前格式的后续每行存储一条已收敛的 Session 事件，包括其中嵌套的 Assistant 流数据，事件序号保持连续。
-- 存储记录是逐条原样的 `SessionEvent` JSON。发布版 v0/v1 artifact 可能包含**分片打包行**（`text-chunks`／`reasoning-chunks`／`tool-call-chunks`；使用无斜线标签避免与事件类型混淆）：一行保存至少 3 个连续同块 `assistant/chunk` delta 事件，`seq0`／`time0` 与各成员的 `dt` 间隔可精确重建每个成员。无损 codec 位于 `@deepseek-ai/dsh-session`（`packChunkRuns`／`decodeStorageRecord`）；当前写入端从不打包——打包行只会经由 catalog 解码的历史 generation 进入此后端，加载结果与非打包行一致。
+- 当前产物为 `session.v<version>.jsonl.zstd` 或 `session.v<version>.jsonl`，其中 `<version>` 为[Session 格式状态](../../../docs/session-format-status.zh.md)标明的写入版本；已提交的旧 generation 保留各自的版本名称。第一个逻辑行是包含该代次版本的 `session` header。`isSeeded` 必须显式提供；继承前缀长度由带继承标记的 `session/end-seed` 记录携带。`delegationDepth` 在磁盘上必需，顶层 Session 为 `0`。可选 `draft` 字段只接受布尔值，两个显式取值都会在列表、检查和冷读取时保留；省略仍保持缺失。未知 header 字段仍然无效。`agentPreset` 必须持久化，因为它决定恢复后的工具与提示词。当前格式的后续每行存储一条已收敛的 Session 事件，包括其中嵌套的 Assistant 流数据，事件序号保持连续。
+- 存储记录是逐条原样的 `SessionEvent` JSON。发布版 v0/v1 与 CoHarness v2/v3 产物可能包含**分片打包行**（`text-chunks`／`reasoning-chunks`／`tool-call-chunks`；使用无斜线标签避免与事件类型混淆）：一行保存至少 3 个连续同块 `assistant/chunk` delta 事件，`seq0`／`time0` 与各成员的 `dt` 间隔可精确重建每个成员。无损 codec 位于 `@deepseek-ai/dsh-session`（`packChunkRuns`／`decodeStorageRecord`）；当前写入端从不打包——打包行只会经由 catalog 解码的历史 generation 进入此后端，加载结果与非打包行一致。
 - surface 的 `sourceEventSeqs` 数组在连续段有收益时使用无损闭区间范围；读取方同时接受范围形式和旧的数字数组形式。
 - 项目目录保留规范化 cwd 的可读形式，便于导航，并限制在文件系统组件上限内。分隔符替换和截断刻意有损，因此规范化相同的 cwd 字符串共享项目目录；会话 id 仍选择不同会话目录。在不区分大小写的文件系统上，只有文件系统规范化将两种写法解析到同一 transcript（文本记录）时，身份验证才接受备选路径写法。配置根仍由部署控制：可以是项目本地、共享、临时或集中式。[项目会话目录决策](../../../.agents/notes/implemented/architecture/2026-07-24-project-session-directories.zh.md) 记录这项取舍。
 - 会话 id 是未验证的带品牌类型的字符串，因此在使用前单射转义为一个安全路径段（无遍历、无冲突）。结果目录保留给其他会话自有产物；发现只读取固定 transcript 文件名。
@@ -53,6 +53,10 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 | `root` | `string`（必需） | 所有会话文件的根目录。**无默认值**：`process.cwd()` 默认值会随进程 cwd 变更（bash 调用、子进程）而分散文件。现有根必须是可读目录；缺失根在第一次实体化时创建。 |
 | `compression` | `'zstd' \| 'none'` | 默认 `'zstd'`；`'none'` 保留换行分隔 UTF-8 文本。 |
 | `listConcurrency` | `number`（正整数） | 枚举会话时文件系统读取的最大并发数；默认 `3`。 |
+| `verificationConcurrency` | `number`（正安全整数） | 本提供者已准入或正在运行的迁移校验上限；默认 `2`。 |
+| `maxQueuedVerifications` | `number`（非负安全整数） | 等待提供者空位的迁移校验上限；默认 `128`。队列满时在分配 Worker 前拒绝请求。 |
+| `maxPendingEvents` | `number`（正安全整数） | 本提供者所有写句柄共同预留的事件上限，包含正在写入的批次；默认 `100000`。 |
+| `maxPendingBytes` | `number`（正安全整数） | 这些写入共同预留的完整 UTF-8 JSON 事件字节上限；默认 `67108864`（64 MiB）。 |
 
 `locate(meta)` 返回已解析项目/会话目录内固定 transcript 的 `{ kind: 'jsonl', path }`。它不执行文件系统 I/O：可以在目录或文件存在前返回目标，现有文件也只包含最近一次 flush 完成的前缀。
 
@@ -72,17 +76,22 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - **崩溃恢复：保留有效尾部工作。**`load` 验证每个完整压缩 frame，并扫描解压 JSONL。最后 frame 结构不完整时，读取器保留其完整解码记录，从 frame 开头截断，并使用共享[持久化约定](../../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.zh.md) 需要的合成工具、步骤和轮次 closer 重新编码这些记录。原始 mode 从第一个不完整行截断。已经存在却没有完整 header frame 的压缩工件、完整 frame 中的 checksum/解压失败，或位于最后已提交的 `turn/end` 处或之前的缺陷都属于损坏，会被拒绝。
 - **非修改式检查。**`inspect()` 返回带精确继承切点的不可变、平衡逻辑视图，并可在内存中合成恢复 closer，但不会截断不完整尾部或更改轻量修订。`readFrom(id, fromOffset)` 接受 `SessionLogOffset`，解析整个工件后向前跳过，把后缀与同一切点一起返回；仅读 header 的列表暴露 `isSeeded`，无需读取事件体。
 - **连续 seq。**`append` 拒绝第一个 `seq` 不继续已存储日志的批次，并拒绝无法 JSON 序列化的 `event.data`，同时命名违规事件类型。
-- **轻量修订。**`revision(id, signal?)` 只解析指定产物，并使用 device、inode、size 和纳秒时间戳标识它，不解析日志；`listSnapshots(signal?)` 对每个已发现产物使用同一身份。该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 也使用同一身份校验保留的 preparation。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
+- **单会话元数据。**`readHeader(id, signal?)`、`revision(id, signal?)` 和 `readRevision(id, signal?)` 使用 `stat(id, { signal })`：在项目目录中查找请求的 id，只校验其选定代次的文件头，并返回与 `stat` 相同的待物化创建元数据或 `undefined` 结果。代次、身份、编码和文件头解码错误从 `stat` 原样传播；最高代次不受支持时绝不回退到前代。根目录编码准入仍检查所配置的根目录。不保留跨请求的文件头缓存，元数据读取不检查事件正文。[存储身份决策](../../../.agents/notes/implemented/bug-fix/2026-07-20-jsonl-storage-identity.zh.md)说明单会话发现与拒绝规则。
+- **轻量修订。**源身份包含 device、inode、size 和纳秒时间戳；历史代次还包含 corpus revision，因此其查找仍会发现并读取整个根目录所选代次的文件状态。`listSnapshots(signal?)` 对每个已发现产物使用同一身份。该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 也使用同一身份校验保留的 preparation。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
 
 <a id="write-path"></a>
 ## 写入路径
 
-插件将冻结的会话事件复制到每个活动会话各自的写句柄。活动事件的批处理窗口是 seam 内部调度策略而非配置项：句柄内的批处理窗口把活动缓冲区合并为一次持久化追加，`session/flush` 或 dispose 会排空当前与待处理批次。每会话游标防止恢复后的会话重新 append 已存储事件，插件加载时会为活动会话设置初始状态。所属后端实例串行化单会话操作；dispose（资源释放）会在拆卸前排空每个保留的写句柄。每个逻辑事件都会保留：批处理只让单个压缩帧或一次原始 JSONL fsync 承载更多记录。
+插件将不可变 Session 事件借用到每个活动会话各自的写句柄。活动事件提交前，提供者为其事件数和完整 UTF-8 JSON 字节数预留容量，统一计算所有待处理队列、显式追加和正在写入的批次。被拒绝的候选事件不会进入 Session 或事件流。容量拒绝会使当前活动写句柄拒绝后续事件：flush 排空已接受前缀后报错，close 排空并释放所有权后报告同一拒绝，新建恢复操作会补齐中断的步骤和轮次后再继续。若排队事件必须持久化，调用方需要在关闭前解决持续的存储故障。显式追加先校验并快照调用方拥有的输入，再预留容量；被拒绝的显式批次不会进入存储，也不会关闭活动写句柄的准入。
+
+活动批处理采用固定的每句柄窗口，`session/flush` 或 dispose 会排空当前与待处理批次。写入失败会保留预留容量以便按序重试。活动预留直接借用已冻结候选事件，不再复制载荷；持久化成功后释放容量。每会话游标防止恢复后的会话重新 append 已存储事件。限额属于一个 Host 进程内的一个提供者，不是整个服务器或持久化历史的总限额。[追加准入决策](../../../.agents/notes/implemented/bug-fix/2026-10-23-jsonl-provider-retention-admission.zh.md)记录拒绝与恢复的依据。
 
 明文正文按有界字节窗口扫描，保留解码后的事件，不构建完整原始文件缓冲区。读取之间检查取消，revision 变化时重试。后继 generation 写完临时文件后重新校验源 revision；源发生变化或消失时拒绝发布。后继 generation 按有界批次编码，在事件和写入之间检查取消。压缩读取和逻辑 preparation 仍保留完整输入或事件数组。
 
 
-移除提供者触发卸载时，插件会等待注入它的消费者完成清理，再移除实时事件路由并关闭句柄。消费者必须在自身的注入作用域内注册清理；并发销毁根作用域不保证依赖清理顺序。
+每个提供者拥有自己的迁移校验队列。校验器在进入本地队列或进程准入队列前保留资源提供者。创建 Worker 前，如果提供者被移除、替换，或原先独立的请求新增了资源准入，则以 `ResourceAdmissionError` 的 `unavailable` 原因拒绝，并将未使用的许可归还原提供者；调用方应重新发起写入打开。托管组合在提供方缺失时拒绝执行。许可使用基础设施归属。容量拒绝、Worker 启动失败和无效 Worker 响应与存储日志损坏分别报告。终止失败时保留本地空位和节点的不确定占用，直到确认线程停止。参见[归属决策](../../../.agents/notes/implemented/bug-fix/2026-10-31-migration-verification-resource-owner.zh.md)。
+
+移除提供者触发卸载时，插件会等待注入它的消费者及已接收的打开操作完成，包括迁移准备与发布，再移除实时事件路由并关闭句柄。发布一旦开始，即使调用者取消也会运行到结束。消费者必须在自身的注入作用域内注册清理；并发销毁根作用域不保证依赖清理顺序。
 
 <a id="model-experience"></a>
 
@@ -105,7 +114,7 @@ JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope �
 ## 已知限制与暂缓事项 <a id="known-limitations-and-deferred-work"></a>
 
 - 设置 `DSH_MANAGED_DATA_MANIFEST` 的受管启动会在写入数据前登记实际解析后的 Session 目录，包括全部已提交代次。清单无效时拒绝初始化；保留旧根和部署批准遵循[清单与备份规则](../../util/managed-data/README.zh.md)。
-- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0–v5 artifact 迁移到当前 v6，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
+- **只加载已配置编码和 catalog 中的 generation**：此后端将[catalog 收录的历史代次](../session-format-catalog/README.zh.md)迁移到当前格式，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
 - **平铺文件存储布局不加载**：加载前使用独立根，或将预发布产物移入项目/会话目录布局。
 - **压缩文件不能直接按行读取**：使用后端加载；或在写入新根前选择 `compression: 'none'`，以便外部行 reader 使用。
 - **显式永久移除** — 日志持续保留，直到生命周期所有者调用 `SessionPersistenceBackend.remove(id)`。归档永久清理所有者会释放空闲运行时资源，并先移除后代、再移除其根会话；普通读取与迁移保留已提交代次。

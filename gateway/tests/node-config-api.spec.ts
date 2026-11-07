@@ -49,7 +49,7 @@ async function fixture() {
 }
 
 it('saves and rereads the current node while rejecting members, wrong nodes, stale revisions and CSRF', async () => {
-  const f = await fixture(), path = '/admin/api/deployment/configuration', initial = await f.nodeConfiguration.view()
+  const f = await fixture(), path = '/admin/api/deployment/configuration', initial = await f.nodeConfiguration.view(1)
   const body = { action: 'save', organizationId: initial.organizationId, nodeId: initial.nodeId, revision: initial.revision,
     values: { ...initial.desired, HGW_PORT: '9381' } }
   const member = await f.login('member-fixture')
@@ -61,7 +61,7 @@ it('saves and rereads the current node while rejecting members, wrong nodes, sta
   const read = await fetch(`${f.base}${path}`, { headers: { cookie: f.cookie } })
   expect(await read.json()).toMatchObject({ revision: 1, desired: { HGW_PORT: '9381' }, effective: { HGW_PORT: '8899' } })
   expect((await f.post(path, { ...body, action: 'apply', revision: 1 })).status).toBe(200)
-  expect((await f.nodeConfiguration.view()).operation).toMatchObject({ status: 'pending', revision: 1 })
+  expect((await f.nodeConfiguration.view(1)).operation).toMatchObject({ status: 'pending', revision: 1 })
 })
 
 it('lets admins stop project runtimes during maintenance but refuses starts and all stale-epoch mutations', async () => {
@@ -74,12 +74,12 @@ it('lets admins stop project runtimes during maintenance but refuses starts and 
   expect((await f.post(`${path}/restart`, {})).status).toBe(503)
   expect(start).not.toHaveBeenCalled()
   expect((await f.post(`${path}/stop`, {})).status).toBe(204)
-  expect(stop).toHaveBeenCalledWith({ kind: 'project', id: project.id })
+  expect(stop).toHaveBeenCalledWith({ kind: 'project', id: project.id }, 'manual', f.admin.id)
   const member = await f.login('member-fixture')
   expect((await f.post(`${path}/stop`, {}, member)).status).toBe(403)
   f.deps.maintenanceGate = async () => 'stale-epoch'
   expect((await f.post(`${path}/stop`, {})).status).toBe(503)
   f.deps.maintenanceGate = async () => 'open'
   expect((await f.post(`${path}/start`, {})).status).toBe(204)
-  expect(start).toHaveBeenCalledWith(expect.objectContaining({ kind: 'project', id: project.id }), 'explicit')
+  expect(start).toHaveBeenCalledWith(expect.objectContaining({ kind: 'project', id: project.id }), 'explicit', f.admin.id)
 })

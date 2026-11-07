@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page } from 'playwright'
+import { chromium, type Browser, type Locator, type Page, type Route } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -16,10 +16,64 @@ import { newEnglishPage, saveFailureShot } from './support.ts'
 const SESSION = SessionId('user-terminal-root')
 const DIRECTORY = fileURLToPath(new URL('./snapshots/user-terminal', import.meta.url))
 
+/** Hold the first real input acknowledgement while the remaining command is typed. */
+async function typeBehindPendingInput(page: Page, input: Locator, outputPath: string): Promise<number> {
+  const accepted = Promise.withResolvers<undefined>()
+  const firstReply = accepted.promise.then(() => ({ ok: true as const }), (error: unknown) => ({ ok: false as const, error }))
+  const release = Promise.withResolvers<undefined>()
+  const operations = new Set<Promise<void>>()
+  const errors: unknown[] = []
+  const origin = new URL(page.url()).origin
+  const inputRequest = (url: URL): boolean => url.origin === origin && url.pathname === '/api/terminal/write'
+  let requests = 0
+  const handler = (route: Route): Promise<void> => {
+    const first = requests++ === 0
+    const operation = (async () => {
+      const response = await route.fetch()
+      if (first) {
+        if (response.status() !== 200) throw new Error('Terminal input was not admitted')
+        accepted.resolve(undefined)
+        await release.promise
+      }
+      await route.fulfill({ response })
+    })()
+    operations.add(operation)
+    void operation.then(() => { operations.delete(operation) }, (error: unknown) => {
+      operations.delete(operation)
+      errors.push(error)
+      if (first) accepted.reject(error)
+    })
+    return operation
+  }
+  await page.route(inputRequest, handler)
+  try {
+    await expect.poll(() => input.isEditable()).toBe(true)
+    await input.press('e')
+    await expect.poll(() => requests).toBe(1)
+    const first = await firstReply
+    if (!first.ok) throw first.error
+    await input.pressSequentially('cho terminal-browser-proof > terminal-proof.txt')
+    await input.press('Enter')
+    expect(requests).toBe(1)
+    release.resolve(undefined)
+    await expect.poll(() => readFile(outputPath, 'utf8').catch(() => ''))
+      .toBe('terminal-browser-proof\n')
+    await expect.poll(() => operations.size).toBe(0)
+    return requests
+  } finally {
+    release.resolve(undefined)
+    await page.unroute(inputRequest, handler)
+    await Promise.allSettled([...operations])
+    if (errors.length > 0) throw new AggregateError(errors, 'Terminal input fixture failed')
+  }
+}
+
 describe('web e2e: private user terminal lifecycle', () => {
   let scaffold: WebScaffold | undefined, browser: Browser | undefined, page: Page
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({})
+    scaffold = await launchWebScaffold({
+      extraOverlayPath: fileURLToPath(new URL('./user-terminal-typing.overlay.yml', import.meta.url)),
+    })
     const result = await scaffold.ctx.apiProxy.sessions.create({ rpcId: RpcId('terminal-create'), payload: { sessionId: SESSION, cwd: scaffold.workspaceCwd } })
     if (!result.result.ok) throw new Error(result.result.error.message)
     await (await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)).attachSession(SESSION)
@@ -46,11 +100,42 @@ describe('web e2e: private user terminal lifecycle', () => {
     await page.locator(guide).getByRole('button', { name: /New terminal/ }).click()
     const input = page.getByRole('textbox', { name: 'Terminal', exact: true })
     await input.waitFor()
-    await input.fill('echo terminal-browser-proof > terminal-proof.txt')
-    await input.press('Enter')
-    await expect.poll(async () => readFile(join(world.workspaceCwd, 'terminal-proof.txt'), 'utf8').catch(() => '')).toContain('terminal-browser-proof')
+    const inputRequests = await typeBehindPendingInput(page, input, join(world.workspaceCwd, 'terminal-proof.txt'))
+    console.info('[terminal-input]', JSON.stringify({ inputRequests }))
+    await compareOrRefreshGolden(join(DIRECTORY, 'input.expected.md'), JSON.stringify({
+      inputRequests,
+      deliveredCommandOutput: await readFile(join(world.workspaceCwd, 'terminal-proof.txt'), 'utf8'),
+    }, null, 2), webSnapshotMode())
     const inventory = await world.ctx.terminalController.list(SESSION)
     expect(inventory).toHaveLength(1)
+    const release = Promise.withResolvers<undefined>()
+    let firstInputReady = false
+    let queuedRequests = 0
+    const inputRoute = /\/api\/terminal\/write(?:\?.*)?$/
+    await page.route(inputRoute, async (route) => {
+      queuedRequests += 1
+      const response = await route.fetch()
+      if (queuedRequests === 1) {
+        firstInputReady = true
+        await release.promise
+      }
+      await route.fulfill({ response })
+    })
+    try {
+      await input.fill('printf ')
+      await expect.poll(() => firstInputReady).toBe(true)
+      await page.keyboard.type('QA_界_BATCH > terminal-batch-proof.txt')
+      await input.press('Enter')
+      expect(queuedRequests).toBe(1)
+      release.resolve(undefined)
+      await expect.poll(async () => readFile(join(world.workspaceCwd, 'terminal-batch-proof.txt'), 'utf8').catch(() => '')).toBe('QA_界_BATCH')
+      expect(queuedRequests).toBe(2)
+      await compareOrRefreshGolden(join(DIRECTORY, 'queued-input.expected.md'),
+        `Queued input RPCs: ${queuedRequests}\n\nTerminal file: ${await readFile(join(world.workspaceCwd, 'terminal-batch-proof.txt'), 'utf8')}`, webSnapshotMode())
+    } finally {
+      release.resolve(undefined)
+      await page.unroute(inputRoute)
+    }
     const management = async (method: string, args: object) => {
       const response = await world.hostFetch(`/api/terminal/${method}`, { method: 'POST',
         headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'terminal-administration', method: `terminal/${method}`, payload: { args } }) })
@@ -84,5 +169,5 @@ describe('web e2e: private user terminal lifecycle', () => {
     expect(await page.locator('[data-slot-error]').count()).toBe(0)
   })
 
-  it('owns one regional terminal guide golden', async () => { await assertFixtureInventory(DIRECTORY, ['guide.expected.md']) })
+  it('owns the terminal guide and input goldens', async () => { await assertFixtureInventory(DIRECTORY, ['guide.expected.md', 'input.expected.md', 'queued-input.expected.md']) })
 })

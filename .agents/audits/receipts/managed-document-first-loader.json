@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-first-loader",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/vitest run packages/attachment/userdoc-gateway/tests/managed-store.spec.ts",
+  "startedAt": "2026-10-26T17:20:20.341901+00:00",
+  "seconds": 46.411,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2b8f527fcd8c97e3bfc326bcf7f6a8db4c50b97bdfcb1dccb1f6638685ade6f7",
+  "inputsAfter": "2b8f527fcd8c97e3bfc326bcf7f6a8db4c50b97bdfcb1dccb1f6638685ade6f7",
+  "postgresToolDirectory": null,
+  "outputSha256": "c93d124a5500831af436d1acc38cde532ed2a725a4c7c4ba9bfc6b83dd7a6f88",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-gateway/tests/managed-store.spec.ts (2 tests | 1 failed) 40919ms\n   × preserves the captured actor and full real-file operations across managed provider HTTP and unload 40025ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-gateway/tests/managed-store.spec.ts > preserves the captured actor and full real-file operations across managed provider HTTP and unload\nError: Command failed: /Users/a1234/.nvm/versions/node/v25.8.1/bin/node --import file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/esm/index.mjs /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/attachment/userdoc-gateway/tests/fixtures/managed-store.mjs src\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed (2)\n   Start at  01:20:25\n   Duration  41.13s (transform 67ms, setup 59ms, import 26ms, tests 40.92s, environment 0ms)\n\n"
+}

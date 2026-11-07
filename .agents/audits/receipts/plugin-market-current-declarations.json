@@ -1,0 +1,14 @@
+{
+  "name": "plugin-market-current-declarations",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/boot/plugin-market",
+  "startedAt": "2026-10-24T22:02:04.463737+00:00",
+  "seconds": 1.999,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "inputsAfter": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

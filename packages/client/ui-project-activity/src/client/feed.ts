@@ -1,4 +1,5 @@
 /** Activity feed wire types, account-route fetch, and client-side grouping. */
+import { addressRuntimeUrl, type SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** One member-visible feed row as served by `GET /account/api/activity`. */
 export interface ActivityItem {
@@ -22,16 +23,27 @@ export interface ActivityPage {
 
 const PAGE_SIZE = 50
 
+/** Keep account routes on their Session's allocation independently of the scope cookie. */
+function activityUrl(path: string, target: SessionRuntimeTarget | undefined): string {
+  if (target === undefined) return path
+  const url = new URL(path, 'http://dsh.internal')
+  addressRuntimeUrl(url, target)
+  return url.pathname + url.search
+}
+
 /**
  * Read one page of the project activity feed through the account session.
  * @param before - opaque cursor from the previous page.
  * @param signal - abort for superseded or disposed reads.
+ * @param target - owning Session's Runtime; absence preserves standalone account routing.
  * @returns the normalized page; transport and payload failures reject.
  */
-export async function fetchActivity(before: string | undefined, signal: AbortSignal): Promise<ActivityPage> {
+export async function fetchActivity(
+  before: string | undefined, signal: AbortSignal, target: SessionRuntimeTarget | undefined,
+): Promise<ActivityPage> {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
   if (before !== undefined) params.set('before', before)
-  const response = await fetch(`/account/api/activity?${params.toString()}`, { credentials: 'same-origin', signal })
+  const response = await fetch(activityUrl(`/account/api/activity?${params.toString()}`, target), { credentials: 'same-origin', signal })
   if (!response.ok) throw new Error(`project activity request failed: ${String(response.status)}`)
   const body = await response.json() as { items?: unknown; nextBefore?: unknown }
   if (!Array.isArray(body.items)) throw new TypeError('project activity returned an invalid page')
@@ -41,16 +53,114 @@ export async function fetchActivity(before: string | undefined, signal: AbortSig
   }
 }
 
+/** One journal line attributed back to its source conversation. */
+export interface ProgressItem {
+  readonly text: string
+  readonly actor?: string
+  readonly sessionId?: string
+  readonly sessionTitle?: string
+  readonly seq?: number
+}
+
+/** Structured digest payload inside a journal entry. */
+export interface ProgressContent {
+  readonly summary?: string
+  readonly sections: {
+    readonly decided: readonly ProgressItem[]
+    readonly done: readonly ProgressItem[]
+    readonly doing: readonly ProgressItem[]
+    readonly blocked: readonly ProgressItem[]
+  }
+}
+
+/** One journal entry as served by `GET /account/api/progress`. */
+export interface ProgressEntry {
+  readonly id: string
+  readonly kind: 'current' | 'period'
+  readonly periodKey?: string
+  readonly content: ProgressContent
+  readonly activityCount: number
+  readonly periodStart?: string
+  readonly periodEnd?: string
+  readonly model?: string
+  readonly generatedAt: string
+}
+
+/** Live digest state shown in the panel footer. */
+export interface ProgressStatus {
+  readonly enabled: boolean
+  readonly pending: number
+  readonly generating: boolean
+  readonly lastRunAt?: string
+  readonly lastError?: string
+  readonly canGenerate: boolean
+}
+
+/** Journal page served by `GET /account/api/progress`. */
+export interface ProgressPage {
+  readonly enabled: boolean
+  readonly current?: ProgressEntry
+  readonly periods: readonly ProgressEntry[]
+  readonly status: ProgressStatus
+}
+
+/**
+ * Read the human-facing progress journal through the account session.
+ * @param signal - abort for superseded or disposed reads.
+ * @param target - owning Session's Runtime; absence preserves standalone account routing.
+ * @returns the normalized page; transport and payload failures reject.
+ */
+export async function fetchProgress(signal: AbortSignal, target: SessionRuntimeTarget | undefined): Promise<ProgressPage> {
+  const response = await fetch(activityUrl('/account/api/progress', target), { credentials: 'same-origin', signal })
+  // The route is absent wherever the journal service is not mounted — present
+  // that as a feature-off page instead of a transport failure.
+  if (response.status === 400 || response.status === 404) {
+    return {
+      enabled: false, periods: [],
+      status: { enabled: false, pending: 0, generating: false, canGenerate: false },
+    }
+  }
+  if (!response.ok) throw new Error(`project progress request failed: ${String(response.status)}`)
+  return await response.json() as ProgressPage
+}
+
+/** Result of a member-forced digest request. */
+export interface ProgressGenerateResult {
+  readonly started: boolean
+  readonly reason?: string
+}
+
+/**
+ * Ask the gateway to run one digest pass now, overriding the idle gates.
+ * @param target - owning Session's Runtime; absence preserves standalone account routing.
+ * @returns whether a pass was admitted; refusals arrive in `reason`.
+ */
+export async function generateProgress(target: SessionRuntimeTarget | undefined): Promise<ProgressGenerateResult> {
+  const response = await fetch(activityUrl('/account/api/progress/generate', target), { method: 'POST', credentials: 'same-origin' })
+  if (!response.ok) throw new Error(`project progress generate failed: ${String(response.status)}`)
+  return await response.json() as ProgressGenerateResult
+}
+
 /** Grouping modes offered by the panel toolbar. */
 export type ActivityGrouping = 'time' | 'conversation' | 'member'
+
+/** Panel modes: the progress journal plus the raw-activity groupings. */
+export type ActivityMode = 'progress' | ActivityGrouping
 
 /** One rendered section: a header label plus its rows in feed order. */
 export interface ActivitySection {
   readonly id: string
   readonly title: string
-  readonly meta?: string
-  /** Time mode only: the day header above this conversation section. */
+  /** Latest row timestamp (`occurredAt`), for recency labels on folded headers. */
+  readonly latest?: string
+  /** Time mode only: the day (`YYYY-MM-DD`) this section covers. */
   readonly day?: string
+  /** Row surfaced as the collapsed summary: the newest answer, else the newest row. */
+  readonly digest?: ActivityItem
+  /** Distinct actors in feed order. */
+  readonly actors: readonly { userId: number; label: string }[]
+  /** Count of answer rows in this section. */
+  readonly answers: number
   readonly rows: readonly ActivityItem[]
 }
 
@@ -81,9 +191,40 @@ function latestOf(rows: readonly ActivityItem[]): string {
   return latest
 }
 
+/** Attach collapsed-view statistics (digest row, actors, answer count) to a section. */
+type ActivityRows = [ActivityItem, ...ActivityItem[]]
+
+function withStats(section: Omit<ActivitySection, 'digest' | 'actors' | 'answers' | 'rows'> & { rows: ActivityRows }): ActivitySection {
+  let digest: ActivityItem | undefined
+  let answers = 0
+  const seen = new Map<number, string>()
+  for (const row of section.rows) {
+    if (row.kind === 'answer') {
+      answers += 1
+      if (digest === undefined) digest = row
+    }
+    if (!seen.has(row.actorUserId)) seen.set(row.actorUserId, row.actorLabel)
+  }
+  const pick = digest ?? section.rows[0]
+  return {
+    ...section,
+    digest: pick,
+    actors: [...seen.entries()].map(([userId, label]) => ({ userId, label })),
+    answers,
+  }
+}
+
+/** Group maps contain their first row at insertion, retaining its display metadata. */
+function appendGroup(groups: Map<string, ActivityRows>, key: string, row: ActivityItem): void {
+  const rows = groups.get(key)
+  if (rows === undefined) groups.set(key, [row])
+  else rows.push(row)
+}
+
 /**
- * Group feed rows into sections. `time` nests day → conversation; `conversation`
- * and `member` produce one section per distinct key, ordered by latest activity.
+ * Group feed rows into sections. `time` folds rows into one section per day;
+ * `conversation` and `member` produce one section per distinct key, ordered by
+ * latest activity.
  * @param items - feed rows in newest-first order.
  * @param grouping - active toolbar mode.
  * @param conversationTitle - fallback label for a null conversation title.
@@ -96,42 +237,81 @@ export function groupItems(
 ): ActivitySection[] {
   const titleOf = (item: ActivityItem): string => item.conversationTitle ?? conversationTitle(item.sessionId)
   if (grouping === 'time') {
-    const days = new Map<string, Map<string, ActivityItem[]>>()
-    const titles = new Map<string, string>()
+    const days = new Map<string, ActivityRows>()
     for (const item of items) {
       const day = dayLabel(item.occurredAt)
-      let conversations = days.get(day)
-      if (conversations === undefined) days.set(day, conversations = new Map<string, ActivityItem[]>())
-      const key = `${titleOf(item)}${item.sessionId}`
-      let rows = conversations.get(key)
-      if (rows === undefined) conversations.set(key, rows = [])
-      titles.set(key, titleOf(item))
-      rows.push(item)
+      appendGroup(days, day, item)
     }
-    return [...days.entries()].flatMap(([day, conversations]) =>
-      [...conversations.entries()].map(([key, rows]) => ({
-        id: `${day}/${key}`, day, title: titles.get(key) ?? '', meta: String(rows.length), rows,
-      })))
+    return [...days.entries()].map(([day, rows]) =>
+      withStats({ id: day, day, title: day, rows }))
   }
-  const keyed = new Map<string, ActivityItem[]>()
+  const keyed = new Map<string, ActivityRows>()
   for (const item of items) {
-    const key = grouping === 'conversation' ? `${titleOf(item)}${item.sessionId}` : `${item.actorLabel}${item.actorUserId}`
-    let rows = keyed.get(key)
-    if (rows === undefined) keyed.set(key, rows = [])
-    rows.push(item)
+    const key = grouping === 'conversation' ? item.sessionId : String(item.actorUserId)
+    appendGroup(keyed, key, item)
   }
   return [...keyed.entries()]
     .sort((left, right) => latestOf(right[1]).localeCompare(latestOf(left[1])))
     .map(([key, rows]) => {
       const first = rows[0]
-      if (first === undefined) return { id: key, title: '', rows }
-      return {
+      return withStats({
         id: key,
         title: grouping === 'conversation' ? titleOf(first) : first.actorLabel,
-        meta: timeLabel(latestOf(rows)),
+        latest: latestOf(rows),
         rows,
-      }
+      })
     })
+}
+
+/** Conversation identity tones cycling deterministically by `sessionId`. */
+export const CONV_TONES = ['toneBlue', 'toneGreen', 'toneAmber', 'toneRed', 'toneDeep'] as const
+
+/**
+ * Map a conversation to a stable tone index so one thread keeps one colour
+ * across groupings and refreshes.
+ * @param sessionId - wire session id carried by the feed row.
+ * @returns index into {@link CONV_TONES}.
+ */
+export function convTone(sessionId: string): number {
+  let sum = 0
+  for (const char of sessionId) sum += Number(char.codePointAt(0))
+  return sum % CONV_TONES.length
+}
+
+/**
+ * Label a section day relative to today.
+ * @param day - `YYYY-MM-DD` produced by {@link dayLabel}.
+ * @param labels - localized `today` / `yesterday` words.
+ * @returns `today`/`yesterday` words for recent days, else the raw date.
+ */
+export function relativeDayLabel(day: string, labels: { today: string; yesterday: string }): string {
+  const { today, yesterday } = localCalendarDays()
+  if (day === today) return labels.today
+  if (day === yesterday) return `${labels.yesterday} · ${day.slice(5)}`
+  return day
+}
+
+/** Viewer-local calendar days include daylight-saving changes. */
+function localCalendarDays(): { today: string; yesterday: string } {
+  const date = new Date()
+  const today = dayLabel(date.toISOString())
+  date.setDate(date.getDate() - 1)
+  return { today, yesterday: dayLabel(date.toISOString()) }
+}
+
+/**
+ * Label a row's latest activity for collapsed headers: `HH:mm` today,
+ * `yesterday HH:mm` yesterday, else `MM-DD`.
+ * @param iso - timestamp to label.
+ * @param yesterdayLabel - localized yesterday word.
+ * @returns short recency label.
+ */
+export function agoLabel(iso: string, yesterdayLabel: string): string {
+  const day = dayLabel(iso)
+  const { today, yesterday } = localCalendarDays()
+  if (day === today) return timeLabel(iso)
+  if (day === yesterday) return `${yesterdayLabel} ${timeLabel(iso)}`
+  return day.slice(5)
 }
 
 /**

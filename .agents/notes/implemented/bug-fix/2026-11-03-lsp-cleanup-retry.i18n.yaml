@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-03-lsp-cleanup-retry.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-03-lsp-cleanup-retry.md
+document:
+  en: 42f8c709228b52e67eb376b5acfc1bd0e7d0040b
+  zh: 7f8424323c9b746a3165648f7df6254471940fd2
+/agent-note-retain-failed-language-server-cleanup-before-replacement:
+  en: 6799437780d432b2
+  zh: a64bcf08d423b256
+/agent-note-retain-failed-language-server-cleanup-before-replacement/problem:
+  en: 20305fec268b0849
+  zh: 5fffc13c6ff1f8fe
+/agent-note-retain-failed-language-server-cleanup-before-replacement/decision:
+  en: 48399ce9edbcc2b9
+  zh: 1bc02cef4b30a78c
+/agent-note-retain-failed-language-server-cleanup-before-replacement/alternatives-considered:
+  en: 02ad4aff5e7fd8f4
+  zh: fe0ea6e18deb43a4
+/agent-note-retain-failed-language-server-cleanup-before-replacement/consequences:
+  en: c4e7093c897de42a
+  zh: a1d025a8598f8afc
+/agent-note-retain-failed-language-server-cleanup-before-replacement/verification:
+  en: b672c222ec4b9232
+  zh: bc53d5ef3e3991f3

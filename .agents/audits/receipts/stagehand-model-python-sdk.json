@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-python-sdk",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src /Users/a1234/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest python/sdk/tests/test_browser_model_snapshot.py -q",
+  "startedAt": "2026-10-23T18:26:44.372666+00:00",
+  "seconds": 1.658,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "85b4c71fa5be25d31d975670076dd926793b99dfd977a3bcc918b752cad0ad6a",
+  "inputsAfter": "85b4c71fa5be25d31d975670076dd926793b99dfd977a3bcc918b752cad0ad6a",
+  "outputSha256": "5104241e04e4cef7312a48f4bff643110dc887089867f9c88f6d5b4f286da9fb",
+  "outputTail": "/Users/a1234/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3: No module named pytest\n"
+}

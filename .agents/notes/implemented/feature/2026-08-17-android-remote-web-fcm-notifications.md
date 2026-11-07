@@ -20,7 +20,7 @@ The Web UI registers an Android FCM token after the authenticated user grants no
 
 The Gateway notifies only the conversation creator's registered devices. It schedules a notification after a conversation append returns `inserted` and the appended events contain `turn/end` with `data.reason.kind === 'completed'`; duplicate appends and non-completed endings do not schedule a second notification. The payload contains only the session id and event sequence, so the app opens the existing authenticated Web UI instead of placing reply text in the notification.
 
-`push_deliveries` records one delivery key per organization, session, event sequence, and device. A sent record is not claimed again, and a provider response identifying an invalid registration removes that registration. The first implementation sends asynchronously after persistence and logs failures; it does not add a background outbox worker, so a process exit between the append and the send can lose a notification without losing the conversation.
+`push_deliveries` records one delivery key per organization, session, event sequence, and device. Current recipient authority, claim leases and conditional invalid-registration cleanup follow [push delivery ownership](../bug-fix/2026-10-29-push-delivery-authority.md). The first implementation sends asynchronously after persistence and logs failures; it does not add a background outbox worker, so a process exit between the append and the send can lose a notification without losing the conversation.
 
 ## Alternatives considered
 

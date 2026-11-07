@@ -6,6 +6,7 @@ import { SshRpcPeer } from '../src/protocol.ts'
 import { SshConnection } from '../src/index.ts'
 
 const transport = vi.hoisted(() => ({ spawn: vi.fn(), execFile: vi.fn() }))
+vi.mock('@deepseek-ai/dsh-subprocess-local', async () => import('./fixtures/local-transport.ts'))
 vi.mock('node:child_process', async importOriginal => ({
   ...await importOriginal<typeof import('node:child_process')>(),
   spawn: transport.spawn,
@@ -76,7 +77,8 @@ describe.skipIf(process.platform === 'win32')('SSH password channel', () => {
     const [, args, options] = transport.spawn.mock.calls[0] as [string, string[], Record<string, unknown>]
     expect(args).toContain('BatchMode=yes')
     expect(args.join(' ')).not.toContain('NumberOfPasswordPrompts')
-    expect(options.env).toBeUndefined()
+    expect(options.env).not.toHaveProperty('SSH_ASKPASS')
+    expect(options.env).not.toHaveProperty('SSH_ASKPASS_REQUIRE')
   })
 
   it('feeds a resolved credential through SSH_ASKPASS and removes it after authentication', async () => {

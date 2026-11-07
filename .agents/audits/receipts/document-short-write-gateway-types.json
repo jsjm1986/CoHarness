@@ -1,0 +1,14 @@
+{
+  "name": "document-short-write-gateway-types",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsc --noEmit",
+  "startedAt": "2026-10-25T10:40:24.225197+00:00",
+  "seconds": 6.274,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bc45a9dc20b46848c7b7a727302822ee25d9ecbecc478da96be1a4ee47a15d3b",
+  "inputsAfter": "bc45a9dc20b46848c7b7a727302822ee25d9ecbecc478da96be1a4ee47a15d3b",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

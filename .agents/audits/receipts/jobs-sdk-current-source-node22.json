@@ -1,0 +1,14 @@
+{
+  "name": "jobs-sdk-current-source-node22",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=src /Users/a1234/.nvm/versions/node/v22.22.1/bin/node node_modules/vitest/vitest.mjs run --config vitest.snapshot.config.ts snapshots/sdk/sdk.snapshot.ts -t 'subagent-dsh-sdk-(diagnostic|dynamic-route)'",
+  "startedAt": "2026-10-26T09:47:59.528408+00:00",
+  "seconds": 14.273,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "067716e721d360932b4bdd52a5108cfdb3e393deaa04015a7bcf72539207a70b",
+  "inputsAfter": "067716e721d360932b4bdd52a5108cfdb3e393deaa04015a7bcf72539207a70b",
+  "postgresToolDirectory": null,
+  "outputSha256": "324b27446a801efb01457cce68011e27f855f68e773269739fc85e0bf4923ea8",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed | 26 skipped (28)\n   Start at  17:48:01\n   Duration  12.34s (transform 1.55s, setup 55ms, import 2.05s, tests 10.10s, environment 0ms)\n\n"
+}

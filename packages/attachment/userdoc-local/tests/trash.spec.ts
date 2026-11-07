@@ -27,6 +27,18 @@ afterEach(async () => {
 })
 
 describe('local document trash', () => {
+  it('distinguishes a retained trash entry from a replacement active file at the same path', async () => {
+    const service = await makeStore()
+    const original = await service.save(await service.resolveTarget({ name: 'reuse.txt' }), stream('old'))
+    await service.trash(original.docId)
+    const replacement = await service.save(await service.resolveTarget({ name: 'reuse.txt' }), stream('new'))
+    expect(replacement.docId).toBe(original.docId)
+    await expect(service.trash(replacement.docId)).rejects.toMatchObject({ code: 'DOCUMENT_TRASH_CONFLICT' })
+    expect(await readFile(replacement.path, 'utf8')).toBe('new')
+    const restored = await service.restore(original.docId, undefined, 'original.txt')
+    expect(await readFile(restored.path, 'utf8')).toBe('old')
+  })
+
   it('moves a document to trash and restores it without exposing the hidden path', async () => {
     const service = await makeStore()
     const target = await service.resolveTarget({ name: 'notes.txt' })

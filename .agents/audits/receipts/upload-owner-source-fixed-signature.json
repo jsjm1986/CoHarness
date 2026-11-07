@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-source-fixed-signature",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc/tests packages/attachment/userdoc-local/tests packages/host/userdoc-http/tests --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-25T09:52:17.788968+00:00",
+  "seconds": 20.767,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f5b3b1da0cc373ce78776050bf26b466ae5ffc0e4b8f7ec46867718b1ad50f1f",
+  "inputsAfter": "f5b3b1da0cc373ce78776050bf26b466ae5ffc0e4b8f7ec46867718b1ad50f1f",
+  "postgresToolDirectory": null,
+  "outputSha256": "36fa54e5ec64fe5320b038d09e4eb8aafc3dee12e1945ae08e9f823d5219ca80",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  18 passed (18)\n      Tests  254 passed (254)\n   Start at  17:52:25\n   Duration  13.41s (transform 7.66s, setup 571ms, import 9.73s, tests 13.45s, environment 1ms)\n\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "auto-review-model-request-current",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/experimental/auto-review/tests/auto-review.spec.ts -t 'logs the exact resolved reviewer|attributes the reviewer to execution admission' --retry=0",
+  "startedAt": "2026-10-24T02:54:02.852397+00:00",
+  "seconds": 4.501,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6809732b7b19fe9e1fbfd6a8b89d5eafa5679db73f51da26429c999e55d2039f",
+  "inputsAfter": "6809732b7b19fe9e1fbfd6a8b89d5eafa5679db73f51da26429c999e55d2039f",
+  "postgresToolDirectory": null,
+  "outputSha256": "25c723dd0232456ba9c6113d7b7180c35d223a76139b468c4bffcd8de01bd8d1",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed | 31 skipped (33)\n   Start at  10:54:05\n   Duration  1.61s (transform 1.22s, setup 40ms, import 1.47s, tests 25ms, environment 0ms)\n\n"
+}

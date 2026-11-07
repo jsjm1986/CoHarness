@@ -1068,6 +1068,30 @@
   gap: 12px;
 }
 
+/* A row's entry `config:` JSON editor. */
+.entryConfigInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-line-regular);
+  border-radius: 8px;
+  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-primary);
+  resize: vertical;
+}
+
+.entryConfigInput:focus {
+  outline: none;
+  border-color: var(--dsw-alias-focus, var(--dsw-alias-label-primary));
+}
+
+.entryConfigInput[aria-invalid='true'] {
+  border-color: var(--dsw-alias-error, #dc2626);
+}
+
 .sectionHead {
   display: flex;
   align-items: baseline;

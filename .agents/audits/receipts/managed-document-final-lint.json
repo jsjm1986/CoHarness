@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-final-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-gateway packages/host/userdoc-http/tests/loader-composition.spec.ts packages/goal/goal/src/index.ts packages/core/agent/tests/agent.spec.ts packages/core/session/tests/session.spec.ts packages/jobs/jobs/tests/archive-admission.spec.ts packages/subagent/subagent/tests/archive-admission.spec.ts packages/subagent/subagent/tests/continuation.spec.ts packages/subagent/subagent/tests/service.spec.ts packages/subagent/tool-subagent/tests/tool-subagent.spec.ts gateway/src/documents-local.ts scripts/check-workspace-constraints.ts scripts/check-workspace-constraints.spec.ts",
+  "startedAt": "2026-10-26T18:16:38.134509+00:00",
+  "seconds": 9.454,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2a8d92dff78be1af880c06accb5bcae6a2c33f7be014239347b137de0cecb526",
+  "inputsAfter": "2a8d92dff78be1af880c06accb5bcae6a2c33f7be014239347b137de0cecb526",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

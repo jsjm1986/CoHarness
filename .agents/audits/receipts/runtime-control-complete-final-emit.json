@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-complete-final-emit",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.build.json",
+  "startedAt": "2026-10-24T19:50:11.787791+00:00",
+  "seconds": 5.371,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c33bdecec6e3388d6fe2c61f978a92e4e22340efc348021211e8115b7dcb3d6a",
+  "inputsAfter": "c33bdecec6e3388d6fe2c61f978a92e4e22340efc348021211e8115b7dcb3d6a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

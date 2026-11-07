@@ -1,0 +1,14 @@
+{
+  "name": "steward-waited-authority-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts -t 'rechecks steward' --no-file-parallelism",
+  "startedAt": "2026-10-24T00:36:26.291570+00:00",
+  "seconds": 13.285,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55fb69ff1f10895be8b166f8139aacdc0dbea4dfb12e9320cbc889f5c2d22fed",
+  "inputsAfter": "55fb69ff1f10895be8b166f8139aacdc0dbea4dfb12e9320cbc889f5c2d22fed",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "97249400a07be86a37461977c774fa9ef02cf405f1271474fc68d0871529acee",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-service-postgres.spec.ts (30 tests | 2 failed | 28 skipped) 10250ms\n     × rechecks steward qualification after waiting to claim an interaction 10124ms\n     × rechecks steward role after waiting to claim an interaction 98ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks steward qualification after waiting to claim an interaction\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ tests/project-service-postgres.spec.ts:277:84\n    275|       claimed = new PostgresCollaborationService(claim.context).claimI…\n    276|         .catch((error: unknown) => error)\n    277|       await expect.poll(() => waiting(claim.applicationName), { timeou…\n       |                                                                                    ^\n    278|       if (kind === 'qualification') await qualification.set(owner, fal…\n    279|       else await new PostgresUserService(f.context, f.cfg).setRole(f.m…\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/project-service-postgres.spec.ts:277:7\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks steward role after waiting to claim an interaction\nAssertionError: expected true to match object { code: 'forbidden' }\n\n- Expected:\n{\n  \"code\": \"forbidden\",\n}\n\n+ Received:\ntrue\n\n ❯ tests/project-service-postgres.spec.ts:284:27\n    282|       await claimed\n    283|     }\n    284|     expect(await claimed).toMatchObject({ code: 'forbidden' })\n       |                           ^\n    285|     expect((await pool.query(`SELECT 1 FROM harness.conversation_inter…\n    286|       WHERE organization_id=$1 AND interaction_id=$2`, [f.context.orga…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 28 skipped (30)\n   Start at  08:36:27\n   Duration  12.18s (transform 1.49s, setup 0ms, import 1.84s, tests 10.25s, environment 0ms)\n\n"
+}

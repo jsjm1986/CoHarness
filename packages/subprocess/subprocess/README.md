@@ -42,7 +42,7 @@ The request is fully explicit: the program and arguments, the working directory,
 
 ```text
 const executable = await ctx.subprocess.resolveExecutable('bash')
-const handle = ctx.subprocess.spawn({
+const handle = await ctx.subprocess.spawn({
   argv: [executable, '-c', 'echo hello'],
   cwd: '/workspace',
   stdio: { stdin: 'ignore', stdout: { maxBytes: 64 * 1024 }, stderr: 'inherit' },
@@ -67,9 +67,17 @@ Set `stdio.control: 'pipe'` to receive a separate raw `Duplex` in `handle.contro
 
 ### Managing process lifetime
 
+Both allocation methods await resource admission before calling the provider. `sessionId` and `resourceOrigin` select execution ownership; ordinary consumers use captured execution, browser terminals require a signed interactive caller, and maintenance can explicitly select infrastructure. The lease holds through full process-range exit or terminal termination, including surviving descendants. Unconfirmed allocation cleanup retains uncertainty; confirmed rollback releases its permit. Independent compositions may omit admission; managed compositions refuse work if the required provider is missing.
+
+Admission retains its original resource provider through queue waiting and the grant handoff. Immediately before invoking the process or terminal provider, a cancelled request or changed resource owner refuses allocation and returns the unused grant. Provider withdrawal, replacement or a newly required but missing provider raises `ResourceAdmissionError` with reason `unavailable`; the old request never acquires replacement capacity. Start a new request after restoring admission. Already allocated ranges retain their original cleanup obligations.
+
+Providers with asynchronous preparation capture `captureAdmissionCheck(spec)` at entry and call the returned check before physical start dispatch. A provider that proves failed allocation fully quiescent uses `rejectAfterCleanup(failure)`; the service releases its permit and preserves the original failure. Other allocation failures retain uncertainty. A failed resource completion preserves both the allocation and accounting errors in an `AggregateError`.
+
 Termination and waiting use one provider-managed range. `terminate()` starts the provider's documented procedure, is idempotent, and becomes a no-op after that range is empty; the request's abort signal starts the same procedure. `waitForExit()` observes the same range and resolves only after the provider proves it quiescent, so direct command completion does not hide a surviving descendant. It rejects when the selected owner can no longer prove quiescence. Providers document their native owners and weaker fallbacks; callers own deadlines, teardown ladders, and cause classification.
 
 ### Running a terminal session
+
+A terminal request's `signal` cancels allocation only. After the handle is published, ending that caller does not terminate the terminal or release its permit; resource-provider withdrawal and subprocess-provider disposal still cancel the owned session.
 
 For interactive programs, `spawnTerminal` allocates a real PTY: write text, read UTF-8 output, inspect and signal the current foreground process group, and await one `terminate()` that settles every session member the provider can still observe. Readiness, scrollback, and prompt policy stay with the PTY consumer.
 
@@ -81,7 +89,7 @@ Children never inherit the harness's ambient secrets: credential-shaped names an
 
 ### What can go wrong
 
-An executable that cannot be resolved fails loudly with a stable error. A spawn that never starts rejects `done`; there is no buffered output for a process that never ran. `waitForExit()` also rejects when the provider cannot prove its selected range is empty, and a provider fallback may not own descendants that escape its process group or observed session. When a transport owns its own spawn (the SDK client, MCP), route around the service and import `scrubbedParentEnv` directly so environment policy stays single-sourced.
+An executable that cannot be resolved fails loudly with a stable error. A spawn that never starts rejects `done`; there is no buffered output for a process that never ran. `waitForExit()` also rejects when the provider cannot prove its selected range is empty, and a provider fallback may not own descendants that escape its process group or observed session. A transport owning its private spawn keeps that launch API and imports `scrubbedParentEnv`; its managed consumer owns process admission and cleanup evidence. See [MCP](../../mcp/mcp-client/README.md) and [SDK subagents](../../subagent/subagent-dsh-sdk/README.md).
 
 -----
 
@@ -106,7 +114,7 @@ The seam is built on one separation: the service owns process coordinates and li
 
 ### Data model and flow
 
-A spawn returns a live handle immediately without exposing target identity. `done` independently reports the direct command outcome or failure, while `waitForExit()` reports managed-range quiescence. The request's abort signal drives the same termination procedure as `terminate()`. Collected readers are cursor-free: offsets are whole-stream byte coordinates the caller owns, so independent readers cannot consume one another's output, and a read whose offset slid out of the in-memory tail is `lossy` and points at the spill file when one exists. `spawnTerminal` is one deep primitive because ordinary pipes cannot allocate a controlling terminal or clean terminal-session members.
+After admission, ordinary spawn publishes a live handle whose provider may still be preparing its target. Target identity remains provider-private. `done` independently reports the direct command outcome or failure, while `waitForExit()` reports managed-range quiescence. The request's abort signal drives the same termination procedure as `terminate()`. Collected readers are cursor-free: offsets are whole-stream byte coordinates the caller owns, so independent readers cannot consume one another's output, and a read whose offset slid out of the in-memory tail is `lossy` and points at the spill file when one exists. `spawnTerminal` is one deep primitive because ordinary pipes cannot allocate a controlling terminal or clean terminal-session members.
 
 ### Lifecycle and invariants
 
@@ -145,7 +153,7 @@ No direct invalidation; the named consumers own any request-prefix changes.
 
 These limits define when the seam is a poor fit or leaves work to its consumers. They are current package constraints, not a comparison or a backlog.
 
-- **SDK-managed spawns remain outside** — a transport that owns its internal spawn (the SDK client, MCP) cannot route that call through this service; it can still import `scrubbedParentEnv` so environment policy stays single-sourced.
+- **Private transport spawns use consumer-owned admission** — SDK and MCP transports retain their launch APIs. Their managed consumers acquire process permits and prove cleanup independently of this service; pure standalone SDK clients have no Cordis budget context.
 - **Teardown ladders are consumer-owned** — the seam ships signalling verbs and the managed-range wait, not a canned quiesce sequence; each out-of-process consumer encodes its child's cooperation shape itself (the ACP backend's stdin-EOF-first ladder is the in-repo template).
 - **Observability is provider-specific** — native providers may own escaped descendants through systemd scopes or Windows Jobs, while fallback providers expose weaker process-group, tree, or session visibility. The seam adds no continuous process-table monitor.
 

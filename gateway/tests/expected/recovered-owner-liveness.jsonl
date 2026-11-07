@@ -1,0 +1,2 @@
+{"scenario":"recovered-owner-attachment","status":503,"code":"INSTANCE_UNAVAILABLE","generationRetained":true,"state":"ready","resident":1}
+{"scenario":"recovered-owner-probe","status":503,"code":"INSTANCE_UNAVAILABLE","generationRetained":true,"state":"ready","resident":1}

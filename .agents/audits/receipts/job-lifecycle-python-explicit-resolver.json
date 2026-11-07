@@ -1,0 +1,14 @@
+{
+  "name": "job-lifecycle-python-explicit-resolver",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_job_lifecycle_snapshot.py -q",
+  "startedAt": "2026-10-26T09:41:56.565002+00:00",
+  "seconds": 7.164,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e1ab9271a038438cb05b0446d4ef69c0b7ec6fc1d20898db85e260f5feff4f11",
+  "inputsAfter": "e1ab9271a038438cb05b0446d4ef69c0b7ec6fc1d20898db85e260f5feff4f11",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

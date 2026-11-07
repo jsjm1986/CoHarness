@@ -1,0 +1,214 @@
+{
+  "at": "2026-10-31T10:34:11.352911+00:00",
+  "finding": "B401",
+  "title": "Opaque backends and Codex model selection omit authority-only parent control",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/subagent/subagent/src/external-model.ts",
+    "packages/subagent/subagent/src/out-of-process.ts",
+    "packages/subagent/subagent-codex/src/index.ts",
+    "packages/subagent/subagent-dsh-sdk/src/admission.ts",
+    "packages/subagent/subagent/tests/external-model.spec.ts",
+    "packages/subagent/subagent/tests/external-admission-example.host.spec.ts",
+    "packages/subagent/subagent/tests/fixtures/opaque-admission.mjs",
+    "packages/subagent/subagent/tests/expected/opaque-admission.jsonl",
+    "packages/subagent/subagent-acp/tests/managed-model-control.spec.ts",
+    "packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts",
+    "packages/subagent/subagent-codex/tests/managed-model-control.spec.ts",
+    "packages/subagent/subagent-codex/tests/real-product.spec.ts",
+    "packages/subagent/subagent-codex/tests/fixtures/execution-authority.mjs",
+    "snapshots/session/subagent-execution-authority.snapshot.ts",
+    "snapshots/session/subagent-execution-authority/expected.jsonl",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent-codex/README.i18n.yaml",
+    "packages/subagent/subagent-codex/README.md",
+    "packages/subagent/subagent-codex/README.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/subagent-parent-model-control/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/subagent-parent-model-control/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/subagent-parent-model-control/guide.zh.md"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-source-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-source-native-exit.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-package-compile.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-package-bundle-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-docs.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-native-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-native-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-origin-fetch-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-pairing.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-old-opaque-observation.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T095100Z/external-authority-old-native-observation.json"
+  ],
+  "causalEvidence": "Two original shared-guard regressions allow required or present execution authority. Unchanged application verification rejects the complete old package graphs. Old ACP/Claude root cases permit one-shot/member preparation and reach one or two blocked native allocation attempts per row; the fixture stops these attempts before any external inference. The installed native Codex old graph skips the parent guard and sends one actual loopback inference request even when the parent denies execution. Updated root/isolated tests and Loader applications refuse opaque paths before allocation while retaining authorized native Codex inference and preventing denied upstream dispatch.",
+  "behavior": "One requiresParentModelControl predicate includes required/installed model policy, resource budget and execution authority. Opaque guards refuse unsupported paths, Codex selects its existing parent Responses bridge, and SDK selects mandatory parent bootstrap from that same predicate. Provider registration and actual Agent realms remain enforced; independent compositions keep their native behavior.",
+  "verification": {
+    "uniqueRelatedCases": 1126,
+    "packageCases": 1125,
+    "packageFiles": 45,
+    "additionalNativeSnapshotCases": 1,
+    "opaqueRows": 6,
+    "nativeRows": 2,
+    "builtApplicationCasesPerNode": 5,
+    "standardCoverage": {
+      "packages/subagent/subagent-codex/src/index.ts": {
+        "statements": [
+          107,
+          107
+        ],
+        "branches": [
+          97,
+          97
+        ],
+        "functions": [
+          17,
+          17
+        ],
+        "lines": [
+          97,
+          97
+        ]
+      },
+      "packages/subagent/subagent-dsh-sdk/src/admission.ts": {
+        "statements": [
+          125,
+          125
+        ],
+        "branches": [
+          51,
+          51
+        ],
+        "functions": [
+          32,
+          32
+        ],
+        "lines": [
+          99,
+          99
+        ]
+      },
+      "packages/subagent/subagent/src/external-model.ts": {
+        "statements": [
+          4,
+          4
+        ],
+        "branches": [
+          8,
+          8
+        ],
+        "functions": [
+          2,
+          2
+        ],
+        "lines": [
+          4,
+          4
+        ]
+      }
+    },
+    "coverageLimits": "Shared classification, Codex provider and SDK admission modules meet all four per-file 100% metrics. No coverage exclusions or thresholds changed.",
+    "build": "Dry plan and actual compile select three related packages; the normal workspace builder emits only Core main, Codex main and SDK main/managed, with its Typert plugin. Full repository build is not rerun or claimed.",
+    "native": "Installed Codex0.153.4 talks only to a private Responses fixture. Source and plain Node22/24 observe native handles and confirmed range exits. Opaque negative cases are stopped at their allocator and do not run paid/native inference.",
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 169,
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0,
+    "identityLimits": "Explicit test authority and captured async scope prove the assembled paths; no real account/PostgreSQL/cross-computer acceptance is substituted."
+  },
+  "evidenceSetupCorrection": "The first native example supplied text as a string to a typed content-block-array API; both affected fixture calls now use valid text blocks, and native lookup uses the package-local binary directory. The CLI treats a regex-looking filter as an exact string; that rejected bundle emitted nothing. Public build API exact-path filters then selected only the intended packages with their normal plugins. Initial receipts are retained.",
+  "noteReview": {
+    "owner": ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+    "decision": "Extend the owning external-model decision with shared authority classification. No new redundant note or archived change."
+  },
+  "baseline": {
+    "at": "2026-10-31T10:27:57.226562+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "scope": "Shared subagent definition and its SDK/Codex consumers; no peer reserved files edited.",
+    "merge": "Merge twenty-seven B401 delta paths with forty-nine explicitly unchanged source/manifest/build prerequisites. Rebuild dsh-subagent, dsh-subagent-codex and dsh-subagent-dsh-sdk together: Codex and SDK now import requiresParentModelControl from the shared package. Include its generated runtime/type exports; references contain the two changed Core lib/types JS modules as well as the main/managed entries. A selected three-package compile and four-entry bundle passed; no new whole-repository build is claimed. Preserve newer peer output and keep this batch out of the existing R13 freeze."
+  },
+  "matchingSourcePrerequisites": [
+    "packages/subagent/subagent/src/archive-admission.ts",
+    "packages/subagent/subagent/src/assistant-output.ts",
+    "packages/subagent/subagent/src/catalog.ts",
+    "packages/subagent/subagent/src/child-agent.ts",
+    "packages/subagent/subagent/src/client.ts",
+    "packages/subagent/subagent/src/continuation-activation.ts",
+    "packages/subagent/subagent/src/continuation-messages.ts",
+    "packages/subagent/subagent/src/continuation.ts",
+    "packages/subagent/subagent/src/control-types.ts",
+    "packages/subagent/subagent/src/control.ts",
+    "packages/subagent/subagent/src/depth.ts",
+    "packages/subagent/subagent/src/descriptor-seed.ts",
+    "packages/subagent/subagent/src/descriptor.ts",
+    "packages/subagent/subagent/src/error.ts",
+    "packages/subagent/subagent/src/external.ts",
+    "packages/subagent/subagent/src/inbox.ts",
+    "packages/subagent/subagent/src/index.ts",
+    "packages/subagent/subagent/src/internal.ts",
+    "packages/subagent/subagent/src/lifecycle.ts",
+    "packages/subagent/subagent/src/list-children.ts",
+    "packages/subagent/subagent/src/projection-types.ts",
+    "packages/subagent/subagent/src/projection.ts",
+    "packages/subagent/subagent/src/run-settlement.ts",
+    "packages/subagent/subagent/src/structured.ts",
+    "packages/subagent/subagent/src/types.ts",
+    "packages/subagent/subagent/package.json",
+    "packages/subagent/subagent-codex/src/managed-model.ts",
+    "packages/subagent/subagent-codex/src/member.ts",
+    "packages/subagent/subagent-codex/src/model-request-event.ts",
+    "packages/subagent/subagent-codex/src/rollout.ts",
+    "packages/subagent/subagent-codex/src/run.ts",
+    "packages/subagent/subagent-codex/src/wire.ts",
+    "packages/subagent/subagent-codex/package.json",
+    "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+    "packages/subagent/subagent-dsh-sdk/src/channel.ts",
+    "packages/subagent/subagent-dsh-sdk/src/control-entry.ts",
+    "packages/subagent/subagent-dsh-sdk/src/control.ts",
+    "packages/subagent/subagent-dsh-sdk/src/index.ts",
+    "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+    "packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+    "packages/subagent/subagent-dsh-sdk/src/managed.ts",
+    "packages/subagent/subagent-dsh-sdk/src/model-relay.ts",
+    "packages/subagent/subagent-dsh-sdk/src/run.ts",
+    "packages/subagent/subagent-dsh-sdk/package.json",
+    "packages/subagent/subagent/tsconfig.json",
+    "packages/subagent/subagent-codex/tsconfig.json",
+    "packages/subagent/subagent-dsh-sdk/tsconfig.json",
+    "packages/subagent/subagent-dsh-sdk/tsdown.config.ts",
+    "tsdown.config.ts"
+  ],
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subagent/subagent-codex/lib/index.js": "169dea82bf87107a71e8efe05432812000a0ad6b3488ef5a23dddb85fe06eb3f",
+    "packages/subagent/subagent-dsh-sdk/lib/index.js": "4e9e865defd0814f8bfa667219134e09ac47b41adff051b5fff6a244e263ebfd",
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review shared-runtime debug authority, remaining direct allocation consumers and lifecycle changes to model control.",
+    "Continue remote pipes, resource-only remote execution, native containment and nonconflicting business permissions.",
+    "Peer owns multi-computer operational acceptance and reserved Local/Gateway/UI changes. Preserve per-user model authorization and default-model denial.",
+    "Paid API validation stays deferred. No root deployment, production database or physical Linux/Windows acceptance is claimed."
+  ]
+}

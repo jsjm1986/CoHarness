@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-governance-source",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run --config plugins/dsh-model-governance/vitest.config.ts tests/execution-billing.spec.ts --retry=0",
+  "startedAt": "2026-10-23T18:34:47.000984+00:00",
+  "seconds": 2.36,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b70ee467dc3bb3cbd8b2ac74263c9d7ed663782f313d79bc197ad91fbf1e07af",
+  "inputsAfter": "b70ee467dc3bb3cbd8b2ac74263c9d7ed663782f313d79bc197ad91fbf1e07af",
+  "outputSha256": "2e90817b4d461ba758adc4380f05908300d35b180d588eb9246d764aacce9692",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/plugins/dsh-model-governance\n\n ❯ tests/execution-billing.spec.ts (13 tests | 1 failed) 143ms\n     × refuses browser dispatch when model permission changes during admission 14ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/execution-billing.spec.ts > verified execution billing > refuses browser dispatch when model permission changes during admission\nAssertionError: expected [ { …(11) } ] to deeply equal [ ObjectContaining{…} ]\n\n- Expected\n+ Received\n\n  [\n    {\n      \"actorUserId\": 7,\n-     \"status\": \"failed\",\n+     \"credentialClass\": \"unknown\",\n+     \"credentialSource\": \"unknown\",\n+     \"eventId\": \"7833385d-43e7-455d-8d94-b913e49ebd13\",\n+     \"executionInputIds\": [\n+       \"input-a\",\n+       \"input-b\",\n+     ],\n+     \"model\": \"m\",\n+     \"occurredAt\": 1792780489240,\n+     \"provider\": \"p\",\n+     \"purpose\": \"assistant\",\n+     \"sessionId\": \"actual-execution\",\n+     \"status\": \"denied\",\n    },\n  ]\n\n ❯ tests/execution-billing.spec.ts:133:31\n    131|     expect(release).toHaveBeenCalledOnce()\n    132|     expect(uncertain).not.toHaveBeenCalled()\n    133|     expect(await f.records()).toEqual([expect.objectContaining({ actor…\n       |                               ^\n    134|   })\n    135|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 12 passed (13)\n   Start at  02:34:48\n   Duration  1.16s (transform 616ms, setup 0ms, import 906ms, tests 143ms, environment 0ms)\n\n"
+}

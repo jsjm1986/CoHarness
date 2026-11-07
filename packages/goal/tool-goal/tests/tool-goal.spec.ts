@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
@@ -15,9 +15,11 @@ import {
   SessionLogOffset,
 } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
+import { turnBoundaryProjectionDefinition } from '../../../core/agent-loop/src/index.ts'
 import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 import type { ReactLoopInbox } from '../../../core/agent-loop/src/inbox.ts'
 
@@ -85,11 +87,15 @@ function closeTurn(stub: StubAgent, turn: number): void {
   stub.session.append('turn/end', { turn, reason: { kind: 'completed' } })
 }
 
-async function harness(config: toolGoal.Config = {}) {
+async function harness(config: toolGoal.Config = {}, withProjections = false) {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(ToolRuntime)
+  if (withProjections) {
+    await ctx.plugin(SessionProjectionRegistry)
+    ctx.sessionProjections.register(turnBoundaryProjectionDefinition)
+  }
   await ctx.plugin(GoalService)
   const fiber = await ctx.plugin(toolGoal, config)
   const root = stubAgent(`goal-tool-root-${Math.random()}`)
@@ -212,6 +218,16 @@ describe('goal tool registration and presentation', () => {
 })
 
 describe('goal tool execution authority', () => {
+  it('uses the open-turn projection and refuses access after that turn closes', async () => {
+    const { ctx, root } = await harness({}, true)
+    onTestFinished(async () => { await ctx.fiber.dispose(); await root.agent.ctx.fiber.dispose() })
+    const turn = openTurn(root, { kind: 'user' })
+    expect(resultJson(await execute(ctx, 'get_goal', {}, root.agent))).toEqual({ goal: null })
+    closeTurn(root, turn)
+    const closed = await execute(ctx, 'get_goal', {}, root.agent)
+    expect(closed.error?.info?.code).toBe('GOAL_TOOL_DRIVER_REQUIRED')
+  })
+
   it('lets a root model infer create intent from its accepted human turn', async () => {
     const { ctx, root } = await harness()
     openTurn(root, { kind: 'user' }, '请持续工作直到这个功能完成')
@@ -622,6 +638,37 @@ describe('goal tool state transitions', () => {
     expect(block.text).toContain('<goal_blocked>')
     expect(block.text).toContain('The required credential is still unavailable.')
     expect(block.text).toContain("Do not call any more tools in this run; further work waits for the user's next instruction.")
+  })
+
+  it.each(['blocked', 'paused', 'disarmed'] as const)('requires fresh admitted rounds after resuming a %s goal', async (phase) => {
+    const { ctx, root } = await harness({ blockedAfterConsecutiveRounds: 3 })
+    onTestFinished(async () => { await ctx.fiber.dispose(); await root.agent.ctx.fiber.dispose() })
+    let turn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'continue after the previous obstacle' })
+    closeTurn(root, turn)
+    for (let round = 1; round <= 3; round += 1) {
+      turn = openTurn(root, { kind: 'goal', goalId: created.id, revision: created.revision, round })
+      closeTurn(root, turn)
+    }
+    const stopped = phase === 'blocked'
+      ? ctx.goals.block(root.agent, created, { code: 'model-reported', message: 'Waiting for access.' })
+      : phase === 'paused' ? ctx.goals.pause(root.agent, created) : ctx.goals.disarm(root.agent)
+    if (stopped === undefined) throw new Error('The fixture lost its current goal.')
+    const resumed = ctx.goals.resume(root.agent, stopped)
+    for (let localRound = 1; localRound <= 3; localRound += 1) {
+      const round = 3 + localRound
+      turn = openTurn(root, { kind: 'goal', goalId: resumed.id, revision: resumed.revision, round })
+      const result = await execute(ctx, 'update_goal', {
+        goal_id: resumed.id, revision: resumed.revision, action: 'blocked', blocked_reason: 'Waiting for access.',
+      }, root.agent)
+      if (localRound < 3) {
+        expect(result.error?.info?.code).toBe('GOAL_TOOL_BLOCK_THRESHOLD')
+        expect(ctx.goals.get(root.agent)).toMatchObject({ phase: 'active', revision: resumed.revision, roundsStarted: round })
+      } else {
+        expect(resultGoal(result)).toMatchObject({ phase: 'blocked', roundsStarted: 6 })
+      }
+      closeTurn(root, turn)
+    }
   })
 
   it('lets direct human authority block before the model threshold', async () => {

@@ -1,0 +1,13 @@
+{
+  "name": "organization-auth-gateway-check",
+  "cwd": "gateway",
+  "command": "npm run build:check",
+  "startedAt": "2026-10-23T19:22:33.307892+00:00",
+  "seconds": 4.085,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9585d3120b9f124c677fcd6a109c3058535e686fcf42261754fc4a753339a754",
+  "inputsAfter": "9585d3120b9f124c677fcd6a109c3058535e686fcf42261754fc4a753339a754",
+  "outputSha256": "0494ddb031b0985dc1b61a849e4e878d24f3ff25ae8c347f3a88b679081d00da",
+  "outputTail": "\n> build:check\n> tsc -p tsconfig.ci.json\n\n"
+}

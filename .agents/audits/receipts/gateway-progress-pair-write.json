@@ -1,0 +1,14 @@
+{
+  "name": "gateway-progress-pair-write",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write gateway/README.md .agents/notes/implemented/feature/2026-10-21-project-progress-journal.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T22:41:54.237500+00:00",
+  "seconds": 2.583,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4a9d03ed04ce828d016c68cabf58cc8052234364a1c21de1fed23e87437f524f",
+  "inputsAfter": "e77b2b899496cbd2b5008a273bfc1472cf2570b12e46c8fe12ebb9c9c6f68f5f",
+  "postgresToolDirectory": null,
+  "outputSha256": "efaf4332e02c7a87bfbb93f0827978f93eaaf4a275ab16ca6968dceaaedc1d4a",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/feature/2026-10-21-project-progress-journal.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-21-project-progress-journal.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

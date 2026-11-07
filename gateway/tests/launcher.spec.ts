@@ -1,13 +1,12 @@
-import { EventEmitter } from 'node:events'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PassThrough } from 'node:stream'
-import { finished } from 'node:stream/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { RuntimeLog } from '../src/runtime-log.ts'
 import { loadConfig } from '../src/config.ts'
-import { LocalLauncher, SystemdLauncher, selectLauncher, type SystemdLauncherOptions } from '../src/launcher.ts'
+import * as childCommand from '../src/child-command.ts'
+import { LocalLauncher, RuntimeLaunchCleanupError, SystemdLauncher, selectLauncher, type SystemdLauncherOptions } from '../src/launcher.ts'
+
+const CREDENTIAL_HASH = 'a'.repeat(64)
 
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -49,12 +48,228 @@ function systemdOptions(unitDir: string, calls: string[][]): SystemdLauncherOpti
     ],
     credentialDir: join(unitDir, 'credentials'),
     unitDir,
+    commandTimeoutMs: 120000,
     run: async (args) => { calls.push(args) },
+    verifySystemUser: async () => {},
   }
 }
 
 describe('SystemdLauncher', () => {
-  it('writes a per-user confinement unit and restarts any process holding the prior credential', async () => {
+  it.each([
+    { code: 1, reason: 'missing', status: 409, diagnostic: 'RUNTIME_ACCOUNT_NOT_PROVISIONED' },
+    { code: 'ENOENT', reason: 'unavailable', status: 503, diagnostic: 'RUNTIME_ACCOUNT_VERIFICATION_UNAVAILABLE' },
+    { code: 'EACCES', reason: 'unavailable', status: 503, diagnostic: 'RUNTIME_ACCOUNT_VERIFICATION_UNAVAILABLE' },
+    { code: undefined, reason: 'unavailable', status: 503, diagnostic: 'RUNTIME_ACCOUNT_VERIFICATION_UNAVAILABLE' },
+  ])('classifies account lookup $code as $reason before allocating anything', async ({ code, status, diagnostic }) => {
+    const unitDir = temporary('account-lookup-'), calls: string[][] = []
+    const options = systemdOptions(unitDir, calls), beforeAllocation = vi.fn(async () => {})
+    delete options.verifySystemUser
+    const cause = Object.assign(new Error('private command diagnostic'), { code })
+    vi.spyOn(childCommand, 'runGatewayChildCommand').mockRejectedValueOnce(cause)
+    const launcher = new SystemdLauncher(options)
+    await expect(launcher.start({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
+      port: 42001, homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
+      generation: 2, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{}', beforeAllocation,
+    })).rejects.toMatchObject({ name: 'RuntimeAccountError', status, code: diagnostic, cause })
+    expect(beforeAllocation).not.toHaveBeenCalled()
+    expect(calls).toEqual([])
+    expect(existsSync(join(unitDir, 'credentials'))).toBe(false)
+    expect(existsSync(join(unitDir, `harness-alice@2-${CREDENTIAL_HASH}.service`))).toBe(false)
+  })
+
+  it('refuses an unprovisioned account before credentials, units or process admission', async () => {
+    const unitDir = temporary('account-preflight-'), calls: string[][] = []
+    const options = systemdOptions(unitDir, calls), beforeAllocation = vi.fn(async () => {})
+    options.verifySystemUser = async () => { throw new Error('Runtime account is not provisioned') }
+    const launcher = new SystemdLauncher(options)
+    await expect(launcher.start({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
+      port: 42001, homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
+      generation: 2, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{}', beforeAllocation,
+    })).rejects.toThrow('Runtime account is not provisioned')
+    expect(beforeAllocation).not.toHaveBeenCalled()
+    expect(calls).toEqual([])
+    expect(existsSync(join(unitDir, 'credentials'))).toBe(false)
+    expect(existsSync(join(unitDir, `harness-alice@2-${CREDENTIAL_HASH}.service`))).toBe(false)
+  })
+  it.each([1, 'ENOENT', 'EACCES', undefined])('retains an unknown supervisor query failure (%s)', async code => {
+    const unitDir = temporary('units-')
+    const failure = Object.assign(new Error('supervisor unavailable'), { code })
+    const options = systemdOptions(unitDir, [])
+    options.run = async () => { throw failure }
+    const launcher = new SystemdLauncher(options)
+    await expect(launcher.attach({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh', generation: 2, credentialHash: CREDENTIAL_HASH,
+    }).isAlive?.()).rejects.toBe(failure)
+  })
+
+  it.each([3, 4])('accepts systemctl inactive or missing-unit evidence (%s)', async code => {
+    const options = systemdOptions(temporary('units-'), [])
+    options.run = async () => { throw Object.assign(new Error('unit inactive'), { code }) }
+    const launcher = new SystemdLauncher(options)
+    await expect(launcher.attach({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh', generation: 2, credentialHash: CREDENTIAL_HASH,
+    }).isAlive?.()).resolves.toBe(false)
+  })
+
+  it('preserves query errors from an existing legacy unit', async () => {
+    const unitDir = temporary('units-')
+    writeFileSync(join(unitDir, 'harness-alice.service'), 'legacy unit')
+    const options = systemdOptions(unitDir, [])
+    const failure = Object.assign(new Error('supervisor bus unavailable'), { code: 1 })
+    options.run = async args => {
+      if (args.at(-1) === 'harness-alice.service') throw failure
+      throw Object.assign(new Error('unit inactive'), { code: 3 })
+    }
+    const launcher = new SystemdLauncher(options)
+    await expect(launcher.attach({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh', generation: 2, credentialHash: CREDENTIAL_HASH,
+    }).isAlive?.()).rejects.toBe(failure)
+  })
+
+  it('does not restart a prepared unit after its allocation signal is cancelled', async () => {
+    const calls: string[][] = [], controller = new AbortController()
+    const launcher = new SystemdLauncher(systemdOptions(temporary('unit-cancel-'), calls))
+    await expect(launcher.start({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
+      port: 42001, homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
+      generation: 2, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{}', signal: controller.signal,
+      beforeAllocation: async () => { controller.abort() },
+    })).rejects.toMatchObject({ reason: 'cancelled' })
+    expect(calls).toEqual([['daemon-reload']])
+  })
+  it('waits for resource admission after preparing the unit and before systemctl restart', async () => {
+    const unitDir = temporary('units-')
+    const calls: string[][] = []
+    const entered = deferred(), grant = deferred()
+    const launcher = new SystemdLauncher(systemdOptions(unitDir, calls))
+    const pending = launcher.start({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
+      port: 42001, homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
+      generation: 2, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{}',
+      beforeAllocation: async () => { entered.resolve(); await grant.promise },
+    })
+    try {
+      expect(await Promise.race([entered.promise.then(() => 'waiting'), pending.then(() => 'allocated')])).toBe('waiting')
+      expect(calls.map(call => call[0])).toEqual(['daemon-reload'])
+    } finally { grant.resolve(); await pending }
+    expect(calls.map(call => call[0])).toEqual(['daemon-reload', 'restart'])
+  })
+
+  it('can start a fresh credential after a backup restores a previously stopped generation number', async () => {
+    const unitDir = temporary('units-')
+    const calls: string[][] = []
+    const launcher = new SystemdLauncher(systemdOptions(unitDir, calls))
+    const runtime = {
+      kind: 'user' as const, ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh', generation: 2, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{}',
+    }
+    const first = await launcher.start({ ...runtime, credentialHash: 'a'.repeat(64) })
+    await first.terminate(0)
+    await expect(launcher.start({ ...runtime, credentialHash: 'b'.repeat(64) })).resolves.toHaveProperty('terminate')
+  })
+
+  it('keeps a replacement unit running when an older process handle is terminated', async () => {
+    const unitDir = temporary('units-')
+    const active = new Set<string>()
+    const options = systemdOptions(unitDir, [])
+    options.run = async ([operation, ...units]) => {
+      if (operation === 'restart') for (const unit of units) active.add(unit)
+      if (operation === 'stop') for (const unit of units) active.delete(unit)
+    }
+    const launcher = new SystemdLauncher(options)
+    const runtime = {
+      kind: 'user' as const, ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh', credentialHash: CREDENTIAL_HASH, gatewayCredential: '{}',
+    }
+    const old = await launcher.start({ ...runtime, generation: 2 })
+    await launcher.start({ ...runtime, generation: 3 })
+    const oldCredential = /^LoadCredential=dsh-gateway:(.+)$/m.exec(readFileSync(join(unitDir, `harness-alice@2-${CREDENTIAL_HASH}.service`), 'utf8'))![1]!
+    const newCredential = /^LoadCredential=dsh-gateway:(.+)$/m.exec(readFileSync(join(unitDir, `harness-alice@3-${CREDENTIAL_HASH}.service`), 'utf8'))![1]!
+    await old.terminate(0)
+    expect([...active]).toEqual([`harness-alice@3-${CREDENTIAL_HASH}.service`])
+    expect(existsSync(oldCredential)).toBe(false)
+    expect(existsSync(newCredential)).toBe(true)
+  })
+
+  it('retains generation credentials until an independently attached stop is confirmed', async () => {
+    const unitDir = temporary('unit-credential-lifetime-'), calls: string[][] = []
+    const options = systemdOptions(unitDir, calls)
+    const runtime = {
+      kind: 'user' as const, ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
+      generation: 2, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{"token":"fixture"}',
+    }
+    await new SystemdLauncher(options).start(runtime)
+    const source = /^LoadCredential=dsh-gateway:(.+)$/m.exec(readFileSync(join(unitDir, `harness-alice@2-${CREDENTIAL_HASH}.service`), 'utf8'))![1]!
+    options.run = async args => { if (args[0] === 'stop') throw new Error('stop unconfirmed') }
+    await expect(new SystemdLauncher(options).attach(runtime).terminate(0)).rejects.toThrow('stop unconfirmed')
+    expect(readFileSync(source, 'utf8')).toBe(runtime.gatewayCredential)
+    const stopping = deferred(), stopped = deferred()
+    options.run = async args => { if (args[0] === 'stop') { stopping.resolve(); await stopped.promise } }
+    const pending = new SystemdLauncher(options).attach(runtime).terminate(0)
+    try {
+      await stopping.promise
+      expect(existsSync(source)).toBe(true)
+    } finally { stopped.resolve(); await pending }
+    expect(existsSync(source)).toBe(false)
+  })
+
+  it('fences an allocation still waiting for grants before confirming that generation stopped', async () => {
+    const unitDir = temporary('units-')
+    const waitingForGrants = deferred()
+    const finishGrants = deferred()
+    const active = new Set<string>()
+    const options = systemdOptions(unitDir, [])
+    options.grantsProvider = async () => { waitingForGrants.resolve(); await finishGrants.promise; return [] }
+    options.run = async ([operation, ...units]) => {
+      if (operation === 'restart') for (const unit of units) {
+        if (statSync(join(unitDir, unit)).size === 0) throw new Error('unit is masked')
+        active.add(unit)
+      }
+      if (operation === 'stop') for (const unit of units) active.delete(unit)
+    }
+    const launcher = new SystemdLauncher(options)
+    const runtime = {
+      kind: 'user' as const, ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh', generation: 2, credentialHash: CREDENTIAL_HASH,
+    }
+    const pending = launcher.start({ ...runtime, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{}' }).then(() => 'started', () => 'refused')
+    try {
+      await waitingForGrants.promise
+      await launcher.attach(runtime).terminate(0)
+    } finally { finishGrants.resolve() }
+    expect(await pending).toBe('refused')
+    expect([...active]).toEqual([])
+  })
+
+  it('returns a cleanup handle when restart fails after the supervisor may have started a process', async () => {
+    const unitDir = temporary('units-')
+    const calls: string[][] = []
+    const options = systemdOptions(unitDir, calls)
+    options.run = async args => {
+      calls.push(args)
+      if (args[0] === 'restart') throw new Error('supervisor response lost')
+    }
+    const launcher = new SystemdLauncher(options)
+    const failure = await launcher.start({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
+      generation: 2, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{"token":"test"}',
+    }).catch(error => {
+      if (error instanceof RuntimeLaunchCleanupError) return error
+      throw error
+    })
+    expect(failure).toBeInstanceOf(RuntimeLaunchCleanupError)
+    await (failure as RuntimeLaunchCleanupError).process.terminate(0)
+    expect(calls.at(-1)).toEqual(['stop', `harness-alice@2-${CREDENTIAL_HASH}.service`, 'harness-alice.service'])
+  })
+
+  it('writes the generation confinement unit with its private credential', async () => {
     const unitDir = temporary('units-')
     const calls: string[][] = []
     const launcher = new SystemdLauncher(systemdOptions(unitDir, calls))
@@ -62,197 +277,81 @@ describe('SystemdLauncher', () => {
     const proc = await launcher.start({
       kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
       homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
-      generation: 2, gatewayCredential: '{"token":"test"}',
+      generation: 2, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{"token":"test"}',
     })
 
-    const unit = readFileSync(join(unitDir, 'harness-alice.service'), 'utf8')
+    const unit = readFileSync(join(unitDir, `harness-alice@2-${CREDENTIAL_HASH}.service`), 'utf8')
     expect(unit).toContain('TemporaryFileSystem=/srv/harness/users:ro')
+    expect(unit).toContain('Type=exec')
     expect(unit).toContain('BindPaths=/srv/harness/users/alice/home')
     expect(unit).toContain('BindReadOnlyPaths=/data/docs')
     expect(unit).toContain('ExecStart="/usr/local/bin/node" "/opt/dsh/lib/bin.js" "web" "--no-open" "--port" "42001"')
-    expect(calls).toEqual([['daemon-reload'], ['restart', 'harness-alice.service']])
+    expect(calls).toEqual([['daemon-reload'], ['restart', `harness-alice@2-${CREDENTIAL_HASH}.service`]])
+    const credential = /^LoadCredential=dsh-gateway:(.+)$/m.exec(unit)![1]!
+    expect(readFileSync(credential, 'utf8')).toBe('{"token":"test"}')
+    expect(statSync(credential).mode & 0o077).toBe(0)
 
     await proc.terminate(1000)
-    expect(calls).toContainEqual(['stop', 'harness-alice.service'])
+    expect(existsSync(credential)).toBe(false)
+    expect(calls).toContainEqual(['stop', `harness-alice@2-${CREDENTIAL_HASH}.service`, 'harness-alice.service'])
+    expect(statSync(join(unitDir, `harness-alice@2-${CREDENTIAL_HASH}.service`)).size).toBe(0)
     expect(proc.hasExited()).toBe(false)
+  })
+
+  it('rejects a restart arriving after the generation unit was written and then fenced', async () => {
+    const unitDir = temporary('units-')
+    const reloadEntered = deferred()
+    const finishReload = deferred()
+    let firstReload = true
+    const active = new Set<string>()
+    const options = systemdOptions(unitDir, [])
+    options.run = async ([operation, ...units]) => {
+      if (operation === 'daemon-reload' && firstReload) {
+        firstReload = false
+        reloadEntered.resolve()
+        await finishReload.promise
+      }
+      if (operation === 'restart') for (const unit of units) {
+        if (statSync(join(unitDir, unit)).size === 0) throw new Error('unit is masked')
+        active.add(unit)
+      }
+      if (operation === 'stop') for (const unit of units) active.delete(unit)
+    }
+    const launcher = new SystemdLauncher(options)
+    const runtime = {
+      kind: 'user' as const, ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh', generation: 2, credentialHash: CREDENTIAL_HASH,
+    }
+    const pending = launcher.start({ ...runtime, credentialHash: CREDENTIAL_HASH, gatewayCredential: '{}' }).then(() => undefined, error => error)
+    try {
+      await reloadEntered.promise
+      await launcher.attach(runtime).terminate(0)
+    } finally { finishReload.resolve() }
+    const failure: unknown = await pending
+    expect(failure).toBeInstanceOf(RuntimeLaunchCleanupError)
+    await (failure as RuntimeLaunchCleanupError).process.terminate(0)
+    expect([...active]).toEqual([])
   })
 })
 
 describe('LocalLauncher', () => {
-  it('inherits runtime stderr while reserving fd 3 for the private credential', async () => {
+  it('does not allocate an owner before runtime admission completes', async () => {
     spawnMock.mockReset()
-    const credentialPipe = new PassThrough()
-    let credential = ''
-    credentialPipe.on('data', chunk => { credential += String(chunk) })
-    const child = Object.assign(new EventEmitter(), {
-      stdio: [null, null, null, credentialPipe],
-      exitCode: null as number | null,
-      signalCode: null,
-      kill: vi.fn(),
-    })
-    spawnMock.mockReturnValue(child)
-    const cfg = loadConfig({})
-    cfg.dshCommand = ['node', 'runtime.js', '--port', '{port}']
-    cfg.dshRepoRoot = '/srv/harness/repo'
-    const launcher = new LocalLauncher(cfg)
-
-    const proc = await launcher.start({
+    const entered = deferred(), grant = deferred()
+    const cfg = loadConfig({ HGW_STATE_ROOT: temporary('local-admission-') })
+    const root = temporary('local-runtime-')
+    const failure = new Error('admission cancelled')
+    const pending = new LocalLauncher(cfg).start({
       kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
-      port: 42001, homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
-      generation: 2, gatewayCredential: '{"token":"test"}',
-    })
-
-    expect(spawnMock).toHaveBeenCalledWith('node', ['runtime.js', '--port', '42001'], expect.objectContaining({
-      cwd: '/srv/harness/users/alice/home',
-      stdio: ['ignore', 'pipe', 'pipe', 'pipe'],
-      env: expect.objectContaining({
-        HOME: '/srv/harness/users/alice/home',
-        DSH_GATEWAY_CREDENTIAL_FD: '3',
-      }),
-    }))
-    expect(credential).toBe('{"token":"test"}')
-    child.exitCode = 0
-    child.emit('exit', 0)
-    child.emit('close', 0)
-    await proc.terminate(0)
+      port: 42001, homePath: root, dshHome: root, generation: 2, credentialHash: CREDENTIAL_HASH,
+      gatewayCredential: '{}', beforeAllocation: async () => { entered.resolve(); await grant.promise; throw failure },
+    }).catch(error => error)
+    await entered.promise
+    expect(spawnMock).not.toHaveBeenCalled()
+    grant.resolve()
+    expect(await pending).toBe(failure)
+    expect(spawnMock).not.toHaveBeenCalled()
   })
-
-  it('drains both runtime streams into bounded generations while preserving each stream order', async () => {
-    spawnMock.mockReset()
-    const stdout = new PassThrough()
-    const stderr = new PassThrough()
-    const credentialPipe = new PassThrough()
-    credentialPipe.on('data', () => {})
-    const child = Object.assign(new EventEmitter(), {
-      stdio: [null, stdout, stderr, credentialPipe],
-      exitCode: null as number | null,
-      signalCode: null,
-      kill: vi.fn(),
-    })
-    spawnMock.mockReturnValue(child)
-    const dshHome = temporary('dsh-home-')
-    const cfg = loadConfig({})
-    cfg.dshCommand = ['node', 'runtime.js', '--port', '{port}']
-    cfg.dshRepoRoot = '/srv/harness/repo'
-    cfg.runtimeLogCapBytes = 16
-    mkdirSync(join(dshHome, 'logs'), { recursive: true })
-    writeFileSync(join(dshHome, 'logs', 'runtime.log'), 'already-oversized', 'utf8')
-    const central = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-    const launcher = new LocalLauncher(cfg)
-
-    const proc = await launcher.start({
-      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
-      port: 42001, homePath: '/srv/harness/users/alice/home', dshHome,
-      generation: 2, gatewayCredential: '{"token":"test"}',
-    })
-
-    // The writer opens lazily: nothing touches the log dir before first output.
-    expect(existsSync(join(dshHome, 'logs', 'runtime.log.1'))).toBe(false)
-    stdout.end('out1\nout2\n')
-    stderr.end('err1\nerr2\n')
-    await Promise.all([finished(stdout), finished(stderr)])
-    child.exitCode = 0
-    child.emit('exit', 0)
-    child.emit('close', 0)
-    await proc.terminate(1000)
-    const previous = join(dshHome, 'logs', 'runtime.log.1'), current = join(dshHome, 'logs', 'runtime.log')
-    expect(statSync(previous).size).toBeLessThanOrEqual(cfg.runtimeLogCapBytes)
-    expect(statSync(current).size).toBeLessThanOrEqual(cfg.runtimeLogCapBytes)
-    const retained = readFileSync(previous, 'utf8') + readFileSync(current, 'utf8')
-    expect(retained).toHaveLength(20)
-    for (const prefix of ['out', 'err']) {
-      expect(retained.indexOf(`${prefix}1\n`)).toBeGreaterThanOrEqual(0)
-      expect(retained.indexOf(`${prefix}2\n`)).toBeGreaterThan(retained.indexOf(`${prefix}1\n`))
-    }
-    expect(central).toHaveBeenCalled()
-  })
-
-  it('waits for diagnostic file closure before reporting a real child terminated', async () => {
-    const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process')
-    spawnMock.mockImplementation(actual.spawn)
-    const dshHome = temporary('dsh-log-close-')
-    const cfg = loadConfig({})
-    cfg.dshCommand = [process.execPath, '-e', 'require("node:fs").readFileSync(3);process.stdout.write("ready\\n");setInterval(()=>{},1000)']
-    const original = RuntimeLog.prototype.close
-    const entered = deferred(), release = deferred()
-    vi.spyOn(RuntimeLog.prototype, 'close').mockImplementation(function (this: RuntimeLog) {
-      entered.resolve()
-      return release.promise.then(() => original.call(this))
-    })
-    const proc = await new LocalLauncher(cfg).start({
-      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
-      port: 42001, homePath: dshHome, dshHome, generation: 2, gatewayCredential: '{"token":"test"}',
-    })
-    let termination: Promise<void> | undefined
-    try {
-      await vi.waitFor(() => expect(readFileSync(join(dshHome, 'logs', 'runtime.log'), 'utf8')).toBe('ready\n'))
-      let completed = false
-      termination = proc.terminate(1000).then(() => { completed = true })
-      await entered.promise
-      await new Promise<void>(resolve => setImmediate(resolve))
-      expect(completed).toBe(false)
-      release.resolve()
-      await termination
-      expect(completed).toBe(true)
-    } finally {
-      release.resolve()
-      await (termination ?? proc.terminate(0))
-    }
-  })
-
-  // LocalLauncher uses detached POSIX groups; taskkill cannot rediscover an
-  // exited parent by PID, so this inherited-pipe case is POSIX-specific.
-  it.skipIf(process.platform === 'win32')('restarts after an exited parent leaves a descendant holding its log pipes', async () => {
-    const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process')
-    spawnMock.mockImplementation(actual.spawn)
-    const dshHome = temporary('dsh-log-orphan-')
-    const pidPath = join(dshHome, 'orphan.pid')
-    const cfg = loadConfig({})
-    cfg.dshCommand = [process.execPath, '-e', `
-      const fs = require('node:fs'), { spawn } = require('node:child_process');
-      const credential = JSON.parse(fs.readFileSync(3, 'utf8'));
-      if (credential.first) {
-        const child = spawn(process.execPath, ['-e', 'process.send("ready"); setInterval(()=>{},1000)'],
-          { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] });
-        fs.writeFileSync(${JSON.stringify(pidPath)}, String(child.pid));
-        child.once('message', () => process.exit(0));
-      } else {
-        process.stdout.write('replacement-ready');
-        setInterval(()=>{},1000);
-      }
-    `]
-    const launcher = new LocalLauncher(cfg)
-    const runtime = { kind: 'user' as const, ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
-      port: 42001, homePath: dshHome, dshHome, generation: 2 }
-    const first = await launcher.start({ ...runtime, gatewayCredential: '{"first":true}' })
-    let second: Awaited<ReturnType<LocalLauncher['start']>> | undefined
-    let pending: Promise<Awaited<ReturnType<LocalLauncher['start']>>> | undefined
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    try {
-      await vi.waitFor(() => expect(first.hasExited()).toBe(true))
-      const orphanPid = Number(readFileSync(pidPath, 'utf8'))
-      expect(() => process.kill(orphanPid, 0)).not.toThrow()
-      pending = launcher.start({ ...runtime, generation: 3, gatewayCredential: '{"first":false}' })
-      second = await Promise.race([pending, new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error('replacement launch stayed blocked by an exited parent')), 5000)
-      })])
-      clearTimeout(timeout)
-      await vi.waitFor(() => expect(readFileSync(join(dshHome, 'logs', 'runtime.log'), 'utf8')).toContain('replacement-ready'))
-      expect(() => process.kill(orphanPid, 0)).toThrow()
-    } finally {
-      clearTimeout(timeout)
-      if (existsSync(pidPath)) {
-        const pid = Number(readFileSync(pidPath, 'utf8'))
-        try { process.kill(pid, 'SIGKILL') } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
-        }
-      }
-      await first.terminate(0)
-      const replacement = second ?? await pending
-      await replacement?.terminate(0)
-    }
-  })
-
 })
 
 describe('selectLauncher', () => {

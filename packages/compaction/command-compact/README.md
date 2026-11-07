@@ -49,6 +49,8 @@ The command turns each expected failure into a stable message you can show direc
 
 Cancelling the command stops the wait: the backend finishes its required cleanup, and the command settles as `Compaction cancelled.` while the UI stops waiting. Failures other than these expected cases surface as errors rather than being silently converted.
 
+In a managed deployment, `/compact` attests the current command caller before entering the engine. Execution permission, resource admission and summary usage belong to that caller while retaining the history participants' restrictions. Missing required authority, cancellation during authorization, or provider replacement prevents engine entry. Independent local compositions can omit execution authority.
+
 ### Composing the command
 
 Mount the command registry, one condensation backend, and this plugin:
@@ -109,7 +111,7 @@ Read these pages when the package-level contract is not enough; they move from t
 - [Compaction basic backend](../compaction-basic/README.md) — the shipped backend that condenses automatically and on demand.
 - [Commands package](../../interaction/commands/README.md) — the registry and dispatch contract behind chat commands.
 - [Compaction subsystem reference](../../../docs/subsystems/compaction.md) — the condensation vocabulary, results, and service behavior.
-- [Queued manual compaction Agent Note](../../../.agents/notes/implemented/feature/2026-07-30-queued-manual-compaction.md) — how on-demand condensation serializes against running turns.
+- [Queued manual compaction reference](../compaction/README.md) — how on-demand condensation serializes against running turns.
 
 -----
 

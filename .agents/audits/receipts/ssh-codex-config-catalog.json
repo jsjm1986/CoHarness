@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-config-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-config-catalog.ts",
+  "startedAt": "2026-10-25T12:33:53.123581+00:00",
+  "seconds": 3.763,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4ec14dcb9a48d99a3fd4a789051b7db2011757e8a0daaed8efe02ca7ed7b0cd5",
+  "inputsAfter": "4ec14dcb9a48d99a3fd4a789051b7db2011757e8a0daaed8efe02ca7ed7b0cd5",
+  "postgresToolDirectory": null,
+  "outputSha256": "7250b71e630a06b4c1dab97dd4706e27f169c9ea4ffe628f7fb3d315122bf8c8",
+  "outputTail": "gen-config-catalog: 3 artifact(s) computed, 3 written.\n"
+}

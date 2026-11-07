@@ -9,8 +9,8 @@ import { resolveInspectorOptions, type InspectorOptions } from './host/bridge/co
 import type { CordisRuntimeTreeReader } from './shared/cordis/reader.ts'
 import type { InspectorJsonValue } from './shared/json.ts'
 
-export { resolveInspectorOptions, startInspector } from './host/plugin.ts'
-export type { InspectorEndpoint, InspectorHandle, InspectorOptions, InspectorSpec } from './host/plugin.ts'
+export { InspectorStartupCleanupError, resolveInspectorOptions, startInspector } from './host/plugin.ts'
+export type { InspectorAdmission, InspectorEndpoint, InspectorHandle, InspectorOptions, InspectorSpec } from './host/plugin.ts'
 export type { CordisRuntimeTreeReader } from './shared/cordis/reader.ts'
 export type {
   CordisRuntimeConnection,
@@ -102,6 +102,7 @@ export const Config: z<Config> = z.object({
  * Start inspection when enabled; the hidden --inspect flag also opens the Host debugging window.
  * @param ctx - Host Cordis plugin context.
  * @param config - Validated Inspector configuration.
+ * @throws When execution authority is present or required; the debugger grants unrestricted Host and Client access.
  */
 export async function apply(ctx: Context, config: Config): Promise<void> {
   await applyHost(ctx, config)

@@ -1,8 +1,10 @@
+import { backfillConversationQueryFieldsV1 } from './conversation-query-migration-v1.ts'
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
+import { GatewayPostgresClient } from './client.ts'
 
 const MIGRATION_LOCK_KEY = 0x48475750
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -50,9 +52,99 @@ export interface GatewayPoolConfig extends PoolConfig {
 interface CheckoutState {
   pending: number
   limit: number
+  rejected: number
 }
 
 const checkoutStates = new WeakMap<Pool, CheckoutState>()
+
+/** Node-local checkout admission; rejected is cumulative for this pool's lifetime. */
+export interface PostgresPoolAdmissionSnapshot {
+  /** Unsettled checkout operations, including connections still being established. */
+  readonly pending: number
+  readonly maxPending: number
+  readonly rejected: number
+}
+
+/**
+ * Read checkout admission without exposing SQL, connection strings or caller identities.
+ * @param pool - Gateway-created pool or an injected pool adopted by connectFromPool.
+ * @returns Current pending count, configured limit and cumulative refusals; null before an injected pool is adopted.
+ */
+export function poolAdmissionSnapshot(pool: Pool): PostgresPoolAdmissionSnapshot | null {
+  const state = checkoutStates.get(pool)
+  return state === undefined ? null : { pending: state.pending, maxPending: state.limit, rejected: state.rejected }
+}
+
+/** An unresolved checkout was refused before entering pg's pending queue. */
+export class PostgresCheckoutQueueFullError extends Error {
+  readonly code = 'DB_CHECKOUT_QUEUE_FULL'
+  /** @param limit - configured unresolved-checkout capacity. */
+  constructor(readonly limit: number) {
+    super('PostgreSQL checkout queue is full (' + String(limit) + ')')
+    this.name = 'PostgresCheckoutQueueFullError'
+  }
+}
+
+function checkoutQueueFull(state: CheckoutState): PostgresCheckoutQueueFullError {
+  state.rejected += 1
+  return new PostgresCheckoutQueueFullError(state.limit)
+}
+
+type CheckoutCallback = Parameters<Pool['connect']>[0]
+
+/** pg.query uses this.connect, so one override owns admission for every native checkout entry. */
+class GatewayPostgresPool extends Pool {
+  private readonly checkout: CheckoutState
+
+  constructor(options: PoolConfig, limit: number) {
+    super(options)
+    this.checkout = { pending: 0, limit, rejected: 0 }
+    checkoutStates.set(this, this.checkout)
+  }
+
+  override connect(): Promise<PoolClient>
+  override connect(callback: CheckoutCallback): void
+  override connect(callback?: CheckoutCallback): Promise<PoolClient> | void {
+    if (this.ending) return callback === undefined ? super.connect() : super.connect(callback)
+    if (this.checkout.pending >= this.checkout.limit) {
+      const error = checkoutQueueFull(this.checkout)
+      if (callback === undefined) return Promise.reject(error)
+      queueMicrotask(() => { callback(error, undefined, () => {}) })
+      return
+    }
+    this.checkout.pending += 1
+    let settled = false
+    const settle = (): void => {
+      if (settled) return
+      settled = true
+      this.checkout.pending -= 1
+    }
+    if (callback !== undefined) {
+      try {
+        super.connect((error, client, release) => {
+          settle()
+          callback(error, client === undefined ? undefined : guardCheckedOutClient(client), release)
+        })
+      } catch (error) {
+        settle()
+        throw error
+      }
+      return
+    }
+    let connecting: Promise<PoolClient>
+    try { connecting = super.connect() } catch (error) {
+      settle()
+      return Promise.reject(error)
+    }
+    return connecting.then(client => {
+      settle()
+      return guardCheckedOutClient(client)
+    }, error => {
+      settle()
+      throw error
+    })
+  }
+}
 
 function checkoutLimit(value: number | undefined): number {
   const resolved = value ?? DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE
@@ -82,7 +174,7 @@ export async function databaseUrlFromFile(env: NodeJS.ProcessEnv = process.env):
 export function createPostgresPool(connectionString: string, overrides: GatewayPoolConfig = {}): Pool {
   const { maxCheckoutQueue, ...poolOverrides } = overrides
   const checkoutQueueLimit = checkoutLimit(maxCheckoutQueue)
-  const pool = new Pool({
+  const pool = new GatewayPostgresPool({
     connectionString,
     max: 10,
     idleTimeoutMillis: 30_000,
@@ -91,9 +183,9 @@ export function createPostgresPool(connectionString: string, overrides: GatewayP
     statement_timeout: DEFAULT_DATABASE_STATEMENT_TIMEOUT_MS,
     lock_timeout: DEFAULT_DATABASE_LOCK_TIMEOUT_MS,
     idle_in_transaction_session_timeout: DEFAULT_DATABASE_IDLE_TRANSACTION_TIMEOUT_MS,
+    Client: GatewayPostgresClient,
     ...poolOverrides,
-  })
-  checkoutStates.set(pool, { pending: 0, limit: checkoutQueueLimit })
+  }, checkoutQueueLimit)
   // `pg.Pool` emits an `error` event when an idle client is terminated by the
   // server or network.  Without a listener Node treats that event as
   // uncaught and takes the Gateway down, even though a later checkout could
@@ -130,20 +222,18 @@ function guardCheckedOutClient(client: PoolClient): PoolClient {
 
 /**
  * Acquire one pool client with the checkout `error` guard attached and the
- * bounded pg-pool wait list enforced. Callers that manage their own
- * BEGIN/COMMIT lifecycle (rather than {@link transaction}) must check out
- * through here so a server-side kill can never reach the process as an
- * unhandled `error` event.
+ * bounded unresolved-checkout count enforced. Gateway-created pools apply
+ * both protections to their native connect and query entries; this helper
+ * also adopts externally supplied pools for transaction callers.
  */
 export function connectFromPool(pool: Pool): Promise<PoolClient> {
+  if (pool instanceof GatewayPostgresPool) return pool.connect()
   const state = checkoutStates.get(pool)
   /* v8 ignore next -- every production pool is created by createPostgresPool; the
      fallback keeps transaction tests and injected pools compatible. */
-  const current = state ?? { pending: 0, limit: DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE }
+  const current = state ?? { pending: 0, limit: DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE, rejected: 0 }
   if (current.pending >= current.limit) {
-    const error = new Error(`PostgreSQL checkout queue is full (${String(current.limit)})`)
-    Object.assign(error, { code: 'DB_CHECKOUT_QUEUE_FULL' })
-    return Promise.reject(error)
+    return Promise.reject(checkoutQueueFull(current))
   }
   current.pending += 1
   if (state === undefined) checkoutStates.set(pool, current)
@@ -168,6 +258,17 @@ function errorCode(error: unknown): string | undefined {
 /** Return a non-secret database error code suitable for operational logs. */
 export function errorCodeForDiagnostics(error: unknown): string {
   return errorCode(error) ?? 'unknown'
+}
+
+/**
+ * Recognize a bounded statement or transaction refused by PostgreSQL contention.
+ * This classification never permits replay of an operation with an unknown commit result.
+ * @param error - failure returned by the database driver.
+ * @returns whether the caller can report temporary unavailability without disclosing SQL.
+ */
+export function isDatabaseContentionError(error: unknown): boolean {
+  const code = errorCode(error)
+  return code === '55P03' || code === '57014' || code === '40P01' || code === '40001'
 }
 
 /** Whether one startup failure can reasonably clear without changing configuration. */
@@ -257,7 +358,6 @@ async function connectWithSignal(pool: Pool, signal?: AbortSignal): Promise<Pool
       settled = true
       cleanup()
       reject(signal.reason instanceof Error ? signal.reason : new Error('database checkout aborted'))
-      void connecting.then(client => { client.release() }, () => {})
     }
     signal.addEventListener('abort', onAbort, { once: true })
     if (signal.aborted) onAbort()
@@ -281,16 +381,35 @@ async function connectWithSignal(pool: Pool, signal?: AbortSignal): Promise<Pool
   })
 }
 
+/** Per-transaction lock waiting; all other pool timeout settings remain effective. */
+export interface PostgresTransactionOptions {
+  /** Use the statement timeout for expected serialized work; an unlimited statement retains the pool lock timeout. */
+  readonly lockWait?: 'statement'
+}
+
+/**
+ * Commit one operation on an owned client; a failed operation is never replayed.
+ * @param pool - database connection pool.
+ * @param operation - database work retaining its client until settlement.
+ * @param signal - optional cancellation checked before committing.
+ * @param options - lock waiting for work that deliberately serializes with other transactions.
+ * @returns the operation result after commit acknowledgement.
+ */
 export async function transaction<T>(
   pool: Pool,
   operation: (client: PoolClient) => Promise<T>,
   signal?: AbortSignal,
+  options?: PostgresTransactionOptions,
 ): Promise<T> {
   const client = await connectWithSignal(pool, signal)
   let failure: Error | null = null
   try {
     signal?.throwIfAborted()
     await client.query('BEGIN')
+    if (options?.lockWait === 'statement') {
+      await client.query(`SELECT set_config('lock_timeout',CASE WHEN current_setting('statement_timeout')='0'
+        THEN current_setting('lock_timeout') ELSE current_setting('statement_timeout') END,true)`)
+    }
     signal?.throwIfAborted()
     const result = await operation(client)
     signal?.throwIfAborted()
@@ -374,7 +493,12 @@ export async function migrationPlan(pool: Pool, directory: string): Promise<Migr
   return { applied, pending, drifted, current: migrations.at(-1)?.version ?? 0 }
 }
 
-/** Apply immutable SQL migrations under one PostgreSQL advisory lock. */
+/**
+ * Apply checksummed SQL and associated versioned backfills in atomic migration transactions.
+ * @param pool - database whose advisory lock serializes all migration runners.
+ * @param directory - complete, immutable SQL migration sequence matching this Gateway.
+ * @returns versions applied by this runner and the latest supported version.
+ */
 export async function runMigrations(pool: Pool, directory: string): Promise<{ applied: number[]; current: number }> {
   const migrations = await migrationFiles(directory)
   const client = await connectFromPool(pool)
@@ -423,6 +547,7 @@ export async function runMigrations(pool: Pool, directory: string): Promise<{ ap
       await client.query('BEGIN')
       try {
         await client.query(migration.sql)
+        if (migration.version === 100) await backfillConversationQueryFieldsV1(client)
         await client.query(
           'INSERT INTO harness.schema_migrations(version,name,checksum) VALUES($1,$2,$3)',
           [migration.version, migration.name, migration.checksum],

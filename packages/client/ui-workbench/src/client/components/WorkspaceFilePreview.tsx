@@ -6,7 +6,8 @@ import { isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { ZoomViewport, zoomSurfaceClass } from '../contract/zoom/ZoomViewport.tsx'
 import { FIT_WIDTH, type ZoomLabels, type ZoomPreference } from '../contract/zoom/types.ts'
-import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import type { WorkspacePreviewActionLabels, WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import { WorkspacePreviewActions } from './WorkspacePreviewActions.tsx'
 import css from './Workbench.module.css'
 
 /** Read one versioned page from the resource's explicit runtime. */
@@ -46,9 +47,7 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
    * absent when the serving Host cannot open native paths (remote/Gateway).
    */
   nativeOpen?: (() => Promise<void>) | undefined
-  labels: {
-    close: string
-    reload: string
+  labels: WorkspacePreviewActionLabels & {
     previous: string
     next: string
     loading: string
@@ -73,25 +72,24 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
   const [error, setError] = useState<Error>()
   const [rawBytes, setRawBytes] = useState<string>()
   const [reloading, setReloading] = useState(false)
-  const [source, setSource] = useState<{ version: string; bytes: number | undefined }>()
-  const completed = useRef<string | undefined>(undefined)
+  const [source, setSource] = useState<{ version: string; bytes: number | undefined; revision: number }>()
+  const settled = useRef<string | undefined>(undefined)
   const denied = metadata.accessDenied || isWorkspaceAccessFailure(error)
   // A retained page or binary read keeps its own source version and size
   // estimate while the resource reports a changed successor, so a revalidation
   // publication cannot re-read the already displayed content.
-  const retained = metadata.value?.changed === true && source !== undefined
+  const retained = metadata.value?.changed === true && source?.revision === revision
   const version = retained ? source.version : metadata.value?.version
   const byteEstimate = retained ? source.bytes : metadata.value?.bytes
   const imageType = imageMime(request.path)
   useEffect(() => {
-    if (denied) { setPage(undefined); setSource(undefined); completed.current = undefined; return }
+    if (denied) { setPage(undefined); setRawBytes(undefined); setSource(undefined); settled.current = undefined; return }
     // The user's metadata reload owns this transition: while its stat is open,
     // the still-old snapshot cannot authorize a new content read.
-    if (reloading) return
+    if (reloading || metadata.status !== 'live') { setPending(false); return }
     if (version === undefined) return
     const key = `${version}:${String(offset)}:${String(revision)}`
-    /* v8 ignore next -- a completed key is only revisited after a parent changes its reader identity. */
-    if (completed.current === key) return
+    if (settled.current === key) return
     const abort = new AbortController()
     const isCancelled = (): boolean => abort.signal.aborted
     setPending(true)
@@ -103,28 +101,30 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
       try {
         const bytes = await readBytes({ resource: request, offset: 0, length: byteEstimate, version }, abort.signal)
         if (isCancelled()) return
+        settled.current = key
         setRawBytes(bytes.bytes)
         setPage(undefined)
-        setSource({ version, bytes: byteEstimate })
+        setSource({ version, bytes: byteEstimate, revision })
         setError(undefined)
       } catch (byteCause: unknown) {
         if (isCancelled()) return
         const byteFailure = byteCause instanceof Error ? byteCause : new Error(String(byteCause))
+        settled.current = key
         setError(byteFailure)
         if (isWorkspaceAccessFailure(byteFailure)) revoke(byteFailure.message)
       }
     }
-    const settled = () => { if (!isCancelled()) setPending(false) }
+    const finish = () => { if (!isCancelled()) setPending(false) }
     if (imageType !== undefined && readBytes !== undefined && byteEstimate !== undefined) {
-      void loadBytes().finally(settled)
+      void loadBytes().finally(finish)
       return () => { abort.abort() }
     }
     void read({ resource: request, offset, version }, abort.signal).then((value) => {
       if (isCancelled()) return
-      completed.current = key
+      settled.current = key
       setRawBytes(undefined)
       setPage(value)
-      setSource({ version, bytes: byteEstimate })
+      setSource({ version, bytes: byteEstimate, revision })
     }, async (cause: unknown) => {
       if (isCancelled()) return
       const failure = cause instanceof Error ? cause : new Error(String(cause))
@@ -133,24 +133,24 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
         await loadBytes()
         return
       }
+      settled.current = key
       setError(failure)
       if (isWorkspaceAccessFailure(failure)) revoke(failure.message)
-    }).finally(settled)
+    }).finally(finish)
     return () => { abort.abort() }
-  }, [denied, version, request, offset, read, readBytes, revision, revoke, byteEstimate, reloading, imageType])
+  }, [denied, version, request, offset, read, readBytes, revision, revoke, byteEstimate, reloading, imageType, metadata.status])
   const reload = async (): Promise<void> => {
     setReloading(true)
+    setError(undefined)
     try {
-      await resource.reload()
+      if (!await resource.reload()) return
       setError(undefined)
-      setRawBytes(undefined)
-      setSource(undefined)
       setRevision(value => value + 1)
     } finally {
       setReloading(false)
     }
   }
-  const changed = metadata.value?.changed === true
+  const changed = metadata.value?.changed === true || (source !== undefined && source.version !== metadata.value?.version)
   /* v8 ignore next -- CSS modules always provide this generated class in a built client. */
   const previewClass = css.filePreview ?? ''
   const message = error?.message ?? metadata.error?.message
@@ -166,10 +166,9 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
   const zoomSection = image ? ` ${css.filePreviewZoom ?? ''}` : ''
   return (
     <section aria-label={request.path} className={previewClass + zoomSection}>
-      <div className={css.filePreviewActions}>
-        <Button size="sm" onClick={close}>{labels.close}</Button>
-        <Button size="sm" disabled={pending || metadata.status === 'loading' || denied || reloading}
-          onClick={() => { void reload() }}>{labels.reload}</Button>
+      <WorkspacePreviewActions close={close} reload={reload}
+        disabled={pending || metadata.status === 'loading' || denied || reloading} denied={denied}
+        hasContent={page !== undefined || rawBytes !== undefined} failure={error ?? metadata.error} message={message} labels={labels}>
         {page !== undefined && (
           <>
             <Button size="sm" disabled={pending || changed || denied || offset <= 1}
@@ -182,12 +181,11 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
             </Button>
           </>
         )}
-      </div>
-      {message !== undefined && <p role="alert">{message}</p>}
+      </WorkspacePreviewActions>
       {changed && !denied && <p role="status" data-workspace-file-changed>{labels.changed}</p>}
       {(pending || metadata.status === 'loading') && page === undefined && <p role="status">{labels.loading}</p>}
       {image && (
-        <PreviewImage key={version ?? ''} path={request.path} bytes={rawBytes} mediaType={imageType}
+        <PreviewImage key={source?.version ?? version ?? ''} path={request.path} bytes={rawBytes} mediaType={imageType}
           preference={preference} onPreference={setZoomPreference} labels={zoomLabels}
           status={labels.loading} failure={labels.imageFailed} alt={labels.imageAlt}
           signal={lifetime.signal} />

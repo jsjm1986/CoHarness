@@ -5,15 +5,21 @@ import { createWorkbenchStore } from '../src/client/stores.ts'
 describe('workbench chooser store', () => {
   it('tracks picker and browser state independently', () => {
     const inst = createWorkbenchStore().create()
-    expect(inst.store.getSnapshot()).toEqual({ workbenchMenuOpen: false, pickerOpen: false, replace: false, browser: undefined })
+    expect(inst.store.getSnapshot()).toEqual({
+      workbenchMenuOpen: false, pickerOpen: false, pickerOpening: 0, replace: false, browser: undefined,
+    })
     inst.actions.toggleWorkbenchMenu()
     expect(inst.store.getSnapshot().workbenchMenuOpen).toBe(true)
     inst.actions.closeWorkbenchMenu()
     expect(inst.store.getSnapshot().workbenchMenuOpen).toBe(false)
     inst.actions.openPicker(true)
-    expect(inst.store.getSnapshot()).toMatchObject({ pickerOpen: true, replace: true })
+    expect(inst.store.getSnapshot()).toMatchObject({ pickerOpen: true, pickerOpening: 1, replace: true })
+    inst.actions.openPicker()
+    expect(inst.store.getSnapshot().pickerOpening).toBe(1)
     inst.actions.closePicker()
-    expect(inst.store.getSnapshot()).toMatchObject({ pickerOpen: false, replace: true })
+    expect(inst.store.getSnapshot()).toMatchObject({ pickerOpen: false, pickerOpening: 1, replace: false })
+    inst.actions.openPicker(true)
+    expect(inst.store.getSnapshot().pickerOpening).toBe(2)
     const owner = { sessionId: 's' as SessionId, runtimeTarget: { kind: 'project' as const, projectId: 3 } }
     inst.actions.openBrowser(owner)
     expect(inst.store.getSnapshot().browser).toBe(owner)

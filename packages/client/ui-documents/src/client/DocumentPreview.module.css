@@ -1,129 +1,58 @@
-/* Document preview dialog: same portal width as the manager, media clipped
-   to the viewport. Compact fills the bottom sheet beneath the title. */
-
-.dialog {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  width: min(960px, 100%);
-  min-height: min(640px, calc(var(--dsw-viewport-height, 100vh) - 48px));
-  max-height: min(860px, calc(var(--dsw-viewport-height, 100vh) - 48px));
+/* The manager owns preview selection; this surface only reads the chosen media. */
+.inline { display: flex; flex: 0 0 336px; min-width: 0; min-height: 0; overflow: hidden; background: var(--dsw-alias-bg-layer-1); border-left: 0.5px solid var(--dsw-alias-border-l2); }
+.surface { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
+.header { display: flex; flex: none; align-items: flex-start; gap: var(--dsw-space-2); padding: var(--dsw-space-3); }
+.heading { flex: 1 1 auto; min-width: 0; }
+.heading h3 { margin: 0; font-size: 13px; font-weight: 500; line-height: 20px; overflow-wrap: anywhere; }
+.heading p { margin: 3px 0 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.close { flex: none; width: 32px; min-height: 32px; padding: 0; margin-top: -4px; }
+.body { --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--dsw-space-3); min-height: 0; margin: 0 var(--dsw-space-3) var(--dsw-space-3); padding: var(--dsw-space-3); border-radius: var(--dsw-radius-md); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: var(--dsw-alias-bg-layer-2); }
+.status { margin: auto; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; text-align: center; }
+.download { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 36px; padding: 0 var(--dsw-space-3); border-radius: var(--dsw-radius-control); color: var(--dsw-alias-label-primary); font-size: 13px; text-decoration: none; background: var(--dsw-alias-interactive-bg-hover); }
+.image { display: block; width: 100%; height: auto; object-fit: contain; }
+.frame { flex: 1 1 auto; width: 100%; min-height: 300px; border: 0; background: var(--dsw-alias-bg-layer-1); }
+.text { overflow: visible; margin: 0; color: var(--dsw-alias-label-primary); font-family: var(--ds-font-family-code); font-size: 12px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.actions { flex: none; display: flex; flex-direction: column; gap: var(--dsw-space-2); padding: var(--dsw-space-3); border-top: 0.5px solid var(--dsw-alias-border-l2); }
+.loading { display: flex; flex-direction: column; gap: var(--dsw-space-3); padding: var(--dsw-space-3); }
+.loading span { height: 14px; width: 90%; border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-interactive-bg-hover); }
+.loading span:nth-child(2) { width: 70%; }
+.dialog { display: flex; flex-direction: column; box-sizing: border-box; width: min(960px, 100%); min-height: min(640px, calc(var(--dsw-viewport-height, 100vh) - 48px)); max-height: min(860px, calc(var(--dsw-viewport-height, 100vh) - 48px)); padding: 0; gap: 0; overflow: hidden; }
+@media (min-width: 768px) and (max-width: 1023px) { .inline { flex-basis: 280px; } }
+@media (pointer: coarse) { .close, .download { min-height: var(--dsw-touch-target); } .close { width: var(--dsw-touch-target); } }
+@media (max-width: 767px) {
+  .dialog.dialog { width: 100%; height: 100%; min-height: 0; max-height: 100%; padding: 0; gap: 0; border-radius: 0; animation: none; }
+  .header { min-height: 64px; padding: var(--dsw-space-3); border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+  .heading h3 { font-size: 14px; line-height: 21px; }
+  .close { width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); margin: -4px 0 0 -4px; }
+  .body { margin: var(--dsw-space-3); }
+  .text { font-size: 13px; }
+  .actions { padding-bottom: calc(var(--dsw-space-3) + var(--dsw-safe-bottom)); }
 }
+@media (hover: hover) { .download:hover { background: var(--dsw-alias-interactive-bg-active); } }
 
-.shell {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
+.fileTypeIcon { flex: none; margin-top: 1px; }
 
-.shell > :last-child {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  width: 100%;
-  margin-top: 0;
-  padding: 0;
-  overflow: hidden;
+.body:has(> .frame) { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
+.frame { min-height: 0; height: 100%; }
+@media (max-width: 767px) {
+  .dialog.dialog { width: 100%; height: 100%; min-height: 0; max-height: 100%; padding: 0; gap: 0; border-radius: 0; animation: none; }
+  .header { min-height: 64px; padding: var(--dsw-space-3); border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+  .heading h3 { font-size: 14px; line-height: 21px; }
+  .close { width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); margin: -4px 0 0 -4px; }
+  .body { margin: var(--dsw-space-3); }
+  .text { font-size: 13px; }
+  .actions { padding-bottom: calc(var(--dsw-space-3) + var(--dsw-safe-bottom)); }
 }
+@media (hover: hover) { .download:hover { background: var(--dsw-alias-interactive-bg-active); } }
 
-.shell > :first-child {
-  min-height: 48px;
-  padding: 12px var(--dsw-space-4) 8px;
-}
+.fileTypeIcon { flex: none; margin-top: 1px; }
 
-.body {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  overflow: auto;
-  scrollbar-gutter: stable;
-  overscroll-behavior: contain;
-}
-
-.status {
-  margin: 0;
-  color: var(--dsw-alias-label-caption);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.download {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--dsw-touch-target);
-  width: fit-content;
-  padding: 0 var(--dsw-space-3);
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-md);
-  color: var(--dsw-alias-label-primary);
-  text-decoration: none;
-}
-
-.download:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.image {
-  display: block;
-  margin: 0 auto;
-  max-width: 100%;
-  max-height: 60dvh;
-  height: auto;
-  object-fit: contain;
-}
-
-.frame,
-.text {
-  box-sizing: border-box;
-  width: 100%;
-  height: auto;
-  min-height: 100%;
-  margin: 0;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1);
-}
-
-.text {
-  padding: var(--dsw-space-3);
-  overflow: visible;
-  color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  line-height: 18px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
+.body:has(> .frame) { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
+.frame { min-height: 0; height: 100%; }
 
 @media (max-width: 767px) {
-  .dialog.dialog {
-    width: 100%;
-    min-height: 0;
-    height: 100%;
-    max-height: 100%;
-    animation: none;
-    overflow: hidden;
-  }
-
-  .shell {
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .image,
-  .frame,
-  .text {
-    max-height: none;
-    height: min(100%, calc(var(--dsw-viewport-height, 100vh) - 8rem - var(--dsw-safe-top) - var(--dsw-safe-bottom)));
-  }
-
-  .text {
-    height: auto;
-    min-height: 0;
-    max-height: none;
-    overflow: visible;
-  }
+  .dialog.dialog::before { display: none; }
+  .header { box-sizing: border-box; min-height: calc(72px + var(--dsw-safe-top)); padding: calc(10px + var(--dsw-safe-top)) 12px 10px; }
+  .heading h3 { font-size: 15px; line-height: 22px; }
 }
+@media (pointer: coarse) { .download { min-height: var(--dsw-touch-target); } }

@@ -9,6 +9,7 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 - Registers `steward_query`: runs one SQL statement through `POST /internal/runtime/steward/query` on the runtime's own loopback credential (no token material enters the tool surface).
 - Read statements (`SELECT`/`WITH`/`VALUES`/`TABLE`/`SHOW`/`EXPLAIN`) execute directly. Anything else first asks the operator through the session approval channel, then carries the granted approval id to the Gateway, which re-verifies it against `conversation_interaction_responses` before executing.
 - `dry_run` returns the statement's `EXPLAIN` plan without executing — including for writes, which need no approval because nothing is applied.
+- `row_limit` bounds returned read rows and dry-run plan rows. The Gateway's result-size limit can truncate either response earlier; the tool marks truncated plans and read results explicitly.
 - Every attempt — read, denied, failed, applied — is journaled by the Gateway in `harness.steward_query_log`.
 - Registers the `steward:policy` system-prompt section so the model knows it runs in the maintenance channel: audited SQL, read-only transactions, in-conversation write approval, journaling.
 
@@ -21,4 +22,6 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 
 ## Tests
 
-`tests/query.spec.ts` covers statement classification and the approval-prompt preview; `tests/composition.spec.ts` covers the registered section, tool, and their disposal. The executor contract is covered by Gateway tests beside `steward-query.ts`.
+`tests/query.spec.ts` covers statement classification and the approval-prompt preview; `tests/composition.spec.ts` covers registration, disposal, and actual dry-run tool execution with and without truncation. The executor contract is covered by Gateway tests beside `steward-query.ts`.
+
+The keyless [steward-query-truncation snapshot](../../snapshots/session/steward-query-truncation/snapshot.yml) loads the source plugin through the shipped headless profile and records the truncated plan as a model-visible tool result. Replay from the repository root with `DSH_EXAMPLE_MODE=src DSH_SNAPSHOT=replay pnpm exec vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts -t steward-query-truncation`.

@@ -1,0 +1,14 @@
+{
+  "name": "pressure-capture-freshness-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/node-resource-budget-postgres.spec.ts -t 'pressure observations that expire|remaining pressure validity' --no-file-parallelism",
+  "startedAt": "2026-10-23T22:42:44.216857+00:00",
+  "seconds": 3.743,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "321a431e50f4a18e11bdf4f4f527b78327f9967119931f385d6fda4dc8c15059",
+  "inputsAfter": "321a431e50f4a18e11bdf4f4f527b78327f9967119931f385d6fda4dc8c15059",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "cdf1d6e43ca87fcd0aa29e21c76129357b73e9f5efa745cf3f092641dc222d92",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/node-resource-budget-postgres.spec.ts (30 tests | 2 failed | 28 skipped) 222ms\n     × does not renew pressure observations that expire while waiting for the node lock 115ms\n     × publishes only the remaining pressure validity after capture 63ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/node-resource-budget-postgres.spec.ts > durable node resource budget > does not renew pressure observations that expire while waiting for the node lock\nAssertionError: expected 1 to be +0 // Object.is equality\n\n- Expected\n+ Received\n\n- 0\n+ 1\n\n ❯ tests/node-resource-budget-postgres.spec.ts:150:28\n    148|         'SELECT credits FROM harness.node_resource_state WHERE organiz…\n    149|         [f.context.organizationId, f.context.nodeId],\n    150|       )).rows[0]!.credits).toBe(0)\n       |                            ^\n    151|     } finally {\n    152|       await blocker.query('ROLLBACK')\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  tests/node-resource-budget-postgres.spec.ts > durable node resource budget > publishes only the remaining pressure validity after capture\nAssertionError: expected 1994.834 to be less than or equal to 500\n ❯ tests/node-resource-budget-postgres.spec.ts:169:37\n    167|       FROM harness.node_resource_state WHERE organization_id=$1 AND no…\n    168|     [f.context.organizationId, f.context.nodeId])).rows[0]!\n    169|     expect(Number(state.remaining)).toBeLessThanOrEqual(500)\n       |                                     ^\n    170|     expect(Number(state.age)).toBeGreaterThanOrEqual(1500)\n    171|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 28 skipped (30)\n   Start at  06:42:47\n   Duration  744ms (transform 267ms, setup 0ms, import 387ms, tests 222ms, environment 0ms)\n\n"
+}

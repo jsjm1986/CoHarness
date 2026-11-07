@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/userdoc-http/README.md
 document:
-  en: 0093f9aa0a899e0bfc32264db957109593d41e82
-  zh: ad6034a660d59e808bd56059bc2661a47dc9d81b
+  en: 6d7f9df316f2aa3799c9d6fa26b1119e74b94789
+  zh: 76cd22d2dc9596704c3dc1ff2c91c475b11ac6da
 /:
   en: 850dbb491603744d
-  zh: 61495d48365178df
+  zh: 425ccf8197267115
 /deepseek-ai-dsh-host-userdoc-http:
-  en: 23e8e3cde8a61eb1
-  zh: 3ca54a2de621a821
+  en: b39528a4e6ca15fc
+  zh: 6c0603a7b07d759f
 /deepseek-ai-dsh-host-userdoc-http/summary:
   en: b111b8fbb186f6c5
   zh: fb4c023a041ece57
@@ -22,10 +22,10 @@ document:
   zh: d2db061e56e577f3
 /deepseek-ai-dsh-host-userdoc-http/model-experience/kv-cache-effect:
   en: 47f982e326fe77fd
-  zh: 10b529588772b11d
+  zh: c2241315dc0c89c9
 /deepseek-ai-dsh-host-userdoc-http/known-limitations-and-deferred-work:
-  en: 04b887dca785f7cf
-  zh: 0eb9838d0eea44c6
+  en: 80f9f1daf05b7aff
+  zh: 9489aebb407e4677
 /deepseek-ai-dsh-host-userdoc-http/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

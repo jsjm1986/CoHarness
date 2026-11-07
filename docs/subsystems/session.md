@@ -170,6 +170,15 @@ interface SessionEventMap {
    * so tolerating concurrent writers needs a signal beyond the log.
    */
   'session/end-seed': { inherited?: true }
+  /**
+   * One recorded human remark about this session. Log-only and independent
+   * of its trigger; it never enters model context or derived history.
+   */
+  'feedback/record': FeedbackRecord
+  /** Explicit message feedback accepted by the sidecar CAS operation. */
+  'feedback/message-put': { sessionId: SessionId; item: MessageFeedbackItem }
+  /** Explicit message feedback removed by the sidecar CAS operation. */
+  'feedback/message-delete': { sessionId: SessionId; messageId: string; version: string }
 }
 ```
 
@@ -195,6 +204,66 @@ interface TodoItem {
   content: string
   /** Lifecycle state. `in_progress` marks a task being worked now; parallel work may mark several. */
   status: 'pending' | 'in_progress' | 'completed'
+}
+```
+
+### Feedback event payloads
+
+The `feedback/*` events are log-only durable records: no `surfaceOp`, no derived-history effect. The declarations keep logs that already carry them readable, and explicit-consent telemetry authorization recognizes them.
+
+```ts type-equiv
+/** One of the fixed feedback categories; the ids are durable log vocabulary. */
+type FeedbackCategory =
+  | 'task-result'
+  | 'instruction-following'
+  | 'product-interaction'
+  | 'service-stability'
+  | 'resource-cost'
+  | 'security-privacy-permission'
+  | 'other'
+```
+
+```ts type-equiv
+/**
+ * One recorded human remark about a Session. Both members are optional: a
+ * submission with neither still records that the human asked for the
+ * Session to be reviewed, which is what authorizes log delivery.
+ */
+interface FeedbackRecord {
+  /** Free-text remark with surrounding whitespace removed; never empty when present. */
+  readonly text?: string
+  /** Category the human filed the remark under. */
+  readonly category?: FeedbackCategory
+}
+```
+
+```ts type-equiv
+/** Opaque compare-and-set token for one exact feedback item revision. */
+type MessageFeedbackVersion = Branded<'MessageFeedbackVersion'>
+```
+
+```ts type-equiv
+/** The human's overall judgment of one assistant message. */
+type MessageFeedbackRating = 'positive' | 'negative'
+```
+
+```ts type-equiv
+/** One current feedback value and its opaque mutation token. */
+interface MessageFeedbackItem {
+  /** Stable identity of the assistant message inside the owning Session. */
+  readonly messageId: MessageId
+  /** Overall positive or negative judgment. */
+  readonly rating: MessageFeedbackRating
+  /** Optional explanation, preserved verbatim after validation. */
+  readonly note?: string
+  /** Optional category chosen by the author of the feedback. */
+  readonly category?: FeedbackCategory
+  /** Equality-only token replaced by every material create or update. */
+  readonly version: MessageFeedbackVersion
+  /** Host-assigned creation time in Unix epoch milliseconds. */
+  readonly createdAt: number
+  /** Host-assigned time of the most recent material update. */
+  readonly updatedAt: number
 }
 ```
 
@@ -382,6 +451,11 @@ type SurfaceIntent<T extends SurfaceEventType = SurfaceEventType> = {
 ```
 
 Required for `SurfaceEventType` events — every message-producing event must declare how it joins the surface, the sole source of derived model history. A human-facing transcript is the other projection and reads the log's append-origin events instead, because the surface deliberately shadows the ranges a replacement summarizes (`isAppendSurfaceEvent` in [dsh-session](../../packages/core/session/README.md)). Non-surface types reject it at compile time.
+
+<a id="append-resource-admission"></a>
+### Append resource admission
+
+`SessionAppendAdmission` receives an attached `Session` and its frozen `SessionEvent` candidate synchronously and returns a rollback function or `undefined`. `ctx.sessions.registerAppendAdmission()` owns the registration through its calling fiber. Before commit, a later refusal or validation failure invokes successful reservations' rollbacks in reverse order; after commit, the corresponding `session/event` consumer owns settlement. Detached construction does not invoke these callbacks. The [Session package](../../packages/core/session/README.md#append-admission) documents registration and reentrance.
 
 <a id="plugin-owned-message-projections"></a>
 ### Plugin-owned message projections
@@ -640,7 +714,9 @@ declare class Session {
      *   of truth, so a bad event fails at the append site rather than later during
      *   a backend flush. A synchronous internal dispatch validation failure or an
      *   append reentered while this acceptance/publication boundary is open also
-     *   rejects before the log changes.
+     *   rejects before the log changes. Attached-store resource admissions reserve
+     *   before surface and dispatch validation; refusal rolls back earlier
+     *   reservations without publishing the candidate.
      */
   append<T extends SessionEventType>(
       type: T,
@@ -868,6 +944,17 @@ In-memory session store (`ctx.sessions`).
 Persistence is intentionally not implemented here — persistence plugins subscribe to `session/event` and flush on `session/flush` / dispose.
 
 ```ts cordis-catalog
+/**
+ * Register synchronous resource admission for every Session attached to this store.
+ * Refusal leaves the log and event feed unchanged. Reservations roll back in
+ * reverse order if any admission, surface validation, or dispatch validation
+ * fails; committed reservations pass to the `session/event` consumer.
+ * @param admission - resource reservation over an immutable candidate; rollback must be synchronous.
+ * @returns the registering fiber's disposer, which removes future admission calls.
+ * @throws when the same callback already has a live registration.
+ */
+registerAppendAdmission(admission: SessionAppendAdmission): () => Promise<void>
+
 /**
  * Register one event interpreter for live creation, restore, and fork.
  * Disposing the contribution makes sessions that used it refuse further derivation.

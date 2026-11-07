@@ -1,0 +1,324 @@
+{
+  "at": "2026-10-31T01:36:38.771880+00:00",
+  "findings": [
+    "B382"
+  ],
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T012355Z",
+  "sourcePaths": [
+    "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/resource-completion.jsonl",
+    "packages/subagent/subagent-dsh-sdk/README.md",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subagent/subagent-dsh-sdk/src/bridge.ts": "b1e8cca314aa8f9249f5249dd12cba9e3b14f1bd96e09066b48b4847996f540d",
+    "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts": "b359786942de929235997e4d1757c683678711a1c846413c07574c4ae21d3c5a",
+    "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts": "817b9846ff1ea80182562538a35aab8cf8d65de19be7f556a1c5e2bc82eeb09e",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs": "47d64c9569eb23e575fcdbe1c555d70d2d916adcf3d0c1ae658da4cb089802e5",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs": "b8dd066fdfad5486dacd702768cbe8552ae17c3e311abc650d7e2dfecc2f11fb",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/resource-completion.jsonl": "8d6706dd0c30550f585c953301743eb3fb7c04cfe0d547a477d8b955c1530a99",
+    "packages/subagent/subagent-dsh-sdk/README.md": "f1bdc02ebf75ebe4742c9b48a5f9d11796582a777c2368a7c156e9e61b50da34",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md": "63296c4911a9ced980ee927ccece422c27edb7cf70293733f56ed3bcb4550cc7",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml": "655362cfd8d962c351b48e95f1627942f9bf4458f3adfb5eb6fa2c4495be1c77",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md": "6ad6374f66491f4de0c8a8325ccc999c88e7c0cd52c172c77d2634ec3ee0eeaf",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md": "f859537f9b6d684df7e553cd9e64ba84fee51ab395553666148e6c9cbdbd087c",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml": "abdc503af98d7fed0ff212c43273bff83afff0b02ab80238439375176748650d",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md": "aac17b04e2e8bf83f0090acf21d057d2014482f4d4e8fe7fcea3db6d4a7e3199",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md": "73238b1523c9e192301a9aeb66dc3e116bba5a6d73204e0fd7e0d83d22ae5c4a",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml": "99eadb76311963cb569232bbc1c194199c45c08f2aa4f990592da72f97b59db3"
+  },
+  "builtArtifacts": {
+    "packages/subagent/subagent-dsh-sdk/lib/index.js": "54391112f318d87d83972153c8afdeeac9b2da5a2a5e959642765f4de3b81e34",
+    "packages/subagent/subagent-dsh-sdk/lib/managed.js": "dbdfc0a4e29ef05e174875d38fc1e4d88f1b29f3a685bdf0a3bf8753866eaa72"
+  },
+  "behavior": "The parent enforces its configured control request timeout while reading authenticated bodies, independently of Node server timeout scans. Timeout, malformed data and oversized partial messages refuse before admission; incomplete connections close after the response. Early authentication/method/capacity refusals also close their unread connections. Provider closure aborts pending body reads.",
+  "protocolAndData": "No additional public fields, private wire fields, Session events or database versions in B382. B381 completion registration metadata still requires matched parent/child builds.",
+  "negativeEvidence": {
+    "bodyDeadline": "20ms authenticated upload still had no response when the 1500ms observation guard fired before the fix.",
+    "connection": "Stalled and oversized uploads advertised keep-alive before connection cleanup was corrected; final cases require close and await actual client connection closure before subsequent admission.",
+    "compiledAttempt": "The old compiled assembly fails during child initialization. Its missing-adapter rollback diagnostic is indirect; source negatives establish causality.",
+    "fixtureCorrections": "The oversized case requires a byte limit large enough for its bounded refusal and valid cleanup timing. The shutdown race identifies parsed request content rather than IncomingMessage identity. The assembled upload probe runs outside the SDK fetch deadline so it does not cancel the resource registration being observed."
+  },
+  "verification": {
+    "uniqueCases": 241,
+    "sdkPackageCases": 236,
+    "typescriptProjectionCases": 4,
+    "pythonProjectionCases": 1,
+    "sourceCoverage": {
+      "bridge.ts": {
+        "statements": [
+          251,
+          251
+        ],
+        "branches": [
+          156,
+          156
+        ],
+        "functions": [
+          44,
+          44
+        ],
+        "lines": [
+          188,
+          188
+        ]
+      }
+    },
+    "engines": [
+      "macOS source SDK and native-process examples",
+      "macOS Node22 compiled examples",
+      "macOS Node24 compiled examples"
+    ],
+    "resourceExample": {
+      "timedOutUpload": 400,
+      "allocations": 6,
+      "acknowledgements": 6,
+      "releaseAttempts": 9,
+      "occupied": 0
+    },
+    "buildGates": 8,
+    "documentationGates": 20,
+    "checks": {
+      "sdk-control-body-complete-package-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:33:26.422149+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T012355Z/coverage-complete"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:34:00.846704+00:00"
+      },
+      "sdk-control-body-final-build": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:32:44.736343+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:33:13.173445+00:00"
+      },
+      "sdk-control-body-final-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:34:00.907741+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:34:08.501757+00:00"
+      },
+      "sdk-control-body-final-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:34:00.908530+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:34:08.313138+00:00"
+      },
+      "sdk-control-body-final-projection": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:34:25.955624+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/scoped-sdk-model-admission.snapshot.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:34:31.886832+00:00"
+      },
+      "sdk-control-body-final-python": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:34:25.952025+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_memory_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:34:28.099040+00:00"
+      },
+      "sdk-control-body-final-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:33:49.878844+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:35:35.802307+00:00"
+      },
+      "sdk-control-body-final-pairing": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:33:25.844959+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "packages/subagent/subagent-dsh-sdk/README.md",
+          ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:33:26.363732+00:00"
+      },
+      "sdk-control-body-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:33:48.725066+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:33:55.746772+00:00"
+      },
+      "sdk-control-body-final-guide": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:33:48.721446+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T012355Z/verify-sdk-guide.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:33:48.776169+00:00"
+      },
+      "sdk-control-body-export-jsdoc": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:30:25.960993+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:30:33.333276+00:00"
+      },
+      "sdk-control-body-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-31T01:30:25.960098+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T01:30:30.926952+00:00"
+      }
+    },
+    "paidProviderCalls": "None. Owned loopback inference only; actual Responses validation remains deferred."
+  },
+  "noteReview": {
+    "updatedOwningNote": ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    "newNotes": 0,
+    "archivedOrDeleted": 0,
+    "retainedActive": [
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+      ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md"
+    ],
+    "reason": "The managed SDK note owns control input and cleanup. Native runtime lifecycle and external model control remain separate responsibilities; frozen archives were not edited.",
+    "upgradeGuide": "Updated SDK README, owning note and current bilingual guide; guide is 487 English words."
+  },
+  "baseline": {
+    "at": "2026-10-31T01:30:30.926952+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "peerThread": "multi-computer architecture chat",
+    "peerReportedRelease": "R6 on mac-mini and Ubuntu; auth-only incremental deployment, schema102 and epoch83.",
+    "peerReportedVerification": "19 real PostgreSQL auth cases and 8-concurrent token performance 7932.94ms to 963.68ms; page performance remains REAL-001 open.",
+    "independentlyVerifiedByThisBatch": false,
+    "rootReleaseStatus": "B379/B380/B381/B382 are outside peer-reported R6; root did not deploy or operate production databases or Docker.",
+    "reservedPeerPaths": [
+      "gateway/src/postgres/auth-service.ts",
+      "gateway/tests/auth-postgres.spec.ts",
+      "Gateway HTML and real Web assembly fixtures",
+      "topology/node access, CUA and migration101/102",
+      "the three resource-budget files and late UI authorization hydration"
+    ],
+    "handoff": "One receipt and source-hash handoff after verification; no repeated progress messages."
+  },
+  "remaining": [
+    "All 12 business domains remain in progress. B04/B25 remain implementation_in_progress.",
+    "Continue private transport concurrency, resource-only external governance and remaining allocation/business/permission review.",
+    "No fresh root PostgreSQL acceptance or physical Linux/Windows validation in this batch. Revalidate owned database identity and port before future tests; never infer container termination from an unreachable historical port.",
+    "Full doc-sync and paid Responses validation remain unclaimed. No production deployment by root."
+  ]
+}

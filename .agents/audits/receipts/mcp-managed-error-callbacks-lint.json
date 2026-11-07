@@ -1,0 +1,13 @@
+{
+  "name": "mcp-managed-error-callbacks-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/mcp/mcp-client/src/managed-stdio.ts packages/mcp/mcp-client/src/transport.ts packages/mcp/mcp-client/src/connection.ts packages/mcp/mcp-client/src/index.ts packages/mcp/mcp-client/tests/resource-admission.spec.ts packages/mcp/mcp-client/tests/mcp-client.spec.ts packages/mcp/mcp-client/tests/reconnect.spec.ts packages/mcp/mcp-client/tests/apply.spec.ts packages/experimental/browser-use-runtime/src/mcp.ts snapshots/session/mcp-resources/resource-admission-fixture.mjs",
+  "startedAt": "2026-10-23T16:40:29.161983+00:00",
+  "seconds": 2.039,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d65166e10fd16c0ee95d87877c2c719e55e42ac9e6bdda3f2f3151274b2452c8",
+  "inputsAfter": "d65166e10fd16c0ee95d87877c2c719e55e42ac9e6bdda3f2f3151274b2452c8",
+  "outputSha256": "c4e58a63b73d68d43662030fda844ba058b20a7c56d94772ba4fb3f39ec2521b",
+  "outputTail": "packages/mcp/mcp-client/src/index.ts:199:1: error @stylistic(max-len): This line has a length of 147. Maximum allowed is 140.\n"
+}

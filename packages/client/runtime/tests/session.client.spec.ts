@@ -6,7 +6,7 @@
  * enough.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
@@ -1275,28 +1275,33 @@ describe('pending submission echoes', () => {
     expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
   })
 
-  it('keeps a steering echo until durable admission rather than queue presence', async () => {
+  it.each(['queue', 'splice'] as const)('retires a steering echo after its accepted %s publication', async (publication) => {
     const { api, session } = makeSession()
     api.onHistory = () => histResponse([])
     await session.open()
     const retired = vi.fn()
     session.handleRunning(true)
     const handle = session.beginSubmission({ mode: 'steer', text: '插队', images: [], onRetire: retired })
-    session.handleMuxEnvelope('q1' as never, {
+    const message = createUserMessage({
+      content: [{ type: 'text', text: '插队' }] as never,
+      source: { kind: 'user', rpcId: handle.requestId } as never,
+    })
+    session.handleMuxEnvelope('q1' as never, publication === 'queue' ? {
       type: 'session/queue', sessionId: SID,
-      items: [{
-        id: 'queue-steer' as never, rpcId: handle.requestId, placement: 'steering' as const,
-        message: createUserMessage({ content: [{ type: 'text', text: '插队' }] as never, source: { kind: 'user' } as never }),
-      }],
+      items: [{ id: 'queue-steer' as never, rpcId: handle.requestId, placement: 'steering' as const, message }],
+    } : {
+      type: 'session/event', sessionId: SID,
+      event: { seq: SessionSeq(1), time: 1_700_000_000_000, type: 'agent/inbox/spliced',
+        data: { target: 'next-step', start: 0, removedCount: 0, inserted: [message] } } as SessionEvent,
     })
     await flushSubmissionFrame()
-    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
-    expect(retired).not.toHaveBeenCalled()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
     session.handleMuxEnvelope('q2' as never, queueFrame([]))
     session.handleMuxEnvelope('e1' as never, { type: 'session/event', sessionId: SID, event: durableUser(8, handle.requestId) })
     await flushSubmissionFrame()
     expect(session.getSnapshot().pendingSubmissions).toEqual([])
-    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+    expect(retired).toHaveBeenCalledTimes(1)
   })
 
   it('keeps an echo whose queue row moves inside one splice', async () => {
@@ -1356,6 +1361,49 @@ describe('pending submission echoes', () => {
     expect(session.getSnapshot().pendingSubmissions).toEqual([])
     expect(retired).toHaveBeenCalledOnce()
     expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+  })
+
+  it.each(['buffered', 'replayed'] as const)('retires a %s input receipt outside the installed history window', async (delivery) => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    const tail = await histResponse([durableUser(48, 'another-request')], true, undefined, {
+      asOfSeq: 48, values: { queuedInbox: [] },
+    })
+    const history = deferred<typeof tail>()
+    api.onHistory = () => history.promise
+    const opening = session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '已接受的输入', images: [], onRetire: retired })
+    await expect(session.prompt([{ type: 'text', text: '已接受的输入' }], 'queue', undefined, handle.requestId))
+      .resolves.toMatchObject({ ok: true })
+    const receipt = { type: 'session/event' as const, sessionId: SID, event: durableUser(9, handle.requestId) }
+    if (delivery === 'buffered') session.handleMuxEnvelope('receipt-buffered' as never, receipt)
+    history.resolve(tail)
+    await opening
+    if (delivery === 'replayed') session.handleMuxEnvelope('receipt-replayed' as never, receipt)
+    session.handleMuxEnvelope('receipt-duplicate' as never, receipt)
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledOnce()
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+    expect(chatSeqs(session.getSnapshot())).toEqual([48])
+  })
+
+  it('retires a matching input receipt when an older history page supplies it', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '补读前已接受', images: [], onRetire: retired })
+    api.onHistory = () => histResponse([durableUser(48, 'another-request')], true)
+    await session.open()
+    expect(retired).not.toHaveBeenCalled()
+    api.onHistory = () => histResponse([durableUser(47, handle.requestId)])
+    await session.loadOlder()
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledOnce()
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+    expect(chatSeqs(session.getSnapshot())).toEqual([47, 48])
   })
 })
 

@@ -168,7 +168,7 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Session 
     })
     const outcome = asked.then(value => value, (error: unknown) => ({ error }))
     try {
-      await plannedRow().locator('[data-state="warning"]').waitFor({ timeout: 10_000 })
+      await plannedRow().locator('[data-state="warning"]').waitFor({ state: 'attached', timeout: 10_000 })
       await scenario()
     } finally {
       controller.abort()
@@ -266,6 +266,36 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Session 
       await outcome
     }
     expect(tripwire.pageErrors).toEqual([])
+  })
+
+  it('keeps decisions visible while a long phone summary scrolls', async () => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    const detail = '# Long plan\n\n' + 'Review the workspace permissions and preserve the existing behavior. '.repeat(100)
+    try {
+      await whileReviewing(planned, detail, async () => {
+        const card = page.locator('[data-plan-review-key]')
+        await card.getByRole('heading', { name: 'Long plan', exact: true }).waitFor()
+        const previewToggle = page.locator('[data-sidebar-right-toggle]')
+        if (await previewToggle.isVisible()) await previewToggle.click()
+        await card.evaluate(async (element) => {
+          await Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => undefined)))
+        })
+        const summary = card.locator('[data-plan-review-scroll]')
+        expect(await summary.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
+        for (const name of ['Request changes', 'Approve']) {
+          const box = await card.getByRole('button', { name, exact: true }).boundingBox()
+          if (box === null) throw new Error(`missing decision: ${name}`)
+          expect(box.y).toBeGreaterThanOrEqual(0)
+          expect(box.y + box.height).toBeLessThanOrEqual(844)
+          expect(box.x + box.width).toBeLessThanOrEqual(390)
+        }
+        await summary.focus()
+        await summary.press('End')
+        await expect.poll(() => summary.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+      })
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 720 })
+    }
   })
 })
 

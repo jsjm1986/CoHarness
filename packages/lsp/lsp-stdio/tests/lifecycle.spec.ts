@@ -279,9 +279,9 @@ describe('lsp-stdio end to end over a fake server', () => {
     // This implementation-local test reaches the private pool only to synchronize with its actual
     // close state. A fixed wall-clock sleep can expire before a CPU-starved child runs its exit timer.
     const instances = (provider as unknown as {
-      readonly instances: ReadonlyMap<string, { readonly dead: boolean }>
+      readonly instances: ReadonlyMap<string, { readonly instance?: { readonly dead: boolean } }>
     }).instances
-    const instance = [...instances.values()][0]
+    const instance = [...instances.values()][0]?.instance
     // The query's finally may already have observed the exit and evicted the dead slot. When the
     // slot remains, synchronize with its close before proving the next query replaces it.
     if (instance !== undefined) await waitFor(async () => instance.dead)
@@ -351,12 +351,12 @@ describe('lsp-stdio end to end over a fake server', () => {
     expect(signal.aborted).toBe(true)
   })
 
-  it('waits for every owned teardown before aggregating instance failures', async () => {
+  it('retains failed instances after sibling drains and retries their cleanup', async () => {
     let provider: LspProvider | undefined
     const ctx = await mount({ LSP_FAKE_DEF: 'null' }, {}, (registered) => { provider = registered })
     if (provider === undefined) throw new Error('expected lsp-stdio to register a provider')
     const internals = provider as unknown as {
-      readonly instances: Map<string, { dispose(): Promise<void> }>
+      readonly instances: Map<string, { allocation: Promise<{ dispose(): Promise<void> }> }>
       readonly queues: Map<string, Promise<void>>
       readonly workspaceLookups: Set<Promise<void>>
       disposeAll(): Promise<void>
@@ -364,8 +364,10 @@ describe('lsp-stdio end to end over a fake server', () => {
     const firstFailure = new Error('first instance cleanup failed')
     const secondFailure = new Error('second instance cleanup failed')
     const release = Promise.withResolvers<undefined>()
-    internals.instances.set('first', { dispose: async () => { throw firstFailure } })
-    internals.instances.set('second', { dispose: async () => { throw secondFailure } })
+    const first = vi.fn(async () => {}).mockRejectedValueOnce(firstFailure)
+    const second = vi.fn(async () => {}).mockRejectedValueOnce(secondFailure)
+    internals.instances.set('first', { allocation: Promise.resolve({ dispose: first }) })
+    internals.instances.set('second', { allocation: Promise.resolve({ dispose: second }) })
     internals.queues.set('pending', release.promise)
     internals.workspaceLookups.add(Promise.resolve())
 
@@ -378,9 +380,13 @@ describe('lsp-stdio end to end over a fake server', () => {
       errors: [firstFailure, secondFailure],
       message: 'lsp-stdio instance teardown failed',
     })
-    expect(internals.instances.size).toBe(0)
+    expect(internals.instances.size).toBe(2)
     expect(internals.queues.size).toBe(0)
     expect(internals.workspaceLookups.size).toBe(0)
+    await internals.disposeAll()
+    expect(internals.instances.size).toBe(0)
+    expect(first).toHaveBeenCalledTimes(2)
+    expect(second).toHaveBeenCalledTimes(2)
     await ctx.fiber.dispose()
   })
 
@@ -506,12 +512,64 @@ describe('lsp-stdio provider transport retry', () => {
   function swapInstance(provider: LspProvider | undefined, fake: FakeInstance): void {
     if (provider === undefined) throw new Error('expected lsp-stdio to register a provider')
     const instances = (provider as unknown as {
-      readonly instances: Map<string, FakeInstance>
+      readonly instances: Map<string, { allocation: Promise<FakeInstance>; instance: FakeInstance }>
     }).instances
     const key = [...instances.keys()][0]
     if (key === undefined) throw new Error('expected a pooled instance after the first query')
-    instances.set(key, fake)
+    instances.set(key, { allocation: Promise.resolve(fake), instance: fake })
   }
+
+  it('allows a fresh allocation after an initial process admission fails', async () => {
+    const ctx = await mount({ LSP_FAKE_DEF: 'null' })
+    const failure = new Error('process admission refused')
+    const create = vi.spyOn(LspLocal.LspInstance, 'create').mockRejectedValueOnce(failure)
+    try {
+      await expect(ctx.lsp.query(query('goToDefinition'))).rejects.toBe(failure)
+      await expect(ctx.lsp.query(query('goToDefinition'))).resolves.toMatchObject({ kind: 'locations' })
+    } finally { create.mockRestore(); await ctx.fiber.dispose() }
+  })
+
+  it('joins an allocation rejected after provider disposal starts', async () => {
+    const ctx = await mount({ LSP_FAKE_DEF: 'null' })
+    const entered = Promise.withResolvers<AbortSignal>(), held = Promise.withResolvers<LspLocal.LspInstance>()
+    const create = vi.spyOn(LspLocal.LspInstance, 'create').mockImplementationOnce((spec) => {
+      if (spec.signal === undefined) throw new Error('LSP allocation has no lifetime signal')
+      entered.resolve(spec.signal)
+      return held.promise
+    })
+    const pending = ctx.lsp.query(query('goToDefinition')), outcome = Promise.allSettled([pending])
+    let closing: Promise<void> | undefined
+    const failure = new Error('allocation cancelled during shutdown')
+    try {
+      const signal = await entered.promise
+      closing = ctx.fiber.dispose()
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect(signal.aborted).toBe(true)
+      held.reject(failure)
+      await expect(pending).rejects.toBe(failure)
+      await expect(closing).resolves.toBeUndefined()
+    } finally { held.reject(failure); await outcome; await closing; create.mockRestore(); await ctx.fiber.dispose() }
+  })
+
+  it('retains a native instance delivered after its allocation caller cancels', async () => {
+    const ctx = await mount({ LSP_FAKE_DEF: 'null' })
+    const original = LspLocal.LspInstance.create.bind(LspLocal.LspInstance)
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const create = vi.spyOn(LspLocal.LspInstance, 'create').mockImplementationOnce(async (...args) => {
+      const instance = await original(...args)
+      entered.resolve(undefined)
+      await release.promise
+      return instance
+    })
+    const caller = new AbortController(), reason = new Error('allocation caller cancelled')
+    const pending = ctx.lsp.query(query('goToDefinition'), caller.signal), outcome = Promise.allSettled([pending])
+    try {
+      await entered.promise
+      caller.abort(reason)
+      release.resolve(undefined)
+      await expect(pending).rejects.toBe(reason)
+    } finally { release.resolve(undefined); await outcome; create.mockRestore(); await ctx.fiber.dispose() }
+  })
 
   it('retries once on a dead transport and serves from the replacement instance', async () => {
     let provider: LspProvider | undefined
@@ -546,27 +604,36 @@ describe('lsp-stdio provider transport retry', () => {
     let provider: LspProvider | undefined
     const ctx = await mount({ LSP_FAKE_DEF: 'null' }, {}, (registered) => { provider = registered })
     expect(await ctx.lsp.query(query('goToDefinition'))).toMatchObject({ kind: 'locations' })
-    swapInstance(provider, {
-      dead: true,
-      dispose: vi.fn(async () => { throw new Error('teardown boom') }),
-      query: vi.fn(async () => { throw new Error('query boom') }),
+    const dispose = vi.fn(async () => {}).mockRejectedValueOnce(new Error('teardown boom'))
+    const failed: FakeInstance = {
+      dead: false,
+      dispose,
+      query: vi.fn(async () => { failed.dead = true; throw new Error('query boom') }),
       isTransportFailure: vi.fn(() => true),
-    })
+    }
+    swapInstance(provider, failed)
     await expect(ctx.lsp.query(query('goToDefinition'))).rejects.toThrow('LSP operation and teardown failed')
     await ctx.fiber.dispose()
+    expect(dispose).toHaveBeenCalledTimes(2)
   })
 
   it('propagates a rejected teardown when the dead instance still answered', async () => {
     let provider: LspProvider | undefined
     const ctx = await mount({ LSP_FAKE_DEF: 'null' }, {}, (registered) => { provider = registered })
     expect(await ctx.lsp.query(query('goToDefinition'))).toMatchObject({ kind: 'locations' })
-    swapInstance(provider, {
-      dead: true,
-      dispose: vi.fn(async () => { throw new Error('teardown boom') }),
-      query: vi.fn(async () => ({ kind: 'locations' as const, locations: [], resolvedWorkspaceUri: 'file:///ws' })),
+    const dispose = vi.fn(async () => {}).mockRejectedValueOnce(new Error('teardown boom'))
+    const failed: FakeInstance = {
+      dead: false,
+      dispose,
+      query: vi.fn(async () => {
+        failed.dead = true
+        return { kind: 'locations' as const, locations: [], resolvedWorkspaceUri: 'file:///ws' }
+      }),
       isTransportFailure: vi.fn(() => true),
-    })
+    }
+    swapInstance(provider, failed)
     await expect(ctx.lsp.query(query('goToDefinition'))).rejects.toThrow('teardown boom')
     await ctx.fiber.dispose()
+    expect(dispose).toHaveBeenCalledTimes(2)
   })
 })

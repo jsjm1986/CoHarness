@@ -1,0 +1,15 @@
+{
+  "reply": "JOB_CAPTURE_ADMISSION_OK",
+  "proof": {
+    "captureCalls": 1,
+    "nestedRefused": true,
+    "producerStarts": 1,
+    "activeJobs": 1,
+    "requests": 1,
+    "closed": 1,
+    "terminal": [
+      "killed"
+    ],
+    "activeAfterCleanup": 0
+  }
+}

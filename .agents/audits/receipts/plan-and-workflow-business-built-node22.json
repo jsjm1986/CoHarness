@@ -1,0 +1,14 @@
+{
+  "name": "plan-and-workflow-business-built-node22",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=lib /Users/a1234/.nvm/versions/node/v22.22.1/bin/node node_modules/vitest/vitest.mjs run packages/plan/plan-mode/tests/pending-command-loader.spec.ts packages/workflow/workflow-ptc/tests/result-loader.spec.ts",
+  "startedAt": "2026-10-26T02:38:53.169342+00:00",
+  "seconds": 4.451,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dae49ea8d6e04ca4f2b3f1e0a7fdf72411a070cf0df82c23b1761dac40e78fdc",
+  "inputsAfter": "dae49ea8d6e04ca4f2b3f1e0a7fdf72411a070cf0df82c23b1761dac40e78fdc",
+  "postgresToolDirectory": null,
+  "outputSha256": "4ed23bfa61dad34bab6b319ce57321a2997867e6e68bc5a01a56c1a716b93e2f",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  2 passed (2)\n   Start at  10:38:56\n   Duration  1.27s (transform 123ms, setup 129ms, import 45ms, tests 1.36s, environment 0ms)\n\n"
+}

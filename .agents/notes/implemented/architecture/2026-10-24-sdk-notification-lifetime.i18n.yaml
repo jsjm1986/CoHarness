@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-sdk-notification-lifetime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-24-sdk-notification-lifetime.md
+document:
+  en: 291997f4e80f9271795a7f7d171f41fc53505b54
+  zh: d4e0b009172a699fcf9c9890f1114a7f888e339b
+/agent-note-sdk-notification-lifetime-and-active-ancestry:
+  en: 9691a3375e439bdd
+  zh: 663752681cb860f6
+/agent-note-sdk-notification-lifetime-and-active-ancestry/problem:
+  en: 7a574ba80b320577
+  zh: b4b4d53d8c07bc8f
+/agent-note-sdk-notification-lifetime-and-active-ancestry/decision:
+  en: 7447c0d7ec2b7318
+  zh: 50b4dbb0cb785ac0
+/agent-note-sdk-notification-lifetime-and-active-ancestry/alternatives-considered:
+  en: 0ab4f81bcc4561b2
+  zh: 6bb88da454ac21f7
+/agent-note-sdk-notification-lifetime-and-active-ancestry/consequences:
+  en: d849e0d9c86c593b
+  zh: ce0d40e3ad05f77e
+/agent-note-sdk-notification-lifetime-and-active-ancestry/verification:
+  en: 1f42274558948bc7
+  zh: 21d2a843b94bbe15

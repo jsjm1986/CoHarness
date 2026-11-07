@@ -1,0 +1,14 @@
+{
+  "name": "gateway-document-stream-authority",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/vitest run tests/runtime-api.spec.ts -t 'streamed document authority'",
+  "startedAt": "2026-10-26T19:06:58.303752+00:00",
+  "seconds": 4.355,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1da43c82128564b5537c168549e4cea7fa576c5f86326e581632cfd12a072c21",
+  "inputsAfter": "1da43c82128564b5537c168549e4cea7fa576c5f86326e581632cfd12a072c21",
+  "postgresToolDirectory": null,
+  "outputSha256": "fdd188073d5e6a4f4ae32a7b3b28d8b90fe1e182596e2c042e73957a71c87117",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/runtime-api.spec.ts (84 tests | 1 failed | 79 skipped) 21ms\n     × verifies interactive signatures and exact runtime generation without using execution receipts 6ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/runtime-api.spec.ts > streamed document authority > verifies interactive signatures and exact runtime generation without using execution receipts\nError: invalid principal assertion\n ❯ verifiedPayload src/principal.ts:105:71\n    103| function verifiedPayload(assertion: string, publicKey: KeyObject, labe…\n    104|   const parts = assertion.split('.')\n    105|   if (parts.length !== 2 || parts[0] === '' || parts[1] === '') throw …\n       |                                                                       ^\n    106|   const payload = parts[0]!\n    107|   const signatureText = parts[1]!\n ❯ GatewayPrincipalSigner.verify src/principal.ts:186:36\n ❯ assertionFor src/runtime-api.ts:415:28\n ❯ Object.principal src/runtime-api.ts:1803:58\n ❯ authorize src/runtime-document-store.ts:82:38\n ❯ Object.serve tests/runtime-api.spec.ts:216:31\n ❯ handler.stream src/runtime-document-store.ts:71:16\n ❯ request tests/runtime-api.spec.ts:102:15\n ❯ tests/runtime-api.spec.ts:280:14\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 4 passed | 79 skipped (84)\n   Start at  03:07:00\n   Duration  1.89s (transform 1.44s, setup 0ms, import 1.77s, tests 21ms, environment 0ms)\n\n"
+}

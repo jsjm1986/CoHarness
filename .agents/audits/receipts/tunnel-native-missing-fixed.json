@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-native-missing-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsx --tsconfig tsconfig.run.json ../.agents/audits/.local/tunnel-native-probe.mjs missing",
+  "startedAt": "2026-10-24T21:33:14.022031+00:00",
+  "seconds": 1.811,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3d796b2fb205a0aa6b1757502871eafd61a5eb3a50fdff3e63dc9646d65e5a4f",
+  "inputsAfter": "3d796b2fb205a0aa6b1757502871eafd61a5eb3a50fdff3e63dc9646d65e5a4f",
+  "postgresToolDirectory": null,
+  "outputSha256": "1dcaa0a5f57eb8b4917191b4c2b3ca6002fec99848959089ebf230d9ebabe584",
+  "outputTail": "missing quick executable reports start-failed without crashing its owner\n"
+}

@@ -1,4 +1,5 @@
 /** Per-user qualification card: reads and writes one resource policy for a fixed account. */
+import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AdminResourcePolicy } from '../api.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
@@ -30,6 +31,7 @@ export function UserQualificationCard({ name, description, userId, read, write, 
   const generation = useRef(0)
   const [reload, setReload] = useState(0)
 
+  usePendingEdits(saving || policy !== null && enabled !== policy.enabled)
   useEffect(() => {
     const attempt = ++generation.current
     const controller = new AbortController()

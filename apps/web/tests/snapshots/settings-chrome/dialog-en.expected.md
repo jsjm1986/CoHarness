@@ -42,14 +42,15 @@
   - button "System" [pressed]:
     - img
     - text: System
-  - text: Font size Only affects conversation content 14
-  - button "Increase font size":
-    - img
-  - button "Decrease font size":
-    - img
-  - text: px
-  - button "More font settings":
-    - img
+  - group "More font settings":
+    - text: Font size Only affects conversation content 14
+    - button "Decrease font size":
+      - img
+    - button "Increase font size":
+      - img
+    - text: px
+    - button "More font settings":
+      - img
   - text: Work details Choose how much detail to show for tool calls
   - button "Detailed":
     - text: Detailed
@@ -71,14 +72,11 @@
   - button "Queue":
     - text: Queue
     - img
-  - text: Conversation display Adjust transcript width and text size Content width
+  - text: Conversation display Adjust the transcript content width Content width
   - slider "Content width": "748"
   - status: 748px
   - checkbox "Fill"
-  - text: Fill Text size
-  - slider "Text size": "14"
-  - status: 14px
-  - text: Performance & usage Choose how much performance and usage detail to show
+  - text: Fill Performance & usage Choose how much performance and usage detail to show
   - button "Detailed":
     - text: Detailed
     - img

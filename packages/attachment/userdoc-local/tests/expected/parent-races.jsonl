@@ -1,0 +1,5 @@
+{"operation":"ordinary-save-parent","code":"INVALID_DOCUMENT_REF","outsideUntouched":true,"partialRemoved":true}
+{"operation":"ordinary-trash-parent","code":"DOCUMENT_TRASH_NOT_FOUND","outsideUntouched":true,"sourceRestored":true}
+{"operation":"ordinary-restore-parent","code":"DOCUMENT_RESTORE_CONFLICT","outsideUntouched":true,"recoverable":true}
+{"operation":"restore-directory-parent","code":"DOCUMENT_RESTORE_CONFLICT","outsideUntouched":true,"recoverable":true}
+{"operation":"ordinary-purge-parent","code":"DOCUMENT_TRASH_NOT_FOUND","outsideUntouched":true,"retryCompleted":true}

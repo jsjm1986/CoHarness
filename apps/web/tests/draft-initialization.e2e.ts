@@ -23,7 +23,9 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/draft-initialization', i
 const MODE = webSnapshotMode()
 
 interface DraftInitHandle {
+  initializations(): number
   startSession(workspaceId: string | undefined, options: { prompt?: string; clearPreviousDraft?: boolean }): void
+  selectedIn(workspaceId: string | undefined): string | undefined
   reusable(workspaceId: string | undefined, sessionId: string | undefined): boolean
 }
 
@@ -76,6 +78,18 @@ describe('web e2e: Session draft initialization', () => {
       const value = localStorage.getItem('dsh.sessions.current')
       return value === null ? undefined : (JSON.parse(value) as { sessionId?: string }).sessionId
     })
+  }
+
+  /**
+   * The selection once it belongs to the Workspace the gesture started: an
+   * ambient startup restore can publish a foreign Session first, so a plain
+   * `selected()` read can capture a Session the test did not start.
+   */
+  async function selectedIn(page: Page, workspaceId: string): Promise<string | undefined> {
+    return page.evaluate(
+      wid => (window as typeof window & { __draftInit?: DraftInitHandle }).__draftInit?.selectedIn(wid),
+      workspaceId,
+    )
   }
 
   async function composerText(page: Page): Promise<string> {
@@ -137,7 +151,7 @@ describe('web e2e: Session draft initialization', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-draft-init-plain'))
 
     await startSession(page, wid, {})
-    await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBeUndefined()
+    await expect.poll(() => selectedIn(page, wid), { timeout: 15_000 }).not.toBeUndefined()
     await expect.poll(() => composerText(page)).toBe('')
   })
 
@@ -146,10 +160,9 @@ describe('web e2e: Session draft initialization', () => {
     await writeFile(join(scaffold.workspaceCwd, 'structured', 'reference target.md'), 'draft reference\n')
     const page = await openPage()
     onTestFailed(() => saveFailureShot(page, 'web-e2e-draft-init-reference'))
-    const previous = await selected(page)
     await startSession(page, wid, {})
-    await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBe(previous)
-    const sessionId = await selected(page)
+    await expect.poll(() => selectedIn(page, wid), { timeout: 15_000 }).not.toBeUndefined()
+    const sessionId = await selectedIn(page, wid)
     const input = page.locator('textarea:enabled').first()
     await input.fill('@reference')
     const menu = page.getByRole('listbox', { name: 'Trigger suggestions', exact: true })
@@ -189,7 +202,12 @@ describe('web e2e: Session draft initialization', () => {
       }, [wid, sessionId] as const),
       { timeout: 90_000 },
     ).toBe(true)
+    const initialized = await page.evaluate(
+      () => (window as typeof window & { __draftInit: DraftInitHandle }).__draftInit.initializations(),
+    )
     await startSession(page, wid, { prompt: 'keep the existing reference' })
+    await expect.poll(() => page.evaluate(() => (window as typeof window & { __draftInit: DraftInitHandle }).__draftInit.initializations()))
+      .toBe(initialized + 1)
     await expect.poll(() => selected(page)).toBe(sessionId)
     await expect.poll(() => input.inputValue()).toBe('@reference target.md ')
     await input.press('End')
@@ -203,7 +221,49 @@ describe('web e2e: Session draft initialization', () => {
     expect(tripwires.at(-1)?.warnings).toEqual([])
   })
 
+  it('retains the editable draft when a submitted input fails before admission', async () => {
+    const wid = await newWorkspace('admission-failure')
+    const page = await openPage()
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-draft-init-admission-failure'))
+    await startSession(page, wid, {})
+    await expect.poll(() => selectedIn(page, wid), { timeout: 15_000 }).not.toBeUndefined()
+    const sessionId = await selectedIn(page, wid)
+    onTestFailed(async () => {
+      if (sessionId === undefined) return
+      const types = (await hostEvents(sessionId)).map(event => event.type)
+      const live = scaffold.ctx.sessions.get(SessionId(sessionId))
+      const agent = scaffold.ctx.agents.get(SessionId(sessionId))
+      console.log('[draft-init] host events at failure:', sessionId, JSON.stringify(types),
+        'live:', live === undefined ? 'unattached' : JSON.stringify(live.snapshotEvents().map(event => event.type)),
+        'agent:', agent === undefined ? 'none'
+          : `session===live:${agent.session === live} ${JSON.stringify(agent.session.snapshotEvents().map(event => event.type))}`)
+    })
+    const stop = scaffold.ctx.on('agent/pre-step', ({ agent }, next) => {
+      if (agent.id === sessionId) throw new Error('The workspace is unavailable before input admission.')
+      return next()
+    }, { prepend: true })
+    try {
+      const input = page.locator('textarea:enabled').first()
+      await input.fill('Keep this draft until the Session accepts it.')
+      await page.getByRole('button', { name: 'Send message', exact: true }).click()
+      await expect.poll(async () => (await hostEvents(sessionId!)).some(event => event.type === 'turn/end'), { timeout: 30_000 }).toBe(true)
+      await expect.poll(() => input.inputValue()).toBe('Keep this draft until the Session accepts it.')
+      expect((await hostEvents(sessionId!)).some(event => event.type === 'user/message')).toBe(false)
+
+      await page.reload({ waitUntil: 'load' })
+      await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      await expect.poll(() => input.inputValue(), { timeout: 15_000 }).toBe('Keep this draft until the Session accepts it.')
+      await input.focus()
+      const snapshot = await captureStableAria(page, '[data-composer-card] textarea', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'admission-failure.expected.md'), snapshot, MODE)
+      expect(tripwires.at(-1)?.pageErrors).toEqual([])
+    } finally {
+      stop()
+      await page.close()
+    }
+  })
+
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['reference.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['reference.expected.md', 'admission-failure.expected.md'])
   })
 })

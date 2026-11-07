@@ -1,0 +1,40 @@
+[
+  {
+    "actor": "owner",
+    "http": {
+      "kind": "project",
+      "projectId": 1701,
+      "projectName": "project",
+      "mode": "rw",
+      "canManage": true,
+      "uiThemePolicy": "follow-user"
+    },
+    "websocket": {
+      "kind": "project",
+      "projectId": 1701,
+      "projectName": "project",
+      "mode": "rw",
+      "canManage": true,
+      "uiThemePolicy": "follow-user"
+    }
+  },
+  {
+    "actor": "member",
+    "http": {
+      "kind": "project",
+      "projectId": 1701,
+      "projectName": "project",
+      "mode": "rw",
+      "canManage": false,
+      "uiThemePolicy": "follow-user"
+    },
+    "websocket": {
+      "kind": "project",
+      "projectId": 1701,
+      "projectName": "project",
+      "mode": "rw",
+      "canManage": false,
+      "uiThemePolicy": "follow-user"
+    }
+  }
+]

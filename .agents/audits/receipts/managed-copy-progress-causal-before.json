@@ -1,0 +1,14 @@
+{
+  "name": "managed-copy-progress-causal-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/managed-files-short-write.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T10:59:59.861282+00:00",
+  "seconds": 2.779,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7767f6013db26866e8c3cb78f142963d7f5687b99778543427d1275d269b5758",
+  "inputsAfter": "7767f6013db26866e8c3cb78f142963d7f5687b99778543427d1275d269b5758",
+  "postgresToolDirectory": null,
+  "outputSha256": "606ac1ac5d87e87b6ebb330529e0a275678d44645481d785ce9fa8a513a435cc",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/managed-files-short-write.spec.ts (3 tests | 2 failed) 18ms\n   × refuses a zero-progress copy before attempting the same write again 6ms\n   × observes the original cancellation before writing another partial prefix 3ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/managed-files-short-write.spec.ts > refuses a zero-progress copy before attempting the same write again\nAssertionError: expected [Function] to throw error including 'Managed file write made no progress' but got 'Fixture stopped a repeated zero-progr…'\n\nExpected: \"Managed file write made no progress\"\nReceived: \"Fixture stopped a repeated zero-progress write\"\n\n ❯ tests/managed-files-short-write.spec.ts:60:54\n     58|   const { source, destination } = await fixture()\n     59|   io.mode = 'zero'\n     60|   await expect(copyVerifiedFile(source, destination)).rejects.toThrow(…\n       |                                                      ^\n     61|   expect(io.calls).toBe(1)\n     62|   expect(await readFile(source, 'utf8')).toBe('abcdefghijklm')\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  tests/managed-files-short-write.spec.ts > observes the original cancellation before writing another partial prefix\nAssertionError: expected 7 to be 1 // Object.is equality\n\n- Expected\n+ Received\n\n- 1\n+ 7\n\n ❯ tests/managed-files-short-write.spec.ts:71:20\n     69|   io.afterWrite = () => { cancellation.abort(reason) }\n     70|   await expect(copyVerifiedFile(source, destination, cancellation.sign…\n     71|   expect(io.calls).toBe(1)\n       |                    ^\n     72|   expect(await readFile(destination, 'utf8')).toBe('ab')\n     73|   expect(await readFile(source, 'utf8')).toBe('abcdefghijklm')\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 1 passed (3)\n   Start at  19:00:02\n   Duration  206ms (transform 45ms, setup 0ms, import 78ms, tests 18ms, environment 0ms)\n\n"
+}

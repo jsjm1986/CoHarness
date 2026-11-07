@@ -172,7 +172,13 @@ entry config 与可编辑的 `llm-pi-ai` settings namespace 属于个人 Provide
 
 每次解析产出一份**不可变**快照——profiles 加上一个持有各路由所建 `Provider` 的 `createModels()` 集合——每个操作都在自己第一个 `await` 之前整体捕获一份快照。配置变化会构造**新**集合，而不是改动正在被使用的那个：`Models.streamSimple()` 是惰性的，它在流首次被消费时才解析 provider，而那已在 credential await 之后，因此改动共享集合会让一个在旧配置下开始的请求在新配置下结束，或者撞上一个已不存在的 provider。这正是 seam 的每步调用冻结（`llm.prepareCall()`）能贯通到底的原因——回复途中切换模型会在下一步生效，绝不会影响在途的那一步。请求经 `Models.streamSimple()` 抵达提供方。保持 catalog 协议不变的 catalog 路由会**复用**已安装提供方，只替换其模型列表，因为该提供方持有本包无法重建的 API 实现——Bedrock 经由独立入口加载其 Smithy 模块——从零件重建会静默收窄可用提供方的范围。其余路由都由 `createProvider()` 基于 `supportedProtocols()` 背后的协议表构造，表中条目正是 pi-ai 自己的提供方工厂所用的同一批 factory。
 
-凭据绝不进入该集合。harness 在请求抵达 pi-ai 之前经自身 seam 解析路由密钥，并作为请求的 `apiKey` 选项传入，而 pi-ai 将其视为优先级最高的 auth 覆盖；因此 `Models` 不持有任何凭据存储，harness 也保住了自己明确失败的引用语义。没有点名任何凭据的路由会解析为「已配置但无密钥」，把该要求留给协议——那才是它真正所在的位置。
+预备的 Messages 模型实现 `deepseek-web-search`，`openai-completions` 模型实现 `perplexity-web-search`；两者均保留捕获的端点、模型、标头与凭据引用。原生操作使用 API key 引用或显式配置的协议路由；仅依靠提供方原生登录的目录路由以 `MODEL_OPERATION_AUTH_UNSUPPORTED` 失败。不匹配的协议返回 `MODEL_OPERATION_UNSUPPORTED`。准备阶段不查询凭据或发出 HTTP；执行阶段报告实际用量及解析出的凭据来源。
+
+`openai-responses` 模型还实现 `native-stream`。父级适配器保留端点、模型与标头，在准入后解析凭据，禁用响应存储，并分别报告未缓存、缓存及推理 token 数。SSE 解析在第一个完成或不完整响应处结束，不受网络分块和尾随帧影响。它限制响应字节数，并拒绝截断或格式错误的流。事件写入失败会取消提供方响应体。该操作支持显式 API key 或已配置协议的路由，不映射提供方原生 OAuth。
+
+普通流会在显式凭据和图片准备完成后重新检查运行时授权，并在 pi-ai 解析自身存储凭据后通过其载荷回调再次检查。回调拒绝保留运行时失败码，并阻止提供方派发。
+
+设置了 `apiKeyEnv` 的路由通过 Harness 凭据服务解析密钥，并作为 pi-ai 优先级最高的请求覆盖值传入。否则，`Models` 集合使用 Harness 支持的凭据存储和认证上下文，解析提供方已存储或环境中的认证。
 
 初始提示词文本和可用工具分别使用 pi-ai 的 `Context.systemPrompt` 与 `Context.tools`；后续系统消息和工具更新保留在 `Context.messages` 中。pi-ai 负责规范化这些字段，并应用所选协议的序列化规则。
 
@@ -243,8 +249,8 @@ pi-ai 事件变成 harness 的推理、文本、工具调用、用量与 finish 
 
 - **只有提供方实际公开的推理才能渲染**：推理等级请求可以改变模型的隐藏计算，却不保证返回推理文本，适配器也不会自行合成。pi-ai 0.82.1 会提升 `reasoning_content`、`reasoning` 和 `reasoning_text`；它会保留与工具调用关联的加密 `reasoning_details`，但只存在于 `reasoning_details` 内的文本会在 Harness 收到事件前被丢弃。这类网关还必须发出已支持的原生字段或严格标签文本前缀，否则需要 pi-ai 上游增加支持。
 - **`maxRequestImageBytes` 只统计 base64 图片载荷**：文本、工具与 JSON 结构不计入上限，因此该值必须低于网关请求体上限并留出余量。offload 在请求转换时决定，是历史与配置的纯函数，不记录为会话事件；由按路由能力元数据（图片数量、单图大小、请求总大小）同时驱动准入与组装的完整设计属于暂缓工作。
-- **仅以 OAuth 认证的提供方不予提供**：pi-ai 的 OAuth 只从*已存储*的 OAuth 凭据解析，而本适配器构造 `Models` 集合时不注入凭据存储、也不运行登录流程，因此这类路由的每个请求都会在发出之前以 `Provider is not configured` 失败。可配置提供方目录因此不列出它们；已安装 catalog 中只有 `openai-codex` 属于此类。settings 文档已经写过的路由仍保留目录条目，配置界面据此可以编辑或删除；`apiKeyEnv` 也仍能用该密钥完成认证——对 Codex 而言那是一个会过期、且这里没有任何环节会去刷新的 token。
-- **提供方自带的凭据发现只读进程环境**：不指定凭据的路由交由 catalog 提供方自行解析，而它探测的是环境变量（`AZURE_OPENAI_API_KEY`、`AWS_PROFILE`、`AWS_ACCESS_KEY_ID` 以及各提供方自己的那一组）。它不读任何本地凭据目录，因此只有 `~/.aws/credentials` 而未导出 `AWS_PROFILE` 会被解析为未配置；由 harness 凭据 seam 保管的值，除非进程环境里也有，否则对它不可见。
+- **原生操作认证比对话认证更窄**——普通流可以使用 Harness 支持的 pi-ai 凭据存储和提供方登录流程；原生 `native-stream` 与网页搜索操作需要显式 API key 或已配置的协议认证。
+- **提供方环境认证使用 Host**——认证上下文通过 Harness 凭据服务解析环境变量名，并在 Host 文件系统检查凭据文件；工作区文件系统访问不选择这些文件。
 - **settings 能新增或覆盖路由，但不能移除组合路由**：用户层合并在组合 `base` 之上，因此删除 `cordis.yml` 提供的提供方属于组合变更；对该 namespace 执行 `replace` 只会重置用户层。
 - **分层合并对字典键没有删除语义**：settings seam 把组合 `base` 与用户层按键递归合并，因此 base 声明的某个 `reasoningEfforts` 档位、`modelOverrides` 条目或 `compat` 字段，用户层只能覆盖、无法移除——而 `reasoningEfforts` 里缺席本身*就是*语义（「不提供」），于是 base 声明过的档位会一直被提供。只有 `cordis.yml` entry config 为用户层正在编辑的同一模型声明了按模型推理字段才会触发；受支持的姿态是把这些字段留给 settings 文档（shipped 组合以 dormant 方式挂载该适配器），且 `models` 列表是数组、整体替换，这是带内的解决办法。
 - **`headers` 可能承载一条脱敏器看不见的凭据**：profile 解析会拒绝 Fetch 无法表示的名称和值，但该字典仍是纯字符串，因此设在其中的 `Authorization` 或 `api-key` 会被脱敏后的 `describe()` 原样返回，并被任何配置 UI 渲染出来。请把凭据存为 `apiKeyEnv` 引用；把该字典整体改为只写与其余[协议边界工作](../llm/README.zh.md#known-limitations-and-deferred-work)一并暂缓。
@@ -265,6 +271,6 @@ pi-ai 事件变成 harness 的推理、文本、工具调用、用量与 finish 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 
-无。
+使用 `pnpm run test:e2e packages/llm/llm-pi-ai/tests/native-stream.e2e.ts` 运行原生 Responses API 冒烟测试。它需要 `OPENAI_API_KEY`，未设置 `DSH_PI_AI_OPENAI_MODEL` 时采用 `gpt-4.1-nano`，并接受 `DSH_PI_AI_OPENAI_BASE_URL` 或 `OPENAI_BASE_URL` 指定端点。
 
 </details>

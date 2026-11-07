@@ -1,0 +1,14 @@
+{
+  "name": "external-model-control-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent/tests/external-model.spec.ts packages/subagent/subagent-codex/tests/managed-model-control.spec.ts packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts packages/subagent/subagent-acp/tests/managed-model-control.spec.ts --coverage --coverage.include=packages/subagent/subagent/src/external-model.ts --coverage.reporter=text --retry=0",
+  "startedAt": "2026-10-24T17:05:38.512620+00:00",
+  "seconds": 17.415,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4a0affc77ed20eb55c84b57393a8f4745745d37f33d249a9aa48c9fcb2f62f39",
+  "inputsAfter": "1345ea06bc8e47a01c5e629368a55777bde7fb7415c5c4b7173b35db96d84cf9",
+  "postgresToolDirectory": null,
+  "outputSha256": "e66ed8b64079d920793b12632ae77ecee79dc4210e3b6dd9e84e32f8b33ecd55",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  4 passed (4)\n      Tests  8 passed (8)\n   Start at  01:05:52\n   Duration  3.81s (transform 6.37s, setup 258ms, import 8.54s, tests 101ms, environment 0ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 3/3 )\nBranches     : 100% ( 6/6 )\nFunctions    : 100% ( 1/1 )\nLines        : 100% ( 3/3 )\n================================================================================\n"
+}

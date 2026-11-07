@@ -16,7 +16,7 @@ import type { ConversationNodeDefinition } from '../src/client/contract/conversa
 import { Session } from '../src/client/sessions/session.ts'
 import type { SessionRuntime } from '../src/client/sessions/service.ts'
 import type { WorkspaceRuntime } from '../src/client/workspaces/service.ts'
-import { FakeApiClient, fakeRemote, ok } from './fake-api.client.ts'
+import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
 
 interface Bench {
   ctx: Context
@@ -61,6 +61,7 @@ async function mount(overrides: Partial<ConnectionHandle> = {}): Promise<Bench> 
     },
   }
   const handle: ConnectionHandle = {
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 },
     api,
     isLoopback: true,
     interactions: 'none',
@@ -99,6 +100,224 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe('runtime client apply', () => {
+  it.each([
+    { principalId: 7, runtimeTarget: { kind: 'personal' } as const, suffix: '7.personal', sessionId: 'personal-seven' },
+    { principalId: 7, runtimeTarget: { kind: 'project', projectId: 42 } as const, suffix: '7.project-42', sessionId: 'project-seven' },
+    { principalId: 8, runtimeTarget: { kind: 'personal' } as const, suffix: '8.personal', sessionId: 'personal-eight' },
+  ])('restores only account/Runtime $suffix while its baseline is pending', async ({ principalId, runtimeTarget, suffix, sessionId }) => {
+    const storage = new Map([
+      ['dsh.sessions.current', JSON.stringify({ sessionId: 'legacy-other-space' })],
+      ['dsh.sessions.current.v2.7.personal', JSON.stringify({ sessionId: 'personal-seven' })],
+      ['dsh.sessions.current.v2.7.project-42', JSON.stringify({ sessionId: 'project-seven' })],
+      ['dsh.sessions.current.v2.8.personal', JSON.stringify({ sessionId: 'personal-eight' })],
+    ])
+    const before = new Map(storage)
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    let bench: Bench | undefined
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    try {
+      bench = await mount({ documentIdentity: { principalId, runtimeTarget } })
+      bench.api.onList = () => list.promise
+      bench.api.onHistory = () => history.promise
+      bench.ctx.on('connection/reset', () => { bench?.ctx.get('sessions')!.beginNavigation() })
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, runtimeTarget })
+      expect(bench.api.callsOf('session.history')).toEqual([{ sessionId, maxMessages: 50, detail: 'conversation' }])
+      expect(bench.api.callsOf('session.list')).toHaveLength(1)
+      expect(bench.ctx.get('sessions')!.list.getSnapshot().current).toBeUndefined()
+      for (const [key, value] of before) {
+        if (key !== `dsh.sessions.current.v2.${suffix}`) expect(storage.get(key)).toBe(value)
+      }
+    } finally {
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      try { await bench?.ctx.fiber.dispose() }
+      finally { vi.unstubAllGlobals() }
+    }
+  })
+
+  it('leaves an unscoped saved selection untouched on the first authenticated space visit', async () => {
+    const saved = JSON.stringify({ sessionId: 'another-space' })
+    const storage = new Map([['dsh.sessions.current', saved]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    let bench: Bench | undefined
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    try {
+      bench = await mount({ documentIdentity: { principalId: 7, runtimeTarget: { kind: 'personal' } } })
+      bench.api.onList = () => list.promise
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, runtimeTarget: { kind: 'personal' } })
+      expect(bench.api.callsOf('session.history')).toHaveLength(0)
+      expect(storage.get('dsh.sessions.current')).toBe(saved)
+    } finally {
+      list.resolve(ok({ items: [] }))
+      try { await bench?.ctx.fiber.dispose() }
+      finally { vi.unstubAllGlobals() }
+    }
+  })
+
+  it('prepares each description publication before resetting with the same initial flag, including for late subscribers', async () => {
+    const bench = await mount()
+    const order: string[] = []
+    const late: string[] = []
+    const connected = { version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }
+    const connection = bench.ctx.get('connection') as ConnectionHandle
+    const stopDescription = connection.hostDescription.subscribe(() => { order.push('description') })
+    try {
+      bench.ctx.on('connection/will-reset', (value) => {
+        order.push(`will-reset:${String(value)}`)
+        expect(connection.hostDescription.getSnapshot()).toBeUndefined()
+      })
+      bench.ctx.on('connection/reset', (value) => {
+        order.push(`reset:${String(value)}`)
+        expect(connection.hostDescription.getSnapshot()).toBe(connected)
+      })
+      bench.sinks?.onBeforeConnected?.(connected)
+      expect(order).toEqual(['will-reset:true'])
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(0)
+      expect(bench.api.callsOf('session.list')).toHaveLength(0)
+      bench.publishDescription(connected)
+      bench.sinks?.onConnected?.(connected)
+      expect(order).toEqual(['will-reset:true', 'description', 'reset:true'])
+      bench.ctx.on('connection/will-reset', (value) => { late.push(`will-reset:${String(value)}`) })
+      bench.ctx.on('connection/reset', (value) => { late.push(`reset:${String(value)}`) })
+      bench.publishDescription(undefined)
+      order.length = 0
+      bench.sinks?.onBeforeConnected?.(connected)
+      expect(order).toEqual(['will-reset:false'])
+      bench.publishDescription(connected)
+      bench.sinks?.onConnected?.(connected)
+      expect(order).toEqual(['will-reset:false', 'description', 'reset:false'])
+      expect(late).toEqual(['will-reset:false', 'reset:false'])
+    } finally { stopDescription(); await bench.ctx.fiber.dispose() }
+  })
+
+  it('withdraws prior connection state before preparing the saved history and fresh baselines', async () => {
+    const storage = new Map([['dsh.sessions.current', JSON.stringify({ sessionId: 'saved' })]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    let bench: Bench | undefined
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    try {
+      bench = await mount()
+      const { api, ctx, sinks } = bench
+      api.onList = () => list.promise
+      api.onHistory = () => history.promise
+      const sessions = ctx.get('sessions')!
+      const readsAtReset: number[][] = []
+      ctx.on('connection/reset', () => {
+        readsAtReset.push(['workspace.list', 'session.list', 'session.history'].map(endpoint => api.callsOf(endpoint).length))
+        sessions.beginNavigation()
+      })
+      sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+      expect(readsAtReset).toEqual([[0, 0, 0]])
+      expect(api.callsOf('session.history')).toHaveLength(1)
+      expect(api.lastHistorySignal?.aborted).toBe(false)
+      expect(api.callsOf('session.historyIndex')).toHaveLength(0)
+      expect(sessions.list.getSnapshot().current).toBeUndefined()
+    } finally {
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      try { await bench?.ctx.fiber.dispose() }
+      finally { vi.unstubAllGlobals() }
+    }
+  })
+
+  it('retries the shared Workspace baseline on a later connection after refusal', async () => {
+    const bench = await mount()
+    const id = 'recovered-archive' as never
+    const key = clientSessionKey({ kind: 'personal' }, id)
+    bench.api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    bench.api.onWorkspaceList = async () => err({ code: 'internal', message: 'refused', details: {} })
+    try {
+      const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
+      const connected = { version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }
+      bench.sinks?.onConnected?.(connected)
+      await workspaces.refresh()
+      expect(workspaces.list.getSnapshot().state).toBe('error')
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(1)
+      bench.sinks?.onStateChange?.('reconnecting')
+      bench.api.onWorkspaceList = async () => ok({ items: [], archivedSessionIds: [id], archiveRevision: 1 })
+      bench.sinks?.onConnected?.(connected)
+      await workspaces.refresh()
+      expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([key])
+      expect(bench.ctx.get('sessions')?.list.getSnapshot().archivedById[key]?.id).toBe(key)
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(2)
+    } finally { await bench.ctx.fiber.dispose() }
+  })
+
+  it('aborts pending Workspace baseline work on runtime disposal and ignores its late response', async () => {
+    const bench = await mount()
+    const baseline = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const list = vi.spyOn(bench.api.workspace, 'list')
+    bench.api.onWorkspaceList = () => baseline.promise
+    try {
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+      const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
+      const pending = workspaces.refresh()
+      const signal = list.mock.calls[0]?.[1]
+      await bench.ctx.fiber.dispose()
+      expect(signal?.aborted).toBe(true)
+      baseline.resolve(ok({ items: [], archivedSessionIds: ['late' as never], archiveRevision: 1 }))
+      await pending
+      expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([])
+      expect(bench.ctx.get('sessions')).toBeUndefined()
+    } finally { baseline.resolve(ok({ items: [] })); await bench.ctx.fiber.dispose() }
+  })
+
+  it('keeps both consumers on the same merged legacy Workspace archive baseline', async () => {
+    const bench = await mount()
+    const baseline = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const ids = ['legacy-a', 'legacy-b'].map(id => id as never)
+    bench.api.onWorkspaceList = () => baseline.promise
+    bench.api.onList = async () => ok({ items: ids.map(sessionId => ({ sessionId, updatedAt: 1, running: false, blank: false })) })
+    try {
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+      bench.sinks?.onHostEnvelope?.({ rpcId: 'legacy-archive' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [ids[1]!],
+      } })
+      baseline.resolve(ok({ items: [], archivedSessionIds: [ids[0]!] }))
+      const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
+      await workspaces.refresh()
+      const expected = new Set(ids.map(id => clientSessionKey({ kind: 'personal' }, id)))
+      expect(new Set(workspaces.list.getSnapshot().archivedSessionIds)).toEqual(expected)
+      expect(new Set(Object.keys(bench.ctx.get('sessions')!.list.getSnapshot().archivedById))).toEqual(expected)
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(1)
+    } finally { baseline.resolve(ok({ items: [] })); await bench.ctx.fiber.dispose() }
+  })
+
+  it('shares the connected Workspace baseline with the Session archive partition', async () => {
+    const bench = await mount()
+    const baseline = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const id = 'baseline-archived' as never
+    const key = clientSessionKey({ kind: 'personal' }, id)
+    bench.api.onWorkspaceList = () => baseline.promise
+    bench.api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    try {
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(1)
+      baseline.resolve(ok({ items: [], archivedSessionIds: [id], archiveRevision: 1 }))
+      const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
+      await workspaces.refresh()
+      await vi.waitFor(() => {
+        expect(bench.ctx.get('sessions')?.list.getSnapshot().archivedById[key]?.id).toBe(key)
+      })
+      expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([key])
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(1)
+    } finally {
+      baseline.resolve(ok({ items: [] }))
+      await bench.ctx.fiber.dispose()
+    }
+  })
+
   it('mounts slots, Sessions, and Workspaces and fans host frames into both managers', async () => {
     const bench = await mount()
     expect(bench.ctx.get('slots') !== undefined).toBe(true)

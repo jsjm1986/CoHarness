@@ -17,12 +17,6 @@ import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
 
-declare module '@deepseek-ai/dsh-client-runtime/client' {
-  interface SessionReferenceSourceMap {
-    composer: true
-  }
-}
-
 /** Structural command face for per-session popup resolution. */
 interface CommandFace {
   popupFor(actx: ClientContext): PopupDismissFace
@@ -53,11 +47,26 @@ export class InputHub implements SessionInputResolver {
   /**
    * @param ctx - client root context (services resolved lazily per call — boot order stays free).
    * @param t - conversation-namespace translate thunk (reads the active locale at call time).
+   * @param draftIsSaved - verifies that this tab can recover the current mirrored Session record.
    */
   constructor(
     private readonly rootCtx: ClientContext,
     private readonly t: TranslateNS<'conversation'>,
+    private readonly draftIsSaved?: (sessionId: SessionId) => boolean,
   ) {}
+
+  hasUnsavedDrafts(): boolean {
+    for (const pending of this.pendingInits.values()) {
+      if (pending.prompt !== undefined && pending.prompt !== '') return true
+    }
+    for (const [id, { shell }] of this.shells) {
+      const state = shell.snapshot
+      if (state.imageIds.length > 0 || state.documentIds.length > 0
+        || state.phase === 'adjudicating' || state.phase === 'submitting') return true
+      if (state.draft !== '' && (!shell.hasDraftMirror || this.draftIsSaved?.(id) !== true)) return true
+    }
+    return false
+  }
 
   /**
    * Resolve the facade for one session-scope ctx (SessionInputResolver face).
@@ -90,6 +99,8 @@ export class InputHub implements SessionInputResolver {
       inputTriggers: () => this.controller(actx),
       popup: () => this.popup(actx),
       queue: queueReadFaceOf(session),
+      submissionBlock: () => this.sessions().list.getSnapshot().navigationBlockedSessionId === id
+        ? this.t('placeholder.openingSession') : undefined,
       defaultSink: (text, imageIds, documentIds, mode, signal) =>
         this.sink(session, text, imageIds, documentIds, mode, signal),
       steerQueue: () => { void this.steerQueue(session, shell) },

@@ -8,9 +8,8 @@
 - insert:
     - id: directory-guard
       name: '@deepseek-ai/dsh-directory-guard'
-    # Pin the in-app directory browser. Gateway instances bind 127.0.0.1 on
-    # a machine with a display, so -auto would mount the native OS chooser
-    # and open it on the host — invisible to a browser on the public domain.
+    # Pin the browser interaction for this bundle in both standalone and
+    # Gateway-managed compositions, independent of local display detection.
     - id: directory-picker-browse
       name: '@deepseek-ai/dsh-host-directory-picker-browse'
     - id: ui-directory-picker-browse

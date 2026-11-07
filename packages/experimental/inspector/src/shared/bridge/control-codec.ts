@@ -98,7 +98,7 @@ export function parseInspectorWorkerControl(value: unknown): InspectorWorkerCont
  */
 export function parseInspectorClientBootstrap(value: unknown): InspectorClientBootstrap {
   const record = exactObject(value, [
-    'endpoint', 'protocol', 'maxQueuedRecords', 'maxQueuedBytes', 'maxRecordsPerFrame', 'maxFrameBytes',
+    'endpoint', 'protocol', 'clientOrigins', 'maxQueuedRecords', 'maxQueuedBytes', 'maxRecordsPerFrame', 'maxFrameBytes',
     'reconnectBaseMs', 'reconnectMaxMs', 'queryTimeoutMs', 'maxRuntimeObjectsPerSession',
     'maxRuntimePropertiesPerResult', 'maxCordisNodes', 'maxClientSourceBytes',
   ], 'Client bootstrap')
@@ -117,9 +117,13 @@ export function parseInspectorClientBootstrap(value: unknown): InspectorClientBo
   if (record.protocol.length === 0 || record.protocol.length > 256) {
     throw new Error('inspector protocol: Client bootstrap protocol must contain 1 to 256 characters')
   }
+  if (!Array.isArray(record.clientOrigins) || !record.clientOrigins.every(origin => typeof origin === 'string')) {
+    throw new Error('inspector protocol: Client bootstrap clientOrigins must be strings')
+  }
   const bootstrap: InspectorClientBootstrap = {
     endpoint: record.endpoint,
     protocol: record.protocol,
+    clientOrigins: record.clientOrigins,
     maxQueuedRecords: natural(record.maxQueuedRecords, 'maxQueuedRecords'),
     maxQueuedBytes: natural(record.maxQueuedBytes, 'maxQueuedBytes'),
     maxRecordsPerFrame: natural(record.maxRecordsPerFrame, 'maxRecordsPerFrame'),

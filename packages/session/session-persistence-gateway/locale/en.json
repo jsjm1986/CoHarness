@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session persistence gateway",
+    "description": "Gateway PostgreSQL session persistence provider for CoHarness."
+  }
+}

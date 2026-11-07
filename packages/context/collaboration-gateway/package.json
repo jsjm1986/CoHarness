@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-collaboration-gateway",
-  "description": "Gateway-backed project collaboration provider for DeepSeek Harness",
+  "description": "Gateway-backed project collaboration provider for CoHarness",
   "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -19,9 +19,11 @@
       "default": "./lib/index.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/types/**/*.d.ts"
   ],

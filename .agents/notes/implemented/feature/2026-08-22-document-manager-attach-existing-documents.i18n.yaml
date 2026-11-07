@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-document-manager-attach-existing-documents.md
 document:
-  en: d44a656c456f1b0f0b522c1e393838847a07d091
-  zh: 75be1efa61983974652ff70845d4aeab4e04cd78
+  en: bc88c08df5cd4a1473659f3f5aadb417ae203b89
+  zh: 6a03fd1419d0eebaaed239e64751f4a161f8304a
 /agent-note-attach-existing-documents-from-the-manager:
   en: 0428d1fb2081aff2
   zh: c6db267929835a23
@@ -12,14 +12,14 @@ document:
   en: ad2db0a6f859b615
   zh: b5f309313cc22e8b
 /agent-note-attach-existing-documents-from-the-manager/decision:
-  en: 14ec08f2ccc67fe0
-  zh: 47a0d39ee71418d1
+  en: 7c46870ad076a675
+  zh: 66f614349da98c17
 /agent-note-attach-existing-documents-from-the-manager/alternatives-considered:
-  en: 95d48154cf484ead
-  zh: 160e193b2203fce4
+  en: 59b41ac0cdedc864
+  zh: 8b23665e4eb2ad9c
 /agent-note-attach-existing-documents-from-the-manager/consequences:
-  en: bb80daa2b2748aed
-  zh: 13648c591f5faa42
+  en: f4a755a07c28b2a9
+  zh: b50434e87897702d
 /agent-note-attach-existing-documents-from-the-manager/verification:
   en: 695e42c0867f69d0
   zh: ad37ddb5e3ae903d

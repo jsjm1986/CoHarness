@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-agent-preset/README.md
 document:
-  en: b8b0d50d79a030d4348ae2043178864334dc104b
-  zh: 292207aeb4e1a3284de29d2cc52bf69b477ebcb4
+  en: f5d0639ef5b2b054d50b49ebb0f2df9957c5629f
+  zh: 9796a2cf8208bc282f3610d85f1394c850e81bae
 /:
   en: bc21e85265ce2411
   zh: 61495d48365178df
 /dsh-client-ui-agent-preset:
-  en: 542b1c9a23d7590e
-  zh: 156b77d9fd066c44
+  en: f4344d4552e8c037
+  zh: 5a943475cae7db12
 /dsh-client-ui-agent-preset/summary:
   en: 9d57e549d79e291c
   zh: 216a3dcaec644cf8
@@ -18,8 +18,8 @@ document:
   en: 5e25a1ea15ca4e0b
   zh: 6cac34038571a702
 /dsh-client-ui-agent-preset/why-it-is-a-new-session-preference:
-  en: 2f0a1ce8f49a4b96
-  zh: 5ba31fc76f241214
+  en: 667d8534f9df9606
+  zh: cc4e955f25b18376
 /dsh-client-ui-agent-preset/the-new-session-chip:
   en: fd9a45a6df649277
   zh: 71b2dd4fa3017454

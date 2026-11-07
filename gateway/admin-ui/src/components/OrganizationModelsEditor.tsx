@@ -1,4 +1,5 @@
-import { useMemo, useSyncExternalStore } from 'react'
+import { usePendingEdits } from '../pending-edits.tsx'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Context } from '@deepseek-ai/cordis'
 import { ModelsSection } from '../../../../packages/client/ui-settings-models/src/client/ModelsSection.tsx'
 import type { ModelDiscoveryProbe } from '../../../../packages/client/ui-settings-models/src/client/ModelListEditor.tsx'
@@ -26,6 +27,8 @@ const organizationCopyZh = {
   customRouteInvalid: '组织 Provider ID 必须匹配 org-名称，例如 org-primary。',
   create: '创建组织 Provider',
   creating: '正在创建组织 Provider…',
+  modelsEmpty: '添加至少一个模型后才能保存组织 Provider',
+  customNeedsModels: '组织 Provider 至少需要一个模型',
   advancedHint: '其余 Provider 字段会保留在完整 profile 中。',
 }
 
@@ -41,6 +44,8 @@ const organizationCopyEn = {
   customRouteInvalid: 'An organization provider ID must match org-name, for example org-primary.',
   create: 'Create the organization provider',
   creating: 'Creating the organization provider…',
+  modelsEmpty: 'Add at least one model to save the organization provider.',
+  customNeedsModels: 'An organization provider needs at least one model.',
   advancedHint: 'The remaining provider fields stay in the complete profile.',
 }
 
@@ -62,20 +67,37 @@ function bindSnapshot(controller: ModelsSettingsStore): SnapshotHook {
 
 /** Shared Models settings plugin mounted against the organization REST facade. */
 export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void }) {
-  const { schema, describeFace, api } = useMemo(() => {
+  const [editing, setEditing] = useState(false)
+  usePendingEdits(editing)
+  const changed = useRef(onChanged)
+  const [owner, setOwner] = useState<OrganizationModelsOwner | null>(null)
+  useEffect(() => { changed.current = onChanged }, [onChanged])
+  useEffect(() => {
+    const lifetime = new AbortController()
     // The admin surface reuses the shared editor outside the Cordis client
     // plugin graph, so it must provide the same schema and settings mirror
     // faces that ui-settings-models receives from its host plugin.
     const schemaService = new SettingsSchemaService(new Context())
-    return {
-      schema: createSettingsSchemaOperations(schemaService),
-      ...createOrganizationModelsMirror({ onChanged }),
-    }
-  }, [onChanged])
-  const controller = useMemo(
-    () => new ModelsSettingsStore(api as never, schema, describeFace),
-    [api, describeFace, schema],
-  )
+    const schema = createSettingsSchemaOperations(schemaService)
+    const { describeFace, api } = createOrganizationModelsMirror({
+      signal: lifetime.signal,
+      onChanged: () => { if (!lifetime.signal.aborted) changed.current() },
+    })
+    const controller = new ModelsSettingsStore(api as never, schema, describeFace)
+    setOwner({ api, controller, schema, onEditingChange: setEditing })
+    return () => { lifetime.abort() }
+  }, [])
+  return owner === null ? null : <MountedOrganizationModelsEditor {...owner} />
+}
+
+interface OrganizationModelsOwner {
+  api: ReturnType<typeof createOrganizationModelsMirror>['api']
+  controller: ModelsSettingsStore
+  schema: ReturnType<typeof createSettingsSchemaOperations>
+  onEditingChange: (editing: boolean) => void
+}
+
+function MountedOrganizationModelsEditor({ api, controller, schema, onEditingChange }: OrganizationModelsOwner) {
   const useSnapshot = useMemo(() => bindSnapshot(controller), [controller])
   const t = useMemo(() => {
     const copy = adminLanguage() === 'en' ? organizationCopyEn : organizationCopyZh
@@ -96,6 +118,7 @@ export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void 
   return (
     <div className="organizationModelsEditor">
       <ModelsSection
+        onEditingChange={onEditingChange}
         controller={controller}
         useSnapshot={useSnapshot as never}
         api={api as never}

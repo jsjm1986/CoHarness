@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-06-agent-request-freeze-evidence.md
 document:
-  en: 6603a728c3dd2acc87902169bb07a67bde0be2a4
-  zh: a5ba15ac139d647755f9c039847acbb642d214d3
+  en: 0adab7fa6122c6e8e7bee8363a504a82cab23688
+  zh: a936d723d232644df8b50e6e03f600f971383876
 /agent-note-reuse-only-loop-proven-message-freezes:
   en: 7ec7e2c8c1eb46bb
   zh: 93a619878774a795
@@ -12,8 +12,8 @@ document:
   en: af6aa6181efb2163
   zh: 3f1630947294db0a
 /agent-note-reuse-only-loop-proven-message-freezes/decision:
-  en: 64e5058366d82142
-  zh: 073f4e1856c58294
+  en: 53315100da86e9bf
+  zh: 606f838447ac8bc8
 /agent-note-reuse-only-loop-proven-message-freezes/measurement-evidence:
   en: 731e00bb5059b1f3
   zh: 118464dc6e640431

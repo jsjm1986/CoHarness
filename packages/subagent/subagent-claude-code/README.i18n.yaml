@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-claude-code/README.md
 document:
-  en: 807ad34c5d0ff0684ec78e855a79467defa326d7
-  zh: efc01c53b53d0712f273df14bd16cabc531d3a04
+  en: e0b0208be2c50b41217a88da7268cee8f56ce8e6
+  zh: a6dd43b6516938db4a7de7f74da4953a02711406
 /:
   en: 106a80259eef465a
   zh: 07bde2df0c861ceb
@@ -18,8 +18,8 @@ document:
   en: b0da2a7b0d6ecfe6
   zh: d4de4894f8ec25ce
 /deepseek-ai-dsh-subagent-claude-code/start-and-ownership:
-  en: 8d5027446af34c32
-  zh: dc65cd9f9ea140ef
+  en: 098d1d05ac32a4f5
+  zh: 835af36a50528148
 /deepseek-ai-dsh-subagent-claude-code/native-settings-and-interaction:
   en: 90b68f691b4bf801
   zh: 5f833d31e8426e5a
@@ -63,8 +63,8 @@ document:
   en: fdbb7dcbf8b37f2b
   zh: 9accaada9f21e36a
 /deepseek-ai-dsh-subagent-claude-code/known-limitations-and-deferred-work:
-  en: 36fedbf787455356
-  zh: 1400e634bb5d2ac9
+  en: d1bb6b9dd10b9044
+  zh: f34d77b825019593
 /deepseek-ai-dsh-subagent-claude-code/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

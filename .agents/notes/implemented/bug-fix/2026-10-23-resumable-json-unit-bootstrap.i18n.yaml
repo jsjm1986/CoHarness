@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-resumable-json-unit-bootstrap.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-resumable-json-unit-bootstrap.md
+document:
+  en: f30816df6112c279df35713e0bcb7774e813ec5d
+  zh: 408791c77565b07b35186866b02ea8c2a3c33609
+/agent-note-resume-interrupted-per-record-json-bootstrap-before-publishing-state:
+  en: b144974f4190612f
+  zh: 898f7cba8025cac0
+/agent-note-resume-interrupted-per-record-json-bootstrap-before-publishing-state/problem:
+  en: e2e5f89b1cbf2976
+  zh: 8a7ed397b12d8750
+/agent-note-resume-interrupted-per-record-json-bootstrap-before-publishing-state/decision:
+  en: fb7ef98afd52a590
+  zh: 8f3b4e4b738368da
+/agent-note-resume-interrupted-per-record-json-bootstrap-before-publishing-state/alternatives-considered:
+  en: 40cb781afb0ca7df
+  zh: 3f96ffd825f83247
+/agent-note-resume-interrupted-per-record-json-bootstrap-before-publishing-state/consequences:
+  en: 8f4210b995f9c645
+  zh: 566e44f71e476ef1
+/agent-note-resume-interrupted-per-record-json-bootstrap-before-publishing-state/verification:
+  en: 2633ed5afcf49e31
+  zh: 1eabebf8af48a469

@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-format-facts",
+  "cwd": ".",
+  "command": "pnpm run verify-persistence-formats --write",
+  "startedAt": "2026-10-24T01:38:09.018415+00:00",
+  "seconds": 9.756,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "inputsAfter": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "postgresToolDirectory": null,
+  "outputSha256": "abea4420bc1b24bae44b5bfd7658f7d91380ae57cd0979f48b72d23f2205cd5b",
+  "outputTail": "$ tsx scripts/persistence-formats.ts --write\nPersistence formats: v0 through v7 verified (8 complete references). Refreshed 3 files.\n"
+}

@@ -112,7 +112,7 @@ describe('the provider hand-off', () => {
     const { ctx, bash } = await setup({}, () => passthrough(['node']))
     const controller = new AbortController()
     const reason = new Error('caller abandoned the failed launch')
-    const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => {
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async () => {
       throw Object.assign(new Error('launch refused'), { code: 'ENOENT', syscall: 'spawn node', path: 'node' })
     })
     try {
@@ -133,7 +133,7 @@ describe('the provider hand-off', () => {
     const controller = new AbortController()
     const reason = new Error('caller cancelled pending launch')
     const reader: SubprocessOutputReader = { readFrom: () => ({ text: '', nextOffset: 0, lossy: false }) }
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => {
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async () => {
       entered.resolve(undefined)
       return {
         stdin: undefined, stdout: undefined, stderr: undefined, control: undefined,
@@ -339,7 +339,7 @@ describe('fail closed', () => {
       denialSignatures: UNIX_SIGNATURES,
       runnerFailureRules: RUNNER_FAILURE,
     }))
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => {
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async () => {
       throw Object.assign(new Error('spawn ENOEXEC'), { code: 'ENOEXEC', syscall: 'spawn' })
     })
 
@@ -368,7 +368,7 @@ describe('fail closed', () => {
     }))
     // This pins an alternative SubprocessRuntime's synchronous seam, not the
     // shipped local behavior.
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => {
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async () => {
       throw Object.assign(new Error('spawn EACCES'), { code: 'EACCES', syscall: 'spawn', path: runner })
     })
 
@@ -393,7 +393,7 @@ describe('fail closed', () => {
     const parent = mkdtempSync(join(tmpdir(), 'dsh-sandbox-missing-cwd-'))
     const workdir = join(parent, 'missing')
     const failure = Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT', syscall: `spawn ${runner}`, path: runner })
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => { throw failure })
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async () => { throw failure })
     try {
       const background = (await start(bash, bash.resolve({ command: 'true', workdir })))
       await background.done
@@ -574,7 +574,7 @@ describe('background sandbox facts', () => {
     const emptyReader: SubprocessOutputReader = {
       readFrom: () => ({ text: '', nextOffset: 0, lossy: false }),
     }
-    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue({
+    vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue({
       control: undefined,
       stdin: undefined,
       stdout: undefined,

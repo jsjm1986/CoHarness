@@ -1,0 +1,14 @@
+{
+  "name": "trash-safety-upgrade-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-trash-manifest/guide.md",
+  "startedAt": "2026-10-24T04:49:12.614332+00:00",
+  "seconds": 1.827,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "db7e56a763628ba87d1cdef67d5cae5a083620ef0bc58ecad9227fe07f7c27ce",
+  "inputsAfter": "db7e56a763628ba87d1cdef67d5cae5a083620ef0bc58ecad9227fe07f7c27ce",
+  "postgresToolDirectory": null,
+  "outputSha256": "d8e28b6f96fa74be020e5b4f4ce08b7ada01b71179bfd4ac1a0a2386554240ca",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-trash-manifest/guide.md\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-trash-manifest/guide.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

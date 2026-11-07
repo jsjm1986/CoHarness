@@ -1,0 +1,14 @@
+{
+  "name": "real-web-gateway-source-assembly-port-fixed",
+  "cwd": ".",
+  "command": "node --import tsx/esm gateway/tests/run-local-web-assembly.mjs src",
+  "startedAt": "2026-10-24T20:59:05.461813+00:00",
+  "seconds": 3.023,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fe3174491c42056704b7d2e50747f04d31ecdc131974016581b4e307b497e7ba",
+  "inputsAfter": "fe3174491c42056704b7d2e50747f04d31ecdc131974016581b4e307b497e7ba",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "4f3536cc821039cfb8b58fa45b7cd368fa108c8bbf13bd390f8c8964cc75af28",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/run-local-web-assembly.mjs:103\n        child.once('error', fail); child.once('exit', () => fail(new Error(`Gateway fixture exited: ${diagnostics}`)))\n                                                                 ^\n\nError: Gateway fixture exited: /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/config.ts:563\n    throw new Error('HGW_INSTANCE_PORT_BASE must be an integer between 1024 and 65535')\n          ^\n\nError: HGW_INSTANCE_PORT_BASE must be an integer between 1024 and 65535\n    at loadConfig (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/config.ts:563:11)\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/local-runtime-web-gateway.mjs:28:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n\nNode.js v25.8.1\n\n    at ChildProcess.<anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/run-local-web-assembly.mjs:103:66)\n    at Object.onceWrapper (node:events:623:12)\n    at ChildProcess.emit (node:events:508:20)\n    at ChildProcess._handle.onexit (node:internal/child_process:294:12)\n\nNode.js v25.8.1\n"
+}

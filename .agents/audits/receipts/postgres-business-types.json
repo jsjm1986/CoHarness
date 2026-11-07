@@ -1,0 +1,14 @@
+{
+  "name": "postgres-business-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T23:54:23.433599+00:00",
+  "seconds": 6.068,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1b49545d8a4dc2c129a8fefe904d84fde2563af8c2e6e42eb2e4813588476e5a",
+  "inputsAfter": "1b49545d8a4dc2c129a8fefe904d84fde2563af8c2e6e42eb2e4813588476e5a",
+  "postgresToolDirectory": null,
+  "outputSha256": "18e843f33a76ee0ec9574b14d36e9df625672a18fd29f465dcf6bfc2a210187f",
+  "outputTail": "gateway/tests/project-service-postgres.spec.ts(35,3): error TS2741: Property 'instancesOutliveGateway' is missing in type '{ start: () => Promise<never>; attach: () => { hasExited: () => boolean; isAlive: () => Promise<boolean>; terminate: () => Promise<void>; }; }' but required in type 'Launcher'.\n"
+}

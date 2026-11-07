@@ -1,0 +1,21 @@
+{
+  "final_response": "DONE",
+  "requests": [
+    {
+      "provider": "browser-fixture",
+      "model": "browser-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Extract the heading"
+            }
+          ]
+        }
+      ],
+      "system": "Return only a JSON value matching this JSON Schema (browser_extraction): {\"type\":\"object\",\"additionalProperties\":true}."
+    }
+  ]
+}

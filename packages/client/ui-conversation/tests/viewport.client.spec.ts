@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSnapshotStore, NavigationController, type ISessions, type SessionId, type SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { clientSessionKey, createSnapshotStore, NavigationController, type ISessions, type SessionId, type SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { ConversationViewportController, createConversationViewportStore } from '../src/client/viewport.ts'
+import { readWorkbenchRecord, writeWorkbenchRecord } from '../src/client/workbench-persistence.ts'
 
 const id = (value: string) => value as SessionId
 
@@ -12,7 +13,8 @@ function harness() {
       id: id(value), displayTitle: value, running: false, blank: false, updatedAt: 0,
     }])),
     archivedById: {},
-    current: id('a'), phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+    current: id('a'), phase: 'ready',
+    state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const opened: SessionId[] = []
   const staged: SessionId[][] = []
@@ -119,6 +121,61 @@ describe('ConversationViewportController', () => {
     viewport.dispose()
   })
 
+  it.each(['single', 'workbench'] as const)('restores empty version-3 layouts without account directory demand: %s', (mode) => {
+    writeWorkbenchRecord('account:7', {
+      version: 3, mode, activeId: 'default', workbenches: [
+        { id: 'default', name: 'Empty layout', paneIds: [], paneRatios: [], updatedAt: 1 },
+        { id: 'another', name: 'Another empty layout', paneIds: [], paneRatios: [], updatedAt: 2 },
+      ],
+    })
+    const h = harness()
+    h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('account:7')
+      viewport.setEnabled(true)
+      expect(viewport.needsCatalogRestore()).toBe(false)
+      expect(viewport.snapshot.getSnapshot()).toMatchObject({ mode, paneIds: [] })
+      expect(viewport.listWorkbenches().map(row => row.name)).toEqual(['Empty layout', 'Another empty layout'])
+      expect(h.opened).toEqual([])
+      expect(h.staged.flat()).toEqual([])
+    } finally { viewport.dispose() }
+  })
+
+  it('keeps directory verification for a nonempty inactive layout beside an empty active layout', () => {
+    const saved = clientSessionKey({ kind: 'personal' }, id('not-loaded'))
+    writeWorkbenchRecord('account:7', {
+      version: 3, mode: 'single', activeId: 'default', workbenches: [
+        { id: 'default', name: 'Empty layout', paneIds: [], paneRatios: [], updatedAt: 1 },
+        { id: 'another', name: 'Saved layout', paneIds: [saved], paneRatios: [1], updatedAt: 2 },
+      ],
+    })
+    const h = harness()
+    h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('account:7')
+      viewport.setEnabled(true)
+      expect(viewport.needsCatalogRestore()).toBe(true)
+      expect(viewport.listWorkbenches()[1]?.paneIds).toEqual([saved])
+      expect(h.opened).toEqual([])
+    } finally { viewport.dispose() }
+  })
+
+  it('keeps version-2 restoration pending even when its layout is empty', () => {
+    writeWorkbenchRecord('account:7', { version: 2, mode: 'workbench', activeId: 'default', workbenches: [
+      { id: 'default', name: 'Legacy layout', paneIds: [], paneRatios: [], updatedAt: 1 },
+    ] })
+    const h = harness()
+    h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('account:7')
+      expect(viewport.needsCatalogRestore()).toBe(true)
+      expect(viewport.snapshot.getSnapshot().pendingIdentity).toBe(true)
+    } finally { viewport.dispose() }
+  })
+
   it('drops stale persisted ids when the list baseline changes', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
@@ -216,6 +273,87 @@ describe('ConversationViewportController', () => {
     viewport.deleteWorkbench?.(created)
     expect(viewport.currentWorkbench?.().id).not.toBe(created)
     viewport.dispose()
+  })
+
+  it('duplicates the selected pane and ratios without moving focus to the first pane', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('local')
+      viewport.setEnabled(true)
+      const original = viewport.createWorkbench('Preview')
+      viewport.add(id('a'))
+      viewport.add(id('b'))
+      viewport.setPaneRatios([1, 2])
+      viewport.focus(id('b'))
+      const copy = viewport.duplicateWorkbench(original, 'Preview copy')
+      expect(viewport.currentWorkbench().id).toBe(copy)
+      expect(viewport.snapshot.getSnapshot()).toMatchObject({
+        paneIds: [id('a'), id('b')], activePaneId: id('b'), paneRatios: [1 / 3, 2 / 3],
+      })
+      expect(h.list.getSnapshot().current).toBe(id('b'))
+      viewport.focus(id('a'))
+      viewport.switchWorkbench(original)
+      expect(viewport.snapshot.getSnapshot().activePaneId).toBe(id('b'))
+      expect(h.list.getSnapshot().current).toBe(id('b'))
+    } finally { viewport.dispose() }
+  })
+
+  it('persists a workbench selection when its panes, focus, and ratios are unchanged', async () => {
+    const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+    const h = harness()
+    const personal = clientSessionKey({ kind: 'personal' }, id('a'))
+    const project = clientSessionKey({ kind: 'project', projectId: 7 }, id('b'))
+    h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+    h.list.set({
+      ...h.list.getSnapshot(), ids: [personal, project], current: personal,
+      byId: Object.fromEntries([personal, project].map(key => [key, {
+        id: key, displayTitle: key, running: false, blank: false, updatedAt: 1,
+      }])),
+    })
+    writeWorkbenchRecord('account:7', {
+      version: 3, mode: 'workbench', activeId: 'B',
+      workbenches: ['A', 'B'].map(name => ({
+        id: name, name, paneIds: [personal, project], activePaneId: personal, paneRatios: [0.5, 0.5], updatedAt: 1,
+      })),
+    })
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    const changed = vi.fn()
+    const stop = viewport.snapshot.subscribe(changed)
+    try {
+      viewport.setPersistenceScope('account:7')
+      viewport.setEnabled(true)
+      expect(viewport.currentWorkbench().id).toBe('B')
+      const before = viewport.snapshot.getSnapshot()
+      changed.mockClear()
+      viewport.switchWorkbench('A')
+      expect(viewport.currentWorkbench().id).toBe('A')
+      expect(viewport.snapshot.getSnapshot()).toBe(before)
+      expect(changed).not.toHaveBeenCalled()
+      expect(readWorkbenchRecord('account:7')?.activeId).toBe('A')
+    } finally {
+      stop()
+      viewport.dispose()
+    }
+    const restored = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      restored.setPersistenceScope('account:7')
+      expect(restored.currentWorkbench()).toMatchObject({
+        id: 'A', paneIds: [personal, project], activePaneId: personal, paneRatios: [0.5, 0.5],
+      })
+    } finally { restored.dispose() }
+  })
+
+  it('does not rewrite persistence for the current or an unknown workbench', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('local')
+      const write = vi.spyOn(Storage.prototype, 'setItem')
+      viewport.switchWorkbench(viewport.currentWorkbench().id)
+      viewport.switchWorkbench('missing')
+      expect(write).not.toHaveBeenCalled()
+    } finally { viewport.dispose() }
   })
 
   it('keeps the persisted active pane when the saved workbench restores its pane set', () => {

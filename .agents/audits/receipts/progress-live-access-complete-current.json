@@ -1,0 +1,14 @@
+{
+  "name": "progress-live-access-complete-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-progress-postgres.spec.ts tests/access-invalidation.spec.ts tests/node-resource-budget-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T23:10:15.697086+00:00",
+  "seconds": 27.005,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "81dc2893e63bc7e9c1068b1a89b6d5a533d3ec5306a36bfb444c3861e80e11a6",
+  "inputsAfter": "81dc2893e63bc7e9c1068b1a89b6d5a533d3ec5306a36bfb444c3861e80e11a6",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "a4b9e19fd7d51733693c8aea57553d879d8a70403e0a33272797e120db9a3c86",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\nstderr | tests/project-progress-postgres.spec.ts > project digest governed model path > cancels dispatched utility inference on organization-disabled\n[gateway] access invalidation unavailable (unknown)\n\n ❯ tests/project-progress-postgres.spec.ts (28 tests | 1 failed) 11904ms\n     × cancels dispatched utility inference on organization-disabled 377ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-progress-postgres.spec.ts > project digest governed model path > cancels dispatched utility inference on organization-disabled\nError: access organization is not active\n ❯ PostgresAccessMonitor.drain src/access-invalidation.ts:188:79\n    186|     )\n    187|     const organization = revision.rows[0]\n    188|     if (organization === undefined || organization.status !== 'active'…\n       |                                                                               ^\n    189|     const target = BigInt(organization.access_revision)\n    190|     // A cold process has no admitted streams and can resume its node'…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 2 passed (3)\n      Tests  1 failed | 76 passed (77)\n   Start at  07:10:18\n   Duration  24.22s (transform 1.73s, setup 0ms, import 2.41s, tests 21.51s, environment 0ms)\n\n"
+}

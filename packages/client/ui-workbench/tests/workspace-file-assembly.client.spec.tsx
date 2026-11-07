@@ -21,6 +21,7 @@ it('opens an authorized workspace file through the assembled tab registry and re
   const animation = Object.getOwnPropertyDescriptor(Element.prototype, 'getAnimations')
   Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] })
   const runtime = await SlotTestRuntime.create()
+  runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
   try {
     const resources = new WorkspaceResourceRegistry()
     resources.register({ kind: 'base' }, {
@@ -61,6 +62,7 @@ it('routes Markdown and HTML resources through the assembled authorized readers'
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: create })
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
   const runtime = await SlotTestRuntime.create()
+  runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
   try {
     const resources = new WorkspaceResourceRegistry()
     resources.register({ kind: 'base' }, {
@@ -118,6 +120,7 @@ it('surfaces a changed notice without rereading and clears content on revocation
   const animation = Object.getOwnPropertyDescriptor(Element.prototype, 'getAnimations')
   Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] })
   const runtime = await SlotTestRuntime.create()
+  runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
   try {
     const resources = new WorkspaceResourceRegistry()
     let version = 'v1'

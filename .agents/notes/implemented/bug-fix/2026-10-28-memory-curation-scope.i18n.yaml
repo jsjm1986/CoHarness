@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-28-memory-curation-scope.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-28-memory-curation-scope.md
+document:
+  en: c841ec969594d7dedf37611995f64b05aec5de65
+  zh: 04e331e3c405d3cdd1fac2da69a1e75030ecb4d5
+/agent-note-memory-consolidation-scope-enforcement:
+  en: 398a21e18eecf7dd
+  zh: ab3b6945bcb979b2
+/agent-note-memory-consolidation-scope-enforcement/problem:
+  en: ecbd36c138686be1
+  zh: 03221da3a0dc4932
+/agent-note-memory-consolidation-scope-enforcement/decision:
+  en: b2adfda5b0c47ad7
+  zh: 2dbc9e435bf1a911
+/agent-note-memory-consolidation-scope-enforcement/alternatives-considered:
+  en: 2533c3052cb7f4b0
+  zh: 5f9254b632aef7c5
+/agent-note-memory-consolidation-scope-enforcement/consequences:
+  en: c36f3b3a0e45cf12
+  zh: 7ccdf0b26585a49b
+/agent-note-memory-consolidation-scope-enforcement/verification:
+  en: dfe9718b7566a9bf
+  zh: 105cabe163fd7add

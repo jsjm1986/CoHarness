@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <sys/file.h>
 
+napi_value initialize_directory(napi_env env, napi_value exports);
+
 typedef struct {
   napi_env env;
   napi_ref callback;
@@ -160,5 +162,5 @@ NAPI_MODULE_INIT() {
       napi_set_named_property(env, exports, "tryLock", function) != napi_ok) {
     return NULL;
   }
-  return exports;
+  return initialize_directory(env, exports);
 }

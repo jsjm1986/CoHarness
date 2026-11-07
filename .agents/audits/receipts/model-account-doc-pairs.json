@@ -1,0 +1,14 @@
+{
+  "name": "model-account-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md",
+  "startedAt": "2026-10-24T00:23:33.889629+00:00",
+  "seconds": 4.812,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "95196bbf09041ba821dab8ea3bea8fe53acf700e91bb96983fa87d6b15375809",
+  "inputsAfter": "4e4b8548810f3528ca1fdac7c1a431d19b616b68dd88b52d2b13eccdeb16cbd6",
+  "postgresToolDirectory": null,
+  "outputSha256": "5048997e7a160a8646d507ab659e6ef37909e7f840ebc980882bdd78bf698d06",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

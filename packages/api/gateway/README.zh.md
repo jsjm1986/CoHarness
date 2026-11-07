@@ -42,12 +42,14 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 <a id="media-references"></a>
 ## 媒体引用
 
-当组合了 `connection`、`fs` 与 `attachments` 时，Host 入口还通过 `connection.http.handlePrefix`（trusted-host 权威）挂载 `GET|HEAD /api/file?path=<绝对路径>`。它经 `ctx.fs` 读取普通文件，包括已注册工作区之外的临时路径与远程 provider 中的文件。目录归属与 MIME 类别均不限制访问；`mime-types` 按解析出的显示路径提供响应类型，未知扩展回退 `application/octet-stream`。GET 复用 `readBytes` 承担预检与读取中的字节上限；HEAD 只读元数据。所有文件使用 `ctx.attachments.imageLimits.maxImageBytes`；超限返回 413。响应包含完整文件、忽略 Range，并携带 `private, no-store`、`nosniff` 与 `sandbox; default-src 'none'` CSP，使被直接打开的 HTML/SVG 无法在 API 源下执行。客户端 socket 关闭会中止进行中的读取；非 `FsError` 的 provider 失败向 Connection 层传播。Markdown 改写位于 `ui-conversation`（`AssistantMarkdown`）；音视频响应可用，Markdown 音视频播放节点属于另行排期的工作。
+当组合了 `connection`、`fs` 与 `attachments` 时，Host 入口还通过 `connection.http.handlePrefix`（trusted-host 权威）挂载 `GET|HEAD /api/file?path=<绝对路径>`。它经 `ctx.fs` 读取普通文件，包括已注册工作区之外的临时路径与远程 provider 中的文件。目录归属与 MIME 类别均不限制访问；`mime-types` 按解析出的显示路径提供响应类型，未知扩展回退 `application/octet-stream`。GET 复用 `readBytes` 承担预检与读取中的字节上限；HEAD 只读元数据。所有文件使用 `ctx.attachments.imageLimits.maxImageBytes`；超限返回 413。响应包含完整文件、忽略 Range，并携带 `private, no-store`、`nosniff` 与 `sandbox; default-src 'none'` CSP，使被直接打开的 HTML/SVG 无法在 API 源下执行。客户端 socket 关闭会中止进行中的读取；每次读取在结束时释放本次取消监听器，失败时也一样。非 `FsError` 的 provider 失败向 Connection 层传播。Markdown 改写位于 `ui-conversation`（`AssistantMarkdown`）；音视频响应可用，Markdown 音视频播放节点属于另行排期的工作。
 
 <a id="client-service-clientremote-ctx-key-remote"></a>
 ## Client 服务：`ClientRemote`（ctx key：`remote`）
 
 `ctx.remote.$mount()` 会校验并注册生成的 Host-for-Client 贡献项，然后为发起调用的 Cordis fiber 安装具体的直接方法和作用域方法。每个 namespace 都是可追踪的 `remote.<namespace>` 子 Service，并在最后一个方法撤回后卸载。新建 namespace 会等到本次挂载贡献项的全部方法安装完毕后才对声明注入的 fiber 可用；批次失败会直接回滚，不会激活依赖方。重复端点、命名空间冲突，以及缺少生成的严格编解码器的描述符，都会在方法可调用前报错。
+
+`ctx.remote.$forTarget(target)` 为不含会话地址的调用、流和转发事件固定 Runtime；省略目标时保留已捕获连接，未绑定服务则固定启动连接。捕获不发送请求，也不启动 Runtime。带会话地址的调用必须归属于该连接。每个代理保留创建者的查找上下文与 fiber 生命周期；未绑定的订阅仍接收全局转发事件。
 
 每次调用都会校验位置参数，构造与描述符完全匹配的具名 `args`，再通过 `ctx.connection.rpc.call('/api', endpoint, ...)` 发送。生成的支持取消的方法接受最后一个可选 `AbortSignal`；Client 会在调用 Connection 前将它与贡献项的挂载生命周期合并。返回值经过校验后才会交给应用代码。撤回贡献项会同时移除其描述符和方法、中止正在进行的调用，并使外部仍持有的方法句柄在调用时返回拒绝。
 
@@ -57,7 +59,10 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 
 调用 waterfall 只包装已解析的业务方法。授权与 Agent 查找先完成，防止请求身份包装器把调用人的权限借给冷查找任务。
 
+账户项目目录仅包含浏览器入口范围内、同时满足当前用户电脑使用权与项目成员资格的电脑。空项目保留固定电脑及所有者元数据。读取目录不启动 Runtime，项目执行仍由被寻址电脑执行本地权限检查。
+
 <a id="model-experience"></a>
+
 ## 模型体验
 
 无，因为该包分发应用调用，不注册任何提示词、工具或会话事件。

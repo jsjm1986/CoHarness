@@ -1,0 +1,13 @@
+{
+  "name": "gateway-execution-provider-current",
+  "cwd": ".",
+  "command": "pnpm run test:gateway:execution",
+  "startedAt": "2026-10-23T12:51:09.607111+00:00",
+  "seconds": 11.345,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7e655ed7adce14c101f9f3aa45c16f51a203e633adf220bfebdad68e83b256d6",
+  "inputsAfter": "7e655ed7adce14c101f9f3aa45c16f51a203e633adf220bfebdad68e83b256d6",
+  "outputSha256": "56d2427746f37635676cac6249162da10f30edf4a085f50fa5823e07d2212114",
+  "outputTail": "$ node -e \"if (!process.env.HGW_TEST_DATABASE_URL) throw new Error('HGW_TEST_DATABASE_URL must select a disposable test database')\" && npm --prefix gateway run test:built-resource-admission && vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts --retry=0\nnpm warn Unknown env config \"manage-package-manager-versions\". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.\n\n> test:built-resource-admission\n> npm run build && node tests/run-built-resource-admission.mjs\n\nnpm warn Unknown env config \"manage-package-manager-versions\". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.\n\n> build\n> tsc -p tsconfig.build.json\n\n{\"freshPressureRequired\":true,\"sharedCreditSpent\":true,\"cancellationBeforeAllocation\":true,\"activeAssignmentPreserved\":true}\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  9 passed (9)\n   Start at  20:51:13\n   Duration  6.98s (transform 1.42s, setup 21ms, import 1.81s, tests 5.08s, environment 0ms)\n\n"
+}

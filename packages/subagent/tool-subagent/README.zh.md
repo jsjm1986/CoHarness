@@ -29,9 +29,15 @@ kind: "package-reference"
 
 每个插件实例把一个 `provider` 绑定到一个 `toolName`；模型不会收到提供方选择器。如需公开另一种传输，请加载另一个名称不同的实例。工具只在其提供方存在时注册，从而避免对同级加载顺序和提供方重新加载的依赖。工具描述遵循 `provider.inheritsParentContext`：新建子 agent（智能体）需要独立提示词，而 fork 子 agent 已能看到父级已完成轮次。
 
-前台调用会让执行信号贯穿启动和执行，等待 `run.result`，并且在返回前总会等待 `run.dispose()`。只有 `completed` 会返回规范值 `{ kind: 'foreground', runId, output: JsonValue[] }`，并渲染为相同的最终文本。中止、拒绝、token 上限和其他失败都会变成出错的工具结果，其消息依次包含终止原因标题、可选的提供方 `SubagentResult.diagnostic`，以及子 agent 保留下来的部分 assistant 文本。诊断与 `SubagentResult.output` 保持分离，因此被截断的回答不会被报告为成功，也不会与基础设施说明混淆。如果结果收集与 dispose（资源释放）都 reject，出错结果会保留两项失败。
+每次委派在子模型预检前捕获原运行时。运行时撤下会取消并等待预检，阻止创建子级或 Job。前台结果收集与清理移交继续纳入该运行时的等待；已发布的后台持有者保留独立的取消与清理。它让合并信号贯穿启动和执行，等待 `run.result`，并且在返回前总会等待 `run.dispose()`。只有 `completed` 会返回规范值 `{ kind: 'foreground', runId, output: JsonValue[] }`，并渲染为相同的最终文本。中止、拒绝、token 上限和其他失败都会变成出错的工具结果，其消息依次包含终止原因标题、可选的提供方 `SubagentResult.diagnostic`，以及子 agent 保留下来的部分 assistant 文本。诊断与 `SubagentResult.output` 保持分离，因此被截断的回答不会被报告为成功，也不会与基础设施说明混淆。如果结果收集与 dispose（资源释放）都 reject，出错结果会保留两项失败。
+
+释放失败时，前台 Consumer 在报告错误前，通过 [`retainFailedCleanup()`](../subagent/README.zh.md#one-shot-ownership-and-lifecycle) 把句柄交回原 subagent 服务。后台 Job 保留自身的终止控制。
 
 `backgroundMode` 同时选择后台路由与省略 `run_in_background` 时的默认行为。`one-shot` 默认在前台等待；显式传入 `true` 时，它会注册一个归父级所有的普通 Task，并返回规范值 `{ kind: 'background', jobId }`，渲染为 `started background subagent job <id>`，即使提供方支持可继续子 agent 也不例外。通用 Task 工具负责其后续状态、收集、取消和通知；失败 Task 的 detail 会保留终止原因与同一份可选提供方诊断。`continuable` 在参数省略或为 `true` 时于后台运行；显式传入 `false` 时则在前台等待结果。其后台路由要求提供方具备 `prepareContinuable` 能力，调用 `ctx.subagents.startContinuable()`，并返回 `{ kind: 'continuable', subagentId }`，渲染为 `started subagent <childId>`。该路由在 inbox 接受时结算：子 agent 自此拥有自己的轮次，因此该调用既不等待也不收集结果。通过该 id 查看其 transcript（文本记录）仍是其详细输出的来源，可选的全局 `send_message` 工具则向其发送更多工作。每当子 agent 的 Activation 结束，继续执行服务都会投递一条结算通知，其中包含结束结果及可能存在的最终 assistant 消息，且这项投递不依赖 `report`。启动可继续工作不要求加载 `send_message`。见[后台 subagent Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.zh.md)、[可继续的 subagent Agent Note](../../../.agents/notes/implemented/feature/2026-07-28-continuable-subagent-conversations.zh.md)和[后台优先委派 Agent Note](../../../.agents/notes/implemented/feature/2026-08-11-background-first-continuable-delegation.zh.md)。
+
+一次性后台任务在所有者会话的生命周期记录中保留确切工具调用 id 与根调用 id。即使启动时抛出的值无法渲染，启动失败仍产生失败结果并保留 `producerReported: true`，不会违反生产者 Promise 的约定。
+
+已发布的一次性子级释放失败时，其任务保持存活，并通过进度提示说明清理尚未确认。后续 `job_kill` 会重试释放。释放仍在等待时收到的终止请求，会在该次尝试失败后保留一次重试；重试开始前收到的请求会合并。再次失败时继续保留占用，并要求另一次终止请求。任务只有在清理成功后才结算为失败，保留独立的结果错误，且不交付子级回答。参见[清理归属决策](../../../.agents/notes/implemented/bug-fix/2026-11-01-subagent-job-cleanup.zh.md)。
 
 `agentPreset` 默认让每个子 agent 使用独立的 preset，`allowedAgentPresets` 允许模型通过 `agent_preset` 选择 id；未提供 allowlist 时模型无法覆盖已配置的选择。只有进程内 spawn 提供方支持这些字段——fork 与外部后端会拒绝。两者都必须指向已声明的 preset：位于 preset 内的工具在 Agent 初始化时校验，Host 挂载的工具在加载时校验。模型省略选择时使用已配置的 `agentPreset`，未配置默认值时加入父级当前的 preset 修订。在 preset 插件清单中组合 persona 与工具；包含 `persona` 或 `toolFilter` 的工具配置会在加载时以迁移错误失败。
 
@@ -164,6 +170,7 @@ Delegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do no
 - **后台运行不通过本工具公开结果**：一次性任务的最终输出通过通用 Task 接口收集，可继续子 agent 的输出留在其自身会话中，按其 subagent id 读取。结算通知会说明该子 agent 如何结束，并携带可能存在的最终 assistant 消息，但它不是本次调用的返回值，也无法在此等待。
 - **等待中的一次性实例较晚才发现重复名称**（`TODO(subagent-dup-toolname)`）：可继续实例会在插件应用期间预留提示词 section 名称，但若要阻止等待中的一次性实例回滚提供方注册，仍需要一份预期名称注册表。
 - **每个实例的子 agent 策略固定**：其他模型、preset 或深度上限都需要另一个名称不同的工具。只有进程内 spawn 提供方接受 `agentPreset`/`allowedAgentPresets`；其他后端在加载时拒绝。
+- **清理持续失败时，一次性任务保持存活**：所有者与服务的释放可能一直等待，直到另一次终止尝试能够确认资源释放；系统不自动重试，也不设放弃清理的期限。
 
 <a id="dev-note"></a>
 ### 开发备注

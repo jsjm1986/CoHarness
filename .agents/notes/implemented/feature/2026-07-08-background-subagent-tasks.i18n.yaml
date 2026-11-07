@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.md
 document:
-  en: 4dcd961ee5a5db925f8f6ad83e97890eaedb8e63
-  zh: f35ac9e040b02c55694cfe5255b7f62ddbb40281
+  en: 4d870371a604df3bc943552671f7b6a2baa38e9a
+  zh: c8ae099c0f0f836328c87951dc48d8d897d2f5d4
 /agent-note-background-subagent-tasks:
   en: 81e6c52af991b288
   zh: 338e4f208ff8113e
@@ -12,8 +12,8 @@ document:
   en: 210b478d3338b92a
   zh: 04ce3c704e1daf95
 /agent-note-background-subagent-tasks/decision:
-  en: 937913479ca57980
-  zh: 301df132c5562242
+  en: 394354aee86d9b66
+  zh: b8d3a016744ae527
 /agent-note-background-subagent-tasks/lifecycle:
   en: a9a43b6289582186
   zh: a3c1e62a7a97e904

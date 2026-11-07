@@ -28,7 +28,7 @@ describe.skipIf(process.platform !== 'win32')('managed Windows ACL control pipe'
     await ctx.plugin(LocalSubprocessRuntime)
     const runner = fileURLToPath(new URL('../src/runner.ts', import.meta.url))
     const fixture = fileURLToPath(new URL('../../../subprocess/win32-process/tests/fixtures/console-state.ts', import.meta.url))
-    const handle = ctx.subprocess.spawn({
+    const handle = await ctx.subprocess.spawn({
       argv: [process.execPath, '--import', 'tsx/esm', runner,
         '--workspace', workspace, '--temp', temp, '--mode', mode, '--', process.execPath, fixture],
       cwd: process.cwd(),
@@ -67,7 +67,7 @@ describe.skipIf(process.platform !== 'win32')('managed Windows ACL control pipe'
         if (received === 262144) channel.write(Buffer.concat(chunks), () => channel.destroy());
       });
     `
-    const handle = ctx.subprocess.spawn({
+    const handle = await ctx.subprocess.spawn({
       argv: [process.execPath, '--import', 'tsx/esm', runner,
         '--workspace', scratch, '--temp', scratch, '--mode', 'read-only', '--',
         process.execPath, '--input-type=module', '-e', program, helper, join(scratch, 'denied.txt')],

@@ -1,14 +1,16 @@
 /** Benchmark npm's dependency-tree resolution against an all-local registry. */
 
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process'
-import { globSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, globSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
-import { parseArgs } from 'node:util'
+import { isDeepStrictEqual, parseArgs } from 'node:util'
 import { setTimeout as pollDelay } from 'node:timers/promises'
 import { linuxProcessGroupHasLiveMembers } from '../packages/subprocess/subprocess-local/src/proc-stat.ts'
+import { valid as validVersion } from 'semver'
+import { z } from 'zod'
 
 const TARGET_PACKAGE = '@deepseek-ai/dsh'
 const DEFAULT_TIMEOUT_MS = 300_000
@@ -36,13 +38,31 @@ const PUBLISHED_FIELDS = [
   'bin',
 ] as const
 
+const dependencyRanges = z.record(z.string(), z.string())
+const publishedMetadataSchema = z.object({
+  schemaVersion: z.literal(1),
+  registry: z.literal('https://registry.npmjs.org'),
+  manifests: z.array(z.object({
+    name: z.string().min(1),
+    version: z.string().refine(version => validVersion(version) === version, 'Expected a canonical npm version'),
+    dependencies: dependencyRanges.optional(),
+    optionalDependencies: dependencyRanges.optional(),
+    peerDependencies: dependencyRanges.optional(),
+    peerDependenciesMeta: z.record(z.string(), z.object({ optional: z.boolean().optional() }).strict()).optional(),
+    engines: dependencyRanges.optional(),
+    os: z.array(z.string()).optional(),
+    cpu: z.array(z.string()).optional(),
+    bin: z.union([z.string(), dependencyRanges]).optional(),
+  }).strict()),
+}).strict()
+
 interface PackageManifest {
   readonly name?: unknown
   readonly version?: unknown
-  readonly dependencies?: Record<string, string>
-  readonly optionalDependencies?: Record<string, string>
-  readonly peerDependencies?: Record<string, string>
-  readonly peerDependenciesMeta?: Record<string, unknown>
+  readonly dependencies?: Record<string, string> | undefined
+  readonly optionalDependencies?: Record<string, string> | undefined
+  readonly peerDependencies?: Record<string, string> | undefined
+  readonly peerDependenciesMeta?: Record<string, unknown> | undefined
   readonly engines?: unknown
   readonly os?: unknown
   readonly cpu?: unknown
@@ -184,6 +204,8 @@ export function publishWorkspaceRange(range: string, targetVersion: string): str
   return range
 }
 
+function copyPublishedManifest(source: RegistryVersion, workspaceVersions: ReadonlyMap<string, string>): RegistryVersion
+function copyPublishedManifest(source: PackageManifest, workspaceVersions: ReadonlyMap<string, string>): RegistryVersion | undefined
 function copyPublishedManifest(
   source: PackageManifest,
   workspaceVersions: ReadonlyMap<string, string>,
@@ -194,7 +216,9 @@ function copyPublishedManifest(
     const value = source[field]
     if (value === undefined) continue
     if (field === 'dependencies' || field === 'optionalDependencies' || field === 'peerDependencies') {
-      output[field] = Object.fromEntries(Object.entries(value as Record<string, string>).map(([name, range]) => {
+      const dependencies = value as Record<string, string>
+      if (Object.keys(dependencies).length === 0) continue
+      output[field] = Object.fromEntries(Object.entries(dependencies).map(([name, range]) => {
         const targetVersion = workspaceVersions.get(name)
         return [name, targetVersion === undefined ? range : publishWorkspaceRange(range, targetVersion)]
       }))
@@ -211,8 +235,34 @@ function addManifest(index: Map<string, Map<string, RegistryVersion>>, manifest:
   index.set(manifest.name, versions)
 }
 
+/** Extend the offline registry without changing workspace or installed-version metadata. */
+function addPublishedMetadata(
+  root: string,
+  index: Map<string, Map<string, RegistryVersion>>,
+  workspaceVersions: ReadonlyMap<string, string>,
+): void {
+  const path = resolve(root, 'scripts/fixtures/npm-resolution-published-metadata.json')
+  if (!existsSync(path)) return
+  const supplement = publishedMetadataSchema.parse(JSON.parse(readFileSync(path, 'utf8')))
+  const seen = new Set<string>()
+  for (const manifest of supplement.manifests) {
+    if (workspaceVersions.has(manifest.name)) throw new Error(`Published metadata cannot replace workspace ${manifest.name}`)
+    const key = `${manifest.name}@${manifest.version}`
+    if (seen.has(key)) throw new Error(`Duplicate published metadata for ${key}`)
+    seen.add(key)
+    const copied = copyPublishedManifest(manifest, new Map())
+    const installed = index.get(manifest.name)?.get(manifest.version)
+    if (installed !== undefined && !isDeepStrictEqual(installed, copied)) {
+      throw new Error(`Published metadata conflicts with installed ${key}`)
+    }
+    addManifest(index, copied)
+  }
+}
+
 /**
- * Build registry metadata from installed external packages and workspace manifests.
+ * Build offline registry metadata from installed packages, workspace manifests and
+ * the recorded published versions absent from the installation. Dependency ranges
+ * retain their published values; a supplement cannot replace workspace metadata.
  * @param root - Repository root containing the pnpm virtual store.
  * @param ref - Optional Git ref used instead of working-tree workspace manifests.
  * @returns Package metadata served by the benchmark registry.
@@ -237,6 +287,7 @@ export function buildRegistryIndex(root: string, ref?: string): RegistryIndex {
     const copied = copyPublishedManifest(manifest, workspaceVersions)
     if (copied !== undefined) addManifest(index, copied)
   }
+  addPublishedMetadata(root, index, workspaceVersions)
   return index
 }
 

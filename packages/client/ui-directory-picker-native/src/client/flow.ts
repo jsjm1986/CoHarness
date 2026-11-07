@@ -6,12 +6,13 @@
 import { useEffect, useRef } from 'react'
 import type { ReactElement } from 'react'
 // Type-only: the owner contract of the directory-flow holes.
+import type { SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type { DirectoryFlowOwnerProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 
 /** Injected face: the wire call the flow drives (bound in apply's closure). */
 export interface NativeFlowInjected {
   /** Ask the local Host to open its native single-directory chooser. */
-  pick: () => Promise<string | null>
+  pick: (target?: SessionRuntimeTarget | null) => Promise<string | null>
 }
 
 /**
@@ -57,7 +58,7 @@ export function NativeDirectoryFlow(props: DirectoryFlowOwnerProps & NativeFlowI
     if (armed.current) return
     armed.current = true
     const launched = ++generation.current
-    pick().then(
+    pick(outcome.current.runtimeTarget).then(
       (path) => {
         if (!alive.current || generation.current !== launched) return
         if (path === null) outcome.current.onCancel(); else outcome.current.onPicked(path)

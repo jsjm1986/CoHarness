@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-catalog-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-cordis-api.ts",
+  "startedAt": "2026-10-24T06:16:00.638155+00:00",
+  "seconds": 7.294,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b12c91630c4eb5d22c58ff2c37f28b08a7b7756a90fb1c5b14a411df0e9d2da2",
+  "inputsAfter": "e743574208b8c8610a1934f32c37956ce7031f44dce6014186ee5411a3586dba",
+  "postgresToolDirectory": null,
+  "outputSha256": "3c3a3eeac5f1918a410c66e3fc83d983b730175847d883a74b2bbbce879ac347",
+  "outputTail": "gen-cordis-catalog: 127 artifact(s) computed, 3 written.\n"
+}

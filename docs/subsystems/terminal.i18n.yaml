@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/terminal.md
 document:
-  en: c1c78963e48f51014678e778bbdc5da530f453c6
-  zh: e97e5771f5681ce98024394752405dca012b0a5e
+  en: de02aefa20882040094b1b752afc301799565e69
+  zh: e428b42d9321cd7278c3b35d17560cfcfd263258
 /persistent-pty-sessions:
   en: 5debd6ec3dc43d0b
   zh: 716307c837310aaa

@@ -15,7 +15,7 @@ kind: "package-reference"
 
 本包不包含传输逻辑或 Host 服务发现逻辑。Web 或未来的 TUI 只要提供同一份不依赖 React 的 `ctx.remote` 约定，均可复用其 Client face。
 
-Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile、安装、启停、取消与移除。拥有该能力的 Host 服务对每次调用检查部署授权；挂载方法不会授予管理员权限。安装事件和日志不在通用转发事件许可清单内。
+Client 组装挂载生成的 Plugin Manager 命名空间，用于单次请求的 profile 目录、检查、安装、启停、取消与移除。Web Host 挂载独立的[只读目录入口](../../boot/plugin-manager/README.zh.md#use-this-package)；仅挂载此 Client 命名空间不会提供 Host 管理器或目录。拥有该能力的 Host 服务对每次调用检查部署授权；挂载方法不会授予管理员权限。安装事件和日志不在通用转发事件许可清单内。
 
 ## 概述
 

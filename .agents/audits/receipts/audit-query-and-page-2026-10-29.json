@@ -1,0 +1,509 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-28T18:29:41.765175+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B257",
+    "B258",
+    "B259",
+    "B260"
+  ],
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "ahead": 139,
+    "behind": 0,
+    "fetchExitCode": 0,
+    "dirtyEditsPreserved": true
+  },
+  "exactRevisionEvidence": "External audit-query-baseline-final.json; no resolved commit refs stored here.",
+  "behavior": {
+    "B257": "SQLite query/count outcome predicates use HTTP status precedence and exact case-sensitive declared suffixes shared with row classification. Successful HTTP results remain successful even under failure-named actions.",
+    "B258": "Audit wire pagination requires safe integer counts before querying a store. Fractions/unsafe values report400 with invalid audit pagination; supported integers retain established clamping.",
+    "B259": "AuditPage generations retain only the latest mounted query for rows, totals, errors and loading. Delayed successes, failures and completion cannot replace the current selection.",
+    "B260": "Audit headers reuse established narrow-layout wrapping; segmented family buttons stay inside the viewport and remain pointer/keyboard reachable."
+  },
+  "negativeEvidence": [
+    "audit-query-correctness-before:actual SQLite store and authenticated HTTP expose wrong result filtering plus raw binding errors or inconsistent unsafe-count acceptance.",
+    "audit-page-stale-queries-negative-control:three current deferred UI tests fail after locally restoring only stale-result publication; current source is restored afterward.",
+    "audit-page-mobile-overflow-before:actual private compiled UI reports496px document width in390px viewport."
+  ],
+  "fixtureCorrections": [
+    "Initial two UI race selectors matched duplicate desktop/mobile text. Corrected selectors plus a restored-and-repaired negative control prove three causal windows; the first incomplete selector run is not accepted for those two windows.",
+    "Concurrent node-scoped qualification changes add server actor forwarding. The expanded cohort records123passing cases plus one obsolete Steward mock-arity expectation; the corrected actor-bound expectation passes its direct rerun.",
+    "The PostgreSQL audit provider is exercised by a separately serialized direct test; schema-resetting baseline is never run concurrently with additive fixtures."
+  ],
+  "verification": {
+    "source": {
+      "initialCohort": {
+        "cases": 83,
+        "files": 6,
+        "skips": 0,
+        "status": "passed"
+      },
+      "expandedCohort": {
+        "cases": 124,
+        "files": 7,
+        "passed": 123,
+        "failed": 1,
+        "reason": "Obsolete Steward qualification mock omitted initiating administrator argument introduced by concurrent node work.",
+        "followup": "audit-query-steward-actor-compatibility:1passed; no business assertion weakened.",
+        "coverageReportRetained": true
+      },
+      "directPostgres": {
+        "passed": 1,
+        "filteredOut": 40,
+        "notAFullBaselineRun": true
+      },
+      "ui": {
+        "cases": 16,
+        "files": 2,
+        "status": "passed"
+      }
+    },
+    "compiled": {
+      "privateGatewayOutput": true,
+      "privateAdminOutput": true,
+      "sharedBuildOutputsWritten": false,
+      "node22": "12actual PostgreSQL authenticated HTTP observations match maintained audit-query golden.",
+      "node24": "12same observations; independent process overlaps Node22 successfully.",
+      "hostSqlite": "12actual SQLite authenticated HTTP observations match maintained golden.",
+      "ownedGatewaySourceDriftSinceBuild": [],
+      "browser": {
+        "engine": "Headless installed Chrome via caller-supplied Playwright1.62.1",
+        "stores": [
+          "sqlite",
+          "postgres"
+        ],
+        "widths": [
+          1280,
+          390,
+          320
+        ],
+        "observations": 6,
+        "maintainedGolden": "gateway/tests/expected/projects/audit-page-browser.jsonl",
+        "checks": [
+          "Older actual Gateway response cannot overwrite selected family",
+          "No page JavaScript errors",
+          "Document width fits viewport",
+          "Last family control remains within viewport and selectable",
+          "Keyboard focus reaches next family",
+          "Real empty response is rendered after selecting the final family"
+        ],
+        "renderReview": "Reviewed desktop and narrow screenshots; final320px PostgreSQL render remains within viewport.",
+        "compositionLimit": "Computer selector is rendered by the current app but this fixture does not compose its independent nodeAccess service; the separate unavailable notice is outside this audit acceptance."
+      }
+    },
+    "types": "Gateway full checking face and independent Admin UI typecheck pass.",
+    "lint": {
+      "gateway": "Exact changed Gateway source/tests and browser runner pass.",
+      "admin": "Root Oxlint configuration intentionally excludes this standalone Admin project, including an explicit scoped invocation. No lint pass is claimed for those excluded files; independent types/unit/build/browser checks are recorded."
+    },
+    "documentation": {
+      "quickGatesPassed": 19,
+      "quickGatesFailed": 1,
+      "wholeRepoStatus": "pending_concurrent_peer_pairing",
+      "failure": "New computer-permissions upgrade pair lacks its sidecar and node-agent reference pairing is being edited by the architecture peer. No peer documentation is stamped or rewritten by this audit.",
+      "ownedNamedPairs": 3,
+      "ownedNamedPairsStatus": "passed"
+    },
+    "commands": [
+      {
+        "name": "audit-query-correctness-initial",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:45:10.845646+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/audit.spec.ts",
+          "tests/admin-api.spec.ts",
+          "tests/audit-summary.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:45:18.890803+00:00"
+      },
+      {
+        "name": "audit-query-real-http-source-record",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:47:09.310398+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54297/hgw_admin_runtime_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/audit-query-transcript.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--update"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:47:10.548142+00:00"
+      },
+      {
+        "name": "audit-query-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:55:47.567603+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54297/hgw_admin_runtime_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/audit.spec.ts",
+          "tests/audit-summary.spec.ts",
+          "tests/admin-api.spec.ts",
+          "tests/audit-query-transcript.spec.ts",
+          "tests/administrator-runtime-control-transcript.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/audit.ts",
+          "--coverage.include=src/postgres/audit-service.ts",
+          "--coverage.include=src/admin-api.ts",
+          "--coverage.reportsDirectory=coverage/audit-query-current-20261029",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportOnFailure=true"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:56:03.190682+00:00"
+      },
+      {
+        "name": "audit-query-postgres-direct-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:05:46.591506+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54297/hgw_admin_runtime_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/postgres.spec.ts",
+          "-t",
+          "derives the durable outcome",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/audit.ts",
+          "--coverage.include=src/postgres/audit-service.ts",
+          "--coverage.reportsDirectory=coverage/audit-query-postgres-direct-20261029",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportOnFailure=true"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:05:49.140452+00:00"
+      },
+      {
+        "name": "audit-page-stale-queries-negative-control",
+        "status": "failed",
+        "startedAt": "2026-10-28T17:59:53.863087+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/with-audit-page-regression.py"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T17:59:54.422306+00:00"
+      },
+      {
+        "name": "audit-query-ui-regression-final",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:16:32.449770+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/admin-ui",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "src/pages/AuditPage.spec.tsx",
+          "src/api.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:16:33.150983+00:00"
+      },
+      {
+        "name": "audit-query-steward-actor-compatibility",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:18:29.430326+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/admin-api.spec.ts",
+          "-t",
+          "serves the steward overview",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:18:30.710949+00:00"
+      },
+      {
+        "name": "audit-query-private-gateway-build-r3",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:19:59.625864+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-audit-query-artifact-r3.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:20:01.800347+00:00"
+      },
+      {
+        "name": "audit-query-private-ui-build-r2",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:14:22.946022+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/admin-ui",
+        "command": [
+          "node_modules/.bin/vite",
+          "build",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/audit-query-admin-ui-r2-20261029",
+          "--emptyOutDir"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:14:24.676633+00:00"
+      },
+      {
+        "name": "audit-query-final-gateway-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:23:00.852238+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:23:04.239418+00:00"
+      },
+      {
+        "name": "audit-query-current-admin-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:15:29.950384+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/admin-ui",
+        "command": [
+          "node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:15:33.449912+00:00"
+      },
+      {
+        "name": "audit-query-emitted-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:20:49.486615+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-audit-query-artifacts-r3.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:20:49.961500+00:00"
+      },
+      {
+        "name": "audit-query-emitted-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:20:49.486726+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-audit-query-artifacts-r3.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:20:49.880413+00:00"
+      },
+      {
+        "name": "audit-query-emitted-sqlite",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:20:49.486617+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-audit-query-artifacts-r3.py",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "sqlite"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:20:49.772031+00:00"
+      },
+      {
+        "name": "audit-query-browser-golden-replay",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:22:15.281387+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54297/hgw_admin_runtime_test",
+          "node",
+          "gateway/tests/run-built-audit-ui.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/audit-query-artifact-r3-20261029/lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/audit-query-admin-ui-r2-20261029",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/index.mjs",
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:22:19.588295+00:00"
+      },
+      {
+        "name": "audit-query-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:17:36.215990+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/audit.ts",
+          "gateway/src/postgres/audit-service.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/tests/audit.spec.ts",
+          "gateway/tests/admin-api.spec.ts",
+          "gateway/tests/audit-query-transcript.spec.ts",
+          "gateway/tests/fixtures/audit-query.mjs",
+          "gateway/tests/run-built-audit-ui.mjs",
+          "gateway/tests/postgres-suite.spec.ts",
+          "gateway/tests/postgres.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:17:37.363933+00:00"
+      },
+      {
+        "name": "audit-query-owned-pairs-verified",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:26:33.996384+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          ".agents/notes/implemented/bug-fix/2026-10-10-audit-log-crash-and-faceted-query.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/audit-query/guide.md",
+          "gateway/README.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:26:35.138577+00:00"
+      },
+      {
+        "name": "audit-query-current-source-coverage",
+        "status": "failed",
+        "startedAt": "2026-10-28T18:16:33.186019+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54297/hgw_admin_runtime_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/audit.spec.ts",
+          "tests/audit-summary.spec.ts",
+          "tests/admin-api.spec.ts",
+          "tests/audit-query-transcript.spec.ts",
+          "tests/administrator-runtime-control-transcript.spec.ts",
+          "tests/runtime-personal-policy-postgres.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/audit.ts",
+          "--coverage.include=src/postgres/audit-service.ts",
+          "--coverage.include=src/admin-api.ts",
+          "--coverage.reportsDirectory=coverage/audit-query-current-final-20261029",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportOnFailure=true"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T18:16:48.439227+00:00"
+      },
+      {
+        "name": "audit-query-doc-quick",
+        "status": "failed",
+        "startedAt": "2026-10-28T18:23:53.096996+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T18:25:08.362745+00:00"
+      },
+      {
+        "name": "audit-query-ui-scoped-lint",
+        "status": "failed",
+        "startedAt": "2026-10-28T18:22:16.439287+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "--no-ignore",
+          "gateway/admin-ui/src/pages/AuditPage.tsx",
+          "gateway/admin-ui/src/pages/AuditPage.spec.tsx"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T18:22:17.169248+00:00"
+      },
+      {
+        "name": "audit-query-final-repository-references",
+        "status": "passed",
+        "startedAt": "2026-10-28T18:30:36.442871+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "verify-repository-references"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T18:30:51.765869+00:00"
+      }
+    ]
+  },
+  "coverage": {
+    "auditHelper": "src/audit.ts100percent lines/statements/functions/branches in the focused source cohort.",
+    "postgresAuditProvider": "Separate direct PG case:89.74percent lines,76.47statements,81.81functions,70.83branches.",
+    "administratorApi": "Expanded report remains partial (49.03percent lines); full-file review/coverage debt remains open.",
+    "thresholdsLowered": false,
+    "exclusionsAdded": false
+  },
+  "noteReview": {
+    "updatedExisting": [
+      ".agents/notes/implemented/bug-fix/2026-10-10-audit-log-crash-and-faceted-query.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false,
+    "reason": "Result precedence, metadata restrictions, bounded audit collection and current selected-query ownership extend the existing faceted-query decision. No other note is superseded."
+  },
+  "cleanup": {
+    "ownedPostgres": "stopped_and_removed",
+    "ownedVolume": "removed",
+    "connectionsBeforeClose": 0,
+    "productionPortExcluded": 5432,
+    "otherServicesModified": false
+  },
+  "limitations": [
+    "All12 original domains and the complete repository audit remain active.",
+    "Real model API validation remains human-deferred.",
+    "Native Windows/Linux browsers and non-Chrome engines are untested in this UI batch.",
+    "New computer usage/qualification, placement and remote Runtime integration remain independent peer work and further review.",
+    "The whole-repository documentation lane is not green until the independent in-progress bilingual records are complete."
+  ]
+}

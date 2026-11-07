@@ -51,3 +51,6 @@ worktrees/
 
 # ZCode client local workspace state
 .zcode/
+.codex/
+.impeccable/
+.local/

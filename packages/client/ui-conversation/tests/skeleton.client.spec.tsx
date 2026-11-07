@@ -25,6 +25,7 @@ import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en, zh } from '../src/client/locales.ts'
 import { ConversationContent as ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
+import type { ConversationSessionHeaderOwnerProps } from '../src/client/contract/slots.ts'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
@@ -126,6 +127,10 @@ function mount(
     viewTabs?: ViewTab[]
     /** Pane session id override — encoded client keys carry their runtime target. */
     sessionId?: SessionId
+    /** An empty pane waiting for the Runtime's first default selection. */
+    noSession?: boolean
+    /** Root workbench navigation supplied independently of the selected Session. */
+    headerLeading?: ReactNode
   } = {},
 ) {
   const root = sid('root')
@@ -142,8 +147,9 @@ function mount(
     ids: listed ? [root, SID] : [root],
     byId: { [root]: rootRow, ...listed && { [SID]: childRow } },
     archivedById: {},
-    current: SID,
-    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+    current: options.noSession === true ? undefined : SID,
+    phase: 'ready',
+    state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const workspaces = createSnapshotStore<WorkspaceListState>(workspaceState(workspaceRows))
   const session = createSnapshotStore<ConversationSnapshot>(snapshot)
@@ -151,7 +157,6 @@ function mount(
   const chat = createChatStore().create()
   const displaySettings = createSnapshotStore<ConversationDisplaySettingsSnapshot>({
     chatContentWidth: 748,
-    chatFontSize: 14,
     chatFullWidth: false,
     settings: { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } },
   })
@@ -184,6 +189,7 @@ function mount(
     if (key === 'conversation.session.header') {
       return (
         <ConversationSessionHeader
+          {...owner as ConversationSessionHeaderOwnerProps}
           sessionId={SID}
           SessionProvider={({ children }) => children(SID)}
           useSession={useSession}
@@ -283,7 +289,8 @@ function mount(
   )) as ConversationPaneProps['renderSlotChain']
   const paneSessionId = options.sessionId ?? SID
   const props = {
-    sessionId: paneSessionId,
+    ...(options.headerLeading === undefined ? {} : { headerLeading: options.headerLeading }),
+    sessionId: options.noSession === true ? undefined : paneSessionId,
     SessionProvider: ({ children }: { children: (id: SessionId) => ReactNode }) => children(paneSessionId),
     useSession,
     useSessions: bindSnapshotSelector(sessions),
@@ -313,9 +320,12 @@ function mount(
   } as ConversationRootProps
   const view = render(<ConversationRoot {...props} />)
   return {
-    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings,
+    view, chat, sink, retargetWorkspace, session, sessions, workspaces, stop, slotCalls, seatOwners, open, displaySettings,
     pickerOwner: () => pickerOwner,
-    rerender: () => { view.rerender(<ConversationRoot {...props} />) },
+    rerender: (overrides: Partial<ConversationRootProps> = {}) => {
+      Object.assign(props, overrides)
+      view.rerender(<ConversationRoot {...props} />)
+    },
   }
 }
 
@@ -337,6 +347,48 @@ describe('Hero chrome', () => {
 })
 
 describe('ConversationRoot resident composer', () => {
+  it('holds only the originating composer while a new conversation opens and keeps Stop available', async () => {
+    const b = mount(conversationSnapshot({ running: true }))
+    const original = b.view.getByRole('textbox') as HTMLTextAreaElement
+    const draft = original.value
+    await act(async () => { b.sessions.set({ ...b.sessions.getSnapshot(), navigationBlockedSessionId: SID }) })
+    expect(b.view.getByRole('textbox')).toBe(original)
+    expect(original.disabled).toBe(true)
+    expect(original.placeholder).toBe(zh['placeholder.openingSession'])
+    expect(original.value).toBe(draft)
+    const stop = b.view.getByRole('button', { name: zh['input.stop'] })
+    expect((stop as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(stop)
+    expect(b.stop).toHaveBeenCalledOnce()
+    await act(async () => { b.sessions.set({ ...b.sessions.getSnapshot(), navigationBlockedSessionId: sid('another-pane') }) })
+    expect(original.disabled).toBe(false)
+  })
+  it('keeps Session-owned header controls mounted while shared tools change focus', () => {
+    const host = document.createElement('div')
+    host.id = 'selected-session-tools'
+    document.body.append(host)
+    try {
+      const b = mount(conversationSnapshot(), undefined, undefined, { summaryOrigin: 'subagent' })
+      b.rerender({ toolsHostId: host.id, active: true })
+      const ancestor = within(host).getByRole('button', { name: 'Root' })
+      const header = host.querySelector('header')!
+      expect(within(host).getByText('当前')).toBeTruthy()
+      b.rerender({ active: false })
+      expect(header.hidden).toBe(true)
+      expect(host.contains(ancestor)).toBe(true)
+      b.rerender({ active: true })
+      expect(header.hidden).toBe(false)
+      expect(within(host).getByRole('button', { name: 'Root' })).toBe(ancestor)
+      fireEvent.click(ancestor)
+      expect(b.open).toHaveBeenCalledWith(sid('root'))
+      b.rerender({ toolsHostId: undefined })
+      expect(host.childElementCount).toBe(0)
+      expect(b.view.container.querySelector('header')).not.toBeNull()
+    } finally {
+      cleanup()
+      host.remove()
+    }
+  })
   const rootOf = (b: ReturnType<typeof mount>): HTMLElement =>
     b.view.container.firstElementChild as HTMLElement
   const mockColumn = (root: HTMLElement, width: number): void => {
@@ -802,10 +854,32 @@ describe('ConversationRoot resident composer', () => {
     )
     // The summary already proves the outcome, so the settling hide would only
     // blank the column for the history round-trip.
+    act(() => { b.workspaces.set({ ...b.workspaces.getSnapshot(), initialSelectionPending: true }) })
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('hero')
     expect(b.view.getByText('COHARNESS')).toBeTruthy()
     expect(b.view.getByRole('textbox')).toBeTruthy()
+    expect(b.view.queryByRole('status', { name: '正在加载工作区' })).toBeNull()
+  })
+
+  it('shows loading for an unresolved initial selection while retaining the empty composer nodes', () => {
+    const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true }), undefined, undefined, {
+      noSession: true, headerLeading: <button>切换工作台</button>,
+    })
+    const textarea = b.view.getByRole('textbox')
+    act(() => { b.workspaces.set({ ...b.workspaces.getSnapshot(), initialSelectionPending: true }) })
+    expect(b.view.getByRole('status', { name: '正在加载工作区' })).toBeTruthy()
+    expect(b.view.queryByRole('textbox')).toBeNull()
+    expect(b.view.container.querySelector('textarea')).toBe(textarea)
+    expect(b.view.getByRole('button', { name: '切换工作台' }).closest('header')).not.toBeNull()
+    act(() => {
+      const state = { ...b.workspaces.getSnapshot() }
+      delete state.initialSelectionPending
+      b.workspaces.set(state)
+    })
+    expect(b.view.queryByRole('status', { name: '正在加载工作区' })).toBeNull()
+    expect(b.view.getByRole('textbox')).toBe(textarea)
+    expect(b.view.getAllByRole('button', { name: '切换工作台' })).toHaveLength(1)
   })
 
   it('same textarea DOM node survives the hero → active flip into the sticky scrollport', () => {

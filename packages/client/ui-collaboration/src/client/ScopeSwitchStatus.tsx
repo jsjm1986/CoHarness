@@ -24,7 +24,11 @@ function stage(elapsedMs: number): CollaborationKey {
  * @param props - target scope and localized copy function.
  * @returns the status dialog.
  */
-export function ScopeSwitchStatus({ target, t }: { target: CollaborationScopeTarget; t: Translate }) {
+export function ScopeSwitchStatus({ target, t, showComputer = false }: {
+  target: CollaborationScopeTarget
+  t: Translate
+  showComputer?: boolean
+}) {
   const targetKey = target.kind === 'personal'
     ? 'personal'
     : `project:${target.projectId}`
@@ -42,9 +46,10 @@ export function ScopeSwitchStatus({ target, t }: { target: CollaborationScopeTar
   const elapsedMs = Math.max(0, now - startedAt.current)
   const elapsedSeconds = Math.floor(elapsedMs / 1_000)
   const stageText = t(stage(elapsedMs))
-  const targetName = target.kind === 'personal'
+  const spaceName = target.kind === 'personal'
     ? t('scope.personal')
     : target.projectName === '' ? t('scope.projectFallback') : target.projectName
+  const targetName = !showComputer || target.nodeName === undefined ? spaceName : `${spaceName} · ${target.nodeName}`
 
   return (
     <Modal

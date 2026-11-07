@@ -386,6 +386,8 @@ type SessionStartSource = 'startup' | 'resume' | 'clear' | 'compact'
 
 其完整字段、`defineTool`/`ValueSchemaSpec`/`ParameterSchemaSpec` 类型化 schema DSL、`ToolExecution`/`ToolExecutionResult` waterfall 类型，以及工具展示 UI 类型都在 **[tools.md](tools.zh.md)** 中。
 
+<a id="repo-wide-type-patterns"></a>
+
 ## 全仓通用类型模式
 
 两个模式在每个子系统中反复出现，只在此处记录一次。
@@ -768,7 +770,7 @@ async standingKeyFor(id?: string): Promise<ScopeKey>
  * The returned lease is a read boundary, not a mount: release it when the
  * cold read ends so a retired generation can collect.
  * @param id - the preset id, or `undefined` for {@link defaultId}.
- * @returns the scope key and its release.
+ * @returns the scope key and an idempotent release that joins generation disposal when retired and unused.
  * @throws when the preset is unknown or its composition is unusable.
  */
 async acquireScope(id?: string): Promise<{ key: ScopeKey; dispose: () => Promise<void> }>
@@ -1430,4 +1432,27 @@ One session committed a different agent preset to its durable log. Consumers inv
 ```
 
 Source: [`packages/preset/agent-preset-registry/src/types.ts`](../../packages/preset/agent-preset-registry/src/types.ts)
+
+<a id="runtime-events"></a>
+
+### `runtime/*` events
+
+<a id="runtimeidle-release-check--bail"></a>
+
+#### `runtime/idle-release-check` — bail
+
+Refuse automatic Host-process release while a plugin owns background work or a future obligation. Providers retain busy until accepted work and cleanup settle; waiting timers count as obligations. This probe never authorizes manual shutdown or revocation bypasses.
+
+```ts cordis-catalog
+/**
+ * Refuse automatic Host-process release while a plugin owns background work or a future obligation.
+ * Providers retain busy until accepted work and cleanup settle; waiting timers count as obligations.
+ * This probe never authorizes manual shutdown or revocation bypasses.
+ * @returns busy while stopping the Host would interrupt plugin work.
+ * @mode bail
+ */
+'runtime/idle-release-check'(): 'busy' | undefined
+```
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 <!-- END GENERATED cordis-surface -->

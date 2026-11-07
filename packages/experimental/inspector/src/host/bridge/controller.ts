@@ -9,6 +9,29 @@ import type { InspectorConnection } from '../../shared/bridge/publisher.ts'
 import { installFetchObserver, NETWORK_TOPICS, type FetchObserver } from '../inspection/network.ts'
 import { HostInspectorSource } from './transport.ts'
 import { InspectorWorkerLifecycle } from './lifecycle.ts'
+import type ResourceBudget from '@deepseek-ai/dsh-resource-budget'
+import { disposeInspectorResources } from '../../shared/dispose.ts'
+
+/** Node accountant and caller cancellation for one infrastructure Worker startup. */
+export interface InspectorAdmission {
+  /** Captured node accountant; independent library callers may omit it. */
+  readonly budget: Pick<ResourceBudget, 'acquire'> | undefined
+  /** Cancels allocation and readiness, without closing an already published handle. */
+  readonly signal?: AbortSignal
+  /** Synchronously verifies the caller's retained resource owner immediately before native allocation. */
+  readonly assertOwnership?: () => void
+}
+
+/** Failed startup whose resource cleanup remains owned by the caller. */
+export class InspectorStartupCleanupError extends Error {
+  /**
+   * @param cleanup - retry resource completion and any required Worker shutdown.
+   * @param cause - startup and cleanup failures.
+   */
+  constructor(readonly cleanup: () => Promise<void>, cause: unknown) {
+    super('inspector: startup cleanup could not be confirmed', { cause })
+  }
+}
 
 const DEFAULT_MAX_REQUEST_BODY_BYTES = 8 * 1024 * 1024
 const DEFAULT_MAX_RESPONSE_BODY_BYTES = 32 * 1024 * 1024
@@ -123,7 +146,10 @@ export interface InspectorEndpoint {
 export interface InspectorHandle {
   readonly endpoint: InspectorEndpoint
   readonly source: InspectorConnection
-  /** Stop capture and wait for the Worker to release every socket and V8 session. */
+  /**
+   * Stop capture, await physical Worker exit and confirm resource completion.
+   * @returns Completion after shutdown and accounting acknowledgement; retry a rejection through this handle.
+   */
   close(): Promise<void>
 }
 
@@ -180,10 +206,31 @@ export function resolveInspectorOptions(options: InspectorOptions = {}): Inspect
 /**
  * Start the Worker, create the Host source, and install full fetch capture by default.
  * @param options - Partial caller configuration.
+ * @param admission - Optional node process admission and startup cancellation.
  * @returns The ready endpoint and its quiescent shutdown handle.
  */
-export async function startInspector(options: InspectorOptions = {}): Promise<InspectorHandle> {
+export async function startInspector(options: InspectorOptions = {}, admission?: InspectorAdmission): Promise<InspectorHandle> {
   const spec = resolveInspectorOptions(options)
+  admission?.signal?.throwIfAborted()
+  const lease = await admission?.budget?.acquire({
+    kind: 'process', origin: 'infrastructure',
+    ...admission.signal === undefined ? {} : { signal: admission.signal },
+  })
+  const signals = [admission?.signal, lease?.signal].filter((signal): signal is AbortSignal => signal !== undefined)
+  const opening = AbortSignal.any(signals)
+  try {
+    opening.throwIfAborted()
+    admission?.assertOwnership?.()
+    opening.throwIfAborted()
+  } catch (error) {
+    let completing: Promise<void> | undefined
+    const cleanup = (): Promise<void> => completing ??= Promise.resolve().then(async () => { await lease?.release() })
+      .catch((failure: unknown) => { completing = undefined; throw failure })
+    try { await cleanup() } catch (failure) {
+      throw new InspectorStartupCleanupError(cleanup, new AggregateError([error, failure], 'inspector: unused resource completion failed'))
+    }
+    throw error
+  }
   const channel = new MessageChannel()
   const clientProtocol = `dsh-inspector-v${String(INSPECTOR_PROTOCOL_VERSION)}-${randomBytes(32).toString('base64url')}`
   const config: InspectorWorkerConfig = {
@@ -202,8 +249,21 @@ export async function startInspector(options: InspectorOptions = {}): Promise<In
     maxDisconnectedCordisTrees: spec.maxDisconnectedCordisTrees,
   }
   const boot: InspectorWorkerBoot<MessagePort> = { config, hostSourcePort: channel.port2 }
-  const worker = spawnWorker(boot)
-  const lifecycle = new InspectorWorkerLifecycle(worker)
+  let worker: Worker
+  try { worker = spawnWorker(boot) } catch (error) {
+    channel.port1.close()
+    channel.port2.close()
+    await lease?.uncertain()
+    throw error
+  }
+  const lifecycle = new InspectorWorkerLifecycle(worker, lease)
+  const rollback = async (error: unknown, disposeSource: () => void): Promise<never> => {
+    const cleanup = () => disposeInspectorResources([disposeSource], () => lifecycle.terminate(), 'inspector: startup rollback failed')
+    try { await cleanup() } catch (cleanupError) {
+      throw new InspectorStartupCleanupError(cleanup, new AggregateError([error, cleanupError], 'inspector: startup failed'))
+    }
+    throw error
+  }
   let source: HostInspectorSource
   try {
     source = new HostInspectorSource(channel.port1, {
@@ -216,16 +276,11 @@ export async function startInspector(options: InspectorOptions = {}): Promise<In
       queryTimeoutMs: spec.queryTimeoutMs,
     })
   } catch (error) {
-    channel.port1.close()
-    await lifecycle.terminate()
-    throw error
+    return rollback(error, () => { channel.port1.close() })
   }
 
-  const ready = await lifecycle.waitForReady(spec.startupTimeoutMs).catch(async (error: unknown) => {
-    source.close()
-    await lifecycle.terminate()
-    throw error
-  })
+  const ready = await lifecycle.waitForReady(spec.startupTimeoutMs, opening)
+    .catch((error: unknown) => rollback(error, () => { source.close() }))
   const authority = `${ready.host}:${String(ready.port)}`
   const endpoint: InspectorEndpoint = {
     httpUrl: `http://${authority}/`,
@@ -234,6 +289,7 @@ export async function startInspector(options: InspectorOptions = {}): Promise<In
     client: {
       endpoint: `ws://${authority}/ingest`,
       protocol: clientProtocol,
+      clientOrigins: spec.clientOrigins,
       maxQueuedRecords: spec.maxQueuedRecords,
       maxQueuedBytes: spec.maxQueuedBytes,
       maxRecordsPerFrame: spec.maxSourceRecordsPerFrame,
@@ -257,9 +313,7 @@ export async function startInspector(options: InspectorOptions = {}): Promise<In
       })
       : undefined
   } catch (error) {
-    source.close()
-    await lifecycle.terminate()
-    throw error
+    return rollback(error, () => { source.close() })
   }
 
   lifecycle.markRunning((error) => {
@@ -275,13 +329,23 @@ export async function startInspector(options: InspectorOptions = {}): Promise<In
   })
 
   let closing: Promise<void> | undefined
+  const close = (): Promise<void> => closing ??= closeInspector(lifecycle, source, fetchObserver, spec.stopTimeoutMs)
+    .then(() => { lease?.signal.removeEventListener('abort', cancelLease) })
+    .catch((error: unknown) => { closing = undefined; throw error })
+  const cancelLease = (): void => {
+    void close().catch((error: unknown) => { console.error('dsh inspector: withdrawn Worker cleanup failed', error) })
+  }
+  lease?.signal.addEventListener('abort', cancelLease, { once: true })
+  if (opening.aborted) {
+    try { await close() } catch (error) {
+      throw new InspectorStartupCleanupError(close, new AggregateError([opening.reason, error], 'inspector: startup cancellation and cleanup failed'))
+    }
+    opening.throwIfAborted()
+  }
   return {
     endpoint,
     source,
-    close(): Promise<void> {
-      closing ??= closeInspector(lifecycle, source, fetchObserver, spec.stopTimeoutMs)
-      return closing
-    },
+    close,
   }
 }
 
@@ -291,6 +355,7 @@ function spawnWorker(boot: InspectorWorkerBoot<MessagePort>): Worker {
     transferList: [boot.hostSourcePort],
     execArgv: [],
   }
+  /* v8 ignore next 3 -- plain-Node startup snapshots execute the bundled entry; source tests select entry.ts. */
   if (!import.meta.url.endsWith('.ts')) {
     return new Worker(new URL('./worker.js', import.meta.url), options)
   }
@@ -309,6 +374,7 @@ function spawnWorker(boot: InspectorWorkerBoot<MessagePort>): Worker {
 
 function sourceWorkerEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {}
+  /* v8 ignore next -- a platform-variant guard; each lane can cover only its own side. */
   if (process.platform === 'win32') {
     env.TMP = tmpdir()
     env.TEMP = tmpdir()

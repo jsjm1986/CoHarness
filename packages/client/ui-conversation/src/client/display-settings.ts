@@ -3,14 +3,11 @@ import {
   type SettingsControlState, type SettingsScope, type SettingsScopeSnapshot, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSettings } from '../submission-settings.ts'
-import {
-  CHAT_CONTENT_WIDTH_RANGE, CHAT_FONT_SIZE_RANGE, DEFAULT_CHAT_CONTENT_WIDTH, DEFAULT_CHAT_FONT_SIZE,
-} from '../submission-settings.ts'
+import { CHAT_CONTENT_WIDTH_RANGE, DEFAULT_CHAT_CONTENT_WIDTH } from '../submission-settings.ts'
 
 /** Render-facing conversation display preference snapshot. */
 export interface ConversationDisplaySettingsSnapshot {
   readonly chatContentWidth: number
-  readonly chatFontSize: number
   readonly chatFullWidth: boolean
   readonly settings: SettingsControlState
 }
@@ -20,7 +17,6 @@ export class ConversationDisplaySettings {
   private readonly store: SnapshotStore<ConversationDisplaySettingsSnapshot>
   private readonly unsubscribe: (() => void) | undefined
   private pendingWidth: number | undefined
-  private pendingFontSize: number | undefined
   private pendingFullWidth: boolean | undefined
   private disposed = false
 
@@ -51,12 +47,6 @@ export class ConversationDisplaySettings {
    * @returns the current width, clamped to the supported range.
    */
   width(): number { return this.getSnapshot().chatContentWidth }
-
-  /**
-   * Read the current transcript font size.
-   * @returns the current font size, clamped to the supported range.
-   */
-  fontSize(): number { return this.getSnapshot().chatFontSize }
 
   /**
    * Persist a transcript width after clamping it to the supported range.
@@ -95,22 +85,6 @@ export class ConversationDisplaySettings {
     void this.scope.set('chatFullWidth', value)
   }
 
-  /**
-   * Persist a transcript font size after clamping it to the supported range.
-   * @param value - requested font size in pixels.
-   */
-  setFontSize(value: number): void {
-    const fontSize = clamp(value, CHAT_FONT_SIZE_RANGE.min, CHAT_FONT_SIZE_RANGE.max)
-    if (fontSize === this.fontSize()) return
-    this.pendingFontSize = fontSize
-    this.store.set({ ...this.getSnapshot(), chatFontSize: fontSize })
-    if (this.scope === undefined) {
-      this.pendingFontSize = undefined
-      return
-    }
-    void this.scope.set('chatFontSize', fontSize)
-  }
-
   /** Release the settings subscription. */
   dispose(): void {
     if (this.disposed) return
@@ -126,28 +100,18 @@ export class ConversationDisplaySettings {
       CHAT_CONTENT_WIDTH_RANGE.min,
       CHAT_CONTENT_WIDTH_RANGE.max,
     )
-    const remoteFontSize = clamp(
-      value?.chatFontSize ?? DEFAULT_CHAT_FONT_SIZE,
-      CHAT_FONT_SIZE_RANGE.min,
-      CHAT_FONT_SIZE_RANGE.max,
-    )
     const remoteFullWidth = value?.chatFullWidth ?? false
     if (snapshot.write.status === 'idle') {
       if (this.pendingWidth === remoteWidth) this.pendingWidth = undefined
-      if (this.pendingFontSize === remoteFontSize) this.pendingFontSize = undefined
       if (this.pendingFullWidth === remoteFullWidth) this.pendingFullWidth = undefined
     } else if (snapshot.write.status === 'error' || snapshot.write.status === 'blocked') {
       this.pendingWidth = undefined
-      this.pendingFontSize = undefined
       this.pendingFullWidth = undefined
     }
     this.store.set({
       chatContentWidth: snapshot.write.status === 'saving' && this.pendingWidth !== undefined
         ? this.pendingWidth
         : remoteWidth,
-      chatFontSize: snapshot.write.status === 'saving' && this.pendingFontSize !== undefined
-        ? this.pendingFontSize
-        : remoteFontSize,
       chatFullWidth: snapshot.write.status === 'saving' && this.pendingFullWidth !== undefined
         ? this.pendingFullWidth
         : remoteFullWidth,
@@ -158,7 +122,6 @@ export class ConversationDisplaySettings {
   private snapshot(snapshot?: SettingsScopeSnapshot<ConversationSettings>): ConversationDisplaySettingsSnapshot {
     return {
       chatContentWidth: DEFAULT_CHAT_CONTENT_WIDTH,
-      chatFontSize: DEFAULT_CHAT_FONT_SIZE,
       chatFullWidth: false,
       settings: snapshot === undefined
         ? { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } }

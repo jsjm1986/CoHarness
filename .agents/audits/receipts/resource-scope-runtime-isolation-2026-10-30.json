@@ -1,0 +1,564 @@
+{
+  "recordedAt": "2026-10-29T17:13:50.445418+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B328"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-source-artifact-hashes.json",
+  "paths": [
+    "gateway/src/execution-identity.ts",
+    "gateway/src/runtime-resource-api.ts",
+    "gateway/tests/execution-runtime-isolation-postgres.spec.ts",
+    "gateway/tests/resource-scope-isolation-transcript.spec.ts",
+    "gateway/tests/fixtures/resource-scope-isolation.mjs",
+    "gateway/tests/expected/resource-scope-isolation.jsonl",
+    "gateway/package.json",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md",
+    ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.zh.md",
+    ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.i18n.yaml"
+  ],
+  "repair": "Resource scope presence is resolved by the execution identity owner within the authenticated exact Runtime and Session. Legacy owner selectors resolve their current generation before the query. An immutable scope in a sibling Runtime with the same Host Session ID cannot force an otherwise legal legacy accumulated request or queue poll into scoped mode; same-Runtime missing scopes, foreign scope references and foreign computer tokens remain refused.",
+  "negativeEvidence": [
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-foreign-scope-before.json",
+      "classification": "expected_regression_failure",
+      "control": "The same legacy request queues before a scope exists in the sibling Runtime, then fails403 solely after the other Runtime creates a scope."
+    },
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-scope-quiescent-compiled-before-node22.json",
+      "classification": "expected_regression_failure",
+      "control": "The unchanged pre-fix compiled Gateway reproduces the same causal failure through two separately authenticated computer endpoints; the fixture joins cancellation and HTTP cleanup before failing."
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "resource-foreign-scope-fixed",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:00:15.978435+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/execution-runtime-isolation-postgres.spec.ts",
+          "-t",
+          "requires an immutable resource scope only when the requesting Runtime has one",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:00:18.466938+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-foreign-scope-fixed.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-foreign-scope-fixed.log"
+      },
+      {
+        "name": "resource-scope-quiescent-source-fixed",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:03:35.298905+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/resource-scope-isolation.mjs",
+          "src"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:03:35.955926+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-scope-quiescent-source-fixed.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-scope-quiescent-source-fixed.log"
+      },
+      {
+        "name": "resource-runtime-complete-selected-regressions",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:05:16.618809+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/runtime-resource-api.spec.ts",
+          "tests/execution-runtime-isolation-postgres.spec.ts",
+          "tests/execution-scopes.spec.ts",
+          "tests/execution.spec.ts",
+          "tests/resource-scope-isolation-transcript.spec.ts",
+          "tests/node-resource-budget-postgres.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=src/runtime-resource-api.ts",
+          "--coverage.include=src/execution-identity.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-source-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:05:38.254937+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-runtime-complete-selected-regressions.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-runtime-complete-selected-regressions.log"
+      },
+      {
+        "name": "resource-real-provider-model-process-regressions",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:07:03.439542+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/runtime-resource-provider.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:07:10.306116+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-real-provider-model-process-regressions.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-real-provider-model-process-regressions.log"
+      },
+      {
+        "name": "resource-private-gateway-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:06:00.880998+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/gateway-artifact/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/gateway-artifact/build.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:06:03.593145+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-private-gateway-build.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-private-gateway-build.log"
+      },
+      {
+        "name": "resource-and-archive-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:06:31.600067+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/resource-scope-isolation-transcript.spec.ts",
+          "tests/archive-administration-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:06:53.468131+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-and-archive-built-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-and-archive-built-node22.log"
+      },
+      {
+        "name": "resource-and-archive-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:07:02.288250+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/resource-scope-isolation-transcript.spec.ts",
+          "tests/archive-administration-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:07:13.997570+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-and-archive-built-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-and-archive-built-node24.log"
+      },
+      {
+        "name": "resource-gateway-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:05:39.185754+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "--noEmit",
+          "-p",
+          "gateway/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:05:43.876835+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-gateway-types.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-gateway-types.log"
+      },
+      {
+        "name": "resource-gateway-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:05:39.188235+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/execution-identity.ts",
+          "gateway/src/runtime-resource-api.ts",
+          "gateway/tests/execution-runtime-isolation-postgres.spec.ts",
+          "gateway/tests/resource-scope-isolation-transcript.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:05:40.697360+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-gateway-lint.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-gateway-lint.log"
+      },
+      {
+        "name": "resource-fixture-js-correctness",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:05:39.194221+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "--config",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/native-fixture-lint.json",
+          "--no-ignore",
+          "-D",
+          "correctness",
+          "gateway/tests/fixtures/resource-scope-isolation.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:05:39.389693+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-fixture-js-correctness.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-fixture-js-correctness.log"
+      },
+      {
+        "name": "resource-new-fixture-syntax",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:06:32.739727+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--check",
+          "gateway/tests/fixtures/resource-scope-isolation.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:06:32.771513+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-new-fixture-syntax.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-new-fixture-syntax.log"
+      },
+      {
+        "name": "resource-scope-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:06:32.739904+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:07:09.664973+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-scope-doc-quick.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-scope-doc-quick.log"
+      },
+      {
+        "name": "resource-doc-pairing",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:05:17.761760+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "gateway/README.md",
+          ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:05:19.612025+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-doc-pairing.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-doc-pairing.log"
+      },
+      {
+        "name": "resource-guide-heading-pairing",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:08:51.781706+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:08:53.068603+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-guide-heading-pairing.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-guide-heading-pairing.log"
+      },
+      {
+        "name": "resource-final-guide-pair-check",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:10:01.738063+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:10:02.963088+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-guide-pair-check.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-guide-pair-check.log"
+      },
+      {
+        "name": "resource-touched-upgrade-guides",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:08:51.690693+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/verify-touched-guides.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:08:51.715716+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-touched-upgrade-guides.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-touched-upgrade-guides.log"
+      },
+      {
+        "name": "resource-and-archive-whitespace",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:07:37.468133+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "diff",
+          "--check",
+          "--",
+          "gateway/src/execution-identity.ts",
+          "gateway/src/runtime-resource-api.ts",
+          "gateway/src/postgres/conversation-archive-service.ts",
+          "gateway/tests/execution-runtime-isolation-postgres.spec.ts",
+          "gateway/tests/resource-scope-isolation-transcript.spec.ts",
+          "gateway/tests/fixtures/resource-scope-isolation.mjs",
+          "gateway/tests/expected/resource-scope-isolation.jsonl",
+          "gateway/tests/archive-administration-postgres.spec.ts",
+          "gateway/tests/archive-administration-transcript.spec.ts",
+          "gateway/tests/fixtures/archive-administration.mjs",
+          "gateway/tests/expected/archive-administration.jsonl",
+          "gateway/tests/postgres.spec.ts",
+          "gateway/tests/admin-business-postgres.spec.ts",
+          "gateway/tests/conversation-archive-service.spec.ts",
+          "gateway/package.json",
+          "gateway/README.md",
+          "gateway/README.zh.md",
+          "gateway/README.i18n.yaml",
+          ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md",
+          ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.zh.md",
+          ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.i18n.yaml",
+          ".agents/notes/implemented/feature/2026-08-25-admin-archive-channel.md",
+          ".agents/notes/implemented/feature/2026-08-25-admin-archive-channel.zh.md",
+          ".agents/notes/implemented/feature/2026-08-25-admin-archive-channel.i18n.yaml",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.zh.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.i18n.yaml",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.zh.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.i18n.yaml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:07:37.509949+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-and-archive-whitespace.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-and-archive-whitespace.log"
+      },
+      {
+        "name": "resource-final-file-format",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:12:04.446754+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/check-touched-files.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:12:04.475394+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-file-format.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-file-format.log"
+      },
+      {
+        "name": "resource-final-origin-fetch",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:11:04.820297+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master",
+          "--prune"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:11:09.472197+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-origin-fetch.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-origin-fetch.log"
+      },
+      {
+        "name": "resource-owned-postgres-joined-final",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:10:16.551285+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/close-owned-postgres.py",
+          "resource-owned-postgres-joined-final"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:10:17.012618+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-owned-postgres-joined-final.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-owned-postgres-joined-final.log"
+      }
+    ],
+    "selectedSourceCases": 121,
+    "providerCases": 17,
+    "sourceSkips": 0,
+    "builtReplays": {
+      "node22": {
+        "passedTranscripts": 2,
+        "archiveActionQualificationCases": 35,
+        "resourceCompositeTranscriptEntries": 10
+      },
+      "node24": {
+        "passedTranscripts": 2,
+        "archiveActionQualificationCases": 35,
+        "resourceCompositeTranscriptEntries": 10
+      }
+    },
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 521,
+          "covered": 511,
+          "skipped": 0,
+          "pct": 98.08
+        },
+        "statements": {
+          "total": 668,
+          "covered": 627,
+          "skipped": 0,
+          "pct": 93.86
+        },
+        "functions": {
+          "total": 121,
+          "covered": 119,
+          "skipped": 0,
+          "pct": 98.34
+        },
+        "branches": {
+          "total": 570,
+          "covered": 515,
+          "skipped": 0,
+          "pct": 90.35
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/execution-identity.ts": {
+        "lines": {
+          "total": 456,
+          "covered": 450,
+          "skipped": 0,
+          "pct": 98.68
+        },
+        "functions": {
+          "total": 114,
+          "covered": 113,
+          "skipped": 0,
+          "pct": 99.12
+        },
+        "statements": {
+          "total": 588,
+          "covered": 554,
+          "skipped": 0,
+          "pct": 94.21
+        },
+        "branches": {
+          "total": 496,
+          "covered": 453,
+          "skipped": 0,
+          "pct": 91.33
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/runtime-resource-api.ts": {
+        "lines": {
+          "total": 65,
+          "covered": 61,
+          "skipped": 0,
+          "pct": 93.84
+        },
+        "functions": {
+          "total": 7,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 85.71
+        },
+        "statements": {
+          "total": 80,
+          "covered": 73,
+          "skipped": 0,
+          "pct": 91.25
+        },
+        "branches": {
+          "total": 74,
+          "covered": 62,
+          "skipped": 0,
+          "pct": 83.78
+        }
+      }
+    },
+    "rootBuild": "The8-gate rootbuild passed in the immediately preceding archive repair. This follow-up changes only Gateway code/tests and docs; Gateway is a separate project and its final compiler, types and private artifacts are checked here. Root package sources were not changed."
+  },
+  "intermediateEvidence": {
+    "fixtureProvisioning": "Initial two-computer fixtures omitted the required node-local account. Legal local provisioning was added without changing schema083constraints. The resulting source and immutable compiled negative controls confirm the actual bug.",
+    "immutableWitnessCleanup": "Attempting generic organization cleanup correctly refused immutable execution witness deletion. Final fixtures retain those records in the exclusively owned disposable database, join exact pending operation cancellation and close HTTP endpoints/pools, then database and volume disposal removes all fixture data. No trigger was disabled.",
+    "cleanupGuard": "Two external cleanup attempts stopped before Docker mutation because the outstanding-command check included its own receipt and container metadata. The final guard distinguishes command receipts and the current cleanup invocation;0otherclients and exact container/volume removal are verified.",
+    "upgradeGuideChecker": "This checkout has no verify-upgrade-guides command.20actual documentation gates and the named final bilingual pair check passed; a separate local touched-guide check validates the documented headings/frontmatter and500wordlimit for both affected guides. It is not represented as a repository gate."
+  },
+  "resourceQuiescence": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T17:10:17.008359+00:00",
+    "container": "hgw-archive-e63c3c0f57",
+    "volume": "hgw-archive-e63c3c0f57-data",
+    "port": 61942,
+    "nonObserverDatabaseClients": 0,
+    "removedOwnedContainer": true,
+    "removedOwnedVolume": true,
+    "excluded": [
+      "production5432",
+      "peer58773"
+    ],
+    "retainedFixtureRows": "Immutable execution proof and historical negative-control rows were retained until disposal of this exclusively owned test database. No production trigger or constraint was disabled."
+  },
+  "limitations": [
+    "The composite runnable transcript uses two computer database identities and two real independently authenticated HTTP endpoints on one macOS host. It does not claim physically separate machine, remote transport or Linux/Windows deployment acceptance.",
+    "The six-file121-case regression and17actual provider/model-adapter/process/terminal cases pass without skips. Source coverage is partial: execution identity94.21%statements,91.33%branches,99.12%functions,98.68%lines; resource HTTP API91.25%,83.78%,85.71%,93.84%. This is not100%file, package, domain or project completion.",
+    "The17provider cases use a local model adapter and real managed processes/terminals. Real model API and public push remain human-deferred.",
+    "B04/B25, remaining native helpers/ownership, archive read/export current authority and every original audit domain remain open. No peer messages or UI/routing/request-context interface edits were made."
+  ],
+  "realProviderApiValidation": "human_deferred"
+}

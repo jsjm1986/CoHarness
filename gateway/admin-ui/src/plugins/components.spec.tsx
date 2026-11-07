@@ -92,7 +92,7 @@ function mockComposition(overrides: Partial<PluginComposition> = {}): PluginComp
     entries: [], bundleRows: [], error: '', notice: '', busy: false, busyRow: '',
     draft: null, dirty: false, applied: false, pending: 0,
     setEntryDesired: vi.fn(), setBundleDesired: vi.fn(), applyLive: vi.fn(async () => {}),
-    save: vi.fn(async () => {}), discard: vi.fn(), refresh: vi.fn(),
+    save: vi.fn(async () => {}), discard: vi.fn(), refresh: vi.fn(), acceptCatalog: vi.fn(), bindLiveRefresh: vi.fn(() => () => {}),
     ...overrides,
   }
 }
@@ -118,6 +118,8 @@ function renderTab(state: Partial<PluginManagerState> = {}, config: Partial<Conf
     confirm: vi.fn(),
     cancelConfirm: vi.fn(),
     setRowEnabled: vi.fn(),
+    describeRowConfig: vi.fn(async () => undefined),
+    setRowConfig: vi.fn(),
     dismissNotice: vi.fn(),
   }
   const props = {

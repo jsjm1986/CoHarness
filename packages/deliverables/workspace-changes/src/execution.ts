@@ -108,8 +108,9 @@ export class PosixRecorderExecution implements GitStorage {
 
   private async run(script: string, args: readonly string[], cancellation?: AbortSignal): Promise<string> {
     const signal = AbortSignal.any([AbortSignal.timeout(this.timeoutMs), ...cancellation === undefined ? [] : [cancellation]])
-    const handle = this.subprocess.spawn({
+    const handle = await this.subprocess.spawn({
       argv: ['/bin/sh', '-eu', '-c', script, 'workspace-snapshot', ...args], cwd: this.cwd,
+      resourceOrigin: 'infrastructure',
       stdio: { stdin: 'ignore', stdout: { maxBytes: 16 * 1024 }, stderr: { maxBytes: 4096 } },
       graceMs: 2_000, signal,
     })

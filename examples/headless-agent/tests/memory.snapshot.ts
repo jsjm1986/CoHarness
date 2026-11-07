@@ -78,6 +78,47 @@ async function seedStore(cwd: string): Promise<void> {
 }
 
 describe('saved-memory catalog snapshot', () => {
+  it('keeps a committed deletion successful when a notification observer fails', async () => {
+    const directory = join(scenarioDir, '..', 'memory-observer-failure')
+    const sessionFile = join(directory, `session.v${String(SESSION_FORMAT_VERSION)}.jsonl`)
+    const streamFile = join(directory, 'stream-json.expected.jsonl')
+    const config = fileURLToPath(new URL('../memory-observer.cordis.snapshot.yml', import.meta.url))
+    let cwd = ''
+    let session = ''
+    let storedFiles: string[] = []
+    const result = await runLoaderSmoke({
+      label: 'memory observer failure snapshot',
+      tempDirPrefix: 'headless-memory-observer-',
+      binScript: driver,
+      libBinScript: driver,
+      configPath: config,
+      binArgs: [config, 'Delete the obsolete release freeze memory.'],
+      tsconfigPath,
+      env: {
+        DSH_SNAPSHOT: 'replay', DSH_SNAPSHOT_FILE: sessionFile,
+        DSH_SNAPSHOT_OVERRIDE: join(directory, 'replay.override.json'),
+      },
+      prepare: async (runCwd) => { cwd = runCwd; await seedStore(runCwd) },
+      inspect: async (runCwd) => {
+        session = await persistedSession(runCwd)
+        storedFiles = await readdir(join(runCwd, '.memory-store', 'memory', 'entries'))
+      },
+    })
+    expect(result.stderr).toBe('')
+    expect(storedFiles).toEqual([])
+    const normalizedSession = normalizeSessionSnapshot(session, contextFor(session))
+    const normalized = normalizedStream(result.stdout, cwd)
+    if (refreshing) {
+      await writeFile(sessionFile, normalizedSession)
+      await writeFile(streamFile, normalized)
+    } else {
+      expect(normalizedSession).toBe(await readFile(sessionFile, 'utf8'))
+      expect(normalized).toBe(await readFile(streamFile, 'utf8'))
+    }
+    expect(normalized).toContain('Deleted memory')
+    expect(normalized).not.toContain('"is_error":true')
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
   it('replays the durable catalog and seeded read output without a key', async () => {
     const prompt = 'Search your saved memories for the deploy rule and read it back.'
     let cwd = ''

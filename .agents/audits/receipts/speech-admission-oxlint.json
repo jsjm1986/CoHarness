@@ -1,0 +1,13 @@
+{
+  "name": "speech-admission-oxlint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/speech-to-text-sensevoice/src/recognizer.ts packages/experimental/speech-to-text-sensevoice/tests/provider-queue.spec.ts packages/experimental/speech-to-text-sensevoice/tests/worker.spec.ts",
+  "startedAt": "2026-10-23T13:13:47.059404+00:00",
+  "seconds": 6.973,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1251d6ad967930c8b9eb452b4a75c60f47a88d10c3a8bc9743e4cce6fec6409e",
+  "inputsAfter": "1251d6ad967930c8b9eb452b4a75c60f47a88d10c3a8bc9743e4cce6fec6409e",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

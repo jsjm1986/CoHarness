@@ -83,6 +83,8 @@ The official root is `https://api.deepseek.com/anthropic`. An explicit `baseURL`
 
 Messages sends text, thinking, tool calls, and tool results as content blocks, reasoning effort as `output_config.effort`, and images as Files references or inline base64. Models declaring `systemPromptUpdate: in-history` retain the initial top-level system and send new system snapshots after their corresponding user/tool-result turn; undeclared models use the latest snapshot as the top-level system. Replay metadata preserves the model and thinking signatures. Invalid replay metadata emits a warning and omits signatures while retaining text and tool history. Model entries may declare `toolUpdate: addition-only` or `in-history`; the default `deepseek-flash` entry declares `addition-only`. Projected developer tool updates become system-role `tool_addition` and `tool_removal` blocks referencing declared names, and deferred declarations carry `defer_loading`. Requests containing those blocks send the `mid-conversation-tool-changes-2026-07-01` beta header. Messages omits empty assistant text blocks and skips assistant messages left without content, including saved history from other protocols. The stored Session content remains intact.
 
+Native `deepseek-web-search` operations retain the same prepared connection, authentication and user attribution as ordinary Messages calls. Their exact secret-free input is available before execution; actual usage retains the request credential source, including usage available before result mapping fails.
+
 ### API-key credentials
 
 `deepseek-official` resolves only its configured API-key reference. Messages and Files requests send the key as `x-api-key` and never follow redirects, so credentials stay on the configured origin.
@@ -121,6 +123,8 @@ Provider plugins own catalog availability. The transport supplies shared default
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
+
+Runtime model authorization is rechecked after credentials, image preparation and request extensions, before each Messages or Files request. An authorization refusal preserves its structured failure and cannot trigger inline-image fallback.
 
 <details>
 <summary>Implementation internals — click to expand</summary>

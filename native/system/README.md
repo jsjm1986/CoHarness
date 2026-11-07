@@ -1,5 +1,5 @@
 ---
-description: "Prebuilt system primitives for Linux confinement and POSIX Session write locks."
+description: "Prebuilt system primitives for Linux confinement, POSIX locks and directory handles."
 kind: "package-library"
 ---
 # @deepseek-ai/node-addon-system
@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use the Linux `landlock-run` executable to confine subprocesses, or the `./flock` entry to acquire a POSIX write lock. Platform packages contain the precompiled binaries; consumer installation never builds native code. Landlock policy and Session lifecycle remain with callers.
+Use the Linux `landlock-run` executable to confine subprocesses, `./flock` to acquire a POSIX write lock, or `./directory` to retain directory objects during asynchronous reads and creation. Platform packages contain precompiled binaries; consumer installation never builds native code. Authorization, sandbox policy and Session lifecycle remain with callers.
 
 ## Table of Contents
 
@@ -24,7 +24,9 @@ The [flock behavior contract](docs/flock-contract.md) maps descriptor, process, 
 
 `@deepseek-ai/node-addon-system/flock` exports `tryLockExclusive(fd): Promise<void>`. Keep the descriptor open until completion. Acquisition uses nonblocking exclusive flock; contention rejects with `EAGAIN` or `EWOULDBLOCK`, and closing the final descriptor for the open file description releases the lock. See the [entry README](packages/entry/README.md).
 
-Importing either entry does not load an addon. A missing Landlock executable probes unusable; a missing flock binding rejects acquisition. Neither path compiles or silently grants unsupported behavior.
+`@deepseek-ai/node-addon-system/directory` exports `DirectoryHandle` for descriptor-relative traversal, bounded reads and child creation. The [directory behavior contract](docs/directory-contract.md) defines handle ownership, link refusal and termination cleanup.
+
+Importing an entry does not load an addon. A missing Landlock executable probes unusable; missing lock or directory bindings reject their operation. No path compiles or silently grants unsupported behavior.
 
 ## Support
 
@@ -32,7 +34,7 @@ Linux x64/arm64 packages contain the static Landlock executable and separate gli
 
 ## Development
 
-From this directory, `pnpm build:ts` builds the entry, `pnpm build:native` builds the host's declared native payload, and `pnpm build:test-oracle` builds an independent flock syscall fixture. Then `pnpm test` exercises entry, lock, packaging, and available kernel behavior. Linux requires musl-gcc for a complete build; macOS uses cc. The root `pnpm run build:native-system` builds only the current host addon for source tests.
+From this directory, `pnpm build:ts` builds the entry, `pnpm build:native` builds the host's declared native payload, and `pnpm build:test-oracle` builds an independent flock syscall fixture. Then `pnpm test` exercises entries, locks, directory ownership, packaging and available kernel behavior. Linux requires musl-gcc for a complete build; macOS uses cc. The root `pnpm run build:native-system` builds only the current host addon for source tests.
 
 The [architecture](docs/architecture.md), [packaging](docs/packaging.md), and [release procedure](docs/release.md) own implementation and publication details.
 

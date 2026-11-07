@@ -8,6 +8,7 @@ const GOAL_COMPOUND_RE = /goal-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 // literal payload strings (result text, job_id arguments, notices).
 const JOB_COMPOUND_RE = /(?<![\w-])([a-z][a-z0-9_-]*-[0-9a-f]{16})(?![\w-])/gi
 const SHORT_JOB_ID_RE = /-[0-9a-f]{16}$/i
+
 const LEGACY_TOKEN_RE = /^\{\{(?:sessionId|messageId)\}\}$/
 const CANONICAL_TOKEN_RE = new RegExp(
   String.raw`^\{\{(session|message|approval|workflow|command|rpc|retry|compaction|`
@@ -55,6 +56,7 @@ function messageId(value: unknown): string | undefined {
 function redactedCandidate(value: string): boolean {
   return UUID_RE.test(value) || SHORT_JOB_ID_RE.test(value)
     || LEGACY_TOKEN_RE.test(value) || CANONICAL_TOKEN_RE.test(value)
+
 }
 
 /**

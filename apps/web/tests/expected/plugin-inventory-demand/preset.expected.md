@@ -1,0 +1,8 @@
+- button "会话插件" [expanded]
+- button "选择要查看的 Agent 预设": Inventory probe
+- paragraph: 由 Agent 预设按会话组成
+- list:
+  - listitem:
+    - button "tool-todo, inventory-probe-todo, 已启用":
+      - strong: tool-todo
+      - code: inventory-probe-todo

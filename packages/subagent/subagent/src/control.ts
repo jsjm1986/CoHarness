@@ -8,6 +8,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { AttachmentError } from '@deepseek-ai/dsh-attachment'
+import { CollaborationError, collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
+import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
@@ -48,6 +50,38 @@ export function validateControlRequest(
 }
 
 /**
+ * Combine carrier cancellation with the original collaboration provider lifetime.
+ * @param signal - caller cancellation, retained unchanged without collaboration.
+ * @param authority - request-bound authorization that must not transfer to a replacement.
+ * @returns cancellation observed by retained reads and pre-acceptance delivery.
+ */
+export function controlAuthoritySignal(signal: AbortSignal, authority: CollaborationAuthority | undefined): AbortSignal {
+  return authority === undefined ? signal : AbortSignal.any([signal, authority.signal])
+}
+
+/**
+ * Refuse an operation after its captured collaboration provider leaves.
+ * @param authority - original request authority, absent for an independent application.
+ * @throws CollaborationError when the captured provider has unloaded.
+ */
+export function assertControlAuthority(authority: CollaborationAuthority | undefined): void {
+  const error = controlAuthorityFailure(undefined, authority)
+  if (error instanceof CollaborationError) throw error
+}
+
+/**
+ * Prefer loss of authorization over an in-flight implementation failure.
+ * @param error - original read, admission or delivery failure.
+ * @param authority - original authority whose provider may have left during the await.
+ * @returns a stable collaboration failure for withdrawal, otherwise the original error.
+ */
+export function controlAuthorityFailure(error: unknown, authority: CollaborationAuthority | undefined): unknown {
+  return authority?.signal.aborted === true
+    ? new CollaborationError('gateway-unavailable', 'The authorizing collaboration provider is unavailable.')
+    : error
+}
+
+/**
  * Project one durable listing onto the catalog view, replacing each row's
  * store-derived activity with the live Agent driver's status and reporting
  * whether the exact parent Agent is live. Without an Agent registry no driver
@@ -76,13 +110,15 @@ export function catalogView(
  * projections registry as distinct failures.
  * @param error - the thrown value.
  * @param signal - the caller's cancellation.
+ * @param parentSessionId - parent whose authorized catalog was read.
  * @returns Never — the refusal is thrown.
  * @throws {RemoteError} always.
  */
-export function rejectCatalogRead(error: unknown, signal: AbortSignal): never {
+export function rejectCatalogRead(error: unknown, signal: AbortSignal, parentSessionId?: SessionId): never {
   if (isCancellation(error, signal)) {
     throw new RemoteError('gateway/cancelled', 'subagent catalog read was cancelled', {}, { cause: error })
   }
+  if (error instanceof CollaborationError) throw collaborationRemoteRefusal(error, 'read', parentSessionId)
   if (error instanceof SubagentError && error.code === 'SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE') {
     throw new RemoteError(
       'subagent/projections-unavailable',
@@ -108,6 +144,7 @@ export function rejectPrompt(error: unknown, childSessionId: SessionId, signal: 
   if (isCancellation(error, signal)) {
     throw new RemoteError('gateway/cancelled', 'subagent prompt was cancelled', {}, { cause: error })
   }
+  if (error instanceof CollaborationError) throw collaborationRemoteRefusal(error, 'write', childSessionId)
   if (error instanceof AttachmentError) {
     throw new RemoteError('subagent/attachment-invalid', error.message, { reason: error.code }, { cause: error })
   }

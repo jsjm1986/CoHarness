@@ -1,0 +1,6 @@
+{
+  "reply": "SUBAGENT_RETRY_OK",
+  "published": { "mode": "published", "firstFailed": true, "resourceRetained": true, "ownerBusy": true, "anotherAdmissionRefused": true, "allocationsBeforeCleanup": 1, "nextSucceeded": true, "oldTransportClosed": true, "allocationsAfterCleanup": 2, "ownerReleased": true },
+  "catalog": { "mode": "catalog", "firstFailed": true, "resourceRetained": true, "ownerBusy": true, "anotherAdmissionRefused": true, "allocationsBeforeCleanup": 1, "nextSucceeded": true, "oldTransportClosed": true, "allocationsAfterCleanup": 2, "ownerReleased": true },
+  "replacement": { "mode": "replacement", "obsoleteProviderRefused": true, "obsoleteAllocations": 0, "replacementAllocationsBeforeRetry": 0, "currentSucceeded": true, "currentStarts": 1 }
+}

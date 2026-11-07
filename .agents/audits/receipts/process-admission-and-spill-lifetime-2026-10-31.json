@@ -1,0 +1,188 @@
+{
+  "at": "2026-10-31T03:37:11.297646+00:00",
+  "findings": [
+    "B386",
+    "B387"
+  ],
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z",
+  "sourcePaths": [
+    "packages/subprocess/subprocess/src/index.ts",
+    "packages/subprocess/subprocess/tests/admission.spec.ts",
+    "packages/subprocess/subprocess/tests/resource-owner-example.host.spec.ts",
+    "packages/subprocess/subprocess/tests/fixtures/resource-owner.mjs",
+    "packages/subprocess/subprocess/tests/expected/resource-owner.jsonl",
+    "packages/subprocess/subprocess/README.md",
+    "packages/subprocess/subprocess/README.zh.md",
+    "packages/subprocess/subprocess/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.i18n.yaml",
+    "packages/subprocess/subprocess-local/src/output.ts",
+    "packages/subprocess/subprocess-local/tests/local.spec.ts",
+    "packages/subprocess/subprocess-local/tests/output-lifetime.host.spec.ts",
+    "packages/subprocess/subprocess-local/tests/fixtures/output-lifetime.mjs",
+    "packages/subprocess/subprocess-local/README.md",
+    "packages/subprocess/subprocess-local/README.zh.md",
+    "packages/subprocess/subprocess-local/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-default-spill-lifetime.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-default-spill-lifetime.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-default-spill-lifetime.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subprocess/subprocess/src/index.ts": "12b1ac6acb574ec8477ff8e439db0d5a09d0cf73c94e67c298a4f0218b3d94b3",
+    "packages/subprocess/subprocess/tests/admission.spec.ts": "983c488ca138b0e151874f4a644d4f54dfcbfb58782321ce2320fdd47e96a645",
+    "packages/subprocess/subprocess/tests/resource-owner-example.host.spec.ts": "b27a58315c9d701b09edeacac6684f54c4417fb1f4b3d8cd183c0a86b97313ef",
+    "packages/subprocess/subprocess/tests/fixtures/resource-owner.mjs": "6d8134c9fe99bdcbefe3560b90eb4bc8c8f9d5598d3599032251c50e9346923c",
+    "packages/subprocess/subprocess/tests/expected/resource-owner.jsonl": "85a8f6cfee12f2e62e732738f1d461c73e55522405b67e4e5b8b62d2d3d5a546",
+    "packages/subprocess/subprocess/README.md": "75fa6a96a6c31cf5f7a6d5025ab352bd6ddb923e0a55b231118a60f8e0deba04",
+    "packages/subprocess/subprocess/README.zh.md": "c376cfd37ced700e224e23d0e0acee5f0db0adea2a3c12ded202377f280a0326",
+    "packages/subprocess/subprocess/README.i18n.yaml": "c6006300a7bbca4eb40cdeb0326db3b910e156ffb7c63f51ca4cc72f3142ce8d",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md": "03e53631cabb5e047698ba8f7c064b4fcc891349f6f8a6a2913686faf0558586",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.zh.md": "beb6e821f4a019fd24522e66fd714d91258341a678d630e103600ea9d80c78df",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.i18n.yaml": "03a5b2758a4452a3d08ca767b97a2779d780fc15e7ecd351fa92750b7b147665",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.md": "64745308c0b4bceaf43bc99375f6d3fce9f8367c8f0bc4e3fa8737217c1320fb",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.zh.md": "4214b7e247aa4a836ac34f3e23203833f8269d7d034fd37f28bc003275f878f1",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.i18n.yaml": "6479e3ad85c4968ff1ea1d2211c1d9caf32d9a5be3791ac9e430d2fcbdaff506",
+    "packages/subprocess/subprocess-local/src/output.ts": "a5777e27a5feca3db5bf7025d43a4c7e61f8b8ed56c2f89479bf771c84fdcc57",
+    "packages/subprocess/subprocess-local/tests/local.spec.ts": "a9d9c905cef6d0d7e2f52fa0e2848cf30c51e4a82113ba1adb5ae4b2b5dad944",
+    "packages/subprocess/subprocess-local/tests/output-lifetime.host.spec.ts": "3615c4e3043c7d740c0cd377790ea8534045990d27b86bc6e73e89126b28ae90",
+    "packages/subprocess/subprocess-local/tests/fixtures/output-lifetime.mjs": "97062441a82e637f5d952c2533bc65fc5f08ae0c7a144ce7f2aa7961b2036c32",
+    "packages/subprocess/subprocess-local/README.md": "d98299b4223f749fe405ad14196c2ce8fabdc7a4734eafb19bb35550118ef706",
+    "packages/subprocess/subprocess-local/README.zh.md": "37917f06331c3c69f1c68c0be06e345b83eb65f93f693923898a388c88eebf2b",
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "cdbe188dc3bb56b8561780622635377994e2baaddeae28ebea8eafb0a034c239",
+    ".agents/notes/implemented/bug-fix/2026-10-31-default-spill-lifetime.md": "90d3b3d69e936ff62274b1914acdd8f76730d7cd14add6c7cc9fc6f10b647efb",
+    ".agents/notes/implemented/bug-fix/2026-10-31-default-spill-lifetime.zh.md": "92fd2c771585bee1970c0f72e96e22e7163cabdff04fd9e212dc0bbcb2c57a23",
+    ".agents/notes/implemented/bug-fix/2026-10-31-default-spill-lifetime.i18n.yaml": "3ca438e78d3c7a901a9e7ea329502a96132efbac908c6a8bbacbee1154a91a50"
+  },
+  "causalEvidence": {
+    "B386": "Twelve source cases fail before the fix. A private old compiled service, loaded through a copied local provider with only its service import redirected, physically creates Node processes and PTYs in all 8 withdrawn/replaced owner cases. The updated Loader transcript refuses all 8, releases the original grant once and never acquires replacement capacity; unchanged owners still create their targets.",
+    "B387": "Fresh isolated processes expose one exit callback immediately after old source or built output import, including caller-owned storage. Both outcomes fail before the fix and pass after it: import/custom directory add 0 callbacks, repeated default allocation adds 1, actual exit removes an empty directory and preserves completed output. Trace evidence identifies the default-spill callback, not a Local provider unload leak; a three-iteration ordinary provider probe returns exit listeners to baseline after each fiber disposal."
+  },
+  "implementation": {
+    "B386": "Capture the process resource owner before waiting, then synchronously validate cancellation, the live underlying Cordis Service and required admission after the helper handoff immediately before invoking either provider. Refusal releases the unused grant to its original owner. Neither provider API nor request metadata changes.",
+    "B387": "Register the default-spill cleanup only after successful first directory creation and capture that directory. Caller-owned storage and unused imports register none. Preserve completed files and the no-recreation rule; retire the duplicate-service test fixture root context."
+  },
+  "verification": {
+    "checks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/subprocess-owner-and-spill-final-coverage.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-final-build.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-final-doc-quick.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-built-node22.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-built-node24.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-sdk-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-python-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-complete-lint.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-export-jsdoc.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/subprocess-resource-owner-guide.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/process-owner-spill-origin-fetch.json"
+    ],
+    "uniqueCases": 525,
+    "cases": {
+      "subprocessLocalAndSsh": 518,
+      "typescriptSdkSnapshots": 5,
+      "pythonSdkSnapshots": 2,
+      "platformSkipped": 16
+    },
+    "coverage": {
+      "packages/subprocess/subprocess-local/src/output.ts": {
+        "s": [
+          82,
+          82
+        ],
+        "f": [
+          14,
+          14
+        ],
+        "b": [
+          35,
+          35
+        ]
+      },
+      "packages/subprocess/subprocess/src/index.ts": {
+        "s": [
+          112,
+          112
+        ],
+        "f": [
+          30,
+          30
+        ],
+        "b": [
+          33,
+          33
+        ]
+      }
+    },
+    "lines": {
+      "packages/subprocess/subprocess/src/index.ts": [
+        81,
+        81
+      ],
+      "packages/subprocess/subprocess-local/src/output.ts": [
+        78,
+        78
+      ]
+    },
+    "coveragePolicy": "Both modified modules pass the standard four per-file 100% thresholds. No baseline/exclusion rule changed. The existing process-exit callback exclusion is narrowed from 4 to 3 lines; isolated Node processes directly verify its empty and nonempty directory behavior.",
+    "builtReplay": "Node22 and Node24 each pass 4 cases: real process/PTY owner transcript, 2 actual spill exit lifetimes and Loader partial-write recovery.",
+    "build": "All 8 final build gates pass.",
+    "documentation": "All 20 final quick documentation gates, guide structure, bilingual pairing and export JSDoc pass. Full doc-sync is not claimed.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": {
+    "owners": [
+      ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md",
+      ".agents/notes/implemented/bug-fix/2026-10-31-default-spill-lifetime.md"
+    ],
+    "decision": "Both new bug-fix notes retain future ownership decisions. SDK private launch, ordinary/native model operations, completed spill writes and tool-result spill policy remain separate responsibilities, not superseded records. No frozen archive was edited.",
+    "upgradeGuide": "Updated both package README triplets. The current process-resource-ownership guide is 192 English words and covers the changed allocation refusal. Spill lifetime adds no breaking exports, configuration or data."
+  },
+  "baseline": {
+    "at": "2026-10-31T03:33:07.933177+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "peerThread": "multi-computer architecture chat",
+    "peerReportedRelease": "R6 on mac-mini and Ubuntu; auth-only incremental deployment, schema102 and epoch83.",
+    "peerReportedVerification": "19 real PostgreSQL auth cases and 8-concurrent token performance 7932.94ms to 963.68ms; page performance remains REAL-001 open.",
+    "independentlyVerifiedByThisBatch": false,
+    "rootReleaseStatus": "Verified root B385-B387 remain outside the previously reported frozen R7; no root deployment.",
+    "reservedPeerPaths": [
+      "gateway/src/postgres/auth-service.ts",
+      "gateway/tests/auth-postgres.spec.ts",
+      "Gateway HTML and real Web assembly fixtures",
+      "topology/node access, CUA and migration101/102",
+      "the three resource-budget files and late UI authorization hydration",
+      "packages/client/runtime",
+      "ui-conversation",
+      "test-support/client-runtime",
+      "apps/web/tests/workspace-history-entry.e2e.ts",
+      "packages/client/ui-documents",
+      "packages/client/ui-agent-preset",
+      "packages/client/runtime Session/navigation/input state"
+    ],
+    "handoff": "One receipt and source-hash handoff after verification; no repeated progress messages.",
+    "latestReadOnlyPeerSnapshot": "Peer reports a real collaborative project write succeeded on computer A; owner and readonly members saw the response, readonly had no send entry, and computer B draft remained independent. Root did not independently reproduce this report.",
+    "peerCandidateStatus": "Peer reports R7 candidate and GUI work are in progress, not deployed. It plans to integrate the frozen root candidate and preserve matched parent/child artifacts.",
+    "peerNewRace": "REAL-013: navigation can submit the previous Session composer while creating a new Session. Peer owns originating-Session input hold and its GUI/real Web regressions. No root acceptance of that fix is claimed.",
+    "productionPerformance": "Peer reports direct QA TLS to actual A Gateway reaches the workbench in about one second; public-entry performance still fails independently. No root verification is claimed.",
+    "peerLatestReported": "Compact peer snapshot reports two unresolved real Web cases: retained zero-byte test uploads exhaust quota, and an Ubuntu Runtime is ready while its page remains loading. The peer owns upload/UI feedback and remote transport diagnosis; root did not modify those paths.",
+    "peerSnapshotEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T025807Z/peer-latest-compact.json"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review SSH physical process.start after asynchronous prepare/stream waits, remaining cross-computer permission and admission ownership.",
+    "Review valid resource-only managed Codex routing and remaining quota/admission failure classification.",
+    "No fresh root PostgreSQL, physical Linux/Windows, paid API or deployment acceptance. Revalidate owned database identity/mapping before any future DB test.",
+    "Peer real Web upload/quota feedback and Ubuntu page transport remain separately owned and incomplete. No full doc-sync claim."
+  ]
+}

@@ -41,6 +41,9 @@ Each successful reload re-executes the plugin bundle and remounts the plugin wit
 |---|---|---|
 | `watchArtifacts` | `true` | Poll artifact files for rebuilds; graph delivery stays active when false |
 | `pollIntervalMs` | `500` | Bundle stat-poll interval in milliseconds |
+| `keepAliveIntervalMs` | `15000` | Graph-stream comment interval in milliseconds; integer from 1 through 2147483647 |
+
+The graph stream sends keepalive comments independently of artifact watching. Comments publish no graph changes or reloads and are skipped while the response needs draining. One unreferenced timer serves all open responses, stops after the last response closes, and is cleared before plugin disposal waits for response closure.
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-client-hmr) is the exhaustive source for every accepted field and its JSDoc.
 
@@ -60,7 +63,7 @@ This section explains how the reload chain is built; observable behavior is cove
 
 ### Design concept
 
-The Host half watches each package's stamped entry artifact and serves `/plugins/events`. It forwards existing graph-change and rebuilt notifications; every new connection receives the current full graph. A graph describes the browser’s desired entries and carries no Host cleanup-completion guarantee. Host activation and cleanup remain owned by the Host lifecycle. The entry's mtime, ctime, and size identify the revision without hashing its contents; unchanged metadata requires no content read. Host restarts over unchanged artifacts keep the same revisions, so reconnecting the graph stream does not replace browser plugins. The browser half delegates both frame kinds to Client Modules, which serializes entry changes and waits for browser resource cleanup.
+The Host half watches each package's stamped entry artifact and serves `/plugins/events`. It forwards existing graph-change and rebuilt notifications; every new connection receives the current full graph. A graph describes the browser’s desired entries and carries no Host cleanup-completion guarantee. Host activation and cleanup remain owned by the Host lifecycle. Entry metadata detects candidate changes without reading unchanged files. [Client Modules](../modules/README.md#incremental-composition) publishes a new revision only when marked executable content changes; unmarked artifacts retain filesystem revisions. Identical compiled content keeps its revision across copies, rebuilds and Host restarts, so graph-stream reconnection does not replace those plugins. The browser half delegates both frame kinds to Client Modules, which serializes entry changes and waits for browser resource cleanup.
 
 ### The browser swap
 

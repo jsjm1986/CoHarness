@@ -1,0 +1,13 @@
+{
+  "name": "mcp-hidden-process-admission-before",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests/resource-admission.spec.ts --retry=0",
+  "startedAt": "2026-10-23T16:11:02.750127+00:00",
+  "seconds": 3.541,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "56dbba7bcac03879830ffac69d45aa0c34a7fad7262112e37d69a4b7b7090d53",
+  "inputsAfter": "56dbba7bcac03879830ffac69d45aa0c34a7fad7262112e37d69a4b7b7090d53",
+  "outputSha256": "ebf5b79569c57dac6f8eeddb950cab6501f4b5ed9bc9fc6a4b252219d3b92aa0",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/mcp/mcp-client/tests/resource-admission.spec.ts (1 test | 1 failed) 312ms\n   × refuses MCP probe and serving processes when node admission is denied 311ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/mcp/mcp-client/tests/resource-admission.spec.ts > refuses MCP probe and serving processes when node admission is denied\nAssertionError: expected undefined to be an instance of Error\n ❯ packages/mcp/mcp-client/tests/resource-admission.spec.ts:24:42\n     22|   }, resolveReconnectPolicy({ enabled: false }, 'admission fixture'))\n     23|   onTestFinished(async () => { await connection.dispose() })\n     24|   expect((await connection.ready).error).toBeInstanceOf(Error)\n       |                                          ^\n     25|   expect(acquire).toHaveBeenCalledWith(expect.objectContaining({ kind:…\n     26| }, 20_000)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  00:11:05\n   Duration  698ms (transform 232ms, setup 26ms, import 296ms, tests 312ms, environment 0ms)\n\n"
+}

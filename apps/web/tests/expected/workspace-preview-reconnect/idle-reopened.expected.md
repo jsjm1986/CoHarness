@@ -1,0 +1,2 @@
+- button "Close preview"
+- button "Reload"

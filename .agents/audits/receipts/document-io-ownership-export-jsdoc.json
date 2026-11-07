@@ -1,0 +1,14 @@
+{
+  "name": "document-io-ownership-export-jsdoc",
+  "cwd": ".",
+  "command": "pnpm run verify-export-jsdoc",
+  "startedAt": "2026-10-25T21:06:45.305563+00:00",
+  "seconds": 39.371,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "76fe6cc6d3248a0b4ea7fdfb17ecec9fd473d20783c87bbea862d6f8f55a0906",
+  "inputsAfter": "76fe6cc6d3248a0b4ea7fdfb17ecec9fd473d20783c87bbea862d6f8f55a0906",
+  "postgresToolDirectory": null,
+  "outputSha256": "34c3189bb05208432b51c80e9941df04ac432c6f79279e01c6008b6c09b8526f",
+  "outputTail": "$ tsx scripts/verify-export-jsdoc.ts\nverify-export-jsdoc: every exported name in each package API is documented.\n"
+}

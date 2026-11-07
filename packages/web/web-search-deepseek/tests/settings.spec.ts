@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { Fiber } from '@deepseek-ai/cordis'
+import type { ResourceLease } from '@deepseek-ai/dsh-resource-budget'
 import { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import WebRuntime from '@deepseek-ai/dsh-web'
@@ -75,6 +76,33 @@ async function searchOnce(ctx: Context): Promise<string> {
 }
 
 describe('web-search-deepseek settings section', () => {
+  it('uses settings committed while native model admission is queued', async () => {
+    const bench = await boot()
+    const entered = Promise.withResolvers<undefined>(), granted = Promise.withResolvers<ResourceLease>()
+    const release = vi.fn(async () => {})
+    const lease: ResourceLease = { signal: new AbortController().signal, release, uncertain: async () => {} }
+    bench.ctx.provide('resourceBudget', { acquire() { entered.resolve(undefined); return granted.promise } })
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(ONE_RESULT))
+    const search = bench.ctx.web.search({ query: 'queued settings' })
+    try {
+      await Promise.race([entered.promise, search.then(() => { throw new Error('Native search completed before model admission') })])
+      await bench.ctx.settings.update(WEB_SEARCH_DEEPSEEK_SETTINGS_NAMESPACE, {
+        baseURL: 'https://search.latest.test/v1', maxTokens: 37,
+      })
+      expect(fetch).not.toHaveBeenCalled()
+      granted.resolve(lease)
+      await search
+      expect(fetch.mock.calls[0]?.[0]).toBe('https://search.latest.test/v1/messages')
+      const body = fetch.mock.calls[0]?.[1]?.body
+      if (typeof body !== 'string') throw new Error('Native search must send JSON text')
+      expect(JSON.parse(body)).toMatchObject({ max_tokens: 37 })
+      expect(release).toHaveBeenCalledTimes(1)
+    } finally {
+      granted.resolve(lease)
+      try { await Promise.allSettled([search]) } finally { await bench.ctx.fiber.dispose() }
+    }
+  })
+
   it('serves a stored endpoint to the next search without re-registering the provider', async () => {
     const bench = await boot()
     expect(await searchOnce(bench.ctx)).toContain('https://search.entry.test/v1')

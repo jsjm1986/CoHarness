@@ -1,3 +1,20 @@
+import { deploymentContextSchema, deploymentCandidatesSchema, deploymentPreflightSchema, nodeConnectionViewSchema, type DeploymentContext, type DeploymentPreflight } from '../../src/deployment-protocol.ts'
+import type { NodeConnectionView } from '../../src/deployment-protocol.ts'
+import { parseConversationSessionIdentity, type ConversationSessionIdentity } from '../../src/session-identity.ts'
+export type { ConversationSessionIdentity } from '../../src/session-identity.ts'
+import { parseConversationArchiveId, type ConversationArchiveId } from '../../src/archive-identity.ts'
+import type { RuntimeId, RuntimeNodeId } from '../../src/runtime-catalog.ts'
+export type { ConversationArchiveId } from '../../src/archive-identity.ts'
+import { adminComputerRequestUrl } from './computer-target.ts'
+import { computerErrorMessage } from './computer.copy.ts'
+import type { DesktopEnvironment } from '@deepseek-ai/dsh-native-command'
+export type { DesktopEnvironment } from '@deepseek-ai/dsh-native-command'
+
+/** Read desktop-session evidence from this Admin document's selected computer without starting a Runtime. */
+export function getDesktopEnvironment(signal?: AbortSignal): Promise<DesktopEnvironment> {
+  return request('/admin/api/desktop-environment', { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+}
+
 export type AdminUser = {
   id: number
   username: string
@@ -7,8 +24,10 @@ export type AdminUser = {
   homePath: string
   mustChangePassword: boolean
   autoReviewEligible: boolean
-  port: number
+  port: number | null
   instanceState: string
+  runtimeCount?: number
+  homeNodeId?: import('../../src/runtime-catalog.ts').RuntimeNodeId
 }
 
 export type Project = {
@@ -92,12 +111,13 @@ export type AuditPage = {
 export type ConversationArchiveState = 'archived' | 'trash' | 'purged'
 
 export type ConversationArchiveRow = {
+  archiveId: ConversationArchiveId
   rootSessionId: string
   title: string
   contentPreview?: string | null
   creator: { id: number; displayName: string } | null
   project: { id: number; name: string } | null
-  runtime: { kind: 'user' | 'project'; id: number }
+  runtime: { kind: 'user' | 'project'; id: number; runtimeId?: RuntimeId; nodeId?: RuntimeNodeId }
   workspace: { path: string; title: string; position: number | null } | null
   state: ConversationArchiveState
   archivedAt: number
@@ -114,7 +134,7 @@ export type ConversationArchiveRow = {
 
 export type EmptyDraftCandidate = {
   rootSessionId: string
-  runtime: { kind: 'user' | 'project'; id: number }
+  runtime: { kind: 'user' | 'project'; id: number; runtimeId: RuntimeId; nodeId?: RuntimeNodeId }
   creator: { id: number; displayName: string } | null
   project: { id: number; name: string } | null
   createdAt: number
@@ -140,7 +160,7 @@ export type AdminDocument = {
   modifiedAt: number
   owner: { id: number; displayName: string } | null
   ownerSource: 'upload' | 'transfer' | 'legacy' | 'admin'
-  state: 'active' | 'trash' | 'purged' | 'deleted'
+  state: 'active' | 'trash' | 'purged' | 'missing' | 'deleted'
   trashedAt?: number | null
   restoredAt?: number | null
   purgeAfter?: number | null
@@ -188,7 +208,12 @@ export type AdminDocumentPage = {
 }
 
 export class AdminRequestError extends Error {
-  constructor(readonly status: number, message: string) {
+  /**
+   * @param status - failed HTTP status.
+   * @param message - localized text for the operator.
+   * @param code - original Gateway code; omission retains the supplied diagnostic.
+   */
+  constructor(readonly status: number, message: string, readonly code = message) {
     super(message)
     this.name = 'AdminRequestError'
   }
@@ -254,33 +279,49 @@ async function readResponseJson<T>(response: Response): Promise<T> {
 }
 /* jscpd:ignore-end */
 
-async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(url, {
+/** Preserve the Gateway discriminator while localizing computer diagnostics. */
+async function responseError(res: Response): Promise<AdminRequestError> {
+  let message = `Request failed (${String(res.status)})`
+  let code: string | undefined
+  try {
+    const body = await readResponseJson<{ error?: unknown; message?: unknown; code?: unknown }>(res)
+    if (typeof body.error === 'string' && body.error !== '') message = body.error
+    else if (typeof body.message === 'string' && body.message !== '') message = body.message
+    if (body.error !== null && typeof body.error === 'object') {
+      const nested = body.error as { code?: unknown; message?: unknown }
+      if (typeof nested.message === 'string' && nested.message !== '') message = nested.message
+      if (typeof nested.code === 'string' && nested.code !== '') code = nested.code
+    }
+    if (typeof body.code === 'string' && body.code !== '') code = body.code
+  } catch {
+    // Preserve the HTTP status when the upstream body is absent, invalid or too large.
+  }
+  return new AdminRequestError(res.status, computerErrorMessage(message), code ?? message)
+}
+
+async function request<T>(url: string, init: RequestInit = {}, target?: 'computer' | 'organization'): Promise<T> {
+  const res = await fetch(adminComputerRequestUrl(url, undefined, target), {
     ...init,
     credentials: 'same-origin',
     headers: { 'content-type': 'application/json', ...init.headers },
   })
-  if (!res.ok) {
-    let message = `Request failed (${String(res.status)})`
-    try {
-      const body = await readResponseJson<{ error?: unknown; message?: unknown }>(res)
-      if (typeof body.error === 'string' && body.error !== '') message = body.error
-      else if (typeof body.message === 'string' && body.message !== '') message = body.message
-    } catch {
-      // Keep the status-only diagnostic when a proxy returns a non-JSON body.
-    }
-    throw new AdminRequestError(res.status, message)
-  }
+  if (!res.ok) throw await responseError(res)
   if (res.status === 204) return undefined as T
   return await readResponseJson<T>(res)
 }
 
-export function listUsers(): Promise<AdminUser[]> {
-  return request('/admin/api/users')
+/** Read shared account choices, or explicitly request the selected computer's instance columns. */
+export function listUsers(target: 'organization' | 'computer' = 'organization'): Promise<AdminUser[]> {
+  return request('/admin/api/users', {}, target)
 }
 
 export function getUser(id: number): Promise<AdminUser> {
-  return request(`/admin/api/users/${id}`)
+  return request(`/admin/api/users/${id}`, {}, 'organization')
+}
+
+/** Read only the current Admin document's computer-local home and instance metadata. */
+export function getUserComputerProfile(id: number, signal?: AbortSignal): Promise<AdminUser> {
+  return request(`/admin/api/users/${id}`, { signal })
 }
 
 /** One stored project membership row as seen from the member's account side. */
@@ -313,7 +354,7 @@ export function patchUser(id: number, body: {
   status?: 'active' | 'disabled'
   autoReviewEligible?: boolean
 }): Promise<void> {
-  return request(`/admin/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+  return request(`/admin/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, 'organization')
 }
 
 export function deleteUser(id: number): Promise<void> {
@@ -321,7 +362,7 @@ export function deleteUser(id: number): Promise<void> {
 }
 
 export function resetPassword(id: number, password: string): Promise<void> {
-  return request(`/admin/api/users/${id}/password`, { method: 'POST', body: JSON.stringify({ password }) })
+  return request(`/admin/api/users/${id}/password`, { method: 'POST', body: JSON.stringify({ password }) }, 'organization')
 }
 
 export function controlInstance(id: number, op: 'start' | 'stop' | 'restart'): Promise<void> {
@@ -414,17 +455,8 @@ export async function listAudit(filter: AuditFilter = {}): Promise<AuditPage> {
   if (filter.limit !== undefined) q.set('limit', String(filter.limit))
   if (filter.offset !== undefined) q.set('offset', String(filter.offset))
   const qs = q.toString()
-  const res = await fetch(`/admin/api/audit${qs === '' ? '' : `?${qs}`}`, { credentials: 'same-origin' })
-  if (!res.ok) {
-    let message = `Request failed (${String(res.status)})`
-    try {
-      const body = await res.json() as { error?: unknown }
-      if (typeof body.error === 'string' && body.error !== '') message = body.error
-    } catch {
-      // Keep the status-only diagnostic when a proxy returns a non-JSON body.
-    }
-    throw new AdminRequestError(res.status, message)
-  }
+  const res = await fetch(adminComputerRequestUrl(`/admin/api/audit${qs === '' ? '' : `?${qs}`}`), { credentials: 'same-origin' })
+  if (!res.ok) throw await responseError(res)
   const totalHeader = res.headers.get('x-total-count')
   const total = totalHeader === null ? null : Number(totalHeader)
   return { entries: await res.json() as AuditEntry[], total: total !== null && Number.isFinite(total) ? total : null }
@@ -450,10 +482,10 @@ export function listArchives(filter: {
     if (value !== undefined) query.set(key, String(value))
   }
   const suffix = query.toString()
-  return request(`/admin/api/archives${suffix === '' ? '' : `?${suffix}`}`)
+  return request<ConversationArchiveRow[]>(`/admin/api/archives/records${suffix === '' ? '' : `?${suffix}`}`).then(rows => rows.map(row => decodeArchiveRecord(row)))
 }
 
-export function previewEmptyDrafts(options: { olderThanMs?: number; limit?: number } = {}): Promise<{
+export async function previewEmptyDrafts(options: { olderThanMs?: number; limit?: number } = {}): Promise<{
   cutoff: number
   candidates: EmptyDraftCandidate[]
 }> {
@@ -461,37 +493,60 @@ export function previewEmptyDrafts(options: { olderThanMs?: number; limit?: numb
   if (options.olderThanMs !== undefined) query.set('ageMs', String(options.olderThanMs))
   if (options.limit !== undefined) query.set('limit', String(options.limit))
   const suffix = query.toString()
-  return request(`/admin/api/archives/empty-drafts/preview${suffix === '' ? '' : `?${suffix}`}`)
+  const result = await request<{ cutoff: number; candidates: EmptyDraftCandidate[] }>(`/admin/api/archives/empty-drafts/preview${suffix === '' ? '' : `?${suffix}`}`)
+  return { ...result, candidates: result.candidates.map(candidate => {
+    const identity = parseConversationSessionIdentity({ rootSessionId: candidate.rootSessionId, runtimeId: candidate.runtime.runtimeId })
+    if (identity === undefined) throw new Error('invalid empty-draft identity')
+    return { ...candidate, runtime: { ...candidate.runtime, runtimeId: identity.runtimeId } }
+  }) }
 }
 
-export function trashEmptyDrafts(ids: string[], cutoff?: number): Promise<{ trashed: string[] }> {
+export function trashEmptyDrafts(sessions: readonly ConversationSessionIdentity[], cutoff?: number): Promise<{ trashed: ConversationSessionIdentity[] }> {
   return request('/admin/api/archives/empty-drafts/trash', {
     method: 'POST',
-    body: JSON.stringify({ ids, ...(cutoff === undefined ? {} : { cutoff }) }),
+    body: JSON.stringify({ sessions, ...(cutoff === undefined ? {} : { cutoff }) }),
   })
 }
 
-export function getArchive(rootSessionId: string, fromSeq = 0, limit = 200): Promise<ConversationArchiveDetail> {
+/** Decode the archive identity at the HTTP response; Host IDs never substitute for it. */
+function decodeArchiveRecord(value: unknown, expected?: ConversationArchiveId): ConversationArchiveRow {
+  if (typeof value !== 'object' || value === null) throw new Error('invalid archive response')
+  const row = value as Record<string, unknown>
+  const archiveId = parseConversationArchiveId(row.archiveId)
+  if (archiveId === undefined || expected !== undefined && archiveId !== expected) throw new Error('invalid archive identity in response')
+  return { ...row, archiveId } as ConversationArchiveRow
+}
+
+export async function getArchive(archiveId: ConversationArchiveId, fromSeq = 0, limit = 200): Promise<ConversationArchiveDetail> {
   const query = new URLSearchParams({ fromSeq: String(fromSeq), limit: String(limit) })
-  return request(`/admin/api/archives/${encodeURIComponent(rootSessionId)}?${query.toString()}`)
+  const detail = await request<ConversationArchiveDetail>(`/admin/api/archives/records/${encodeURIComponent(archiveId)}?${query.toString()}`)
+  return { ...detail, record: decodeArchiveRecord(detail.record, archiveId) }
 }
 
-export function getArchiveStatus(rootSessionId: string): Promise<ConversationArchiveRow> {
-  return request(`/admin/api/archives/${encodeURIComponent(rootSessionId)}/status`)
+export async function getArchiveStatus(archiveId: ConversationArchiveId): Promise<ConversationArchiveRow> {
+  return decodeArchiveRecord(await request(`/admin/api/archives/records/${encodeURIComponent(archiveId)}/status`), archiveId)
 }
 
-export function exportArchive(rootSessionId: string): string {
-  return `/admin/api/archives/${encodeURIComponent(rootSessionId)}/export`
+export function exportArchive(archiveId: ConversationArchiveId): string {
+  return adminComputerRequestUrl(`/admin/api/archives/records/${encodeURIComponent(archiveId)}/export`)
 }
 
-export function applyArchiveAction(action: 'restore' | 'trash' | 'purge' | 'settle', ids: string[]): Promise<{
+export async function applyArchiveAction(action: 'restore' | 'trash' | 'purge' | 'settle', archiveIds: ConversationArchiveId[]): Promise<{
   action: string
-  results: Array<{ rootSessionId: string; ok: boolean; error?: string }>
+  results: Array<{ archiveId: ConversationArchiveId; ok: boolean; error?: string }>
 }> {
-  return request('/admin/api/archives/actions', {
+  const result = await request<{
+    action: string
+    results: Array<{ archiveId: ConversationArchiveId; ok: boolean; error?: string }>
+  }>('/admin/api/archives/records/actions', {
     method: 'POST',
-    body: JSON.stringify({ action, ids, idempotencyKey: crypto.randomUUID() }),
+    body: JSON.stringify({ action, archiveIds, idempotencyKey: crypto.randomUUID() }),
   })
+  if (result.action !== action || result.results.length !== archiveIds.length
+    || result.results.some((item, index) => parseConversationArchiveId(item.archiveId) !== archiveIds[index])) {
+    throw new Error('invalid archive action response')
+  }
+  return result
 }
 
 export function listDocumentMetrics(): Promise<AdminDocumentMetrics> {
@@ -502,7 +557,7 @@ export async function listAdminDocuments(filter: {
   scope?: 'personal' | 'project'
   projectId?: number
   ownerUserId?: number
-  state?: 'active' | 'trash' | 'purged' | 'deleted' | 'all'
+  state?: 'active' | 'trash' | 'purged' | 'missing' | 'deleted' | 'all'
   query?: string
   limit?: number
   offset?: number
@@ -525,7 +580,7 @@ export async function listAdminDocumentsPage(filter: {
   scope?: 'personal' | 'project'
   projectId?: number
   ownerUserId?: number
-  state?: 'active' | 'trash' | 'purged' | 'deleted' | 'all'
+  state?: 'active' | 'trash' | 'purged' | 'missing' | 'deleted' | 'all'
   query?: string
   limit?: number
   cursor?: string
@@ -781,6 +836,8 @@ export interface AdminWebhookEndpoint {
   executionUserId: number
   runtimeKind: 'user' | 'project'
   runtimePublicId: number
+  runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId | null
+  nodeId?: import('../../src/runtime-catalog.ts').RuntimeNodeId | null
   intakeLimit: number
   intakeWindowMs: number
   replayWindowMs: number
@@ -793,7 +850,7 @@ export interface AdminWebhookEndpoint {
 export type AdminWebhookEndpointFields = Pick<AdminWebhookEndpoint,
   'name' | 'provider' | 'source' | 'events' | 'actions' | 'repositories' | 'titleTemplate' | 'promptTemplate' | 'workspacePath'
   | 'agentPreset' | 'permissionPreset' | 'modelProvider' | 'modelId' | 'modelMaxTokens'
-  | 'executionUserId' | 'runtimeKind' | 'runtimePublicId' | 'intakeLimit' | 'intakeWindowMs'
+  | 'executionUserId' | 'runtimeKind' | 'runtimePublicId' | 'runtimeId' | 'intakeLimit' | 'intakeWindowMs'
   | 'replayWindowMs' | 'maxBodyBytes' | 'projectVisibility'>
 
 export function listWebhookEndpoints(): Promise<{ endpoints: AdminWebhookEndpoint[] }> {
@@ -934,8 +991,13 @@ export type OrganizationModelDiscovery = {
   apiKey?: string
 }
 
-export function describeOrganizationModelSettings(): Promise<OrganizationModelSettingsView> {
-  return request('/admin/api/model-settings')
+/**
+ * Read current organization settings.
+ * @param signal - optional owner lifetime; omission leaves the request uncancelled by that owner.
+ * @returns the current settings and revision, after the response body is read.
+ */
+export function describeOrganizationModelSettings(signal?: AbortSignal): Promise<OrganizationModelSettingsView> {
+  return request('/admin/api/model-settings', signal === undefined ? {} : { signal })
 }
 
 export function mutateOrganizationModelSettings(body: {
@@ -945,10 +1007,16 @@ export function mutateOrganizationModelSettings(body: {
   return request('/admin/api/model-settings', { method: 'PUT', body: JSON.stringify(body) })
 }
 
-export function describeOrganizationCredentials(refs: string[]): Promise<{ credentials: Record<string, OrganizationCredentialView> }> {
+/**
+ * Describe organization credential state without retrieving values.
+ * @param refs - credential references to inspect.
+ * @param signal - optional owner cancellation; omission leaves this request uncancelled by that owner.
+ * @returns credential configuration state for the requested references.
+ */
+export function describeOrganizationCredentials(refs: string[], signal?: AbortSignal): Promise<{ credentials: Record<string, OrganizationCredentialView> }> {
   const query = new URLSearchParams()
   for (const ref of refs) query.append('refs', ref)
-  return request(`/admin/api/model-settings/credentials?${query.toString()}`)
+  return request(`/admin/api/model-settings/credentials?${query.toString()}`, signal === undefined ? {} : { signal })
 }
 
 export function setOrganizationCredential(ref: string, value: string): Promise<void> {
@@ -959,10 +1027,16 @@ export function unsetOrganizationCredential(ref: string): Promise<void> {
   return request('/admin/api/model-settings/credentials', { method: 'DELETE', body: JSON.stringify({ ref }) })
 }
 
-export function discoverOrganizationModels(body: OrganizationModelDiscovery): Promise<{
+/**
+ * Discover models through the organization endpoint.
+ * @param body - provider endpoint and authentication for this discovery.
+ * @param signal - optional owner cancellation; omission leaves this request uncancelled by that owner.
+ * @returns discovered model metadata.
+ */
+export function discoverOrganizationModels(body: OrganizationModelDiscovery, signal?: AbortSignal): Promise<{
   models: Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>
 }> {
-  return request('/admin/api/model-settings/discover', { method: 'POST', body: JSON.stringify(body) })
+  return request('/admin/api/model-settings/discover', { method: 'POST', body: JSON.stringify(body), signal })
 }
 
 export type ModelAccessView = {
@@ -1098,8 +1172,13 @@ export function listModels(): Promise<ModelGovernanceRow[]> {
   return request('/admin/api/models')
 }
 
-export function listModelProviders(): Promise<ModelProviderRow[]> {
-  return request('/admin/api/model-providers')
+/**
+ * List the current organization Provider catalog.
+ * @param signal - optional owner cancellation; omission leaves this request uncancelled by that owner.
+ * @returns Provider metadata and current management status.
+ */
+export function listModelProviders(signal?: AbortSignal): Promise<ModelProviderRow[]> {
+  return request('/admin/api/model-providers', signal === undefined ? {} : { signal })
 }
 
 export function saveModelProvider(provider: ModelProviderInput): Promise<void> {
@@ -1121,7 +1200,7 @@ export function setModelAccess(userId: number, provider: string, model: string, 
 }
 
 export function getProjectModelAccess(projectId: number): Promise<ProjectModelAccessView> {
-  return request(`/admin/api/project-model-access?projectId=${projectId}`)
+  return request(`/admin/api/project-model-access?projectId=${projectId}`, {}, 'computer')
 }
 
 export function setProjectModelAccess(
@@ -1132,13 +1211,13 @@ export function setProjectModelAccess(
 ): Promise<void> {
   return request('/admin/api/project-model-access', {
     method: 'PUT', body: JSON.stringify({ projectId, provider, model, allowed }),
-  })
+  }, 'computer')
 }
 
 export function setAllProjectModelAccess(projectId: number, allowed: true | null): Promise<void> {
   return request('/admin/api/project-model-access', {
     method: 'PUT', body: JSON.stringify({ projectId, all: true, allowed }),
-  })
+  }, 'computer')
 }
 
 export function setQuota(body: {
@@ -1147,7 +1226,7 @@ export function setQuota(body: {
   tokenLimit: number | null | 'inherit'
   companyCostMicrosLimit: number | null | 'inherit'
 }): Promise<void> {
-  return request('/admin/api/quotas', { method: 'PUT', body: JSON.stringify(body) })
+  return request('/admin/api/quotas', { method: 'PUT', body: JSON.stringify(body) }, body.subjectType === 'project' ? 'computer' : 'organization')
 }
 
 /** Per-metric user quota setting: role inheritance, unlimited, or an explicit monthly cap. */
@@ -1190,7 +1269,7 @@ export function listUsageContributors(projectId?: number, month?: string): Promi
   if (projectId !== undefined) query.set('projectId', String(projectId))
   if (month !== undefined && month !== '') query.set('month', month)
   const suffix = query.toString()
-  return request(`/admin/api/usage/contributors${suffix === '' ? '' : `?${suffix}`}`)
+  return request(`/admin/api/usage/contributors${suffix === '' ? '' : `?${suffix}`}`, {}, projectId === undefined ? 'organization' : 'computer')
 }
 
 export function getUsageHealth(month?: string): Promise<UsageHealth> {
@@ -1200,7 +1279,7 @@ export function getUsageHealth(month?: string): Promise<UsageHealth> {
 export function getProjectUsage(projectId: number, month?: string): Promise<UsageSummary> {
   const query = new URLSearchParams({ projectId: String(projectId) })
   if (month !== undefined && month !== '') query.set('month', month)
-  return request(`/admin/api/usage?${query.toString()}`)
+  return request(`/admin/api/usage?${query.toString()}`, {}, 'computer')
 }
 
 export type AdminTerminal = {
@@ -1212,26 +1291,26 @@ export type AdminTerminal = {
 }
 export type AdminTerminalInventory = {
   nodeId: string
-  target: { kind: 'user' | 'project'; id: number }
+  target: { kind: 'user' | 'project'; id: number; runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId }
   generation: number | null
   terminals: AdminTerminal[]
 }
 
-export function listTerminals(kind: 'user' | 'project', id: number, signal?: AbortSignal): Promise<AdminTerminalInventory> {
-  return request(`/admin/api/terminals?kind=${kind}&id=${String(id)}`, { signal })
+export function listTerminals(kind: 'user' | 'project', id: number, signal?: AbortSignal, runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId): Promise<AdminTerminalInventory> {
+  return request(`/admin/api/terminals?kind=${kind}&id=${String(id)}${runtimeId === undefined ? '' : `&dshRuntime=${encodeURIComponent(runtimeId)}`}`, { signal })
 }
 
 export function closeTerminal(inventory: AdminTerminalInventory, entry: AdminTerminal): Promise<{ closed: true }> {
   return request('/admin/api/terminals/close', { method: 'POST', body: JSON.stringify({
     kind: inventory.target.kind, targetId: inventory.target.id, nodeId: inventory.nodeId,
-    generation: inventory.generation, ownerId: entry.ownerId, id: entry.id,
+    generation: inventory.generation, runtimeId: inventory.target.runtimeId, ownerId: entry.ownerId, id: entry.id,
   }) })
 }
 
 /** Exact current-node profile binding returned before management actions are enabled. */
-export interface PluginManagementTarget { nodeId: string; target: { kind: 'user' | 'project'; id: number }; generation: number | null }
-export function pluginManagementTarget(kind: 'user' | 'project', id: number, signal?: AbortSignal): Promise<PluginManagementTarget> {
-  return request(`/admin/api/plugins/target?kind=${kind}&id=${String(id)}`, { signal })
+export interface PluginManagementTarget { nodeId: string; target: { kind: 'user' | 'project'; id: number; runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId }; generation: number | null }
+export function pluginManagementTarget(kind: 'user' | 'project', id: number, signal?: AbortSignal, runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId): Promise<PluginManagementTarget> {
+  return request(`/admin/api/plugins/target?kind=${kind}&id=${String(id)}${runtimeId === undefined ? '' : `&dshRuntime=${encodeURIComponent(runtimeId)}`}`, { signal })
 }
 /** Generated Remote codecs validate the answer in the profile adapter. */
 export function pluginManagementInvoke(input: unknown, signal: AbortSignal): Promise<unknown> {
@@ -1242,6 +1321,11 @@ export function pluginManagementInvoke(input: unknown, signal: AbortSignal): Pro
 export interface PluginDesiredEntry { id: string; name?: string; disabled: boolean }
 /** The deployment's saved plugin composition for one runtime owner. */
 export interface PluginDesiredState { entries: PluginDesiredEntry[]; bundles: string[] }
+/** Localized display text resolved for state rows whose instance cannot answer live. */
+export interface PluginStateMeta {
+  title?: string | ({ en: string } & Record<string, string>)
+  description?: string | ({ en: string } & Record<string, string>)
+}
 /** The store row, the instance's applied marker, and the files' observed composition. */
 export interface PluginManagementState {
   revision: string
@@ -1249,11 +1333,28 @@ export interface PluginManagementState {
   appliedRevision: string
   generation: number | null
   observed: PluginDesiredState | null
+  /** Display metadata keyed by state-row id and bundle name. */
+  meta?: { entries: Record<string, PluginStateMeta>; bundles: Record<string, PluginStateMeta> }
 }
-export function pluginManagementState(kind: 'user' | 'project', id: number, signal?: AbortSignal): Promise<PluginManagementState> {
-  return request(`/admin/api/plugins/state?kind=${kind}&id=${String(id)}`, { signal })
+export function pluginManagementState(kind: 'user' | 'project', id: number, signal?: AbortSignal, runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId): Promise<PluginManagementState> {
+  return request(`/admin/api/plugins/state?kind=${kind}&id=${String(id)}${runtimeId === undefined ? '' : `&dshRuntime=${encodeURIComponent(runtimeId)}`}`, { signal })
 }
-export function pluginManagementSaveState(input: { target: { kind: 'user' | 'project'; id: number }; revision: string; state: PluginDesiredState | null }, signal?: AbortSignal): Promise<PluginManagementState> {
+
+/** One space holding a saved plugin composition, as the cross-space overview lists it. */
+export interface PluginManagementOverviewRow {
+  target: { kind: 'user' | 'project'; id: number; label: string }
+  entries: number
+  disabled: number
+  bundles: number
+  revision: string
+  updatedAt: string
+  live: boolean
+  generation: number | null
+}
+export function pluginManagementOverview(signal?: AbortSignal): Promise<PluginManagementOverviewRow[]> {
+  return request('/admin/api/plugins/overview', { signal })
+}
+export function pluginManagementSaveState(input: { target: { kind: 'user' | 'project'; id: number; runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId }; revision: string; state: PluginDesiredState | null }, signal?: AbortSignal): Promise<PluginManagementState> {
   return request('/admin/api/plugins/state', { method: 'POST', body: JSON.stringify(input), signal })
 }
 
@@ -1325,8 +1426,8 @@ export interface DeploymentBackup {
   error: string | null
 }
 
-export function getDeployment(): Promise<DeploymentState> {
-  return request('/admin/api/deployment')
+export function getDeployment(signal?: AbortSignal): Promise<DeploymentState> {
+  return request('/admin/api/deployment', signal === undefined ? {} : { signal })
 }
 export function setMaintenance(action: 'enter' | 'exit', reason?: string): Promise<ClusterState> {
   return request('/admin/api/deployment/maintenance', { method: 'POST', body: JSON.stringify({ action, reason }) })
@@ -1334,11 +1435,84 @@ export function setMaintenance(action: 'enter' | 'exit', reason?: string): Promi
 export function setDeploymentNodeStatus(nodeId: string, status: DeploymentNodeStatus): Promise<DeploymentNode> {
   return request('/admin/api/deployment/nodes/status', { method: 'POST', body: JSON.stringify({ nodeId, status }) })
 }
+
+export type { NodeAccessEntry, NodeAccessPage, NodeEnrollment } from '../../src/node-access.ts'
+
+/** A success response did not identify the requested node operation; its effect remains unconfirmed. */
+export class NodeAccessResponseError extends Error {
+  readonly code = 'node-access/unconfirmed-response'
+  constructor() { super('The node operation response did not match the request.'); this.name = 'NodeAccessResponseError' }
+}
+
+/**
+ * Read one cached node page without probing or starting nodes.
+ * @param cursor - continuation returned by the preceding page.
+ * @param signal - cancellation owned by this directory view.
+ * @returns validated current node metadata; an incomplete page is never deletion evidence.
+ */
+export async function listNodeAccess(cursor?: string, signal?: AbortSignal): Promise<import('../../src/node-access.ts').NodeAccessPage> {
+  const query = cursor === undefined ? '' : `?${new URLSearchParams({ cursor }).toString()}`
+  const value = await request<unknown>(`/admin/api/deployment/nodes/access${query}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+  return (await import('../../src/node-access.ts')).nodeAccessPageSchema.parse(value)
+}
+
+/**
+ * Read the center identity without contacting managed computers.
+ * @param signal - selector-owned cancellation.
+ * @returns validated center and forwarding metadata.
+ */
+export async function getAdminComputerContext(signal?: AbortSignal): Promise<import('../../src/node-access.ts').AdminComputerContext> {
+  const value = await request<unknown>('/admin/api/deployment/current-node', { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+  return (await import('../../src/node-access.ts')).adminComputerContextSchema.parse(value)
+}
+
+/**
+ * Issue a ticket once; this operation must never be retried automatically.
+ * @param name - administrator-selected computer name.
+ * @param requestId - caller-generated durable issuance identity.
+ * @returns one-time credential material; a transport or malformed-response failure may follow a committed issuance.
+ */
+export async function issueNodeEnrollment(name: string, requestId: import('../../src/node-access.ts').NodeEnrollmentId, nodeId?: RuntimeNodeId): Promise<import('../../src/node-access.ts').NodeEnrollment> {
+  const value = await request<unknown>('/admin/api/deployment/nodes/enrollments', { method: 'POST', body: JSON.stringify(nodeId === undefined ? { name, requestId } : { nodeId, requestId }) })
+  const receipt = (await import('../../src/node-access.ts')).nodeEnrollmentSchema.parse(value)
+  if (receipt.enrollmentId !== requestId || receipt.revision !== 1 || nodeId !== undefined && receipt.nodeId !== nodeId) throw new NodeAccessResponseError()
+  return receipt
+}
+
+/**
+ * Replace a node credential after explicit confirmation using its current revision.
+ * @param node - directory entry whose revision the administrator reviewed.
+ * @param requestId - new durable issuance identity.
+ * @returns one-time replacement ticket; failures with an unknown outcome require directory inspection.
+ */
+export async function reissueNodeEnrollment(node: import('../../src/node-access.ts').NodeAccessEntry,
+  requestId: import('../../src/node-access.ts').NodeEnrollmentId): Promise<import('../../src/node-access.ts').NodeEnrollment> {
+  const value = await request<unknown>(`/admin/api/deployment/nodes/access/${encodeURIComponent(node.nodeId)}`, {
+    method: 'POST', body: JSON.stringify({ action: 'issue-enrollment', revision: node.revision, requestId }),
+  })
+  const receipt = (await import('../../src/node-access.ts')).nodeEnrollmentSchema.parse(value)
+  if (receipt.nodeId !== node.nodeId || receipt.enrollmentId !== requestId || receipt.revision !== node.revision + 1) throw new NodeAccessResponseError()
+  return receipt
+}
+
+/**
+ * Revoke one node credential without changing process state or releasing runtime allocations.
+ * @param node - directory entry whose revision the administrator reviewed.
+ * @returns validated revocation receipt; stale revisions are refused.
+ */
+export async function revokeNodeAccess(node: import('../../src/node-access.ts').NodeAccessEntry): Promise<import('zod').infer<typeof import('../../src/node-access.ts').nodeRevocationSchema>> {
+  const value = await request<unknown>(`/admin/api/deployment/nodes/access/${encodeURIComponent(node.nodeId)}`, {
+    method: 'POST', body: JSON.stringify({ action: 'revoke', revision: node.revision }),
+  })
+  const receipt = (await import('../../src/node-access.ts')).nodeRevocationSchema.parse(value)
+  if (receipt.nodeId !== node.nodeId || receipt.revision !== node.revision + 1) throw new NodeAccessResponseError()
+  return receipt
+}
 export function requestDeploymentRestore(backupId: string): Promise<DeploymentOperation> {
   return request('/admin/api/deployment/restore', { method: 'POST', body: JSON.stringify({ backupId }) })
 }
-export function listBackups(): Promise<{ backups: DeploymentBackup[] }> {
-  return request('/admin/api/backups')
+export function listBackups(signal?: AbortSignal): Promise<{ backups: DeploymentBackup[] }> {
+  return request('/admin/api/backups', signal === undefined ? {} : { signal })
 }
 export function createBackup(): Promise<DeploymentBackup> {
   return request('/admin/api/backups', { method: 'POST', body: '{}' })
@@ -1444,4 +1618,117 @@ export function tunnelAccessAction(
     | { action: 'start-named'; hostname: string; domain?: string; apiToken?: string },
 ): Promise<TunnelAccessView> {
   return request('/admin/api/tunnel/actions', { method: 'POST', body: JSON.stringify(body) })
+}
+
+export type DigestModelSettings = {
+  model: string | null
+  candidates: Array<{ provider: string; model: string }>
+}
+
+export function getDigestModelSettings(): Promise<DigestModelSettings> {
+  return request('/admin/api/progress/digest-model')
+}
+export function setDigestModel(model: string | null): Promise<DigestModelSettings> {
+  return request('/admin/api/progress/digest-model', { method: 'POST', body: JSON.stringify({ model }) })
+}
+
+/** Stable Runtime and computer metadata used by scoped Admin actions. */
+export type { RuntimeCatalogEntry, RuntimeCatalogPage, RuntimeId, RuntimeNodeId } from '../../src/runtime-catalog.ts'
+/** Effective allocation limits as returned by the Admin wire API. */
+export interface RuntimeAllocationPolicy { revision: string; maxTotal: number; maxPerNode: number; source: 'organization' | 'user' }
+/** Idempotent allocation receipt; no process is started by allocating. */
+export interface RuntimeAllocationReceipt { requestId: string; runtimeId: import('../../src/runtime-catalog.ts').RuntimeId; nodeId: import('../../src/runtime-catalog.ts').RuntimeNodeId; userId: number; status: 'preparing' | 'allocated' | 'retired' }
+
+/** Read one bounded environment page without starting a Runtime. */
+export function listRuntimeEnvironments(cursor?: string, signal?: AbortSignal): Promise<import('../../src/runtime-catalog.ts').RuntimeCatalogPage> {
+  return request(`/admin/api/runtimes${cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`}`, { signal })
+}
+/** Read one user's assignments across computers. */
+export function listUserRuntimes(userId: number, cursor?: string, signal?: AbortSignal): Promise<import('../../src/runtime-catalog.ts').RuntimeCatalogPage> {
+  return request(`/admin/api/users/${String(userId)}/runtimes${cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`}`, { signal })
+}
+/** Read the current effective allocation limits and optimistic revision. */
+export function getRuntimeAllocationPolicy(userId?: number, signal?: AbortSignal): Promise<RuntimeAllocationPolicy> {
+  return request(`/admin/api/${userId === undefined ? '' : `users/${String(userId)}/`}runtime-allocation-policy`, { signal })
+}
+/** Save a revision-checked override; null restores organization limits. */
+export function saveRuntimeAllocationPolicy(userId: number | undefined, revision: string, limits: { maxTotal: number; maxPerNode: number } | null) {
+  return request<RuntimeAllocationPolicy>(`/admin/api/${userId === undefined ? '' : `users/${String(userId)}/`}runtime-allocation-policy`, { method: 'PUT', body: JSON.stringify({ revision, limits }) })
+}
+/** Allocate a stopped Runtime on the explicitly captured computer with a retry-stable request id. */
+export function allocateUserRuntime(userId: number, nodeId: import('../../src/runtime-catalog.ts').RuntimeNodeId, requestId: string) {
+  return request<RuntimeAllocationReceipt>(`/admin/api/users/${String(userId)}/runtimes?dshNode=${encodeURIComponent(nodeId)}`, { method: 'POST', body: JSON.stringify({ requestId }) })
+}
+/** Operate one exact allocation; stop, restart and retire compare its displayed generation. */
+export function operateRuntime(runtime: import('../../src/runtime-catalog.ts').RuntimeCatalogEntry, action: 'start' | 'stop' | 'restart' | 'retire') {
+  return request(`/admin/api/runtimes/${encodeURIComponent(runtime.id)}/${action}?dshNode=${encodeURIComponent(runtime.node.id)}&dshRuntime=${encodeURIComponent(runtime.id)}`, {
+    method: 'POST', body: JSON.stringify(action === 'start' ? {} : { generation: runtime.generation }),
+  })
+}
+
+/** Current use permission independent of computer connectivity and Runtime allocations. */
+export interface AdminComputerPermission { nodeId: import('../../src/runtime-catalog.ts').RuntimeNodeId; name: string; status: 'active' | 'draining' | 'offline'; enabled: boolean; revision: string }
+/** Read one bounded page of the user's computer permissions. */
+export function listUserComputerPermissions(userId: number, cursor?: string, signal?: AbortSignal): Promise<{ items: AdminComputerPermission[]; nextCursor: import('../../src/runtime-catalog.ts').RuntimeNodeId | null }> {
+  return request(`/admin/api/users/${userId}/computers${cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`}`, { signal })
+}
+/** Compare the displayed revision before changing one computer's use grant. */
+export function saveUserComputerPermission(userId: number, computer: AdminComputerPermission, enabled: boolean): Promise<AdminComputerPermission> {
+  return request(`/admin/api/users/${userId}/computers/${encodeURIComponent(computer.nodeId)}`, { method: 'PUT', body: JSON.stringify({ revision: computer.revision, enabled }) })
+}
+
+/** Read organization policy from this browser entry; never contact the selected managed computer. */
+export async function getDeploymentTopology(signal?: AbortSignal): Promise<DeploymentContext> {
+  return deploymentContextSchema.parse(await request<unknown>('/account/api/deployment/context', { cache: 'no-store', ...(signal === undefined ? {} : { signal }) }))
+}
+
+/** Save a reviewed mode without changing the current browser selection or form state. */
+export async function saveDeploymentTopology(input: { revision: string; enabled: boolean; primaryOrigin?: string }): Promise<DeploymentContext> {
+  const result = deploymentContextSchema.parse(await request<unknown>('/admin/api/deployment/topology', { method: 'PUT', body: JSON.stringify(input) }))
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('hgw-deployment-policy-changed'))
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('hgw-deployment-policy')
+      channel.postMessage({ revision: result.revision }); channel.close()
+    }
+  }
+  return result
+}
+
+/** Inspect the retained attachments that prevent disabling multi-computer mode. */
+export async function preflightDeploymentTopology(): Promise<DeploymentPreflight> {
+  return deploymentPreflightSchema.parse(await request<unknown>('/admin/api/deployment/topology/preflight', { cache: 'no-store' }))
+}
+
+/** Read this computer's independent-agent setup without returning its code or credential. */
+export async function getNodeConnection(signal?: AbortSignal): Promise<NodeConnectionView> {
+  return nodeConnectionViewSchema.parse(await request<unknown>('/admin/api/deployment/node-connection', { cache: 'no-store', ...(signal === undefined ? {} : { signal }) }))
+}
+
+/** Store a one-time code in the target computer's private setup file. */
+export async function saveNodeConnection(values: { revision: number; centerUrl: string; enrollmentToken: string }): Promise<NodeConnectionView> {
+  return nodeConnectionViewSchema.parse(await request<unknown>('/admin/api/deployment/node-connection', { method: 'POST', body: JSON.stringify({ action: 'save', values }) }))
+}
+
+/** Start the fixed, operator-installed Node Agent service. */
+export async function startNodeConnection(): Promise<NodeConnectionView> {
+  return nodeConnectionViewSchema.parse(await request<unknown>('/admin/api/deployment/node-connection', { method: 'POST', body: JSON.stringify({ action: 'start' }) }))
+}
+
+/** Exit managed execution only after Runtime stop and stream quiescence are confirmed. */
+export async function detachNodeAccess(node: import('../../src/node-access.ts').NodeAccessEntry): Promise<void> {
+  const value = await request<unknown>(`/admin/api/deployment/nodes/access/${encodeURIComponent(node.nodeId)}`, {
+    method: 'POST', body: JSON.stringify({ action: 'detach', revision: node.revision }),
+  })
+  const result = (await import('../../src/node-access.ts')).nodeDetachmentSchema.parse(value)
+  if (result.nodeId !== node.nodeId || result.revision !== node.revision + 1) throw new NodeAccessResponseError()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('hgw-deployment-policy-changed'))
+    if (typeof BroadcastChannel !== 'undefined') { const channel = new BroadcastChannel('hgw-deployment-policy'); channel.postMessage({ revision: result.topologyRevision }); channel.close() }
+  }
+}
+
+/** Read one bounded page of already deployed identities without making an enrollment decision. */
+export async function listDeploymentCandidates(cursor?: string, signal?: AbortSignal): Promise<import('../../src/deployment-protocol.ts').DeploymentCandidates> {
+  return deploymentCandidatesSchema.parse(await request<unknown>(`/admin/api/deployment/topology/candidates${cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) }))
 }

@@ -1,0 +1,225 @@
+{
+  "finding": "B341",
+  "status": "fixed_by_architecture_owner_and_independently_verified_for_named_scope",
+  "updatedAt": "2026-10-30T09:46:01.454672+00:00",
+  "implementationOwner": "Parallel architecture chat01a1821f-1577-7472-93db-3bd83ee42345; explicit concrete-overlap handoff",
+  "auditSourceFilesModified": false,
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z",
+  "sourcePaths": [
+    "gateway/src/deployment-commands.ts",
+    "gateway/src/postgres/node-access-service.ts",
+    "gateway/deploy/postgres/migrations/102_node_enrollment_issuer_history.sql",
+    "gateway/tests/deployment-restore.spec.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/deployment-modes/guide.md",
+    ".agents/notes/implemented/architecture/2026-10-30-entry-topology-and-independent-node-authority.md"
+  ],
+  "sourceHashes": {
+    "gateway/src/deployment-commands.ts": "ad79e5297031675ac54c2066fb519ed30ed4c8a25e22b5687352a79a1f2a9488",
+    "gateway/src/postgres/node-access-service.ts": "0c006472c41b87f11300a20a7f09e8ea9af40a212e43222f8928fa4fae27436f",
+    "gateway/deploy/postgres/migrations/102_node_enrollment_issuer_history.sql": "aedca5d6af591f4d317656160c08a605e3da80b391ad3414f77f8fbf62e4e051",
+    "gateway/tests/deployment-restore.spec.ts": "7f3e8d3dd478f50a83585be5665a2c23a084c64761ddb0bed9dabdca67c71613",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/deployment-modes/guide.md": "4c5f6d241b409fadb722b26fa0623f2d0e09afc0843fed0621a943dca9ec53b0",
+    ".agents/notes/implemented/architecture/2026-10-30-entry-topology-and-independent-node-authority.md": "88aa046e83a46fc3a8e35e7850b7adea14590043640d280ef7bc3ade11ce091e"
+  },
+  "problem": "The restored users table can omit a newer issuer while destination node enrollments are preserved. The prior created_by user foreign key rejects the entire restore. Both computer identities predate the backup.",
+  "causalNegative": "restore-enrollment-issuer-source-negative.json",
+  "repair": "Migration102retains created_by as its original historical UUID without requiring a current users row. Issuance and administrative mutations retain current same-organization administrator authority. Restore refuses an older dump that would recreate the incompatible constraint.",
+  "verification": {
+    "maintainedDatabaseTests": 4,
+    "independentSourcePrograms": 2,
+    "sourceProgramsOverlapNamedMaintainedScenarios": true,
+    "originalIssuerUuidRetained": true,
+    "laterIssuerNotRetainedAsLiveAccount": true,
+    "removedAdministratorDenied": true,
+    "currentEnrollmentUsable": true,
+    "oldBackupEnrollmentDenied": true,
+    "oldBackupCredentialDenied": true,
+    "preRestoreCurrentLeaseDenied": true,
+    "freshCurrentLeaseAccepted": true,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledProgramsRepeatSourceCredentialCase": true,
+    "compiledRuntimeNoTypeScriptLoader": true,
+    "compiledFiles": 162,
+    "gatewayTypesPassed": true,
+    "checks": {
+      "restore-enrollment-issuer-source-fixed": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:18:54.280550+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z/restore-current-enrollment-issuer.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:18:56.300581+00:00"
+      },
+      "restore-enrollment-maintained-acceptance": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:19:36.226317+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "HGW_TEST_PG_DUMP_COMMAND=[\"/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_dump\"]",
+          "HGW_TEST_PG_RESTORE_COMMAND=[\"/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_restore\"]",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/deployment-restore.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:19:48.659124+00:00"
+      },
+      "restore-node-credential-history-source": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:26:30.272332+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z/restore-node-credential-history.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:26:31.962837+00:00"
+      },
+      "restore-issuer-private-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:29:54.617430+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z/restore-issuer-artifact/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z/restore-issuer-artifact/tsconfig.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:29:59.013365+00:00"
+      },
+      "restore-issuer-gateway-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:29:54.617427+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:30:00.854728+00:00"
+      },
+      "restore-issuer-compiled-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:32:03.749348+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z/restore-node-credential-history-built.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z/restore-issuer-artifact/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:32:05.794796+00:00"
+      },
+      "restore-issuer-compiled-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T09:32:03.749344+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z/restore-node-credential-history-built.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T090400Z/restore-issuer-artifact/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T09:32:05.781610+00:00"
+      }
+    },
+    "schema102Integration": {
+      "uniqueTests": 60,
+      "files": 4,
+      "scope": "Archive HTTP transcript, PostgreSQL baseline, conversation Runtime namespace and archive Runtime namespace; separate fresh child databases.",
+      "checks": {
+        "schema102-archive-and-session-namespace": {
+          "status": "passed",
+          "startedAt": "2026-10-30T09:36:42.278257+00:00",
+          "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "command": [
+            "python3",
+            "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+            "env",
+            "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+            "node",
+            "--import",
+            "tsx/esm",
+            "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+            "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+            "run",
+            "tests/archive-runtime-namespace-transcript.spec.ts",
+            "tests/conversation-runtime-namespace.spec.ts",
+            "tests/postgres.spec.ts",
+            "--no-file-parallelism",
+            "--maxWorkers=2"
+          ],
+          "exitCode": 0,
+          "finishedAt": "2026-10-30T09:36:47.928631+00:00"
+        },
+        "schema102-remaining-namespace-postgres": {
+          "status": "passed",
+          "startedAt": "2026-10-30T09:44:50.785952+00:00",
+          "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "command": [
+            "python3",
+            "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+            "env",
+            "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+            "node",
+            "--import",
+            "tsx/esm",
+            "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+            "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+            "run",
+            "tests/conversation-runtime-namespace-postgres.spec.ts",
+            "tests/archive-runtime-namespace-postgres.spec.ts",
+            "--no-file-parallelism",
+            "--maxWorkers=2"
+          ],
+          "exitCode": 0,
+          "finishedAt": "2026-10-30T09:44:54.617658+00:00"
+        }
+      },
+      "selectionCorrection": "The initial command selected two real files (43 tests); the nonexistent conversation-runtime-namespace.spec.ts selector did not select a file. The correct conversation-runtime-namespace-postgres.spec.ts and archive-runtime-namespace-postgres.spec.ts leaves then passed 17 tests."
+    }
+  },
+  "limits": [
+    "This validates actual PostgreSQL/CLI transactional restore and node capability behavior; it does not establish complete multi-computer file backup coverage or physical multi-host UI acceptance.",
+    "All12original domains, B04and B25remain open.",
+    "Peer-reported GUI/Admin/full-build counts are not added to audit-owned acceptance counts.",
+    "Paid real model validation and public push remain human-deferred."
+  ]
+}

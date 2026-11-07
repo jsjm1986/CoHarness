@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-export-jsdoc",
+  "cwd": ".",
+  "command": "pnpm run verify-export-jsdoc",
+  "startedAt": "2026-10-23T18:26:44.372535+00:00",
+  "seconds": 8.122,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "85b4c71fa5be25d31d975670076dd926793b99dfd977a3bcc918b752cad0ad6a",
+  "inputsAfter": "85b4c71fa5be25d31d975670076dd926793b99dfd977a3bcc918b752cad0ad6a",
+  "outputSha256": "34c3189bb05208432b51c80e9941df04ac432c6f79279e01c6008b6c09b8526f",
+  "outputTail": "$ tsx scripts/verify-export-jsdoc.ts\nverify-export-jsdoc: every exported name in each package API is documented.\n"
+}

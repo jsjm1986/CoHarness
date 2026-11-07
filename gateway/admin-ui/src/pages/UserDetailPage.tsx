@@ -1,4 +1,5 @@
 /** User-centric administration: account, qualifications, model overrides, memberships, and quota. */
+import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowLeft, KeyRound, Pencil, Power, Trash2, UserRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -13,6 +14,7 @@ import {
   getStewardPolicy,
   getTerminalPolicy,
   getUser,
+  getUserComputerProfile,
   getUserQuota,
   listModels,
   listProjects,
@@ -50,12 +52,13 @@ import {
   Section,
   StatusBadge,
 } from '../components/ui.tsx'
+import { UserComputerPermissions } from '../components/UserComputerPermissions.tsx'
+import { UserRuntimePanel } from '../components/UserRuntimePanel.tsx'
 import { UserQualificationCard } from '../components/UserQualificationCard.tsx'
 import {
   AccountBadge,
   AutoReviewBadge,
   Definition,
-  InstanceControls,
   InstanceState,
   RoleBadge,
   UserDeleteConfirm,
@@ -85,9 +88,32 @@ export function UserDetailPage() {
   return <UserDetail key={params.id} userId={userId} />
 }
 
+function UserComputerProfile({ userId, reload }: { userId: number; reload: number }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
+  const [profile, setProfile] = useState<AdminUser>()
+  const [error, setError] = useState('')
+  useEffect(() => {
+    const controller = new AbortController()
+    void getUserComputerProfile(userId, controller.signal).then(value => {
+      if (controller.signal.aborted) return
+      if (value.id !== userId) throw new Error(t('localProfileUnavailable'))
+      setProfile(value); setError('')
+    }).catch((cause: unknown) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('localProfileUnavailable')) })
+    return () => { controller.abort() }
+  }, [userId, reload, t])
+  if (error !== '') return <Definition label={t('localProfile')}><ErrorBanner message={error} /></Definition>
+  if (profile === undefined) return <Definition label={t('localProfile')}><span className="muted">{t('loadingUser')}</span></Definition>
+  return <>
+    <Definition label={t('defInstance')}><InstanceState state={profile.instanceState} /></Definition>
+    <Definition label={t('defPort')}><span className="codeText">{profile.port ?? '—'}</span></Definition>
+    <Definition label={t('defHomePath')}><span className="codeText">{profile.homeNodeId === undefined ? '—' : profile.homePath}</span></Definition>
+  </>
+}
+
 function UserDetail({ userId }: { userId: number }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const navigate = useNavigate()
+  const [profileRevision, setProfileRevision] = useState(0)
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
@@ -171,12 +197,11 @@ function UserDetail({ userId }: { userId: number }) {
       <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
       <PageHeader
         title={user === null ? t('pageTitle') : t('pageTitleUser', { name: user.displayName || user.username })}
-        description={user === null ? undefined : t('pageDescription', { username: user.username, id: String(user.id), port: String(user.port) })}
+        description={user === null ? undefined : t('pageDescription', { username: user.username, id: String(user.id) })}
         meta={user === null ? undefined : (
           <span className="pageBadges">
             <RoleBadge role={user.role} />
             <AccountBadge status={user.status} />
-            <InstanceState state={user.instanceState} />
           </span>
         )}
         actions={user === null ? undefined : (
@@ -203,17 +228,13 @@ function UserDetail({ userId }: { userId: number }) {
                 <Definition label={t('defUsername')}><span className="codeText">@{user.username}</span></Definition>
                 <Definition label={t('defDisplayName')}>{user.displayName === '' ? t('notSet') : user.displayName}</Definition>
                 <Definition label={t('defAutoReview')}><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
-                <Definition label={t('defInstance')}>
-                  <div className="instanceBlock">
-                    <InstanceState state={user.instanceState} />
-                    <InstanceControls user={user} pending={pending} run={run} />
-                  </div>
-                </Definition>
-                <Definition label={t('defPort')}><span className="codeText">{user.port}</span></Definition>
-                <Definition label={t('defHomePath')}><span className="codeText">{user.homePath}</span></Definition>
+
+                <UserComputerProfile userId={user.id} reload={profileRevision} />
             </dl>
           </Section>
 
+          <UserComputerPermissions userId={user.id} />
+          <UserRuntimePanel userId={user.id} onChanged={() => setProfileRevision(value => value + 1)} />
           <Section title={t('sectionQualifications')} className="responsiveSection">
               <p className="muted">{t('qualificationsHint')}</p>
               <div className="qualificationGrid">
@@ -599,6 +620,7 @@ function UserQuota({ userId }: { userId: number }) {
   const [costMode, setCostMode] = useState<UserQuotaMode>('inherit')
   const [tokenLimit, setTokenLimit] = useState('')
   const [costLimit, setCostLimit] = useState('')
+  usePendingEdits(saving || quota !== null && (tokenMode !== quota.tokenMode || costMode !== quota.companyCostMode || tokenLimit !== (quota.tokenLimit === null ? '' : String(quota.tokenLimit)) || costLimit !== (quota.companyCostMicrosLimit === null ? '' : formatCostInput(quota.companyCostMicrosLimit))))
 
   const load = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)

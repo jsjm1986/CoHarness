@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-types-first",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T22:21:21.861393+00:00",
+  "seconds": 5.95,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6b9ba99e4cc0e328b51c60aae9f80c9087b4be3aa4f0cc50ce17dfa9ee5ad322",
+  "inputsAfter": "6b9ba99e4cc0e328b51c60aae9f80c9087b4be3aa4f0cc50ce17dfa9ee5ad322",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -25,7 +25,7 @@ Long-running tools are producers. `dsh-tool-bash` adapts a `ShellProcess` into i
 
 The literal types live on the [tasks subsystem page](../../../../docs/subsystems/jobs.md). A producer calls `ctx.jobs.start()` with a kind, label, optional owning `Agent`, optional positive `outputLimitBytes`, and a `run()` function. The runtime completes all failable preflight work before calling `run()` and invokes it once. After `run()` returns hooks, registration commits without another failable step; a producer cannot start work that lacks a collectable job id.
 
-The process-local provider also owns bounded admission, whose rationale is recorded in the [bounded background job admission decision](../bug-fix/2026-08-11-bounded-background-job-admission.md). Its positive-safe-integer `maxConcurrentJobsPerOwner` config defaults to `10`; `start()` derives each exact `Agent` object's active count from `running` and `stopping` records, while every unowned task shares one service bucket. Capacity rejection occurs before `run()` and id allocation, and producer `done` settlement is the only event that releases a stopping task's place. The provider does not queue, preempt, or retain a second mutable count.
+The process-local provider also owns bounded admission, whose rationale is recorded in the [bounded background job admission decision](../bug-fix/2026-08-11-bounded-background-job-admission.md). Its positive-safe-integer `maxConcurrentJobsPerOwner` config defaults to `10`; `start()` counts each exact `Agent` object's synchronous starts plus `running` and `stopping` records, while every unowned task shares one service bucket. Capacity rejection occurs before `run()` and id allocation, and producer `done` settlement is the only event that releases a stopping task's place. The provider does not queue or preempt. Startup reservations last only through the synchronous producer callback; committed occupancy is derived from authoritative records.
 
 `outputLimitBytes` is producer-owned presentation policy, not a registry buffer. The registry validates and projects it unchanged into `JobSnapshot`; generic control APIs apply the cap to complete model-facing output after adding their own status or notice metadata. Omitting it preserves the existing controller behavior, so the runtime does not impose a hidden default on unrelated producer families.
 
@@ -39,9 +39,9 @@ The producer hooks define three responsibilities:
 
 Statuses are `running`, `stopping`, `completed`, `killed`, and `failed`. Producer-specific information such as an exit code or stop reason belongs in `detail`; the registry does not interpret it. Task kinds form a merge-extensible string union, and job ids are branded and generated as `<kind>-<short-uuid>`, a random 16-hex suffix ([job-id format note](2026-10-18-job-id-format.md)).
 
-The runtime attaches one continuation to `done`, records the first terminal outcome, resolves waiters, and invokes completion listeners with per-listener error containment. First-wins settlement matters during teardown: if `cancel` throws, the runtime force-fails the record and warns that work may be orphaned rather than waiting forever for a promise that may never settle. A later producer outcome cannot overwrite that diagnosis or notify twice. A `cancel` that returns without eventually settling `done` still blocks teardown because the runtime cannot distinguish it from a slow, valid stop.
+The runtime attaches one continuation to `done`, records the first terminal outcome, resolves waiters, and invokes completion listeners with per-listener error containment. First-wins settlement matters during teardown: if `cancel` throws, the runtime force-fails the record and warns that work may be orphaned rather than waiting forever for a promise that may never settle. A later producer outcome cannot overwrite that diagnosis or notify twice. A `cancel` that returns without eventually settling `done` still blocks teardown because the runtime cannot distinguish it from a slow, valid stop. Error conversion is contained independently, so a thrown value with no usable primitive representation cannot interrupt record settlement, source exhaustion, or delivery to peer listeners.
 
-Task registrations are not effects of the producer tool fiber. Reloading a tool or controller plugin therefore does not kill work owned by an agent and backend. The task service's own disposal cancels all live tasks and awaits contract-compliant producers.
+Task registrations are not effects of the producer tool fiber. Reloading a tool or controller plugin therefore does not kill work owned by an agent and backend. The task service's own disposal closes new-start admission before cancelling live tasks and awaiting contract-compliant producers. Captured service references cannot publish work after that snapshot or after disposal; accepted producers retain their append and settlement paths until cleanup finishes. Controlled pending-work tests and the real Loader pin that lifetime fence.
 
 ## Authorization and owner lifecycle
 
@@ -121,9 +121,9 @@ The wait uses the shared deadline primitives but not the generic tool-timeout po
 
 A push sink would centralize buffering, but bash already owns bounded buffers, truncation, and spill files behind its executor seam. Pulling formatted deltas preserves that ownership. A durable backend that owns storage may justify revisiting the producer interface.
 
-### Random ids, promotion, or lifecycle session events
+### Foreground-to-background promotion
 
-Authorization, not unguessability, is the access boundary, and ids do not derive filesystem paths; sequential branded ids keep transcripts readable. Foreground-to-background promotion requires a user interaction contract the SDK does not prescribe. Starts, reads, and notices are already logged as tool and context events, so dedicated task session events would duplicate model-visible facts.
+Promotion requires a user interaction contract that the SDK does not prescribe. Historical ownership and terminal timing are recorded separately by the [owned-job lifecycle decision](../bug-fix/2026-10-26-owned-job-lifecycle-records.md); the records do not restore execution or output streams.
 
 ## Testing
 

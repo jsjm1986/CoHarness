@@ -1,0 +1,14 @@
+{
+  "name": "memory-domain-lifecycle-loader-before",
+  "cwd": ".",
+  "command": "pnpm exec vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/memory-lifecycle.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T01:11:54.627097+00:00",
+  "seconds": 5.806,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "106944e6f026ec8f7ba2d1e4e1d9f6e165941268ae4ed10a727af6b79da84807",
+  "inputsAfter": "106944e6f026ec8f7ba2d1e4e1d9f6e165941268ae4ed10a727af6b79da84807",
+  "postgresToolDirectory": null,
+  "outputSha256": "47f924752507796683b716fdf9c23d939582f78bcb05563953e45e371e5fdba3",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ examples/headless-agent/tests/memory-lifecycle.snapshot.ts (1 test | 1 failed) 809ms\n   × replaces memory during JSON opening and completes a real model memory-save turn 808ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  examples/headless-agent/tests/memory-lifecycle.snapshot.ts > replaces memory during JSON opening and completes a real model memory-save turn\nError: memory lifecycle snapshot exited 1 (expected 0). stdout:\n\nstderr:\n/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/examples/headless-agent/tests/fixtures/memory-lifecycle-driver.ts:41\n  if (closes !== 1 || ctx.storageDomain.get('memory') !== undefined) throw new Error('Opening memory domain survived provider unloading')\n                                                                           ^\n\nError: Opening memory domain survived provider unloading\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/examples/headless-agent/tests/fixtures/memory-lifecycle-driver.ts:41:76)\n\nNode.js v25.8.1\n\n ❯ <anonymous> examples/headless-agent/tests/fixtures/memory-lifecycle-driver.ts:41:76\n ❯ runLoaderSmoke packages/test-support/loader-smoke/src/index.ts:253:13\n    251|     const expectedExitCode = options.expectedExitCode ?? 0\n    252|     if (result.exitCode !== expectedExitCode) {\n    253|       throw new Error(`${options.label} exited ${String(result.exitCod…\n       |             ^\n    254|     }\n    255|     await options.inspect?.(cwd)\n ❯ examples/headless-agent/tests/memory-lifecycle.snapshot.ts:17:18\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  09:11:59\n   Duration  1.38s (transform 354ms, setup 30ms, import 440ms, tests 809ms, environment 0ms)\n\n"
+}

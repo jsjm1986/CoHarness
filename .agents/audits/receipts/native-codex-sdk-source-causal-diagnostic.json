@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-sdk-source-causal-diagnostic",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=src DSH_SNAPSHOT_MAX_CONCURRENCY=1 node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/managed-codex-model.snapshot.ts --retry=0",
+  "startedAt": "2026-10-25T02:42:17.136175+00:00",
+  "seconds": 4.727,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e2a0745f0eccc2cf2aeb6b94822273f400c938338bc1da685cc575a84bce35c9",
+  "inputsAfter": "e2a0745f0eccc2cf2aeb6b94822273f400c938338bc1da685cc575a84bce35c9",
+  "postgresToolDirectory": null,
+  "outputSha256": "611abb1e3bb446c802b05095d9e27cacb1594b3d5498ed87e5cb293663682885",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ examples/headless-agent/tests/managed-codex-model.snapshot.ts (1 test | 1 failed) 1487ms\n   × projects every native Codex request and resumes its parent in a fresh process 1487ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  examples/headless-agent/tests/managed-codex-model.snapshot.ts > projects every native Codex request and resumes its parent in a fresh process\nAssertionError: {\"terminal\":[{\"type\":\"turn/end\",\"seq\":19,\"time\":1792896141799,\"data\":{\"turn\":1,\"reason\":{\"kind\":\"error\",\"error\":{\"message\":\"{\\\"nativeRequests\\\":1,\\\"persisted\\\":1,\\\"modelFailures\\\":[{\\\"kind\\\":\\\"error\\\",\\\"failure\\\":{\\\"message\\\":\\\"fetch failed\\\",\\\"code\\\":\\\"UNKNOWN\\\"}}],\\\"serverFailures\\\":[\\\"The pinned native Codex must advertise its plan tool\\\"]}\",\"code\":\"UNKNOWN\"}}}}],\"nativeRequests\":1}: expected '' to be 'PARENT_CODEX_DONE' // Object.is equality\n\n- Expected\n+ Received\n\n- PARENT_CODEX_DONE\n\n ❯ examples/headless-agent/tests/managed-codex-model.snapshot.ts:18:113\n     16|       const result = await harness.run('Run managed Codex.', { session…\n     17|       expect(result.finalResponse, JSON.stringify({ terminal: result.e…\n     18|         nativeRequests: result.events.filter(event => event.type === '…\n       |                                                                                                                 ^\n     19|       const requests: unknown[] = []\n     20|       let completion: unknown\n ❯ withAuxiliaryModelHarness examples/headless-agent/tests/auxiliary-model-fixture.ts:44:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  10:42:19\n   Duration  2.51s (transform 678ms, setup 25ms, import 913ms, tests 1.49s, environment 0ms)\n\n"
+}

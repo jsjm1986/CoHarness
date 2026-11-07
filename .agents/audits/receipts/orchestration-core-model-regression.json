@@ -1,0 +1,14 @@
+{
+  "name": "orchestration-core-model-regression",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm/tests --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-25T05:59:51.953815+00:00",
+  "seconds": 2.502,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7e59bcbb6b8028aa497e9850d8e93f42c4b09d307f91554b821822a2e9319e06",
+  "inputsAfter": "7e59bcbb6b8028aa497e9850d8e93f42c4b09d307f91554b821822a2e9319e06",
+  "postgresToolDirectory": null,
+  "outputSha256": "5bedd015fa2845278328987597c7c0531f0a3d075440d3787e9576fc46145aec",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/llm/llm/tests/orchestration.spec.ts (5 tests | 1 failed) 13ms\n   × retains mandatory policy ownership while orchestration metadata resolves 4ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/llm/llm/tests/orchestration.spec.ts > retains mandatory policy ownership while orchestration metadata resolves\nError: service \"modelAccess\" has been registered at <root>\n ❯ Fiber.<anonymous> vendor/cordis/src/reflect.ts:290:15\n    288|       const impl: Impl = { name, value, fiber: this.ctx.fiber, check }\n    289|       if (this.store[key]) {\n    290|         throw new Error(`service \"${name}\" has been registered at <${t…\n       |               ^\n    291|       }\n    292|       this.store[key] = impl\n ❯ vendor/cordis/src/fiber.ts:366:45\n ❯ Proxy.provide vendor/cordis/src/reflect.ts:278:27\n ❯ packages/llm/llm/tests/orchestration.spec.ts:86:7\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 16 passed (17)\n      Tests  1 failed | 371 passed (372)\n   Start at  13:59:53\n   Duration  1.07s (transform 448ms, setup 134ms, import 735ms, tests 287ms, environment 1ms)\n\n"
+}

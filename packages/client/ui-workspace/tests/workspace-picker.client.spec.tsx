@@ -29,7 +29,8 @@ function hook<T>(snapshot: T) {
   return function select<S>(selector: (state: T) => S): S { return selector(snapshot) }
 }
 const sessions: SessionListState = {
-  ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+  ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+  state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
 }
 const workspaceState = (items: readonly WorkspaceView[]): WorkspaceListState => ({
   items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true,
@@ -135,7 +136,7 @@ describe('WorkspacePicker', () => {
     expect(b.onClose).toHaveBeenCalled()
     expect(screen.getByTestId('directory-flow')).toBeTruthy()
     await act(async () => { b.probe.owner!.onPicked('/tmp/project') })
-    expect(createWorkspace).toHaveBeenCalledWith({ path: '/tmp/project' })
+    expect(createWorkspace).toHaveBeenCalledWith({ path: '/tmp/project', runtimeTarget: null })
     await waitFor(() => { expect(b.onPick).toHaveBeenCalledWith(created.workspaceId) })
     // Successful adoption withdraws the flow request.
     expect(screen.queryByTestId('directory-flow')).toBeNull()
@@ -327,7 +328,7 @@ describe('WorkspacePicker', () => {
     })
     expect(screen.getByRole('alert').textContent).toBe('此工作区已不在授权范围内，无法打开。')
     expect(b.onPick).not.toHaveBeenCalled()
-    expect(listDirectory).toHaveBeenCalledWith()
+    expect(listDirectory).toHaveBeenCalledWith(undefined, undefined, undefined)
   })
 
   it('opens an existing workspace that sits on an authorized root', async () => {

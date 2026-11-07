@@ -1,0 +1,14 @@
+{
+  "name": "progress-material-key-sql-current",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/check-material-sql.mjs",
+  "startedAt": "2026-10-23T22:00:41.110929+00:00",
+  "seconds": 1.853,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6f4d30f2c092b8da9e3967b9e33095106a0290bf4c3476c56c730c2699ce4ea0",
+  "inputsAfter": "c90aaf9c8fdb9c8651bc94b367fbc4ce53512fa7424f7b8a6087d963c5c0f35e",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "af34c7df6098b5bfe0dd6bb69740633ef7fad45ed4e63ff46b59c9e3efc43fea",
+  "outputTail": "{\"checkedHashSupported\":true,\"distinctTupleKeys\":true}\n"
+}

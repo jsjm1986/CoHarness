@@ -1,0 +1,4 @@
+{"operation":"disposed-caller","staleHandlerRuns":0,"result":"error"}
+{"operation":"replaced-caller","staleHandlerRuns":0,"result":"error","freshResult":"success"}
+{"operation":"pending-command-idle","retiredWhilePending":false,"handlerRuns":1,"result":"success","retiredAfterCompletion":true}
+{"operation":"withdrawn-command-service","handlerRuns":0,"result":"error","retiredAfterCleanup":true}

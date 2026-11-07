@@ -1,0 +1,14 @@
+{
+  "name": "ordinary-model-dispatch-owners",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm/tests packages/llm/llm-pi-ai/tests packages/llm/llm-deepseek/tests --coverage --coverage.include=packages/llm/llm-pi-ai/src/adapter.ts --coverage.include=packages/llm/llm-deepseek/src/adapter.ts --coverage.include=packages/llm/llm-deepseek/src/file-store.ts --coverage.include=packages/llm/llm-deepseek/src/files-api.ts --coverage.include=packages/llm/llm-deepseek/src/request-files.ts --coverage.reportsDirectory=.agents/audits/.local/ordinary-model-dispatch-coverage --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-25T05:19:43.832462+00:00",
+  "seconds": 35.957,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a7e9f3fd69840d15cab57eb5f1ea517c1449a6e083ac179e49c84a8d1a792d29",
+  "inputsAfter": "a7e9f3fd69840d15cab57eb5f1ea517c1449a6e083ac179e49c84a8d1a792d29",
+  "postgresToolDirectory": null,
+  "outputSha256": "2637e77f39510c5ae099a21166ee8dbf397a3b39f81ff94b4b0afb1464bfdd24",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  55 passed (55)\n      Tests  1422 passed (1422)\n   Start at  13:20:03\n   Duration  15.76s (transform 3.40s, setup 891ms, import 8.09s, tests 8.40s, environment 3ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 478/478 )\nBranches     : 100% ( 367/367 )\nFunctions    : 100% ( 106/106 )\nLines        : 100% ( 415/415 )\n================================================================================\n"
+}

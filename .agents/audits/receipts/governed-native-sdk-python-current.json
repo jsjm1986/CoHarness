@@ -1,0 +1,14 @@
+{
+  "name": "governed-native-sdk-python-current",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_governed_native_model_snapshot.py -q",
+  "startedAt": "2026-10-24T07:14:08.931504+00:00",
+  "seconds": 2.865,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ab9ae91b7fa70aee5237f3dc4fbf02cec1533dc84a292115283781d18161c378",
+  "inputsAfter": "ab9ae91b7fa70aee5237f3dc4fbf02cec1533dc84a292115283781d18161c378",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { ProjectService } from '../src/projects.ts'
@@ -24,6 +24,188 @@ async function setup() {
 }
 
 describe('ProjectService', () => {
+  it.each(['administrator', 'owner', 'disabled', 'deleted'] as const)('requires current SQLite administrator authority for removal (%s)', async state => {
+    const f = await setup()
+    try {
+      const actor = await f.users.create({ username: 'removal-admin', password: 'pw-123456', role: 'admin' })
+      await f.users.create({ username: 'removal-keeper', password: 'pw-123456', role: 'admin' })
+      const project = f.projects.createManaged({ name: 'Removal authority', ownerUserId: actor.id })
+      writeFileSync(join(project.path, 'retained.txt'), 'retained project bytes')
+      if (state === 'owner') f.users.setRole(actor.id, 'user')
+      else if (state === 'disabled') f.users.setStatus(actor.id, 'disabled')
+      else if (state === 'deleted') await f.users.remove(actor.id)
+      if (state === 'administrator') expect(f.projects.remove(project.id, actor.id)).toEqual([actor.id])
+      else {
+        expect(() => f.projects.remove(project.id, actor.id)).toThrow('forbidden')
+        expect(f.projects.getById(project.id)).not.toBeNull()
+      }
+      expect(readFileSync(join(project.path, 'retained.txt'), 'utf8')).toBe('retained project bytes')
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
+
+  it.each((['managed', 'import'] as const).flatMap(operation =>
+    (['active', 'role', 'disabled', 'deleted'] as const).map(state => ({ operation, state })),
+  ))('requires a current SQLite administrator to provision $operation ($state)', async ({ operation, state }) => {
+    const f = await setup()
+    try {
+      const actor = await f.users.create({ username: 'provisioning-admin', password: 'pw-123456', role: 'admin' })
+      await f.users.create({ username: 'provisioning-keeper', password: 'pw-123456', role: 'admin' })
+      mkdirSync(f.cfg.projectsRoot, { recursive: true })
+      if (state === 'role') f.db.prepare("UPDATE users SET role='user' WHERE id=?").run(actor.id)
+      else if (state === 'disabled') f.db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(actor.id)
+      else if (state === 'deleted') await f.users.remove(actor.id)
+      const input = { name: 'Administrator provisioning', ...(operation === 'import' ? { path: f.shared } : {}),
+        createdBy: actor.id, actorUserId: actor.id }
+      if (state === 'active') expect(f.projects.create(input)).toMatchObject({ origin: 'admin', owner: null, createdBy: { id: actor.id } })
+      else {
+        expect(() => f.projects.create(input)).toThrow('forbidden')
+        expect(f.projects.list()).toEqual([])
+        expect(readdirSync(f.cfg.projectsRoot)).toEqual([])
+      }
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
+
+  it('refuses SQLite administrator creation attributed to a different account', async () => {
+    const f = await setup()
+    try {
+      const actor = await f.users.create({ username: 'creator-admin', password: 'pw-123456', role: 'admin' })
+      mkdirSync(f.cfg.projectsRoot, { recursive: true })
+      expect(() => f.projects.create({ name: 'Foreign creator', createdBy: f.alice.id, actorUserId: actor.id })).toThrow('forbidden')
+      expect(readdirSync(f.cfg.projectsRoot)).toEqual([])
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
+
+  it.each(['accept', 'create'] as const)('refuses a disabled SQLite account attempting to %s a project relationship', async operation => {
+    const f = await setup()
+    try {
+      const actor = await f.users.create({ username: 'relationship-actor', password: 'pw-123456' })
+      const project = operation === 'accept' ? f.projects.createManaged({ name: 'Account invitation', ownerUserId: f.alice.id }) : undefined
+      const invitation = project === undefined ? undefined : f.projects.createInvitation({ projectId: project.id,
+        inviteeUserId: actor.id, inviterUserId: f.alice.id, mode: 'rw' })
+      mkdirSync(f.cfg.userProjectsRoot, { recursive: true })
+      const names = readdirSync(f.cfg.userProjectsRoot)
+      f.db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(actor.id)
+      const input = { name: 'Account creation', ownerUserId: actor.id, actorUserId: actor.id }
+      expect(() => operation === 'accept' ? f.projects.acceptInvitation(invitation!.id, actor.id)
+        : f.projects.createManaged(input)).toThrow('forbidden')
+      expect(readdirSync(f.cfg.userProjectsRoot)).toEqual(names)
+      f.db.prepare("UPDATE users SET status='active' WHERE id=?").run(actor.id)
+      if (operation === 'accept') {
+        expect(f.projects.listInvitations(actor.id)[0]?.status).toBe('pending')
+        f.projects.acceptInvitation(invitation!.id, actor.id)
+        expect(f.projects.getById(project!.id)?.members.find(member => member.userId === actor.id)?.mode).toBe('rw')
+      } else expect(f.projects.createManaged(input).owner?.id).toBe(actor.id)
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
+
+  it.each(['owner', 'creator'] as const)('refuses authenticated SQLite creation with a different %s', async field => {
+    const f = await setup()
+    try {
+      const other = await f.users.create({ username: 'other-project-account', password: 'pw-123456' })
+      const input = { name: 'Foreign project identity', actorUserId: f.alice.id,
+        ownerUserId: field === 'owner' ? other.id : f.alice.id,
+        createdBy: field === 'creator' ? other.id : f.alice.id }
+      expect(() => f.projects.createManaged(input)).toThrow('forbidden')
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
+
+  it.each(['accept', 'create'] as const)('refuses a deleted SQLite account attempting to %s a project relationship', async operation => {
+    const f = await setup()
+    try {
+      const actor = await f.users.create({ username: 'deleted-relationship-actor', password: 'pw-123456' })
+      const project = operation === 'accept' ? f.projects.createManaged({ name: 'Deleted actor scope', ownerUserId: f.alice.id }) : undefined
+      const invitation = project === undefined ? undefined : f.projects.createInvitation({ projectId: project.id,
+        inviteeUserId: actor.id, inviterUserId: f.alice.id, mode: 'rw' })
+      await f.users.remove(actor.id)
+      const input = { name: 'Deleted account creation', ownerUserId: actor.id, actorUserId: actor.id }
+      expect(() => operation === 'accept' ? f.projects.acceptInvitation(invitation!.id, actor.id)
+        : f.projects.createManaged(input)).toThrow('forbidden')
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
+
+  it('returns every committed SQLite member when another connection writes before project deletion', async () => {
+    const f = await setup(), restore: Array<() => void> = []
+    let other: ReturnType<typeof openDb> | undefined
+    try {
+      const writer = openDb(join(f.root, 'g.sqlite')); other = writer
+      writer.pragma('busy_timeout=0')
+      const member = await f.users.create({ username: 'deletion-member', password: 'pw-123456' })
+      const project = f.projects.createManaged({ name: 'SQLite deletion snapshot', ownerUserId: f.alice.id })
+      const prepare = f.db.prepare.bind(f.db)
+      let committed = false
+      const intercepted = vi.spyOn(f.db, 'prepare').mockImplementation((sql: string) => {
+        const statement = prepare(sql)
+        if (sql.includes('SELECT user_id AS userId FROM project_members')) {
+          const all = statement.all.bind(statement)
+          const captured = vi.spyOn(statement, 'all').mockImplementation((...values: unknown[]) => {
+            const rows = all(...values)
+            try {
+              writer.prepare('INSERT INTO project_members(project_id,user_id,mode) VALUES(?,?,?)').run(project.id, member.id, 'rw')
+              committed = true
+            } catch (error) {
+              if (!(error instanceof Error && 'code' in error && error.code === 'SQLITE_BUSY')) throw error
+            }
+            return rows
+          })
+          restore.push(() => { captured.mockRestore() })
+        }
+        return statement
+      })
+      restore.push(() => { intercepted.mockRestore() })
+      const removed = f.projects.remove(project.id)
+      expect(removed).toEqual((committed ? [f.alice.id, member.id] : [f.alice.id]).sort((left, right) => left - right))
+      expect(f.projects.getById(project.id)).toBeNull()
+      expect(statSync(project.path).isDirectory()).toBe(true)
+    } finally {
+      for (const dispose of restore.reverse()) dispose()
+      other?.close(); f.db.close(); rmSync(f.root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a missing SQLite project before inserting membership', async () => {
+    const f = await setup()
+    try {
+      expect(() => f.projects.setMember(10_000, f.alice.id, 'rw')).toThrow('unknown project 10000')
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
+
+  it.each(['set', 'remove'] as const)('requires a current SQLite administrator to %s membership', async operation => {
+    const f = await setup()
+    try {
+      const admin = await f.users.create({ username: 'membership-admin', password: 'pw-123456', role: 'admin' })
+      const target = await f.users.create({ username: 'membership-target', password: 'pw-123456' })
+      const project = f.projects.createManaged({ name: 'Membership authority', ownerUserId: f.alice.id })
+      if (operation === 'remove') f.projects.setMember(project.id, target.id, 'ro')
+      const mutate = (actor: number) => operation === 'set' ? f.projects.setMember(project.id, target.id, 'rw', actor)
+        : f.projects.removeMember(project.id, target.id, actor)
+      for (const actor of [f.alice.id, admin.id + 1000]) expect(() => mutate(actor)).toThrow('forbidden')
+      f.db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(admin.id)
+      expect(() => mutate(admin.id)).toThrow('forbidden')
+      expect(f.projects.getById(project.id)?.members.find(member => member.userId === target.id)?.mode)
+        .toBe(operation === 'remove' ? 'ro' : undefined)
+      f.db.prepare("UPDATE users SET status='active' WHERE id=?").run(admin.id)
+      mutate(admin.id)
+      expect(f.projects.getById(project.id)?.members.find(member => member.userId === target.id)?.mode)
+        .toBe(operation === 'set' ? 'rw' : undefined)
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
+
+  it('rechecks the current manager before a SQLite project rename', async () => {
+    const f = await setup()
+    try {
+      const admin = await f.users.create({ username: 'manager-admin', password: 'pw-123456', role: 'admin' })
+      const project = f.projects.createManaged({ name: 'Manager', ownerUserId: f.alice.id })
+      f.projects.rename(project.id, 'Owner update', f.alice.id)
+      f.db.prepare('UPDATE projects SET owner_user_id=? WHERE id=?').run(admin.id, project.id)
+      expect(() => f.projects.rename(project.id, 'Former owner', f.alice.id)).toThrow('forbidden')
+      f.projects.rename(project.id, 'Current administrator', admin.id)
+      expect(f.projects.getById(project.id)?.name).toBe('Current administrator')
+      f.db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(admin.id)
+      expect(() => f.projects.rename(project.id, 'Disabled administrator', admin.id)).toThrow('forbidden')
+      f.projects.remove(project.id)
+      expect(() => f.projects.rename(project.id, 'Removed project', admin.id)).toThrow('unknown project')
+    } finally { f.db.close(); rmSync(f.root, { recursive: true, force: true }) }
+  })
   it('creates a managed directory from a name when no path is supplied', async () => {
     const { projects, cfg, alice } = await setup()
     const project = projects.create({ name: '  产品文档  ', createdBy: alice.id })
@@ -203,5 +385,63 @@ describe('ProjectService', () => {
     expect(() => projects.acceptInvitation(invitation.id, bob.id)).toThrow('invitation-not-pending')
     expect(() => projects.acceptInvitation('not-an-id', bob.id)).toThrow('invitation-not-found')
     expect(() => projects.rename(project.id, '   ')).toThrow('project-name-invalid')
+  })
+
+  it('omits expired invitations from pending counts and permits a fresh invitation', async () => {
+    const { projects, users, alice, db, root } = await setup()
+    try {
+      const bob = await users.create({ username: 'bob', password: 'pw-123456' })
+      const project = projects.createManaged({ name: 'Renewed invitation', ownerUserId: alice.id })
+      const input = { projectId: project.id, inviteeUserId: bob.id, inviterUserId: alice.id, mode: 'ro' as const }
+      const old = projects.createInvitation(input)
+      db.prepare('UPDATE project_invitations SET expires_at=? WHERE id=?').run(Date.now() - 60_000, Number(old.id))
+      expect(projects.countPendingInvitations(bob.id)).toBe(0)
+      expect(projects.listInvitations(bob.id).find(item => item.id === old.id)?.status).toBe('expired')
+      const fresh = projects.createInvitation({ ...input, mode: 'rw' })
+      expect(fresh.id).not.toBe(old.id)
+      expect(projects.countPendingInvitations(bob.id)).toBe(1)
+      projects.acceptInvitation(fresh.id, bob.id)
+      expect(projects.getById(project.id)?.members.find(item => item.userId === bob.id)?.mode).toBe('rw')
+      expect(projects.listInvitations(bob.id).find(item => item.id === old.id)?.status).toBe('expired')
+    } finally { db.close(); rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it.each([['rw', 'ro'], ['ro', 'rw']] as const)(
+    'revokes a pending %s invitation after an explicit %s membership decision',
+    async (invitedMode, currentMode) => {
+      const { projects, users, alice, db, root } = await setup()
+      try {
+        const bob = await users.create({ username: 'bob', password: 'pw-123456' })
+        const project = projects.createManaged({ name: 'Membership decisions', ownerUserId: alice.id })
+        const invitation = projects.createInvitation({
+          projectId: project.id, inviterUserId: alice.id, inviteeUserId: bob.id, mode: invitedMode,
+        })
+        projects.setMember(project.id, bob.id, currentMode)
+        expect(() => projects.acceptInvitation(invitation.id, bob.id)).toThrow('invitation-not-pending')
+        expect(projects.getById(project.id)?.members).toContainEqual({ userId: bob.id, username: 'bob', mode: currentMode })
+        expect(projects.listInvitations(bob.id).find(item => item.id === invitation.id)?.status).toBe('revoked')
+      } finally {
+        db.close()
+        rmSync(root, { recursive: true, force: true })
+      }
+    },
+  )
+
+  it('revokes a pending invitation when removing an account from the project', async () => {
+    const { projects, users, alice, db, root } = await setup()
+    try {
+      const bob = await users.create({ username: 'bob', password: 'pw-123456' })
+      const project = projects.createManaged({ name: 'Revoked membership', ownerUserId: alice.id })
+      const invitation = projects.createInvitation({
+        projectId: project.id, inviterUserId: alice.id, inviteeUserId: bob.id, mode: 'rw',
+      })
+      projects.removeMember(project.id, bob.id)
+      expect(() => projects.acceptInvitation(invitation.id, bob.id)).toThrow('invitation-not-pending')
+      expect(projects.getById(project.id)?.members.some(item => item.userId === bob.id)).toBe(false)
+      expect(projects.listInvitations(bob.id).find(item => item.id === invitation.id)?.status).toBe('revoked')
+    } finally {
+      db.close()
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

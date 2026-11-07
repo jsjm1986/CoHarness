@@ -1,0 +1,13 @@
+{
+  "name": "gateway-root-startup-types",
+  "cwd": "gateway",
+  "command": "pnpm exec tsc --noEmit",
+  "startedAt": "2026-10-23T13:04:31.053540+00:00",
+  "seconds": 8.742,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "deda2a985ce434253d0329dce6f9a49e1259d889d86533592391c0608ac71a6d",
+  "inputsAfter": "deda2a985ce434253d0329dce6f9a49e1259d889d86533592391c0608ac71a6d",
+  "outputSha256": "6f225b7cf15d591f0e770e847aa52dfe1fc19d81d39096760d10f2498ad53615",
+  "outputTail": "✓ Lockfile passes supply-chain policies (verified 21m ago)\nLockfile is up to date, resolution step is skipped\nAlready up to date\n\n[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: argon2@0.44.0, better-sqlite3@12.11.1, esbuild@0.28.2\n\nRun \"pnpm approve-builds\" to pick which dependencies should be allowed to run scripts.\n[WARN] The install that runs before scripts failed, so your node_modules may be out of sync with your lockfile. Set \"verifyDepsBeforeRun: false\" to skip this install.\n"
+}

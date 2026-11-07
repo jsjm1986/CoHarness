@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-gateway-model-governance-and-usage.md
 document:
-  en: 839d1c4b1dea06242dc64fa6f74f9f754a2adc61
-  zh: afbd3f552e3f09ebd47ccf8cc0d882660523892b
+  en: 3ac627cdf2d92a243420cb3d7fc67fd9f2011383
+  zh: 1484ecda0545f554e85cfea64328a94cecb0e7f0
 /agent-note-gateway-model-governance-and-usage-accounting:
   en: 9615f71e2a9df8f8
   zh: 4bf94e13a6af0635
@@ -12,14 +12,14 @@ document:
   en: cc14d2cb0d071619
   zh: 5b583fa5277f46ac
 /agent-note-gateway-model-governance-and-usage-accounting/decision:
-  en: e61a3887c4405e8b
-  zh: 21564bc018a274cc
+  en: 1e96b0addc2ad02f
+  zh: fa96b390bb815f8a
 /agent-note-gateway-model-governance-and-usage-accounting/testing:
   en: d0a68e2fe9d2c94e
   zh: 17324c8446bae452
 /agent-note-gateway-model-governance-and-usage-accounting/alternatives-considered:
-  en: d135c0e28aff8ce0
-  zh: 3aee31b8577c8f25
+  en: 21174476e922e7f7
+  zh: 235d9bd11633d8f2
 /agent-note-gateway-model-governance-and-usage-accounting/consequences:
   en: 2e0ccdffd7fb5352
   zh: 60b4ea0f9e925d76

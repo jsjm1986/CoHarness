@@ -1,0 +1,13 @@
+{
+  "name": "business-third-party-notices",
+  "cwd": ".",
+  "command": "pnpm run gen-third-party-notices",
+  "startedAt": "2026-10-23T19:03:58.480384+00:00",
+  "seconds": 6.581,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6d61ddbf690f2c8ff21d01f7043b963c2b8ee988854d94083a84619b225e347f",
+  "inputsAfter": "6d61ddbf690f2c8ff21d01f7043b963c2b8ee988854d94083a84619b225e347f",
+  "outputSha256": "2f2161b7bfb56228de7d89faf56a6d7539f58ecbe48d93b2b92fd8143c706ada",
+  "outputTail": "$ tsx scripts/gen-third-party-notices.ts\ngen-third-party-notices: wrote THIRD_PARTY_NOTICES.md.\n"
+}

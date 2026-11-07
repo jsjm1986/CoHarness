@@ -1,0 +1,11 @@
+- dialog "Project members and invitations":
+  - heading "Project members and invitations" [level=2]
+  - button "Close":
+    - img
+  - paragraph: Invite colleagues to this project and review pending invitations.
+  - region "Pending invitations":
+    - heading "Pending invitations" [level=3]
+    - strong: Compute release room
+    - text: Zhou invited you to join
+    - button "Accept"
+  - button "Cancel"

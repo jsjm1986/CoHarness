@@ -85,6 +85,8 @@
     "src/shared/network/observation.ts",
     "src/shared/service.ts",
     "src/shared/validation.ts",
+    "src/shared/client-bootstrap.ts",
+    "src/shared/source-selection.ts",
     "src/shared/web.ts",
     "src/worker/bridge/endpoint.ts",
     "src/worker/bridge/hub.ts",
@@ -136,7 +138,9 @@
     "src/worker/server.ts"
   ],
   "references": [
-    { "path": "../../client/connection/tsconfig.host.json" },
+    {
+      "path": "../../client/connection/tsconfig.host.json"
+    },
     {
       "path": "../../boot/cmdline"
     },
@@ -154,6 +158,12 @@
     },
     {
       "path": "../../util/crypto"
+    },
+    {
+      "path": "../../context/resource-budget"
+    },
+    {
+      "path": "../../context/execution-authority"
     }
   ]
 }

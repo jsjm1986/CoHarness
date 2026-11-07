@@ -1,0 +1,161 @@
+{
+  "directory/revoke": {
+    "phase": "directory",
+    "change": "revoke",
+    "captured": 1,
+    "reviews": 0,
+    "physical": 0,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 2,
+    "executionAdmissions": 0,
+    "released": 2,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ]
+  },
+  "directory/replace": {
+    "phase": "directory",
+    "change": "replace",
+    "captured": 1,
+    "reviews": 0,
+    "physical": 0,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 2,
+    "executionAdmissions": 0,
+    "released": 2,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ]
+  },
+  "grant/revoke": {
+    "phase": "grant",
+    "change": "revoke",
+    "captured": 1,
+    "reviews": 0,
+    "physical": 0,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "released": 3,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ]
+  },
+  "grant/replace": {
+    "phase": "grant",
+    "change": "replace",
+    "captured": 1,
+    "reviews": 0,
+    "physical": 0,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "released": 3,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ]
+  },
+  "physical/revoke": {
+    "phase": "physical",
+    "change": "revoke",
+    "captured": 1,
+    "reviews": 1,
+    "physical": 0,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "released": 3,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ]
+  },
+  "physical/replace": {
+    "phase": "physical",
+    "change": "replace",
+    "captured": 1,
+    "reviews": 1,
+    "physical": 0,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "released": 3,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ]
+  },
+  "response/revoke": {
+    "phase": "response",
+    "change": "revoke",
+    "captured": 1,
+    "reviews": 1,
+    "physical": 1,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "released": 3,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ]
+  },
+  "response/replace": {
+    "phase": "response",
+    "change": "replace",
+    "captured": 1,
+    "reviews": 1,
+    "physical": 1,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "released": 3,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ]
+  },
+  "none/none": {
+    "phase": "none",
+    "change": "none",
+    "captured": 1,
+    "reviews": 1,
+    "physical": 1,
+    "executed": 1,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "released": 3,
+    "denialCodes": []
+  },
+  "adoption/adopt": {
+    "phase": "adoption",
+    "change": "adopt",
+    "captured": 0,
+    "reviews": 1,
+    "physical": 1,
+    "executed": 0,
+    "primary": 2,
+    "replacementAuthorizations": 0,
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "released": 3,
+    "denialCodes": [
+      "AUTO_REVIEW_DENIED"
+    ],
+    "fallback": "workspace-write"
+  }
+}

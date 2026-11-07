@@ -1,0 +1,7 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, commandRegistrationReady]
+- insert:
+    - id: command-registration-model
+      name: './model.mjs'

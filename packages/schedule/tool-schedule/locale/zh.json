@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "日程提醒工具",
+    "description": "让 AI 通过 schedule_create/list/update/delete 管理提醒。"
+  }
+}

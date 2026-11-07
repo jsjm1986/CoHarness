@@ -319,6 +319,67 @@ describe('native Flash translation', () => {
     expect(b.session?.snapshotEvents()).toHaveLength(1)
   })
 
+  it.each(['official-models', 'official-key', 'account-models', 'credential-withdrawn', 'account-signed-out'] as const)(
+    'rejects a native owner changed during model resource admission: %s', async (change) => {
+      const b = await paidFixture(cleanups)
+      const entered = Promise.withResolvers<undefined>(), granted = Promise.withResolvers<undefined>()
+      let released = 0
+      b.ctx.provide('resourceBudget', { async acquire() {
+        entered.resolve(undefined)
+        await granted.promise
+        return { signal: new AbortController().signal, release: async () => { released++ },
+          uncertain: async () => { throw new Error('Translation dispatched under a changed native owner') } }
+      } })
+      const provider = change === 'account-models' || change === 'account-signed-out' ? 'deepseek-account' : 'deepseek-official'
+      const pending = b.translate(provider)
+      const settled = pending.then(value => ({ value }), (error: unknown) => ({ error }))
+      try {
+        await Promise.race([entered.promise, settled.then(() => { throw new Error('Translation did not reach model admission.') })])
+        const owner = [...b.ctx.loader.entries()].find(entry => entry.options.id === (change === 'account-models' ? 'llm-deepseek-account' : 'llm-deepseek'))!
+        if (change === 'credential-withdrawn') b.setConfigured(false)
+        else if (change === 'account-signed-out') b.setSignedIn(false)
+        else if (change === 'account-models') {
+          const config = owner.fiber!.config as ReturnType<typeof AccountConfig>
+          config.modelOverrides = AccountConfig({ modelOverrides: { 'deepseek-flash': { maxTokens: 4096 } } }).modelOverrides
+        } else {
+          const config = owner.fiber!.config as ReturnType<typeof OfficialConfig>
+          if (change === 'official-models') config.models = OfficialConfig({ models: [{ id: 'deepseek-flash', maxTokens: 4096 }] }).models
+          else config.apiKeyEnv = OfficialConfig({ apiKeyEnv: 'ANOTHER_TRANSLATION_FIXTURE_KEY' }).apiKeyEnv
+        }
+        granted.resolve(undefined)
+        expect(await settled).toMatchObject({ error: { code: 'TRANSLATION_UNAVAILABLE' } })
+        expect(b.requests).toEqual([])
+        expect(released).toBe(1)
+        expect(b.session?.snapshotEvents().filter(event => pluginRecordOf(event)?.type === 'plugin:translator/request')).toHaveLength(1)
+      } finally { granted.resolve(undefined); await settled }
+    },
+  )
+
+  it('rejects a native configuration changed while admitted stream credentials are resolving', async () => {
+    const b = await paidFixture(cleanups), entered = Promise.withResolvers<undefined>(), proceed = Promise.withResolvers<undefined>()
+    let streaming = false
+    const prepare = b.ctx.llm.prepareCall.bind(b.ctx.llm)
+    vi.spyOn(b.ctx.llm, 'prepareCall').mockImplementationOnce(async (...args) => {
+      const call = await prepare(...args)
+      return { ...call, stream: (...streamArgs) => { streaming = true; return call.stream(...streamArgs) } }
+    })
+    const resolve = b.ctx.credentials.resolve.bind(b.ctx.credentials)
+    vi.spyOn(b.ctx.credentials, 'resolve').mockImplementation(async (ref) => {
+      if (streaming) { streaming = false; entered.resolve(undefined); await proceed.promise }
+      return resolve(ref)
+    })
+    const settled = b.translate('deepseek-official').then(value => ({ value }), (error: unknown) => ({ error }))
+    try {
+      await Promise.race([entered.promise, settled.then(() => { throw new Error('Translation did not reach credential resolution.') })])
+      const owner = [...b.ctx.loader.entries()].find(entry => entry.options.id === 'llm-deepseek')!
+      const config = owner.fiber!.config as ReturnType<typeof OfficialConfig>
+      config.models = OfficialConfig({ models: [{ id: 'deepseek-flash', maxTokens: 4096 }] }).models
+      proceed.resolve(undefined)
+      expect(await settled).toMatchObject({ error: { code: 'TRANSLATION_UNAVAILABLE' } })
+      expect(b.requests).toEqual([])
+    } finally { proceed.resolve(undefined); await settled }
+  })
+
   it('rejects empty text and enforces the complete multibyte output limit', async () => {
     const empty = await paidFixture(cleanups, { reply: (response) => { response.end(sse(replyEvents('   '))) } })
     await expect(empty.translate('deepseek-account')).rejects.toMatchObject({ code: 'TRANSLATION_INVALID_RESPONSE' })
@@ -328,6 +389,46 @@ describe('native Flash translation', () => {
     const short = await paidFixture(cleanups, { translator: { maxResponseBytes: 2 },
       reply: (response) => { response.end(sse(replyEvents('中'))) } })
     await expect(short.translate('deepseek-official')).rejects.toMatchObject({ code: 'TRANSLATION_RESPONSE_LIMIT' })
+  })
+
+  it.each(['models', 'apiKeyEnv'] as const)('rejects an effective Settings %s change during model admission', async (field) => {
+    const b = await paidFixture(cleanups, { withSettings: true })
+    const settings = b.ctx.get('settings')!
+    const entered = Promise.withResolvers<undefined>(), granted = Promise.withResolvers<undefined>()
+    const released = vi.fn(async () => {})
+    b.ctx.provide('resourceBudget', { async acquire() {
+      entered.resolve(undefined); await granted.promise
+      return { signal: new AbortController().signal, release: released,
+        uncertain: async () => { throw new Error('Changed Settings must not dispatch translation.') } }
+    } })
+    const settled = b.translate('deepseek-official').then(value => ({ value }), (error: unknown) => ({ error }))
+    try {
+      await Promise.race([entered.promise, settled.then(() => { throw new Error('Translation did not reach resource admission.') })])
+      await settings.update('llm-deepseek', field === 'models'
+        ? { models: [{ id: 'deepseek-flash', maxTokens: 4096 }] } : { apiKeyEnv: 'CHANGED_TRANSLATION_KEY' })
+      granted.resolve(undefined)
+      expect(await settled).toMatchObject({ error: { code: 'TRANSLATION_UNAVAILABLE' } })
+      expect(b.requests).toEqual([])
+      expect(released).toHaveBeenCalledOnce()
+    } finally { granted.resolve(undefined); await settled }
+  })
+
+  it('uses the effective Settings credential reference for initial native eligibility', async () => {
+    const b = await paidFixture(cleanups, { withSettings: true, configuredRefs: ['EFFECTIVE_TRANSLATION_KEY'] })
+    await b.ctx.get('settings')!.update('llm-deepseek', { apiKeyEnv: 'EFFECTIVE_TRANSLATION_KEY' })
+    expect(await b.translate('deepseek-official')).toBe('翻译结果')
+    expect(b.requests).toHaveLength(1)
+  })
+
+  it('reuses a saved translation after effective credentials become unavailable and refuses a new fragment', async () => {
+    const b = await paidFixture(cleanups, { withSettings: true, configuredRefs: ['PAID_TRANSLATION_FIXTURE_KEY'] })
+    expect(await b.translate('deepseek-official')).toBe('翻译结果')
+    const events = b.session!.snapshotEvents()
+    await b.ctx.get('settings')!.update('llm-deepseek', { apiKeyEnv: 'UNCONFIGURED_TRANSLATION_KEY' })
+    expect(await b.translate('deepseek-official')).toBe('翻译结果')
+    expect(b.session!.snapshotEvents()).toEqual(events)
+    await expect(b.translate('deepseek-official', 'Another fragment')).rejects.toMatchObject({ code: 'TRANSLATION_UNAVAILABLE' })
+    expect(b.requests).toHaveLength(1)
   })
 
   it.each(['block-start', 'block-end', 'reasoning-delta', 'tool-call-delta', 'missing-finish'])('rejects unwanted model output %s', async (kind) => {

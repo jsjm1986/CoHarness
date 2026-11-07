@@ -19,16 +19,17 @@ import { UserService } from '../../../gateway/src/users.ts'
 import { ProjectService } from '../../../gateway/src/projects.ts'
 import { AuditService } from '../../../gateway/src/audit.ts'
 import { InstanceManager } from '../../../gateway/src/instances.ts'
-import { GatewayPrincipalSigner } from '../../../gateway/src/principal.ts'
+import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../../../gateway/src/principal.ts'
 import { GatewayPluginManagement } from '../../../gateway/src/plugin-management.ts'
 import { createGatewayServer, type GatewayDeps } from '../../../gateway/src/server.ts'
 import { createAdminApiHandler } from '../../../gateway/src/admin-api.ts'
+import { RuntimeCatalogError, type RuntimeCatalogEntry, type RuntimeId, type RuntimeNodeId } from '../../../gateway/src/runtime-catalog.ts'
 
 it('installs a local bundle through the built Admin workflow and verifies the real profile files', async () => {
   const root = await mkdtemp(join(tmpdir(), 'plugin-admin-browser-'))
   const cleanup: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
   try {
-    const bundle = join(root, 'bundle'), home = join(root, 'home')
+    const bundle = join(root, 'bundle'), home = join(root, 'users/admin/dsh')
     await mkdir(bundle)
     await writeFile(join(bundle, 'package.json'), JSON.stringify({ name: '@fixture/admin-install', version: '1.0.0', description: 'Administrative installation acceptance', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
     await writeFile(join(bundle, 'cordis.patch.yml'), '[]\n')
@@ -46,7 +47,33 @@ it('installs a local bundle through the built Admin workflow and verifies the re
       users: new UserService(db, cfg), projects: new ProjectService(db, cfg), audit: new AuditService(db) }
     const admin = await deps.users.create({ username: 'admin', password: 'fixture-password', role: 'admin' })
     await deps.users.changeOwnPassword(admin.id, 'fixture-password')
-    deps.pluginManagement = new GatewayPluginManagement(deps, new GatewayPrincipalSigner(pair.privateKey, 'fixture', 30000), 'fixture-node')
+    const runtimeId = randomUUID() as RuntimeId, nodeId = randomUUID() as RuntimeNodeId
+    const environment: RuntimeCatalogEntry = { id: runtimeId, owner: { kind: 'personal', id: admin.id, name: admin.displayName },
+      node: { id: nodeId, name: 'Plugin fixture computer', status: 'active', lastHeartbeatAt: null },
+      routing: 'local', observedState: 'ready', generation: 1 }
+    const resolveEnvironment = async (_actor: unknown, id: string) => {
+      if (id !== runtimeId) throw new RuntimeCatalogError(404, 'runtime-catalog/not-found')
+      return environment
+    }
+    // This fixture owns one externally launched process; its SQLite owner row and allocation name refer to that process.
+    instances.resolveTarget = async (target) => {
+      if (typeof target === 'number') target = { kind: 'user', id: target }
+      if (target.kind !== 'user' || target.id !== admin.id || target.runtimeId !== undefined && target.runtimeId !== runtimeId) {
+        throw new RuntimeCatalogError(404, 'runtime-catalog/not-found')
+      }
+      return { ...target, runtimeId }
+    }
+    deps.runtimeCatalog = {
+      pageForAccount: async () => ({ items: [environment], nextCursor: null }),
+      pageForAdministrator: async () => ({ items: [environment], nextCursor: null }),
+      pageForAdministratorOwner: async (_actor, owner) => ({ items: owner.kind === 'personal' && owner.id === admin.id ? [environment] : [], nextCursor: null }),
+      resolveForAccount: resolveEnvironment, resolveForAdministrator: resolveEnvironment,
+    }
+    const unsupportedAllocation = async (): Promise<never> => { throw new Error('Allocation mutations are outside the plugin fixture') }
+    deps.runtimeManagement = { policy: unsupportedAllocation, setPolicy: unsupportedAllocation, allocate: unsupportedAllocation,
+      allocationReceipt: unsupportedAllocation, retire: unsupportedAllocation }
+    deps.nodeServiceIdentity = { nodeId, organizationId: 'fixture', authorize: async () => { throw new Error('The plugin fixture has no node bridge') } }
+    deps.pluginManagement = new GatewayPluginManagement(deps, new GatewayPrincipalSigner(pair.privateKey, 'fixture', 30000), nodeId)
     const server = createGatewayServer(deps, { admin: createAdminApiHandler(deps), adminRoot: resolve('gateway/public/admin') })
     await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
     cleanup.push(() => new Promise<void>((resolve, reject) => {
@@ -59,11 +86,15 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     // credential file naming this test's signer public key and runtime identity.
     const overlay = join(root, 'gateway-runtime.patch.yml')
     await writeFile(overlay, "- insert:\n    - id: gateway-runtime\n      name: '@deepseek-ai/dsh-gateway-runtime'\n")
+    const workspace = join(root, 'workspace')
+    await mkdir(workspace, { recursive: true })
+    await mkdir(home, { recursive: true })
+    await writeFile(join(home, 'directory-grants.json'), JSON.stringify([{ path: workspace, mode: 'rw' }]))
     const credential = join(root, 'gateway-credential.json')
     await writeFile(credential, JSON.stringify({
       version: 1, gatewayUrl: base, organization: 'fixture', token: 'fixture-runtime-token',
       principalPublicKey: pair.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
-      runtime: { kind: 'user', id: admin.id, generation: 1 },
+      runtime: { kind: 'user', id: admin.id, runtimeId, generation: 1 },
     }))
     const process = spawn(globalThis.process.execPath, [resolve('apps/cli/lib/bin.js'), '--profile', 'web', '--patch', overlay, '--port', '0', '--no-open'], {
       cwd: root, env: { ...globalThis.process.env, DSH_HOME: home, DSH_AGENTS_HOME: join(root, 'agents'), DSH_TELEMETRY_DISABLED: '1', DEEPSEEK_API_KEY: 'keyless-no-model-calls', DSH_GATEWAY_CREDENTIAL_FILE: credential }, stdio: ['ignore', 'pipe', 'pipe'],
@@ -79,6 +110,18 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     const runtime = /dsh web: (http:\/\/\S+)/u.exec(output)?.[1]
     if (runtime === undefined) throw new Error('CLI did not report its Web address')
     runtimePort = Number(new URL(runtime).port)
+    const assertion = new GatewayPrincipalSigner(pair.privateKey, 'fixture', 30000).issuePluginManagement({
+      user: admin, runtime: { kind: 'user', id: admin.id, runtimeId, generation: 1 }, scope: { kind: 'personal' },
+    }, 120000)
+    const rpcId = randomUUID(), endpoint = 'pluginManager/catalog'
+    const catalog = await fetch(`http://127.0.0.1:${runtimePort}/api/${endpoint}`, {
+      method: 'POST', headers: { 'content-type': 'application/json', [PRINCIPAL_HEADER]: assertion },
+      body: JSON.stringify({ type: 'client-request', rpcId, method: endpoint, payload: { args: {} } }),
+    })
+    expect(catalog.status).toBe(200)
+    expect(await catalog.json()).toMatchObject({
+      rpcId, result: { ok: true, value: { managementAvailable: true, manage: true } },
+    })
     const browser = await chromium.launch(); cleanup.push(() => browser.close())
     const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } })
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
@@ -96,14 +139,14 @@ it('installs a local bundle through the built Admin workflow and verifies the re
       await compareOrRefreshGolden(join(DIRECTORY, 'configuration.expected.md'), await config.ariaSnapshot(), webSnapshotMode())
       await config.getByLabel('maxDepth', { exact: true }).fill('4')
       const describe = await page.request.post(`${base}/admin/api/plugins/invoke`, { headers: { origin: base }, data: {
-        nodeId: 'fixture-node', target: { kind: 'user', id: admin.id }, generation: 1, rpcId: randomUUID(), endpoint: 'settings.describe', args: {},
+        nodeId, target: { kind: 'user', id: admin.id, runtimeId }, generation: 1, rpcId: randomUUID(), endpoint: 'settings.describe', args: {},
       } })
       expect(describe.status()).toBe(200)
       const described = await describe.json() as { result: { ok: boolean; value: { namespaces: Array<{ ns: string; revision: number }> } } }
       expect(described.result.ok).toBe(true)
       const revision = described.result.value.namespaces.find(item => item.ns === 'subagent')!.revision
       const concurrent = await page.request.post(`${base}/admin/api/plugins/invoke`, { headers: { origin: base }, data: {
-        nodeId: 'fixture-node', target: { kind: 'user', id: admin.id }, generation: 1, rpcId: randomUUID(), endpoint: 'settings.mutate',
+        nodeId, target: { kind: 'user', id: admin.id, runtimeId }, generation: 1, rpcId: randomUUID(), endpoint: 'settings.mutate',
         args: { ns: 'subagent', expectedRevision: revision, ops: [{ op: 'set', path: ['maxDepth'], value: 3 }] },
       } })
       expect((await concurrent.json() as { result: { ok: boolean } }).result.ok).toBe(true)

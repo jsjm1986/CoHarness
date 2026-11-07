@@ -1,13 +1,17 @@
 /** Administrator-only forwarding to the exact current-node profile generation. */
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import type { UserRow } from './auth.ts'
 import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
-import { parseDesiredState, PluginStateError, type PluginDesiredState } from './plugin-state.ts'
+import { INSTANCE_PROFILE, parseDesiredState, PluginStateError, type PluginDesiredState, type PluginStateOverviewRow } from './plugin-state.ts'
+import { PluginStateMetaResolver, type PluginStateMetaIndex } from './plugin-meta.ts'
 import type { GatewayDeps } from './server.ts'
+import type { RuntimeId } from './runtime-catalog.ts'
 
-const targetSchema = z.object({ kind: z.enum(['user', 'project']), id: z.number().int().positive() }).strict()
+const targetSchema = z.object({ kind: z.enum(['user', 'project']), id: z.number().int().positive(),
+  runtimeId: z.uuid().transform(value => value as RuntimeId).optional() }).strict()
 const stateWriteSchema = z.object({
   target: targetSchema,
   revision: z.string().regex(/^(0|[1-9][0-9]{0,18})$/u),
@@ -15,8 +19,8 @@ const stateWriteSchema = z.object({
 }).strict()
 const invocationSchema = z.object({
   target: targetSchema, nodeId: z.string().min(1), generation: z.number().int().positive(), rpcId: z.uuid(),
-  endpoint: z.enum(['settings.describe', 'settings.mutate', 'pluginInventory/list', 'pluginManager/listPlugins', 'pluginManager/listBundles', 'pluginManager/inspect',
-    'pluginManager/setPluginEnabled', 'pluginManager/setBundleEnabled', 'pluginManager/installBundleStream',
+  endpoint: z.enum(['settings.describe', 'settings.mutate', 'pluginInventory/list', 'pluginManager/catalog', 'pluginManager/listPlugins', 'pluginManager/listBundles', 'pluginManager/inspect',
+    'pluginManager/setPluginEnabled', 'pluginManager/setPluginConfig', 'pluginManager/describePluginConfig', 'pluginManager/setBundleEnabled', 'pluginManager/installBundleStream',
     'pluginManager/cancelInstall', 'pluginManager/removeBundle', 'pluginManager/registries', 'pluginManager/waitForInstall',
     'pluginRegistryProbe/fastest']),
   args: z.record(z.string(), z.unknown()),
@@ -30,6 +34,8 @@ export interface PluginManagementState {
   appliedRevision: string
   generation: number | null
   observed: PluginDesiredState | null
+  /** Display metadata keyed by state-row id and bundle name; absent rows have none. */
+  meta?: PluginStateMetaIndex
 }
 export class PluginManagementError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 502 | 503, message: string) { super(message) }
@@ -47,8 +53,19 @@ export class GatewayPluginManagement {
   private probePending: Promise<string | null> | undefined
   private probeCached: { registry: string | null; expiresAt: number } | undefined
 
+  private readonly meta: PluginStateMetaResolver
+
   constructor(private readonly deps: Pick<GatewayDeps, 'users' | 'projects' | 'instances' | 'cfg' | 'pluginState'>,
-    private readonly signer: GatewayPrincipalSigner, private readonly nodeId: string) {}
+    private readonly signer: GatewayPrincipalSigner, private readonly nodeId: string) {
+    // The release layout keeps workspace packages beside gateway/; a stubbed
+    // config still resolves them from this module's own location.
+    const anchor = this.deps.cfg.modelGovernancePackage
+    const releaseRoot = anchor === undefined
+      ? dirname(dirname(dirname(fileURLToPath(import.meta.url))))
+      : dirname(dirname(anchor))
+    this.meta = new PluginStateMetaResolver(
+      ['packages', 'plugins', 'vendor'].map(dir => join(releaseRoot, dir)))
+  }
 
   /**
    * Race the public registry pings; the manager dialog uses the winner to preselect a mirror
@@ -97,12 +114,31 @@ export class GatewayPluginManagement {
     const parsed = targetSchema.safeParse(input)
     if (!parsed.success) throw new PluginManagementError(400, 'invalid plugin management target')
     await this.authorize(admin, parsed.data)
-    const generation = await this.deps.instances.isLive(parsed.data) ? await this.deps.instances.generationOf(parsed.data) : null
-    return { nodeId: this.nodeId, target: parsed.data, generation }
+    const target = await this.deps.instances.resolveTarget?.(parsed.data) ?? parsed.data
+    const generation = await this.deps.instances.isLive(target) ? await this.deps.instances.generationOf(target) : null
+    await this.administrator(admin)
+    return { nodeId: this.nodeId, target, generation }
+  }
+
+  /**
+   * Every space holding a saved plugin composition, with entry counts and
+   * liveness — the administrator's map into per-target management without
+   * touching a runtime that has never been overridden.
+   * @param admin - current authenticated administrator.
+   * @returns one row per space that carries a saved desired state.
+   */
+  async overview(admin: UserRow): Promise<PluginStateOverviewRow[]> {
+    await this.administrator(admin)
+    const store = this.deps.pluginState
+    if (store === undefined) throw new PluginManagementError(503, 'plugin state store unavailable')
+    const rows = await store.list()
+    await this.administrator(admin)
+    return rows
   }
 
   /** The owner's runtime home, where the observed profile projection lives. */
   private async dshHomeFor(target: RuntimeTarget): Promise<string> {
+    if (this.deps.instances.storageOf !== undefined) return (await this.deps.instances.storageOf(target)).dshHome
     if (target.kind === 'project') return join(this.deps.cfg.projectRuntimesRoot, String(target.id), 'dsh')
     const owner = await this.deps.users.getById(target.id)
     if (owner === null) throw new PluginManagementError(404, 'profile runtime owner not found')
@@ -121,13 +157,31 @@ export class GatewayPluginManagement {
     const parsed = targetSchema.safeParse(input)
     if (!parsed.success) throw new PluginManagementError(400, 'invalid plugin management target')
     await this.authorize(admin, parsed.data)
+    const target = await this.deps.instances.resolveTarget?.(parsed.data) ?? parsed.data
     const store = this.deps.pluginState
     if (store === undefined) throw new PluginManagementError(503, 'plugin state store unavailable')
+    const dshHome = await this.dshHomeFor(target)
     const [saved, appliedRevision, observed] = await Promise.all([
-      store.get(parsed.data), store.applied(parsed.data), store.observed(await this.dshHomeFor(parsed.data)),
+      store.get(target), store.applied(target), store.observed(dshHome),
     ])
-    const generation = await this.deps.instances.isLive(parsed.data) ? await this.deps.instances.generationOf(parsed.data) : null
-    return { revision: saved.revision, state: saved.state, appliedRevision, generation, observed }
+    const generation = await this.deps.instances.isLive(target) ? await this.deps.instances.generationOf(target) : null
+    const profileDir = join(dshHome, 'profiles', INSTANCE_PROFILE)
+    const meta: PluginStateMetaIndex = { entries: {}, bundles: {} }
+    for (const entry of [...saved.state?.entries ?? [], ...observed?.entries ?? []]) {
+      if (meta.entries[entry.id] === undefined) {
+        const resolved = this.meta.metaOf(entry.name, profileDir)
+        if (resolved !== undefined) meta.entries[entry.id] = resolved
+      }
+    }
+    for (const name of [...saved.state?.bundles ?? [], ...observed?.bundles ?? []]) {
+      if (meta.bundles[name] === undefined) {
+        const resolved = this.meta.metaOf(name, profileDir)
+        if (resolved !== undefined) meta.bundles[name] = resolved
+      }
+    }
+    await this.administrator(admin)
+    return { revision: saved.revision, state: saved.state, appliedRevision, generation, observed,
+      ...(Object.keys(meta.entries).length === 0 && Object.keys(meta.bundles).length === 0 ? {} : { meta }) }
   }
 
   /**
@@ -146,12 +200,12 @@ export class GatewayPluginManagement {
     if (store === undefined) throw new PluginManagementError(503, 'plugin state store unavailable')
     const state = parsed.data.state === null ? null : parseDesiredState(parsed.data.state)
     try {
-      await store.set(parsed.data.target, state, parsed.data.revision)
+      await store.set(parsed.data.target, state, parsed.data.revision, admin.id)
     } catch (error) {
       if (error instanceof PluginStateError) throw new PluginManagementError(error.status === 500 ? 502 : error.status, error.message)
       throw error
     }
-    return this.state(admin, { kind: parsed.data.target.kind, id: parsed.data.target.id })
+    return this.state(admin, parsed.data.target)
   }
 
   /**
@@ -159,12 +213,13 @@ export class GatewayPluginManagement {
    * @param admin - current authenticated administrator.
    * @param input - exact target, node, generation, method, arguments and correlation id.
    * @param signal - downstream lifetime; installation cancellation waits in the runtime.
-   * @returns bounded response chunks, without retrying side effects after transport failure.
+   * @returns bounded responses after current administrator authority is checked: ordinary replies after lease cleanup, streaming chunks before each yield. Approved effects are never retried after transport failure or withdrawal.
    */
   async *invoke(admin: UserRow, input: unknown, signal: AbortSignal): AsyncGenerator<Uint8Array> {
     const parsed = invocationSchema.safeParse(input)
     if (!parsed.success) throw new PluginManagementError(400, 'invalid plugin management request')
-    const value = parsed.data, { target, generation } = value
+    const value = parsed.data, { generation } = value
+    let target: RuntimeTarget = value.target
     if (value.endpoint === 'settings.mutate' && (typeof value.args.expectedRevision !== 'number'
       || !Number.isSafeInteger(value.args.expectedRevision) || value.args.expectedRevision < 0)) {
       throw new PluginManagementError(400, 'profile configuration requires a valid expected revision')
@@ -172,11 +227,13 @@ export class GatewayPluginManagement {
     if (value.nodeId !== this.nodeId) throw new PluginManagementError(409, 'plugin management target belongs to another node')
     const owner = await this.authorize(admin, target)
     const instances = this.deps.instances
+    if (instances.resolveTarget !== undefined) target = await instances.resolveTarget(target)
     if (!await instances.isLive(target) || await instances.generationOf(target) !== generation) {
       throw new PluginManagementError(409, 'profile instance changed; reload before retrying')
     }
     if (value.endpoint === 'pluginRegistryProbe/fastest') {
       const registry = await this.fastestRegistry().catch(() => null)
+      await this.administrator(admin)
       yield new TextEncoder().encode(JSON.stringify({ type: 'server-response', rpcId: value.rpcId, result: { ok: true, value: registry } }))
       return
     }
@@ -186,13 +243,15 @@ export class GatewayPluginManagement {
     }
     const lifetime = new AbortController()
     const abort = AbortSignal.any([signal, lifetime.signal, AbortSignal.timeout(this.deps.cfg.upstreamTimeoutMs)])
+    const streaming = value.endpoint === 'pluginManager/installBundleStream'
+    const buffered: Uint8Array[] = []
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
     try {
       abort.throwIfAborted()
       const authority = `127.0.0.1:${String(await instances.portOf(target))}`
-      const assertion = this.signer.issuePluginManagement({ user: admin, runtime: { ...target, generation },
+      const current = await this.administrator(admin)
+      const assertion = this.signer.issuePluginManagement({ user: current, runtime: { ...target, generation },
         scope: target.kind === 'user' ? { kind: 'personal' } : { kind: 'project', projectId: target.id, projectName: owner, mode: 'ro' } }, this.deps.cfg.upstreamTimeoutMs)
-      const streaming = value.endpoint === 'pluginManager/installBundleStream'
       const response = await fetch(`http://${authority}/api/${streaming ? '_stream/' : ''}${value.endpoint}`, {
         method: 'POST', headers: { host: authority, 'content-type': 'application/json', [PRINCIPAL_HEADER]: assertion },
         body: JSON.stringify({ type: 'client-request', rpcId: value.rpcId, method: value.endpoint, payload: value.endpoint.startsWith('settings.') ? value.args : { args: value.args } }), signal: abort,
@@ -210,7 +269,11 @@ export class GatewayPluginManagement {
         if (chunk.done) break
         bytes += chunk.value.byteLength
         if (bytes > this.deps.cfg.upstreamResponseLimitBytes) throw new PluginManagementError(502, 'profile response exceeds its byte budget')
-        yield chunk.value
+        if (streaming) {
+          await this.administrator(admin)
+          abort.throwIfAborted()
+          yield chunk.value
+        } else buffered.push(chunk.value)
       }
       if (!await instances.isLive(target) || await instances.generationOf(target) !== generation) {
         throw new PluginManagementError(409, 'profile instance changed; reload before retrying')
@@ -228,13 +291,21 @@ export class GatewayPluginManagement {
         console.error('[gateway] profile operation lease release failed:', error)
       }
     }
+    await this.administrator(admin)
+    signal.throwIfAborted()
+    if (!streaming) yield Buffer.concat(buffered)
   }
 
-  private async authorize(admin: UserRow, target: RuntimeTarget): Promise<string> {
+  private async administrator(admin: UserRow): Promise<UserRow> {
     const current = await this.deps.users.getById(admin.id)
     if (admin.role !== 'admin' || current?.role !== 'admin' || current.status !== 'active') {
       throw new PluginManagementError(403, 'administrator permission required')
     }
+    return current
+  }
+
+  private async authorize(admin: UserRow, target: RuntimeTarget): Promise<string> {
+    await this.administrator(admin)
     const owner = target.kind === 'user' ? await this.deps.users.getById(target.id) : await this.deps.projects.getById(target.id)
     if (owner === null) throw new PluginManagementError(404, 'profile runtime owner not found')
     // The steward space mounts a fixed composition: a live mutation here could

@@ -1,0 +1,245 @@
+{
+  "findings": [
+    "B427"
+  ],
+  "status": "fixed_verified_named_uncertain_cancellation_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T04:55:03.200796+00:00",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-origin-final.json",
+    "fetchedAt": "2026-11-01T04:53:09.599983+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "problem": "Acknowledged uncertain completion retired local operation metadata and removed its caller-abort listener. Subsequent provider disposal, caller cancellation or fail-closed accounting no longer aborted that still-running lease.",
+  "fix": "Each lease combines provider lifetime, caller signal and operation signal independently of accounting-entry retirement. Accounting failure aborts the provider lifetime. Reporting uncertainty does not itself cancel work or release remote occupation; exact later quiescence still closes it.",
+  "verification": {
+    "distinctRelatedCases": 162,
+    "runtimePackageCases": 116,
+    "httpPostgresCases": 40,
+    "newHttpPostgresCases": 3,
+    "typescriptSdkScenarios": 3,
+    "pythonSdkScenarios": 3,
+    "newScenarioPerSdk": 1,
+    "repeatVersionRunsNotAddedToDistinctCount": true,
+    "passedChecks": [
+      {
+        "name": "uncertain-cancellation-fixed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-cancellation-fixed.json"
+      },
+      {
+        "name": "uncertain-owner-related",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-related.json"
+      },
+      {
+        "name": "uncertain-owner-related-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-related-node22.json"
+      },
+      {
+        "name": "uncertain-owner-package-related",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-package-related.json"
+      },
+      {
+        "name": "uncertain-owner-source-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-source-types.json"
+      },
+      {
+        "name": "uncertain-owner-bundle",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-bundle.json"
+      },
+      {
+        "name": "uncertain-owner-gateway-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-gateway-types.json"
+      },
+      {
+        "name": "uncertain-owner-host-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-host-types.json"
+      },
+      {
+        "name": "uncertain-owner-sdk-source",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-sdk-source.json"
+      },
+      {
+        "name": "uncertain-owner-sdk-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-sdk-node22.json"
+      },
+      {
+        "name": "uncertain-owner-sdk-node24",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-sdk-node24.json"
+      },
+      {
+        "name": "uncertain-owner-sdk-python",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-sdk-python.json"
+      },
+      {
+        "name": "uncertain-owner-pairing",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-pairing.json"
+      },
+      {
+        "name": "uncertain-owner-docs",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-docs.json"
+      },
+      {
+        "name": "uncertain-owner-lint-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-lint-final.json"
+      },
+      {
+        "name": "uncertain-owner-python-lint",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-python-lint.json"
+      },
+      {
+        "name": "uncertain-owner-export-docs",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-export-docs.json"
+      },
+      {
+        "name": "uncertain-owner-generate-catalog",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-generate-catalog.json"
+      },
+      {
+        "name": "uncertain-owner-coverage",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-coverage.json"
+      },
+      {
+        "name": "uncertain-owner-origin-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-origin-final.json"
+      },
+      {
+        "name": "uncertain-owner-references-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-references-final.json"
+      }
+    ],
+    "negativeChecks": [
+      {
+        "name": "uncertain-cancellation-negative",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-cancellation-negative.json"
+      },
+      {
+        "name": "uncertain-owner-sdk-old-source",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-sdk-old-source.json"
+      },
+      {
+        "name": "uncertain-owner-sdk-old-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-owner-sdk-old-node22.json"
+      }
+    ],
+    "counterfactual": "Original provider fails all3 new HTTP/PostgreSQL cancellation cases. Complete original38-file package in source and normal Node22 built SDK each fails only the new scenario, with both previous cases passing. No missing-module failure.",
+    "transportEvidence": "Runnable SDK scenario holds a real loopback HTTP response open, reports uncertainty, unloads the concrete provider, observes the body and server response close, and records uncertain then exact quiescent completion with active0.",
+    "preservation": {
+      "prior24ProviderTestBodiesUnchanged": true,
+      "api13SourceUnchanged": true,
+      "priorTwoSdkExpectedOutputsUnchanged": true,
+      "completeOriginalRuntimeFilesUnchanged": 38
+    },
+    "coverage": {
+      "totals": {
+        "lines": {
+          "total": 246,
+          "covered": 228,
+          "skipped": 0,
+          "pct": 92.68
+        },
+        "statements": {
+          "total": 312,
+          "covered": 269,
+          "skipped": 0,
+          "pct": 86.21
+        },
+        "functions": {
+          "total": 55,
+          "covered": 51,
+          "skipped": 0,
+          "pct": 92.72
+        },
+        "branches": {
+          "total": 189,
+          "covered": 147,
+          "skipped": 0,
+          "pct": 77.77
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "changedCancellationSites": [
+        {
+          "line": 297,
+          "count": 29,
+          "statement": "entry.result.resolve({ signal: entry.signal,"
+        },
+        {
+          "line": 400,
+          "count": 1,
+          "statement": "this.lifetime.abort(error)"
+        },
+        {
+          "line": 407,
+          "count": 29,
+          "statement": "this.lifetime.abort(new ResourceAdmissionError('unavailable', 'Resource admission is stopping.'))"
+        }
+      ],
+      "scope": "Additional nongating real HTTP/PostgreSQL provider measurement; not aggregate CI coverage. Existing thresholds and baseline debt unchanged."
+    },
+    "documentation": {
+      "quickLeavesPassed": 20,
+      "quickLeavesFailed": 0,
+      "ownedBilingualPairs": 4,
+      "runner": "Same repository doc-quick leaves through direct Node commands; no pnpm invocation or repository gate change.",
+      "exportJsdoc": "passed",
+      "catalog": "127 computed,0 changed"
+    },
+    "lintCorrection": "Initial SDK expected type member formatting failed lint; formatting corrected and focused lint passed. No runtime behavior change.",
+    "ownedResources": "Unique test orgs in the previously verified owned loopback PostgreSQL instance, ephemeral loopback servers and awaited SDK subprocess/HTTP teardown. No production endpoint or paid API."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T040546Z/uncertain-cancellation-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-uncertain-resource-cancellation.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-uncertain-resource-cancellation.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-uncertain-resource-cancellation.zh.md",
+    "apps/cli/tests/profiles/sdk/resource-retirement.expected.e2e.ts",
+    "docs/subsystems/resource-budget.i18n.yaml",
+    "docs/subsystems/resource-budget.md",
+    "docs/subsystems/resource-budget.zh.md",
+    "examples/headless-agent/tests/fixtures/resource-retirement/expected.json",
+    "examples/headless-agent/tests/fixtures/resource-retirement/model.mjs",
+    "gateway/tests/runtime-resource-provider.spec.ts",
+    "packages/context/gateway-runtime/README.i18n.yaml",
+    "packages/context/gateway-runtime/README.md",
+    "packages/context/gateway-runtime/README.zh.md",
+    "packages/context/gateway-runtime/src/resource-budget.ts",
+    "packages/context/resource-budget/README.i18n.yaml",
+    "packages/context/resource-budget/README.md",
+    "packages/context/resource-budget/README.zh.md",
+    "packages/context/resource-budget/src/types.ts",
+    "python/sdk/tests/test_resource_retirement_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 41,
+  "artifactReferences": 6,
+  "mergeRequirement": "Apply only the19 sourceDeltaPaths and normally rebuild the matching resource-budget/gateway-runtime packages. Prerequisite sources and normal build/type references are read-only context. This packet depends on B425/B426; B416-B424 retain their independent integration requirements, including matched B417 Session readers. No root production deployment or peer-owned source modification.",
+  "notes": {
+    "otherProviderReview": {
+      "managedSdkBudget": "Native composition already includes provider lifetime and caller cancellation independently of its completed/uncertain entry set.",
+      "subagentAdmission": "Wrapper already combines admission-provider lifetime and caller, then the underlying lease signal.",
+      "localSubprocessConsumer": "spawn.ts observeRangeExit removes the abort listener after confirmed managed-range absence; late signal changes cannot target a proved exited range."
+    },
+    "decision": "Use the existing native AbortSignal.any pattern for Gateway leases. Accounting-entry retirement and cancellation membership remain independent; no need to retain uncertain metadata or make uncertainty itself request cancellation.",
+    "newNote": ".agents/notes/implemented/bug-fix/2026-11-01-uncertain-resource-cancellation.md",
+    "retainedExistingNote": ".agents/notes/implemented/bug-fix/2026-11-01-resource-registration-retirement.md",
+    "classification": "retain both active ownership decisions; no archived note changed"
+  },
+  "compatibility": "Private implementation fix and clarified cancellation documentation. No public type fields, wire messages, configuration, Session data or schema version change; immutable generations preserved. No upgrade migration required.",
+  "remaining": [
+    "Integrate the19 owned source deltas with matching normal Runtime builds. R24 and production acceptance remain peer-owned and pending; this packet does not imply B416-B426 integration or B417 reader acceptance.",
+    "Continue remaining resource response validation, origin resolution, queue limits and cleanup deadline paths. Named provider tests measure lines92.68%,statements86.21%,branches77.77%,functions92.72%; whole-provider and aggregate CI completion are not claimed.",
+    "Continue per-account/computer permission, filesystem/document race, model/tool/workflow and Inspector business reviews outside peer-owned files. All12 domains and B04/B25 remain open.",
+    "Retain designed cold auxiliary unattributed calls and advisory token quota alerts. Do not invent execution witnesses, hard billing denials or implicit cancellation when uncertainty is reported.",
+    "No root production deployment, restart or dependency synchronization; official paid Responses verification remains deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true
+}

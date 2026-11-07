@@ -40,6 +40,8 @@ export interface SessionInputDeps {
   popup?: (() => PopupDismissFace | undefined) | undefined
   /** Queue read face; overlaid onto InputState.queue (absent = empty). */
   queue?: ObservableSnapshot<readonly QueuedMessage[]> | undefined
+  /** Current navigation refusal; omission leaves submission available. */
+  submissionBlock?: (() => string | undefined) | undefined
   /**
    * Steer every still-pending queued message into the running turn, in FIFO
    * order (the empty-draft accelerated-Enter gesture); absent = unsupported.
@@ -278,6 +280,11 @@ export class SessionInputShell implements SessionInput {
    * dismisses and the menu tracks frozen.
    */
   submit(mode: InputSubmitMode = 'queue'): void {
+    const block = this.deps.submissionBlock?.()
+    if (block !== undefined) {
+      this.notify('info', block)
+      return
+    }
     if (this.snapshot.draft.trim() === '' && (this.imageIds.length > 0 || this.documentIds.length > 0)) {
       if (this.snapshot.phase === 'plain' && !this.attachmentSendInFlight) {
         const imageIds = [...this.imageIds]
@@ -469,6 +476,7 @@ export class SessionInputShell implements SessionInput {
 
   /** Teardown: abort any in-flight attempt and stop accepting async settlements. */
   dispose(): void {
+    this.mirrorFn = undefined
     const unsubscribe = this.queueUnsubscribe
     this.queueUnsubscribe = undefined
     unsubscribe?.()
@@ -487,9 +495,11 @@ export class SessionInputShell implements SessionInput {
    * Restore an empty, editable input from persisted data and bind its mirror.
    * An existing draft or live submission takes precedence. Binding immediately
    * persists the current semantic draft, including input prepared before mount.
+   * The store writer remains bound until this input is disposed, including
+   * while its Conversation view is hidden. It must not capture view-local state.
    * @param write - store draft write.
    * @param initialDraft - optional JSON-parsed draft from the session store.
-   * @returns the unbind disposer.
+   * @returns an optional early-release disposer for a shorter-lived store owner.
    */
   bindMirror(write: (draft: string | DraftSnapshot) => void, initialDraft?: unknown): () => void {
     if (this.snapshot.draft === '' && initialDraft !== undefined) {
@@ -501,6 +511,9 @@ export class SessionInputShell implements SessionInput {
       if (this.mirrorFn === write) this.mirrorFn = undefined
     }
   }
+
+  /** Whether current input changes reach the owning Session store synchronously. */
+  get hasDraftMirror(): boolean { return this.mirrorFn !== undefined }
 
   // ---- effect executor ----
 

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-node-service-retirement-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-node-service-retirement-admission.md
+document:
+  en: 120a1ab576890e268d0f89bd419ba82f1f849c02
+  zh: 5c9f68c279d5af26800bee5d1c1e0b11752cff45
+/agent-note-node-service-retirement-admission:
+  en: 13ef755ebbb86735
+  zh: 58c15bdde1d7c6a6
+/agent-note-node-service-retirement-admission/problem:
+  en: 74382ee147ec5a2f
+  zh: af2b8d1f1e9cb74a
+/agent-note-node-service-retirement-admission/decision:
+  en: e3a30413a74146c4
+  zh: 1e2108454f288072
+/agent-note-node-service-retirement-admission/alternatives-considered:
+  en: 55297ab091b618d0
+  zh: bee5c36536e7203f
+/agent-note-node-service-retirement-admission/consequences:
+  en: 56fda07007c9783e
+  zh: 89bb64dd5cca23d7
+/agent-note-node-service-retirement-admission/verification:
+  en: a0525fbfe1bc175b
+  zh: 147fbee13f608a1b

@@ -1,5 +1,5 @@
 ---
-description: "为 Linux 进程隔离与 POSIX 会话写锁提供预编译系统原语。"
+description: "为 Linux 进程隔离、POSIX 锁与目录句柄提供预编译系统原语。"
 kind: "package-library"
 ---
 # @deepseek-ai/node-addon-system
@@ -8,7 +8,7 @@ kind: "package-library"
 
 ## Summary
 
-使用 Linux `landlock-run` 可执行文件限制子进程，或通过 `./flock` 入口获取 POSIX 写锁。平台包包含预编译二进制；消费方安装时不会构建原生代码。Landlock 策略与会话生命周期仍由调用方负责。
+使用 Linux `landlock-run` 可执行文件限制子进程，通过 `./flock` 获取 POSIX 写锁，或通过 `./directory` 在异步读取和创建期间保留目录对象。平台包包含预编译二进制；消费方安装时不会构建原生代码。授权、隔离策略和会话生命周期仍由调用方负责。
 
 ## Table of Contents
 
@@ -24,7 +24,9 @@ kind: "package-library"
 
 `@deepseek-ai/node-addon-system/flock` 导出 `tryLockExclusive(fd): Promise<void>`。在调用完成前保持描述符打开。获取操作使用非阻塞独占 flock；发生竞争时，返回的 Promise 会以 `EAGAIN` 或 `EWOULDBLOCK` 拒绝，关闭该打开文件描述的最后一个描述符即释放锁。参见[入口 README](packages/entry/README.zh.md)。
 
-导入任一入口都不会加载 addon。Landlock 可执行文件缺失时探测为不可用；flock 绑定缺失时拒绝获取。两条路径都不会进行编译，也不会静默允许不受支持的行为。
+`@deepseek-ai/node-addon-system/directory` 导出 `DirectoryHandle`，用于相对描述符的遍历、有界读取和子目录创建。[目录行为约定](docs/directory-contract.md)定义句柄归属、链接拒绝和退出清理。
+
+导入入口不会加载 addon。Landlock 可执行文件缺失时探测为不可用；锁或目录绑定缺失时拒绝相应操作。任何路径都不会进行编译，也不会静默允许不受支持的行为。
 
 ## Support
 
@@ -32,7 +34,7 @@ Linux x64/arm64 包包含静态 Landlock 可执行文件，以及分别用于 gl
 
 ## Development
 
-在本目录运行 `pnpm build:ts` 构建入口、`pnpm build:native` 构建当前宿主声明的原生产物、`pnpm build:test-oracle` 构建独立的 flock 系统调用 fixture（测试前置数据）。随后用 `pnpm test` 验证入口、锁、打包及可用的内核行为。Linux 完整构建需要 musl-gcc；macOS 使用 cc。根目录 `pnpm run build:native-system` 只构建源码测试所需的当前宿主 addon。
+在本目录运行 `pnpm build:ts` 构建入口、`pnpm build:native` 构建当前宿主声明的原生产物、`pnpm build:test-oracle` 构建独立的 flock 系统调用 fixture（测试前置数据）。随后用 `pnpm test` 验证入口、锁、目录归属、打包及可用的内核行为。Linux 完整构建需要 musl-gcc；macOS 使用 cc。根目录 `pnpm run build:native-system` 只构建源码测试所需的当前宿主 addon。
 
 [架构](docs/architecture.md)、[打包](docs/packaging.md)和[发布流程](docs/release.md)分别负责实现与发布细节。
 

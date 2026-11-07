@@ -10,17 +10,33 @@ import { vi } from 'vitest'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import MemoryService, { type Config, type MemorySwitches } from '../src/index.ts'
 
-/** Create isolated services with an in-memory `memory` domain. */
-export async function memoryHarness(options: {
+/** Domain and provider setup shared by isolated and Gateway-composed tests. */
+interface MemorySetupOptions {
   config?: Partial<Config>
-  beforeService?: (ctx: Context) => void
-} = {}) {
+  beforeOpen?: (backend: MemoryStorageBackend) => void
+  /** Observe the instantiated provider before awaiting startup. */
+  onService?: (fiber: ReturnType<Context['plugin']>) => void
+}
+
+/** Create isolated services with an in-memory `memory` domain. */
+export async function memoryHarness(options: MemorySetupOptions & { beforeService?: (ctx: Context) => void } = {}) {
   const ctx = new Context()
   options.beforeService?.(ctx)
   await ctx.plugin(SessionStore)
+  return { ctx, ...await mountMemory(ctx, options) }
+}
+
+/**
+ * Mount real memory storage in an existing Session-owning test context.
+ * @param ctx - Caller-owned context; its disposal owns the mounted resources.
+ * @param options - Memory configuration and storage barriers.
+ * @returns the provider and domain handles.
+ */
+export async function mountMemory(ctx: Context, options: MemorySetupOptions = {}) {
   await ctx.plugin(Storage)
   const pool = new MemoryMediaPool()
   const backend = new MemoryStorageBackend(pool)
+  options.beforeOpen?.(backend)
   ctx.effect(() => ctx.storage.backend.register('fixture', backend))
   ctx.effect(() => async () => { await backend.close() })
   const facility = new DomainFacility(ctx, { backend: 'fixture' })
@@ -29,8 +45,10 @@ export async function memoryHarness(options: {
     ctx.provide('storageDomain', facility)
     return async () => { await facility.closeAll(); unmount() }
   })
-  const fiber = await ctx.plugin(MemoryService, (options.config ?? {}) as Config)
-  return { ctx, service: ctx.memory, facility, fiber }
+  const fiber = ctx.plugin(MemoryService, (options.config ?? {}) as Config)
+  options.onService?.(fiber)
+  await fiber
+  return { service: ctx.memory, facility, fiber }
 }
 
 /** Build an unregistered Agent for a test-owned Session with the given header fields. */

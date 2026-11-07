@@ -12,14 +12,14 @@ const paths = ['packages/util/timeout/src/index.ts', 'docs/testing.md']
 const record = { commit: FROZEN_CI_SCOPE_COMMIT, base: FROZEN_CI_SCOPE_COMMIT, paths }
 
 it('compares full-to-scoped coverage and exact Web reductions against the pinned complete plan', () => {
-  const records = [record, { ...record, paths: ['apps/web/tests/goal-bar.e2e.ts'] }]
+  const records = [record, { ...record, paths: ['apps/web/tests/default-model.e2e.ts'] }]
   const result = compareScopeReplay(records, entry => resolveCiPrScopePlans(entry.paths, '', root, {}))
   expect(result.unexplained).toEqual([])
   expect(result.groups).toEqual({
     'reduce:coverage:accompanying-inert-prose': 1,
     'reduce:web:exact-scenario-owners-and-smokes': 1,
   })
-  expect(result.differences.find(change => change.lane === 'web')?.from).toContain('queue-actions.e2e.ts')
+  expect(result.differences.find(change => change.lane === 'web')?.from).toContain('models-settings.e2e.ts')
 })
 
 it('keeps an older archived selector distinct from the migration baseline', () => {

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-final-target-and-control-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk packages/llm/llm/tests/model-policy.spec.ts packages/subagent/subagent/tests/external-model.spec.ts --maxWorkers=1 --coverage '--coverage.include=packages/subagent/subagent-dsh-sdk/src/**' --coverage.include=packages/llm/llm/src/model-policy.ts --coverage.include=packages/subagent/subagent/src/external-model.ts --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory=.agents/audits/.local/sdk-managed-coverage --retry=0",
+  "startedAt": "2026-10-24T17:44:08.787295+00:00",
+  "seconds": 23.817,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65bce3a2fed108d32a432926cf63828d4c05520653726359ecc51506c9852362",
+  "inputsAfter": "65bce3a2fed108d32a432926cf63828d4c05520653726359ecc51506c9852362",
+  "postgresToolDirectory": null,
+  "outputSha256": "6ad2e1b096f0d4ec8c4c046cab18d056dad3877147920328a280652d3927b3d7",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  6 passed (6)\n      Tests  201 passed (201)\n   Start at  01:44:23\n   Duration  9.34s (transform 1.06s, setup 79ms, import 2.12s, tests 4.42s, environment 0ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 748/748 )\nBranches     : 100% ( 485/485 )\nFunctions    : 100% ( 126/126 )\nLines        : 100% ( 584/584 )\n================================================================================\n"
+}

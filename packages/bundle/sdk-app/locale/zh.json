@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SDK 应用包",
+    "description": "dsh SDK 配置包：stdio JSON-RPC 服务与进程生命周期。"
+  }
+}

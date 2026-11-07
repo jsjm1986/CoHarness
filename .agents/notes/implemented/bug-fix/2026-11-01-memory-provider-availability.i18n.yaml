@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-memory-provider-availability.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-memory-provider-availability.md
+document:
+  en: df886dc9555ae79c063aa53d35854934582d8cd2
+  zh: 3bade535b8dbf95d75a0e91bbe8ccf9f08c01909
+/agent-note-effective-memory-source-changes-cancel-unavailable-work:
+  en: 5ee1ae194251a3d0
+  zh: 0e1111636c1d94df
+/agent-note-effective-memory-source-changes-cancel-unavailable-work/problem:
+  en: 95cbf1f459a001db
+  zh: 78a7b713cf89ea19
+/agent-note-effective-memory-source-changes-cancel-unavailable-work/decision:
+  en: 52c9250bfd78efce
+  zh: ab595d6326611919
+/agent-note-effective-memory-source-changes-cancel-unavailable-work/alternatives-considered:
+  en: a930d1a92fef7e81
+  zh: 9d9ed37e5fc291db
+/agent-note-effective-memory-source-changes-cancel-unavailable-work/consequences:
+  en: 1977e02514e5e713
+  zh: 4e88ed78531163b8
+/agent-note-effective-memory-source-changes-cancel-unavailable-work/verification:
+  en: 7c851c91f93a2a30
+  zh: 180ccbc0d93faea6

@@ -1,0 +1,96 @@
+{
+  "name": "document-controls-and-public-parents-2026-10-27",
+  "verifiedAt": "2026-10-27T00:33:14.403089+00:00",
+  "aheadBehind": "139 ahead, 0 behind",
+  "sourceInputsSha256": "59d19e1dad89851300e36f92016044354ac792ce251322850734bf4a67692c99",
+  "sourceInputFiles": 55,
+  "linux": {
+    "node": "22.22.1",
+    "platform": "linux-arm64",
+    "uid": 0,
+    "testFiles": 27,
+    "passed": 479,
+    "failed": 0,
+    "skipped": 0,
+    "configuration": "Isolated Vitest 4.1.12 in Lima redroid, repository source aliases and decorator transform, two fork workers; no production services or Docker.",
+    "reportSha256": "fd4374952db8bb36ca30e7fd1188da596c994cb087e3071b8ad4a5c43dbb7fdf"
+  },
+  "built": {
+    "mode": "lib",
+    "loaderScenarios": 4,
+    "passed": 4,
+    "failed": 0,
+    "platformDependencies": "Exact Linux esbuild 0.28.2 and node-addon-require-builtin-linux-arm64-gnu 0.1.6 installed only in a private VM temporary directory. ESBUILD_BINARY_PATH and NODE_PATH supplied to the verifier.",
+    "reportSha256": "5f006e4fc02b24aeb21f472d3417a57ad0a42cf2befae09f8d75271c899e2e4a"
+  },
+  "negativeControls": [
+    {
+      "scenario": "Complete an upload under a disjoint private controlRoot",
+      "exitCode": 1,
+      "observed": "The existing test observed finalization state failed instead of complete before explicit private-source-root publication."
+    },
+    {
+      "scenario": "Replace an ordinary-save parent immediately before exclusive staging open",
+      "exitCode": 1,
+      "observed": "Actual Linux Node22 observed upload bytes in the outside replacement directory before the old save rejected the path."
+    },
+    {
+      "scenario": "Replace an ordinary-trash source parent immediately before rename",
+      "exitCode": 1,
+      "observed": "Actual Linux Node22 observed the unrelated outside source file missing after the old trash operation."
+    }
+  ],
+  "otherChecks": [
+    {
+      "command": "pnpm exec vitest run packages/attachment/userdoc-local/tests/trash-publication.spec.ts packages/attachment/userdoc-local/tests/trash.spec.ts packages/attachment/userdoc-local/tests/trash-integrity.spec.ts packages/attachment/userdoc-local/tests/trash-retention.spec.ts packages/attachment/userdoc-local/tests/local-fs.spec.ts",
+      "passed": 83,
+      "exitCode": 0
+    },
+    {
+      "command": "env NODE_DISABLE_COMPILE_CACHE=1 DSH_GATE_CONCURRENCY=2 pnpm run build",
+      "gatesPassed": 8,
+      "exitCode": 0
+    },
+    {
+      "command": "env NODE_DISABLE_COMPILE_CACHE=1 DSH_GATE_CONCURRENCY=3 pnpm run test:docs",
+      "gatesPassed": 20,
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm exec tsc -b packages/attachment/userdoc-local/tsconfig.json --pretty false",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm exec tsx scripts/run-oxlint.ts <changed userdoc-local TypeScript and MJS files>",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- packages/attachment/userdoc-local <changed Agent Note pair>",
+      "exitCode": 0
+    }
+  ],
+  "coverage": {
+    "local-fs.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "store.ts": {
+      "explicitMeasurementExitCode": 1,
+      "statements": 82.42,
+      "branches": 68.53,
+      "functions": 96.55,
+      "lines": 86.11,
+      "note": "Measured by overriding the existing baseline exclusion for this diagnostic. Coverage thresholds and repository exclusions were not changed."
+    }
+  },
+  "limitations": [
+    "Production Gateway still does not choose controlRoot or activate the managed document backend.",
+    "Different-UID replay still demonstrates EACCES for root-owned public document files. It verifies private control isolation and publication, not repaired runtime public-file access.",
+    "Non-Linux replacement races, remaining path-based lifecycle operations, B131 identity/catalog ownership and all broader audit domains remain open.",
+    "Real model endpoint verification remains explicitly deferred by the user."
+  ],
+  "headReference": "codex/business-logic-audit-2026-10-23",
+  "originReference": "origin/master"
+}

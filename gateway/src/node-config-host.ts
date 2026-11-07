@@ -1,11 +1,10 @@
 /** Fixed service actions and environmental checks for the independent node configuration applier. */
-import { execFile } from 'node:child_process'
 import { constants } from 'node:fs'
 import { access, lstat } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { dirname } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { promisify } from 'node:util'
+import { runGatewayChildCommand } from './child-command.ts'
 import { loadConfig } from './config.ts'
 import { NODE_CONFIG_FIELDS } from './node-config-fields.ts'
 import { NodeConfigurationError, type NodeConfigurationRecord } from './node-config-store.ts'
@@ -14,8 +13,8 @@ import { verifyNodeDataRelocation } from './node-config-relocation.ts'
 import { createPostgresPool, databaseUrlFromFile } from './postgres/database.ts'
 import { PostgresMaintenanceService } from './postgres/maintenance-service.ts'
 import { resolvePostgresRuntimeContext, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
-
-const execute = promisify(execFile)
+import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
+import { readResponseJson } from './response-budget.ts'
 
 /** Explicit file selection takes precedence over a bootstrap inline URL without copying that secret. */
 export function nodeSettingsEnvironment(environment: NodeJS.ProcessEnv, values: NodeConfigurationRecord['applied']): NodeJS.ProcessEnv {
@@ -65,17 +64,24 @@ export function createNodeConfigurationHost(environment: NodeJS.ProcessEnv, cont
   const maintenance = new PostgresMaintenanceService(context, loadConfig(environment).nodeStaleMs)
   const command = process.platform === 'darwin'
     ? ['launchctl', 'kickstart', '-k', `${environment.HGW_LAUNCHD_DOMAIN ?? `gui/${process.getuid?.() ?? 0}`}/${environment.HGW_LAUNCHD_LABEL ?? 'com.maycran.harness-gateway'}`]
-    : process.platform === 'linux' ? ['systemctl', 'restart', environment.HGW_GATEWAY_SERVICE ?? 'harness-gateway.service'] : undefined
+    : process.platform === 'linux' ? ['systemctl', '--no-ask-password', '--no-pager', 'restart', environment.HGW_GATEWAY_SERVICE ?? 'harness-gateway.service'] : undefined
   if (command === undefined) throw new NodeConfigurationError(409, 'node-configuration-platform-not-supported')
   if (command.some(part => /[\s\u0000-\u001f]/u.test(part))) throw new NodeConfigurationError(400, 'invalid-gateway-service-action')
 
-  async function healthy(record: NodeConfigurationRecord): Promise<boolean> {
+  async function healthy(record: NodeConfigurationRecord, timeoutMs = 2000): Promise<boolean> {
     signal.throwIfAborted()
     const cfg = loadConfig(nodeSettingsEnvironment(environment, record.applied))
     try {
-      const response = await fetch(`http://127.0.0.1:${cfg.port}/healthz`, { signal: AbortSignal.any([signal, AbortSignal.timeout(2000)]) })
-      if (!response.ok) return false
-      const body: unknown = await response.json()
+      const response = await fetch(`http://127.0.0.1:${cfg.port}/healthz`, {
+        headers: { [NODE_SERVICE_TARGET_HEADER]: context.nodeId },
+        signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
+      })
+      if (!response.ok || response.headers.get(NODE_SERVICE_TARGET_HEADER) !== context.nodeId) {
+        await response.body?.cancel()
+        return false
+      }
+      const body = await readResponseJson(response, cfg.upstreamResponseLimitBytes)
+      signal.throwIfAborted()
       return body !== null && typeof body === 'object' && 'ok' in body && body.ok === true
         && 'configurationRevision' in body && body.configurationRevision === record.appliedRevision
         && (cfg.releaseId === undefined || 'release' in body && body.release === cfg.releaseId)
@@ -124,14 +130,17 @@ export function createNodeConfigurationHost(environment: NodeJS.ProcessEnv, cont
     isHealthy: healthy,
     async restartAndVerify(record) {
       signal.throwIfAborted()
-      try { await execute(command[0]!, command.slice(1), { signal, timeout: 60_000, maxBuffer: 64 * 1024 }) }
-      catch { throw new NodeConfigurationError(409, 'gateway-service-restart-failed') }
-      const timeout = loadConfig(nodeSettingsEnvironment(environment, record.applied)).readinessTimeoutMs
-      const deadline = Date.now() + timeout
+      const cfg = loadConfig(nodeSettingsEnvironment(environment, record.applied))
+      try { await runGatewayChildCommand(command[0]!, command.slice(1), cfg.systemdCommandTimeoutMs, signal, 64 * 1024) }
+      catch (error) { throw new NodeConfigurationError(409, 'gateway-service-restart-failed', { cause: error }) }
+      const deadline = performance.now() + cfg.readinessTimeoutMs
       do {
-        if (await healthy(record)) return
-        await delay(250, undefined, { signal })
-      } while (Date.now() < deadline)
+        const ready = await healthy(record, Math.max(1, Math.floor(Math.min(2000, deadline - performance.now()))))
+        if (ready && performance.now() <= deadline) return
+        const remaining = deadline - performance.now()
+        if (remaining <= 0) break
+        await delay(Math.min(250, remaining), undefined, { signal })
+      } while (performance.now() < deadline)
       throw new NodeConfigurationError(409, 'gateway-did-not-confirm-configured-revision')
     },
   }

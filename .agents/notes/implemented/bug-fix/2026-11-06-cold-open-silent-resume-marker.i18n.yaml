@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-11-06-cold-open-silent-resume-marker.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-06-cold-open-silent-resume-marker.md
+document:
+  en: cdc45311a44f9e6e98e0b20d04f4f05f4a96d359
+  zh: 2aabab0d40dfd6e1d4c16e96433726f997cbeff7
+/agent-note-startup-reads-no-longer-race-the-silent-resume-marker:
+  en: 7eda40fae0d80583
+  zh: a417c1447075547b
+/agent-note-startup-reads-no-longer-race-the-silent-resume-marker/problem:
+  en: 34d0f3f0c3f7f14e
+  zh: fffcdce57bb66f90
+/agent-note-startup-reads-no-longer-race-the-silent-resume-marker/decision:
+  en: 2f7e9abecc11a1e4
+  zh: 5e7300a23ce87d7c
+/agent-note-startup-reads-no-longer-race-the-silent-resume-marker/alternatives-considered:
+  en: 8aa981f2d584c8e0
+  zh: 16b00c7e979d739e
+/agent-note-startup-reads-no-longer-race-the-silent-resume-marker/consequences:
+  en: 94b7a2744bb8997e
+  zh: f6a32793b6093db4
+/agent-note-startup-reads-no-longer-race-the-silent-resume-marker/verification:
+  en: 22a16fd744ed4dae
+  zh: ec958dbf93b0069c
+/agent-note-startup-reads-no-longer-race-the-silent-resume-marker/related:
+  en: 6b8b5310a85f6304
+  zh: 8c863ad17b9dd2c4

@@ -1,0 +1,13 @@
+{
+  "name": "gateway-keyless-unit-current",
+  "cwd": "gateway",
+  "command": "npm test -- --maxWorkers=2 --retry=0",
+  "startedAt": "2026-10-23T19:56:13.891944+00:00",
+  "seconds": 47.872,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2e2616562582f125be796ec807688b223479464eabe8add12efc7553434ff285",
+  "inputsAfter": "2e2616562582f125be796ec807688b223479464eabe8add12efc7553434ff285",
+  "outputSha256": "3b9c6c54f482a2e713ced7cc8b54f63772a20fe2a99623c2438e370c8c010a1a",
+  "outputTail": "\n> test\n> vitest run --exclude tests/postgres.spec.ts --exclude tests/auth-postgres.spec.ts --exclude tests/project-activity-postgres.spec.ts --exclude tests/project-service-postgres.spec.ts --exclude tests/access-invalidation.spec.ts --exclude tests/execution.spec.ts --exclude tests/ssh.spec.ts --exclude tests/webhook.spec.ts --exclude tests/maintenance.spec.ts --exclude tests/deployment-restore.spec.ts --exclude tests/deployment-backups.spec.ts --exclude tests/node-config-process.spec.ts --exclude tests/startup-generation.spec.ts --exclude tests/execution-scopes.spec.ts --exclude tests/admin-business-postgres.spec.ts --exclude tests/instance-capacity-postgres.spec.ts --maxWorkers=2 --retry=0\n\n\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/node-config-store.spec.ts (7 tests | 1 failed) 252ms\n   × persists node admission limits and upgrades missing additive settings from the bootstrap configuration 19ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/node-config-store.spec.ts > persists node admission limits and upgrades missing additive settings from the bootstrap configuration\nAssertionError: expected { HGW_PORT: '8899', …(37) } to match object { HGW_RUNTIME_MAX_STARTING: '2', …(8) }\n(29 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n@@ -3,9 +3,9 @@\n    \"HGW_DATABASE_MAX_CHECKOUT_QUEUE\": \"256\",\n    \"HGW_DATABASE_MAX_CONNECTIONS\": \"10\",\n    \"HGW_PERFORMANCE_ENABLED\": \"true\",\n    \"HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS\": \"20\",\n    \"HGW_RUNTIME_MAX_QUEUED\": \"32\",\n-   \"HGW_RUNTIME_MAX_RESIDENT\": \"8\",\n+   \"HGW_RUNTIME_MAX_RESIDENT\": \"0\",\n    \"HGW_RUNTIME_MAX_STARTING\": \"2\",\n    \"HGW_RUNTIME_QUEUE_WAIT_MS\": \"30000\",\n  }\n\n ❯ tests/node-config-store.spec.ts:102:29\n\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n  Snapshots  1 written\n Test Files  1 failed | 63 passed | 3 skipped (67)\n      Tests  1 failed | 710 passed | 77 skipped (788)\n   Start at  03:56:17\n   Duration  44.50s (transform 3.40s, setup 0ms, import 8.15s, tests 73.08s, environment 6ms)\n\n"
+}

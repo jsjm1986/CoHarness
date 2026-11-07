@@ -1,0 +1,13 @@
+{
+  "name": "ssh-admission-owner-subsystem-pairing",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write docs/subsystems/ssh.md",
+  "startedAt": "2026-10-23T15:27:52.447196+00:00",
+  "seconds": 2.211,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a9c2b7381a46756f35956db2cd982b260995e675f42c4051b92fdd27a22f06b4",
+  "inputsAfter": "a9c2b7381a46756f35956db2cd982b260995e675f42c4051b92fdd27a22f06b4",
+  "outputSha256": "11a17a43b0a7d09f6fc612142a8c50792760b438b538b44811bc6abd30805838",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write docs/subsystems/ssh.md\nverify-translation-pairing: recorded docs/subsystems/ssh.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

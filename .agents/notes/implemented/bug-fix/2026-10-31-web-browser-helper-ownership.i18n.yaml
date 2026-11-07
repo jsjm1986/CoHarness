@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-web-browser-helper-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-web-browser-helper-ownership.md
+document:
+  en: 50c115fed8506f9c7612fe3e82a8b8c31f209894
+  zh: 66e5bba427f8e326e6597e7b118502f385f3a3da
+/agent-note-web-browser-handoff-retains-its-node-helper:
+  en: ff85dce197f5f60d
+  zh: 8a58d96892c03f50
+/agent-note-web-browser-handoff-retains-its-node-helper/problem:
+  en: 2b7d8380c921c2d6
+  zh: 75ea8ee739d7b282
+/agent-note-web-browser-handoff-retains-its-node-helper/decision:
+  en: fb8bd8acb5b5b5cf
+  zh: abd72da6a960913b
+/agent-note-web-browser-handoff-retains-its-node-helper/alternatives-considered:
+  en: 119b697535276610
+  zh: 467e14d48a2e86c6
+/agent-note-web-browser-handoff-retains-its-node-helper/consequences:
+  en: 37c0eea5a0abc52e
+  zh: e38a98bed3683490
+/agent-note-web-browser-handoff-retains-its-node-helper/verification:
+  en: 6409f2450a792cec
+  zh: c292de34ea9db332

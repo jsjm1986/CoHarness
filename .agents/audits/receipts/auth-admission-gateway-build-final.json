@@ -1,0 +1,14 @@
+{
+  "name": "auth-admission-gateway-build-final",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-24T02:00:14.242450+00:00",
+  "seconds": 3.47,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "def7c4a3f0225c64cf742988f6fd40ed341facba68277c4c7df2bf14be2d21af",
+  "inputsAfter": "81b2d1574e9d05b29fa612f1a49491f7fed8ea7dcb7a2b8bccb35b3cd6961528",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

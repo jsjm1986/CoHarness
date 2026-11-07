@@ -1,0 +1,4 @@
+{"operation":"backup","unrelatedSecretsAbsent":true,"postgresCredentialPolicyHonored":true}
+{"operation":"verify","unrelatedSecretsAbsent":true,"postgresCredentialPolicyHonored":true}
+{"operation":"render","unrelatedSecretsAbsent":true,"postgresCredentialPolicyHonored":true}
+{"operation":"restore","unrelatedSecretsAbsent":true,"postgresCredentialPolicyHonored":true}

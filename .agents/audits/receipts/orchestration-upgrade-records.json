@@ -1,0 +1,14 @@
+{
+  "name": "orchestration-upgrade-records",
+  "cwd": ".",
+  "command": "pnpm run verify-upgrade-records",
+  "startedAt": "2026-10-25T07:07:17.104281+00:00",
+  "seconds": 2.0,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ce2343a15ec32f7e49529f5f1f6a8091303d72eeba912e031852e378431efdbd",
+  "inputsAfter": "ce2343a15ec32f7e49529f5f1f6a8091303d72eeba912e031852e378431efdbd",
+  "postgresToolDirectory": null,
+  "outputSha256": "f4871677a23322e554da468a5bd7010a94bd0fcc492115fb72888a67700805bb",
+  "outputTail": "$ tsx scripts/verify-upgrade-records.ts\nupgrade-records: upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json packages/experimental/browser-use-runtime localSovereignty differs from scripts/upstream-sync.json\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

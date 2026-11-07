@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-queue-order-before",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm exec vitest run packages/host/userdoc-http/tests/handler-edges.spec.ts -t 'keeps an earlier catalog delivery'",
+  "startedAt": "2026-10-26T21:02:46.470274+00:00",
+  "seconds": 7.137,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8af004a6f41559ffe7898b02a515441fd8d605b20e236666f856951de2930b2e",
+  "inputsAfter": "8af004a6f41559ffe7898b02a515441fd8d605b20e236666f856951de2930b2e",
+  "postgresToolDirectory": null,
+  "outputSha256": "e5b9b988ee3504eb52006dd044c1f422fe53bb8cfb4026324d144e181896c9e0",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/host/userdoc-http/tests/handler-edges.spec.ts (28 tests | 1 failed | 27 skipped) 23ms\n     × keeps an earlier catalog delivery ordered when a later admission is refused 21ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/host/userdoc-http/tests/handler-edges.spec.ts > user-document HTTP handler edges > keeps an earlier catalog delivery ordered when a later admission is refused\nAssertionError: expected [ Array(3) ] to deeply equal [ 'first-start', 'first-end', …(1) ]\n\n- Expected\n+ Received\n\n  [\n    \"first-start\",\n-   \"first-end\",\n    \"next-delivery\",\n+   \"first-end\",\n  ]\n\n ❯ packages/host/userdoc-http/tests/handler-edges.spec.ts:221:22\n    219|       await scope.dispose()\n    220|       expect(admissions).toBe(3)\n    221|       expect(events).toEqual(['first-start', 'first-end', 'next-delive…\n       |                      ^\n    222|     } finally {\n    223|       release.resolve(undefined)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 27 skipped (28)\n   Start at  05:02:53\n   Duration  382ms (transform 164ms, setup 54ms, import 155ms, tests 23ms, environment 0ms)\n\n"
+}

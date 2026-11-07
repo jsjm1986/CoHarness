@@ -29,6 +29,8 @@ The managed webhook route uses the same Session-creation service dependencies as
 
 Project delivery requires the collaboration provider and creates the root under the configured project or private visibility. The Gateway rechecks current write membership and binds persistence to the execution account; other restricted-purpose assertions cannot create roots.
 
+Human message and continued-question admission also replace project participant metadata with the authenticated caller snapshot. The immutable input reference controls execution authority; the participant snapshot supplies durable display and model attribution. Personal inputs receive no new project attribution.
+
 The Gateway database requires execution identity migrations 030, 031, and [immutable scopes migration 047](../../../gateway/deploy/postgres/migrations/047_execution_scopes.sql). Startup migration handling belongs to the [Gateway](../../../gateway/README.md).
 
 | Field | Default | Meaning |
@@ -40,6 +42,8 @@ The Gateway database requires execution identity migrations 030, 031, and [immut
 | `desktopCleanupMs` | `30000` | Desktop cleanup request timeout in milliseconds; positive integer at most `2147483647`. |
 
 The Gateway launch composition supplies `desktop` when the node declares `HGW_DESKTOP_ID` ([managed desktop](../../../gateway/deploy/README.md)). A configured desktop mounts `computerUseAuthorization`. Qualification and each participant's explicit confirmation apply to the live root Agent tree; historical parentage does not grant access. Root, descendants and owned jobs retain one lease across calls. Driver effects are serialized and verify the current lease before execution and output delivery. Lost permission, confirmation or renewal cancels work. Normal quiescence releases the lease; uncertain cancellation marks it stopping and requires independent drainage confirmation or an explicit administrator recovery action. This provider cannot prove native operating-system drainage from an MCP cancellation response.
+
+The separate `@deepseek-ai/dsh-gateway-execution/desktop-availability` plugin observes desktop-session evidence without enabling a driver or policy. Managed launch readiness includes this plugin even when `HGW_DESKTOP_ID` is unset. Its environment facts follow the [computer-use availability rules](../../computer-use/computer-use/README.md); a registered external or virtual desktop provider remains authoritative.
 
 <a id="execution-authorization"></a>
 ## Execution authorization
@@ -55,11 +59,13 @@ This provider owns `pluginManagementAuthorization` and `permissionPresetAuthoriz
 <a id="revocation-and-cancellation"></a>
 ## Revocation and cancellation
 
-Authorization requires a ready Gateway update stream. A participant invalidation rechecks each affected execution scope and stops its current turn, jobs, and tool calls without cancelling an independent request by another qualified user. A lost stream stops every active scope. Responses from an obsolete stream generation, changed scope, disposed Agent, or cancelled operation cannot authorize execution. Accepted queue entries survive an individual actor’s cancellation and remain parked until a new waking send; reconnection does not replay effects.
+Authorization requires a ready Gateway update stream. A participant invalidation rechecks each affected execution scope and stops its current turn, jobs, and tool calls without cancelling an independent request by another qualified user. A lost stream stops every active scope. Each pending permission check also retains matching user or project invalidations until it settles, including checks owned by idle Agents. Responses from an obsolete stream generation, invalidated participant, changed scope, disposed Agent, or cancelled operation cannot authorize execution. Accepted queue entries survive an individual actor’s cancellation and remain parked until a new waking send; reconnection does not replay effects.
 
 An idle Agent's owned running or stopping jobs retain their required qualifications until they settle. When its last owned job settles, the provider clears cached qualifications for that idle Agent. Revocation stops those jobs through the existing Jobs service and waits within `jobStopTimeoutMs`; a job that remains active produces a cleanup failure, not a successful-stop result.
 
-Provider disposal aborts its transport lifetime and drains owned checks. Operation signals bound individual authorization and relay requests. The owning executor remains responsible for terminating and draining its work after cancellation.
+Provider disposal aborts its transport lifetime and drains owned checks. Operation signals bound individual authorization and relay requests, including waits for Session registration and inheritance restoration. Cancelling one caller's wait preserves the shared registration needed by another caller. Message entry also cancels its own inheritance restoration. The owning executor remains responsible for terminating and draining its work after cancellation.
+
+Denied Gateway replies and invalid update streams request response cancellation without waiting for its acknowledgement. Response cleanup cannot postpone revocation or replace the permission failure. Terminal revocation still waits for its process owner to confirm cleanup. See the [response and revocation decision](../../../.agents/notes/implemented/bug-fix/2026-11-01-gateway-revocation-response.md).
 
 
 <a id="further-exploration"></a>
@@ -72,11 +78,19 @@ Provider disposal aborts its transport lifetime and drains owned checks. Operati
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as authorization adds no prompt or tool schema; each consumer owns its refusal output.
+### Desktop environment guidance
+
+#### What the model sees
+
+Without a registered desktop driver, `desktop-availability` adds a logged system instruction that explains the missing graphical session or disabled driver and forbids local desktop actions. It keeps file, terminal and separately configured headless-browser tools independent. The execution provider adds no identity metadata or tool schema to model content; a registered desktop provider owns its own guidance.
+
+#### Token effect
+
+The fixed environment instruction adds system-prompt tokens while no desktop driver is registered. It creates no desktop tools.
 
 #### KV Cache effect
 
-None; authorization references remain outside model request content and do not alter its prefix.
+Authorization references remain outside model request content. Environment guidance stays stable while the detected environment and provider registration remain unchanged.
 
 ## Known Limitations and Deferred Work
 

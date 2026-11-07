@@ -37,6 +37,21 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/resource-budget"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../subprocess/subprocess-local"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../attachment/attachment"
     }
   ]
 }

@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-whole-gateway-current",
+  "cwd": ".",
+  "command": "npm test --prefix gateway -- --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T21:49:15.895805+00:00",
+  "seconds": 48.735,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ee387131d760802680f97a753e6c970f83b99ddae1bbbd21aaa17351d4e37737",
+  "inputsAfter": "ee387131d760802680f97a753e6c970f83b99ddae1bbbd21aaa17351d4e37737",
+  "postgresToolDirectory": null,
+  "outputSha256": "5fdd07a8c66d64dd13445ca5b7c99654b4231a56f7462bb51d23ae00711542ca",
+  "outputTail": "\n> test\n> vitest run --exclude tests/postgres.spec.ts --exclude tests/auth-postgres.spec.ts --exclude tests/project-activity-postgres.spec.ts --exclude tests/project-progress-postgres.spec.ts --exclude tests/project-service-postgres.spec.ts --exclude tests/access-invalidation.spec.ts --exclude tests/execution.spec.ts --exclude tests/ssh.spec.ts --exclude tests/webhook.spec.ts --exclude tests/maintenance.spec.ts --exclude tests/deployment-restore.spec.ts --exclude tests/deployment-backups.spec.ts --exclude tests/node-config-process.spec.ts --exclude tests/startup-generation.spec.ts --exclude tests/execution-scopes.spec.ts --exclude tests/admin-business-postgres.spec.ts --exclude tests/instance-capacity-postgres.spec.ts --retry=0 --maxWorkers=2\n\n\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  69 passed | 3 skipped (72)\n      Tests  818 passed | 93 skipped (911)\n   Start at  05:49:17\n   Duration  47.15s (transform 2.53s, setup 0ms, import 6.56s, tests 82.50s, environment 3ms)\n\n"
+}

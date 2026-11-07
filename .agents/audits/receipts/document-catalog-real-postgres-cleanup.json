@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-real-postgres-cleanup",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/vitest run tests/document-catalog-maintenance.spec.ts",
+  "startedAt": "2026-10-26T21:10:09.370139+00:00",
+  "seconds": 5.736,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ccbf0ddafb52f8ffbec658630ef2510d65224ef2f1e2b37e39f520cec16ce642",
+  "inputsAfter": "ccbf0ddafb52f8ffbec658630ef2510d65224ef2f1e2b37e39f520cec16ce642",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "9d317db6c7e70f88ac9b3b95b98512626c3553fc8ad415180096b81f4d8fb9d1",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  05:10:12\n   Duration  2.67s (transform 1.63s, setup 0ms, import 2.02s, tests 456ms, environment 0ms)\n\n"
+}

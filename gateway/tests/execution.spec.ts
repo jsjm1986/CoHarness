@@ -1,3 +1,4 @@
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { DesktopAccess, desktopPolicyOwner } from '../src/desktop-access.ts'
 import { TerminalAccess, terminalPolicyOwner } from '../src/terminal-access.ts'
 import { createHash, randomUUID } from 'node:crypto'
@@ -11,17 +12,30 @@ import { barrier } from './barrier.ts'
 import { createExecutionFixture, type Receipt } from './execution-fixture.ts'
 import { PRINCIPAL_HEADER } from '../src/principal.ts'
 import { PostgresWebhookDeliveryService, type WebhookEndpointId } from '../src/postgres/webhook-delivery-service.ts'
+import { PostgresWebhookEndpointService, WebhookSecretCipher } from '../src/postgres/webhook-endpoint-service.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 let pool: Pool
 let cleanup: Array<() => Promise<unknown> | void> = []
 afterEach(async () => { for (const dispose of cleanup.reverse()) await dispose(); cleanup = [] })
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex')
-async function fixture(options: { executionWatchHeartbeatMs?: number } = {}) {
+async function fixture(options: { executionWatchHeartbeatMs?: number; executionWatchAuthorizationTimeoutMs?: number;
+  nodeConnection?: { id: string; epoch: number } } = {}) {
   const value = await createExecutionFixture(pool, options)
   cleanup.push(value.dispose)
   return value
+}
+
+async function endpointFor(f: Awaited<ReturnType<typeof fixture>>, kind: 'user' | 'project' = 'user'): Promise<{ endpointId: WebhookEndpointId; configurationRevision: string }> {
+  const service = new PostgresWebhookEndpointService(f.context, new WebhookSecretCipher(Buffer.alloc(32, 7)))
+  const created = await service.create(f.admin.id, { name: `fixture-${randomUUID()}`, provider: 'github', source: 'fixture',
+    events: [], actions: [], repositories: [], titleTemplate: 'Fixture event', promptTemplate: 'Fixture prompt', workspacePath: '/unused',
+    agentPreset: 'default', permissionPreset: 'default', executionUserId: f.admin.id, runtimeKind: kind,
+    runtimePublicId: kind === 'user' ? f.admin.id : f.project.id, intakeLimit: 100, intakeWindowMs: 60_000, replayWindowMs: 60_000,
+    maxBodyBytes: 1024, secret: 'fixture-signing-secret' })
+  const enabled = (await service.mutate({ targetId: created.publicId, revision: created.revision, action: 'enable' }, f.admin.id))!
+  return { endpointId: enabled.id as WebhookEndpointId, configurationRevision: enabled.revision }
 }
 
 describePg('Gateway execution identities', () => {
@@ -32,32 +46,36 @@ describePg('Gateway execution identities', () => {
   })
   afterAll(async () => { await pool?.end() })
 
-  it('reserves each webhook delivery once across Gateway nodes and never replays an unknown result', async () => {
+  it('reserves each webhook delivery once across Gateway coordinators and refuses a foreign computer', async () => {
     const f = await fixture()
     const node = await pool.query<{ id: string }>('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2) RETURNING id', [f.organizationId, randomUUID()])
     const first = new PostgresWebhookDeliveryService(f.context)
-    const second = new PostgresWebhookDeliveryService({ ...f.context, nodeId: node.rows[0]!.id })
-    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'delivery-1', requestHash: hash('body+signed-event'),
-      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const second = new PostgresWebhookDeliveryService(f.context)
+    const foreign = new PostgresWebhookDeliveryService({ ...f.context, nodeId: node.rows[0]!.id })
+    const input = { ...await endpointFor(f), deliveryId: 'delivery-1', requestHash: hash('body+signed-event'),
+      executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id, runtimeId: f.personal.runtimeId }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
     const results = await Promise.all([first.reserve(input), second.reserve(input)])
     expect(results.filter(result => result.dispatch)).toHaveLength(1)
     expect(results[0]!.receipt.id).toBe(results[1]!.receipt.id)
-    const winner = results[0]!.dispatch ? first : second, loser = results[0]!.dispatch ? second : first
-    await expect(loser.complete(input.endpointId, results[0]!.receipt.id, { state: 'submitted', sessionId: 's' })).rejects.toMatchObject({ status: 404 })
+    const winner = results[0]!.dispatch ? first : second
+    await expect(foreign.reserve(input)).rejects.toMatchObject({ status: 409 })
+    await expect(foreign.complete(input.endpointId, results[0]!.receipt.id, { state: 'submitted', sessionId: 's' })).rejects.toMatchObject({ status: 404 })
     await winner.complete(input.endpointId, results[0]!.receipt.id, { state: 'unknown', errorCode: 'runtime-timeout' })
-    expect(await first.reserve({ ...input, configurationRevision: '2' })).toMatchObject({ dispatch: false, receipt: { state: 'unknown', configurationRevision: '1' } })
+    await pool.query('UPDATE harness.webhook_endpoints SET revision=revision+1 WHERE organization_id=$1 AND id=$2', [f.organizationId, input.endpointId])
+    expect(await first.reserve({ ...input, configurationRevision: String(Number(input.configurationRevision) + 1) })).toMatchObject({ dispatch: false, receipt: { state: 'unknown', configurationRevision: input.configurationRevision } })
     await expect(first.reserve({ ...input, requestHash: hash('other-body') })).rejects.toMatchObject({ status: 409 })
     await expect(winner.complete(input.endpointId, results[0]!.receipt.id, { state: 'submitted', sessionId: 's' })).rejects.toMatchObject({ status: 409 })
     expect((await winner.complete(input.endpointId, results[0]!.receipt.id, { state: 'unknown', errorCode: 'runtime-timeout' })).state).toBe('unknown')
   })
 
-  it('deduplicates a signed body across nodes and retains delivery aliases after the window expires', async () => {
+  it('deduplicates a signed body across Gateway coordinators and retains delivery aliases after the window expires', async () => {
     const f = await fixture()
     const node = await pool.query<{ id: string }>('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2) RETURNING id', [f.organizationId, randomUUID()])
     const first = new PostgresWebhookDeliveryService(f.context)
-    const second = new PostgresWebhookDeliveryService({ ...f.context, nodeId: node.rows[0]!.id })
-    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'first', requestHash: hash('same signed body'),
-      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id },
+    const second = new PostgresWebhookDeliveryService(f.context)
+    const foreign = new PostgresWebhookDeliveryService({ ...f.context, nodeId: node.rows[0]!.id })
+    const input = { ...await endpointFor(f), deliveryId: 'first', requestHash: hash('same signed body'),
+      executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id, runtimeId: f.personal.runtimeId },
       limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
     const results = await Promise.all([first.reserve(input), second.reserve({ ...input, deliveryId: 'second' })])
     expect(results.filter(result => result.dispatch)).toHaveLength(1)
@@ -69,6 +87,7 @@ describePg('Gateway execution identities', () => {
       expect(await second.reserve({ ...input, deliveryId })).toMatchObject({ dispatch: false, receipt: { state: 'ignored' } })
       await expect(second.reserve({ ...input, deliveryId, requestHash: hash('changed body') })).rejects.toMatchObject({ status: 409 })
     }
+    await expect(foreign.reserve(input)).rejects.toMatchObject({ status: 409 })
     const aliases = await pool.query('SELECT receipt_id FROM harness.webhook_delivery_aliases WHERE organization_id=$1 AND endpoint_id=$2', [f.organizationId, input.endpointId])
     expect(aliases.rows).toEqual([{ receipt_id: results[0]!.receipt.id }])
     const budget = await pool.query('SELECT accepted FROM harness.webhook_intake_windows WHERE organization_id=$1 AND endpoint_id=$2', [f.organizationId, input.endpointId])
@@ -77,8 +96,8 @@ describePg('Gateway execution identities', () => {
 
   it('expires body deduplication independently of the intake budget, preserving unresolved reservations', async () => {
     const f = await fixture(), service = new PostgresWebhookDeliveryService(f.context)
-    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'first', requestHash: hash('same body'),
-      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id },
+    const input = { ...await endpointFor(f), deliveryId: 'first', requestHash: hash('same body'),
+      executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id, runtimeId: f.personal.runtimeId },
       limit: 10, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
     const first = await service.reserve(input)
     await pool.query("UPDATE harness.webhook_delivery_receipts SET received_at=now()-interval '2 minutes' WHERE id=$1", [first.receipt.id])
@@ -92,15 +111,15 @@ describePg('Gateway execution identities', () => {
     await pool.query("UPDATE harness.webhook_delivery_receipts SET received_at=now()-interval '2 minutes' WHERE id=$1", [known.receipt.id])
     expect((await service.reserve({ ...otherBody, deliveryId: 'outside-window' })).dispatch).toBe(true)
     expect((await service.reserve({ ...otherBody, deliveryId: 'inside-window' })).dispatch).toBe(false)
-    expect((await service.reserve({ ...input, endpointId: randomUUID() as WebhookEndpointId })).dispatch).toBe(true)
+    expect((await service.reserve({ ...input, ...await endpointFor(f) })).dispatch).toBe(true)
     await expect(service.reserve({ ...input, replayWindowMs: 0, event: { name: 'push', payload: {} } })).rejects.toMatchObject({ status: 400 })
     await expect(service.reserve({ ...input, replayWindowMs: 1.5 })).rejects.toMatchObject({ status: 400 })
   })
 
   it('enforces a shared webhook delivery budget without charging duplicates or carrying expired windows', async () => {
     const f = await fixture(), service = new PostgresWebhookDeliveryService(f.context)
-    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'first', requestHash: hash('body'),
-      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'project' as const, id: f.project.id }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const input = { ...await endpointFor(f, 'project'), deliveryId: 'first', requestHash: hash('body'),
+      executionUserUuid: f.admin.uuid, target: { kind: 'project' as const, id: f.project.id, runtimeId: f.project.runtimeId }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
     const attempts = await Promise.allSettled([service.reserve(input), service.reserve({ ...input, deliveryId: 'second', requestHash: hash('second body') })])
     expect(attempts.filter(result => result.status === 'fulfilled')).toHaveLength(1)
     expect(attempts.filter(result => result.status === 'rejected')).toEqual([expect.objectContaining({ reason: expect.objectContaining({ status: 429 }) })])
@@ -117,8 +136,8 @@ describePg('Gateway execution identities', () => {
   it('binds webhook delivery completion to organization and endpoint and records admission separately from success', async () => {
     const f = await fixture(), other = await fixture()
     const service = new PostgresWebhookDeliveryService(f.context)
-    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'same-id', requestHash: hash('body'),
-      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const input = { ...await endpointFor(f), deliveryId: 'same-id', requestHash: hash('body'),
+      executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id, runtimeId: f.personal.runtimeId }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
     const reserved = await service.reserve(input)
     for (const [organizationId, endpointId] of [[other.organizationId, input.endpointId], [f.organizationId, randomUUID()]]) {
       await expect(pool.query(`INSERT INTO harness.webhook_delivery_aliases(organization_id,endpoint_id,delivery_id,receipt_id)
@@ -131,25 +150,26 @@ describePg('Gateway execution identities', () => {
     expect(await service.complete(input.endpointId, reserved.receipt.id, { state: 'submitted', sessionId: 's' })).toMatchObject({ state: 'submitted', sessionId: 's', errorCode: null })
     expect((await service.reserve(input)).dispatch).toBe(false)
     await expect(service.complete(input.endpointId, reserved.receipt.id, { state: 'submitted', sessionId: 'another' })).rejects.toMatchObject({ status: 409 })
-    expect((await new PostgresWebhookDeliveryService(other.context).reserve({ ...input, executionUserUuid: other.admin.uuid, target: { kind: 'user', id: other.admin.id } })).dispatch).toBe(true)
-    const ignoredEndpoint = randomUUID() as WebhookEndpointId
+    await expect(new PostgresWebhookDeliveryService(other.context).reserve({ ...input, executionUserUuid: other.admin.uuid, target: { kind: 'user', id: other.admin.id, runtimeId: other.personal.runtimeId } })).rejects.toMatchObject({ status: 404 })
+    expect((await new PostgresWebhookDeliveryService(other.context).reserve({ ...input, ...await endpointFor(other), executionUserUuid: other.admin.uuid, target: { kind: 'user', id: other.admin.id, runtimeId: other.personal.runtimeId } })).dispatch).toBe(true)
+    const { endpointId: ignoredEndpoint } = await endpointFor(f)
     const ignored = await service.reserve({ ...input, endpointId: ignoredEndpoint })
     expect(await service.complete(ignoredEndpoint, ignored.receipt.id, { state: 'ignored' })).toMatchObject({ state: 'ignored', sessionId: null, errorCode: null })
   })
 
   it('pages webhook delivery receipts without crossing endpoints or exposing execution payloads', async () => {
     const f = await fixture(), service = new PostgresWebhookDeliveryService(f.context)
-    const endpoint = randomUUID() as WebhookEndpointId
-    const input = { endpointId: endpoint, deliveryId: 'first', requestHash: hash('private body'),
-      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id }, limit: 10, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const { endpointId: endpoint, configurationRevision } = await endpointFor(f)
+    const input = { endpointId: endpoint, configurationRevision, deliveryId: 'first', requestHash: hash('private body'),
+      executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id, runtimeId: f.personal.runtimeId }, limit: 10, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
     const first = await service.reserve(input)
     const second = await service.reserve({ ...input, deliveryId: 'second', requestHash: hash('second body') })
-    const page = await service.list(endpoint, undefined, 1)
+    const page = await service.list(f.admin.id, endpoint, undefined, 1)
     expect(page).toEqual({ items: [second.receipt], nextCursor: second.receipt.id })
-    expect(await service.list(endpoint, page.nextCursor, 1)).toEqual({ items: [first.receipt], nextCursor: null })
-    expect(await service.list(randomUUID())).toEqual({ items: [], nextCursor: null })
-    await expect(service.list(randomUUID(), first.receipt.id)).rejects.toMatchObject({ status: 400 })
-    await expect(service.list(endpoint, undefined, 101)).rejects.toMatchObject({ status: 400 })
+    expect(await service.list(f.admin.id, endpoint, page.nextCursor, 1)).toEqual({ items: [first.receipt], nextCursor: null })
+    expect(await service.list(f.admin.id, randomUUID())).toEqual({ items: [], nextCursor: null })
+    await expect(service.list(f.admin.id, randomUUID(), first.receipt.id)).rejects.toMatchObject({ status: 400 })
+    await expect(service.list(f.admin.id, endpoint, undefined, 101)).rejects.toMatchObject({ status: 400 })
     await expect(service.reserve({ ...input, requestHash: 'unhashed' })).rejects.toMatchObject({ status: 400 })
     expect(JSON.stringify(page)).not.toContain(input.requestHash)
     expect(JSON.stringify(page)).not.toContain(input.executionUserUuid)
@@ -159,7 +179,7 @@ describePg('Gateway execution identities', () => {
     const f = await fixture(), id = await f.session()
     const dispatch = async (action: string, body: unknown) => {
       const assertion = f.principals.issueWebhookDispatch({
-        user: f.admin, runtime: { kind: f.project.kind, id: f.project.id, generation: f.project.generation },
+        user: f.admin, runtime: { kind: f.project.kind, id: f.project.id, generation: f.project.generation, runtimeId: f.project.runtimeId },
         scope: { kind: 'project', projectId: f.project.id, projectName: 'Project', mode: 'ro' },
       }, 60_000)
       const response = await fetch(`${f.base}/internal/runtime/execution/${action}`, { method: 'POST',
@@ -178,7 +198,7 @@ describePg('Gateway execution identities', () => {
     const runtimeApi = await fetch(`${f.base}/internal/runtime/ssh/resolve`, { method: 'POST',
       headers: { authorization: `Bearer ${f.project.token}`, 'content-type': 'application/json',
         [PRINCIPAL_HEADER]: f.principals.issueWebhookDispatch({
-          user: f.admin, runtime: { kind: f.project.kind, id: f.project.id, generation: f.project.generation },
+          user: f.admin, runtime: { kind: f.project.kind, id: f.project.id, generation: f.project.generation, runtimeId: f.project.runtimeId },
           scope: { kind: 'project', projectId: f.project.id, projectName: 'Project', mode: 'ro' },
         }, 60_000) },
       body: JSON.stringify({}) })
@@ -190,7 +210,7 @@ describePg('Gateway execution identities', () => {
     const f = await fixture()
     const domain = kind === 'terminal-admin' ? 'terminal-management' : 'plugin-management'
     const request = async (person = f.admin, purpose: 'terminal-admin' | 'plugin-admin' | null = kind, path = domain, runtime = f.peerPersonal) => {
-      const assertion = f.principals.issue({ user: person, runtime: { kind: runtime.kind, id: runtime.id, generation: runtime.generation },
+      const assertion = f.principals.issue({ user: person, runtime: { kind: runtime.kind, id: runtime.id, generation: runtime.generation, runtimeId: runtime.runtimeId },
         scope: runtime.kind === 'user' ? { kind: 'personal' } : { kind: 'project', projectId: runtime.id, projectName: 'project', mode: 'ro' },
         ...(purpose === null ? {} : { purpose }) })
       const response = await fetch(`${f.base}/internal/runtime/${path}/authorize`, { method: 'POST',
@@ -311,7 +331,7 @@ describePg('Gateway execution identities', () => {
     cleanup.push(f.accessMonitor.subscribe(invalidated))
     await policies.set({ kind: 'user', id: f.member.id }, false, '1')
     await f.accessMonitor.synchronize()
-    expect(invalidated).toHaveBeenCalledWith({ userId: f.member.id })
+    expect(invalidated).toHaveBeenCalledWith({ userId: f.member.id, nodeId: f.context.nodeId })
     expect((await f.call('authorize', { sessionId: id, capability: 'desktop' })).status).toBe(403)
   })
 
@@ -683,10 +703,10 @@ describePg('Gateway execution identities', () => {
     const receipt = await f.admit(id, f.member)
     await f.enter(id, receipt)
     expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(403)
-    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,user_id,enabled,revision,node_id) VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))',
       [f.organizationId, f.member.uuid])
     expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(403)
-    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,project_id,enabled,revision) VALUES($1,$2,true,1)',
+    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,project_id,enabled,revision,node_id) VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))',
       [f.organizationId, f.project.uuid])
     expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(200)
     expect((await f.call('selection', { sessionId: id, capability: 'plugin-management' }, f.member)).status).toBe(204)
@@ -700,10 +720,10 @@ describePg('Gateway execution identities', () => {
     const receipt = await f.admit(id, f.member)
     await f.enter(id, receipt)
     expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
-    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision,node_id) VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))',
       [f.organizationId, f.member.uuid])
     expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
-    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,project_id,enabled,revision) VALUES($1,$2,true,1)',
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,project_id,enabled,revision,node_id) VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))',
       [f.organizationId, f.project.uuid])
     expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(200)
     await pool.query('UPDATE harness.memory_access_policies SET enabled=false,revision=revision+1 WHERE organization_id=$1 AND user_id=$2',
@@ -716,9 +736,9 @@ describePg('Gateway execution identities', () => {
     const receipt = await f.admit(id, f.admin)
     await f.enter(id, receipt)
     expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
-    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision,node_id) VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))',
       [f.organizationId, f.admin.uuid])
-    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,project_id,enabled,revision) VALUES($1,$2,true,1)',
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,project_id,enabled,revision,node_id) VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))',
       [f.organizationId, f.project.uuid])
     expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(200)
     // Writable membership binds non-administrator actors; administrators keep
@@ -729,7 +749,7 @@ describePg('Gateway execution identities', () => {
     const memberReceipt = await f.admit(id, f.member)
     await f.enter(id, memberReceipt)
     expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
-    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision,node_id) VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))',
       [f.organizationId, f.member.uuid])
     expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(200)
     await pool.query("UPDATE harness.project_members SET access_mode='ro' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.member.uuid])
@@ -750,7 +770,7 @@ describePg('Gateway execution identities', () => {
     const receipt = await f.admit(id, f.admin)
     await f.enter(id, receipt)
     expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(200)
-    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,user_id,enabled,revision,node_id) VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))',
       [f.organizationId, f.member.uuid])
     expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(200)
   })
@@ -765,9 +785,9 @@ describePg('Gateway execution identities', () => {
       sessionId: child, inputIds: state.inputs, primaryActorUserId: f.admin.id }
     await expect(verifyExecutionAttribution(pool, attribution)).resolves.toBeUndefined()
     await expect(verifyExecutionAttribution(pool, { ...attribution, primaryActorUserId: f.member.id })).rejects.toThrow('unrelated primary')
-    await expect(verifyExecutionAttribution(pool, { ...attribution, inputIds: [randomUUID()] })).rejects.toThrow('unentered')
-    await expect(verifyExecutionAttribution(pool, { ...attribution, sessionId: randomUUID() })).rejects.toThrow('unentered')
-    await expect(verifyExecutionAttribution(pool, { ...attribution, runtime: { kind: 'project', id: f.other.id } })).rejects.toThrow('unentered')
+    await expect(verifyExecutionAttribution(pool, { ...attribution, inputIds: [randomUUID()] })).rejects.toThrow('belongs to another runtime')
+    await expect(verifyExecutionAttribution(pool, { ...attribution, sessionId: randomUUID() })).rejects.toThrow('belongs to another runtime')
+    await expect(verifyExecutionAttribution(pool, { ...attribution, runtime: { kind: 'project', id: f.other.id } })).rejects.toThrow('belongs to another runtime')
     await expect(verifyExecutionAttribution(pool, { ...attribution, inputIds: [] })).rejects.toThrow('requires witnesses')
   })
 
@@ -924,6 +944,60 @@ describePg('Gateway execution identities', () => {
     expect((await f.call('question', { sessionId: id, questionId, answer: { different: true } }, actor, runtime)).status).toBe(409)
     if (kind === 'project') expect((await f.call('question', { sessionId: id, questionId, answer }, f.admin)).status).toBe(409)
     expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' }, undefined, runtime)).status).toBe(kind === 'project' ? 403 : 200)
+  })
+
+  it('closes an execution watch on expired node authority even when its change hint is lost', async () => {
+    const f = await fixture({ executionWatchHeartbeatMs: 10, nodeConnection: { id: randomUUID(), epoch: 1 } })
+    const subscribe = f.accessMonitor.subscribe.bind(f.accessMonitor)
+    // Drop only this hint; periodic credential checks must still detect expiration.
+    f.accessMonitor.subscribe = listener => subscribe(subject => subject.nodeId === f.context.nodeId ? undefined : listener(subject))
+    const response = await fetch(`${f.base}/internal/runtime/execution/watch`, {
+      headers: f.headers(f.project), signal: AbortSignal.timeout(5_000),
+    })
+    const reader = response.body!.getReader()
+    try {
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain('"type":"ready"')
+      await pool.query("UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE node_id=$1", [f.context.nodeId])
+      for (;;) {
+        const ended = await reader.read().then(chunk => chunk.done, () => true)
+        if (ended) break
+      }
+      expect(await f.instances.authenticateRuntimeToken(f.project.token)).toBeNull()
+      expect(await f.instances.authenticateRuntimeCleanupToken(f.project.token)).not.toBeNull()
+      await pool.query(`UPDATE harness.node_agents SET connection_id=$2,connection_epoch=2,
+        lease_expires_at=clock_timestamp()+interval '1 hour' WHERE node_id=$1`, [f.context.nodeId, randomUUID()])
+      const stale = await fetch(`${f.base}/internal/runtime/execution/watch`, { headers: f.headers(f.project) })
+      try { expect(stale.status).toBe(401) } finally { await stale.body?.cancel() }
+      expect(await f.instances.stateOf({ kind: 'project', id: f.project.id })).toBe('ready')
+    } finally {
+      await reader.cancel().catch(() => { /* node expiration deliberately errors this stream */ })
+      reader.releaseLock()
+    }
+  })
+
+  it('closes a stalled authority read without overlapping checks or publishing another heartbeat', async () => {
+    const f = await fixture({ executionWatchHeartbeatMs: 5, executionWatchAuthorizationTimeoutMs: 25 })
+    const response = await fetch(`${f.base}/internal/runtime/execution/watch`, {
+      headers: f.headers(f.project), signal: AbortSignal.timeout(5_000),
+    })
+    const reader = response.body!.getReader(), entered = barrier(), release = barrier(), settled = barrier()
+    const authenticate = f.instances.authenticateRuntimeToken.bind(f.instances)
+    const check = vi.spyOn(f.instances, 'authenticateRuntimeToken').mockImplementation(async token => {
+      entered.resolve()
+      try { await release.promise; return await authenticate(token) } finally { settled.resolve() }
+    })
+    try {
+      await entered.promise
+      for (;;) {
+        const ended = await reader.read().then(chunk => chunk.done, () => true)
+        if (ended) break
+      }
+      expect(check).toHaveBeenCalledTimes(1)
+    } finally {
+      release.resolve(); await settled.promise; check.mockRestore()
+      await reader.cancel().catch(() => { /* the authority deadline deliberately errors the stream */ })
+      reader.releaseLock()
+    }
   })
 
   it('streams ready and revocation hints without a principal or runtime acknowledgment', async () => {

@@ -10,10 +10,13 @@ import { watchConfig } from '../src/watch-config.ts'
 import Hmr from '../src/index.ts'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
+import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { FSWatcher, type ChokidarOptions } from 'chokidar'
 
-const configWatch = vi.hoisted(() => ({ create: undefined as ((options?: ChokidarOptions) => FSWatcher) | undefined }))
+const configWatch = vi.hoisted(() => ({
+  create: undefined as ((paths: string | string[], options?: ChokidarOptions) => FSWatcher) | undefined,
+}))
 vi.mock('node:fs', async (importOriginal) => {
   const native = await importOriginal<typeof import('node:fs')>()
   return { ...native, realpathSync: vi.fn(native.realpathSync) }
@@ -25,7 +28,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 vi.mock('chokidar', async (importOriginal) => {
   const native = await importOriginal<typeof import('chokidar')>()
   return { ...native, watch: (paths: string | string[], options?: ChokidarOptions) =>
-    configWatch.create === undefined ? native.watch(paths, options) : configWatch.create(options) }
+    configWatch.create === undefined ? native.watch(paths, options) : configWatch.create(paths, options) }
 })
 
 /** Every per-test tree root, removed once the booted watcher has been disposed. */
@@ -80,6 +83,42 @@ describe('HMR exact config paths', () => {
     for (const root of hmrRoots.splice(0)) rmSync(root, { recursive: true, force: true })
   })
 
+  it.for([false, true])('excludes siblings while observing config replacement through an alias (missing parents: %s)', async (missingParents, test) => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-scope-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const target = join(root, 'target')
+    const dir = join(root, 'alias')
+    mkdirSync(target)
+    symlinkSync(target, dir, process.platform === 'win32' ? 'junction' : 'dir')
+    const filename = join(dir, ...(missingParents ? ['later', 'nested'] : []), 'package.json')
+    writeFileSync(join(dir, 'package.json.lock'), 'held')
+    mkdirSync(join(dir, 'unrelated'))
+    writeFileSync(join(dir, 'unrelated', 'config.yml'), 'ignored')
+    if (!missingParents) writeFileSync(filename, 'initial')
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    let watcher!: FSWatcher
+    const previousFactory = configWatch.create
+    onTestFinished(() => { configWatch.create = previousFactory })
+    configWatch.create = (paths, options) => {
+      watcher = new FSWatcher(options)
+      return watcher.add(paths)
+    }
+    const observed: string[] = []
+    await watchConfig(ctx, filename, {}, () => { observed.push(readFileSync(filename, 'utf8')) })
+    const watchedEntries = () => Object.values(watcher.getWatched()).flat()
+    expect(watchedEntries()).not.toContain('package.json.lock')
+    expect(watchedEntries()).not.toContain('unrelated')
+    ensureNativeWatchLive(dir)
+    await writeFileAtomic(filename, 'created', { mode: 0o600 })
+    await eventually(() => observed.includes('created'), 'created config was not observed', test.task.timeout)
+    await writeFileAtomic(filename, 'replaced', { mode: 0o600 })
+    await eventually(() => observed.includes('replaced'), 'replaced config was not observed', test.task.timeout)
+    expect(watchedEntries()).toContain('package.json')
+    expect(watchedEntries()).not.toContain('package.json.lock')
+    expect(watchedEntries()).not.toContain('unrelated')
+  })
+
   it.each(['relative', 'absolute'])('observes %s module roots through a filesystem alias', { timeout: 30_000 }, async (rootKind) => {
     const target = mkdtempSync(join(tmpdir(), 'dsh-hmr-module-canonical-'))
     const alias = `${target}-alias`
@@ -121,8 +160,8 @@ describe('HMR exact config paths', () => {
     symlinkSync(target, alias, process.platform === 'win32' ? 'junction' : 'dir')
     const ctx = await bootHmr(alias)
     try {
-      await watchConfig(ctx, join(alias, 'plugins.yml'), {}, () => {})
-      await expect(watchConfig(ctx, join(await realpath(target), 'plugins.yml'), {}, () => {}))
+      await ctx.hmr.watchConfig(join(alias, 'plugins.yml'), async () => {})
+      await expect(ctx.hmr.watchConfig(join(await realpath(target), 'plugins.yml'), async () => {}))
         .rejects.toThrow('config path already registered')
     } finally {
       await ctx.fiber.dispose()
@@ -252,7 +291,7 @@ describe('HMR exact config paths', () => {
     let watcher!: FSWatcher
     const previousFactory = configWatch.create
     onTestFinished(() => { configWatch.create = previousFactory })
-    configWatch.create = (options) => {
+    configWatch.create = (_paths, options) => {
       watcher = new FSWatcher(options)
       // Use Chokidar's real normalization with deterministic event delivery.
       Reflect.set(watcher, '_readyEmitted', true)
@@ -342,6 +381,27 @@ describe('HMR exact config paths', () => {
     ))).not.toThrow()
   })
 
+  it('retains the watcher startup error when closing that failed watcher also fails', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-patch-close-failure-'))
+    hmrRoots.push(dir)
+    const ctx = await bootHmr(dir)
+    const watcher = new FSWatcher()
+    const failure = new Error('watcher startup failed'), cleanup = new Error('watcher close failed')
+    const close = vi.spyOn(watcher, 'close').mockRejectedValue(cleanup)
+    const previousFactory = configWatch.create
+    configWatch.create = () => { queueMicrotask(() => { watcher.emit('error', failure) }); return watcher }
+    try {
+      const error: unknown = await ctx.hmr.watchConfig(join(dir, 'plugins.yml'), async () => {}).catch((reason: unknown) => reason)
+      expect(error).toBeInstanceOf(AggregateError)
+      expect((error as AggregateError).errors).toEqual([failure, cleanup])
+    } finally {
+      close.mockRestore()
+      configWatch.create = previousFactory
+      await watcher.close()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('closes a ready watcher when its context has already been disposed', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-patch-disposed-'))
     hmrRoots.push(dir)
@@ -358,6 +418,41 @@ describe('HMR exact config paths', () => {
     await expect(watchConfig(ctx, join(dir, 'plugins.yml'), {}, () => {}))
       .rejects.toThrow('cannot create effect on inactive context')
     expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('closes an allocated native configuration watch while readiness is pending', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-patch-pending-ready-'))
+    hmrRoots.push(dir)
+    const filename = join(dir, 'plugins.yml')
+    writeFileSync(filename, '[]')
+    const ctx = await bootHmr(dir)
+    const watcher = new FSWatcher()
+    const emit = watcher.emit.bind(watcher)
+    const nativeReady = Promise.withResolvers<undefined>()
+    vi.spyOn(watcher, 'emit').mockImplementation((event, ...args) => {
+      if (event === 'ready') { nativeReady.resolve(undefined); return false }
+      return Boolean(Reflect.apply(emit, watcher, [event, ...args]))
+    })
+    const close = vi.spyOn(watcher, 'close')
+    const previousFactory = configWatch.create
+    configWatch.create = paths => watcher.add(paths)
+    const starting = ctx.hmr.watchConfig(filename, async () => {})
+    const outcome = starting.then(dispose => ({ dispose }), (error: unknown) => ({ error }))
+    try {
+      await nativeReady.promise
+      expect(Object.values(watcher.getWatched()).flat()).toContain('plugins.yml')
+      await ctx.fiber.dispose()
+      expect(close).toHaveBeenCalledOnce()
+      expect(watcher.getWatched()).toEqual({})
+      expect(await outcome).toHaveProperty('error.message', 'Configuration watch stopped during startup')
+    } finally {
+      emit('ready')
+      const result = await outcome
+      if ('dispose' in result) await result.dispose()
+      await watcher.close()
+      configWatch.create = previousFactory
+      await ctx.fiber.dispose()
+    }
   })
 
   it.each([42, new Error('42')])('logs refresh failure %s and continues processing later events', async (failure) => {

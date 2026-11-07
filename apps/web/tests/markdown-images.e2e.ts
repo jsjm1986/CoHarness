@@ -362,6 +362,8 @@ describe('web e2e: Markdown image rendering', () => {
     await page.keyboard.press('Escape')
     await hoverImage.waitFor({ state: 'detached' })
 
+    await page.locator('[data-conversation-scroll]').evaluate((host) => { host.scrollTop = host.scrollHeight })
+    await expect.poll(() => page.getByRole('button', { name: 'Back to bottom', exact: true }).count()).toBe(0)
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
       .replace(/ \d{1,2}\/\d{1,2} (?=\{\{clock\}\})/g, ' ')

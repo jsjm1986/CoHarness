@@ -8,5 +8,6 @@
   - img
   - text: Add conversation
 - status:
-  - text: Saved conversation ownership is not verified, so layout edits are disabled. Start any stopped Workspace, then reload the directory.
+  - text: The saved layout needs verified conversation ownership before editing. Reload the directory or confirm the original environments to restore it.
   - button "Reload directory"
+  - button "Confirm original conversation environments"

@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
-import type { GenerateOptions, RequestMessage, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
+import { sameExecutionAuthority, type ExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
+import { LlmError, type GenerateOptions, type RequestMessage, type StreamChunk, type TokenUsage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ReloadableModelAccess } from './access.ts'
@@ -25,7 +26,8 @@ function credentialClass(source: string): UsageRecord['credentialClass'] {
 }
 
 function terminalStatus(chunk: Extract<StreamChunk, { type: 'finish' }>): UsageRecord['status'] {
-  return chunk.reason.kind === 'error' ? 'failed' : chunk.reason.kind === 'aborted' ? 'cancelled' : 'succeeded'
+  if (chunk.reason.kind === 'error') return chunk.reason.failure.code === 'MODEL_FORBIDDEN' ? 'denied' : 'failed'
+  return chunk.reason.kind === 'aborted' ? 'cancelled' : 'succeeded'
 }
 
 function participantIdentity(messages: readonly RequestMessage[]): { userId: number; projectId: number } | undefined {
@@ -47,16 +49,51 @@ function participantIdentity(messages: readonly RequestMessage[]): { userId: num
   return undefined
 }
 
+/** One physical model call retains its issuing service, Agent and billing witnesses. */
+interface ModelExecution {
+  readonly authority: ExecutionAuthority | undefined
+  readonly agent: Agent | undefined
+  readonly deployment: { readonly managed: boolean }
+  readonly identity: GenerateOptions['executionIdentity']
+  readonly signal: GenerateOptions['signal']
+}
+
+/** A replacement service cannot authorize an earlier request or make it unmanaged. */
+function assertExecutionIssuer(ctx: Context, execution: Pick<ModelExecution, 'authority' | 'deployment'>): void {
+  if (!sameExecutionAuthority(ctx.get('executionAuthority'), execution.authority)
+    || (execution.deployment.managed || ctx.get('executionAuthorityRequired') === true) && execution.authority === undefined) {
+    throw new LlmError('The model request execution authority is unavailable or was replaced.', 'MODEL_EXECUTION_IDENTITY_FAILED')
+  }
+}
+
+/** Bind downstream iteration and early closure to this request's own authorization context. */
+function executionStream(
+  requests: AsyncLocalStorage<ModelExecution>,
+  execution: ModelExecution,
+  next: () => AsyncIterable<StreamChunk>,
+): AsyncIterable<StreamChunk> {
+  return {
+    [Symbol.asyncIterator]() {
+      const iterator = requests.run(execution, () => next()[Symbol.asyncIterator]())
+      return {
+        next: () => requests.run(execution, () => iterator.next()),
+        get return() {
+          const close = iterator.return
+          return close === undefined ? undefined : () => requests.run(execution, () => close.call(iterator))
+        },
+      }
+    },
+  }
+}
+
 /** Resolve billing witnesses without borrowing the current browser connection's identity. */
 async function billingExecution(
-  ctx: Context,
   options: GenerateOptions,
-  initiator: Agent | undefined,
+  agent: Agent | undefined,
+  authority: ExecutionAuthority | undefined,
 ): Promise<{ managed: boolean; identity: GenerateOptions['executionIdentity'] }> {
-  const authority = executionAuthorityOf(ctx)
   if (options.executionIdentity !== undefined) return { managed: authority !== undefined, identity: options.executionIdentity }
   if (authority === undefined) return { managed: false, identity: undefined }
-  const agent = initiator ?? (options.sessionId === undefined ? undefined : ctx.get('agents')?.get(options.sessionId))
   if (agent === undefined) {
     if (options.purpose === 'auto-review') throw new Error('Auto review has no executing Agent for attribution')
     // Configuration probes and cold auxiliary requests have no live Agent; retain explicit unattributed usage.
@@ -71,13 +108,30 @@ export function apply(ctx: Context): void {
   const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
   const policyPath = process.env.DSH_MODEL_GOVERNANCE ?? join(home, 'model-governance.json')
   const policy = loadPolicy(policyPath)
+  let stopped = false
+  const requests = new AsyncLocalStorage<ModelExecution>()
+  let activeRequests = 0
+  const deployment = { managed: ctx.get('executionAuthorityRequired') === true || ctx.get('executionAuthority') !== undefined }
+  ctx.inject(['executionAuthority'], () => { deployment.managed = true })
+  ctx.effect(() => () => {
+    stopped = true
+    if (activeRequests === 0) requests.disable()
+  }, 'model-governance: retained request context')
   const userDeclared = new UserDeclaredRoutes()
   const access = new ReloadableModelAccess(policy, userDeclared)
   const providerConfig = new ReloadableModelProviderConfig(ctx, {
     revision: policy.version,
     providers: policy.providers,
   })
-  ctx.provide('modelAccess', access)
+  ctx.provide('modelAccess', {
+    decide(target) {
+      const execution = requests.getStore()
+      execution?.signal?.throwIfAborted()
+      const decision = access.decide(target)
+      if (decision.allowed && execution !== undefined) assertExecutionIssuer(ctx, execution)
+      return decision
+    },
+  })
   ctx.inject(['credentials', 'gatewayRuntime', 'modelProviderConfig'], (sctx) => {
     const layer = new OrganizationCredentialLayer(sctx.gatewayRuntime, sctx.modelProviderConfig)
     sctx.effect(
@@ -108,12 +162,15 @@ export function apply(ctx: Context): void {
   let personalRuntime = policy.userDeclaredAllowed
   let reloader: PolicyReloader | undefined
   ctx.effect(() => async () => {
+    stopped = true
+    access.unavailable()
     await reloader?.close()
     await outbox.close()
   }, 'model-governance: drain policy reload and usage outbox')
   reloader = new PolicyReloader({
     filename: policyPath,
     onValid: next => {
+      if (stopped) return
       providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), {
         revision: next.version,
         providers: next.providers,
@@ -176,11 +233,53 @@ export function apply(ctx: Context): void {
       }
     })
   })
-  ctx.on('llm/stream', (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>) => {
-    const initiator = ctx.get('agents')?.currentInitiator()
+  const currentAccess = (target: Pick<GenerateOptions, 'provider' | 'model'>) => {
+    if (stopped) return access.decide(target)
+    try { access.replace(loadPolicy(policyPath)) } catch {
+      access.unavailable()
+    }
+    return access.decide(target)
+  }
+  ctx.on('llm/pre-dispatch', async (options, next) => {
+    options.signal?.throwIfAborted()
+    const decision = currentAccess(options)
+    if (!decision.allowed) throw new LlmError(decision.reason, 'MODEL_FORBIDDEN')
+    const execution = requests.getStore()
+    if (execution === undefined) throw new LlmError('The model request has no retained execution owner.', 'MODEL_EXECUTION_IDENTITY_FAILED')
+    assertExecutionIssuer(ctx, execution)
+    const authority = execution.authority
+    if (authority !== undefined && (options.purpose === 'auto-review' || options.resourceOrigin !== 'infrastructure')) {
+      authority.current()
+      const agent = execution.agent
+      if (agent !== undefined) {
+        const current = await authority.authorize(options.purpose === 'auto-review' ? 'auto-review' : 'execute', agent, options.signal)
+        options.signal?.throwIfAborted()
+        assertExecutionIssuer(ctx, execution)
+        const identity = execution.identity
+        if (identity !== undefined && (identity.primaryActorUserId !== current.primaryActorUserId
+          || identity.inputs.length !== current.inputs.length || identity.inputs.some(input => !current.inputs.includes(input)))) {
+          throw new LlmError('The model request execution participants changed before dispatch.', 'MODEL_EXECUTION_IDENTITY_FAILED')
+        }
+      }
+      else if (options.purpose === 'auto-review') {
+        throw new LlmError('Auto review requires its executing Agent.', 'MODEL_EXECUTION_IDENTITY_FAILED')
+      }
+    }
+    await next()
+    options.signal?.throwIfAborted()
+    assertExecutionIssuer(ctx, execution)
+  }, { global: true })
+  const meter = (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk> => {
+    const agents = ctx.get('agents')
+    // A maintenance Session trace does not identify an executing user.
+    const infrastructure = options.resourceOrigin === 'infrastructure'
+    const initiator = infrastructure ? undefined : agents?.currentInitiator()
     const initiatorId = initiator?.session.id
     const explicitId = options.sessionId
     const attributedId = explicitId ?? initiatorId
+    const authority = ctx.get('executionAuthority')
+    deployment.managed ||= ctx.get('executionAuthorityRequired') === true || authority !== undefined
+    const billingAgent = infrastructure ? undefined : initiator ?? (explicitId === undefined ? undefined : agents?.get(explicitId))
     const base: Omit<UsageRecord, 'credentialSource' | 'credentialClass' | 'status' | 'usage'> = {
       eventId: randomUUID(), occurredAt: Date.now(), provider: options.provider, model: options.model,
       purpose: options.purpose ?? 'assistant', ...attributedId === undefined ? {} : { sessionId: String(attributedId) },
@@ -194,56 +293,72 @@ export function apply(ctx: Context): void {
       })()
     }
     return (async function* (): AsyncIterable<StreamChunk> {
-      let execution: Awaited<ReturnType<typeof billingExecution>>
+      activeRequests++
       try {
-        execution = await billingExecution(ctx, options, initiator)
-      } catch {
-        // A missing managed provider or refused attribution must not dispatch the model request.
-        enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'failed' })
-        yield { type: 'finish', reason: { kind: 'error', failure: {
-          message: 'model-governance: execution identity could not be verified', code: 'MODEL_EXECUTION_IDENTITY_FAILED',
-        } } }
-        return
-      }
-      if (execution.identity !== undefined) {
-        if (execution.identity.primaryActorUserId === undefined || attributedId === undefined) {
-          enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'failed' })
-          yield { type: 'finish', reason: { kind: 'error', failure: {
-            message: 'model-governance: verified billing inputs require a Session and primary actor', code: 'MODEL_EXECUTION_IDENTITY_FAILED',
+        let execution: Awaited<ReturnType<typeof billingExecution>>
+        let agent: Agent | undefined
+        try {
+          options.signal?.throwIfAborted()
+          assertExecutionIssuer(ctx, { authority, deployment })
+          const captured = infrastructure ? undefined : authority?.current()
+          agent = billingAgent ?? (explicitId === undefined && captured !== undefined ? agents?.get(captured.parentSessionId) : undefined)
+          execution = await billingExecution(options, billingAgent, authority)
+          options.signal?.throwIfAborted()
+          assertExecutionIssuer(ctx, { authority, deployment })
+        } catch {
+          // Cancellation and failed attribution both stop dispatch before any model work.
+          const cancelled = options.signal?.aborted === true
+          enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: cancelled ? 'cancelled' : 'failed' })
+          yield { type: 'finish', reason: { kind: cancelled ? 'aborted' : 'error', failure: {
+            message: cancelled ? 'model-governance: model request cancelled during execution attribution' : 'model-governance: execution identity could not be verified', code: cancelled ? 'ABORTED' : 'MODEL_EXECUTION_IDENTITY_FAILED',
           } } }
           return
         }
-        base.executionInputIds = [...execution.identity.inputs]
-        base.actorUserId = execution.identity.primaryActorUserId
-      } else if (!execution.managed && !personalRuntime) {
-        const actor = participantIdentity(options.messages)
-        if (actor !== undefined) {
-          base.actorUserId = actor.userId
-          base.actorProjectId = actor.projectId
+        if (execution.identity !== undefined) {
+          if (execution.identity.primaryActorUserId === undefined || attributedId === undefined) {
+            enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'failed' })
+            yield { type: 'finish', reason: { kind: 'error', failure: {
+              message: 'model-governance: verified billing inputs require a Session and primary actor', code: 'MODEL_EXECUTION_IDENTITY_FAILED',
+            } } }
+            return
+          }
+          base.executionInputIds = [...execution.identity.inputs]
+          base.actorUserId = execution.identity.primaryActorUserId
+        } else if (!infrastructure && !execution.managed && !personalRuntime) {
+          const actor = participantIdentity(options.messages)
+          if (actor !== undefined) {
+            base.actorUserId = actor.userId
+            base.actorProjectId = actor.projectId
+          }
         }
-      }
-      const decision = access.decide({ provider: options.provider, model: options.model })
-      if (!decision.allowed) {
-        enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'denied' })
-        yield { type: 'finish', reason: { kind: 'error', failure: { message: decision.reason, code: 'MODEL_FORBIDDEN' } } }
-        return
-      }
-      let usage: TokenUsage | undefined
-      let source = 'unknown'
-      let status: UsageRecord['status'] = 'cancelled'
-      try {
-        for await (const chunk of next()) {
-          if (chunk.type === 'usage') { usage = chunk.usage; source = chunk.credentialSource ?? 'unknown' }
-          if (chunk.type === 'finish') status = terminalStatus(chunk)
-          yield chunk
+        const decision = currentAccess(options)
+        if (!decision.allowed) {
+          enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'denied' })
+          yield { type: 'finish', reason: { kind: 'error', failure: { message: decision.reason, code: 'MODEL_FORBIDDEN' } } }
+          return
+        }
+        let usage: TokenUsage | undefined
+        let source = 'unknown'
+        let status: UsageRecord['status'] = 'cancelled'
+        try {
+          for await (const chunk of executionStream(requests, { authority, deployment, agent, identity: execution.identity, signal: options.signal }, next)) {
+            if (chunk.type === 'usage') { usage = chunk.usage; source = chunk.credentialSource ?? 'unknown' }
+            if (chunk.type === 'finish') status = terminalStatus(chunk)
+            yield chunk
+          }
+        } finally {
+          enqueue({
+            ...base, credentialSource: source, credentialClass: credentialClass(source),
+            status: status === 'succeeded' && usage === undefined ? 'missing-usage' : status,
+            ...usage === undefined ? {} : { usage },
+          })
         }
       } finally {
-        enqueue({
-          ...base, credentialSource: source, credentialClass: credentialClass(source),
-          status: status === 'succeeded' && usage === undefined ? 'missing-usage' : status,
-          ...usage === undefined ? {} : { usage },
-        })
+        activeRequests--
+        if (stopped && activeRequests === 0) requests.disable()
       }
     })()
-  })
+  }
+  ctx.on('llm/stream', meter, { global: true })
+  ctx.on('llm/delegated-stream', meter, { global: true })
 }

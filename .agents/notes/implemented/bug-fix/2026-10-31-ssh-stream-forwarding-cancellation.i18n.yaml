@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-ssh-stream-forwarding-cancellation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-ssh-stream-forwarding-cancellation.md
+document:
+  en: 9e910a4a74f65de41877c3f802752184ab35c354
+  zh: d41bb86bcca7f4920c33ba82cb37e584a84470a3
+/agent-note-ssh-stream-rollback-retains-transport-ownership:
+  en: 86e30b1d733da09e
+  zh: 06870e0f029fe3c2
+/agent-note-ssh-stream-rollback-retains-transport-ownership/problem:
+  en: 00fffc86412e740e
+  zh: 1a0431d01300f172
+/agent-note-ssh-stream-rollback-retains-transport-ownership/decision:
+  en: 7151f4b4b57e91f6
+  zh: bffb80b49b664732
+/agent-note-ssh-stream-rollback-retains-transport-ownership/alternatives-considered:
+  en: 8cfca7a171cddad7
+  zh: b0b8abef1b41bcdb
+/agent-note-ssh-stream-rollback-retains-transport-ownership/consequences:
+  en: 77ddc544101d19b2
+  zh: aa427f7280b44bc5
+/agent-note-ssh-stream-rollback-retains-transport-ownership/verification:
+  en: 8e799fde797cfe70
+  zh: bbeca5c58cd96ba0

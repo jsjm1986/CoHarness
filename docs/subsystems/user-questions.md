@@ -112,7 +112,7 @@ interface AskUserQuestionRequestEvent {
   questions: AskUserQuestionItem[]
   /** Agent identity projected to the corresponding Client Context in transit. */
   agent?: Agent
-  /** Cancellation lifetime of the pending request. */
+  /** Cancellation of this question; the service combines caller, service and Agent lifetimes for answerers. */
   signal?: AbortSignal
   /**
    * Tool call the Client card is keyed by. Timed answerers attach to the
@@ -184,7 +184,7 @@ interface UserQuestionProjectionView {
 }
 ```
 
-An open question accepts answers only through the waterfall. Once it is `continued`, the `answer` Remote method queues a user message for the owning agent and wakes it if idle. The message has source `user-question-reply`, outcome `answered`, and an `answer_to_pending_question` payload. The method returns `false` for an open or unknown call, rejects a second queued reply with `REPLY_QUEUED` even after a Host restart, and rejects incomplete or duplicate answer batches with `BAD_ANSWER`. The `user-question-reply` source also admits `outcome: 'dismissed'`, which the projection and the Client conversation node still read for Sessions that recorded one; no current caller produces it.
+An open question accepts answers only through the waterfall. Once it is `continued`, the `answer` Remote method queues a user message for the owning agent and wakes it if idle. The message has source `user-question-reply`, outcome `answered`, and an `answer_to_pending_question` payload. Managed project replies may also carry an authenticated `participant` snapshot; [collaboration context](../../packages/context/collaboration-context/README.md#runtime-contract) turns it into model-visible attribution. The method returns `false` for an open or unknown call, rejects a second queued reply with `REPLY_QUEUED` even after a Host restart, and rejects incomplete or duplicate answer batches with `BAD_ANSWER`. The `user-question-reply` source also admits `outcome: 'dismissed'`, which the projection and the Client conversation node still read for Sessions that recorded one; no current caller produces it.
 
 Closing the Client panel sends nothing. A foreground timeout ends only the tool wait. Continued questions have no deadline; they stay answerable until a reply is admitted.
 
@@ -226,13 +226,14 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
  * @param agent - Live root agent for the owning Session.
  * @param callId - Continued question identity.
  * @param answer - Complete structured answer batch, one item per question of the call.
- * @returns Whether the question is still continued; an accepted reply stays
+ * @param signal - Answer submission cancellation, including Client disconnect.
+ * @returns Whether the question is still continued after caller attestation; an accepted reply stays
  *   queued until the agent admits its user message.
  * @throws {UserQuestionError} `BAD_ANSWER` when the batch does not name each
  *   question of the call exactly once, or `REPLY_QUEUED` when a reply is
  *   already waiting for admission.
  */
-@Remote answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean
+@Remote async answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer, signal: AbortSignal): Promise<boolean>
 
 /**
  * Let one answer UI hold a live timed wait. Closing the stream releases its claim.
@@ -265,11 +266,15 @@ async askTimed( request: AskUserQuestionRequest & { agent: Agent }, callId: Tool
  * decides this boundary: an owned child has no human answerer and would
  * block forever, while a lineage-bearing session resumed as a new runtime
  * root may ask normally.
+ * Answerers receive a signal linked to caller cancellation, service withdrawal
+ * and disposal of that exact Agent. Pending questions prevent idle retirement.
+ * Each continuation and accepted answer rechecks the current caller; late
+ * answers cannot restore a cancelled question.
  *
  * @param request Questions, owner agent, and abort signal.
  * @returns The answer chosen or typed by the human.
  * @throws {UserQuestionError} code `ASK_ABORTED` when the supplied signal
- *   is already or becomes aborted, `CALLER_NOT_LIVE` when a supplied agent
+ *   is already or becomes aborted, or the service is withdrawn; `CALLER_NOT_LIVE` when a supplied agent
  *   is not the registry's exact live instance, or `DELEGATED_CALLER` when
  *   that live agent is owned by another agent.
  */

@@ -1,0 +1,13 @@
+{
+  "name": "mcp-subsystem-pairing-current",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write docs/subsystems/mcp.md",
+  "startedAt": "2026-10-23T17:06:59.370186+00:00",
+  "seconds": 1.995,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9adc87a83a62bb3d5c69368e8564624f0915e27b7085cf9f957de9684897b343",
+  "inputsAfter": "9adc87a83a62bb3d5c69368e8564624f0915e27b7085cf9f957de9684897b343",
+  "outputSha256": "192bc1e570f73eb44ac5b2fee001a8e5414d8dfa1b3df9372632248741592b33",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write docs/subsystems/mcp.md\nverify-translation-pairing: recorded docs/subsystems/mcp.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

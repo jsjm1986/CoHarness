@@ -7,10 +7,28 @@
 
 import { isCompactCheckpointSource } from '@deepseek-ai/dsh-compaction'
 import type { Context } from '@deepseek-ai/cordis'
-import { BlockAssembler, type GenerateOptions } from '@deepseek-ai/dsh-llm'
+import { BlockAssembler, deepFreeze, type FinishReason, type GenerateOptions, type RequestUserInput } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionSurfaceSnapshot } from '@deepseek-ai/dsh-session-query'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
+
+/** Auxiliary handoff input retained in the calling Session before model dispatch. */
+export interface SessionHandoffLlmRequestEventData {
+  /** Authorized Session whose projected conversation supplies the input. */
+  readonly sourceSessionId: SessionId
+  /** Requested auxiliary provider and model. Provider defaults resolve within the model stream. */
+  readonly route: Pick<GenerateOptions, 'provider' | 'model'>
+  /** Exact instruction and projected conversation submitted to the model stream. */
+  readonly messages: RequestUserInput[]
+}
+
+declare module '@deepseek-ai/dsh-session/types' {
+  interface SessionEventMap {
+    /** Log-only pre-dispatch input of an auxiliary session-handoff request. */
+    'session/handoff-llm-request': SessionHandoffLlmRequestEventData
+  }
+}
 
 /** One conversation item projected from a target session's current surface. */
 export interface HandoffItem {
@@ -134,14 +152,16 @@ function extractionTarget(agent: Agent): { provider: string; model: string } | u
  *
  * @param ctx - plugin context used to reach the optional `llm` service and log failures.
  * @param agent - calling agent; supplies the extraction provider/model fallback and session id.
+ * @param sourceSessionId - authorized Session represented by the projected conversation.
  * @param projected - projected conversation items and serialized text.
  * @param config - resolved extraction switch and size budgets.
  * @param signal - caller cancellation; an aborted signal propagates instead of falling back.
- * @returns the capsule markdown, or `undefined` to render the local tail instead.
+ * @returns nonempty capsule markdown after a normal stop, or `undefined` to render the local tail instead.
  */
 export async function extractHandoff(
   ctx: Context,
   agent: Agent,
+  sourceSessionId: SessionId,
   projected: ProjectedConversation,
   config: HandoffConfig,
   signal: AbortSignal,
@@ -151,21 +171,27 @@ export async function extractHandoff(
   if (llm === undefined) return undefined
   const target = extractionTarget(agent)
   if (target === undefined) return undefined
-  const options: GenerateOptions = {
-    provider: target.provider,
-    model: target.model,
-    messages: [{
-      role: 'user',
-      content: [{ type: 'text', text: HANDOFF_INSTRUCTION.replace('{transcript}', projected.text) }],
-    }],
+  const messages: RequestUserInput[] = [{
+    role: 'user',
+    content: [{ type: 'text', text: HANDOFF_INSTRUCTION.replace('{transcript}', () => projected.text) }],
+  }]
+  const options: GenerateOptions = deepFreeze({
+    ...target,
+    messages,
     sessionId: agent.session.id,
     purpose: 'session-handoff',
     signal,
-  }
+  })
   try {
+    agent.session.append('session/handoff-llm-request', { sourceSessionId, route: target, messages })
     const assembler = new BlockAssembler()
-    for await (const chunk of llm.stream(options)) assembler.push(chunk)
+    let finish: FinishReason | undefined
+    for await (const chunk of llm.stream(options)) {
+      assembler.push(chunk)
+      if (chunk.type === 'finish') finish = chunk.reason
+    }
     signal.throwIfAborted()
+    if (finish?.kind !== 'stop') return undefined
     const text = assembler.blocks()
       .flatMap(block => block.type === 'text' ? [block.text] : [])
       .join('')

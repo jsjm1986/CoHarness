@@ -306,11 +306,13 @@ describe('PythonPtcRuntime — seam descriptors and misuse', () => {
     const future = join(dir, 'python-future')
     const pypy = join(dir, 'pypy')
     const failed = join(dir, 'python-failed')
+    const noisy = join(dir, 'python-noisy')
     await writeFile(oldMajor, '#!/bin/sh\nprintf \'cpython 2 99 0\\n\'\n', { mode: 0o755 })
     await writeFile(old, '#!/bin/sh\nprintf \'cpython 3 9 6\\n\'\n', { mode: 0o755 })
     await writeFile(future, '#!/bin/sh\nprintf \'cpython 4 0 0\\n\'\n', { mode: 0o755 })
     await writeFile(pypy, '#!/bin/sh\nprintf \'pypy 3 10 0\\n\'\n', { mode: 0o755 })
     await writeFile(failed, '#!/bin/sh\nexit 7\n', { mode: 0o755 })
+    await writeFile(noisy, '#!/bin/sh\nprintf \'%1500s\\n\' \'\'\nprintf \'cpython 3 10 0\\n\'\n', { mode: 0o755 })
     try {
       expect(resolvePythonBin(relative(process.cwd(), old))).toBe(old)
       const obsolete = await createRuntimeContext()
@@ -328,6 +330,9 @@ describe('PythonPtcRuntime — seam descriptors and misuse', () => {
       const probeFailure = await createRuntimeContext()
       await expect(probeFailure.plugin(PythonPtcRuntime, { pythonBin: failed }))
         .rejects.toThrow(/failed the CPython version probe/)
+      const oversizedProbe = await createRuntimeContext()
+      await expect(oversizedProbe.plugin(PythonPtcRuntime, { pythonBin: noisy }))
+        .rejects.toThrow('interpreter version response exceeded 1024 bytes')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -1308,13 +1313,38 @@ describe('PythonPtcRuntime — programs and bindings', () => {
     // arbitrary pipe boundaries inside one native write. Stray capture holds a
     // per-stream residual and admits only on a real `\n`, so a 200 KiB blast
     // with no newline reads back as exactly one entry with no interior breaks.
-    const { runtime } = await setup({ maxLogBytes: 300_000 })
+    // The settlement drain shares graceMs with the exit wait; under an
+    // instrumented coverage partition the event loop can starve pipe reads for
+    // more than the 3s default while the finished 200 KiB write is still queued
+    // in the kernel buffer, so this run takes a wider cleanup bound.
+    const { runtime } = await setup({ maxLogBytes: 300_000, graceMs: 30_000 })
     const size = 200_000
     const result = await runtime.run(runtime.resolve({
-      program: ['import os', `os.write(1, b"A" * ${size})`, 'return None'].join('\n'),
+      // `os.write` returns a SHORT count on a non-blocking fd — libuv marks
+      // the child's stdio ends non-blocking, so under a starved reader the
+      // write accepts only what fits the kernel buffer (CI observed 146176
+      // of 200000) and Python silently drops the rest. Loop until the full
+      // payload is written; EAGAIN arrives as BlockingIOError, retried after
+      // `select` reports the pipe writable again.
+      program: [
+        'import os, select',
+        `view = memoryview(b"A" * ${size})`,
+        'while len(view) > 0:',
+        '    try:',
+        '        written = os.write(1, view)',
+        '    except BlockingIOError:',
+        '        select.select([], [1], [])',
+        '        continue',
+        '    view = view[written:]',
+        'return None',
+      ].join('\n'),
       bindings: [],
     }))
     expect(result.error).toBeUndefined()
+    // Length first: the string diff of a 200 KiB entry is display-truncated,
+    // so a mismatch under CI only shows identical 'A' prefixes. The count and
+    // byte lengths expose whether an entry was truncated, split, or doubled.
+    expect(result.logs.map(entry => entry.length)).toEqual([size])
     expect(result.logs).toEqual(['A'.repeat(size)])
   })
 
@@ -3437,40 +3467,42 @@ describe('PythonPtcRuntime — budgets, termination, disposal', () => {
     expect(() => process.kill(pid, 0)).toThrow(/ESRCH/)
   }, 8000)
 
-  it('settles on the decided result even when a setsid-escaped orphan holds stdio open past close', async () => {
-    // `close` only fires once every inherited stdio stream drains. A descendant
-    // started with start_new_session=True escapes the child's process group, so
-    // the SIGTERM/SIGKILL aimed at that group never reaches it; if it inherited
-    // our stdout/stderr/fd 3 and outlives the run, `close` would never fire and
-    // run() would hang forever. The close-deadline backstop (graceMs + margin)
-    // must force settlement on the value the `done` frame already decided.
+  it('settles its decided result when a descendant holds inherited output', async () => {
+    const handoff = await makeTempDir('dsh-python-descendant-')
+    const heartbeat = join(handoff, 'heartbeat'), stopped = join(handoff, 'stop')
     const { runtime } = await setup({ graceMs: 100 })
-    const start = Date.now()
-    const result = await runtime.run(runtime.resolve({
-      program: [
-        'import subprocess, sys',
-        // Orphan in a fresh session, inheriting our stdout/stderr/fd 3, alive
-        // past the close-deadline so `close` cannot fire on its own. Its own
-        // 5 s self-exit is the leak ceiling AND the discriminator: it must stay
-        // ABOVE the < 4000 ms upper-bound assertion below, so if the deadline
-        // backstop failed to settle, settlement could only come from this
-        // self-exit at ~5 s and blow the bound — a sharper signal than the wall
-        // ceiling would give.
-        'subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"],',
-        '                 start_new_session=True)',
-        'return "escaped"',
-      ].join('\n'),
-      bindings: [],
-    }))
-    const elapsed = Date.now() - start
-    // The done frame decided the value; the deadline settled it despite the
-    // orphan pinning the pipes open.
-    expect(result.error).toBeUndefined()
-    expect(result.value).toBe('escaped')
-    // Settlement waited for the backstop (graceMs + CLOSE_REAP_MARGIN_MS ≈ 2.1s),
-    // not the orphan's 5 s self-exit — proving the deadline, not a fallback, fired.
-    expect(elapsed).toBeGreaterThanOrEqual(1_500)
-    expect(elapsed).toBeLessThan(4_000)
+    try {
+      const start = Date.now()
+      const result = await runtime.run(runtime.resolve({
+        program: [
+          'import subprocess, sys, os, time',
+          `heartbeat = ${JSON.stringify(heartbeat)}`,
+          `stopped = ${JSON.stringify(stopped)}`,
+          'code = "import os,sys,time\\nend = time.monotonic() + 8\\nwhile not os.path.exists(sys.argv[2]) and time.monotonic() < end:\\n    open(sys.argv[1], \'w\').close()\\n    time.sleep(0.05)"',
+          'subprocess.Popen([sys.executable, "-c", code, heartbeat, stopped], start_new_session=True)',
+          'deadline = time.monotonic() + 4',
+          'while not os.path.exists(heartbeat) and time.monotonic() < deadline: time.sleep(0.01)',
+          'if not os.path.exists(heartbeat): raise RuntimeError("descendant did not start")',
+          'return "escaped"',
+        ].join('\n'),
+        bindings: [],
+      }))
+      expect(result.error).toBeUndefined()
+      expect(result.value).toBe('escaped')
+      expect(existsSync(heartbeat)).toBe(true)
+      expect(Date.now() - start).toBeLessThan(4_000)
+    } finally {
+      await writeFile(stopped, '')
+      const deadline = Date.now() + 4_000
+      let previous = statSync(heartbeat).mtimeMs
+      while (Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 200))
+        const current = statSync(heartbeat).mtimeMs
+        if (current === previous) break
+        previous = current
+      }
+      expect(statSync(heartbeat).mtimeMs).toBe(previous)
+    }
   }, 8000)
 
   it('flushes a newline-free diagnostic when the closeDeadline forces settlement', async () => {
@@ -5076,30 +5108,42 @@ describe('PythonPtcRuntime — hostile peer', () => {
     // `sendReply` checks `settled`, but only after the resolution has been walked
     // and copied by `snapshotJsonValue`. Binding resolution carries no seam-level
     // byte cap, so a binding that resolves a wide value AFTER the run already
-    // settled (here on `maxWallMs`) spent host heap building a frame that is then
-    // discarded. The check now runs before the snapshot.
+    // settled (here on an explicit abort) spent host heap building a frame that
+    // is then discarded. The check now runs before the snapshot.
     //
-    // The binding resolves well after the 1s wall clock with a 2M-element array;
-    // the run must still report `timeout`, and the late value must not appear.
+    // The binding resolves well after the run settles with a 2M-element array;
+    // the run must still report its settle cause, and the late value must not
+    // appear. Settling by explicit abort (not maxWallMs) is deterministic: a
+    // wall clock only keeps the late path late when the child's first `call`
+    // frame beats the deadline, which instrumented coverage partitions cannot
+    // promise — aborting after the binding is provably in-flight does.
     let resolvedLate = false
-    const { runtime } = await setup({ maxWallMs: 1_000 })
-    const result = await runtime.run(runtime.resolve({
+    let invoked!: () => void
+    const bindingCall = new Promise<void>((accept) => { invoked = accept })
+    const controller = new AbortController()
+    const { runtime } = await setup()
+    const run = runtime.run(runtime.resolve({
       program: 'return await tools.slow({})',
       bindings: [{
         global: 'tools',
         functions: {
           slow: async () => {
+            invoked()
             await new Promise(resolve => setTimeout(resolve, 2_500))
             resolvedLate = true
             return Array.from({ length: 2_000_000 }, () => 0)
           },
         },
       }],
+      signal: controller.signal,
     }))
-    expect(result.error?.kind).toBe('timeout')
+    await bindingCall
+    controller.abort(new Error('settle now'))
+    const result = await run
+    expect(result.error?.kind).toBe('abort')
     expect(result.value).toBeUndefined()
     // Pin that the late path actually ran, so the assertion above is not vacuous.
-    await new Promise(resolve => setTimeout(resolve, 2_000))
+    await vi.waitUntil(() => resolvedLate, { timeout: 30_000 })
     expect(resolvedLate).toBe(true)
   }, 90_000)
 

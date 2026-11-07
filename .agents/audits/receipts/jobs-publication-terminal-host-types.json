@@ -1,0 +1,14 @@
+{
+  "name": "jobs-publication-terminal-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-26T08:57:31.680673+00:00",
+  "seconds": 10.504,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "115876a02f247480d467be2db0980623bc41a3d87aed2e8c178b468f6a0af998",
+  "inputsAfter": "115876a02f247480d467be2db0980623bc41a3d87aed2e8c178b468f6a0af998",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

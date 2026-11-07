@@ -7,6 +7,8 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+Managed Hosts refuse automatic process release while the Schedule domain is loading, a management or delivery write remains pending, or any stored task is active. The declaration survives provider removal until domain cleanup finishes. A due task wakes its original Session Agent inside a running Host; it cannot start a stopped Host process. Keep the Runtime running for timers. Inactive retained tasks do not block idle release, and deleting the final active task releases the obligation after accepted recomputation settles.
+
 ## Summary
 
 Schedule delivers one-shot, fixed-rate, daily, weekly, and cron wall-clock reminders as follow-up messages in their original Session. Tasks remain available after Host restart, and each recurring task contributes only its latest missed occurrence. The Host restores a cold Session when delivery is due. Active and inactive tasks remain inspectable until explicit deletion, and deletion removes the task row together with its saved delivery records.

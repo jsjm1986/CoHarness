@@ -1,4 +1,0 @@
-- "button \"feedback Feedback recorded for session session-{{uuid}} Anonymous user: {{uuid}}. Session sharing is feedback-gated; recording feedback releases the session prefix for sharing.\"":
-  - img
-  - img
-  - text: "feedback Feedback recorded for session session-{{uuid}} Anonymous user: {{uuid}}. Session sharing is feedback-gated; recording feedback releases the session prefix for sharing."

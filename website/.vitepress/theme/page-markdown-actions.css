@@ -40,6 +40,16 @@
   color: var(--vp-c-text-2);
 }
 
+@media (max-width: 767px), (pointer: coarse) {
+  .page-markdown-actions-controls button {
+    min-height: 44px;
+  }
+
+  .page-markdown-toggle {
+    width: 44px;
+  }
+}
+
 .page-markdown-toggle[aria-expanded="true"] .page-markdown-icon {
   transform: rotate(180deg);
 }

@@ -41,7 +41,7 @@ Byte windows and text streams accept `expectedVersion`; the remote provider reje
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The helper reuses [`fs-local`](../../fs/fs-local/README.md) and [`fs-sandbox`](../../fs/fs-sandbox/README.md), preserving symlink identity, stale-version rejection, diff bases and publication semantics. UTF-8 streaming uses bounded pull requests and closes its remote iterator when the consumer stops early.
+The helper reuses [`fs-local`](../../fs/fs-local/README.md) and [`fs-sandbox`](../../fs/fs-sandbox/README.md), preserving symlink identity, stale-version rejection, diff bases and publication semantics. UTF-8 streaming reserves a remote iterator on the first pull, uses bounded pull requests and closes the iterator when the consumer stops early. Closing or cancelling an unread iterable consumes no remote stream capacity. Stream admission and file errors are reported while iterating.
 
 </details>
 

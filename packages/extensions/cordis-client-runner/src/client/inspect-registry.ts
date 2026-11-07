@@ -38,12 +38,33 @@ export interface ClientCordisInspectHost {
 /** Client provider registry, manifest publisher, and live query dispatcher. */
 export class ClientCordisInspectRegistry {
   private readonly providers = new Map<string, ClientCordisInspectProviderRegistration>()
-  private readonly active = new Map<CordisInspectRequestId, AbortController>()
+  private readonly active = new Map<ClientCordisInspectHost, Map<CordisInspectRequestId, AbortController>>()
+  private readonly hosts = new Set<ClientCordisInspectHost>()
   private publishQueued = false
-  private syncChain = Promise.resolve()
+  private readonly pendingHosts = new Set<ClientCordisInspectHost>()
+  private readonly syncChains = new Map<ClientCordisInspectHost, Promise<void>>()
+  private disposed = false
 
   /** @param host - folded manifest and query result transport. */
-  constructor(private readonly host: ClientCordisInspectHost) {}
+  constructor(private readonly host: ClientCordisInspectHost) { this.hosts.add(host) }
+
+  /**
+   * Publish providers to an already-owned Runtime without starting it.
+   * @param host - captured manifest and query transport.
+   * @returns disposer that removes this transport and cancels only its queries.
+   */
+  addHost(host: ClientCordisInspectHost): () => void {
+    if (this.disposed) throw new Error('Client Cordis inspect registry is disposed')
+    this.hosts.add(host)
+    this.publish(host)
+    return () => {
+      this.hosts.delete(host)
+      for (const controller of this.active.get(host)?.values() ?? []) controller.abort()
+      this.active.delete(host)
+      this.syncChains.delete(host)
+      this.pendingHosts.delete(host)
+    }
+  }
 
   /**
    * Register one Client provider and publish a new complete manifest.
@@ -51,6 +72,7 @@ export class ClientCordisInspectRegistry {
    * @returns idempotent disposer.
    */
   register(registration: ClientCordisInspectProviderRegistration): () => void {
+    if (this.disposed) throw new Error('Client Cordis inspect registry is disposed')
     const { manifest } = registration
     if (manifest.id.trim() === '') throw new Error('Client Cordis inspect provider id must not be empty')
     if (this.providers.has(manifest.id)) throw new Error(`Client Cordis inspect provider "${manifest.id}" is already registered`)
@@ -72,30 +94,47 @@ export class ClientCordisInspectRegistry {
     }
   }
 
-  /** Publish the current complete manifest, including after reconnect. */
-  publish(): void {
+  /**
+   * Publish the current complete manifest.
+   * @param host - reconnecting Runtime; omission updates all registered Hosts.
+   */
+  publish(host?: ClientCordisInspectHost): void {
+    if (this.disposed) return
+    for (const target of host === undefined ? this.hosts : [host]) {
+      if (this.hosts.has(target)) this.pendingHosts.add(target)
+    }
     if (this.publishQueued) return
     this.publishQueued = true
     queueMicrotask(() => {
       this.publishQueued = false
+      if (this.disposed) return
+      const targets = [...this.pendingHosts]
+      this.pendingHosts.clear()
       const manifests = [...this.providers.values()].map(provider => provider.manifest)
-      this.syncChain = this.syncChain.then(async () => {
-        await this.host.sync(manifests)
-      }).catch((error: unknown) => {
-        console.error('[cordis-client-runner] syncing inspect providers failed:', error)
-      })
+      for (const host of targets) {
+        const pending = (this.syncChains.get(host) ?? Promise.resolve()).then(async () => {
+          if (!this.disposed && this.hosts.has(host)) await host.sync(manifests)
+        }).catch((error: unknown) => {
+          if (!this.disposed) console.error('[cordis-client-runner] syncing inspect providers failed:', error)
+        })
+        this.syncChains.set(host, pending)
+      }
     })
   }
 
   /**
    * Execute and answer one Host-broadcast query.
    * @param request - exact provider query and Session correlation received from Host.
+   * @param host - Runtime transport that delivered the query.
    * @returns after the first local result has been sent back to Host.
    */
-  async query(request: CordisInspectQueryRequest): Promise<void> {
-    if (this.active.has(request.requestId)) return
+  async query(request: CordisInspectQueryRequest, host: ClientCordisInspectHost = this.host): Promise<void> {
+    if (this.disposed || !this.hosts.has(host)) return
+    let active = this.active.get(host)
+    if (active === undefined) { active = new Map(); this.active.set(host, active) }
+    if (active.has(request.requestId)) return
     const controller = new AbortController()
-    this.active.set(request.requestId, controller)
+    active.set(request.requestId, controller)
     let resolution: CordisInspectQueryResolution
     try {
       const provider = this.providers.get(request.provider)
@@ -117,19 +156,35 @@ export class ClientCordisInspectRegistry {
         ? { ok: false, reason: 'cancelled', message: 'Client inspect query was cancelled' }
         : { ok: false, reason: 'provider-error', message: error instanceof Error ? error.message : String(error) }
     } finally {
-      this.active.delete(request.requestId)
+      active.delete(request.requestId)
     }
     if (controller.signal.aborted) return
-    await this.host.resolve(request.agentId, request.requestId, resolution)
+    await host.resolve(request.agentId, request.requestId, resolution)
   }
 
   /**
    * Cancel local work after another page answered or the Tool call ended.
    * @param requestId - query correlation that is no longer answerable.
+   * @param host - Runtime transport that delivered the resolution.
    */
-  close(requestId: CordisInspectRequestId): void {
-    this.active.get(requestId)?.abort()
-    this.active.delete(requestId)
+  close(requestId: CordisInspectRequestId, host: ClientCordisInspectHost = this.host): void {
+    const active = this.active.get(host)
+    active?.get(requestId)?.abort()
+    active?.delete(requestId)
+  }
+
+  /** Cancel this document's provider queries and retire queued manifest publications. */
+  dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    for (const queries of this.active.values()) {
+      for (const controller of queries.values()) controller.abort()
+    }
+    this.active.clear()
+    this.providers.clear()
+    this.hosts.clear()
+    this.syncChains.clear()
+    this.pendingHosts.clear()
   }
 }
 

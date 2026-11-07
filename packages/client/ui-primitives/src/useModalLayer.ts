@@ -67,7 +67,8 @@ export function useModalLayer(dialog: RefObject<HTMLElement | null>, open: boole
       }
       if (event.key !== 'Tab') return
       // Portaled menus own their traversal while they contain focus.
-      if (document.activeElement?.closest('[role="menu"]')) return
+      const menu = document.activeElement?.closest('[role="menu"]')
+      if (menu != null && !element.contains(menu)) return
       const items = [...element.querySelectorAll<HTMLElement>(focusable)]
         .filter(item => !item.closest('[inert], [hidden]'))
       const first = items[0] ?? element

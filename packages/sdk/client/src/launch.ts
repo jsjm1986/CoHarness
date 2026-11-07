@@ -13,7 +13,8 @@ export const DEFAULT_INITIALIZE_TIMEOUT_MS = 10_000
 
 /** Internal generic process launch used by the transport and fake-runtime tests. */
 export interface RuntimeProcessOptions extends Pick<HarnessClientOptions,
-  'maxLineBytes' | 'maxPendingRequests' | 'maxConcurrentIncoming' | 'maxOutputBytes' | 'maxNotificationQueue'> {
+  'maxLineBytes' | 'maxPendingRequests' | 'maxConcurrentIncoming' | 'maxOutputBytes' | 'maxNotificationQueue'
+  | 'maxSessionRelationships'> {
   command: string
   args: string[]
   cwd?: string

@@ -14,6 +14,7 @@ export { SegmentedTabs, type SegmentedTab } from '../../../packages/client/ui-pr
 export { StateDot, type StateDotState } from '../../../packages/client/ui-primitives/src/StateDot.tsx'
 export { Switch } from '../../../packages/client/ui-primitives/src/Switch.tsx'
 export { Tag } from '../../../packages/client/ui-primitives/src/Tag.tsx'
+export { ComputerBadge } from '../../../packages/client/ui-primitives/src/ComputerBadge.tsx'
 export { TerminalBlock, type TerminalBlockLabels } from '../../../packages/client/ui-primitives/src/TerminalBlock.tsx'
 export { Toast } from '../../../packages/client/ui-primitives/src/Toast.tsx'
 export { useAnchoredPosition } from '../../../packages/client/ui-primitives/src/useAnchoredPosition.ts'

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-preset-two-package-migration.md
 document:
-  en: 58742ac5f811960a89e321a240ecd71f34678615
-  zh: ce6587d5c08266ee0203e7daaad88954f3b989a6
+  en: 5f9cf425882dfb121b4873f3502d6d9ce64f370b
+  zh: 20d4c0f1daa4cd5de44d7fb1aee29f850b70f0b1
 /agent-note-preset-two-package-migration-onto-the-declaration-model:
   en: 2a582c63d9611a18
   zh: e1518628058b1fa5
@@ -12,8 +12,8 @@ document:
   en: 858c4b7920fb1251
   zh: 5ab860a3d9b96d2a
 /agent-note-preset-two-package-migration-onto-the-declaration-model/decision:
-  en: 76d3b35eb106a62d
-  zh: 0fc78e268d370130
+  en: a90ed3855c16966f
+  zh: ea4e5fceed45533f
 /agent-note-preset-two-package-migration-onto-the-declaration-model/alternatives-considered:
   en: ef5d601e82bd4f75
   zh: 605b2f76a440a6dc
@@ -21,5 +21,5 @@ document:
   en: cdcaf6c75845f5ed
   zh: 86c580d19032a264
 /agent-note-preset-two-package-migration-onto-the-declaration-model/verification:
-  en: 298000149aca94cb
-  zh: ae65dfb6451f5eb5
+  en: 61359dc8c8b53acb
+  zh: d19ba0f5a496e10d

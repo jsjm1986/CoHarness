@@ -1,7 +1,7 @@
 /** Direct Messages transport with one cancellable lifecycle per model request. */
 
 import { attributionHeaders, LlmAdapter, LlmError } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, ImageAttachmentAccessResolver, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, ImageAttachmentAccessResolver, LlmOperationDispatch, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { DeepSeekLlmApiJson } from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import { idleWatchdog, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import { modelInfo } from './model-info.ts'
@@ -15,6 +15,7 @@ import { serialize } from './serialize.ts'
 import { parseSse } from './sse.ts'
 import { translate } from './translate.ts'
 import { providerError, providerErrorDetail } from './transport.ts'
+import { deepSeekSearchOperations } from './search-operation.ts'
 
 /** DeepSeek provider using Messages content and native thinking replay. */
 export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapter {
@@ -42,17 +43,21 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
   }
   override prepareCall(provider: string, model: string, _signal?: AbortSignal): Promise<PreparedAdapterCall> {
     const connection = this.dependencies.options()
-    return Promise.resolve({ model: modelInfo(connection, provider, model), stream: options => this.generate(options, connection) })
+    return Promise.resolve({
+      model: modelInfo(connection, provider, model),
+      stream: (options, dispatchRequest) => this.generate(options, connection, dispatchRequest),
+      operations: deepSeekSearchOperations(connection, this.dependencies),
+    })
   }
-  stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    return this.generate(options, this.dependencies.options())
+  stream(options: GenerateOptions, dispatchRequest?: LlmOperationDispatch): AsyncIterable<StreamChunk> {
+    return this.generate(options, this.dependencies.options(), dispatchRequest)
   }
 
-  private async * generate(options: GenerateOptions, connection: C): AsyncGenerator<StreamChunk> {
+  private async * generate(options: GenerateOptions, connection: C, dispatchRequest?: LlmOperationDispatch): AsyncGenerator<StreamChunk> {
     const consumer = new AbortController()
     const signal = options.signal === undefined ? consumer.signal : AbortSignal.any([consumer.signal, options.signal])
     using watchdog = idleWatchdog(signal, connection.streamIdleTimeoutMs, 'MESSAGES_IDLE')
-    const iterator = this.request(options, connection, watchdog.signal, () => { watchdog.pulse() })
+    const iterator = this.request(options, connection, watchdog.signal, () => { watchdog.pulse() }, dispatchRequest)
     try {
       while (true) {
         const next = await watchdog.next(iterator)
@@ -76,6 +81,7 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
 
   private async * request(
     options: GenerateOptions, connection: C, signal: AbortSignal, activity: () => void,
+    dispatchRequest?: LlmOperationDispatch,
   ): AsyncGenerator<StreamChunk> {
     signal.throwIfAborted()
     const { messages, versions } = await prepareImages(
@@ -85,6 +91,7 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
     try {
       const files = new RequestFiles(this.files, {
         baseURL: connection.baseURL, headers: auth.headers,
+        ...dispatchRequest === undefined ? {} : { dispatchRequest },
       },
       connection.filePolicy, connection.filesApiTimeoutMs, signal, activity)
       let inline = false
@@ -121,7 +128,7 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
             ? [MESSAGES_TOOL_CHANGES_BETA]
             : [],
         ]
-        const response = await fetch(`${messagesApiRoot(connection.baseURL)}/messages`, {
+        const send = () => fetch(`${messagesApiRoot(connection.baseURL)}/messages`, {
           method: 'POST', signal, body: extensions.payload, redirect: 'error',
           headers: {
             ...attributionHeaders(),
@@ -134,6 +141,7 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
             ...options.purpose === 'compaction' ? { 'x-deepseek-harness-compact': '1' } : {},
           },
         })
+        const response = await (dispatchRequest === undefined ? send() : dispatchRequest(send))
         if (!response.ok) {
           const text = await response.text()
           let raw: unknown
@@ -148,7 +156,11 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
         }
         await extensions.accept()
         if (response.body === null) throw new LlmError('DeepSeek Messages returned no response body', 'EMPTY_RESPONSE')
-        yield* translate(parseSse(response.body, activity), options.model)
+        for await (const chunk of translate(parseSse(response.body, activity), options.model)) {
+          yield chunk.type === 'usage' && auth.credentialSource !== undefined
+            ? { ...chunk, credentialSource: auth.credentialSource }
+            : chunk
+        }
         return
       }
     } catch (error) {

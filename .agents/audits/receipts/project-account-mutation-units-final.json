@@ -1,0 +1,14 @@
+{
+  "name": "project-account-mutation-units-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/apply-grants.spec.ts tests/users.spec.ts tests/macos-release-control.spec.ts",
+  "startedAt": "2026-10-24T00:06:01.053715+00:00",
+  "seconds": 14.814,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ca1dfd85b41c9dbfc8f401f23dc014e69c9fdd88f2152c4b84b1156a1d361c9c",
+  "inputsAfter": "91c95984debc9dedf69dccf85b8cef23a0cfc67cbe72877621b85f6fa5eec3f7",
+  "postgresToolDirectory": null,
+  "outputSha256": "a526b6210bd7a4eb8e354f32528f001a69787360dd453af5034965484892c1fa",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  55 passed (55)\n   Start at  08:06:02\n   Duration  13.22s (transform 1.57s, setup 0ms, import 1.88s, tests 16.13s, environment 0ms)\n\n"
+}

@@ -1,5 +1,7 @@
 /** Terminal qualification and metadata-only process supervision on the current node. */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { RuntimePicker } from '../components/RuntimePicker.tsx'
+import type { RuntimeCatalogEntry } from '../api.ts'
 import { TerminalPermissions } from '../components/TerminalPermissions.tsx'
 import { Button, ConfirmDialog, ErrorBanner, Field, LoadingState, PageHeader, Section, StatusBadge } from '../components/ui.tsx'
 import { closeTerminal, listTerminals, listUsers, listProjects, type AdminTerminal, type AdminTerminalInventory } from '../api.ts'
@@ -18,7 +20,12 @@ export function TerminalsPage() {
     failed: t('stateFailed'), stopping: t('stateStopping'),
   }
   const [targets, setTargets] = useState<Target[]>([])
+  const [projects, setProjects] = useState<ReadonlyArray<{ id: number; name: string }>>([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [projectsError, setProjectsError] = useState('')
   const [selected, setSelected] = useState('')
+  const [runtime, setRuntime] = useState<RuntimeCatalogEntry>()
+  const [runtimeAvailable, setRuntimeAvailable] = useState(false)
   const [inventory, setInventory] = useState<AdminTerminalInventory | null>(null)
   const [confirm, setConfirm] = useState<AdminTerminal | null>(null)
   const [error, setError] = useState('')
@@ -31,7 +38,15 @@ export function TerminalsPage() {
 
   useEffect(() => {
     let disposed = false
-    void Promise.all([listUsers(), listProjects()]).then(([users, projects]) => {
+    setLoadingProjects(true); setProjectsError('')
+    const projectRead = listProjects().then(rows => {
+      if (!disposed) setProjects(rows)
+      return rows
+    }).catch((cause: unknown) => {
+      if (!disposed) setProjectsError(messageOf(cause))
+      throw cause
+    }).finally(() => { if (!disposed) setLoadingProjects(false) })
+    void Promise.all([listUsers(), projectRead]).then(([users, projects]) => {
       if (disposed) return
       setTargets([...users.map(user => ({ kind: 'user' as const, id: user.id, label: t('targetUser', { name: user.displayName, username: user.username }) })),
         ...projects.map(project => ({ kind: 'project' as const, id: project.id, label: t('targetProject', { name: project.name }) }))])
@@ -42,20 +57,20 @@ export function TerminalsPage() {
 
   useEffect(() => {
     const target = targets.find(item => keyOf(item) === selected)
-    if (target === undefined) return
+    if (target === undefined || runtime === undefined || runtime.owner.id !== target.id || runtime.owner.kind !== (target.kind === 'user' ? 'personal' : 'project')) return
     const attempt = ++generation.current, controller = new AbortController()
     setLoading(true)
-    void listTerminals(target.kind, target.id, controller.signal).then(value => {
+    void listTerminals(target.kind, target.id, controller.signal, runtime.id).then(value => {
       if (attempt !== generation.current) return
-      if (value.target.kind !== target.kind || value.target.id !== target.id) throw new Error(t('targetMismatch'))
+      if (value.target.kind !== target.kind || value.target.id !== target.id || value.target.runtimeId !== runtime.id) throw new Error(t('targetMismatch'))
       setInventory(value); setError('')
     }).catch(error => { if (attempt === generation.current) { setInventory(null); setError(messageOf(error)) } })
       .finally(() => { if (attempt === generation.current) setLoading(false) })
     return () => { generation.current++; controller.abort() }
-  }, [targets, selected, reload, t])
+  }, [targets, selected, runtime, reload, t])
 
   async function close(): Promise<void> {
-    if (confirm === null || inventory === null || acting || loading || `${inventory.target.kind}:${String(inventory.target.id)}` !== selected) return
+    if (!runtimeAvailable || confirm === null || inventory === null || runtime === undefined || inventory.target.runtimeId !== runtime.id || acting || loading || `${inventory.target.kind}:${String(inventory.target.id)}` !== selected) return
     const attempt = generation.current
     setActing(true); setError(''); setNotice('')
     try {
@@ -69,12 +84,14 @@ export function TerminalsPage() {
 
   return <div className="page">
     <PageHeader title={t('pageTitle')} description={t('pageDescription')} />
-    <TerminalPermissions />
+    <TerminalPermissions projects={{
+      items: projects, loading: loadingProjects, error: projectsError, reload: () => setOwnerReload(value => value + 1),
+    }} />
     <Section title={t('sectionProcesses')}>
       <ErrorBanner message={error} />
       <div className="formGrid">
       <Field label={t('scopeLabel')}><select className="select" aria-label={t('scopeAria')} value={selected} disabled={acting} onChange={event => {
-        generation.current++; setSelected(event.target.value); setInventory(null); setConfirm(null); setLoading(false); setError(''); setNotice('')
+        generation.current++; setSelected(event.target.value); setRuntime(undefined); setInventory(null); setConfirm(null); setLoading(false); setError(''); setNotice('')
       }}>
         <option value="">{t('scopePlaceholder')}</option>
         {targets.map(target => <option key={keyOf(target)} value={keyOf(target)}>{target.label}</option>)}
@@ -84,6 +101,8 @@ export function TerminalsPage() {
       {selected === '' ? null : <Button disabled={acting || loading} onClick={() => { setInventory(null); setConfirm(null); setNotice(''); setReload(value => value + 1) }}>{t('refreshInventory')}</Button>}
       </div>
       </div>
+      {targets.find(item => keyOf(item) === selected) === undefined ? null : <RuntimePicker key={selected} disabled={acting} owner={targets.find(item => keyOf(item) === selected)!} value={runtime} onAvailabilityChange={setRuntimeAvailable}
+        onSelect={value => { generation.current++; setRuntime(value); setInventory(null); setConfirm(null) }} />}
       {loading ? <LoadingState label={t('loadingInventory')} /> : null}
       {inventory === null ? null : <>
         <p className="muted">{t('nodeLine', { node: inventory.nodeId })} · {inventory.generation === null ? t('instanceStopped') : t('instanceGeneration', { generation: String(inventory.generation) })}</p>
@@ -91,13 +110,13 @@ export function TerminalsPage() {
           <thead><tr><th>{t('columnTerminal')}</th><th>{t('columnSession')}</th><th>{t('columnCreator')}</th><th>{t('columnStatus')}</th><th>{t('columnActions')}</th></tr></thead>
           <tbody>{inventory.terminals.map(entry => <tr key={`${entry.ownerId}:${entry.id}`}>
             <td className="terminalIdentity">{entry.id}</td><td className="terminalIdentity">{entry.sessionId}</td><td>{entry.creatorUserId === undefined ? t('localOperator') : t('creatorUser', { id: String(entry.creatorUserId) })}</td><td><StatusBadge tone={entry.state === 'running' ? 'success' : entry.state === 'failed' ? 'danger' : 'neutral'}>{labels[entry.state]}</StatusBadge></td>
-            <td><Button variant="danger" disabled={acting || loading} onClick={() => setConfirm(entry)}>{entry.state === 'stopping' ? t('retryCleanup') : t('closeTerminal')}</Button></td>
+            <td><Button variant="danger" disabled={acting || loading || !runtimeAvailable} onClick={() => setConfirm(entry)}>{entry.state === 'stopping' ? t('retryCleanup') : t('closeTerminal')}</Button></td>
           </tr>)}</tbody>
         </table></div>}
       </>}
       {notice === '' ? null : <p role="status">{notice}</p>}
     </Section>
     <ConfirmDialog open={confirm !== null} title={t('closeTerminal')} description={t('closeDescription', { id: confirm?.id ?? '' })}
-      confirmLabel={t('confirmClose')} pending={acting} onConfirm={() => void close()} onClose={() => { if (!acting) setConfirm(null) }} />
+      confirmLabel={t('confirmClose')} confirmDisabled={!runtimeAvailable} pending={acting} onConfirm={() => void close()} onClose={() => { if (!acting) setConfirm(null) }} />
   </div>
 }

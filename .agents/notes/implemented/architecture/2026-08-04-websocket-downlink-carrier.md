@@ -22,9 +22,15 @@ The Host sends protocol-level Ping frames to every open downlink at the configur
 
 A browser abort or socket close cancels the corresponding host stream; plugin teardown also waits for that source iterator's cleanup. If a host stream throws midway, the carrier sends one existing `stream/error` frame and then closes the socket; the client treats that frame as connection loss rather than delivering it to a business sink. Each WebSocket reports open independently, and the existing readiness handshake still waits until mux and host are both open and the `host.describe` HTTP call has succeeded before publishing connected.
 
+The connection Controller attributes only the first unexpected terminal outcome in its existing generation. Closing the companion socket is cancellation, not a second independent outage; a stopped or replaced generation cannot publish a late cause. Ordinary EOF follows the same failure channel with a fixed transport error carrying no HTTP status, while RPC and transport failures retain their original error for authorization consumers. This keeps a clean close from becoming an access denial or a Host-restart claim.
+
+Retry diagnostics contain fixed source/cause tags, local attempt count, monotonic relative durations, and available numeric close code and clean-handshake flag. They exclude remote close reasons, error text, URLs, query strings, frames, and Session IDs because these can carry private data. They add no connection lifetime or recovery policy; TLS failures still require native browser evidence, and a Client attempt count cannot establish a Host process generation change.
+
 ## Verification
 
 Webserver contract tests pin upgrade-pathname dispatch, duplicate-registration rejection, disposal, and teardown; connection real-network tests pin each WebSocket's trust check, open, schema envelope, frame order, stream error, and close cancellation; client tests also prove that downlinks create `ws:`/`wss:` URLs while unary calls and `respond` still use HTTP `fetch`. The assembled keyless browser replay continues to cover Chromium, a real host, HTTP uplink, and the full WebSocket downlink chain.
+
+Controlled Client tests distinguish mux/host close, ordinary EOF, transport rejection and RPC failure; they hold companion closure past the next generation, preserve normal cancellation, and assert the diagnostic field allowlist. Runtime consumer tests retain authorized base and target resources on EOF while still withdrawing them on explicit authorization loss.
 
 ## Alternatives considered
 

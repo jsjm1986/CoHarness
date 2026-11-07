@@ -85,11 +85,12 @@ class FakeInspector implements ProcessInspector {
   /** Counts process-table captures so read-amplification cases can pin them. */
   captures = 0
   complete = true
+  declareComplete = true
 
   snapshot(): ProcessSnapshot {
     this.captures += 1
     return {
-      complete: this.complete,
+      ...this.declareComplete ? { complete: this.complete } : {},
       tree: () => this.readTree(),
       session: () => this.readSession(),
       alive: identity => this.readAlive(identity),
@@ -119,10 +120,53 @@ function makeHandle(pty: FakePty, inspector: ProcessInspector, graceMs: number):
 }
 
 describe('LocalTerminalHandle', () => {
+  for (const change of ['frozen', 'forward'] as const) it.each(['linux', 'win32'] as const)(`preserves %s terminal escalation when the wall clock changes: ${change}`, async (platform) => {
+    vi.useFakeTimers()
+    const wallClock = vi.spyOn(Date, 'now')
+    if (change === 'frozen') wallClock.mockReturnValue(0)
+    const pty = new FakePty()
+    const inspector = new FakeInspector()
+    const target = platform === 'win32' ? inspector.root! : { pid: 124, started: 'child' }
+    inspector.members = platform === 'win32' ? [] : [target]
+    inspector.alive.add(target.pid)
+    inspector.removeOnSignal = false
+    const signalProcess = inspector.signalProcess.bind(inspector)
+    inspector.signalProcess = (identity, signal) => {
+      signalProcess(identity, signal)
+      if (signal === 'SIGKILL') inspector.alive.delete(identity.pid)
+    }
+    const handle = new LocalTerminalHandle(pty.asPty(), inspector, 100, platform)
+    let settled = false
+    const termination = handle.terminate().then(() => { settled = true })
+    try {
+      if (change === 'forward') {
+        await vi.advanceTimersByTimeAsync(50)
+        wallClock.mockReturnValue(60_000)
+        await vi.advanceTimersByTimeAsync(25)
+        expect(settled).toBe(false)
+        expect(inspector.processes).toEqual([[target.pid, 'SIGTERM']])
+        await vi.advanceTimersByTimeAsync(75)
+      } else await vi.advanceTimersByTimeAsync(300)
+      expect(settled).toBe(true)
+      expect(inspector.processes).toEqual([[target.pid, 'SIGTERM'], [target.pid, 'SIGKILL']])
+      expect(inspector.alive.size).toBe(0)
+      await termination
+      await expect(handle.done).resolves.toEqual(platform === 'win32'
+        ? { exitCode: null, signal: null } : { exitCode: null, signal: 'SIGTERM' })
+    } finally {
+      wallClock.mockRestore()
+      inspector.alive.clear()
+      pty.emitExit()
+      await vi.runAllTimersAsync()
+      await termination
+      handle.output.destroy()
+    }
+  })
+
   it('retains ownership after shell exit when /proc cannot be enumerated', async () => {
     const pty = new FakePty()
     let readable = false
-    const inspector = createProcessInspector('linux', 'x64', {
+    const inspector = createProcessInspector(1000, 'linux', 'x64', {
       readDir: () => { if (!readable) throw new Error('EACCES'); return [] },
     } as unknown as ProcessInspectorInternals)
     const released = vi.fn()
@@ -135,6 +179,58 @@ describe('LocalTerminalHandle', () => {
     await expect(handle.inspectActivity()).resolves.toMatchObject({ state: 'idle' })
     await handle.terminate()
     expect(released).toHaveBeenCalledOnce()
+  })
+
+  it.each(['linux', 'darwin'] as const)('waits for complete %s process evidence within the configured cleanup grace', async (platform) => {
+    vi.useFakeTimers()
+    const pty = new FakePty(), inspector = new FakeInspector(), released = vi.fn()
+    const handle = new LocalTerminalHandle(pty.asPty(), inspector, 100, platform, undefined, undefined, undefined, released)
+    let result: 'pending' | 'resolved' | 'rejected' = 'pending'
+    try {
+      pty.emitExit()
+      inspector.root = undefined
+      inspector.complete = false
+      const cleanup = handle.terminate().then(() => { result = 'resolved' }, () => { result = 'rejected' })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(result).toBe('pending')
+      expect(released).not.toHaveBeenCalled()
+      inspector.complete = true
+      await vi.runAllTimersAsync()
+      await cleanup
+      expect(result).toBe('resolved')
+      expect(released).toHaveBeenCalledOnce()
+    } finally {
+      inspector.complete = true
+      pty.emitExit()
+      await vi.runAllTimersAsync()
+      await handle.terminate()
+      handle.output.destroy()
+    }
+  })
+
+  it.each([['linux', true], ['darwin', true], ['linux', false], ['darwin', false]] as const)('retains %s terminal ownership after a partial process observation (completeness declared: %s)', async (platform, declared) => {
+    const pty = new FakePty(), inspector = new FakeInspector(), released = vi.fn()
+    const child = { pid: 124, started: 'child' }
+    inspector.members = [child]; inspector.alive.add(child.pid)
+    inspector.readAlive = identity => inspector.complete && inspector.alive.has(identity.pid)
+    const handle = new LocalTerminalHandle(pty.asPty(), inspector, 1, platform, undefined, undefined, undefined, released)
+    try {
+      await handle.inspectForeground()
+      inspector.root = undefined; inspector.members = []; inspector.complete = false; inspector.declareComplete = declared
+      pty.emitExit()
+      await expect(handle.terminate()).rejects.toThrow('process observation is incomplete')
+      expect(released).not.toHaveBeenCalled()
+      expect(inspector.alive.has(child.pid)).toBe(true)
+      inspector.complete = true; inspector.declareComplete = true
+      await handle.terminate()
+      expect(inspector.processes).toContainEqual([child.pid, 'SIGTERM'])
+      expect(inspector.alive.has(child.pid)).toBe(false)
+      expect(released).toHaveBeenCalledOnce()
+    } finally {
+      inspector.complete = true; inspector.declareComplete = true; inspector.alive.clear(); pty.emitExit()
+      await handle.terminate()
+      handle.output.destroy()
+    }
   })
 
   it('pauses native output until the consumer drains and resumes before termination', async () => {
@@ -880,7 +976,7 @@ describe('process-table read amplification', () => {
 
   async function tableReadsForOnePoll(descendants: number): Promise<number> {
     const { internals, tableReads } = darwinInternals(shellTable(descendants))
-    const inspector = createProcessInspector('darwin', 'arm64', internals)
+    const inspector = createProcessInspector(1000, 'darwin', 'arm64', internals)
     const handle = new LocalTerminalHandle(new FakePty().asPty(), inspector, 10, 'darwin')
     tableReads.length = 0
     const foreground = await handle.inspectForeground()

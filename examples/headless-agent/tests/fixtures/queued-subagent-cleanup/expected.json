@@ -1,0 +1,5 @@
+{
+  "reply": "QUEUED_CLEANUP_OK",
+  "refused": { "mode": "refused", "bothHeldAtBarrier": true, "refused": true, "startsAfterWait": 2, "secondAttemptsAfterWait": 2, "secondOpenAfterWait": true, "closedBeforeDispatch": true, "startsAfterRecovery": 3, "allClosed": true },
+  "recovered": { "mode": "recovered", "bothHeldAtBarrier": true, "refused": false, "startsAfterWait": 3, "secondAttemptsAfterWait": 2, "secondOpenAfterWait": false, "closedBeforeDispatch": true, "startsAfterRecovery": 3, "allClosed": true }
+}

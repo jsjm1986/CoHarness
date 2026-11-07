@@ -1,0 +1,14 @@
+{
+  "name": "sonar-current-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/llm/llm-pi-ai/tsconfig.json packages/web/web-search-deepseek/tsconfig.json examples/tsconfig.json",
+  "startedAt": "2026-10-24T09:14:05.448497+00:00",
+  "seconds": 2.93,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d38ee7e7ce21cc051d2989a954f8dfb3d51b75a52266e5a871dec53285422c00",
+  "inputsAfter": "d38ee7e7ce21cc051d2989a954f8dfb3d51b75a52266e5a871dec53285422c00",
+  "postgresToolDirectory": null,
+  "outputSha256": "155935ca65cfee08dd7260a594b209cc884203f1666a8da69a2eb01357d9aeb3",
+  "outputTail": "error TS5083: Cannot read file '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/examples/tsconfig.json'.\n"
+}

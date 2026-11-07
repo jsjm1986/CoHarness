@@ -20,6 +20,37 @@ function scheduleEvent(data: unknown, seq: number): SessionEvent {
 }
 
 describe('shared Schedule management', () => {
+  it('retains its veto until provider cleanup has closed durable storage', async () => {
+    vi.useRealTimers()
+    const closing = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const pool = new MemoryMediaPool()
+    const test = await harness({ pool, backend: gatedScheduleBackend(pool, {
+      closeUnit: async () => { closing.resolve(undefined); await release.promise },
+    }) })
+    tests.push(test)
+    let disposal: Promise<void> | undefined
+    try {
+      disposal = test.fiber.dispose()
+      await closing.promise
+      expect(test.ctx.bail('runtime/idle-release-check')).toBe('busy')
+      release.resolve(undefined)
+      await disposal
+      expect(test.ctx.bail('runtime/idle-release-check')).toBeUndefined()
+    } finally { release.resolve(undefined); await disposal }
+  })
+
+  it('keeps the Host running for future tasks even while their original Session is inactive', async () => {
+    const { ctx, service } = await setup()
+    expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
+    const sessionId = SessionId('cold-timer-owner')
+    const record = await service.create(sessionId, { prompt: 'Later', after_seconds: 3600, title: 'Later' })
+    expect(ctx.agents.get(sessionId)).toBeUndefined()
+    expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
+    expect(await service.delete({ id: record.id, sessionId })).toEqual({ id: record.id, deleted: true })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
+  })
+
   it('initializes a new task with empty known delivery history', async () => {
     const { service, pool } = await setup()
     const sessionId = SessionId('new-history')
@@ -32,16 +63,6 @@ describe('shared Schedule management', () => {
   it('returns an empty catalog when the Host has no active reminders', async () => {
     const { service } = await setup()
     expect(await service.catalog()).toEqual([])
-  })
-
-  it('ignores the disposal of an Agent it never attached', async () => {
-    const { ctx, service } = await setup()
-    const sessionId = SessionId('unattached-disposal')
-    await service.create(sessionId, { prompt: 'later', after_seconds: 60, title: 'Later' })
-    // An Agent the plugin never attached has no detacher, so its disposal returns
-    // from the listener without one and leaves the stored task alone.
-    ctx.emit('agent/disposed', { agent: agentFor(ctx, 'never-attached') })
-    expect((await service.catalog()).map(entry => entry.title)).toEqual(['Later'])
   })
 
   it('reports a Session its active reminders and deletes them on a stop request', async () => {

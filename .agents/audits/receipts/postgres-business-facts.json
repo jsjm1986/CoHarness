@@ -1,0 +1,14 @@
+{
+  "name": "postgres-business-facts",
+  "cwd": "gateway",
+  "command": "node ../.agents/audits/.local/postgres-business-facts.mjs",
+  "startedAt": "2026-10-24T23:44:13.469438+00:00",
+  "seconds": 1.871,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "inputsAfter": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "282f015d6dd94346136ec608401487d12e2c3c1d0cd03e0a3f7c4d0cf481c1ea",
+  "outputTail": "[\n  {\n    datcollate: 'C',\n    datctype: 'C',\n    datlocprovider: 'c',\n    datlocale: null\n  }\n]\n[\n  {\n    folded: 'clİent',\n    same: false,\n    delimiter_before: false,\n    similarity: 0,\n    fuzzy_matches: false\n  }\n]\n"
+}

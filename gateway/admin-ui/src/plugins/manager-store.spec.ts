@@ -4,7 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import type { BundleInfo, ChangeResult, ManagementError, PluginEntryId, PluginInfo, PluginInstallRequestId } from '../../../../packages/boot/plugin-manager/src/types.ts'
+import type { BundleInfo, ChangeResult, ManagementError, PluginManagementCatalog, PluginEntryId, PluginInfo, PluginInstallRequestId } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import type { HostObservable } from './config-ledger.ts'
 import type { ConfigLedger } from './config-ledger.ts'
 import { offeredRegistries, packageView, PluginManagerController, rowKey, sortPackages } from './manager-store.ts'
@@ -69,9 +69,16 @@ const NO_CONFIG: HostObservable<ConfigLedger> = {
   subscribe: () => () => {},
 }
 
-function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}) {
+function catalog(value: Partial<PluginManagementCatalog> = {}) {
+  return ok<PluginManagementCatalog>({ managementAvailable: true, manage: true, bundles: [BUNDLE], plugins: PLUGINS, ...value })
+}
+
+function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}, callbacks: Omit<ConstructorParameters<typeof PluginManagerController>[0], 'remote'> = {}) {
   const inventory = { list: overrides.inventory ?? vi.fn(() => Promise.resolve(ok({ entries: [], managementAvailable: true }))) }
   const plugins = {
+    catalog: vi.fn<
+      (includeEntryMetadata?: boolean, signal?: AbortSignal) => Promise<ReturnType<typeof catalog> | ReturnType<typeof refused>>
+    >(() => Promise.resolve(catalog())),
     listBundles: vi.fn<() => Promise<ReturnType<typeof ok<BundleInfo[]>> | ReturnType<typeof refused>>>(
       () => Promise.resolve(ok([BUNDLE])),
     ),
@@ -89,6 +96,7 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
   const probe = { fastest: overrides.fastest ?? vi.fn(() => Promise.resolve(ok(null))) }
   const ctx = {
     remote: { pluginManager: plugins, pluginInventory: inventory, pluginRegistryProbe: probe },
+    ...callbacks,
   } as never
   const controller = new PluginManagerController(ctx)
   onTestFinished(() => { controller.dispose() })
@@ -111,6 +119,36 @@ beforeEach(() => {
     getItem: (key: string) => storage.get(key) ?? null,
     setItem: (key: string, value: string) => { storage.set(key, value) },
     removeItem: (key: string) => { storage.delete(key) },
+  })
+})
+
+describe('shared Admin catalog acceptance', () => {
+  it('publishes an accepted catalog and reports actual writes without an initial idle notification', async () => {
+    const onCatalog = vi.fn()
+    const onWriteSettled = vi.fn()
+    const { controller, face, plugins } = bench({}, { onCatalog, onWriteSettled })
+    await controller.load()
+    expect(plugins.catalog).toHaveBeenCalledWith(true, expect.any(AbortSignal))
+    expect(onCatalog).toHaveBeenCalledExactlyOnceWith(catalog().value)
+    expect(onWriteSettled).not.toHaveBeenCalled()
+    face.setRowEnabled(ROW_ENTRY, false)
+    await vi.waitFor(() => expect(onWriteSettled).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(onCatalog).toHaveBeenCalledTimes(2))
+  })
+
+  it('does not publish refused catalogs or late catalogs from a disposed generation', async () => {
+    const onCatalog = vi.fn()
+    const gate = deferred<ReturnType<typeof catalog>>()
+    onTestFinished(() => { gate.resolve(catalog()) })
+    const { controller, plugins } = bench({ catalog: vi.fn().mockResolvedValueOnce(refused('plugin-management/forbidden', 'denied')).mockReturnValueOnce(gate.promise) }, { onCatalog })
+    await controller.load()
+    expect(onCatalog).not.toHaveBeenCalled()
+    const loading = controller.load()
+    await vi.waitFor(() => expect(plugins.catalog).toHaveBeenCalledTimes(2))
+    controller.dispose()
+    gate.resolve(catalog())
+    await loading
+    expect(onCatalog).not.toHaveBeenCalled()
   })
 })
 
@@ -150,7 +188,7 @@ describe('sortPackages', () => {
     const views = [zeta, BUNDLE, alpha].map(bundle => packageView(bundle, PLUGINS))
     expect(sortPackages(views).map(pkg => pkg.name)).toEqual(['@acme/dsh-alpha', 'dsh-better-sidebar', 'dsh-zeta'])
     // The store lists what it read in that order, whatever the Host's order.
-    const { state, controller } = bench({ listBundles: vi.fn(() => Promise.resolve(ok([zeta, BUNDLE, alpha]))) })
+    const { state, controller } = bench({ catalog: vi.fn(() => Promise.resolve(catalog({ bundles: [zeta, BUNDLE, alpha] }))) })
     await controller.load()
     expect(state().packages.map(pkg => pkg.name)).toEqual(['@acme/dsh-alpha', 'dsh-better-sidebar', 'dsh-zeta'])
   })
@@ -197,7 +235,7 @@ describe('PluginManagerController', () => {
       meta,
       rows: BUNDLE.rows.map(row => ({ ...row, meta: rowMeta })),
     }
-    const { controller, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([bundle])) })
+    const { controller, state } = bench({ catalog: vi.fn().mockResolvedValue(catalog({ bundles: [bundle] })) })
 
     await controller.load()
 
@@ -208,10 +246,10 @@ describe('PluginManagerController', () => {
     expect(state().packages[0]!.error).toBeUndefined()
   })
 
-  it('starts idle, reads the inventory then the bundles and entries on first use, and folds concurrent loads', async () => {
-    const gate = deferred<ReturnType<typeof ok<BundleInfo[]>>>()
-    const { plugins, inventory, face, state, controller } = bench({
-      listBundles: vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValue(ok([BUNDLE])),
+  it('starts idle and folds concurrent catalog loads', async () => {
+    const gate = deferred<ReturnType<typeof catalog>>()
+    const { plugins, face, state, controller } = bench({
+      catalog: vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValue(catalog({ bundles: [BUNDLE] })),
     })
     expect(state().status).toBe('idle')
     face.ensure()
@@ -219,33 +257,31 @@ describe('PluginManagerController', () => {
     await Promise.resolve()
     expect(state().status).toBe('loading')
     const mid = controller.load()
-    gate.resolve(ok([BUNDLE]))
+    gate.resolve(catalog({ bundles: [BUNDLE] }))
     await mid
     expect(state().status).toBe('ready')
     expect(state().packages).toEqual([packageView(BUNDLE, PLUGINS)])
-    expect(inventory.list).toHaveBeenCalledTimes(2)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
-    expect(plugins.listPlugins).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
     face.ensure()
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
   })
 
   it('keeps cached packages while a manual refresh reads and ignores repeated refreshes without a success notice', async () => {
     vi.useFakeTimers()
     onTestFinished(() => { vi.useRealTimers() })
-    const { plugins, inventory, face, state, controller } = bench()
+    const { plugins, face, state, controller } = bench()
     await controller.load()
     const packages = state().packages
-    const gate = deferred<ReturnType<typeof ok<BundleInfo[]>>>()
-    plugins.listBundles.mockReturnValueOnce(gate.promise)
+    const gate = deferred<ReturnType<typeof catalog>>()
+    plugins.catalog.mockReturnValueOnce(gate.promise)
     face.refresh()
     expect(state()).toMatchObject({ status: 'ready', refreshStatus: 'refreshing', notice: null })
     expect(state().packages).toBe(packages)
     await vi.advanceTimersByTimeAsync(0)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
     face.refresh()
     face.refresh()
-    gate.resolve(ok([{ ...BUNDLE, version: '0.17.0' }]))
+    gate.resolve(catalog({ bundles: [{ ...BUNDLE, version: '0.17.0' }] }))
     await vi.advanceTimersByTimeAsync(399)
     expect(state().refreshStatus).toBe('refreshing')
     await vi.advanceTimersByTimeAsync(1)
@@ -253,36 +289,34 @@ describe('PluginManagerController', () => {
     expect(state().packages[0]?.version).toBe('0.17.0')
     expect(state().status).toBe('ready')
     expect(state().notice).toBeNull()
-    expect(inventory.list).toHaveBeenCalledTimes(2)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
-    expect(plugins.listPlugins).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
   })
 
   it.each(['refused', 'rejected'] as const)('keeps cached packages ready after a %s refresh and clears its toast when retry starts', async (failure) => {
     vi.useFakeTimers()
     onTestFinished(() => { vi.useRealTimers() })
-    const { inventory, plugins, face, state, controller } = bench()
+    const { plugins, face, state, controller } = bench()
     await controller.load()
     const packages = state().packages
-    if (failure === 'refused') inventory.list.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
-    else inventory.list.mockRejectedValueOnce(new Error('transport down'))
+    if (failure === 'refused') plugins.catalog.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
+    else plugins.catalog.mockRejectedValueOnce(new Error('transport down'))
     face.refresh()
     await vi.advanceTimersByTimeAsync(400)
     expect(state().refreshStatus).toBe('idle')
     expect(state()).toMatchObject({ status: 'ready', notice: { kind: 'refresh-failed', seq: 1 } })
     expect(state().packages).toBe(packages)
-    const gate = deferred<ReturnType<typeof ok<BundleInfo[]>>>()
-    plugins.listBundles.mockReturnValueOnce(gate.promise)
+    const gate = deferred<ReturnType<typeof catalog>>()
+    plugins.catalog.mockReturnValueOnce(gate.promise)
     face.refresh()
     expect(state()).toMatchObject({ status: 'ready', refreshStatus: 'refreshing', notice: null })
     expect(state().packages).toBe(packages)
     await vi.advanceTimersByTimeAsync(0)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
-    gate.resolve(ok([BUNDLE]))
+    expect(plugins.catalog).toHaveBeenCalledTimes(3)
+    gate.resolve(catalog({ bundles: [BUNDLE] }))
     await vi.advanceTimersByTimeAsync(400)
     expect(state().refreshStatus).toBe('idle')
     expect(state()).toMatchObject({ status: 'ready', notice: null })
-    inventory.list.mockResolvedValueOnce(refused('gateway/internal', 'offline again'))
+    plugins.catalog.mockResolvedValueOnce(refused('gateway/internal', 'offline again'))
     face.refresh()
     await vi.advanceTimersByTimeAsync(400)
     expect(state().notice).toEqual({ kind: 'refresh-failed', seq: 2 })
@@ -293,10 +327,10 @@ describe('PluginManagerController', () => {
   it.each(['refused', 'rejected'] as const)('keeps a %s first refresh failure inline without a toast', async (failure) => {
     vi.useFakeTimers()
     onTestFinished(() => { vi.useRealTimers() })
-    const inventory = failure === 'refused'
+    const catalog = failure === 'refused'
       ? vi.fn().mockResolvedValueOnce(refused('gateway/internal', 'offline'))
       : vi.fn().mockRejectedValueOnce(new Error('transport down'))
-    const { face, state } = bench({ inventory })
+    const { face, state } = bench({ catalog })
     face.refresh()
     await vi.advanceTimersByTimeAsync(400)
     expect(state().refreshStatus).toBe('failed')
@@ -306,10 +340,10 @@ describe('PluginManagerController', () => {
   it('treats an empty successful inventory as cached for refresh failures', async () => {
     vi.useFakeTimers()
     onTestFinished(() => { vi.useRealTimers() })
-    const { inventory, face, state, controller } = bench({ listBundles: vi.fn().mockResolvedValue(ok([])) })
+    const { plugins, face, state, controller } = bench({ catalog: vi.fn().mockResolvedValue(catalog({ bundles: [] })) })
     await controller.load()
     expect(state().packages).toEqual([])
-    inventory.list.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
+    plugins.catalog.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
     face.refresh()
     await vi.advanceTimersByTimeAsync(400)
     expect(state().refreshStatus).toBe('idle')
@@ -319,12 +353,12 @@ describe('PluginManagerController', () => {
   it('forgets cached inventory when the managed profile becomes unavailable', async () => {
     vi.useFakeTimers()
     onTestFinished(() => { vi.useRealTimers() })
-    const { inventory, face, state, controller } = bench()
+    const { plugins, face, state, controller } = bench()
     await controller.load()
-    inventory.list.mockResolvedValueOnce(ok({ entries: [], managementAvailable: false }))
+    plugins.catalog.mockResolvedValueOnce(catalog({ managementAvailable: false, manage: false, bundles: [], plugins: [] }))
     await controller.load()
     expect(state()).toMatchObject({ status: 'unavailable', packages: [] })
-    inventory.list.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
+    plugins.catalog.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
     face.refresh()
     await vi.advanceTimersByTimeAsync(400)
     expect(state().refreshStatus).toBe('failed')
@@ -353,19 +387,19 @@ describe('PluginManagerController', () => {
     vi.useFakeTimers()
     onTestFinished(() => { vi.useRealTimers() })
     const { plugins, face, state, controller } = bench({
-      inventory: vi.fn().mockResolvedValueOnce(refused('gateway/internal', 'offline'))
-        .mockResolvedValue(ok({ entries: [], managementAvailable: true })),
+      catalog: vi.fn().mockResolvedValueOnce(refused('gateway/internal', 'offline'))
+        .mockResolvedValue(catalog()),
     })
     face.refresh()
     await vi.advanceTimersByTimeAsync(400)
     expect(state().refreshStatus).toBe('failed')
-    const gate = deferred<ReturnType<typeof ok<BundleInfo[]>>>()
-    plugins.listBundles.mockReturnValueOnce(gate.promise)
+    const gate = deferred<ReturnType<typeof catalog>>()
+    plugins.catalog.mockReturnValueOnce(gate.promise)
     const loading = controller.load()
     await vi.advanceTimersByTimeAsync(0)
-    expect(plugins.listBundles).toHaveBeenCalledOnce()
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
     expect(state().refreshStatus).toBe('failed')
-    gate.resolve(ok([BUNDLE]))
+    gate.resolve(catalog({ bundles: [BUNDLE] }))
     await loading
     expect(state()).toMatchObject({ status: 'ready', refreshStatus: 'idle', notice: null })
   })
@@ -375,29 +409,29 @@ describe('PluginManagerController', () => {
     onTestFinished(() => { vi.useRealTimers() })
     const { plugins, face, state, controller } = bench()
     await controller.load()
-    const initial = deferred<ReturnType<typeof ok<BundleInfo[]>>>()
-    const rerun = deferred<ReturnType<typeof ok<BundleInfo[]>>>()
-    plugins.listBundles.mockReturnValueOnce(initial.promise).mockReturnValueOnce(rerun.promise)
+    const initial = deferred<ReturnType<typeof catalog>>()
+    const rerun = deferred<ReturnType<typeof catalog>>()
+    plugins.catalog.mockReturnValueOnce(initial.promise).mockReturnValueOnce(rerun.promise)
     const background = first === 'background' ? controller.load() : undefined
     if (first === 'manual') face.refresh()
     await vi.advanceTimersByTimeAsync(0)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
     expect(state().refreshStatus).toBe(first === 'background' ? 'idle' : 'refreshing')
     const completion = background ?? controller.load()
     if (first === 'background') face.refresh()
-    initial.resolve(ok([{ ...BUNDLE, version: '0.17.0' }]))
+    initial.resolve(catalog({ bundles: [{ ...BUNDLE, version: '0.17.0' }] }))
     await vi.advanceTimersByTimeAsync(400)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(3)
+    expect(plugins.catalog).toHaveBeenCalledTimes(3)
     expect(state()).toMatchObject({ status: 'ready', refreshStatus: 'refreshing', notice: null })
     expect(state().packages[0]?.version).toBe('0.17.0')
     face.refresh()
-    rerun.resolve(ok([{ ...BUNDLE, version: '0.18.0' }]))
+    rerun.resolve(catalog({ bundles: [{ ...BUNDLE, version: '0.18.0' }] }))
     await completion
     await vi.advanceTimersByTimeAsync(0)
     expect(state().refreshStatus).toBe('idle')
     expect(state().packages[0]?.version).toBe('0.18.0')
     expect(state().notice).toBeNull()
-    expect(plugins.listBundles).toHaveBeenCalledTimes(3)
+    expect(plugins.catalog).toHaveBeenCalledTimes(3)
   })
 
   it.each([false, true])('reports only the final coalesced refresh result (failure: %s)', async (failure) => {
@@ -405,19 +439,19 @@ describe('PluginManagerController', () => {
     onTestFinished(() => { vi.useRealTimers() })
     const { plugins, face, state, controller } = bench()
     await controller.load()
-    const initial = deferred<ReturnType<typeof ok<BundleInfo[]>> | ReturnType<typeof refused>>()
-    const rerun = deferred<ReturnType<typeof ok<BundleInfo[]>> | ReturnType<typeof refused>>()
-    plugins.listBundles.mockReturnValueOnce(initial.promise).mockReturnValueOnce(rerun.promise)
+    const initial = deferred<ReturnType<typeof catalog> | ReturnType<typeof refused>>()
+    const rerun = deferred<ReturnType<typeof catalog> | ReturnType<typeof refused>>()
+    plugins.catalog.mockReturnValueOnce(initial.promise).mockReturnValueOnce(rerun.promise)
     face.refresh()
     await vi.advanceTimersByTimeAsync(0)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
     const loading = controller.load()
-    initial.resolve(failure ? ok([BUNDLE]) : refused('gateway/internal', 'offline'))
+    initial.resolve(failure ? catalog({ bundles: [BUNDLE] }) : refused('gateway/internal', 'offline'))
     await vi.advanceTimersByTimeAsync(0)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(3)
+    expect(plugins.catalog).toHaveBeenCalledTimes(3)
     expect(state().refreshStatus).toBe('refreshing')
     expect(state().notice).toBeNull()
-    rerun.resolve(failure ? refused('gateway/internal', 'offline') : ok([BUNDLE]))
+    rerun.resolve(failure ? refused('gateway/internal', 'offline') : catalog({ bundles: [BUNDLE] }))
     await loading
     await vi.advanceTimersByTimeAsync(400)
     expect(state().refreshStatus).toBe('idle')
@@ -430,44 +464,44 @@ describe('PluginManagerController', () => {
     onTestFinished(() => { vi.useRealTimers() })
     const { plugins, face, state, controller } = bench()
     await controller.load()
-    const gate = deferred<ReturnType<typeof ok<BundleInfo[]>> | ReturnType<typeof refused>>()
-    plugins.listBundles.mockReturnValueOnce(gate.promise)
+    const gate = deferred<ReturnType<typeof catalog> | ReturnType<typeof refused>>()
+    plugins.catalog.mockReturnValueOnce(gate.promise)
     face.refresh()
     await vi.advanceTimersByTimeAsync(0)
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
     const completion = controller.load()
     const before = state()
     const listener = vi.fn()
     const unsubscribe = face.hooks.pluginManager.subscribe(listener)
     onTestFinished(unsubscribe)
     controller.dispose()
-    gate.resolve(failure ? refused('gateway/internal', 'offline') : ok([{ ...BUNDLE, version: '0.17.0' }]))
+    gate.resolve(failure ? refused('gateway/internal', 'offline') : catalog({ bundles: [{ ...BUNDLE, version: '0.17.0' }] }))
     await completion
     face.refresh()
     await vi.advanceTimersByTimeAsync(400)
     expect(state()).toBe(before)
     expect(listener).not.toHaveBeenCalled()
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
   })
 
   it('reports a Host without a managed profile as unavailable and keeps the last packages across a failed read', async () => {
     vi.useFakeTimers()
     onTestFinished(() => { vi.useRealTimers() })
-    const { inventory, plugins, face, state, controller } = bench()
+    const { plugins, face, state, controller } = bench()
     await controller.load()
     expect(state().packages).toHaveLength(1)
-    inventory.list.mockResolvedValueOnce(ok({ entries: [] }))
+    plugins.catalog.mockResolvedValueOnce(catalog({ managementAvailable: false, manage: false, bundles: [], plugins: [] }))
     await controller.load()
     expect(state()).toMatchObject({ status: 'unavailable', packages: [] })
-    inventory.list.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
+    plugins.catalog.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
     await controller.load()
     expect(state().status).toBe('error')
     await controller.load()
     expect(state().status).toBe('ready')
-    plugins.listPlugins.mockResolvedValueOnce(refused('gateway/internal', 'offline') as never)
+    plugins.catalog.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
     await controller.load()
     expect(state()).toMatchObject({ status: 'error', packages: [packageView(BUNDLE, PLUGINS)] })
-    plugins.listBundles.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
+    plugins.catalog.mockResolvedValueOnce(refused('gateway/internal', 'offline'))
     await controller.load()
     expect(state().status).toBe('error')
     face.refresh()
@@ -492,7 +526,7 @@ describe('PluginManagerController', () => {
     gate.resolve(ok(APPLIED))
     await vi.waitFor(() => { expect(state().busy).toEqual([]) })
     expect(state().notice).toBeNull()
-    expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+    expect(plugins.catalog).toHaveBeenCalledTimes(2)
     face.setEnabled(BUNDLE.name, false)
     await vi.waitFor(() => { expect(state().notice).toEqual({ kind: 'restart', packageName: BUNDLE.name, seq: 1 }) })
     face.setEnabled(BUNDLE.name, false)
@@ -625,7 +659,7 @@ describe('PluginManagerController', () => {
       { jobId: 'j1', command: 'pnpm add dsh-new', cwd: '/p', output: 'Progress\nDone\n', exitCode: 0 },
       { jobId: 'j2', command: 'pnpm remove lib', cwd: '/p', output: '- lib\n', exitCode: 0 },
     ])
-    await vi.waitFor(() => { expect(plugins.listBundles).toHaveBeenCalledTimes(2) })
+    await vi.waitFor(() => { expect(plugins.catalog).toHaveBeenCalledTimes(2) })
     // Cancelling from the finished screen does nothing, nor does the Host's late progress; a new spec after it starts over.
     face.cancelInstall()
     controller.installProgress({ requestId, phase: 'applying' })
@@ -639,7 +673,7 @@ describe('PluginManagerController', () => {
   it('refuses a spec the list already shows without asking the Host, and words what the Host refused', async () => {
     const shipped: BundleInfo = { ...BUNDLE, name: '@deepseek-ai/dsh-official', installed: false, optional: true, removable: false }
     const { plugins, face, state, controller } = bench({
-      listBundles: vi.fn(() => Promise.resolve(ok([BUNDLE, shipped]))),
+      catalog: vi.fn(() => Promise.resolve(catalog({ bundles: [BUNDLE, shipped] }))),
       inspect: vi.fn()
         .mockResolvedValueOnce(ok({ status: 'refused', problem: 'not-found', reason: 'E404', registries: [null, MIRROR] }))
         .mockResolvedValueOnce(ok({ status: 'refused', problem: 'not-a-bundle', reason: 'plain declares no dsh.bundle' }))
@@ -913,7 +947,7 @@ describe('PluginManagerController', () => {
     await vi.waitFor(() => { expect(state().install.phase).toBe(phase) })
     expect(state().install.open).toBe(false)
     expect(state().notice).toMatchObject({ kind: 'install', outcome: phase })
-    await vi.waitFor(() => { expect(plugins.listBundles).toHaveBeenCalled() })
+    await vi.waitFor(() => { expect(plugins.catalog).toHaveBeenCalled() })
     face.openInstall()
     expect(state().install.phase).toBe(phase)
     if (status === 'not-running') {
@@ -1158,7 +1192,7 @@ describe('PluginManagerController', () => {
     await controller.load()
     gate.resolve(ok({ ...APPLIED, bundle: 'pkg' }))
     await vi.waitFor(() => { expect(state().install.phase).toBe('done') })
-    expect(plugins.listBundles).toHaveBeenCalledTimes(3)
+    expect(plugins.catalog).toHaveBeenCalledTimes(3)
   })
 
   it('keeps the Host words and kind of a failed install, and settles a run whose last chunk never came', async () => {
@@ -1261,28 +1295,35 @@ describe('PluginManagerController', () => {
   })
 
   it('drops a read that settles after disposal', async () => {
-    const gate = deferred<ReturnType<typeof ok<{ entries: never[]; managementAvailable: boolean }>>>()
-    const { state, controller } = bench({ inventory: vi.fn().mockReturnValueOnce(gate.promise) })
+    const gate = deferred<ReturnType<typeof catalog>>()
+    const { state, controller, plugins } = bench({ catalog: vi.fn().mockReturnValueOnce(gate.promise) })
     const loading = controller.load()
     await Promise.resolve()
+    const signal = plugins.catalog.mock.calls[0]?.[1]
+    expect(signal?.aborted).toBe(false)
     const before = state()
     controller.dispose()
-    gate.resolve(ok({ entries: [], managementAvailable: true }))
+    expect(signal?.aborted).toBe(true)
+    gate.resolve(catalog())
     await loading
     expect(state()).toBe(before)
   })
 
-  it('drops a bundle read that settles after disposal', async () => {
-    const gate = deferred<ReturnType<typeof ok<BundleInfo[]>>>()
-    const { state, controller } = bench({ listBundles: vi.fn().mockReturnValueOnce(gate.promise) })
-    const loading = controller.load()
-    await vi.waitFor(() => { expect(state().status).toBe('loading') })
+  it('keeps a replacement runtime catalog when the previous generation replies late', async () => {
+    const gate = deferred<ReturnType<typeof catalog>>()
+    const previous = bench({ catalog: vi.fn().mockReturnValueOnce(gate.promise) })
+    const loading = previous.controller.load()
     await Promise.resolve()
-    const before = state()
-    controller.dispose()
-    gate.resolve(ok([BUNDLE]))
+    previous.controller.dispose()
+    const current = bench({ catalog: vi.fn().mockResolvedValue(catalog({ bundles: [{ ...BUNDLE, version: '2.0.0' }] })) })
+    await current.controller.load()
+    const previousState = previous.state()
+    const currentState = current.state()
+    gate.resolve(catalog({ bundles: [BUNDLE] }))
     await loading
-    expect(state()).toBe(before)
+    expect(previous.state()).toBe(previousState)
+    expect(current.state()).toBe(currentState)
+    expect(current.state().packages[0]?.version).toBe('2.0.0')
   })
 
   it.each([false, true])('drops refresh feedback when disposed during the spinner hold (failure: %s)', async (failure) => {
@@ -1290,7 +1331,7 @@ describe('PluginManagerController', () => {
     try {
       const { plugins, face, state, controller } = bench()
       await controller.load()
-      plugins.listBundles.mockResolvedValueOnce(failure ? refused('gateway/internal', 'offline') : ok([BUNDLE]))
+      plugins.catalog.mockResolvedValueOnce(failure ? refused('gateway/internal', 'offline') : catalog({ bundles: [BUNDLE] }))
       face.refresh()
       await vi.advanceTimersByTimeAsync(0)
       expect(state().refreshStatus).toBe('refreshing')
@@ -1314,13 +1355,13 @@ describe('PluginManagerController', () => {
     try {
       const { plugins, face, state, controller } = bench()
       await controller.load()
-      const gate = deferred<ReturnType<typeof ok<BundleInfo[]>>>()
-      plugins.listBundles.mockReturnValueOnce(gate.promise)
+      const gate = deferred<ReturnType<typeof catalog>>()
+      plugins.catalog.mockReturnValueOnce(gate.promise)
       face.refresh()
       await vi.advanceTimersByTimeAsync(401)
-      expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+      expect(plugins.catalog).toHaveBeenCalledTimes(2)
       expect(state().refreshStatus).toBe('refreshing')
-      gate.resolve(ok([{ ...BUNDLE, version: '0.42.0' }]))
+      gate.resolve(catalog({ bundles: [{ ...BUNDLE, version: '0.42.0' }] }))
       await vi.advanceTimersByTimeAsync(0)
       expect(state().refreshStatus).toBe('idle')
       expect(state().packages[0]?.version).toBe('0.42.0')

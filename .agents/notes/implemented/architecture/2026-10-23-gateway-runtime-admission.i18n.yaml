@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-23-gateway-runtime-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.md
+document:
+  en: 7f83c4fc8d02fd833482a109e792e28104ebda90
+  zh: 1505db9d498451552904dc15ab41ee108cecfccf
+/agent-note-managed-runtime-process-admission:
+  en: 50b4c013f0ed4ed5
+  zh: 9f1015ac85745a7b
+/agent-note-managed-runtime-process-admission/problem:
+  en: 472306c8a5a15f6d
+  zh: c552906f03ee4067
+/agent-note-managed-runtime-process-admission/decision:
+  en: 5eddd210ebd3d8c8
+  zh: e86ceb2e0a7c550b
+/agent-note-managed-runtime-process-admission/alternatives-considered:
+  en: 65f96ced7046f9a2
+  zh: 8ffa778fcbda7848
+/agent-note-managed-runtime-process-admission/consequences:
+  en: b23288fc5eb811d3
+  zh: 5b53a93f1ec48e28

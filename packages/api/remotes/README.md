@@ -15,7 +15,7 @@ The current Client assembly mounts the Goal Remote contribution and the read-onl
 
 This package contains no transport or Host service discovery logic. Its Client face can be reused by Web or a future TUI that provides the same React-free `ctx.remote` contract.
 
-The Client assembly mounts the generated Plugin Manager namespace for profile inspection, installation, activation, cancellation and removal. The owning Host service checks deployment authorization for every call; mounting methods grants no administrator rights. Installation events and logs are not part of the general forwarded-event allowlist.
+The Client assembly mounts the generated Plugin Manager namespace for the single-request profile catalog, inspection, installation, activation, cancellation and removal. The Web Host mounts the separate [read-only catalog entry](../../boot/plugin-manager/README.md#use-this-package); mounting this Client namespace alone does not provide a Host manager or catalog. The owning Host service checks deployment authorization for every call; mounting methods grants no administrator rights. Installation events and logs are not part of the general forwarded-event allowlist.
 
 ## Summary
 

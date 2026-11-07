@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-title-llm/README.md
 document:
-  en: 26e62c45ba787714b02f530a9d339765016401e1
-  zh: 58b42d949e8103c1c45796888d4e8f003c396c11
+  en: aa38d5e59e8e841d2153184544a662488b2a77f4
+  zh: a459c9affd4038dc1abc287ef531db5667888579
 /:
   en: 129d1901a10435e8
-  zh: 0a51af1cad6486b4
+  zh: f4c2ac320288e6f8
 /deepseek-ai-dsh-session-title-llm:
   en: b0bceb537bef8d44
   zh: 2cd86ed67141e567
@@ -18,8 +18,8 @@ document:
   en: 71eddffdffd8d82a
   zh: 7f267ebd12f53f74
 /deepseek-ai-dsh-session-title-llm/route-and-failure-contract:
-  en: 891af83d6c0b20fc
-  zh: e857069d6d4bc2b9
+  en: c8ac66c3bca9c107
+  zh: 6e6ff1bb61628bb2
 /deepseek-ai-dsh-session-title-llm/configuration:
   en: 6c3a69995e222f02
   zh: fce9e59eadd5925e

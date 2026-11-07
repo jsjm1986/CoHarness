@@ -783,11 +783,13 @@ describe('SubagentRuntime.startContinuable', () => {
     })
   })
 
-  it('releases the Activation when the parent catalog append fails', async () => {
+  it.each<{ kind: string; cleanupFailure: unknown }>([
+    { kind: 'ordinary', cleanupFailure: new Error('activation disposal also failed') },
+    { kind: 'unrenderable', cleanupFailure: Object.create(null) },
+  ])('preserves catalog failure after an $kind Activation disposal failure', async ({ cleanupFailure }) => {
     const { ctx, parent } = await setup([textResponse('unused')])
     const childId = SessionId('00000000-0000-4000-8000-000000000321')
     const catalogFailure = new Error('catalog append failed')
-    const cleanupFailure = new Error('activation disposal also failed')
     const appendCatalog = parent.session.append.bind(parent.session) as (
       type: 'subagent/catalog',
       data: SessionEventMap['subagent/catalog'],
@@ -837,11 +839,13 @@ describe('SubagentRuntime.startContinuable', () => {
     expect(adapter.requests).toEqual([])
   })
 
-  it('preserves prompt admission failure when Activation disposal also fails', async () => {
+  it.each<{ kind: string; cleanupFailure: unknown }>([
+    { kind: 'ordinary', cleanupFailure: new Error('activation disposal also failed') },
+    { kind: 'unrenderable', cleanupFailure: Object.create(null) },
+  ])('preserves admission failure after an $kind Activation disposal failure', async ({ cleanupFailure }) => {
     const { ctx, parent } = await setup([textResponse('unused')])
     const childId = SessionId('00000000-0000-4000-8000-000000000322')
     const admissionFailure = new Error('prompt admission failed')
-    const cleanupFailure = new Error('activation disposal also failed')
     const controller = new AbortController()
     const warnings: string[] = []
     ctx.logger.warn = (message: string) => { warnings.push(message) }
@@ -4114,4 +4118,22 @@ describe('continuable structured output', () => {
     expect(toolNames(adapter.requests[2]!)).not.toContain(STRUCTURED_OUTPUT_TOOL)
     await drainManager(ctx)
   })
+})
+
+it('joins gated direct child work through the public runtime before reporting no remaining children', async () => {
+  const finish = Promise.withResolvers<undefined>()
+  const adapter = new GatedAdapter([{ chunks: textResponse('child completed'), gate: finish.promise }])
+  const { ctx, parent } = await setupWith(adapter)
+  parkParent(ctx, parent)
+  let joining: Promise<boolean> | undefined, joined = false
+  try {
+    const child = await ctx.subagents.startContinuable(startSpec(parent))
+    joining = ctx.subagents.waitForChildren(parent).then((result) => { joined = true; return result })
+    await expect.poll(() => adapter.requests.length).toBe(1)
+    expect(joined).toBe(false)
+    finish.resolve(undefined)
+    await expect(joining).resolves.toBe(true)
+    await waitNoActivation(ctx, child.childId)
+    await expect(ctx.subagents.waitForChildren(parent)).resolves.toBe(false)
+  } finally { finish.resolve(undefined); await joining }
 })

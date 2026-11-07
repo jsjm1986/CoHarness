@@ -1,0 +1,13 @@
+{
+  "name": "typed-fixture-focused-units",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests/launch.spec.ts packages/experimental/browser-use-runtime/tests/mcp.spec.ts packages/experimental/browser-use-stagehand-native/tests/provider.spec.ts packages/experimental/inspector/tests/plugin.host.spec.ts packages/experimental/ptc-runtime-python/tests/resource-admission.spec.ts packages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts packages/mcp/mcp-client/tests/resource-admission.spec.ts --maxWorkers=2 --retry=0",
+  "startedAt": "2026-10-23T20:11:21.625341+00:00",
+  "seconds": 11.403,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8cacdadaeafccbb973b5cb2975ccb73f9d8a5b627ba72aaae1c7a9178ad9a688",
+  "inputsAfter": "8cacdadaeafccbb973b5cb2975ccb73f9d8a5b627ba72aaae1c7a9178ad9a688",
+  "outputSha256": "4194482ede83dba8e203e1ba8356e63d09b7df75756f5202ceece2daa0a0f56e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  7 passed (7)\n      Tests  113 passed (113)\n   Start at  04:11:24\n   Duration  8.09s (transform 3.39s, setup 149ms, import 5.35s, tests 9.68s, environment 0ms)\n\n"
+}

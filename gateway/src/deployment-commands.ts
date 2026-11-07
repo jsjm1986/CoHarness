@@ -3,19 +3,23 @@
  * manifest shared by the admin backup API and the standalone `pg:deploy`
  * applier. Commands stream the dump on stdout/stdin so a Docker Compose
  * `exec` command line works identically to a local `pg_dump` install.
+ * Failure diagnostics retain a complete UTF-8 stderr prefix within eight KiB.
  */
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
+import { addAbortListener } from 'node:events'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdir, mkdtemp, open, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { StringDecoder } from 'node:string_decoder'
 
 import type { ManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { compareManagedFiles, copyVerifiedFile, restoreManagedSnapshot, snapshotManagedFiles, verifyStoredFiles, type ManagedSnapshot, type PreservedManagedFiles } from './managed-files.ts'
 import type { DeploymentDataLease } from './postgres/deployment-lock.ts'
+import { scrubbedGatewayChildEnv } from './child-environment.ts'
 import { DEPLOYMENT_DATA_LOCK, DEPLOYMENT_SQL_LOCK } from './postgres/maintenance-service.ts'
 export type { ManagedFileEntry, ManagedSnapshot } from './managed-files.ts'
 
@@ -34,6 +38,9 @@ CREATE TEMP TABLE hgw_saved_control ON COMMIT DROP AS TABLE harness.cluster_cont
 CREATE TEMP TABLE hgw_saved_operations ON COMMIT DROP AS TABLE harness.deployment_operations;
 CREATE TEMP TABLE hgw_saved_backups ON COMMIT DROP AS TABLE harness.backup_records;
 CREATE TEMP TABLE hgw_saved_nodes ON COMMIT DROP AS SELECT id,organization_id,name::text FROM harness.compute_nodes;
+CREATE TEMP TABLE hgw_saved_topology ON COMMIT DROP AS TABLE harness.deployment_topology;
+CREATE TEMP TABLE hgw_saved_agents ON COMMIT DROP AS TABLE harness.node_agents;
+CREATE TEMP TABLE hgw_saved_enrollments ON COMMIT DROP AS TABLE harness.node_agent_enrollments;
 `
 
 const RESTORE_SUFFIX = `
@@ -46,7 +53,20 @@ DO $$ BEGIN
     OR EXISTS (SELECT * FROM hgw_saved_nodes EXCEPT SELECT id,organization_id,name FROM harness.compute_nodes) THEN
     RAISE EXCEPTION 'backup compute node identity differs from the destination';
   END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint
+    WHERE conrelid='harness.node_agent_enrollments'::regclass
+      AND conname='node_agent_enrollments_created_by_organization_id_fkey') THEN
+    RAISE EXCEPTION 'backup node enrollment history requires migration 102 in an isolated recovery deployment';
+  END IF;
 END $$;
+-- Deployment authority belongs to the destination, never to a data backup.
+DELETE FROM harness.node_agent_enrollments;
+DELETE FROM harness.node_agents;
+INSERT INTO harness.node_agents SELECT * FROM hgw_saved_agents;
+UPDATE harness.node_agents SET connection_id=NULL,lease_expires_at=NULL,connection_epoch=connection_epoch+1;
+INSERT INTO harness.node_agent_enrollments SELECT * FROM hgw_saved_enrollments;
+DELETE FROM harness.deployment_topology;
+INSERT INTO harness.deployment_topology SELECT * FROM hgw_saved_topology;
 DELETE FROM harness.cluster_control;
 INSERT INTO harness.cluster_control SELECT * FROM hgw_saved_control;
 UPDATE harness.cluster_control SET mode='restoring', write_epoch=write_epoch+1, updated_at=now();
@@ -120,31 +140,46 @@ export class DeploymentCommandError extends Error {
   constructor(message: string) { super(message) }
 }
 
+/** PostgreSQL tools retain their credential inputs without unrelated Gateway secrets. */
+function commandEnvironment(): NodeJS.ProcessEnv {
+  const env = scrubbedGatewayChildEnv()
+  for (const key of ['PGPASSWORD', 'PGPASSFILE', 'PGSSLKEY']) {
+    const value = process.env[key]
+    if (value !== undefined) env[key] = value
+  }
+  return env
+}
+
 async function run(argv: string[], input?: string | Readable, stdoutPath?: string, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted()
   const [command, ...args] = argv
   if (command === undefined || command === '') throw new DeploymentCommandError('empty deployment command')
   const child = spawn(command, args, {
+    env: commandEnvironment(),
     stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
-    ...(signal === undefined ? {} : { signal, killSignal: 'SIGKILL' }),
   })
   const stderrStream = child.stderr
   const stdoutStream = child.stdout
   const stdinStream = child.stdin
   if (stderrStream === null || stdoutStream === null || (input !== undefined && stdinStream === null)) {
-    child.kill('SIGKILL')
+    if (child.pid !== undefined) child.kill('SIGKILL')
     throw new DeploymentCommandError('deployment command streams were not piped')
   }
-  let stderr = ''
+  let stderr = Buffer.alloc(0)
   stderrStream.setEncoding('utf8')
   stderrStream.on('data', (chunk: string) => {
-    if (stderr.length < STDERR_CAPTURE_BYTES) stderr += chunk
+    const remaining = STDERR_CAPTURE_BYTES - stderr.length
+    if (remaining > 0) stderr = Buffer.concat([stderr, Buffer.from(chunk).subarray(0, remaining)])
   })
   let commandError: Error | undefined
   const exited = new Promise<number | null>((resolve) => {
     child.once('error', error => { commandError = error })
     child.once('close', exit => resolve(exit))
   })
+  const cancellation = signal === undefined ? undefined : addAbortListener(signal, () => {
+    if (child.pid !== undefined) child.kill('SIGKILL')
+  })
+  child.once('close', () => { cancellation?.[Symbol.dispose]() })
   const pipes: Promise<void>[] = []
   if (input !== undefined && stdinStream !== null) {
     pipes.push(pipeline(typeof input === 'string' ? createReadStream(input) : input, stdinStream).catch((error: unknown) => {
@@ -164,14 +199,15 @@ async function run(argv: string[], input?: string | Readable, stdoutPath?: strin
     exited,
     ...pipes,
   ]).catch(async (error: unknown) => {
-    child.kill('SIGKILL')
+    if (child.pid !== undefined) child.kill('SIGKILL')
     await Promise.allSettled([exited, ...pipes])
     throw error
   })
   if (commandError !== undefined) throw commandError
   signal?.throwIfAborted()
   if (code !== 0) {
-    const lines = stderr.trim().split('\n')
+    // A clipped final code point is not part of the diagnostic prefix.
+    const lines = new StringDecoder('utf8').write(stderr).trim().split('\n')
     const detail = lines.find(line => /\berror:/iu.test(line)) ?? lines.at(-1) ?? ''
     throw new DeploymentCommandError(`deployment command failed (exit ${String(code)}): ${argv[0]}${detail === '' ? '' : ` — ${detail}`}`)
   }

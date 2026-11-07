@@ -1,10 +1,8 @@
-/** Exact-path watching for live profile patch files outside Cordis module roots. */
-import { dirname, relative, resolve } from 'node:path'
+/** Exact-path watcher resources; the HMR service owns canonical-path registration. */
+import { dirname, relative, resolve, sep } from 'node:path'
 import { realpath, stat } from 'node:fs/promises'
 import { watch, type ChokidarOptions } from 'chokidar'
 import type { Context } from '@deepseek-ai/cordis'
-
-const registrations = new WeakMap<Context, Set<string>>()
 
 async function findWatchRoot(filename: string): Promise<{ filename: string; root: string; depth: number }> {
   let root = dirname(filename)
@@ -25,29 +23,30 @@ async function findWatchRoot(filename: string): Promise<{ filename: string; root
 }
 
 /**
- * Watch one patch path, including missing parents, and serialize refresh callbacks.
+ * Watch one patch path and its parent chain without subscribing to sibling files or directories.
+ * Missing parents are observed as they appear; refresh callbacks run serially.
  * @param ctx Context that owns watcher disposal and receives refresh failures.
  * @param filename Absolute patch-file path.
  * @param options Deployment watcher options; configuration watches enable write stabilization by default.
  * @param refresh Callback for additions, changes, and removals.
  * @param inTransaction Whether disposal is running inside the refresh being removed.
  * @returns A disposer that closes the watcher and drains its current refresh.
- * @throws When path resolution, watcher startup, or effect registration fails.
+ * @throws When path resolution, startup, effect registration, or startup cancellation fails; cleanup errors retain the primary cause.
  */
 export async function watchConfig(
   ctx: Context, filename: string, options: ChokidarOptions, refresh: () => Promise<void> | void,
   inTransaction: () => boolean = () => false,
 ): Promise<() => Promise<void>> {
   const target = await findWatchRoot(filename)
-  const paths = registrations.get(ctx) ?? new Set<string>()
-  registrations.set(ctx, paths)
-  if (paths.has(target.filename)) throw new Error(`config path already registered: ${filename}`)
   const { cwd: _cwd, ignored: _ignored, ...watchOptions } = options
   const watcher = watch(target.root, {
     // Stabilized events bypass Chokidar's lossy 50 ms change-event throttle.
     awaitWriteFinish: true, ...watchOptions, depth: target.depth, ignoreInitial: false,
+    ignored: (path) => {
+      const remainder = relative(resolve(path), target.filename)
+      return remainder === '..' || remainder.startsWith(`..${sep}`)
+    },
   })
-  paths.add(target.filename)
   const state = { dirty: false }
   let running: Promise<void> | undefined
   const onChange = (path: string) => {
@@ -84,6 +83,8 @@ export async function watchConfig(
   watcher.on('error', onError)
   const dispose = async () => {
     disposed = true
+    // Disposal settles startup waiters without publishing a live registration.
+    if (pending) { pending = false; ready.resolve() }
     // `close()` drops every listener but leaves a scheduled write-settle poll;
     // its straggler stats a file this teardown is deleting, which Windows
     // reports as EPERM, and an 'error' emission with no listener is rethrown
@@ -91,14 +92,20 @@ export async function watchConfig(
     const closing = watcher.close()
     watcher.on('error', onError)
     await closing
-    paths.delete(target.filename)
     if (!inTransaction()) await running
   }
+  let release = dispose
   try {
+    const owned = ctx.effect(() => dispose, 'hmr.watchConfig()')
+    release = owned
     await ready.promise
-    return ctx.effect(() => dispose, 'hmr.watchConfig()')
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- Owner disposal can set this flag while readiness is pending.
+    if (disposed) throw new Error('Configuration watch stopped during startup')
+    return owned
   } catch (error) {
-    await dispose()
+    try { await release() } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Configuration watcher startup and cleanup failed')
+    }
     throw error
   }
 }

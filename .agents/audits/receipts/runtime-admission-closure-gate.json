@@ -1,0 +1,13 @@
+{
+  "name": "runtime-admission-closure-gate",
+  "cwd": ".",
+  "command": "pnpm run verify-runtime-closure",
+  "startedAt": "2026-10-23T20:12:22.029992+00:00",
+  "seconds": 2.549,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8cacdadaeafccbb973b5cb2975ccb73f9d8a5b627ba72aaae1c7a9178ad9a688",
+  "inputsAfter": "d549a1bd4fcb09f839158fab7516dff9398e7e01e7d310c182e32220a6067c37",
+  "outputSha256": "7a15e3f1b568fa4ce32ad19e763aec1a6b4ba4f24193c354d72a737970206698",
+  "outputTail": "$ tsx scripts/verify-runtime-closure.ts\nverify-runtime-closure: 4 agent presets and 170 workspace packages form a closed runtime dependency graph.\n"
+}

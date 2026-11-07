@@ -44,6 +44,7 @@ export async function createHelperHarness(handshake = true, leaseMs = 30_000, ki
   let facts: z.infer<typeof helloSchema> | undefined
   try { if (handshake) facts = await hello() } catch (error) { await close(); throw error }
   const connection = {
+    retainConsumer: (cleanup: () => Promise<void>) => cleanup,
     ready: Promise.resolve(facts),
     request: <T>(method: string, params: unknown, schema: z.ZodType<T>, signal?: AbortSignal) =>
       client.request(method, params, schema, signal),

@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/capability-seams.md
 document:
-  en: 6287ba42166a27d41d5cf1c76c4140fd80d4afc2
-  zh: 126aee8d33237e26514712b4758db29324d0ff85
+  en: b170072a5665d6c4db5d4990e56700e5a52e7159
+  zh: 3ca88445bcbcc5786c7d395341c4c4f321087015
 /:
   en: 41d772192075e133
   zh: 5ef3da69b4de1d8a
 /capability-seams-and-core-services:
-  en: 8843be183eb57a75
-  zh: 75433f4b22efc911
+  en: fc1818ba52ec6324
+  zh: 00faa40937fe5e67

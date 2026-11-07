@@ -48,5 +48,5 @@ export async function mountWorkflowRuntime(
 /** Give a stub subagent provider a parent with a real Session and immutable cwd. */
 export function fakeParent(ctx: Context): Agent {
   const session = ctx.sessions.create(undefined, { meta: { cwd: ctx.sandboxPolicy.workspaceRoot } })
-  return { id: session.id, session, options: {} } as unknown as Agent
+  return { id: session.id, session, options: {}, ctx: ctx.plugin(() => {}).ctx } as unknown as Agent
 }

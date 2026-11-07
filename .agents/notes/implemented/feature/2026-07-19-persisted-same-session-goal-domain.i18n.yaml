@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-persisted-same-session-goal-domain.md
 document:
-  en: fb32b17913dda62d6794472b8b64c849b104812c
-  zh: 78355e59dae0d3d53f41051bc0f03d555e3c01d8
+  en: 53a611f57b576f7cd10348792764bcfad9c093c5
+  zh: 427e5999a880957bd7b1afa605c5695336c59b7e
 /agent-note-persisted-same-session-goal-domain:
   en: 05f6641270399579
   zh: 962259d5bd3b3e16
@@ -18,8 +18,8 @@ document:
   en: d4520ec456f4023a
   zh: 2ffcb155955539e5
 /agent-note-persisted-same-session-goal-domain/decision/lifecycle-and-live-activation:
-  en: 99cf4ccff3b08275
-  zh: ae0014c4d3f17f05
+  en: cb96e7b981be739b
+  zh: f063d7b9ac089523
 /agent-note-persisted-same-session-goal-domain/decision/service-boundary:
   en: 0bff035a2664e7c0
   zh: ba303bd3ec64151b

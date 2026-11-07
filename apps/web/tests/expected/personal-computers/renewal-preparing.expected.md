@@ -1,0 +1,1 @@
+- textbox "Opening the new conversation…" [disabled]: Keep the original draft across transport renewal

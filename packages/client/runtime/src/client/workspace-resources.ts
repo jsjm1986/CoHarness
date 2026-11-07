@@ -1,5 +1,6 @@
 /** Metadata-only Workspace resources isolated by connection target and Session. */
 import type { ConnectionRuntimeTarget, IApiClient, SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import { runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 
 /** Opaque browser address containing only a Session and relative file path. */
 export type WorkspaceResourceAddress = string & { readonly __workspaceResourceAddress: unique symbol }
@@ -58,7 +59,7 @@ export class WorkspaceResourceError extends Error {
  * @returns whether to discard metadata and content.
  */
 export function isWorkspaceAccessFailure(error: unknown): error is WorkspaceResourceError {
-  if (!(error instanceof WorkspaceResourceError)) return false
+  if (!(error instanceof Error) || !('code' in error) || typeof error.code !== 'string') return false
   return ['collaboration-forbidden', 'session-not-found', 'workspace-file/unknown-session', 'access-revoked'].includes(error.code)
 }
 /**
@@ -137,7 +138,7 @@ export function workspacePathForResource(cwd: string | undefined, path: string):
 }
 
 function targetKey(target: WorkspaceResourceTarget): string {
-  return target.kind === 'project' ? `project:${String(target.projectId)}` : target.kind
+  return target.kind === 'base' ? target.kind : runtimeTargetKey(target)
 }
 const EMPTY: WorkspaceResourceState = { status: 'none' }
 const UNAVAILABLE: WorkspaceResourceState = {
@@ -219,7 +220,7 @@ export class WorkspaceResourceRegistry {
         // One registration per subscription, even when two callers pass the same callback.
         const notify = (): void => { listener() }
         record.subscribers.add(notify)
-        if (record.state.status === 'none') void this.reload(key, record)
+        this.loadRetained(key, record)
         let released = false
         return () => {
           if (released) return
@@ -249,7 +250,7 @@ export class WorkspaceResourceRegistry {
     const record = this.retain(key, request.address, source)
     if (record === undefined) return () => {}
     record.pins += 1
-    if (record.state.status === 'none') void this.reload(key, record)
+    this.loadRetained(key, record)
     let released = false
     const release = (): void => {
       if (released) return
@@ -346,6 +347,12 @@ export class WorkspaceResourceRegistry {
     const record: ResourceRecord = { address, source, state: EMPTY, subscribers: new Set(), pins: 0 }
     owner.records.set(address, record)
     return record
+  }
+
+  private loadRetained(key: string, record: ResourceRecord): void {
+    const revalidate = record.state.status === 'failed' && record.state.error instanceof WorkspaceResourceError
+      && record.state.error.code === 'connection-unavailable'
+    if (record.state.status === 'none' || revalidate) void this.reload(key, record, revalidate)
   }
 
   private async reload(key: string, record: ResourceRecord, revalidate = false): Promise<void> {

@@ -6,6 +6,8 @@ import type { PluginInfo } from '../../../../packages/boot/plugin-manager/src/ty
 import { pluginManagementRemote } from './transport.ts'
 import { PluginMatrix } from './PluginMatrix.tsx'
 import { usePluginComposition } from './composition.ts'
+import { useEffect } from 'react'
+import { PluginManagerController } from './manager-store.ts'
 
 vi.mock('../api.ts', async (importOriginal) => {
   const original = await importOriginal<typeof import('../api.ts')>()
@@ -19,8 +21,16 @@ vi.mock('./transport.ts', () => ({ pluginManagementRemote: vi.fn() }))
 const api = vi.mocked(await import('../api.ts'))
 const remote = vi.mocked(pluginManagementRemote)
 
-beforeEach(() => { vi.clearAllMocks() })
-afterEach(cleanup)
+beforeEach(() => {
+  vi.clearAllMocks()
+  const storage = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value) },
+    removeItem: (key: string) => { storage.delete(key) },
+  })
+})
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const stopped: PluginManagementTarget = { nodeId: 'node-a', target: { kind: 'user', id: 7 }, generation: null }
 const running: PluginManagementTarget = { ...stopped, generation: 3 }
@@ -38,6 +48,7 @@ function view(overrides: Partial<PluginManagementState> = {}): PluginManagementS
 
 function liveRemote(plugins: PluginInfo[] = []) {
   const calls = {
+    catalog: vi.fn(async () => ({ ok: true as const, value: { managementAvailable: true, manage: true, plugins, bundles: [] } })),
     listPlugins: vi.fn(async () => ({ ok: true as const, value: plugins })),
     listBundles: vi.fn(async () => ({ ok: true as const, value: [] })),
     setPluginEnabled: vi.fn(async () => ({ ok: true as const, value: { changed: true, application: 'applied' } })),
@@ -59,6 +70,15 @@ const plugin = (patchId: string, enabled: boolean, title?: string): PluginInfo =
 /** The page arrangement under test: the matrix over the shared composition, its error and notice, and the draft actions. */
 function Harness({ kind, id, target }: { kind: 'user' | 'project'; id: number; target: PluginManagementTarget }) {
   const composition = usePluginComposition(kind, id, target)
+  useEffect(() => {
+    if (target.generation === null) return
+    const abort = new AbortController()
+    const remote = pluginManagementRemote(target, abort.signal, () => {}, () => {})
+    const controller = new PluginManagerController({ remote, onCatalog: composition.acceptCatalog })
+    const unbind = composition.bindLiveRefresh(() => controller.load())
+    void controller.load()
+    return () => { unbind(); controller.dispose(); abort.abort() }
+  }, [target, composition.acceptCatalog, composition.bindLiveRefresh])
   return <>
     {composition.error === '' ? null : <p role="alert">{composition.error}</p>}
     {composition.notice === '' ? null : <p role="status">{composition.notice}</p>}

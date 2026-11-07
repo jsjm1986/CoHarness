@@ -1,3 +1,4 @@
+import { DeploymentContextProvider, useDeploymentContext } from './deployment-context.tsx'
 import {
   ChartNoAxesCombined,
   Ellipsis,
@@ -18,14 +19,14 @@ import {
   Webhook,
   type LucideIcon,
 } from 'lucide-react'
-import { NavLink, Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
+import { NavLink, Navigate, Route, createBrowserRouter, RouterProvider, Routes, useLocation } from 'react-router-dom'
 import { AuditPage } from './pages/AuditPage.tsx'
 import { ProjectDetailPage } from './pages/ProjectDetailPage.tsx'
 import { ProjectListPage } from './pages/ProjectListPage.tsx'
 import { UsersPage } from './pages/UsersPage.tsx'
 import { UserDetailPage } from './pages/UserDetailPage.tsx'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Dialog } from './components/ui.tsx'
+import { Button, Dialog, ErrorBanner } from './components/ui.tsx'
 import { adminLanguage, setAdminLanguage, translateCopy, type AdminLanguage } from './language.ts'
 import { zh as chromeZh, en as chromeEn, type ChromeCopyKey } from './chrome.copy.ts'
 const PluginsPage = lazy(async () => ({ default: (await import('./pages/PluginsPage.tsx')).PluginsPage }))
@@ -40,15 +41,45 @@ import { DeploymentPage } from './pages/DeploymentPage.tsx'
 import { WebhooksPage } from './pages/WebhooksPage.tsx'
 import { TerminalsPage } from './pages/TerminalsPage.tsx'
 import { StewardPage } from './pages/StewardPage.tsx'
+import { ComputerSelector } from './ComputerSelector.tsx'
+import { adminComputerBase, adminComputerTarget } from './computer-target.ts'
+import { PendingEditsProvider, useProtectedNavigation } from './pending-edits.tsx'
+import { zh as computerZh, en as computerEn } from './computer.copy.ts'
 
 export function App() {
+  const [computer] = useState(() => {
+    try { return { nodeId: adminComputerTarget(window.location.pathname), invalid: false } }
+    catch { return { nodeId: undefined, invalid: true } }
+  })
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: computerZh, en: computerEn }), [])
+  const [router, setRouter] = useState<ReturnType<typeof createBrowserRouter>>()
+  useEffect(() => {
+    if (computer.invalid) return
+    const owned = createBrowserRouter([{ path: '*', element: <PendingEditsProvider protectHistory>
+      <DeploymentContextProvider><AdminDocument nodeId={computer.nodeId} /></DeploymentContextProvider>
+    </PendingEditsProvider> }], { basename: adminComputerBase(computer.nodeId) })
+    setRouter(owned)
+    return () => { owned.dispose() }
+  }, [computer])
+  if (computer.invalid) return <main className="mainContent">
+    <div className="page"><p role="alert">{t('invalid')}</p><a href="/admin/">{t('returnCenter')}</a></div>
+  </main>
+  return router === undefined ? <PluginsFallback /> : <RouterProvider router={router} />
+}
+
+function AdminDocument({ nodeId }: { nodeId: ReturnType<typeof adminComputerTarget> }) {
+  const navigation = useProtectedNavigation()
+  const deployment = useDeploymentContext()
+  const location = useLocation()
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: computerZh, en: computerEn }), [])
+  const unavailable = nodeId !== undefined && deployment.value !== null && deployment.value.scope === 'local' && nodeId !== deployment.value.entry.nodeId
   useEffect(() => {
     const previous = document.documentElement.lang
     document.documentElement.lang = adminLanguage()
     return () => { document.documentElement.lang = previous }
   }, [])
   return (
-    <Router basename="/admin">
+    <>
       <div className="adminShell" data-testid="admin-app">
         <aside className="sidebar">
           <Brand />
@@ -64,7 +95,12 @@ export function App() {
           <LogoutButton compact />
         </header>
         <main className="mainContent">
-          <Routes>
+          {deployment.value?.scope === 'organization' && <ComputerSelector nodeId={nodeId} onSelect={nextNodeId => {
+            navigation.navigate(`${adminComputerBase(nextNodeId)}${location.pathname}${location.search}${location.hash}`)
+          }} />}
+          {deployment.error && location.pathname !== '/deployment' && <div className="page"><ErrorBanner message={t('policyFailed')} /><Button onClick={() => void deployment.refresh()}>{t('retryPolicy')}</Button></div>}
+          {unavailable && <div className="page"><p role="alert">{t('entryUnavailable')}</p><a href="/admin/" target="_blank" rel="noopener noreferrer">{t('openLocal')}</a></div>}
+          <div className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}><Routes>
             <Route path="/" element={<UsersPage />} />
             <Route path="/users" element={<Navigate to="/" replace />} />
             <Route path="/users/:id" element={<UserDetailPage />} />
@@ -83,11 +119,11 @@ export function App() {
             <Route path="/desktops" element={<DesktopsPage />} />
             <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
             <Route path="/audit" element={<AuditPage />} />
-          </Routes>
+          </Routes></div>
         </main>
         <AdminNav className="mobileNav" />
       </div>
-    </Router>
+    </>
   )
 }
 

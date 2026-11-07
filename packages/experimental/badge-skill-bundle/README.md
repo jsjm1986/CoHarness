@@ -1,5 +1,5 @@
 ---
-description: "Let agents add a “powered by dsh” badge to documents, pull requests, and other outputs."
+description: "Let agents add a “powered by CoHarness” badge to documents, pull requests, and other outputs."
 kind: "package-bundle"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Let Agents whose presets load skills add a “powered by dsh” badge to documents, pull requests, and other outputs. The shared provider adds no model tool. It ships switched off in Web and Desktop. Select it in Plugins to enable it.
+Let Agents whose presets load skills add a “powered by CoHarness” badge to documents, pull requests, and other outputs. The shared provider adds no model tool. It ships switched off in Web and Desktop. Select it in Plugins to enable it.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ Let Agents whose presets load skills add a “powered by dsh” badge to documen
 <a id="use-this-package"></a>
 ## Use this package
 
-In Web or Desktop, open Plugins and enable **DSH badge skill** in Official. Switch it off to remove its profile layer.
+In Web or Desktop, open Plugins and enable **CoHarness badge skill** in Official. Switch it off to remove its profile layer.
 
 The switch adds or removes a Host-wide skill provider for existing and new Agents. Presets that expose skill loading can use the badge; minimal keeps its tool catalog unchanged.
 

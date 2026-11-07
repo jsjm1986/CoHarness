@@ -11,8 +11,8 @@ import { HostNativeDomainSession } from './domains/native.ts'
 import { InspectorRealmSessionSet } from './realm-sessions.ts'
 import type { InspectorRealmRegistry } from '../inspection/realm-store.ts'
 import type { CordisRuntimeTreeReader } from '../../shared/cordis/reader.ts'
-import { cordisRuntimeSourceId, type CordisRuntimeTree } from '../../shared/cordis/model.ts'
-import type { InspectorSourceId } from '../../shared/bridge/ids.ts'
+import type { CordisRuntimeTree } from '../../shared/cordis/model.ts'
+import { isInspectorSourceSelected, type InspectorClientSelection } from '../../shared/web.ts'
 
 /** Per-connection CDP dispatcher with optional Client selection; Host remains visible. */
 export class CdpSession implements NetworkSink {
@@ -33,7 +33,7 @@ export class CdpSession implements NetworkSink {
     realmRegistry: InspectorRealmRegistry,
     domBackend: CordisDomBackend,
     private readonly cordisTrees: CordisRuntimeTreeReader,
-    private readonly clientSourceId?: InspectorSourceId,
+    private readonly clientSourceId?: InspectorClientSelection,
   ) {
     this.realms = new InspectorRealmSessionSet(realmRegistry, clientSourceId)
     const native = this.realms.host().nativeDomains
@@ -105,14 +105,12 @@ export class CdpSession implements NetworkSink {
   }
 
   private visibleSources(): ReturnType<InspectorSourceRegistry['describe']> {
-    return this.sources.describe().filter(source => this.clientSourceId === undefined
-      || source.kind === 'host' || source.sourceId === this.clientSourceId)
+    return this.sources.describe().filter(source => isInspectorSourceSelected(this.clientSourceId, source))
   }
 
   private visibleTree(tree: CordisRuntimeTree): CordisRuntimeTree {
     if (this.clientSourceId === undefined) return tree
-    const sourceId = cordisRuntimeSourceId(this.clientSourceId)
-    return { ...tree, clients: tree.clients.filter(client => client.source.sourceId === sourceId) }
+    return { ...tree, clients: tree.clients.filter(client => isInspectorSourceSelected(this.clientSourceId, client.source)) }
   }
 
   /** Push one CDP event. */

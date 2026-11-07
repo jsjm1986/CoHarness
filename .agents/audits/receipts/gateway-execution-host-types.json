@@ -1,0 +1,13 @@
+{
+  "name": "gateway-execution-host-types",
+  "cwd": ".",
+  "command": "pnpm exec tsc --noEmit -p tsconfig.host.json",
+  "startedAt": "2026-10-23T13:05:18.179862+00:00",
+  "seconds": 28.375,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8189e9d2d88d6504c4308e4c4069700c23736f1cd1872376d4d6ef8b3e6dea05",
+  "inputsAfter": "8189e9d2d88d6504c4308e4c4069700c23736f1cd1872376d4d6ef8b3e6dea05",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

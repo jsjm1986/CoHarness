@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-gateway-types",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/tsc --noEmit",
+  "startedAt": "2026-10-26T21:16:30.588128+00:00",
+  "seconds": 19.279,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5b9e3ede63c89ec867910ac00865157a2e9cf8bf87e6bbaf99702646639c3706",
+  "inputsAfter": "5b9e3ede63c89ec867910ac00865157a2e9cf8bf87e6bbaf99702646639c3706",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

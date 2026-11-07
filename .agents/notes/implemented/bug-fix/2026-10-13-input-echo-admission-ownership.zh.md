@@ -15,7 +15,7 @@ Status: implemented
 
 ## 决策
 
-1. 移植上游 `820824edd74`：为每条回显跨 `session/queue` 帧、`queuedInbox` 投影与 `agent/inbox/spliced` 事件跟踪 `queueTarget`/`queueIndex`/`queueSeq` 回执；queued 位置的回显在被队列接受时退役；transcript/steering 回显等待持久录取且队列行被移除；`canceled` splice 立即使被移除回显失败；已离开队列且未录取的回显在移除观察之后记录的下一条 `request/context` 或 `turn/end` 边界处失败。
+1. 移植上游 `820824edd74`：为每条回显跨 `session/queue` 帧、`queuedInbox` 投影与 `agent/inbox/spliced` 事件跟踪 `queueTarget`/`queueIndex`/`queueSeq` 回执；queued 与 steering 回显在 Host 接受队列身份时退役；transcript 回显等待持久录取且队列行被移除；`canceled` splice 立即使被移除回显失败；已离开队列且未录取的回显在移除观察之后记录的下一条 `request/context` 或 `turn/end` 边界处失败。
 2. 同一提交：种子时 reconciliation 把所有在 `projections.asOfSeq` 及之前已被队列观察到的身份按已观察接受——即使其持久录取不在已加载窗口内；`ProjectionValueStore.seqOf` 暴露该比较所需的逐 key 水位。
 3. 同一提交：`BeginSubmissionInput` 改为携带 `mode`，由 Session 依据自身实时 `running` 状态派生位置，与上游一致并消除过期快照竞态。
 4. 移植上游 `08c0e8e71b6`：已录取的本地身份在队列发布移除其行之前一直抑制该行（ChatView 的 steering 行与 QueueDock 的 transcript 行均按 `rpcId` 匹配）；渲染侧去重只在持久节点持有其 `rpcId` 后隐藏回显，队列占位不隐藏。
@@ -31,6 +31,8 @@ Status: implemented
 **移植上游 Playwright e2e（`idle-submission-handoff.e2e.ts`）。** 延后：我们的 wire 面不同（`session/queue` 帧与 `queuedInbox` 投影，而非上游的 `session/control`/`session/follow` 流），门控需要重写而非照抄；单元测试已覆盖全部结算路径。
 
 ## 影响
+
+输入框提交的完成状态对文字、图片和文档使用相同的回执。控制器等待回显完成交接，再提交成功并释放本次文档引用。仅有传输接收确认、尚无队列或持久输入记录时，预执行准备失败不能清空草稿。输入框挂载后才获得已验证的存储归属时，store 会明确恢复实时输入区；首次创建 store 则保留已经存在的实时草稿。
 
 同一身份的队列观察与持久观察经结算锁存去重，任一路径都不会重复或乱序退役回显。队列行消失但未获录取的提交恰好在拥有该移除的 splice 或下一持久边界处失败一次，不再闪烁或泄漏。重连基线把 Host 已确认的输入按已接受处理，而不再当草稿重现。成功的 Assistant 回答在模型结算时即刻发布，准备/工具行在其后完成。
 

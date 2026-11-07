@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-scoped-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/eslint packages/attachment/userdoc-gateway/src packages/attachment/userdoc-gateway/tests packages/attachment/userdoc/src/index.ts packages/attachment/userdoc/src/error.ts packages/host/userdoc-http/src/index.ts packages/context/gateway-runtime/src/index.ts",
+  "startedAt": "2026-10-26T17:32:11.845398+00:00",
+  "seconds": 2.98,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6472cd8494bc77444e74d4427f0adad91f55e230941f0169955679ce5fc7041c",
+  "inputsAfter": "6472cd8494bc77444e74d4427f0adad91f55e230941f0169955679ce5fc7041c",
+  "postgresToolDirectory": null,
+  "outputSha256": "07433ec4f264fcbea011cb736ce73cb5ee9afe467c58738003d111174fc1adeb",
+  "outputTail": "\nOops! Something went wrong! :(\n\nESLint: 10.5.0\n\nESLint couldn't find an eslint.config.(js|mjs|cjs) file.\n\nFrom ESLint v9.0.0, the default configuration file is now eslint.config.js.\nIf you are using a .eslintrc.* file, please follow the migration guide\nto update your configuration file to the new format:\n\nhttps://eslint.org/docs/latest/use/configure/migration-guide\n\nIf you still have problems after following the migration guide, please stop by\nhttps://eslint.org/chat/help to chat with the team.\n\n"
+}

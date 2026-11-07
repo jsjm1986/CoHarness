@@ -1,0 +1,14 @@
+{
+  "name": "external-model-control-source",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent/tests/external-model.spec.ts packages/subagent/subagent-codex/tests/managed-model-control.spec.ts packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts packages/subagent/subagent-acp/tests/managed-model-control.spec.ts --retry=0",
+  "startedAt": "2026-10-24T17:01:25.834926+00:00",
+  "seconds": 5.629,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "31ce5a0badaa1146db516056f817db3619649e0f28361ac3ae0398cd8c3467ff",
+  "inputsAfter": "31ce5a0badaa1146db516056f817db3619649e0f28361ac3ae0398cd8c3467ff",
+  "postgresToolDirectory": null,
+  "outputSha256": "cd68091144deb9ec62d6386d3f608f0e093eb2101ab35264d63c36d0c24a0325",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  4 passed (4)\n      Tests  8 passed (8)\n   Start at  01:01:29\n   Duration  1.99s (transform 4.62s, setup 168ms, import 6.14s, tests 56ms, environment 0ms)\n\n"
+}

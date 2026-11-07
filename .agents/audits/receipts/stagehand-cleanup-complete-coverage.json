@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-cleanup-complete-coverage",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests packages/experimental/browser-use-runtime/tests --coverage --coverage.include=packages/experimental/browser-use-stagehand-native/src/launch.ts --coverage.include=packages/experimental/browser-use-stagehand-native/src/index.ts --coverage.include=packages/experimental/browser-use-stagehand-native/src/worker-client.ts --coverage.reportsDirectory=.agents/audits/.local/stagehand-cleanup-complete-coverage --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T17:24:51.430018+00:00",
+  "seconds": 22.948,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "017d745e3f6863ff8b3fd39e0166ac366fa11eae3e39684f35f67652f3252abf",
+  "inputsAfter": "017d745e3f6863ff8b3fd39e0166ac366fa11eae3e39684f35f67652f3252abf",
+  "outputSha256": "bee889b830a8b6bffbcb3f77b9146b281920c71037e0c60c77d42f68ba699e63",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  13 passed (13)\n      Tests  145 passed (145)\n   Start at  01:25:05\n   Duration  8.83s (transform 1.72s, setup 208ms, import 3.98s, tests 5.74s, environment 1ms)\n\n % Coverage report from v8\n------------------|---------|----------|---------|---------|-------------------\nFile              | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n------------------|---------|----------|---------|---------|-------------------\n------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 261/261 )\nBranches     : 100% ( 88/88 )\nFunctions    : 100% ( 57/57 )\nLines        : 100% ( 212/212 )\n================================================================================\n"
+}

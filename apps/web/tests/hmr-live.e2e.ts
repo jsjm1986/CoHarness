@@ -110,7 +110,7 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
       { id: 'userdoc-local', config: { uploadRoot: join(world, 'documents') } },
     ]) + '\n')
     subprocessFiber = await subprocessCtx.plugin(LocalSubprocessRuntime)
-    watcher = subprocessCtx.subprocess.spawn(spawnSpec(
+    watcher = await subprocessCtx.subprocess.spawn(spawnSpec(
       // NODE_ENV=production: any build stage inside dev:web would otherwise
       // bake vitest's ambient NODE_ENV=test into the bundles it digests.
       ['pnpm', 'run', 'dev:web'],
@@ -121,7 +121,7 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     // generic bound several times over on loaded runners, so the bound must
     // cover the worst observed cold compile plus margin.
     await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web', 420_000)
-    host = subprocessCtx.subprocess.spawn(spawnSpec(
+    host = await subprocessCtx.subprocess.spawn(spawnSpec(
       [process.execPath, binPath, 'web', '--patch', storagePatch, '--no-open', '--port', '0'],
       world,
       {

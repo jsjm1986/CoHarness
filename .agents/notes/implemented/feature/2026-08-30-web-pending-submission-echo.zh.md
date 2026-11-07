@@ -14,7 +14,7 @@ Status: implemented
 
 `Session.beginSubmission()` 在图片序列化前同步注册本地回显，并返回新的 `rpcId`。调用方把该身份传给 `session.prompt()` 或 `subagent.prompt()`。宿主/API 投影在持久化 user-message 的 source 和每个 `session/queue` occurrence 上携带同一身份；队列 schema 保留 occurrence 字段，不再把它剥离。
 
-`Session` 在 Session 日志之外保存待提交回显。持久化 `user/message` 或队列 occurrence 会安排下一帧回收，settlement latch 让重复观察保持幂等。准入失败、序列化失败、取消和 Session dispose 会把回显按失败回收。调用方恰好收到一次回收回调，并可恢复失败草稿，而不会把未提交回显误认为持久化历史。
+`Session` 在 Session 日志之外保存待提交回显。持久化 `user/message` 或队列 occurrence 会安排下一帧回收，settlement latch 让重复观察保持幂等。准入失败、序列化失败、取消和 Session dispose 会把回显按失败回收。调用方恰好收到一次回收回调，并可恢复失败草稿，而不会把未提交回显误认为持久化历史。缓冲、重放或从更早历史页补入的持久用户消息在已安装历史窗口之外仍可证明准入。匹配的回执会完成输入结算，而不追加旧内容或重放队列变更；仅凭准入 RPC 成功仍不能证明 pre-step 流程接受了消息。
 
 `ConversationController` 立即向 Chat 视图提供浏览器所有的预览 URL。图片准入被观察到后，它把每个预览转移到按 Session 作用域的持久图片缓存；经过授权的字节完成读取前，预览仍可同步读取。随后规范 URL 替换预览并回收预览 URL。读取失败或被作废时删除缓存项；释放已渲染 Session 时立即回收当前预览，并在稍后回收规范 URL。仅文档和仅图片提示词不会生成空文本块，并发提交只会回收各自的图片。
 
@@ -23,6 +23,8 @@ Status: implemented
 ## 验证
 
 运行时、队列 schema、ConversationController、ChatView 和 MessageImage 的 focused 测试覆盖慢速编码、request-id 传递、队列/持久化重复观察、业务/传输/取消失败、序列化回收、仅图片与仅文档内容、并发提交、持久化 URL 替换、失败读取重试，以及 Session 释放和 dispose 时的预览清理。
+
+无密钥 Web 回归运行正式宿主，在工具回合期间丢弃实时下行数据，再通过正式历史分页重连。它验证更早的匹配回执会解锁输入框且不重复用户消息；修复前的浏览器产物无法通过此场景。
 
 ## 考虑过的替代方案
 

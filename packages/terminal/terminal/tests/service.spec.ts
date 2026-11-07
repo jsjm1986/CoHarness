@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import { setImmediate } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry, { agentCarrier } from '@deepseek-ai/dsh-agent'
@@ -133,6 +134,35 @@ async function disposeTerminalSessionService(ctx: Context): Promise<void> {
 }
 
 describe('TerminalSessionService backend registry', () => {
+  it('withdraws pending setup and joins rollback when its backend plugin leaves', async () => {
+    const ctx = await harness(), owner = stubAgent(ctx, 'withdrawn-terminal-backend')
+    await ctx.agents.register(owner)
+    const entered = Promise.withResolvers<AbortSignal>(), release = Promise.withResolvers<StubSession>()
+    const session = new StubSession()
+    const backendOwner = await ctx.plugin({ inject: ['terminals'], apply(scope: Context) {
+      scope.terminals.registerBackend({ type: 'withdrawn', async spawn(spec) {
+        if (spec.signal === undefined) throw new Error('Terminal setup has no lifetime signal')
+        entered.resolve(spec.signal)
+        return release.promise
+      } })
+    } })
+    const pending = ctx.terminals.spawn(owner, { type: 'withdrawn', name: 'pending' })
+    const outcome = Promise.allSettled([pending])
+    const signal = await entered.promise
+    let stopped = false
+    const stopping = backendOwner.dispose().then(() => { stopped = true })
+    try {
+      await setImmediate()
+      expect(signal.aborted).toBe(true)
+      expect(stopped).toBe(false)
+      release.resolve(session)
+      await expect(pending).rejects.toMatchObject({ code: 'NO_BACKEND' })
+      await stopping
+      expect(session.closed).toHaveLength(1)
+      expect(ctx.terminals.list(owner)).toEqual([])
+    } finally { release.resolve(session); await outcome; await stopping; await ctx.fiber.dispose() }
+  })
+
   it('preserves the id brand and disposes exact backend contributions', async () => {
     expectTypeOf(TerminalSessionId('pty-1')).toEqualTypeOf<TerminalSessionIdType>()
     const ctx = await harness()
@@ -140,11 +170,93 @@ describe('TerminalSessionService backend registry', () => {
     const dispose = ctx.terminals.registerBackend(first.provider)
     expect(ctx.terminals.listBackends()).toEqual(['stub'])
     expect(() => ctx.terminals.registerBackend(backend().provider)).toThrow(TerminalError)
-    const internal = ctx.terminals as unknown as { backends: Map<string, TerminalBackend> }
-    internal.backends.set('stub', backend('replacement').provider)
-    dispose()
+    const internal = ctx.terminals as unknown as { backends: Map<string, { backend: TerminalBackend }> }
+    internal.backends.set('stub', { backend: backend('replacement').provider })
+    await dispose()
     expect(ctx.terminals.listBackends()).toEqual(['stub'])
     internal.backends.clear()
+  })
+
+  it('reports withdrawal rollback failure while retaining the exact owner activity', async () => {
+    const ctx = await harness(), owner = stubAgent(ctx, 'failed-backend-rollback')
+    await ctx.agents.register(owner)
+    const ready = [Promise.withResolvers<StubSession>(), Promise.withResolvers<StubSession>()]
+    const good = new StubSession(), failed = new StubSession()
+    failed.rejectClose = true
+    let count = 0
+    const withdraw = ctx.terminals.registerBackend({ type: 'withdrawn', spawn: () => ready[count++]!.promise })
+    const pending = [ctx.terminals.spawn(owner, { type: 'withdrawn' }), ctx.terminals.spawn(owner, { type: 'withdrawn' })]
+    const outcomes = Promise.allSettled(pending)
+    const stopping = expect(withdraw()).rejects.toMatchObject({
+      message: 'failed to roll back withdrawn PTY backend setup',
+      errors: [expect.objectContaining({ message: 'close failed' })],
+    })
+    ready[0]!.resolve(good)
+    ready[1]!.resolve(failed)
+    await stopping
+    await expect(withdraw()).rejects.toThrow('failed to roll back withdrawn PTY backend setup')
+    const results = await outcomes
+    expect(results[0]).toMatchObject({ status: 'rejected', reason: { code: 'NO_BACKEND' } })
+    expect(results[1]).toMatchObject({ status: 'rejected', reason: { message: 'PTY spawn and rollback both failed' } })
+    expect(ctx.terminals.list(owner)).toEqual([])
+    expect(ctx.terminals.hasOwnerActivity(owner)).toBe(true)
+    const internal = ctx.terminals as unknown as { disposeOwned(owner: Agent): Promise<void> }
+    await expect(internal.disposeOwned(owner)).rejects.toThrow('failed to clean up PTY lifecycle')
+    await ctx.fiber.dispose()
+  })
+
+  it('joins backend withdrawal already started by its owning plugin', async () => {
+    const ctx = await harness(), owner = stubAgent(ctx, 'concurrent-backend-withdrawal')
+    await ctx.agents.register(owner)
+    const ready = Promise.withResolvers<StubSession>(), session = new StubSession()
+    const aborted = Promise.withResolvers<undefined>()
+    let withdraw!: () => Promise<void>
+    const backendOwner = await ctx.plugin({ inject: ['terminals'], apply(scope: Context) {
+      withdraw = scope.terminals.registerBackend({ type: 'held', spawn: ({ signal }) => {
+        if (signal === undefined) throw new Error('Terminal setup has no lifetime signal')
+        signal.addEventListener('abort', () => { aborted.resolve(undefined) }, { once: true })
+        return ready.promise
+      } })
+    } })
+    const pending = ctx.terminals.spawn(owner, { type: 'held' })
+    const outcome = Promise.allSettled([pending])
+    const stopping = backendOwner.dispose()
+    await aborted.promise
+    let joined = false
+    const concurrent = withdraw().then(() => { joined = true })
+    try {
+      await setImmediate()
+      expect(joined).toBe(false)
+      ready.resolve(session)
+      await expect(pending).rejects.toMatchObject({ code: 'NO_BACKEND' })
+      await Promise.all([stopping, concurrent])
+      expect(joined).toBe(true)
+      expect(session.closed).toHaveLength(1)
+    } finally { ready.resolve(session); await outcome; await Promise.allSettled([stopping, concurrent]); await ctx.fiber.dispose() }
+  })
+
+  it('admits the replacement backend without releasing a draining owner name early', async () => {
+    const ctx = await harness(), owner = stubAgent(ctx, 'replacement-backend')
+    await ctx.agents.register(owner)
+    const ready = Promise.withResolvers<StubSession>(), previous = new StubSession()
+    const withdraw = ctx.terminals.registerBackend({ type: 'replaceable', spawn: () => ready.promise })
+    const pending = ctx.terminals.spawn(owner, { type: 'replaceable', name: 'main' })
+    const rejection = expect(pending).rejects.toMatchObject({ code: 'NO_BACKEND' })
+    const stopping = withdraw()
+    const replacement = backend('replaceable')
+    ctx.terminals.registerBackend(replacement.provider)
+    try {
+      await expect(ctx.terminals.spawn(owner, { type: 'replaceable', name: 'main' })).rejects.toMatchObject({ code: 'DUPLICATE_NAME' })
+      const other = await ctx.terminals.spawn(owner, { type: 'replaceable', name: 'other' })
+      ready.resolve(previous)
+      await rejection
+      await stopping
+      expect(ctx.terminals.list(owner).map(session => session.sessionId)).toEqual([other.sessionId])
+      const next = await ctx.terminals.spawn(owner, { type: 'replaceable', name: 'main' })
+      expect(next.sessionId).not.toBe(other.sessionId)
+      expect(previous.closed).toHaveLength(1)
+      expect(replacement.sessions.every(session => session.closed.length === 0)).toBe(true)
+    } finally { ready.resolve(previous); await rejection; await stopping; await ctx.fiber.dispose() }
   })
 
   it('rejects empty backend types', async () => {
@@ -154,6 +266,20 @@ describe('TerminalSessionService backend registry', () => {
 })
 
 describe('TerminalSessionService ownership and lifecycle', () => {
+  it('rolls back setup when Session removal reserves its owner before publication', async () => {
+    const ctx = await harness(), owner = stubAgent(ctx, 'reserved-during-startup')
+    await ctx.agents.register(owner)
+    const ready = Promise.withResolvers<StubSession>(), session = new StubSession()
+    ctx.terminals.registerBackend({ type: 'deferred', spawn: () => ready.promise })
+    const pending = ctx.terminals.spawn(owner, { type: 'deferred' })
+    try {
+      using _removal = ctx.agents.reserveRemoval([owner.id])
+      ready.resolve(session)
+      await expect(pending).rejects.toMatchObject({ code: 'OWNER_NOT_LIVE' })
+      expect(session.closed).toEqual(['PTY spawn rolled back'])
+      expect(ctx.terminals.hasOwnerActivity(owner)).toBe(false)
+    } finally { ready.resolve(session); await ctx.fiber.dispose() }
+  })
   it('vetoes idle release from allocation through close and refuses a new terminal during removal', async () => {
     const ctx = await harness(), owner = stubAgent(ctx, 'purge-terminal')
     await ctx.agents.register(owner)
@@ -545,7 +671,7 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     const owner = stubAgent(ctx, 'owner')
     await ctx.agents.register(owner)
     const created = await ctx.terminals.spawn(owner, { type: 'stub' })
-    disposeBackend()
+    await disposeBackend()
     expect(ctx.terminals.listBackends()).toEqual([])
     expect(ctx.terminals.read(owner, created.sessionId).text).toBe('0:0')
 

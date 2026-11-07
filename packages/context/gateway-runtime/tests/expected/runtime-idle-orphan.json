@@ -1,0 +1,14 @@
+{
+  "running": {
+    "policy": "on-demand",
+    "canStop": false
+  },
+  "providerRemoved": {
+    "policy": "on-demand",
+    "canStop": false
+  },
+  "producerFinished": {
+    "policy": "on-demand",
+    "canStop": true
+  }
+}

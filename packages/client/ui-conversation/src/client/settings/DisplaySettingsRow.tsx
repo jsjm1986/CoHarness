@@ -1,11 +1,9 @@
-/** General settings row for transcript width and chat text size. */
+/** General settings row for transcript width. */
 import type { ChangeEvent } from 'react'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationDisplaySettingsSnapshot } from '../display-settings.ts'
-import {
-  CHAT_CONTENT_WIDTH_RANGE, CHAT_FONT_SIZE_RANGE,
-} from '../../submission-settings.ts'
+import { CHAT_CONTENT_WIDTH_RANGE } from '../../submission-settings.ts'
 import type { ConversationKey } from '../locales.ts'
 import css from './DisplaySettingsRow.module.css'
 
@@ -19,8 +17,6 @@ export interface DisplaySettingsRowInjected {
   setWidth: (value: number) => void
   /** Persist the fill-width preference. */
   setFullWidth: (value: boolean) => void
-  /** Persist a transcript font size. */
-  setFontSize: (value: number) => void
 }
 
 /** Full settings-row props. */
@@ -99,14 +95,13 @@ export function noticeOf(
  * @param props - composed settings-row props.
  * @returns the display preference row.
  */
-export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth, setFontSize, t }: DisplaySettingsRowProps) {
+export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth, t }: DisplaySettingsRowProps) {
   const snapshot = useDisplaySettings(value => value)
   const disabled = snapshot.settings.status !== 'ready'
     || !snapshot.settings.writable
     || snapshot.settings.write.status === 'saving'
   const notice = noticeOf(snapshot.settings, t)
   const widthLabel: ConversationKey = 'settings.display.width'
-  const fontLabel: ConversationKey = 'settings.display.fontSize'
   return (
     <div className={css.row}>
       <div className={css.rowText}>
@@ -142,18 +137,6 @@ export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth,
               {t('settings.display.fill')}
             </label>
           </span>
-        </label>
-        <label className={css.control}>
-          <span className={css.controlLabel}>{t(fontLabel)}</span>
-          <RangeInput
-            label={t(fontLabel)}
-            min={CHAT_FONT_SIZE_RANGE.min}
-            max={CHAT_FONT_SIZE_RANGE.max}
-            value={snapshot.chatFontSize}
-            disabled={disabled}
-            onChange={setFontSize}
-          />
-          <output>{t('settings.display.fontSizeValue', { value: snapshot.chatFontSize })}</output>
         </label>
       </div>
     </div>

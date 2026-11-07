@@ -1,0 +1,2 @@
+- id: subprocess
+  name: '../../../../packages/subprocess/subprocess-local/lib/index.js'

@@ -19,6 +19,8 @@ Status: implemented
 - **`agent-preset`** 按上游形态携带:`Config` 即 `PresetDefinition` 的 `Service` 插件,`EntryGroup.key` 在激活前保留子表达式,附带 creator skills(`agent-experience` 通过 `.agents/skills` 符号链接进入仓库 skill 树)。
 - **`skill-filesystem`** 通过 `realpath` 规范化已加载 skill 路径,与上游一致,使仓库级 skill 符号链接解析到包目标。
 
+声明式代际的引用属于已加入的 agent、临时挂载预留和冷读租约。绑定不额外保留预留引用，读取租约的释放具有幂等性。Agent 清理在重组后跟随其当前绑定，包括最初建立在文件型 preset 上的绑定。退役代际的最后一个引用会等待作用域释放，使提供方在持有它的消费方仍需使用时保持可用，并在调用方拆卸结束前释放。
+
 `agent-presets` settings 命名空间保持不变——它是持久化用户键,而非包标识。
 
 ## 已考虑的替代方案
@@ -33,6 +35,6 @@ Status: implemented
 
 ## 验证
 
-- `npx vitest run packages/preset/agent-preset-registry`——11 个文件 181 项测试通过,含 `declared.spec.ts` 生命周期覆盖(join、bind、retain、retire、scope 释放)。
+- 声明式代际回归覆盖最后一个 agent 释放、另一读取者仍活跃时重复释放读取租约、重复重组、文件型与声明式 preset 互换、继承的子级及绑定回滚。真实 Loader 组合在声明退役后保持 SSH helper 可用，并验证最后一个 Agent 退出后、Host 释放前连接已关闭。
 - `npx vitest run packages/preset/agent-preset`——上游 skill 加载 spec 在 `realpath` 规范化加载器下通过。
 - `pnpm exec tsc -b packages/host` 与 preset 包 typecheck 在 `exactOptionalPropertyTypes` 下通过(`FileAgentPreset` 收窄后)。

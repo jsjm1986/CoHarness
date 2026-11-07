@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-host-coverage",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm exec vitest run packages/host/userdoc-http --coverage --coverage.include=packages/host/userdoc-http/src/index.ts",
+  "startedAt": "2026-10-26T21:23:34.112292+00:00",
+  "seconds": 28.064,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55106eac52c480d0bc432b23e51467b67a142fdf7bccf5aac3d7aa81871e8e80",
+  "inputsAfter": "55106eac52c480d0bc432b23e51467b67a142fdf7bccf5aac3d7aa81871e8e80",
+  "postgresToolDirectory": null,
+  "outputSha256": "e66ec13a5a1b694e900dd658d63ba6f78340470f1845d5acce9e00d73e013af9",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  4 passed (4)\n      Tests  63 passed (63)\n   Start at  05:23:56\n   Duration  5.66s (transform 3.54s, setup 305ms, import 4.46s, tests 1.47s, environment 0ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|-------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n----------|---------|----------|---------|---------|-------------------\nAll files |       0 |        0 |       0 |       0 |                   \n----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : Unknown% ( 0/0 )\nBranches     : Unknown% ( 0/0 )\nFunctions    : Unknown% ( 0/0 )\nLines        : Unknown% ( 0/0 )\n================================================================================\n"
+}

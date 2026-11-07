@@ -33,7 +33,7 @@ A `JobSpec` declares identity, the owning session, optional pull `output` source
  * the output ring.
  */
 interface JobSpec {
-  /** Producer kind — also the id prefix (`bash`, `subagent`, …). */
+  /** Producer kind — also the id prefix (`bash`, …). */
   kind: JobKind
   /** One-line model-facing label (the command; the delegation description). */
   label: string
@@ -44,6 +44,8 @@ interface JobSpec {
    * caller until service disposal.
    */
   owner?: SessionId
+  /** Creating tool invocation, retained in the durable lifecycle records. */
+  toolCall?: JobToolCall
   /**
    * Optional UTF-8 byte cap for each complete model-facing completion notice or
    * output read, including controller status metadata. Independent of ring
@@ -107,7 +109,8 @@ interface JobHooks {
   cancel(reason?: string): void
   /**
    * Resolves after the producer releases its resources, not merely when work
-   * finishes. Must not reject; the runtime converts a rejection to `failed`.
+   * finishes. Must not reject; the runtime converts a rejection to a `failed`
+   * record while unconfirmed resource release keeps automatic idle release blocked.
    * If teardown cancellation throws, the runtime may force-fail only the
    * registry record without claiming that the work stopped.
    */

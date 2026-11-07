@@ -1,0 +1,14 @@
+{
+  "name": "deleted-account-delayed-usage-cleanup-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/postgres.spec.ts -t 'keeps proved personal Auto' --no-file-parallelism",
+  "startedAt": "2026-10-24T00:22:22.303337+00:00",
+  "seconds": 6.115,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7734939bf433e6915a0a94eb636a2ca6107db94892c0341fe810a1913614e4c1",
+  "inputsAfter": "7734939bf433e6915a0a94eb636a2ca6107db94892c0341fe810a1913614e4c1",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "2e041f024ac3beb7ffa7db378127c7c7b8028f46eb6f892c0811548abe457219",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/postgres.spec.ts (39 tests | 1 failed | 38 skipped) 877ms\n     × keeps proved personal Auto fees on the owner only after revocation and deletion 125ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > keeps proved personal Auto fees on the owner only after revocation and deletion\nAssertionError: expected { status: 401, body: null } to deeply equal { status: 200, body: { …(2) } }\n\n- Expected\n+ Received\n\n  {\n-   \"body\": {\n-     \"alerts\": 0,\n-     \"inserted\": true,\n-   },\n-   \"status\": 200,\n+   \"body\": null,\n+   \"status\": 401,\n  }\n\n ❯ tests/postgres.spec.ts:369:37\n    367|       await pool.query('UPDATE harness.users SET auto_review_eligible=…\n    368|       await pool.query(await readFile(resolve(import.meta.dirname, '..…\n    369|       expect(await f.post(f.usage)).toEqual({ status: 200, body: { ins…\n       |                                     ^\n    370|       const rows = await pool.query<{ actor_user_id: string | null; us…\n    371|         FROM harness.model_usage WHERE organization_id=$1`, [f.org])\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 38 skipped (39)\n   Start at  08:22:25\n   Duration  3.29s (transform 1.85s, setup 0ms, import 2.30s, tests 877ms, environment 0ms)\n\n"
+}

@@ -18,6 +18,12 @@ Steward mirroring: `journal()` writes a bounded `audit_events` row for every att
 
 Query surface: both stores accept `family` (admin/auth/model/steward/api/other), `outcome`, `actor` (username/display-name substring), `q` (literal action substring), and wildcard-escaped `actionPrefix`; `action` keeps honored-wildcard LIKE semantics. Rows join the actor's current username and display name, IP renders through `host(source_ip)`, and the endpoint sets `x-total-count` for paged totals. The console regroups the page into family tabs — Management, Authentication, Model denials, Maintenance channel, Failed requests, All — with actor/action/outcome/time filters, a refresh control, actor names, and total-aware pagination.
 
+SQLite result filters and counts use the same status precedence as row classification. Only rows without an HTTP status use the exact, case-sensitive declared suffixes; a successful HTTP status remains successful even when its action ends in a failure suffix. Admin pagination accepts safe integers, clamps supported integer counts, and rejects fractions or unsafe values with400 before querying a store. Custom audit callers supply integer pagination counts.
+
+The console retains one generation for the latest page query. Older successes, failures and completion callbacks cannot replace current rows, totals, errors or loading state; unmount invalidates pending generations. This keeps a selected family or filter aligned with the displayed response during slow or reordered requests. [Upgrade guidance](../../../../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/audit-query/guide.md) records the query behavior.
+
+Narrow headers give the audit toolbar its own row and allow family buttons to wrap, preserving access without horizontal page overflow. Desktop, narrow-screen and keyboard checks use the real compiled Admin application and authenticated Gateway with both stores.
+
 ## Alternatives considered
 
 **Keep successful `api` rows under a default filter.** Rejected: a ~1.4M-row polling trail is transport telemetry, not audit; retaining it spends write amplification on rows nobody pages through, and the failed-request subset preserves the forensic value.

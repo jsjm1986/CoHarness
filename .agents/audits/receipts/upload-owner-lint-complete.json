@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-lint-complete",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc/src/brand.ts packages/attachment/userdoc/src/index.ts packages/attachment/userdoc-local/src/index.ts packages/attachment/userdoc-local/src/local-fs.ts packages/attachment/userdoc-local/src/upload.ts packages/attachment/userdoc-local/src/store.ts packages/attachment/userdoc-local/tests/upload.spec.ts packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/acl.spec.ts gateway/tests/documents-local.spec.ts gateway/tests/document-upload-postgres.spec.ts gateway/tests/document-catalog-service.spec.ts scripts/gen-cordis-catalog.ts",
+  "startedAt": "2026-10-25T10:22:45.088518+00:00",
+  "seconds": 6.054,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a14c198776dfe0c582c5eed0c2a9dfd204be8402b12938431d058eb0ca449854",
+  "inputsAfter": "a14c198776dfe0c582c5eed0c2a9dfd204be8402b12938431d058eb0ca449854",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

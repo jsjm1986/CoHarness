@@ -14,6 +14,7 @@
     { "path": "../app-boot" },
     { "path": "../plugin-manager" },
     { "path": "../../util/plugin-market-index" },
+    { "path": "../../context/resource-budget" },
     { "path": "../../util/package-manifest" },
     { "path": "../../util/timeout" },
     { "path": "../../util/values" },

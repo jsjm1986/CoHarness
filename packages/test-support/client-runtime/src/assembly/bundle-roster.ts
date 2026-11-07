@@ -15,7 +15,7 @@
  */
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { evaluate, isJsExpr, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, entryListSchema, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -33,6 +33,7 @@ interface PackageManifest {
 
 /** One bundle: where its package.json is (plugin names resolve from there) and its parsed patch list. */
 interface BundleLayer {
+  readonly name: string
   readonly manifestPath: string
   readonly patches: PatchOptions[]
 }
@@ -64,7 +65,7 @@ export function bundleRoster(
     if (disabledContext !== undefined
       && disabled.some(value => isJsExpr(value) && Boolean(evaluate(disabledContext, value.__jsExpr)))) continue
     seen.add(name)
-    const manifestPath = locateManifest(anchors, name)
+    const manifestPath = layers.find(layer => layer.name === name)?.manifestPath ?? locateManifest(anchors, name)
     if (manifestPath === undefined) {
       throw new Error(`client-test-runtime: cannot resolve plugin package ${name} from ${bundles.join(', ')}`)
     }
@@ -97,7 +98,7 @@ function readLayer(bundle: string, anchor: string): BundleLayer {
     if (!Array.isArray(parsed)) throw new Error(`client-test-runtime: ${file} must be a top-level list of patches`)
     return parsed as PatchOptions[]
   })
-  return { manifestPath, patches }
+  return { name: bundle, manifestPath, patches }
 }
 
 /** One Loader row with its ancestor and own disable conditions, in outer-to-inner order. */
@@ -132,6 +133,9 @@ function readManifest(path: string): PackageManifest {
 
 /** Resolve package manifests to real paths so linked bundles use their own dependency directories. */
 function locateManifest(anchors: readonly string[], name: string): string | undefined {
+  for (const anchor of anchors) {
+    if (basename(anchor) === 'package.json' && readManifest(anchor).name === name) return realpathSync(anchor)
+  }
   const paths = anchors.map(anchor => createRequire(anchor).resolve.paths(name) ?? [])
   for (let depth = 0; depth < Math.max(...paths.map(search => search.length)); depth++) {
     for (const search of paths) {

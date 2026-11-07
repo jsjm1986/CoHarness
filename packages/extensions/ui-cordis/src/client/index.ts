@@ -11,9 +11,8 @@ import { CordisActionRow } from './CordisActionRow.tsx'
 import { CordisDefineRow } from './CordisDefineRow.tsx'
 import { CordisRunRow } from './CordisRunRow.tsx'
 import { CordisPanel } from './CordisPanel.tsx'
-import { createCordisInventory } from './inventory.ts'
+import { createRuntimeCordisInventories } from './runtime-inventory.ts'
 import { CordisRunCardRegistry } from './run-card-index.ts'
-import type { CordisDynamicPort } from './dynamic-port.ts'
 import type { CordisCardFace, CordisPanelFace, CordisRunCardFace } from './slots.ts'
 import { en, NS, zh } from './locales.ts'
 
@@ -33,85 +32,37 @@ export type { CordisKey } from './locales.ts'
 
 /** Required services for the two Tool cards, panel, Remote lifecycle, and Slash source. */
 export const inject = [
-  'slots', 'locale', 'inputTriggers', 'remote', 'remote.dynamicCordisRunner', 'dynamicCordisRunner',
+  'slots', 'locale', 'inputTriggers', 'remote', 'remote.dynamicCordisRunner', 'dynamicCordisRunner', 'sessions', 'connection', 'runtimeEnvironments',
 ]
 
 /** Mount every Cordis browser surface over the shared Host inventory. */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-cordis: dictionaries')
 
-  const port: CordisDynamicPort = {
-    stop: async (sessionId, pluginId) => {
-      const answered = await ctx.remote.dynamicCordisRunner.stopFromPanel(sessionId, pluginId)
-      if (!answered.ok) return { ok: false, message: `${answered.error.code}: ${answered.error.message}` }
-      if (answered.value.ok || answered.value.reason === 'not-running') return { ok: true }
-      return { ok: false, message: answered.value.message }
-    },
-    remove: async (sessionId, pluginId) => {
-      const answered = await ctx.remote.dynamicCordisRunner.undefineFromPanel(sessionId, pluginId)
-      if (!answered.ok) return { ok: false, message: `${answered.error.code}: ${answered.error.message}` }
-      return answered.value.ok ? { ok: true } : { ok: false, message: answered.value.message }
-    },
-    inventory: async () => {
-      const answered = await ctx.remote.dynamicCordisRunner.inventory()
-      if (!answered.ok) throw new Error(`${answered.error.code}: ${answered.error.message}`)
-      return answered.value
-    },
-  }
-  const inventory = createCordisInventory(port, (error) => {
-    console.error('[ui-cordis] reading the Cordis inventory failed:', error)
-  })
-  const runner = ctx.dynamicCordisRunner
-  const loaded = { getSnapshot: () => runner.getSnapshot(), subscribe: (fn: () => void) => runner.subscribe(fn) }
+  const sources = createRuntimeCordisInventories(ctx)
   const runCards = new CordisRunCardRegistry()
-
-  ctx.effect(() => inventory.subscribe(() => {
-    const snapshot = inventory.getSnapshot()
-    if (snapshot.read) runner.reconcileApprovals(snapshot.rows)
-  }), 'ui-cordis: reconcile pending approvals')
-
-  ctx.remote.$on('@deepseek-ai/cordis/dynamic-package', () => { inventory.refresh() })
-  ctx.remote.$on('@deepseek-ai/cordis/dynamic-retract', () => { inventory.refresh() })
-  ctx.remote.$on('@deepseek-ai/cordis/request-run', (request) => {
-    if (!inventory.getSnapshot().rows.some(row => row.pluginId === request.pluginId)) inventory.refresh()
-  })
-  ctx.remote.$on('@deepseek-ai/cordis/request-run-resolved', () => { inventory.refresh() })
-  ctx.on('connection/reset', () => {
-    inventory.reset()
-    inventory.refresh()
-  })
 
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     id: 'cordis-panel',
     locale: NS,
     inject: (): CordisPanelFace => ({
-      hooks: {
-        inventory,
-        activeRuns: runner.activeRuns,
-        runErrors: runner.lastRunError,
-        loaded,
-        renderFailures: runner.renderFailures,
+      hooks: { pendingApprovals: ctx.dynamicCordisRunner.pendingApprovals, runtimeEnvironments: ctx.runtimeEnvironments },
+      keyedHooks: {
+        inventory: key => sources.forSession(key === 'base' ? undefined : key as SessionId).inventory,
+        activeRuns: key => sources.forSession(key === 'base' ? undefined : key as SessionId).runner.activeRuns,
+        runErrors: key => sources.forSession(key === 'base' ? undefined : key as SessionId).runner.lastRunError,
+        renderFailures: key => sources.forSession(key === 'base' ? undefined : key as SessionId).runner.renderFailures,
+        loaded: key => sources.forSession(key === 'base' ? undefined : key as SessionId).loaded,
       },
-      onApprove: (requestId, approveFutureVersions) => runner.approve(requestId, approveFutureVersions),
-      onDecline: requestId => runner.decline(requestId),
-      onRun: request => runner.startUserRun(request),
-      onStop: async (sessionId, pluginId) => {
-        const result = await port.stop(sessionId, pluginId)
-        inventory.refresh()
-        return result
-      },
-      onRemove: async (sessionId, pluginId) => {
-        const result = await port.remove(sessionId, pluginId)
-        if (result.ok) inventory.retire(pluginId)
-        inventory.refresh()
-        return result
-      },
-      onRefresh: () => { inventory.refresh() },
+      actionsForSession: id => sources.forSession(id).actions,
     }),
   }, CordisPanel))
 
-  const cardFace = (): CordisCardFace => ({ hooks: { inventory, loaded } })
+  const cardFace = (sessionId: SessionId): CordisCardFace => {
+    const source = sources.forSession(sessionId)
+    return { hooks: { inventory: source.inventory, loaded: source.loaded } }
+  }
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
     name: 'tool.call.toolview',
     key: 'cordis_define',
@@ -126,8 +77,10 @@ export function apply(ctx: ClientContext): void {
     children: { 'tool.view.cordis': { kind: 'keyed', scope: 'session' } },
     inject: (sessionId: SessionId): CordisRunCardFace => {
       const store = runCards.forSession(sessionId)
+      const source = sources.forSession(sessionId)
       return {
-        hooks: { inventory, loaded, runCards: store, activeRuns: runner.activeRuns },
+        viewPrefix: source.runner.viewPrefix,
+        hooks: { inventory: source.inventory, loaded: source.loaded, runCards: store, activeRuns: source.runner.activeRuns },
         onObserveRunCard: (pointer) => { store.observe(pointer) },
       }
     },
@@ -142,7 +95,7 @@ export function apply(ctx: ClientContext): void {
     }, CordisActionRow)
   })
 
-  const rowsOf = (sessionId: SessionId, query: string) => inventory.getSnapshot().rows
+  const rowsOf = (sessionId: SessionId, query: string) => sources.forSession(sessionId).inventory.getSnapshot().rows
     .filter(row => row.agentId === sessionId && String(row.pluginId).includes(query))
   const source: InputTriggerSource = {
     trigger: '@',
@@ -159,13 +112,13 @@ export function apply(ctx: ClientContext): void {
         }
       }))
     },
-    warm() { inventory.refresh() },
+    warm(session) { sources.forSession(session.sessionId).inventory.refresh() },
     lexicon(session) { return rowsOf(session.sessionId, '').map(row => String(row.pluginId)) },
-    subscribeLexicon(_session, listener) { return inventory.subscribe(listener) },
+    subscribeLexicon(session, listener) { return sources.forSession(session.sessionId).inventory.subscribe(listener) },
     onPick({ candidate }) { return { text: `@${candidate.name} ` } },
   }
   const slash = ctx.get('inputTriggers') as InputTriggerService
   ctx.effect(() => slash.registerSource(source), 'ui-cordis: @pluginId source')
 
-  inventory.refresh()
+  sources.forSession().inventory.refresh()
 }

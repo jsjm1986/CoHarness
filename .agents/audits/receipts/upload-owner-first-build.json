@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-first-build",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/build.ts",
+  "startedAt": "2026-10-25T09:50:45.535021+00:00",
+  "seconds": 9.462,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0c5ac09862e4c62fabbe4b4f1656553ab6d73bf3f01c64e4fe4104ccbaac2d58",
+  "inputsAfter": "0c5ac09862e4c62fabbe4b4f1656553ab6d73bf3f01c64e4fe4104ccbaac2d58",
+  "postgresToolDirectory": null,
+  "outputSha256": "4c88265a7e64461d2c70cd9d24fceb3d9cd82668309f365e4a0e1d1533ec5fd9",
+  "outputTail": "run-gates: build running 8 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s).\nrun-gates: start native addon\nrun-gates: PASS native addon (0.93s)\nrun-gates: start host compiler\n\n== FAILED host compiler (6.13s) ==\ncommand: tsc -b <tsconfig.host.json references>\noutcome: exit 2\npackages/attachment/userdoc-local/src/local-fs.ts(313,56): error TS2554: Expected 2-3 arguments, but got 4.\npackages/attachment/userdoc-local/src/upload.ts(631,55): error TS2304: Cannot find name 'ownerId'.\n\n== SKIPPED Host bundle (0.00s) ==\ncommand: pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE host\noutcome: dependency failed or skipped: host-src\n\n== SKIPPED client compiler (0.00s) ==\ncommand: tsc -b <tsconfig.client.json references>\noutcome: dependency failed or skipped: host-bundle\n\n== SKIPPED Client bundle (0.00s) ==\ncommand: pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE client\noutcome: dependency failed or skipped: client-src\n\n== SKIPPED Web build (0.00s) ==\ncommand: pnpm run build:web\noutcome: dependency failed or skipped: client-bundle\n\n== SKIPPED host aggregate check (0.00s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: dependency failed or skipped: host-src\n\n== SKIPPED client aggregate check (0.00s) ==\ncommand: tsc -p tsconfig.client.json\noutcome: dependency failed or skipped: client-src\n\nrun-gates: 1 passed, 1 failed, 6 skipped in 7.06s.\nrun-gates: unsuccessful gates:\n  - FAILED host compiler (6.13s, exit 2)\n    tsc -b <tsconfig.host.json references>\n  - SKIPPED Host bundle (0.00s, dependency failed or skipped: host-src)\n    pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE host\n  - SKIPPED client compiler (0.00s, dependency failed or skipped: host-bundle)\n    tsc -b <tsconfig.client.json references>\n  - SKIPPED Client bundle (0.00s, dependency failed or skipped: client-src)\n    pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE client\n  - SKIPPED Web build (0.00s, dependency failed or skipped: client-bundle)\n    pnpm run build:web\n  - SKIPPED host aggregate check (0.00s, dependency failed or skipped: host-src)\n    tsc -p tsconfig.host.json\n  - SKIPPED client aggregate check (0.00s, dependency failed or skipped: client-src)\n    tsc -p tsconfig.client.json\n"
+}

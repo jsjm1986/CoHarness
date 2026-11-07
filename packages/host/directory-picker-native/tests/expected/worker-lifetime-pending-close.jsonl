@@ -1,0 +1,3 @@
+{"operation":"before-exit","pending":true,"childAlive":true}
+{"operation":"after-exit-before-close-completion","pending":true}
+{"operation":"complete","childClosed":true,"aborted":true}

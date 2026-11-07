@@ -1,0 +1,14 @@
+{
+  "name": "document-trash-conflict-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-25T05:06:20.199548+00:00",
+  "seconds": 39.656,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e32b3c4aae030757d029ff9aa23c0ff16dd80d99563a0dcc3b6079a45e0bc872",
+  "inputsAfter": "e32b3c4aae030757d029ff9aa23c0ff16dd80d99563a0dcc3b6079a45e0bc872",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

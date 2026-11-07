@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/session.md
 document:
-  en: 1726406f03f58de3e9ac3c48e6e9f3cec9be302b
-  zh: a0e2835bf762716acbd00d926cf017e540062155
+  en: dfdae1bed368a5675051759812a3cd2cc76c017d
+  zh: 01ec8e4de092116dadc0aa1039233ad0c123e068
 /sessions:
   en: 28fb7eb8f758fdf0
   zh: a36d6f03e331ad86
@@ -12,8 +12,11 @@ document:
   en: 9cfcba05a52ba8d8
   zh: 1669f9791a60fc59
 /sessions/sessioneventmap-the-event-vocabulary/todoitem-one-todo-list-entry:
-  en: 7fafec5ba4292589
+  en: c18fb70c28c7d41e
   zh: 6a69dc7a22d6c833
+/sessions/sessioneventmap-the-event-vocabulary/feedback-event-payloads:
+  en: 21489db754aeb139
+  zh: 0e1702a60f6287ee
 /sessions/sessioneventmap-the-event-vocabulary/the-request-header-event-request-header:
   en: d372ffcc1724f8a1
   zh: 838eb25ce350a518
@@ -33,8 +36,11 @@ document:
   en: e7ead24911d9d6c8
   zh: d50edc487c596a67
 /sessions/surface-types/surfaceintent-the-parameter-to-session-append:
-  en: 9ec95db9133ffaec
-  zh: 41c08fef5fa9fdb6
+  en: 9e3286e64c844240
+  zh: e052c79fcd3483bc
+/sessions/surface-types/append-resource-admission:
+  en: 8c3cdf16786a7f77
+  zh: 2f4486789a15236e
 /sessions/surface-types/plugin-owned-message-projections:
   en: f1f73607d650620f
   zh: b3ef72f19fb5ee3d

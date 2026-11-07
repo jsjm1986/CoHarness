@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 The agent-preset surfaces: a General-settings row choosing which [preset](../../preset/agent-preset-registry/README.md) new sessions are composed from, a chip on the new-session screen choosing the next session's, a read-only label in the session header, and a settings section that manages the roster — copy, delete, default, and the way into a preset's own files.
 
-Each retained Workbench Session owns its preset chip and roster reads. Reads resolve the currently mounted namespace in that Session’s Context and recheck its generation before publishing the reply. Selection captures that Session’s browser identity, so focusing another pane cannot redirect a pending choice. The no-session creation flow and settings retain their current-space staged choice; it never applies to a different runtime’s blank Session.
+Each retained Workbench Session owns its preset chip and roster reads. Reads resolve the currently mounted namespace in that Session’s Context and recheck its generation before publishing the reply. Selection captures that Session’s browser identity, so focusing another pane cannot redirect a pending choice. The no-session creation flow and settings retain their current-space staged choice. While a new Session is being prepared, its originating Session cannot consume that choice; the destination receives it after selection. It never applies to a different runtime’s blank Session.
 
 ## Summary
 
@@ -31,6 +31,8 @@ Use this package to choose the agent preset for a new Web GUI session, see the a
 
 <a id="why-it-is-a-new-session-preference"></a>
 ## Why it is a new-session preference
+
+A staged preset for the next bootstrap conversation is not consumed by a blank conversation on another Runtime. Foreign creation uses that Runtime’s existing defaults. Settings-roster invalidations remain bound to the bootstrap Runtime.
 
 A session's preset is fixed when the session is created — the host refuses to adopt an existing session under a different one, because that session's history was produced under the first preset's tools. So this row cannot be a live switch, and it says so: changing it applies to sessions started afterwards while running sessions keep the composition they began with.
 

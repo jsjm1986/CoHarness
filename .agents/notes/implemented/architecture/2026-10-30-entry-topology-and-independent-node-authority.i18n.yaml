@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-30-entry-topology-and-independent-node-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-30-entry-topology-and-independent-node-authority.md
+document:
+  en: cc741b02fafdb57a8ae255cac4055805ceb0fcbc
+  zh: f795ac33561b8be85ab8399efbc61f19f78e7ba2
+/agent-note-entry-topology-and-independent-computer-authority:
+  en: 733ac419f8711ffa
+  zh: 0d87156a4e3ca4e0
+/agent-note-entry-topology-and-independent-computer-authority/problem:
+  en: aab41be0148044c6
+  zh: 90d17ea4ba7ed583
+/agent-note-entry-topology-and-independent-computer-authority/decision:
+  en: ee1140404c7e393f
+  zh: 97e2633e90448638
+/agent-note-entry-topology-and-independent-computer-authority/alternatives-considered:
+  en: cba4968c0a8824bd
+  zh: 9c36a5a22ceb80e6
+/agent-note-entry-topology-and-independent-computer-authority/consequences:
+  en: af85dd25bf96ec7a
+  zh: c336dca966fbb456

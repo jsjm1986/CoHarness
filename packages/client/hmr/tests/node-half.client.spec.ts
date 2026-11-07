@@ -101,6 +101,22 @@ async function mount(clientModuleHost: FakeHost, webServer: WebServer, watchArti
   return fiber
 }
 
+/** Socket-like response whose destroy operation reaches the observable close edge. */
+function fakeResponse(lines: string[]) {
+  const response = Object.assign(new EventEmitter(), {
+    destroyed: false, closed: false, writableEnded: false, writableNeedDrain: false,
+    writeHead: vi.fn(),
+    write: vi.fn((line: string) => { lines.push(line); return true }),
+    destroy: vi.fn(() => {
+      response.destroyed = true
+      if (!response.closed) response.emit('close')
+    }),
+    end: vi.fn(),
+  })
+  response.on('close', () => { response.closed = true; response.destroyed = true })
+  return response
+}
+
 describe('hmr node half', () => {
   it('delivers graph changes without acquiring artifact watches or polling in production', async () => {
     const rows = new Map<string, string>()
@@ -110,18 +126,16 @@ describe('hmr node half', () => {
     const routes: WebRoute[] = []
     const fiber = await mount(host, fakeHttpServer(routes), false)
     const lines: string[] = []
-    const response = Object.assign(new EventEmitter(), {
-      writeHead: vi.fn(), write: (line: string) => { lines.push(line) },
-      destroy: vi.fn(), end: vi.fn(),
-    })
+    const response = fakeResponse(lines)
     try {
+      expect(timer).not.toHaveBeenCalled()
       await routes[0]!.handler({ method: 'GET' } as IncomingMessage, response as unknown as ServerResponse)
       rows.set('new-plugin', join(dir, 'unbuilt.js'))
       host.fireGraphChanged()
       expect(lines).toHaveLength(3)
       expect((JSON.parse(lines[2]!.slice(6)) as { graph: WebBootGraph }).graph.entries.map(row => row.id)).toEqual(['new-plugin'])
       expect(baseline).not.toHaveBeenCalled()
-      expect(timer).not.toHaveBeenCalled()
+      expect(timer).toHaveBeenCalledExactlyOnceWith(expect.any(Function), 15_000)
       expect(host.rebuiltCalls).toEqual([])
       await fiber.dispose()
       host.fireGraphChanged()
@@ -132,6 +146,144 @@ describe('hmr node half', () => {
       await fiber.dispose()
       timer.mockRestore()
       baseline.mockRestore()
+    }
+  })
+
+  it('validates the graph-stream keepalive timer range before activation', () => {
+    expect(Config({}).keepAliveIntervalMs).toBe(15_000)
+    for (const keepAliveIntervalMs of [1, 2_147_483_647]) {
+      expect(Config({ keepAliveIntervalMs }).keepAliveIntervalMs).toBe(keepAliveIntervalMs)
+    }
+    for (const keepAliveIntervalMs of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2_147_483_648]) {
+      expect(() => Config({ keepAliveIntervalMs })).toThrow()
+    }
+  })
+
+  it('writes idle comments with one unref timer until the last graph stream closes', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const timer = vi.spyOn(globalThis, 'setInterval')
+    const routes: WebRoute[] = []
+    const host = fakeClientModuleHost(new Map())
+    const fiber = await mount(host, fakeHttpServer(routes), false)
+    const first: string[] = []
+    const second: string[] = []
+    const a = fakeResponse(first)
+    const b = fakeResponse(second)
+    try {
+      expect(vi.getTimerCount()).toBe(0)
+      await routes[0]!.handler({ method: 'GET' } as IncomingMessage, a as unknown as ServerResponse)
+      await routes[0]!.handler({ method: 'GET' } as IncomingMessage, b as unknown as ServerResponse)
+      expect(timer).toHaveBeenCalledOnce()
+      expect((timer.mock.results[0]!.value as NodeJS.Timeout).hasRef()).toBe(false)
+      vi.advanceTimersByTime(15_000)
+      expect(first).toEqual([': connected\n\n', expect.stringContaining('"type":"graph"'), ': keep-alive\n\n'])
+      expect(second).toEqual(first)
+      a.emit('close')
+      vi.advanceTimersByTime(15_000)
+      expect(first).toHaveLength(3)
+      expect(second).toHaveLength(4)
+      b.emit('close')
+      expect(vi.getTimerCount()).toBe(0)
+      expect(a.listenerCount('error')).toBe(0)
+      expect(b.listenerCount('error')).toBe(0)
+    } finally {
+      await fiber.dispose()
+      timer.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('skips backpressured comments and contains a heartbeat write failure', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const routes: WebRoute[] = []
+    const fiber = await mount(fakeClientModuleHost(new Map()), fakeHttpServer(routes), false)
+    const warn = vi.spyOn(fiber.ctx.logger, 'warn').mockImplementation(() => {})
+    const lines: string[] = []
+    const response = fakeResponse(lines)
+    try {
+      await routes[0]!.handler({ method: 'GET' } as IncomingMessage, response as unknown as ServerResponse)
+      response.writableNeedDrain = true
+      vi.advanceTimersByTime(45_000)
+      expect(lines).toHaveLength(2)
+      response.writableNeedDrain = false
+      vi.advanceTimersByTime(15_000)
+      expect(lines.at(-1)).toBe(': keep-alive\n\n')
+      response.write.mockImplementationOnce(() => { throw new Error('fixture write failure') })
+      expect(() => vi.advanceTimersByTime(15_000)).not.toThrow()
+      expect(warn).toHaveBeenCalledOnce()
+      expect(response.destroy).toHaveBeenCalledOnce()
+      expect(response.listenerCount('error')).toBe(0)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      await fiber.dispose()
+      warn.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('contains asynchronous response errors and retires their graph-stream timer', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const routes: WebRoute[] = []
+    const fiber = await mount(fakeClientModuleHost(new Map()), fakeHttpServer(routes), false)
+    const warn = vi.spyOn(fiber.ctx.logger, 'warn').mockImplementation(() => {})
+    const response = fakeResponse([])
+    try {
+      await routes[0]!.handler({ method: 'GET' } as IncomingMessage, response as unknown as ServerResponse)
+      expect(() => response.emit('error', new Error('fixture socket failure'))).not.toThrow()
+      expect(response.destroy).toHaveBeenCalledOnce()
+      expect(warn).toHaveBeenCalledOnce()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      await fiber.dispose()
+      warn.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it.each([false, true])('joins delayed response closure and rejects later admissions when a write fails: %s', async (failedWrite) => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const host = fakeClientModuleHost(new Map())
+    const routes: WebRoute[] = []
+    const fiber = await mount(host, fakeHttpServer(routes), false)
+    const warn = vi.spyOn(fiber.ctx.logger, 'warn').mockImplementation(() => {})
+    const route = routes[0]!
+    const lines: string[] = []
+    const response = fakeResponse(lines)
+    let destroyed!: () => void
+    const destroying = new Promise<void>((resolve) => { destroyed = resolve })
+    response.destroy.mockImplementation(() => {
+      response.destroyed = true
+      if (response.destroy.mock.calls.length === (failedWrite ? 2 : 1)) destroyed()
+    })
+    let disposing: Promise<void> | undefined
+    try {
+      await route.handler({ method: 'GET' } as IncomingMessage, response as unknown as ServerResponse)
+      if (failedWrite) {
+        response.write.mockImplementationOnce(() => { throw new Error('fixture delayed write failure') })
+        vi.advanceTimersByTime(15_000)
+      }
+      let settled = false
+      disposing = fiber.dispose().then(() => { settled = true })
+      await destroying
+      expect(settled).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
+      host.fireGraphChanged()
+      vi.advanceTimersByTime(30_000)
+      expect(lines).toHaveLength(2)
+      response.emit('close')
+      await disposing
+      const late = fakeResponse([])
+      await route.handler({ method: 'GET' } as IncomingMessage, late as unknown as ServerResponse)
+      expect(late.destroy).toHaveBeenCalledOnce()
+      expect(late.writeHead).not.toHaveBeenCalled()
+      expect(routes).toHaveLength(0)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      response.emit('close')
+      await disposing
+      await fiber.dispose()
+      warn.mockRestore()
+      vi.useRealTimers()
     }
   })
 
@@ -314,10 +466,7 @@ it('broadcasts the desired graph without waiting for Host activation or cleanup'
   const route = routes[0]!
   const connect = async () => {
     const lines: string[] = []
-    const response = Object.assign(new EventEmitter(), {
-      writeHead: vi.fn(), write: (line: string) => { lines.push(line) },
-      destroy: vi.fn(), end: vi.fn(),
-    })
+    const response = fakeResponse(lines)
     await route.handler({ method: 'GET' } as IncomingMessage, response as unknown as ServerResponse)
     return { lines, response }
   }

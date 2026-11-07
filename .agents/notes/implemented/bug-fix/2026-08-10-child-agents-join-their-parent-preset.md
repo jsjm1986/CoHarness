@@ -42,7 +42,7 @@ Giving the child its parent's tools exposed a second defect the same agent-plane
 
 ## Testing
 
-`packages/preset/agent-presets/tests/mount.spec.ts` covers the join against real fixture compositions: the child sees its parent's tools and prompt sections, no second generation is mounted, the join survives the parent's disposal (a background child outliving its parent), the reported id matches, a parent without a preset joins nothing, and an unscoped context is refused.
+[Preset composition tests](../../../../packages/preset/agent-preset-registry/tests/mount.spec.ts) covers the join against real fixture compositions: the child sees its parent's tools and prompt sections, no second generation is mounted, the join survives the parent's disposal (a background child outliving its parent), the reported id matches, a parent without a preset joins nothing, and an unscoped context is refused.
 
 `packages/core/tools/tests/scoped.spec.ts` covers the restriction rule directly: a child's filter removes a tool it inherited from an ancestor scope, the child's own registrations survive its own filter, and an ancestor's restriction still reaches every scope nested inside it.
 

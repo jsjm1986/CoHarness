@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-dual-usage-attribution.md
 document:
-  en: b33a762f85ba6c4447bfda98c79cd1f80744318f
-  zh: 1e44bd8a05f9b8dca3307d1822e65ada355c6212
+  en: 49940462d618724c8e3aa7155ca5a38c65281f90
+  zh: 7b6fafe87d87d8cf372a1bb7c5808a282be14246
 /agent-note-separate-billing-ownership-from-project-activity-attribution:
   en: df365e063154fdf2
   zh: c8e403b1c2699b8e
@@ -12,8 +12,8 @@ document:
   en: 6297ff9c39908bb9
   zh: 209736644daa8ba8
 /agent-note-separate-billing-ownership-from-project-activity-attribution/decision:
-  en: e4bc3e5fbb4d8131
-  zh: cfa25f44c04b45e0
+  en: 1d6ae96a7db84939
+  zh: 1e826149db215e5d
 /agent-note-separate-billing-ownership-from-project-activity-attribution/alternatives-considered:
   en: dc5ebb6cbfa06d25
   zh: da9ca714dc306e08

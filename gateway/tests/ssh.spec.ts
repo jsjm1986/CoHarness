@@ -1,4 +1,5 @@
 /** Registered SSH targets: revisioned CRUD, project sharing, and qualified runtime resolution. @module */
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -8,7 +9,7 @@ import { PostgresSshTargetService } from '../src/postgres/ssh-target-service.ts'
 import { SshAccess, sshPolicyOwner } from '../src/ssh-access.ts'
 import { createExecutionFixture } from './execution-fixture.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 let pool: Pool
 let cleanup: Array<() => Promise<unknown> | void> = []
@@ -39,15 +40,15 @@ describePg('Gateway SSH targets', () => {
     expect(created).toMatchObject({ name: 'builder', host: 'ssh-builder', enabled: true, sharedProjects: [] })
     await expect(service.create(f.admin.id, targetInput)).rejects.toMatchObject({ status: 409 })
     const updated = await service.update({ targetId: created.publicId, revision: created.revision,
-      fields: { ...targetInput, requestTimeoutMs: 5_000, bootstrapPath: '/opt/dsh/ptc.js', bootstrapHash: hash('ptc') } })
+      fields: { ...targetInput, requestTimeoutMs: 5_000, bootstrapPath: '/opt/dsh/ptc.js', bootstrapHash: hash('ptc') } }, f.admin.id)
     expect(updated.revision).not.toBe(created.revision)
     await expect(service.update({ targetId: created.publicId, revision: created.revision,
-      fields: targetInput })).rejects.toMatchObject({ status: 409 })
-    const disabled = await service.mutate({ targetId: created.publicId, revision: updated.revision, action: 'disable' })
+      fields: targetInput }, f.admin.id)).rejects.toMatchObject({ status: 409 })
+    const disabled = await service.mutate({ targetId: created.publicId, revision: updated.revision, action: 'disable' }, f.admin.id)
     expect(disabled!.enabled).toBe(false)
-    expect(await service.mutate({ targetId: created.publicId, revision: disabled!.revision, action: 'remove' })).toBeNull()
-    expect(await service.list()).toEqual([])
-    await expect(service.mutate({ targetId: created.publicId, revision: '1', action: 'enable' }))
+    expect(await service.mutate({ targetId: created.publicId, revision: disabled!.revision, action: 'remove' }, f.admin.id)).toBeNull()
+    expect(await service.list(f.admin.id)).toEqual([])
+    await expect(service.mutate({ targetId: created.publicId, revision: '1', action: 'enable' }, f.admin.id))
       .rejects.toMatchObject({ status: 404 })
     await expect(service.create(f.admin.id, { ...targetInput, helperHash: 'nope' }))
       .rejects.toMatchObject({ status: 400 })
@@ -60,13 +61,13 @@ describePg('Gateway SSH targets', () => {
     const service = new PostgresSshTargetService(f.context)
     const created = await service.create(f.admin.id, { ...targetInput, passwordRef: 'SSH_PASSWORD' })
     const renamed = await service.update({ targetId: created.publicId, revision: created.revision,
-      fields: { ...targetInput, name: 'renamed-builder' } })
+      fields: { ...targetInput, name: 'renamed-builder' } }, f.admin.id)
     expect(renamed.passwordRef).toBe('SSH_PASSWORD')
     await expect(service.update({ targetId: created.publicId, revision: renamed.revision,
-      fields: { ...targetInput, passwordRef: 'invalid-reference' } })).rejects.toMatchObject({ status: 400 })
-    expect((await service.list())[0]?.passwordRef).toBe('SSH_PASSWORD')
+      fields: { ...targetInput, passwordRef: 'invalid-reference' } }, f.admin.id)).rejects.toMatchObject({ status: 400 })
+    expect((await service.list(f.admin.id))[0]?.passwordRef).toBe('SSH_PASSWORD')
     const cleared = await service.update({ targetId: created.publicId, revision: renamed.revision,
-      fields: { ...targetInput, passwordRef: null } })
+      fields: { ...targetInput, passwordRef: null } }, f.admin.id)
     expect(cleared.passwordRef).toBeNull()
   })
 
@@ -134,9 +135,9 @@ describePg('Gateway SSH targets', () => {
     await policies.set({ kind: 'user', id: f.member.id }, true, '0')
     expect((await resolve(f.member)).status).toBe(200)
     expect((await resolve(f.admin, f.other)).status).toBe(403)
-    const disabled = await service.mutate({ targetId: target.publicId, revision: target.revision, action: 'disable' })
+    const disabled = await service.mutate({ targetId: target.publicId, revision: target.revision, action: 'disable' }, f.admin.id)
     expect((await resolve()).status).toBe(404)
-    await service.mutate({ targetId: target.publicId, revision: disabled!.revision, action: 'enable' })
+    await service.mutate({ targetId: target.publicId, revision: disabled!.revision, action: 'enable' }, f.admin.id)
     await service.share(f.admin.id, { targetId: target.publicId, projectId: f.project.id, shared: false })
     expect((await resolve()).status).toBe(403)
     expect((await f.call('/internal/runtime/ssh/resolve', { targetId: 'alias' }, f.admin)).status).toBe(400)

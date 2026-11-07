@@ -1,0 +1,13 @@
+{
+  "name": "resource-budget-isolated-packed-service",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/packed-resource-budget-smoke.py",
+  "startedAt": "2026-10-23T20:37:27.579472+00:00",
+  "seconds": 8.098,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "61126578c0d8291e76098cf680859f510c6ca6d2a9080588f18df299125b6acb",
+  "inputsAfter": "61126578c0d8291e76098cf680859f510c6ca6d2a9080588f18df299125b6acb",
+  "outputSha256": "b932c803bb9d3dd512e6a25f096137536f0bc7dc16823b7c50d29cf5b9f91529",
+  "outputTail": "npm error code ENOTCACHED\nnpm error request to https://registry.npmmirror.com/@standard-schema%2fspec failed: cache mode is 'only-if-cached' but no cached response is available.\nnpm error A complete log of this run can be found in: /Users/a1234/.npm/_logs/2026-10-23T20_37_35_164Z-debug-0.log\nTraceback (most recent call last):\n  File \"/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/packed-resource-budget-smoke.py\", line 13, in <module>\n    subprocess.run(['npm','install','--ignore-scripts','--legacy-peer-deps','--no-audit','--no-fund','--offline',*tarballs],cwd=consumer,env=env,check=True,stdout=subprocess.DEVNULL,timeout=120)\n  File \"/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['npm', 'install', '--ignore-scripts', '--legacy-peer-deps', '--no-audit', '--no-fund', '--offline', '/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/coharness-packed-budget-x3rm9c2o/archives/deepseek-ai-cordis-4.0.5.tgz', '/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/coharness-packed-budget-x3rm9c2o/archives/deepseek-ai-cosmokit-1.8.5.tgz', '/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/coharness-packed-budget-x3rm9c2o/archives/deepseek-ai-dsh-brand-0.2.1-rc.1.coharness.1.tgz', '/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/coharness-packed-budget-x3rm9c2o/archives/deepseek-ai-dsh-resource-budget-0.2.1-rc.1.coharness.1.tgz', '/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/coharness-packed-budget-x3rm9c2o/archives/deepseek-ai-schemastery-3.18.4.tgz']' returned non-zero exit status 1.\n"
+}

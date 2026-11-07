@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-lint-fixture-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/admin-ui/src/pages/TunnelAccessSection.tsx gateway/admin-ui/src/pages/TunnelAccessSection.spec.tsx gateway/admin-ui/src/pages/tunnel-access.copy.ts apps/web/tests/admin-form-values.e2e.ts gateway/src/tunnel-process.ts",
+  "startedAt": "2026-10-24T23:12:37.587718+00:00",
+  "seconds": 2.029,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bb6b5039da9f0d989564216ca8a9a3d13d45cc7da2ccdc6ecc21c249f1967f90",
+  "inputsAfter": "bb6b5039da9f0d989564216ca8a9a3d13d45cc7da2ccdc6ecc21c249f1967f90",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

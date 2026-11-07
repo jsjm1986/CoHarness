@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../../native/system/packages/entry"
+    },
+    {
       "path": "../userdoc"
     },
     {
@@ -27,7 +30,13 @@
       "path": "../../../vendor/schemastery"
     },
     {
+      "path": "../../session/session-persistence-sqlite"
+    },
+    {
       "path": "../../util/managed-data"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

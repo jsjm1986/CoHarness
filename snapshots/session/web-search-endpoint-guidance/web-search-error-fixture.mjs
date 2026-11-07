@@ -36,10 +36,31 @@ function transportInput(input, transportEndpoint) {
 /** Start the local Messages endpoint and stop it with the plugin fiber. */
 export async function apply(ctx) {
   let restoreFetch = () => {}
+  const permits = []
+  ctx.provide('resourceBudgetRequired', true)
+  ctx.provide('resourceBudget', {
+    async acquire(request) {
+      const permit = { origin: request.origin, released: false }
+      if (request.kind !== 'model' || typeof request.sessionId !== 'string') {
+        throw new Error('web-search-error-fixture: expected Session model admission')
+      }
+      permits.push(permit)
+      return {
+        signal: new AbortController().signal,
+        release: async () => { permit.released = true },
+        uncertain: async () => { throw new Error('web-search-error-fixture: model cleanup was uncertain') },
+      }
+    },
+  })
   await applyLoopbackServerEffect(ctx, {
     label: 'web-search-error-fixture',
     requestListener: (request, response) => {
       if (request.method === 'POST' && request.url === '/anthropic/v1/messages') {
+        if (!permits.some(permit => permit.origin === 'execution' && !permit.released)) {
+          response.writeHead(500, { 'content-type': 'application/json' })
+          response.end(JSON.stringify({ error: { message: 'native search contacted HTTP without execution admission' } }))
+          return
+        }
         response.writeHead(401, { 'content-type': 'application/json' })
         response.end(JSON.stringify({ error: { message: 'invalid snapshot API key' } }))
         return
@@ -59,6 +80,9 @@ export async function apply(ctx) {
         globalThis.fetch = originalFetch
       }
     },
-    onCleanup: () => restoreFetch(),
+    onCleanup: () => {
+      restoreFetch()
+      if (permits.some(permit => !permit.released)) throw new Error('web-search-error-fixture: model permit retained after completion')
+    },
   })
 }

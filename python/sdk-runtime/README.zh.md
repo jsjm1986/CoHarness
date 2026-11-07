@@ -29,6 +29,8 @@ Office 操作技能通过提供方在加载时追加的绝对路径，调用随�
 
 两种载体执行相同的 `dsh` 语法与随附 profile，包括独立的 `sdk-minimal` 配置树，以及包含前端产物的完整 `web` profile。私有 `dsh-python-runtime-closure` manifest（元数据清单）定义打包依赖闭包。本包还检入 `runtime/cordis.yml`，这是一个可通过显式 `DSH_CORDIS_CONFIG` 或 argv 配置路径选择的内置 bootstrap 组合。
 
+依赖闭包包含模型、原生操作与子进程 Consumer 所需的 [resource-budget 服务定义](../../packages/context/resource-budget/README.zh.md)和 [model-access 服务定义](../../packages/llm/model-access/README.zh.md)。提供方的启用仍由选定的组合负责。
+
 ## Python 模块 API
 
 - `bundled_package_dir() -> Path` 返回已安装模块数据根目录，并校验发布元数据。
@@ -49,6 +51,8 @@ Python bootstrap 从相邻目录解析 Office kit，让原生辅助程序与 URL
 ## 构建与分发
 
 生产部署允许工作区中不属于运行时闭包的补丁保持未使用；闭包内包的补丁仍必须成功应用。此例外仅用于部署命令，仓库安装仍拒绝未使用的补丁。
+
+共享运行时构建器会校验每个锁定归档的摘要，并通过路径、条目类型和重复路径检查流式解压 ZIP 条目。它会拒绝符号链接、特殊文件以及不支持的 wheel 安装方案。
 
 在仓库根目录运行 `pnpm exec tsx scripts/build-exe-for-python-sdk.ts`，会校验闭包、构建包、部署无符号链接的文件树、打包所选目标，并把可执行程序及伴随文件同步到本模块。`scripts/build-python-release.py` 按仓库根版本暂存发布形态的 wheel 包，并将 `deepseek-harness-sdk` 固定到完全相同的运行时版本。
 

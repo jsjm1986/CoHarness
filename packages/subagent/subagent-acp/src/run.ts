@@ -34,8 +34,7 @@ export interface AcpRunSpec {
   args: string[]
   /**
    * Absolute working directory for the child process AND its ACP session
-   * `cwd`. The provider resolves it before this spec exists: config override,
-   * else the delegating parent session's workspace.
+   * `cwd`, selected before provider startup.
    */
   cwd: string
   /** How to auto-answer the child's permission prompts. */
@@ -70,7 +69,7 @@ export interface AcpRunSpec {
    * child rides the shared scrub, managed-range teardown, and service-owned
    * lifetime instead of a package-local child_process path.
    */
-  spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
+  spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>
   /**
    * Host sink for startup, published-run, or teardown failures. Model-visible
    * text uses fixed safe facts, while this callback retains the original Error
@@ -346,7 +345,7 @@ export async function startAcpRun(request: SubagentStartRequest, spec: AcpRunSpe
   // while spec.env (the child's own key, its deployment facts) merges after it.
   let child: SubprocessHandle
   try {
-    child = spec.spawn({
+    child = await spec.spawn({
       argv: [spec.command, ...spec.args],
       cwd: spec.cwd,
       stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' },

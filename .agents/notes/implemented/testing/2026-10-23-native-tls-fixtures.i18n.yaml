@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-23-native-tls-fixtures.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-23-native-tls-fixtures.md
+document:
+  en: a876767a533403c49bac0cb72bf7d859653437d6
+  zh: 48ef88cfe4f3ce9b8f158dd14efc8e4d369a1d78
+/agent-note-native-cryptography-for-disposable-tls-fixtures:
+  en: 3cdaa89fd06b0d05
+  zh: f7df75801db888cf
+/agent-note-native-cryptography-for-disposable-tls-fixtures/problem:
+  en: d3813db641af535d
+  zh: c2a62100c46a55ce
+/agent-note-native-cryptography-for-disposable-tls-fixtures/decision:
+  en: 420dd17be54ade83
+  zh: 27c7efcb88ea5d67
+/agent-note-native-cryptography-for-disposable-tls-fixtures/alternatives-considered:
+  en: 7d1684f22147e1c2
+  zh: 19b9e3899215d7a4
+/agent-note-native-cryptography-for-disposable-tls-fixtures/consequences:
+  en: 133478f0fb7faa55
+  zh: d66e9ac519329295

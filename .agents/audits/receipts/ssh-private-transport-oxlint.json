@@ -1,0 +1,13 @@
+{
+  "name": "ssh-private-transport-oxlint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/ssh/ssh/src/index.ts packages/ssh/ssh/tests/fixtures/local-transport.ts packages/ssh/ssh/tests/startup-behavior.spec.ts packages/ssh/ssh/tests/password-channel.spec.ts packages/ssh/ssh/tests/connection-disposal.spec.ts packages/ssh/ssh/tests/resource-admission.e2e.ts packages/host/apiproxy/src/ssh-execution.ts",
+  "startedAt": "2026-10-23T15:04:11.812253+00:00",
+  "seconds": 3.236,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1204387c6f47c9c0bd0e3fa16dbdefe92a205b038f7622f16a959aae4b5d9bbe",
+  "inputsAfter": "1204387c6f47c9c0bd0e3fa16dbdefe92a205b038f7622f16a959aae4b5d9bbe",
+  "outputSha256": "e728be33372e31c8f9446eca7af98f809b280c47f68dfe79bdef3a7bd8149b54",
+  "outputTail": "packages/ssh/ssh/tests/resource-admission.e2e.ts:19:7: error eslint(prefer-const): `connection` is never reassigned. help: Use `const` instead.\npackages/ssh/ssh/tests/startup-behavior.spec.ts:226:45: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/ssh/ssh/src/index.ts:428:1: error @stylistic(indent): Expected indentation of 4 spaces but found 6.\npackages/ssh/ssh/src/index.ts:429:1: error @stylistic(indent): Expected indentation of 4 spaces but found 6.\npackages/ssh/ssh/src/index.ts:430:1: error @stylistic(indent): Expected indentation of 4 spaces but found 6.\npackages/ssh/ssh/src/index.ts:431:1: error @stylistic(indent): Expected indentation of 6 spaces but found 8.\npackages/ssh/ssh/src/index.ts:432:1: error @stylistic(indent): Expected indentation of 8 spaces but found 10.\npackages/ssh/ssh/src/index.ts:433:1: error @stylistic(indent): Expected indentation of 8 spaces but found 10.\npackages/ssh/ssh/src/index.ts:434:1: error @stylistic(indent): Expected indentation of 8 spaces but found 10.\npackages/ssh/ssh/src/index.ts:435:1: error @stylistic(indent): Expected indentation of 8 spaces but found 10.\npackages/ssh/ssh/src/index.ts:436:1: error @stylistic(indent): Expected indentation of 8 spaces but found 10.\npackages/ssh/ssh/src/index.ts:437:1: error @stylistic(indent): Expected indentation of 6 spaces but found 8.\npackages/ssh/ssh/src/index.ts:438:1: error @stylistic(indent): Expected indentation of 4 spaces but found 6.\n"
+}

@@ -1,0 +1,273 @@
+{
+  "finding": "B362",
+  "status": "fixed_named_postgres_child_environment_scope",
+  "updatedAt": "2026-10-30T18:08:32.607023+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z",
+  "sourcePaths": [
+    "gateway/src/deployment-commands.ts",
+    "gateway/tests/deployment-command-environment.spec.ts",
+    "gateway/tests/fixtures/deployment-command-environment.mjs",
+    "gateway/tests/expected/deployment-command-environment.jsonl",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-postgres-command-environment.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-postgres-command-environment.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-postgres-command-environment.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "gateway/src/deployment-commands.ts": "1a927f9090a86205e25426a3b1fa507e0852ff4838da6725e068af486292335c",
+    "gateway/tests/deployment-command-environment.spec.ts": "13730df46367d37c6fe819d33df74ed3213bc08db1debbb7989053235a57770c",
+    "gateway/tests/fixtures/deployment-command-environment.mjs": "f6c049c87bae7bc234195f7cc3796994a41a67dbc2c5a1d83e741c42c0d6a0f6",
+    "gateway/tests/expected/deployment-command-environment.jsonl": "03cfaa35cda735c3ac9e1c3b854b72213cbe5c662fcac9e96caae0596c49a479",
+    "gateway/README.md": "3bed107471f2ded9ed61083e0efa2247aa4579a96b2e1f68970ea5bd1fb7ff15",
+    "gateway/README.zh.md": "9b05afff23d0af454082bd865d724c085b0bc9bea76312f7a42f6b7967db1920",
+    "gateway/README.i18n.yaml": "7d346cdef56df68101ec065e6726a1f7c120a16ea9f049d449fd2b972ea36dc8",
+    ".agents/notes/implemented/bug-fix/2026-10-31-postgres-command-environment.md": "f022ca41769cf699934106096d7d585ff1244877c694e524b53ec9c97f77bce4",
+    ".agents/notes/implemented/bug-fix/2026-10-31-postgres-command-environment.zh.md": "efa9b549784c94c2cffd5533ca1bf355e6e6ebc5fc85ca592d8b5a86dab6c51d",
+    ".agents/notes/implemented/bug-fix/2026-10-31-postgres-command-environment.i18n.yaml": "0aec4adf6d27f249b3d6e5ae7c3feccf79cdfd7b39a0272be992a2b5d48fa0ef",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.md": "ecd5f629e68a9d8db7cb52641f058ba5778c2519fa0abd944c96569bcf6d8742",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.zh.md": "730f6d08006f52267da5b8b4f33f22b2c4f2bcf7f01048ef99f4fad6ce422bd4",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-command-environment/guide.i18n.yaml": "ec9ce0078f5b56b7479ae95f0d7d5e323e9e7542f0004233987fa2c75d163fcf"
+  },
+  "privateCompiledArtifact": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/deployment-child-env-gateway-artifact/lib",
+  "compiledHashes": {
+    "deployment-commands.js": "aa2d26a5adf00674fc31d53ba221c7bdfbfcef4c5f09376b6c764b626c199132",
+    "child-environment.js": "53ce0bd138de86dd75319cd22230af2054c16ca5384f8949f61fc0fb516e5f6c"
+  },
+  "repair": "All PostgreSQL maintenance command children use the existing scrubbed Gateway tooling environment, with explicit PGPASSWORD/PGPASSFILE/PGSSLKEY exceptions when those standard database inputs are present. Absent values remain absent; unrelated HGW/DSH/credential-named configuration is not inherited. Database arguments, stdio transport, process-close ownership and backup formats are unchanged.",
+  "causalEvidence": {
+    "status": "failed",
+    "startedAt": "2026-10-30T18:00:13.561731+00:00",
+    "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+    "command": [
+      "node",
+      "../node_modules/vitest/vitest.mjs",
+      "run",
+      "tests/deployment-command-environment.spec.ts",
+      "--maxWorkers=2"
+    ],
+    "exitCode": 1,
+    "finishedAt": "2026-10-30T18:00:14.345966+00:00"
+  },
+  "verification": {
+    "sourceCases": 32,
+    "sourceFiles": 4,
+    "commandAndClosureCases": 6,
+    "realPostgresBackupCases": 22,
+    "realPostgresRestoreCases": 4,
+    "keylessRunnablePrograms": 1,
+    "environmentScenarios": [
+      "configured-postgres-credentials",
+      "absent-postgres-credentials"
+    ],
+    "goldenStagesPerScenario": 4,
+    "actualChildInvocationsPerMode": 8,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "repeatedExecutionsAreNotNewCases": true,
+    "nativePostgresPasswordAuthenticationModes": [
+      "PGPASSWORD",
+      "0600PGPASSFILE"
+    ],
+    "nativePasswordAbsentFromDatabaseArgument": true,
+    "nativePostgresClientVersion": "18.6_1",
+    "ownedPostgresServerMajor": 17,
+    "realDatabasesAreIndependentDisposableChildren": true,
+    "docQuickGates": 20,
+    "checks": {
+      "deployment-child-env-source": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:01:23.988140+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-command-environment.spec.ts",
+          "tests/deployment-commands.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:01:24.805518+00:00"
+      },
+      "deployment-child-env-real-backups": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:02:25.155162+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "HGW_TEST_PG_DUMP_COMMAND=[\"/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_dump\"]",
+          "HGW_TEST_PG_RESTORE_COMMAND=[\"/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_restore\"]",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-backups.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:02:41.353681+00:00"
+      },
+      "deployment-child-env-real-restore": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:02:25.155029+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "HGW_TEST_PG_DUMP_COMMAND=[\"/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_dump\"]",
+          "HGW_TEST_PG_RESTORE_COMMAND=[\"/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_restore\"]",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-restore.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:02:39.002866+00:00"
+      },
+      "deployment-child-env-artifact-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:01:24.842578+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/deployment-child-env-gateway-artifact/lib",
+          "--incremental",
+          "false"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:01:27.280655+00:00"
+      },
+      "deployment-child-env-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:04:31.009950+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "HGW_TEST_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/deployment-child-env-gateway-artifact/lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-command-environment.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:04:31.753792+00:00"
+      },
+      "deployment-child-env-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:04:31.009950+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "HGW_TEST_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/deployment-child-env-gateway-artifact/lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/deployment-command-environment.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:04:31.735460+00:00"
+      },
+      "deployment-child-env-native-auth": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:04:47.926642+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/postgres-native-environment.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:04:48.252830+00:00"
+      },
+      "deployment-child-env-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:03:05.096337+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.ci.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:03:07.626860+00:00"
+      },
+      "deployment-child-env-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:03:05.096340+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/deployment-commands.ts",
+          "gateway/tests/deployment-command-environment.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:03:06.112880+00:00"
+      },
+      "deployment-child-env-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:04:31.789197+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:06:22.544953+00:00"
+      }
+    }
+  },
+  "coverageScope": "Both present and absent explicit PostgreSQL credential paths and all4actual maintenance command forms are observed through process environment witnesses. This is named behavior coverage; no whole-deployment-commands or Gateway100percent measurement is claimed.",
+  "documentation": {
+    "pairedStems": 3,
+    "upgradeGuideAdded": true,
+    "newActiveDecision": ".agents/notes/implemented/bug-fix/2026-10-31-postgres-command-environment.md",
+    "fullSupersessions": [],
+    "frozenArchivesEdited": false,
+    "reference": "https://www.postgresql.org/docs/17/libpq-envars.html"
+  },
+  "limits": [
+    "The keyless replay uses actual Node children standing in for PostgreSQL executables and a synthetic restore lease; it does not claim a database transaction from that program. Separate22backup and4restore tests use actual PostgreSQL clients against isolated real databases.",
+    "The extra native authentication smoke uses only this audit-owned database role password, never a provider/API key or production credential. Configured SSL key path retention is witnessed; a physical client-certificate TLS deployment is not covered.",
+    "Explicit database argument credential transport remains a separate review candidate. Environment isolation does not prove argument privacy or every possible third-party wrapper.",
+    "Only a private Gateway artifact was compiled; shared Gatewaylib, peer project preparation, live deployments and production data are untouched. Real paid model success and public push remain deferred. All12original domains and B04/B25 remain in progress."
+  ]
+}

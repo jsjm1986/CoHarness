@@ -1,9 +1,17 @@
 - insert:
     - id: gateway-runtime
       name: '@deepseek-ai/dsh-gateway-runtime'
+    - id: gateway-resource-budget
+      name: '@deepseek-ai/dsh-gateway-runtime/resource-budget'
     - id: gateway-execution
       name: '@deepseek-ai/dsh-gateway-execution'
     - id: archive-gateway
       name: '@deepseek-ai/dsh-archive-gateway'
     - id: model-governance
       name: '@deepseek-ai/dsh-model-governance'
+
+- id: llm
+  inject: [resourceBudget]
+
+- id: subprocess
+  inject: [resourceBudget]

@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-restore-refusal-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/identity-fs.spec.ts -t 'unverified file-by-file restore'",
+  "startedAt": "2026-10-25T22:34:02.746297+00:00",
+  "seconds": 6.344,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "46919855739c9eee84c8beca8704a647671bb587fe96f1dcfe80c25e3fe4c908",
+  "inputsAfter": "46919855739c9eee84c8beca8704a647671bb587fe96f1dcfe80c25e3fe4c908",
+  "postgresToolDirectory": null,
+  "outputSha256": "b0454dfe490712fe19a5de015382a136a83deaad507fdba2aff2299f8531a6c2",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed | 26 skipped (27)\n   Start at  06:34:08\n   Duration  685ms (transform 355ms, setup 93ms, import 353ms, tests 79ms, environment 0ms)\n\n"
+}

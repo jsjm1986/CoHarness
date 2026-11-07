@@ -6,7 +6,8 @@ import type { QueryResult, QueryResultRow } from 'pg'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { transaction } from './postgres/database.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
-import type { ResourcePolicyOwner } from './resource-access.ts'
+import type { RuntimeId } from './runtime-catalog.ts'
+import { lockAdministrator } from './postgres/administrator-authority.ts'
 import type { RuntimeTarget } from './instances.ts'
 
 /** One manager-owned patch row: literal enablement for one composition id. */
@@ -15,6 +16,17 @@ export interface PluginStateEntry { id: string; name?: string; disabled: boolean
 export interface PluginDesiredState { entries: PluginStateEntry[]; bundles: string[] }
 /** Current desired state with its optimistic-concurrency marker; `state` is null while no row exists. */
 export interface PluginStateSnapshot { revision: string; state: PluginDesiredState | null }
+/** One organization's saved desired-state row as the administrator overview lists it. */
+export interface PluginStateOverviewRow {
+  target: RuntimeTarget & { label: string }
+  entries: number
+  disabled: number
+  bundles: number
+  revision: string
+  updatedAt: string
+  live: boolean
+  generation: number | null
+}
 /** A state request was invalid, addressed a missing owner, or carried a stale revision. */
 export class PluginStateError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 500, message: string) { super(message) }
@@ -23,7 +35,7 @@ export class PluginStateError extends Error {
 /** The instance profile directory every managed runtime launches. */
 export const INSTANCE_PROFILE = 'web'
 
-interface InternalOwner { organizationId: string; userId?: string; projectId?: string }
+interface InternalOwner { organizationId: string; runtimeId: RuntimeId; userId?: string; projectId?: string }
 
 interface Querier {
   query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]): Promise<QueryResult<R>>
@@ -182,30 +194,74 @@ export async function projectDesiredState(profileDir: string, desired: PluginDes
   await writeFileAtomic(manifestPath, `${JSON.stringify(manifest, undefined, 2)}\n`, { mode: 0o600 })
 }
 
-/** PostgreSQL-backed `harness.plugin_states` store keyed by the internal owner id. */
+/** PostgreSQL-backed `harness.plugin_states` store keyed by the persistent Runtime identity. */
 export class PostgresPluginState {
   constructor(private readonly context: PostgresRuntimeContext) {}
 
-  private async resolveOwner(owner: ResourcePolicyOwner, querier?: Querier, lock = false): Promise<InternalOwner> {
-    const table = owner.kind === 'user' ? 'users' : 'projects'
-    const result = await (querier ?? this.context.pool).query<{ id: string; organization_id: string }>(
-      `SELECT id,organization_id FROM harness.${table} WHERE organization_id=$1 AND public_id=$2
-        ${owner.kind === 'user' ? 'AND deleted_at IS NULL' : ''}${lock ? ' FOR UPDATE' : ''}`,
-      [this.context.organizationId, owner.id])
+  private async resolveOwner(owner: RuntimeTarget, querier?: Querier, lock = false): Promise<InternalOwner> {
+    const table = owner.kind === 'user' ? 'users' : 'projects', column = owner.kind === 'user' ? 'user_id' : 'project_id'
+    const result = await (querier ?? this.context.pool).query<{ id: string; organization_id: string; runtime_id: RuntimeId }>(
+      `SELECT owner.id,owner.organization_id,i.runtime_id FROM harness.${table} owner
+        JOIN harness.instances i ON i.organization_id=owner.organization_id AND i.${column}=owner.id
+        WHERE owner.organization_id=$1 AND owner.public_id=$2 AND i.assigned_node_id=$3
+          AND ($4::uuid IS NULL OR i.runtime_id=$4)
+          ${owner.kind === 'user' ? 'AND owner.deleted_at IS NULL' : ''} ORDER BY i.runtime_id LIMIT 2${lock ? ' FOR UPDATE OF owner,i' : ''}`,
+      [this.context.organizationId, owner.id, this.context.nodeId, owner.runtimeId ?? null])
     const row = result.rows[0]
-    if (row === undefined) throw new PluginStateError(404, 'plugin state owner not found')
+    if (row === undefined) throw new PluginStateError(404, 'plugin Runtime not found on this computer')
+    if (result.rows.length !== 1) throw new PluginStateError(409, 'plugin configuration requires an exact Runtime identity')
     return owner.kind === 'user'
-      ? { organizationId: row.organization_id, userId: row.id }
-      : { organizationId: row.organization_id, projectId: row.id }
+      ? { organizationId: row.organization_id, runtimeId: row.runtime_id, userId: row.id }
+      : { organizationId: row.organization_id, runtimeId: row.runtime_id, projectId: row.id }
   }
 
   private async readRow(querier: Querier, owner: InternalOwner): Promise<PluginStateSnapshot> {
     const result = await querier.query<{ entries: unknown; bundles: unknown; revision: string }>(
-      `SELECT entries,bundles,revision::text FROM harness.plugin_states WHERE organization_id=$1 AND ${ownerColumn(owner)}=$2`,
-      [owner.organizationId, ownerId(owner)])
+      `SELECT entries,bundles,revision::text FROM harness.plugin_states WHERE organization_id=$1 AND runtime_id=$2`,
+      [owner.organizationId, owner.runtimeId])
     const row = result.rows[0]
     if (row === undefined) return { revision: '0', state: null }
     return { revision: row.revision, state: parseState(row) }
+  }
+
+  /**
+   * Every saved desired state in this organization joined with the owner's
+   * live instance row, for the administrator's cross-space overview. Spaces
+   * without a saved override are absent: their composition is file-driven.
+   * @returns one row per owner carrying counts and the runtime's liveness.
+   */
+  async list(): Promise<PluginStateOverviewRow[]> {
+    const result = await this.context.pool.query<{
+      user_public: number | null; project_public: number | null; runtime_id: RuntimeId
+      username: string | null; project_name: string | null
+      entries: unknown; bundles: unknown; revision: string; updated_at: string
+      desired_state: string | null; observed_state: string | null; generation: number | null
+    }>(
+      `SELECT s.runtime_id,u.public_id AS user_public, p.public_id AS project_public,
+        u.username, p.name AS project_name,
+        s.entries, s.bundles, s.revision::text, s.updated_at::text,
+        i.desired_state, i.observed_state, i.generation
+       FROM harness.plugin_states s
+       LEFT JOIN harness.users u ON u.id=s.user_id AND u.deleted_at IS NULL
+       LEFT JOIN harness.projects p ON p.id=s.project_id
+       JOIN harness.instances i ON i.organization_id=s.organization_id AND i.runtime_id=s.runtime_id
+       WHERE s.organization_id=$1 AND i.assigned_node_id=$2
+       ORDER BY s.updated_at DESC`,
+      [this.context.organizationId, this.context.nodeId])
+    const rows: PluginStateOverviewRow[] = []
+    for (const row of result.rows) {
+      const state = parseState(row)
+      const target = row.user_public !== null
+        ? { kind: 'user' as const, id: row.user_public, runtimeId: row.runtime_id, label: row.username ?? `user ${row.user_public}` }
+        : row.project_public !== null
+          ? { kind: 'project' as const, id: row.project_public, runtimeId: row.runtime_id, label: row.project_name ?? `project ${row.project_public}` }
+          : undefined
+      if (target === undefined) continue
+      rows.push({ target, entries: state.entries.length, disabled: state.entries.filter(entry => entry.disabled).length,
+        bundles: state.bundles.length, revision: row.revision, updatedAt: row.updated_at,
+        live: row.observed_state === 'ready', generation: row.generation })
+    }
+    return rows
   }
 
   /**
@@ -213,7 +269,7 @@ export class PostgresPluginState {
    * @param owner - account or project within this organization.
    * @returns the saved state and revision, or the revision-zero default.
    */
-  async get(owner: ResourcePolicyOwner): Promise<PluginStateSnapshot> {
+  async get(owner: RuntimeTarget): Promise<PluginStateSnapshot> {
     return this.readRow(this.context.pool, await this.resolveOwner(owner))
   }
 
@@ -223,44 +279,58 @@ export class PostgresPluginState {
    * @param owner - account or project within this organization.
    * @param state - the complete desired composition, or null to clear it.
    * @param revision - decimal revision the editor read; '0' requires an absent row.
+   * @param actorUserId - current administrator retained through the configuration write.
    * @returns the committed revision and state.
    */
-  async set(owner: ResourcePolicyOwner, state: PluginDesiredState | null, revision: unknown): Promise<PluginStateSnapshot> {
+  async set(owner: RuntimeTarget, state: PluginDesiredState | null, revision: unknown, actorUserId?: number): Promise<PluginStateSnapshot> {
     if (typeof revision !== 'string' || !/^(0|[1-9][0-9]{0,18})$/u.test(revision)) {
       throw new PluginStateError(400, 'invalid plugin state revision')
     }
     return transaction(this.context.pool, async (client) => {
+      if (actorUserId !== undefined) await lockAdministrator(client, this.context, actorUserId)
       const internal = await this.resolveOwner(owner, client, true)
       await this.assertCompositionMutable(client, internal)
       const current = await client.query<{ revision: string }>(
-        `SELECT revision::text FROM harness.plugin_states WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2 FOR UPDATE`,
-        [internal.organizationId, ownerId(internal)])
+        `SELECT revision::text FROM harness.plugin_states WHERE organization_id=$1 AND runtime_id=$2 FOR UPDATE`,
+        [internal.organizationId, internal.runtimeId])
       const currentRevision = current.rows[0]?.revision ?? '0'
       if (currentRevision !== revision) throw new PluginStateError(409, 'plugin state changed; reload before saving')
       if (state === null) {
         if (current.rows.length === 0) return { revision: '0', state: null }
-        await client.query(`DELETE FROM harness.plugin_states WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2`,
-          [internal.organizationId, ownerId(internal)])
+        await client.query(`DELETE FROM harness.plugin_states WHERE organization_id=$1 AND runtime_id=$2`,
+          [internal.organizationId, internal.runtimeId])
         return { revision: '0', state: null }
       }
       const entries = JSON.stringify(state.entries), bundles = JSON.stringify(state.bundles)
       const result = current.rows.length === 0
         ? await client.query<{ revision: string }>(
-          `INSERT INTO harness.plugin_states(organization_id,${ownerColumn(internal)},entries,bundles,revision)
-            VALUES($1,$2,$3::jsonb,$4::jsonb,1) RETURNING revision::text`,
-          [internal.organizationId, ownerId(internal), entries, bundles])
+          `INSERT INTO harness.plugin_states(organization_id,runtime_id,entries,bundles,revision,${ownerColumn(internal)})
+            VALUES($1,$2,$3::jsonb,$4::jsonb,1,$5) RETURNING revision::text`,
+          [internal.organizationId, internal.runtimeId, entries, bundles, ownerId(internal)])
         : await client.query<{ revision: string }>(
           `UPDATE harness.plugin_states SET entries=$3::jsonb,bundles=$4::jsonb,revision=revision+1,updated_at=now()
-            WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2 RETURNING revision::text`,
-          [internal.organizationId, ownerId(internal), entries, bundles])
+            WHERE organization_id=$1 AND runtime_id=$2 RETURNING revision::text`,
+          [internal.organizationId, internal.runtimeId, entries, bundles])
       return { revision: result.rows[0]!.revision, state }
     })
   }
 
-  private subjectOwner(subject: { organizationId: string; userInternalId?: string; projectInternalId?: string }): InternalOwner {
-    if (subject.userInternalId !== undefined) return { organizationId: subject.organizationId, userId: subject.userInternalId }
-    if (subject.projectInternalId !== undefined) return { organizationId: subject.organizationId, projectId: subject.projectInternalId }
-    throw new PluginStateError(404, 'plugin state owner not found')
+  private async subjectOwner(
+    subject: { organizationId: string; target?: RuntimeTarget; generation?: number; userInternalId?: string; projectInternalId?: string },
+    querier: Querier = this.context.pool,
+    lock = false,
+  ): Promise<InternalOwner> {
+    const column = subject.userInternalId === undefined ? 'project_id' : 'user_id'
+    const id = subject.userInternalId ?? subject.projectInternalId
+    if (id === undefined) throw new PluginStateError(404, 'plugin Runtime owner not found')
+    const result = await querier.query<{ runtime_id: RuntimeId }>(`SELECT runtime_id FROM harness.instances
+      WHERE organization_id=$1 AND assigned_node_id=$2 AND ${column}=$3
+        AND ($4::uuid IS NULL OR runtime_id=$4) AND ($5::bigint IS NULL OR generation=$5)
+      ORDER BY runtime_id LIMIT 2${lock ? ' FOR UPDATE' : ''}`,
+    [subject.organizationId, this.context.nodeId, id, subject.target?.runtimeId ?? null, subject.generation ?? null])
+    if (result.rows.length !== 1) throw new PluginStateError(409, 'plugin publication requires its current Runtime assignment')
+    return { organizationId: subject.organizationId, runtimeId: result.rows[0]!.runtime_id,
+      ...(column === 'user_id' ? { userId: id } : { projectId: id }) }
   }
 
   /**
@@ -285,16 +355,16 @@ export class PostgresPluginState {
    * @param subject - authenticated runtime identity carrying its internal owner id.
    * @returns the saved snapshot plus the applied marker; both '0' when the instance never launched here.
    */
-  async readForSubject(subject: { organizationId: string; userInternalId?: string; projectInternalId?: string }): Promise<PluginStateSnapshot & { appliedRevision: string }> {
-    const internal = this.subjectOwner(subject)
+  async readForSubject(subject: { organizationId: string; target?: RuntimeTarget; userInternalId?: string; projectInternalId?: string }): Promise<PluginStateSnapshot & { appliedRevision: string }> {
+    const internal = await this.subjectOwner(subject)
     const result = await this.context.pool.query<{ entries: unknown; bundles: unknown; revision: string; applied: string }>(
       `SELECT s.entries,s.bundles,COALESCE(s.revision,0)::text revision,
         COALESCE(i.applied_policy_revision,0)::text applied
         FROM harness.instances i
         LEFT JOIN harness.plugin_states s ON s.organization_id=i.organization_id
-          AND s.${ownerColumn(internal)}=i.${ownerColumn(internal)}
-        WHERE i.organization_id=$1 AND i.${ownerColumn(internal)}=$2 AND i.assigned_node_id=$3`,
-      [internal.organizationId, ownerId(internal), this.context.nodeId])
+          AND s.runtime_id=i.runtime_id
+        WHERE i.organization_id=$1 AND i.runtime_id=$2 AND i.assigned_node_id=$3`,
+      [internal.organizationId, internal.runtimeId, this.context.nodeId])
     const row = result.rows[0]
     if (row === undefined) return { revision: '0', state: null, appliedRevision: '0' }
     return {
@@ -321,12 +391,12 @@ export class PostgresPluginState {
     if (typeof baseRevision !== 'string' || !/^(0|[1-9][0-9]{0,18})$/u.test(baseRevision)) {
       throw new PluginStateError(400, 'invalid plugin state base revision')
     }
-    const internal = this.subjectOwner(subject)
     return transaction(this.context.pool, async (client) => {
+      const internal = await this.subjectOwner(subject, client, true)
       await this.assertCompositionMutable(client, internal)
       const current = await client.query<{ entries: unknown; bundles: unknown; revision: string }>(
-        `SELECT entries,bundles,revision::text FROM harness.plugin_states WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2 FOR UPDATE`,
-        [internal.organizationId, ownerId(internal)])
+        `SELECT entries,bundles,revision::text FROM harness.plugin_states WHERE organization_id=$1 AND runtime_id=$2 FOR UPDATE`,
+        [internal.organizationId, internal.runtimeId])
       const row = current.rows[0]
       if ((row?.revision ?? '0') !== baseRevision) {
         return {
@@ -337,20 +407,20 @@ export class PostgresPluginState {
       const entries = JSON.stringify(desired.entries), bundles = JSON.stringify(desired.bundles)
       const result = row === undefined
         ? await client.query<{ revision: string }>(
-          `INSERT INTO harness.plugin_states(organization_id,${ownerColumn(internal)},entries,bundles,revision)
-            VALUES($1,$2,$3::jsonb,$4::jsonb,1) RETURNING revision::text`,
-          [internal.organizationId, ownerId(internal), entries, bundles])
+          `INSERT INTO harness.plugin_states(organization_id,runtime_id,entries,bundles,revision,${ownerColumn(internal)})
+            VALUES($1,$2,$3::jsonb,$4::jsonb,1,$5) RETURNING revision::text`,
+          [internal.organizationId, internal.runtimeId, entries, bundles, ownerId(internal)])
         : await client.query<{ revision: string }>(
           `UPDATE harness.plugin_states SET entries=$3::jsonb,bundles=$4::jsonb,revision=revision+1,updated_at=now()
-            WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2 RETURNING revision::text`,
-          [internal.organizationId, ownerId(internal), entries, bundles])
+            WHERE organization_id=$1 AND runtime_id=$2 RETURNING revision::text`,
+          [internal.organizationId, internal.runtimeId, entries, bundles])
       const revision = result.rows[0]!.revision
       // The publisher's files are exactly what this revision stores: mark the
       // running generation so its next start skips re-projecting what it wrote.
       await client.query(
         `UPDATE harness.instances SET applied_policy_revision=$3,updated_at=now()
-          WHERE organization_id=$1 AND ${subject.target.kind === 'user' ? 'user_id' : 'project_id'}=$2 AND generation=$4`,
-        [internal.organizationId, ownerId(internal), revision, subject.generation])
+          WHERE organization_id=$1 AND runtime_id=$2 AND generation=$4 AND assigned_node_id=$5`,
+        [internal.organizationId, internal.runtimeId, revision, subject.generation, this.context.nodeId])
       return { status: 'applied' as const, revision }
     })
   }
@@ -368,9 +438,9 @@ export class PostgresPluginState {
       `SELECT s.entries,s.bundles,s.revision::text,COALESCE(i.applied_policy_revision,0)::text applied
         FROM harness.plugin_states s
         LEFT JOIN harness.instances i ON i.organization_id=s.organization_id
-          AND i.${target.kind === 'user' ? 'user_id' : 'project_id'}=s.${ownerColumn(internal)} AND i.assigned_node_id=$3
-        WHERE s.organization_id=$1 AND s.${ownerColumn(internal)}=$2`,
-      [internal.organizationId, ownerId(internal), this.context.nodeId])
+          AND i.runtime_id=s.runtime_id AND i.assigned_node_id=$3
+        WHERE s.organization_id=$1 AND s.runtime_id=$2`,
+      [internal.organizationId, internal.runtimeId, this.context.nodeId])
     const row = result.rows[0]
     if (row === undefined) return null
     if (BigInt(row.applied) >= BigInt(row.revision)) return 'current'
@@ -386,8 +456,8 @@ export class PostgresPluginState {
     const internal = await this.resolveOwner(target)
     const result = await this.context.pool.query<{ applied: string }>(
       `SELECT COALESCE(applied_policy_revision,0)::text applied FROM harness.instances
-        WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2 AND assigned_node_id=$3`,
-      [internal.organizationId, ownerId(internal), this.context.nodeId])
+        WHERE organization_id=$1 AND runtime_id=$2 AND assigned_node_id=$3`,
+      [internal.organizationId, internal.runtimeId, this.context.nodeId])
     return result.rows[0]?.applied ?? '0'
   }
 
@@ -402,8 +472,8 @@ export class PostgresPluginState {
     const internal = await this.resolveOwner(target)
     await this.context.pool.query(
       `UPDATE harness.instances SET applied_policy_revision=$3,updated_at=now()
-        WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2 AND assigned_node_id=$4`,
-      [internal.organizationId, ownerId(internal), revision, this.context.nodeId])
+        WHERE organization_id=$1 AND runtime_id=$2 AND assigned_node_id=$4`,
+      [internal.organizationId, internal.runtimeId, revision, this.context.nodeId])
   }
 
   /**

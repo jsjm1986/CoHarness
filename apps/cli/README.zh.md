@@ -19,6 +19,8 @@
 
 运行命令时所在的目录将作为默认 workspace 根目录。`web`、`headless`、`sdk`、`sdk-minimal` 和 `acp` profile 在首次使用时会从随附模板自动初始化。使用 `--from-default-profile` 可以基于这些模板之一，在非内置名称处创建或重置其他 profile；通过 `dsh plugin` 则可以初始化一个以 base 为基础的 profile。`desktop` 名称保留给 Electron 持有的 profile，因此 CLI（命令行界面）会拒绝针对它的启动和配置 dump 请求。npm 版 CLI 同样拒绝其插件管理请求；Desktop 安装的载体命令通过 `manageDesktopProfile` 使用该安装的运行时管理已初始化的 Desktop profile。
 
+Gateway 托管启动在 SDK 引导或 profile 插件运行前，就要求模型、资源和执行授权。详见[托管启动参考](reference/README.zh.md#managed-launch)。
+
 ## 应用参数
 
 启动器只解析自身的 flag，并将其后的所有内容交给已启动的 profile；注入该 profile 的任意应用插件都可以解析这份共享的不可变快照（[`dsh-cmdline`](../../packages/boot/cmdline/README.zh.md)）。启动器无法识别的第一个 token 标志着应用参数的开始：

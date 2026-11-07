@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { NormalizedBinding } from '@deepseek-ai/dsh-client-shortcuts/protocol'
-import { settingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
+import { settingsControlState, settingsFieldControlState } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ClientContext, ProjectUiPolicyRuntime, SettingsScope,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -286,7 +286,7 @@ export class ThemeRuntime {
     const spec = FONT_SIZE_SPECS[role]
     if (!isFontSize(role, px)) throw new Error(`${role} font size ${px} is outside ${spec.min}..${spec.max}`)
     if (this.fontSizes[role] === px) return
-    if (this.readOnly()) return
+    if (this.readOnly(spec.field)) return
     this.fontSizes = Object.freeze({ ...this.fontSizes, [role]: px })
     this.write(() => this.host.set(spec.field, px))
     this.publish()
@@ -308,7 +308,7 @@ export class ThemeRuntime {
       fontSizes[role] = px
       fields.push([field, px])
     }
-    if (fields.length === 0 || this.readOnly()) return
+    if (fields.length === 0 || this.readOnly(FONT_SIZE_SPECS.text.field)) return
     this.fontSizes = Object.freeze(fontSizes)
     this.write(() => Promise.all(fields.map(([field, value]) => this.host.set(field, value))))
     this.publish()
@@ -324,7 +324,7 @@ export class ThemeRuntime {
   setFontFamily(role: FontRole, value: string): void {
     const list = normalizeFontFamily(value)
     if (this.fontFamilies[role] === list) return
-    if (this.readOnly()) return
+    if (this.readOnly(FONT_FAMILY_FIELDS[role])) return
     this.fontFamilies = Object.freeze({ ...this.fontFamilies, [role]: list })
     this.write(() => this.host.set(FONT_FAMILY_FIELDS[role], list))
     this.publish()
@@ -335,8 +335,10 @@ export class ThemeRuntime {
    * loading/unavailable scope has no authority answer yet; a known read-only
    * answer must not change the live project/provider value even transiently.
    */
-  private readOnly(): boolean {
-    const settings = this.host.getSnapshot()
+  private readOnly(field?: string): boolean {
+    const settings = field === undefined
+      ? settingsControlState(this.host.getSnapshot())
+      : settingsFieldControlState(this.host, field)
     return settings.status === 'ready' && !settings.writable
   }
 
@@ -631,7 +633,9 @@ export function apply(ctx: ClientContext): void {
       settingsControlState(host.getSnapshot()),
       snapshot.projectOverride,
     )
-    fontBound?.sync(snapshot.fontSizes, snapshot.fontFamilies, snapshot.revision)
+    fontBound?.sync(
+      snapshot.fontSizes, snapshot.fontFamilies, snapshot.revision, settingsFieldControlState(host, FONT_SIZE_SPECS.text.field),
+    )
   }
   ctx.on('theme/change', sync)
   ctx.effect(() => host.subscribe(() => { sync() }), 'ui-theme: settings row state')

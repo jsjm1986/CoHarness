@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-paths-final",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm run verify-tsconfig-paths",
+  "startedAt": "2026-10-26T22:59:45.653164+00:00",
+  "seconds": 2.58,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "inputsAfter": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "postgresToolDirectory": null,
+  "outputSha256": "5e55d34332f1f9efbfc4c4f5e656b1a1f24722a8ee17f41189cbf4b583df3240",
+  "outputTail": "$ tsx scripts/gen-tsconfig-paths.ts --check\ngen-tsconfig-paths: tsconfig.base.json package aliases are current.\n"
+}

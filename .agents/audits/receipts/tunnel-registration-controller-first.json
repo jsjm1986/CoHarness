@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-controller-first",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-access.spec.ts tests/config.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T22:14:32.157128+00:00",
+  "seconds": 3.063,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1eb971ce04f81051442a9bef25c1e8a122c08152627cee38096a2a8540825b99",
+  "inputsAfter": "1eb971ce04f81051442a9bef25c1e8a122c08152627cee38096a2a8540825b99",
+  "postgresToolDirectory": null,
+  "outputSha256": "62f1660fd4d7af70fae240fd77e2e54eb3bebb19fff7ce92d687bb19d28fb9d4",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  50 passed (50)\n   Start at  06:14:34\n   Duration  561ms (transform 445ms, setup 0ms, import 587ms, tests 115ms, environment 0ms)\n\n"
+}

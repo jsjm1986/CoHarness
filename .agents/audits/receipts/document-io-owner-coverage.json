@@ -1,0 +1,14 @@
+{
+  "name": "document-io-owner-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests packages/host/userdoc-http/tests --coverage --coverage.include=packages/attachment/userdoc-local/src/body.ts --coverage.include=packages/attachment/userdoc-local/src/handle.ts --coverage.include=packages/attachment/userdoc-local/src/local-fs.ts --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.reportsDirectory=.agents/audits/.local/document-io-owner-coverage",
+  "startedAt": "2026-10-25T21:05:25.463597+00:00",
+  "seconds": 22.124,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "76fe6cc6d3248a0b4ea7fdfb17ecec9fd473d20783c87bbea862d6f8f55a0906",
+  "inputsAfter": "76fe6cc6d3248a0b4ea7fdfb17ecec9fd473d20783c87bbea862d6f8f55a0906",
+  "postgresToolDirectory": null,
+  "outputSha256": "2d08efa1969fc3ac7edac68e79c6d764a5c62f42afd223834fe3b8aa2316154b",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  26 passed (26)\n      Tests  404 passed (404)\n   Start at  05:05:40\n   Duration  7.50s (transform 4.67s, setup 1.00s, import 6.70s, tests 17.89s, environment 3ms)\n\n % Coverage report from v8\n-------------|---------|----------|---------|---------|-------------------\nFile         | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------|---------|----------|---------|---------|-------------------\n-------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 297/297 )\nBranches     : 100% ( 112/112 )\nFunctions    : 100% ( 93/93 )\nLines        : 100% ( 258/258 )\n================================================================================\n"
+}

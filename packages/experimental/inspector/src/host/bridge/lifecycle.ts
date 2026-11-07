@@ -1,6 +1,7 @@
 /** Failure containment and shutdown coordination for the Inspector Worker. */
 
 import type { Worker } from 'node:worker_threads'
+import type { ResourceLease } from '@deepseek-ai/dsh-resource-budget'
 import type { InspectorHostControl, InspectorWorkerControl } from '../../shared/bridge/messages/control.ts'
 import { parseInspectorWorkerControl } from '../../shared/bridge/control-codec.ts'
 
@@ -14,13 +15,14 @@ export class InspectorWorkerLifecycle {
   private notified = false
   private onUnexpectedExit: ((error: Error) => void) | undefined
   private exitCodeValue: number | undefined
+  private completion: Promise<void> | undefined
 
   /** Worker exit code once its `exit` event has fired. */
   get exitCode(): number | undefined {
     return this.exitCodeValue
   }
 
-  constructor(private readonly worker: Worker) {
+  constructor(private readonly worker: Worker, private readonly lease?: ResourceLease) {
     worker.on('error', (error) => {
       this.failure ??= error
       this.failureResolution.resolve(error)
@@ -30,45 +32,48 @@ export class InspectorWorkerLifecycle {
       this.exitCodeValue = code
       this.exitResolution.resolve(code)
       this.notifyUnexpectedExit()
+      void this.complete().catch((error: unknown) => {
+        console.error('dsh inspector: Worker resource completion could not be confirmed', error)
+      })
     })
   }
 
   /**
    * Wait for the validated ready frame while also observing startup failure and exit.
    * @param timeoutMs - Readiness deadline in milliseconds.
+   * @param signal - Cancellation of startup, before the handle is published.
    * @returns The Worker's bound endpoint fields.
    */
-  async waitForReady(timeoutMs: number): Promise<Extract<InspectorWorkerControl, { type: 'ready' }>> {
-    let timer: NodeJS.Timeout | undefined
-    let onMessage: ((value: unknown) => void) | undefined
-    const message = new Promise<Extract<InspectorWorkerControl, { type: 'ready' }>>((resolve, reject) => {
-      onMessage = (value: unknown): void => {
-        let control: InspectorWorkerControl
-        try {
-          control = parseInspectorWorkerControl(value)
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)))
-          return
-        }
-        if (control.type === 'ready') resolve(control)
-        else if (control.type === 'failure') reject(new Error(`inspector Worker failed: ${control.message}`))
-      }
-      timer = setTimeout(() => {
-        reject(new Error(`inspector Worker did not become ready within ${String(timeoutMs)}ms`))
-      }, timeoutMs)
-      this.worker.on('message', onMessage)
-    })
+  async waitForReady(timeoutMs: number, signal?: AbortSignal): Promise<Extract<InspectorWorkerControl, { type: 'ready' }>> {
+    signal?.throwIfAborted()
+    const ready = Promise.withResolvers<Extract<InspectorWorkerControl, { type: 'ready' }>>()
+    const onMessage = (value: unknown): void => {
+      let control: InspectorWorkerControl
+      try { control = parseInspectorWorkerControl(value) } catch (error) { ready.reject(error); return }
+      if (control.type === 'ready') ready.resolve(control)
+      else if (control.type === 'failure') ready.reject(new Error(`inspector Worker failed: ${control.message}`))
+    }
+    const onAbort = (event: Event): void => {
+      const reason: unknown = (event.currentTarget as AbortSignal).reason
+      ready.reject(reason instanceof Error ? reason : new Error('inspector: startup canceled', { cause: reason }))
+    }
+    const timer = setTimeout(() => {
+      ready.reject(new Error(`inspector Worker did not become ready within ${String(timeoutMs)}ms`))
+    }, timeoutMs)
+    this.worker.on('message', onMessage)
+    signal?.addEventListener('abort', onAbort, { once: true })
     try {
       return await Promise.race([
-        message,
+        ready.promise,
         this.failureResolution.promise.then((error) => { throw error }),
         this.exitResolution.promise.then((code) => {
           throw new Error(`inspector Worker exited before readiness (code ${String(code)})`)
         }),
       ])
     } finally {
-      if (timer !== undefined) clearTimeout(timer)
-      if (onMessage !== undefined) this.worker.off('message', onMessage)
+      clearTimeout(timer)
+      this.worker.off('message', onMessage)
+      signal?.removeEventListener('abort', onAbort)
     }
   }
 
@@ -90,7 +95,15 @@ export class InspectorWorkerLifecycle {
   /** Terminate the Worker during failed initialization. */
   async terminate(): Promise<void> {
     this.expectExit()
-    if (this.exitCodeValue === undefined) await this.worker.terminate()
+    if (this.exitCodeValue === undefined) {
+      try { await this.worker.terminate() } catch (error) {
+        try { await this.lease?.uncertain() } catch (reportError) {
+          throw new AggregateError([error, reportError], 'inspector: Worker termination and uncertainty report failed')
+        }
+        throw error
+      }
+    }
+    await this.complete()
   }
 
   /**
@@ -99,7 +112,7 @@ export class InspectorWorkerLifecycle {
    */
   async stop(timeoutMs: number): Promise<void> {
     this.expectExit()
-    if (this.exitCodeValue !== undefined) return
+    if (this.exitCodeValue !== undefined) return this.complete()
     this.worker.postMessage({ type: 'shutdown' } satisfies InspectorHostControl)
     let timer: NodeJS.Timeout | undefined
     const timeout = new Promise<'timeout'>((resolve) => {
@@ -109,10 +122,17 @@ export class InspectorWorkerLifecycle {
       this.exitResolution.promise.then(() => 'exited' as const),
       timeout,
     ])
-    if (timer !== undefined) clearTimeout(timer)
-    if (outcome === 'exited') return
-    await this.worker.terminate()
+    clearTimeout(timer)
+    if (outcome === 'exited') return this.complete()
+    await this.terminate()
     throw new Error(`inspector Worker did not stop within ${String(timeoutMs)}ms and was terminated`)
+  }
+
+  private complete(): Promise<void> {
+    return this.completion ??= Promise.resolve().then(() => this.lease?.release()).catch((error: unknown) => {
+      this.completion = undefined
+      throw error
+    })
   }
 
   private notifyUnexpectedExit(): void {

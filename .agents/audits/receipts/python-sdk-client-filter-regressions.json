@@ -1,0 +1,14 @@
+{
+  "name": "python-sdk-client-filter-regressions",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_client.py -q",
+  "startedAt": "2026-10-24T10:54:34.100453+00:00",
+  "seconds": 2.729,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6e4c87fcddb986d54c7de4af9be0aed802bb6a60fca683ceab30683fd8dbde14",
+  "inputsAfter": "6e4c87fcddb986d54c7de4af9be0aed802bb6a60fca683ceab30683fd8dbde14",
+  "postgresToolDirectory": null,
+  "outputSha256": "8e0dd3e259f68c193f05e3e04acef6407a9ed36e5124438d9f9a04fbd0db33db",
+  "outputTail": "......................................                                   [100%]\n"
+}

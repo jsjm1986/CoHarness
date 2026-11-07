@@ -8,7 +8,7 @@
  * access after such a failure.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
@@ -134,6 +134,31 @@ describe('goal projection unit', () => {
     }
   })
 
+  it('restores a checkpoint after lowering the round cap below already admitted rounds', async () => {
+    const { ctx, agent, session } = await harness(true)
+    onTestFinished(() => ctx.fiber.dispose())
+    let goal = ctx.goals.create(agent, { objective: 'reduce continuation budget', maxGoalRounds: 4 })
+    for (let round = 1; round <= 2; round += 1) {
+      session.append('turn/start', { turn: round })
+      session.append('user/message', createUserMessage({
+        content: [{ type: 'text', text: `round ${round}` }],
+        source: { kind: 'goal', goalId: goal.id, revision: goal.revision, round },
+      }), { surfaceOp: 'append' })
+      session.append('turn/end', { turn: round, reason: { kind: 'completed' } })
+    }
+    goal = ctx.goals.pause(agent, goal)
+    goal = ctx.goals.edit(agent, goal, { maxGoalRounds: 1 })
+    expect(goal).toMatchObject({ phase: 'paused', roundsStarted: 2, maxGoalRounds: 1 })
+    expect(() => ctx.goals.resume(agent, goal)).toThrow('increase maxGoalRounds before resuming')
+    const checkpoint = structuredClone(ctx.sessionProjections.checkpoint(session))
+    const floor = ctx.sessionProjections.restoreFloor(checkpoint)
+    if (floor === undefined) throw new Error('expected registered projections')
+    const restored = ctx.sessionProjections.restore(checkpoint, session.snapshotEvents().slice(floor),
+      floor, session.header, session.inheritedEventCount)
+    expect(restored.snapshot.values.goal).toEqual(ctx.sessionProjections.snapshot(session).values.goal)
+    expect(foldGoal(session.snapshotEvents())).toMatchObject({ roundsStarted: 2, goal: { maxGoalRounds: 1 } })
+  })
+
   it('does not let inbox changes revive a cleared goal', async () => {
     const bench = await harness(true)
     const created = bench.ctx.goals.create(bench.agent, { objective: 'stay cleared' })
@@ -174,7 +199,7 @@ describe('goal projection unit', () => {
     }).success).toBe(false)
     expect(goalProjectionDefinition.stateSchema.safeParse({
       ...state,
-      current: { ...current, roundsStarted: current.goal.maxGoalRounds + 1 },
+      current: { ...current, roundsStarted: -1 },
     }).success).toBe(false)
     const empty = goalProjectionDefinition.init()
     expect(goalProjectionDefinition.stateSchema.parse(empty)).toEqual(empty)
@@ -250,6 +275,40 @@ describe('goal projection unit', () => {
     const bench = await harness(false)
     seedMessage(bench.session)
     expect('goal' in (bench.tailValues() ?? {})).toBe(false)
+  })
+
+  it('disarms a live goal when another producer appends its next lifecycle snapshot', async () => {
+    const { ctx, agent, session } = await harness(true)
+    onTestFinished(() => ctx.fiber.dispose())
+    const created = ctx.goals.create(agent, { objective: 'observe another lifecycle producer' })
+    const first = session.snapshotEvents().find(event => event.type === 'goal/change')
+    if (first?.type !== 'goal/change' || first.data.operation === 'clear') throw new Error('expected created snapshot')
+    session.append('goal/change', { ...first.data, operation: 'pause',
+      goal: { ...first.data.goal, phase: 'paused', revision: created.revision + 1 } })
+    expect(ctx.goals.get(agent)).toMatchObject({ phase: 'paused', activation: 'disarmed' })
+  })
+
+  it('refuses goal access while a mounted projection registry lacks the goal unit', async () => {
+    const { ctx, agent } = await harness(true)
+    onTestFinished(() => ctx.fiber.dispose())
+    const stateOf = vi.spyOn(ctx.sessionProjections, 'stateOf').mockReturnValue(undefined)
+    try { expect(() => ctx.goals.get(agent)).toThrow('goal projection is not registered') }
+    finally { stateOf.mockRestore() }
+  })
+
+  it('disarms a projected goal after its optional projection registry unloads', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    const projection = await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(GoalService)
+    const agent = await liveAgent(ctx, ctx.sessions.create())
+    ctx.goals.create(agent, { objective: 'retain the goal after projection unload' })
+    await projection.dispose()
+    expect(ctx.get('sessionProjections')).toBeUndefined()
+    ctx.goals.disarm(agent)
+    expect(ctx.goals.get(agent)).toMatchObject({ phase: 'active', activation: 'disarmed' })
   })
 
   it('drops the key when the goal fiber unloads (HMR safety)', async () => {

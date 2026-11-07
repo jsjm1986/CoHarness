@@ -1,0 +1,77 @@
+{
+  "workload": "8 concurrent exact Runtime activity admissions, ready Ubuntu QA project29 generation12, actual node PostgreSQL configuration and pool max10",
+  "includes": "Complete manager/repository eligibility and activity writes; balanced release; prewarmed connections and equal imports, fresh child per sample",
+  "excludes": "Not whole Gateway/HTTP/browser; no Runtime start/stop, model request or changes to authority policy/configuration",
+  "databaseWrites": "Only last_activity_at/updated_at on the existing owned QA Runtime; all admitted in-memory references released",
+  "samplesOrder": [
+    "old",
+    "candidate",
+    "candidate",
+    "old",
+    "old",
+    "candidate"
+  ],
+  "byVariant": {
+    "old": {
+      "admissionMs": [
+        12854,
+        13030,
+        14246
+      ],
+      "medianMs": 13030,
+      "admissionQueries": [
+        40,
+        40,
+        40
+      ],
+      "releaseMs": [
+        3134,
+        3862,
+        3382
+      ],
+      "peakRssKiB": [
+        87232,
+        87172,
+        86516
+      ],
+      "retainedHeapBytes": [
+        15507120,
+        15503424,
+        15504640
+      ]
+    },
+    "candidate": {
+      "admissionMs": [
+        3051,
+        3148,
+        3223
+      ],
+      "medianMs": 3148,
+      "admissionQueries": [
+        8,
+        8,
+        8
+      ],
+      "releaseMs": [
+        2493,
+        3628,
+        3519
+      ],
+      "peakRssKiB": [
+        87044,
+        86516,
+        87240
+      ],
+      "retainedHeapBytes": [
+        15474504,
+        15474848,
+        15470440
+      ]
+    }
+  },
+  "medianRatio": 4.139135959339263,
+  "negativeControl": ".artifacts/full-real-task-20261031/r20-old-lease-administrator-negative.log",
+  "functional": "75 owning unit cases, real PostgreSQL assignment predicates and real HTTP owner-disable-before-admission transcript passed; old full artifact fails that exact new admission assertion while retaining its existing runtime-token refusal",
+  "productionParent": "Both nodes R20 serving at epoch98; native main-entry B startup and history/model/task retest in progress.",
+  "deployment": ".artifacts/full-real-task-20261031/r20-serving-confirmation.json"
+}

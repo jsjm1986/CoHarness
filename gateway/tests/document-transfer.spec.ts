@@ -2,6 +2,7 @@ import { generateKeyPairSync } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
+import { USERDOC_IDENTITY_HEADER } from '@deepseek-ai/dsh-host-userdoc-http'
 import {
   DOCUMENT_TRANSFER_UPLOADS_PATH,
   createDocumentTransferCapabilitiesHandler,
@@ -13,10 +14,23 @@ import {
   createGatewayDocumentTransferUploadHandler,
   createGatewayDocumentScopeHandler,
   DocumentTransferError,
+  safeUploadSession,
 } from '../src/document-transfer.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
 import { GatewayPrincipalSigner } from '../src/principal.ts'
 import type { RuntimeCredentialSubject } from '../src/runtime-api.ts'
+
+it('retains document incarnation metadata in sanitized upload completions', () => {
+  const identity = { incarnationId: 'upload-incarnation', revision: 1, origin: 'upload', createdBy: 'user:7' }
+  const result = safeUploadSession({ uploadId: '00000000-0000-4000-8000-000000000000', name: 'report.txt',
+    directoryId: '', bytes: 5, fingerprint: 'ref', chunkBytes: 65536, receivedBytes: 5, expiresAt: 10,
+    state: 'complete', ref: { docId: 'report.txt', path: '/private/report.txt', name: 'report.txt',
+      bytes: 5, mediaType: 'text/plain', modifiedAt: 1, identity: { ...identity, privatePath: '/private/control' } } })
+  expect(result).toMatchObject({ ref: { path: '', identity } })
+  expect(JSON.stringify(result)).not.toContain('/private/')
+  expect(() => safeUploadSession({ ...result, ref: { ...(result.ref as Record<string, unknown>),
+    identity: { ...identity, revision: 0 } } })).toThrow('invalid document metadata')
+})
 
 const USER: UserRow = {
   id: 7,
@@ -53,11 +67,11 @@ function fixture() {
   const principals = new GatewayPrincipalSigner(privateKey, 'acme', 60_000)
   const audit = vi.fn(async () => {})
   const projectForUser = vi.fn(async (projectId: number) => projectId === 41
-    ? { projectId, name: 'Compiler', path: '/tmp/compiler', mode: 'rw' as const, administrator: false }
+    ? { projectId, name: 'Compiler', path: '/tmp/compiler', mode: 'rw' as const, administrator: false, canManage: false, uiThemePolicy: 'follow-user' as const }
     : projectId === 42
-      ? { projectId, name: 'Read only', path: '/tmp/readonly', mode: 'ro' as const, administrator: false }
+      ? { projectId, name: 'Read only', path: '/tmp/readonly', mode: 'ro' as const, administrator: false, canManage: false, uiThemePolicy: 'follow-user' as const }
       : projectId === 43
-        ? { projectId, name: 'Runtime', path: '/tmp/runtime', mode: 'rw' as const, administrator: false }
+        ? { projectId, name: 'Runtime', path: '/tmp/runtime', mode: 'rw' as const, administrator: false, canManage: false, uiThemePolicy: 'follow-user' as const }
       : null)
   const ensureRunning = vi.fn(async (subject: UserRow | { kind: 'project'; id: number; name: string; path: string }) =>
     'username' in subject ? { port: 41001, generation: 1 } : { port: subject.id === 41 ? 41041 : 41042, generation: 2 })
@@ -139,10 +153,11 @@ function fixture() {
   }
 }
 
-function responseForTarget(docId: string, name = 'report.txt', bytes = 5): Response {
+function responseForTarget(docId: string, name = 'report.txt', bytes = 5, identity?: unknown): Response {
   return new Response(JSON.stringify({
     state: 'complete',
-    ref: { docId, path: '/private/should-not-leak', name, bytes, mediaType: 'text/plain', modifiedAt: 10 },
+    ref: { docId, path: '/private/should-not-leak', name, bytes, mediaType: 'text/plain', modifiedAt: 10,
+      ...(identity === undefined ? {} : { identity }) },
   }), { status: 200, headers: { 'content-type': 'application/json' } })
 }
 
@@ -161,6 +176,67 @@ function responseForTargetChunk(): Response {
 }
 
 describe('Gateway document transfer broker', () => {
+  it.each([
+    ['application/pdf', true, "'self'", 'inline'],
+    ['application/pdf; charset=binary', true, "'self'", 'inline'],
+    ['application/pdf', false, "'none'", 'attachment'],
+    ['text/html', true, "'none'", 'inline'],
+    ['image/svg+xml', true, "'none'", 'inline'],
+    ['text/plain', true, "'none'", 'inline'],
+    ['application/pdfx', true, "'none'", 'attachment'],
+    ['application/octet-stream', true, "'none'", 'attachment'],
+  ] as const)('keeps type-specific scope framing for %s with inline=%s', async (mediaType, inline, ancestors, disposition) => {
+    const runtime = fixture()
+    const operationRef = vi.fn(async () => {})
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('bytes', { headers: {
+      'content-type': mediaType,
+      'content-length': '5',
+      'content-disposition': 'attachment',
+      'content-security-policy': "frame-ancestors 'none'",
+    } })))
+    const handler = createGatewayDocumentScopeHandler({
+      ...runtime.dependencies,
+      instances: { ensureRunning: runtime.ensureRunning, operationRef },
+    })
+    const request = Object.assign(Readable.from([]), {
+      method: 'GET', headers: {},
+      url: `/api/documents/scope/content?scope=project%3A41&id=preview.pdf${inline ? '&inline=1' : ''}`,
+    })
+    const response = await handler({
+      user: USER, request: request as never, pathname: '/api/documents/scope/content',
+      operation: 'content', scope: { kind: 'project', projectId: 41 }, signal: new AbortController().signal,
+    })
+    expect(response?.headers.get('content-security-policy')).toBe(
+      `default-src 'none'; img-src 'self' data:; frame-ancestors ${ancestors}; sandbox`,
+    )
+    expect(response?.headers.get('content-disposition')).toBe(disposition)
+    expect(response?.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(response?.headers.get('cache-control')).toBe('private, no-store')
+    expect(response?.headers.get('content-type')).toBe(mediaType)
+    expect(response?.headers.get('content-length')).toBe('5')
+    expect(await response?.text()).toBe('bytes')
+    expect(operationRef.mock.calls).toEqual([
+      [{ kind: 'project', id: 41 }, 1, 2], [{ kind: 'project', id: 41 }, -1, 2],
+    ])
+  })
+
+  it('refuses inline PDF content before forwarding for a non-member project', async () => {
+    const runtime = fixture()
+    runtime.projectForUser.mockResolvedValueOnce(null)
+    const send = vi.fn()
+    vi.stubGlobal('fetch', send)
+    const handler = createGatewayDocumentScopeHandler(runtime.dependencies)
+    const request = Object.assign(Readable.from([]), {
+      method: 'GET', headers: {}, url: '/api/documents/scope/content?id=preview.pdf&inline=1',
+    })
+    await expect(handler({
+      user: USER, request: request as never, pathname: '/api/documents/scope/content',
+      operation: 'content', scope: { kind: 'project', projectId: 41 }, signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: 'COLLABORATION_FORBIDDEN', status: 403 })
+    expect(send).not.toHaveBeenCalled()
+    expect(runtime.ensureRunning).not.toHaveBeenCalled()
+  })
+
   it('times out stalled scope metadata and releases its runtime lease', async () => {
     const runtime = fixture()
     const operationRef = vi.fn(async () => {})
@@ -346,16 +422,21 @@ describe('Gateway document transfer broker', () => {
 
   it('streams a personal snapshot into a rw project and returns no host path', async () => {
     const runtime = fixture()
+    const identity = { incarnationId: 'target-incarnation', revision: 1, origin: 'transfer', createdBy: 'user:7' }
+    const sourceIdentity = { incarnationId: 'source-incarnation', revision: 4, origin: 'upload', createdBy: 'user:7' }
+    const recordCopy = vi.fn(async () => ({ operationId: 'copied', targetCatalogId: 'copied-target' }))
+    const handler = createDocumentTransferHandler({ ...runtime.dependencies, audit: { write: runtime.audit }, catalog: { recordCopy } })
     const fetch = vi.fn()
       .mockResolvedValueOnce(new Response('hello', {
         status: 200,
-        headers: { 'content-type': 'text/plain', 'content-length': '5' },
+        headers: { 'content-type': 'text/plain', 'content-length': '5',
+          [USERDOC_IDENTITY_HEADER]: Buffer.from(JSON.stringify(sourceIdentity)).toString('base64url') },
       }))
       .mockResolvedValueOnce(responseForTargetStart('report (2).txt'))
       .mockResolvedValueOnce(responseForTargetChunk())
-      .mockResolvedValueOnce(responseForTarget('report (2).txt', 'report (2).txt'))
+      .mockResolvedValueOnce(responseForTarget('report (2).txt', 'report (2).txt', 5, { ...identity, privatePath: '/private/identity' }))
     vi.stubGlobal('fetch', fetch)
-    const result = await runtime.handler({
+    const result = await handler({
       request: {} as never,
       subject: SUBJECT,
       principal: PRINCIPAL,
@@ -371,15 +452,176 @@ describe('Gateway document transfer broker', () => {
     expect(result.items).toMatchObject([{
       status: 'copied',
       source: { name: 'report.txt', bytes: 5, mediaType: 'text/plain' },
-      target: { docId: 'report (2).txt', name: 'report (2).txt', bytes: 5 },
+      target: { docId: 'report (2).txt', name: 'report (2).txt', bytes: 5, identity },
     }])
     expect(JSON.stringify(result)).not.toContain('/private/should-not-leak')
+    expect(JSON.stringify(result)).not.toContain('/private/identity')
     expect(fetch).toHaveBeenCalledTimes(4)
     // The copy reads declared length and identity bytes; a compressed runtime
     // response drops content-length, so the source fetch asks for identity.
     expect(((fetch.mock.calls[0]?.[1] as RequestInit).headers as Headers).get('accept-encoding')).toBe('identity')
     expect(fetch.mock.calls[1]?.[0]).toContain('/api/documents/uploads')
     expect(runtime.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'documents.transfer' }))
+    expect(recordCopy).toHaveBeenCalledWith(expect.objectContaining({ sourceIdentity, target: expect.objectContaining({ identity }) }))
+  })
+
+  it.each(['invalid++', Buffer.from('not JSON').toString('base64url'), Buffer.from('{"revision":0}').toString('base64url')])(
+    'refuses malformed source identity and releases the unread content body: %s', async (encoded) => {
+      const runtime = fixture(), cancel = vi.fn()
+      const body = new ReadableStream<Uint8Array>({ cancel })
+      const fetch = vi.fn(async () => new Response(body, { headers: { 'content-length': '5', [USERDOC_IDENTITY_HEADER]: encoded } }))
+      vi.stubGlobal('fetch', fetch)
+      try {
+        await expect(runtime.handler({ request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+          payload: { version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 41 }, documents: [{ docId: 'report.txt' }] },
+          signal: new AbortController().signal,
+        })).resolves.toMatchObject({ items: [{ status: 'failed', error: { code: 'DOCUMENT_TRANSFER_FAILED' } }] })
+        expect(fetch).toHaveBeenCalledTimes(1)
+        expect(cancel).toHaveBeenCalledOnce()
+      } finally { vi.unstubAllGlobals() }
+    },
+  )
+
+  it('renews request authority when a preceding transfer request outlives its principal', async () => {
+    const runtime = fixture()
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const requests: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      const assertion = new Headers(init?.headers).get('x-dsh-gateway-principal')
+      const claims = runtime.dependencies.principals.verify(assertion!)
+      expect(claims.user.id).toBe(USER.id)
+      requests.push(`${init?.method ?? 'GET'} ${url.pathname}`)
+      now += 60_000
+      if (url.pathname === '/api/documents/content') {
+        return new Response('hello', { status: 200, headers: { 'content-length': '5' } })
+      }
+      if (url.pathname.endsWith('/complete')) return new Response(JSON.stringify({ state: 'verifying' }), { status: 202 })
+      if (init?.method === undefined) return responseForTarget('report.txt')
+      if (url.pathname.includes('/chunks/')) return responseForTargetChunk()
+      return responseForTargetStart()
+    }))
+    try {
+      await expect(runtime.handler({
+        request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+        payload: { version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 41 }, documents: [{ docId: 'report.txt' }] },
+        signal: new AbortController().signal,
+      })).resolves.toMatchObject({ items: [{ status: 'copied' }] })
+      expect(requests).toHaveLength(5)
+    } finally {
+      clock.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each(['source', 'target', 'account'] as const)('stops a copy before another chunk after %s access is revoked', async (revoked) => {
+    const runtime = fixture()
+    let allowed = true
+    runtime.projectForUser.mockImplementation(async projectId => !allowed
+      && ((revoked === 'source' && projectId === 41) || (revoked === 'target' && projectId === 43))
+      ? null : { projectId, name: 'Compiler', path: '/tmp/compiler', mode: 'rw', administrator: false, canManage: false, uiThemePolicy: 'follow-user' as const })
+    const handler = createDocumentTransferHandler({
+      ...runtime.dependencies,
+      users: { getById: async () => !allowed && revoked === 'account' ? { ...USER, status: 'disabled' } : USER },
+    })
+    const cancelled = vi.fn()
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new TextEncoder().encode('hello')) },
+      cancel: cancelled,
+    })
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/documents/content') {
+        return new Response(source, { status: 200, headers: { 'content-length': '5' } })
+      }
+      if (url.pathname === '/api/documents/uploads') {
+        allowed = false
+        return responseForTargetStart('report.txt', 5)
+      }
+      if (url.pathname.endsWith('/complete')) return responseForTarget('report.txt')
+      return responseForTargetChunk()
+    })
+    vi.stubGlobal('fetch', fetch)
+    try {
+      await expect(handler({
+        request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+        payload: { version: 1, source: { kind: 'project', projectId: 41 }, target: { kind: 'project', projectId: 43 }, documents: [{ docId: 'report.txt' }] },
+        signal: new AbortController().signal,
+      })).resolves.toMatchObject({ items: [{ status: 'failed', error: { code: 'COLLABORATION_FORBIDDEN' } }] })
+      expect(fetch).toHaveBeenCalledTimes(2)
+      expect(cancelled).toHaveBeenCalledTimes(1)
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('stops administrator fan-out after demotion even when project write memberships remain', async () => {
+    const runtime = fixture()
+    let role: UserRow['role'] = 'admin'
+    const handler = createDocumentTransferHandler({
+      ...runtime.dependencies, users: { getById: async () => ({ ...USER, role }) },
+    })
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/documents/content') return new Response('hello', { headers: { 'content-length': '5' } })
+      if (url.pathname === '/api/documents/uploads') {
+        role = 'user'
+        return responseForTargetStart('report.txt', 5)
+      }
+      if (url.pathname.endsWith('/complete')) return responseForTarget('report.txt')
+      return responseForTargetChunk()
+    })
+    vi.stubGlobal('fetch', fetch)
+    try {
+      const denied = { items: [{ status: 'failed', error: { code: 'DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN' } }] }
+      await expect(handler({
+        request: {} as never, subject: SUBJECT, principal: { ...PRINCIPAL, user: { ...PRINCIPAL.user, role: 'admin' } },
+        payload: {
+          version: 1, source: { kind: 'personal' },
+          targets: [{ kind: 'project', projectId: 41 }, { kind: 'project', projectId: 43 }],
+          documents: [{ docId: 'report.txt' }],
+        },
+        signal: new AbortController().signal,
+      })).resolves.toMatchObject({ targets: [denied, denied] })
+      expect(fetch).toHaveBeenCalledTimes(2)
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('bounds failed-copy cancellation and releases runtime leases', async () => {
+    const runtime = fixture()
+    const operationRef = vi.fn(async () => {})
+    let cleanupSignal: AbortSignal | null | undefined
+    const handler = createDocumentTransferHandler({
+      ...runtime.dependencies,
+      instances: { ensureRunning: runtime.ensureRunning, operationRef },
+      upstreamTimeoutMs: 10,
+    })
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (init?.method === 'DELETE') {
+        cleanupSignal = init.signal
+        if (cleanupSignal === undefined || cleanupSignal === null) throw new Error('Cancellation has no deadline')
+        const signal = cleanupSignal
+        return new Promise<Response>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+          if (signal.aborted) reject(signal.reason)
+        })
+      }
+      if (url.pathname === '/api/documents/content') return new Response('hello', { headers: { 'content-length': '5' } })
+      if (url.pathname === '/api/documents/uploads') return responseForTargetStart('report.txt', 5)
+      return new Response(JSON.stringify({ error: { code: 'UPLOAD_FAILED', message: 'Upload failed.' } }), { status: 503 })
+    }))
+    try {
+      await expect(handler({
+        request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+        payload: { version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 41 }, documents: [{ docId: 'report.txt' }] },
+        signal: new AbortController().signal,
+      })).resolves.toMatchObject({ items: [{ status: 'failed', error: { code: 'UPLOAD_FAILED' } }] })
+      expect(cleanupSignal?.aborted).toBe(true)
+      expect(operationRef.mock.calls).toEqual([
+        [{ kind: 'user', id: USER.id }, 1, 1], [{ kind: 'project', id: 41 }, 1, 2],
+        [{ kind: 'project', id: 41 }, -1, 2], [{ kind: 'user', id: USER.id }, -1, 1],
+      ])
+    } finally { vi.unstubAllGlobals() }
   })
 
   it('keeps source bytes bounded when the target advertises small chunks', async () => {
@@ -595,6 +837,41 @@ describe('Gateway document transfer broker', () => {
     })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_EXPIRED' })
   })
 
+  it.each(['actor', 'organization'] as const)('preserves a transfer plan after a different %s attempts to commit it', async (identity) => {
+    const runtime = fixture()
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ documents: [{
+        docId: 'report.txt', name: 'report.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1,
+      }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response('hello', { status: 200, headers: { 'content-length': '5' } }))
+      .mockResolvedValueOnce(responseForTargetStart())
+      .mockResolvedValueOnce(responseForTargetChunk())
+      .mockResolvedValueOnce(responseForTarget('report.txt'))
+    vi.stubGlobal('fetch', fetch)
+    const payload = {
+      version: 1,
+      source: { kind: 'project', projectId: 41 },
+      target: { kind: 'project', projectId: 43 },
+      documents: [{ docId: 'report.txt' }],
+    }
+    const plan = await runtime.plan({ subject: SUBJECT, principal: PRINCIPAL, payload })
+    const commit = {
+      request: {} as never,
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: { ...payload, planId: plan.planId },
+      signal: new AbortController().signal,
+    }
+    const other = identity === 'actor'
+      ? { ...PRINCIPAL, user: { ...PRINCIPAL.user, id: 8 } }
+      : { ...PRINCIPAL, organization: 'another-organization' }
+    await expect(runtime.commit({ ...commit, principal: other }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_EXPIRED' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    await expect(runtime.commit(commit)).resolves.toMatchObject({ items: [{ status: 'copied' }] })
+    expect(fetch).toHaveBeenCalledTimes(5)
+  })
+
   it('rejects a plan that exceeds the actor byte budget before retaining it', async () => {
     const runtime = fixture()
     const docId = 'x'.repeat(256)
@@ -615,6 +892,89 @@ describe('Gateway document transfer broker', () => {
         documents: [{ docId }],
       },
     })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_LIMIT' })
+  })
+
+  it.each([{ kind: 'personal' }, { kind: 'project', projectId: 41 }] as const)(
+    'plans nested documents from their source directories in $kind scope', async (source) => {
+      const runtime = fixture()
+      const requests: { directory: string | null; cursor: string | null; limit: string | null }[] = []
+      const fetch = vi.fn(async (input: string) => {
+        const url = new URL(input)
+        const directory = url.searchParams.get('directory')
+        const cursor = url.searchParams.get('cursor')
+        requests.push({ directory, cursor, limit: url.searchParams.get('limit') })
+        const docId = directory === 'deep'
+          ? cursor === null ? 'deep/alpha.txt' : 'deep/omega.txt'
+          : directory === 'beta' ? 'beta/gamma.txt'
+          : cursor === null ? 'unrelated.txt' : 'root.txt'
+        return new Response(JSON.stringify({
+          documents: [{ docId, name: docId.split('/').at(-1), bytes: 5, mediaType: 'text/plain', modifiedAt: 1 }],
+          ...(cursor === null && directory !== 'beta' ? { nextCursor: 'second-page' } : {}),
+        }), { status: 200 })
+      })
+      vi.stubGlobal('fetch', fetch)
+      const documents = ['deep/alpha.txt', 'root.txt', 'beta/gamma.txt', 'deep/omega.txt'].map(docId => ({ docId }))
+      const payload = { version: 1, source, target: { kind: 'project', projectId: 43 }, directory: 'destination', documents }
+      const plan = await runtime.plan({ subject: SUBJECT, principal: PRINCIPAL, payload })
+      try {
+        expect(plan.documents.map(document => document.docId)).toEqual(documents.map(document => document.docId))
+        expect(plan.directory).toBe('destination')
+        expect(requests).toEqual([
+          { directory: 'deep', cursor: null, limit: '100' },
+          { directory: 'deep', cursor: 'second-page', limit: '100' },
+          { directory: '', cursor: null, limit: '100' },
+          { directory: '', cursor: 'second-page', limit: '100' },
+          { directory: 'beta', cursor: null, limit: '100' },
+        ])
+      } finally {
+        runtime.projectForUser.mockResolvedValueOnce(null)
+        await expect(runtime.commit({
+          request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+          payload: { ...payload, planId: plan.planId }, signal: new AbortController().signal,
+        })).rejects.toMatchObject({ code: 'COLLABORATION_FORBIDDEN', status: 403 })
+      }
+    },
+  )
+
+  it('rejects a repeating cursor within a source directory', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ documents: [], nextCursor: 'repeat' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    await expect(runtime.plan({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 43 },
+        documents: [{ docId: 'deep/missing.txt' }],
+      },
+    })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_FAILED', status: 502 })
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps one metadata page budget across source directories', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn(async (input: string) => {
+      const url = new URL(input)
+      const directory = url.searchParams.get('directory')
+      const page = Number(url.searchParams.get('cursor') ?? '0')
+      const complete = directory === 'first' && page === 249
+      return new Response(JSON.stringify({
+        documents: complete ? [{
+          docId: 'first/source.txt', name: 'source.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1,
+        }] : [],
+        ...(complete ? {} : { nextCursor: String(page + 1) }),
+      }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetch)
+    await expect(runtime.plan({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 43 },
+        documents: [{ docId: 'first/source.txt' }, { docId: 'second/source.txt' }],
+      },
+    })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_FAILED', status: 502 })
+    expect(fetch).toHaveBeenCalledTimes(500)
   })
 
   it('validates plan limits and rejects a process-wide byte budget', async () => {

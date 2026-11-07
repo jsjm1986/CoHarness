@@ -1,0 +1,312 @@
+{
+  "finding": "B456",
+  "status": "fixed_verified_peer_owned_http_lease_retirement_core_regressions_global_review_open",
+  "updatedAt": "2026-11-01T22:41:28.952261+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-01T22:19:19.329767+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/baseline-latest-origin-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problem": "A released HTTP borrower could still destroy its pooled connection after a successor request acquired it, aborting the successor response. This proves request-lifecycle isolation failure, not an account ACL bypass.",
+  "fix": "The peer makes destroy idempotent after release and adds a native transport regression. Root changes only four Core test files to cover invalid admission limits, bare composition, blank input refusal, parent-removal exclusion, unpublished result rejection and child waiting.",
+  "compatibility": {
+    "publicApiChanged": false,
+    "persistedDataChanged": false,
+    "configurationChanged": false,
+    "rootCoreProductionSourceChanged": false
+  },
+  "verification": {
+    "differentNamedCases": 783,
+    "caseSets": [
+      {
+        "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/core-complete-entry-cases.json",
+        "passed": 717
+      },
+      {
+        "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/pool-readonly-fixed-cases.json",
+        "passed": 41
+      },
+      {
+        "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/node-authority-postgres-current-cases.json",
+        "passed": 25
+      }
+    ],
+    "nativeEvidence": "The same final native diagnostic fails against frozen original pool source and passes against normal TypeScript-built JavaScript under plain Node24. The first lease releases before a held successor response; its late destroy aborts only the original implementation. All owned connections and servers are closed.",
+    "coreCompleteEntry": {
+      "lines": {
+        "total": 253,
+        "covered": 251,
+        "skipped": 0,
+        "pct": 99.2
+      },
+      "functions": {
+        "total": 65,
+        "covered": 65,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 286,
+        "covered": 284,
+        "skipped": 0,
+        "pct": 99.3
+      },
+      "branches": {
+        "total": 128,
+        "covered": 127,
+        "skipped": 0,
+        "pct": 99.21
+      }
+    },
+    "controlHelper": {
+      "lines": {
+        "total": 32,
+        "covered": 32,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 9,
+        "covered": 9,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 35,
+        "covered": 35,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 41,
+        "covered": 41,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "completeEntry100PercentGatePassed": false,
+    "uncoveredStatements": {
+      "path": "packages/subagent/subagent/src/index.ts",
+      "lines": [
+        874,
+        875
+      ],
+      "scope": "retained-cleanup retry fallback"
+    },
+    "coveragePolicyChanged": false,
+    "postgres": {
+      "cases": 25,
+      "skipped": 0,
+      "ownedDisposableDatabase": "dropped",
+      "productionDatabaseUsed": false
+    },
+    "checks": [
+      {
+        "name": "pool-readonly-fixed",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/pool-readonly-fixed.json"
+      },
+      {
+        "name": "node-authority-postgres-current",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/node-authority-postgres-current.json"
+      },
+      {
+        "name": "core-remaining-public-paths",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/core-remaining-public-paths.json"
+      },
+      {
+        "name": "core-final-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/core-final-lint.json"
+      },
+      {
+        "name": "core-final-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/core-final-host-types.json"
+      },
+      {
+        "name": "gateway-private-normal-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/gateway-private-normal-build.json"
+      },
+      {
+        "name": "lease-retirement-after",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/lease-retirement-after.json"
+      },
+      {
+        "name": "lease-retirement-built-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/lease-retirement-built-node24.json"
+      },
+      {
+        "name": "documentation-current",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/documentation-current.json"
+      },
+      {
+        "name": "export-jsdoc-current",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/export-jsdoc-current.json"
+      },
+      {
+        "name": "baseline-latest-origin-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/baseline-latest-origin-fetch.json"
+      },
+      {
+        "name": "lease-retirement-before",
+        "status": "expected_original_native_http_successor_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/lease-retirement-before.json"
+      },
+      {
+        "name": "lease-retirement-matched-original",
+        "status": "expected_original_native_http_successor_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/lease-retirement-matched-original.json"
+      },
+      {
+        "name": "core-complete-entry-measurement",
+        "status": "717_cases_passed_100_percent_threshold_not_met_two_uncovered_statements",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/core-complete-entry-measurement.json"
+      },
+      {
+        "name": "maintained-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/maintained-repository-references.json"
+      }
+    ]
+  },
+  "coordination": {
+    "status": "peer_transport_fix_and_ui_routes_root_nonconflicting_resource_review",
+    "rootScope": "B456 native HTTP diagnostic, independent verification and four Core regression-test deltas; read-only draft recovery API review",
+    "peerScope": "R38 HTTP pool fix and production release; R39 App.tsx route correction and subsequent draft recovery implementation",
+    "rootProductionSourceEdits": 0,
+    "rootUiEdits": 0,
+    "rootProductionMutation": false,
+    "b451Integration": "deferred_by_peer",
+    "communications": "One concrete lease bug handoff and one requested draft API assessment; no routine status pings."
+  },
+  "peerOwnedFix": {
+    "owner": "parallel_R38_thread",
+    "paths": [
+      "gateway/src/node-service-http-pool.ts",
+      "gateway/tests/node-service.spec.ts",
+      ".agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.i18n.yaml",
+      ".agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.md",
+      ".agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.zh.md"
+    ],
+    "beforePoolSha256": "20e68dad746c55abda5f84d555f7cd9f4c225f074cf8e94138126f2bb79c28db",
+    "afterPoolSha256": "de73e5df9bad8a2aa5acb1835a757ef79978cfbfdf2eb4d278624f35b27eb493",
+    "reviewPatch": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/peer-owned-lease-retirement.patch",
+    "reviewPatchSha256": "470df9401d2fd3956f9fa78eb4208e086e1634daac6ea208faabdca8cd20e3e6",
+    "rootProductionSourceEdits": 0,
+    "mergeRule": "Peer source references are not Root-owned deltas. Integrate its frozen R38 fix under the peer release; do not overwrite Gateway or the peer Agent Note from this snapshot."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/lease-retirement-capsule.json",
+  "paths": [
+    "packages/subagent/subagent/tests/service.spec.ts",
+    "packages/subagent/subagent/tests/control.spec.ts",
+    "packages/subagent/subagent/tests/run-cleanup.spec.ts",
+    "packages/subagent/subagent/tests/continuation.spec.ts"
+  ],
+  "readOnlyPrerequisiteCount": 373,
+  "artifactReferences": {
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/boot/app-boot/lib/index.js": "e7527dacdd9bc28e1a95536f3930f042ebbac186b16393059469ac7f3a537b80",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/context/collaboration-gateway/lib/index.js": "0f9959205ed5dcc40ee9558d04c575fbf5fe3aa643e42430ec471ca3cc975b65",
+    "packages/core/agent-loop/lib/index.js": "4d9e306e15bd8a750ff97bd48c6253a45f2faa49edf5b41ac88b37c2b0f0e882",
+    "packages/core/agent/lib/index.js": "4ffa8768f1ed50640eaba1ef6cddd9183c824a5a183208e3012a4f86ed27fa18",
+    "packages/extensions/tool-cordis/lib/index.js": "a8db112aaa38e65f1c4a25ff4215d876df687c4f079ad38faaa8c83a9bd01cb8",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.d.ts": "751ebac54d1c2d0a694d18973b2d1a95f901b8dda3ed49eb6303795a30c8dc4e",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.js": "1601d1a9a14d2788d68534f88c96ea7d66fc5eceea45427abb5e14e7c2e6167a",
+    "packages/extensions/tool-cordis/lib/types/index.d.ts": "af71d264ee9c5c04b991eeb6c75c7b02137bc0281cd576b6db3f8e7f8d49ae57",
+    "packages/extensions/tool-cordis/lib/types/index.js": "a96b33268cd03e577cdfc62f32c55ebc380e98d7ba3006789feb65cd2480dfc6",
+    "packages/jobs/jobs-local/lib/index.js": "9d7ef77f5119202345aafddd4ac2a1dead773db0a70e887bc852f50f4fa2cf3b",
+    "packages/jobs/jobs-local/lib/types/index.d.ts": "ee46e954b695a13ede2d19a07028517e0389a79ed73a4c4b86d687296a9f84e6",
+    "packages/jobs/jobs-local/lib/types/index.js": "7a7872b40f897a044e630c19ad7b42a637687556467e548ea7aaecdbb42b9523",
+    "packages/jobs/jobs/lib/index.js": "0e7659e20c3ab0cdef78aeadc08d14baa23cc05412f28daf21e5ecc7b71b3821",
+    "packages/jobs/tool-jobs/lib/index.js": "d09749a36d2b6247ac32a476fb2947c1fe32fe95ea4444bbd768901c6b838c0b",
+    "packages/ptc-runtime/ptc-runtime-node/lib/index.js": "9b01e82609461ca27c7353386722a523bed4ebbed0f326d6ccc803c620032fa6",
+    "packages/sdk/client/lib/index.js": "7099941321aa5a129caed823ac18c4749ac269dba7705c5ce6274b0276f51aad",
+    "packages/sdk/server/lib/index.js": "c94739bc12898d337ca362ef657464e2aa06d117cec7c90395fc37a03abd4196",
+    "packages/subagent/subagent/lib/index.js": "d1d5a046de6fb2a67dc15d682bdb7c0b8ef6966a3b918a1ca48b62f66180b007",
+    "packages/subagent/subagent/lib/types/index.d.ts": "0fda33152b96a3ab06f65d8d2f3009554e7e51c330c1b2f193ad7c6254285dea",
+    "packages/subagent/subagent/lib/types/index.js": "367eeafbfccd4d538ce6d26b6733e7f8208b0fb056215b25ac0c9d1cfb992e6b",
+    "packages/subagent/subagent/lib/types/internal.d.ts": "910db97a43b6dd599126d6c7cf9057b2c007120bcf9dd761bcf1439aa2e45291",
+    "packages/subagent/subagent/lib/types/internal.js": "9e629487ae14104c2d46269197692279bf5c1a5209af0b2a56ee0865ac477afb",
+    "packages/subagent/subagent/lib/types/retained-cleanup.d.ts": "612a42281e3890f569f17ff5a8a34cbd14b62efde68bf7b4578bfce7bf0bebf3",
+    "packages/subagent/subagent/lib/types/retained-cleanup.js": "f3faf639884fea1af4ddcf84386170e8e41926d229b7fd131425b7bba71924a1",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/tool-subagent/lib/index.js": "d9de7ae8a530685125fa1cca13d988bde53ab75c30e9846188c2efe264e0cf46",
+    "packages/subagent/tool-subagent/lib/types/index.d.ts": "8b09f71db58a223e7e965f4f5775d97941851d5d6dd8d92b3e6a83d54b6eea5c",
+    "packages/subagent/tool-subagent/lib/types/index.js": "4d8643492ed30c70d067d7d0e5f91115371318e890e35da11380847c7b9041c5",
+    "packages/workflow/tool-ralph/lib/index.js": "657f8d26e9bba0ed6a953351c3133c0042e3e5d33e145a265988e58308b50c47",
+    "packages/workflow/tool-ralph/lib/types/index.d.ts": "aca7d199ca84ddfa327b1f198767482d647cadab731176dbfc66466eb2064d1a",
+    "packages/workflow/tool-ralph/lib/types/index.js": "5eb5bd99e37fbefec07703d7b6d28e0e98e90f0bdf07ca2e5d8f09e1fbad4736",
+    "packages/workflow/tool-workflow/lib/index.js": "b67d1ca2c2f20b0ae0162ab79977cacac34358ec0dbdbf72329da00d5dcba466",
+    "packages/workflow/tool-workflow/lib/types/index.d.ts": "580add4796ea967c51f79558608ef6472780a393c046e20673751437d41df549",
+    "packages/workflow/tool-workflow/lib/types/index.js": "63ba6b1738032618f6894e342b488ff9a6ddd24a27f58c7f12a3ba303095411b",
+    "packages/workflow/tool-workflow/lib/types/record.d.ts": "b76ec5244084c6bc7a23bf099fab530280c818b7c4b87866d0d675960fa521a6",
+    "packages/workflow/tool-workflow/lib/types/record.js": "a796561d1ce5a65fcaeb4c62f20694dfade02a92102534306ed0c6c7ccbfa8f6",
+    "packages/workflow/workflow-ptc/lib/index.js": "c3d9578dcdaa08430018fc72848d587d98f457d695b2200dd5a385d758a4b373",
+    "packages/workflow/workflow-ptc/lib/types/index.d.ts": "7fb2a61124763eed3629d93eb1d0e95de4de7a2e68697961b740f959eda81c54",
+    "packages/workflow/workflow-ptc/lib/types/index.js": "4faffdf81ad5a92ec4b99070ec2775362af9ce7711da3f0e2ff3f0e63e0a70e5",
+    "packages/workflow/workflow/lib/index.js": "fa7c0ac38c714b7230c41fa38d22524923c1237940fbfa416f63d3e1b37fde8b",
+    "packages/workflow/workflow/lib/types/index.d.ts": "91b595cdbb6d70e398d68b7529e4980f74f4651cea24a65f286201926dee1b15",
+    "packages/workflow/workflow/lib/types/index.js": "889279d97ad94551d2dcc2e945f0d4363e6056d3d175ae3dabd6cc889d1cd54d"
+  },
+  "privateNormalBuiltArtifactReferences": {
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/gateway-built/node-service-http-pool.js": "905061ca669450aefb93cedf8f01cf8e296d5e831df06a9f735c9af924768de8",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/gateway-built/node-service.js": "01f50f09947e645b9b7af8e697d08f599020344eb40a40cea0f38fcf2ecd1668",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/gateway-built/node-service-stream.js": "d5f1cb94a15be89e414d5b9d7da00e4de4631c04d1a335ad822eba84fce98efd"
+  },
+  "noteReview": {
+    "action": "The source owner updated the existing HTTP reuse note and its bilingual metadata. Root adds only local regression coverage and creates no Agent Note.",
+    "newRootNotes": 0,
+    "archivedNotesChanged": false
+  },
+  "remaining": [
+    "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "B457: a noncurrent blank Session with unsent input is hidden by current tree and flat-list filters. Existing document-local composer retention can provide recoverability without reading or copying text. The peer owns UI implementation; Root has only reviewed and handed off reuse of ISessions.retainInfo. The exact production draft bytes have not been inspected.",
+    "B458: the peer reported a ComputerSelector target identity/path calculation bug in App.tsx and owns the R39 route fix and tests. Root has not independently accepted this change.",
+    "Continue nonconflicting resource admission, exact-parent teardown, queued continuation, model/Inspector consumers and permission withdrawal. Core entry coverage is99.30%statements,99.21%branches,100%functions,99.20%lines; lines874 and875 remain uncovered. Thresholds and source are unchanged. Full control helper100% is verified. Historical Tool and JobsLocal full-entry100%measurements retain their original scopes.",
+    "The peer reports R38 deployed on both hosts with original Runtimes ready and a native FlashOff task completed. Root has independently verified the source and normal-built lease fix, but has not inspected a completed R38 production receipt. B451 exact Admin Runtime control integration remains deferred.",
+    "Other cross-account/computer/document paths, allocation inventory, full native user/Admin operational acceptance and an assembled Root/peer release remain incomplete. The configured search capability gap remains unresolved; never broaden account authorization to bypass it.",
+    "Official paid Responses remains deferred. No Root production deployment, restart, dependency synchronization, reset, stash, commit or push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": {
+    "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T220104Z/B416-B456-integration-index.json",
+    "findings": 41,
+    "capsules": 34,
+    "frozenDeltaVersions": 724,
+    "presentPaths": 425,
+    "currentSourceDriftPaths": [
+      "gateway/README.i18n.yaml",
+      "gateway/README.md",
+      "gateway/README.zh.md",
+      "packages/context/gateway-runtime/src/index.ts"
+    ]
+  },
+  "inventoryObservation": {
+    "currentGitPaths": 22063,
+    "inventoryRows": 22080,
+    "historicalAbsentPaths": 17,
+    "unrecordedCurrentPaths": 0,
+    "concurrentPeerPathsPendingIndependentReview": [
+      "packages/client/ui-workspace/src/client/draft-sessions.ts",
+      "packages/client/ui-workspace/tests/draft-sessions.client.spec.ts"
+    ]
+  }
+}

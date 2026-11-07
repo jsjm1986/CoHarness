@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/ssh/ssh/README.md
 document:
-  en: eef6f5a11de07dfae62a693aa10dca924cb1b39b
-  zh: a8f53cf1983f69512895f40438b8135d96cf84fb
+  en: abecd4a52099b9608f98fcab2d4a7989b79cdbca
+  zh: 87fb63251ff1c7e7bbe3c285efa94c981e5ea0fb
 /:
   en: e8056e7ebc59ace5
   zh: 69512c6dc08b162f
@@ -21,11 +21,11 @@ document:
   en: 8fbb876fefb42f3c
   zh: ddd38f747088e032
 /deepseek-ai-dsh-ssh/use-this-package/deployment-prerequisites:
-  en: 1e313893357d6d42
-  zh: f805135dae08df87
+  en: 8e76de087d59f2c1
+  zh: 45ab73aa6225cf93
 /deepseek-ai-dsh-ssh/understand-the-implementation:
-  en: 01fedb6b36ac94af
-  zh: 9353c40acd9075d8
+  en: 5c3400e8e0c561d0
+  zh: f5a21ba9fc54eb0e
 /deepseek-ai-dsh-ssh/further-exploration:
   en: 1d179b90a32af26b
   zh: 683cf3c0085147e1

@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-governed-model-unit-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests --maxWorkers=2 --retry=0",
+  "startedAt": "2026-10-23T18:12:19.271939+00:00",
+  "seconds": 7.976,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3d246c0c541193e6275d0d4db58190769a1ab88b838b9474ada45849ec47cdd8",
+  "inputsAfter": "3d246c0c541193e6275d0d4db58190769a1ab88b838b9474ada45849ec47cdd8",
+  "outputSha256": "bfcd1e50bd698aa7875beb51aa1fe3effe287795e1535a86c23ee122aaf7bb98",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/experimental/browser-use-stagehand-native/tests/model.spec.ts (31 tests | 1 failed) 282ms\n   × records the complete request before dispatch and meters each inference separately 18ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/experimental/browser-use-stagehand-native/tests/model.spec.ts > records the complete request before dispatch and meters each inference separately\nLlmError: expected { provider: 'browser-fixture', …(7) } to match object { …(4) }\n(13 matching properties omitted from actual)\n ❯ packages/experimental/browser-use-stagehand-native/src/model.ts:88:13\n     86|     const finish = assembler.finish\n     87|     if (finish.kind === 'error' || finish.kind === 'aborted') {\n     88|       throw new LlmError(finish.failure.message, finish.failure.code, …\n       |             ^\n     89|     }\n     90|     if (finish.kind === 'max-tokens') throw new LlmError('Stagehand mo…\n ❯ ../../../%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/schemas.js:2127:28\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 10 passed (11)\n      Tests  1 failed | 138 passed (139)\n   Start at  02:12:23\n   Duration  3.84s (transform 2.16s, setup 145ms, import 3.85s, tests 2.72s, environment 1ms)\n\n"
+}

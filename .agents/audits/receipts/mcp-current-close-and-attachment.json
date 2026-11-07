@@ -1,0 +1,13 @@
+{
+  "name": "mcp-current-close-and-attachment",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests packages/experimental/browser-use-runtime/tests --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T17:02:06.789185+00:00",
+  "seconds": 7.781,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5a47377439b99b96951f3c02cd3262c6adfb0ba41110451d64bf725b24f9a6b4",
+  "inputsAfter": "5a47377439b99b96951f3c02cd3262c6adfb0ba41110451d64bf725b24f9a6b4",
+  "outputSha256": "0783b8fad5ff08a3d11efa63c969ef913fef39ee0c6dd7a95902cb922fdb65e6",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/mcp/mcp-client/tests/reconnect.spec.ts (31 tests | 1 failed) 1401ms\n     × closes a transport that attaches after disposal starts 2ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/mcp/mcp-client/tests/reconnect.spec.ts > reconnect supervisor > closes a transport that attaches after disposal starts\nAssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n ❯ packages/mcp/mcp-client/tests/reconnect.spec.ts:380:23\n    378|     gate.resolve(undefined)\n    379|     await disposing\n    380|     expect(mockClose).toHaveBeenCalledTimes(1)\n       |                       ^\n    381|     expect(mockListTools).not.toHaveBeenCalled()\n    382|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 14 passed (15)\n      Tests  1 failed | 182 passed (183)\n   Start at  01:02:09\n   Duration  4.73s (transform 1.11s, setup 124ms, import 2.34s, tests 5.96s, environment 1ms)\n\n"
+}

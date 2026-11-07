@@ -9,9 +9,11 @@ import type { BrowserAuth } from '@deepseek-ai/dsh-client-connection/src/browser
 import open from 'open'
 import WebSocket, { type RawData } from 'ws'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apply, Config, inject, name, startInspector } from '../src/index.ts'
+import { apply, Config, inject, name, startInspector, InspectorStartupCleanupError } from '../src/index.ts'
 import { isPlainObject } from '../src/shared/json.ts'
 import { INSPECTOR_BOOTSTRAP_PATH } from '../src/shared/web.ts'
+import ResourceBudget from '@deepseek-ai/dsh-resource-budget'
+import type { ResourceLease, ResourceRequest } from '@deepseek-ai/dsh-resource-budget'
 
 vi.mock('open', () => ({ default: vi.fn(async () => undefined), apps: { chrome: 'chrome' } }))
 
@@ -28,6 +30,118 @@ describe('experimental Inspector Host plugin', () => {
     context = undefined
     vi.restoreAllMocks()
     vi.clearAllMocks()
+  })
+
+  it.each([
+    { change: 'replaced', failedCompletion: false }, { change: 'withdrawn', failedCompletion: false },
+    { change: 'replaced', failedCompletion: true },
+  ] as const)('refuses an Inspector provider $change while waiting with failed completion=$failedCompletion', async ({ change, failedCompletion }) => {
+    context = new Context()
+    const releaseRoute = vi.fn()
+    const routes: Pick<WebServer, 'register' | 'registerUpgrade'> = {
+      register: () => releaseRoute, registerUpgrade: () => releaseRoute,
+    }
+    context.provide('webServer', routes as WebServer)
+    new HostConnectionService(context, [], {} as BrowserAuth)
+    const entered = Promise.withResolvers<undefined>(), grant = Promise.withResolvers<undefined>()
+    const release = vi.fn(async () => {}), uncertain = vi.fn(async () => {})
+    if (failedCompletion) release.mockRejectedValueOnce(new Error('Original resource accountant unavailable'))
+    const budget = { async acquire() {
+      entered.resolve(undefined); await grant.promise
+      return { signal: new AbortController().signal, release, uncertain }
+    } }
+    const replacement = vi.fn(async () => ({ signal: new AbortController().signal, release, uncertain }))
+    const withdraw = context.provide('resourceBudget', budget)
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const fiber = context.plugin({ name, inject: [...inject], Config, apply }, { port: 0, captureFetch: false })
+    const observed = fiber.await().then(() => ({ ready: true }), (error: unknown) => ({ error }))
+    try {
+      await entered.promise
+      withdraw()
+      if (change === 'replaced') context.provide('resourceBudget', { acquire: replacement })
+      grant.resolve(undefined)
+      const outcome = await observed
+      if (failedCompletion) {
+        if (!('error' in outcome) || !(outcome.error instanceof InspectorStartupCleanupError)) throw new Error('Startup cleanup was not retained')
+        expect(outcome.error.cause).toMatchObject({ errors: [expect.objectContaining({ reason: 'unavailable' }), expect.any(Error)] })
+      } else expect(outcome).toMatchObject({ error: { reason: 'unavailable' } })
+      expect(context.get('inspector')).toBeUndefined()
+      expect(release).toHaveBeenCalledTimes(failedCompletion ? 2 : 1)
+      expect(uncertain).not.toHaveBeenCalled()
+      expect(replacement).not.toHaveBeenCalled()
+    } finally { grant.resolve(undefined); await observed; await fiber.dispose(); log.mockRestore() }
+  })
+
+  it('retains a live resource Service through unrelated plugin activity while startup is queued', async () => {
+    context = new Context()
+    const releaseRoute = vi.fn(), grant = Promise.withResolvers<ResourceLease>(), requested = Promise.withResolvers<ResourceRequest>()
+    const release = vi.fn(async () => {}), uncertain = vi.fn(async () => {})
+    context.provide('webServer', {
+      register: () => releaseRoute, registerUpgrade: () => releaseRoute,
+    } as Pick<WebServer, 'register' | 'registerUpgrade'> as WebServer)
+    new HostConnectionService(context, [], {} as BrowserAuth)
+    class Budget extends ResourceBudget {
+      async acquire(request: ResourceRequest): Promise<ResourceLease> { requested.resolve(request); return grant.promise }
+    }
+    await context.plugin(Budget)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const fiber = context.plugin({ name, inject: [...inject], Config, apply }, { port: 0, captureFetch: false })
+    const startup = fiber.await()
+    try {
+      const request = await requested.promise
+      const unrelated = context.plugin(() => {})
+      await unrelated.await()
+      await unrelated.dispose()
+      expect(request.signal?.aborted).toBe(false)
+      grant.resolve({ signal: new AbortController().signal, release, uncertain })
+      await startup
+      expect(context.get('inspector')).toBeDefined()
+      expect(release).not.toHaveBeenCalled()
+      await fiber.dispose()
+      expect(release).toHaveBeenCalledOnce()
+      expect(uncertain).not.toHaveBeenCalled()
+    } finally {
+      grant.resolve({ signal: new AbortController().signal, release, uncertain })
+      await startup
+      await fiber.dispose()
+    }
+  })
+
+  it('cancels queued infrastructure admission before unloading its startup context', async ({ signal }) => {
+    context = new Context()
+    const releaseRoute = vi.fn()
+    const routes: Pick<WebServer, 'register' | 'registerUpgrade'> = {
+      register: () => releaseRoute, registerUpgrade: () => releaseRoute,
+    }
+    context.provide('webServer', routes as WebServer)
+    new HostConnectionService(context, [], {} as BrowserAuth)
+    const requested = Promise.withResolvers<ResourceRequest>(), grant = Promise.withResolvers<ResourceLease>()
+    const canceled = () => { grant.reject(signal.reason) }
+    signal.addEventListener('abort', canceled, { once: true })
+    const acquire = vi.fn((request: ResourceRequest) => {
+      requested.resolve(request)
+      request.signal?.addEventListener('abort', () => { grant.reject(request.signal?.reason) }, { once: true })
+      return grant.promise
+    })
+    context.provide('resourceBudgetRequired', true)
+    new class extends ResourceBudget { acquire = acquire }(context)
+    const fiber = context.plugin({ name, inject: [...inject], Config, apply }, { port: 0, captureFetch: false })
+    const startup = fiber.await().catch((error: unknown) => error)
+    let disposal: Promise<void> | undefined
+    try {
+      const request = await requested.promise
+      expect(request).toMatchObject({ kind: 'process', origin: 'infrastructure' })
+      disposal = fiber.dispose()
+      await disposal
+      expect(request.signal?.aborted).toBe(true)
+      await startup
+      expect(context.get('inspector')).toBeUndefined()
+    } finally {
+      signal.removeEventListener('abort', canceled)
+      grant.reject(new Error('fixture startup cleanup'))
+      await disposal
+      await startup
+    }
   })
 
   it('starts the Worker, provides ctx.inspector, injects Client bootstrap, and disposes', async () => {
@@ -67,7 +181,8 @@ describe('experimental Inspector Host plugin', () => {
       socket.destroy()
     }
     authenticated = true
-    for (const query of ['clientSourceId=', 'clientSourceId=a&clientSourceId=b']) {
+    for (const query of ['clientSourceId=', 'clientSourceId=a&clientSourceId=b',
+      'sourceScope=client', 'sourceScope=host&sourceScope=host', 'sourceScope=host&clientSourceId=a']) {
       const socket = new PassThrough()
       await upgrade.handler({ url: `/inspector/devtools/cdp?${query}`, headers: { host: '127.0.0.1', origin: 'http://127.0.0.1' } } as IncomingMessage, socket, Buffer.alloc(0))
       expect(String(socket.read())).toContain('HTTP/1.1 400')

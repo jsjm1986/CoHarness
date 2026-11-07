@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/agent-loop/README.md
 document:
-  en: 8f892a8d29ac8093371349c6028c8d22ecd08dd6
-  zh: 59464dc4084955640be1a331c1a9dbb9b869ec6e
+  en: aef2785575183d9998a27a2fbb7a35d19c7203b2
+  zh: cdc8bf4b9440de628d73a7eac54e613c188e8404
 /:
   en: c66a79e8f336e414
   zh: 61495d48365178df

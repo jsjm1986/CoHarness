@@ -107,7 +107,7 @@ export function grantArgs(grants: LauncherGrants): string[] {
  * enforcement; a zero exit without the partial marker reads as `full`. A
  * failed or timed-out spawn (missing binary, wrong architecture, unenforcing
  * kernel) probes `unusable`. Synchronous by design: consumers run it once
- * and cache the verdict.
+ * and cache the verdict. A timeout force-closes the probe child before returning.
  * @param launcher - the launcher path to probe; defaults to
  *   {@link launcherPath}'s resolution for this host.
  * @param options - `timeoutMs` bounds the probe child (default 2000).
@@ -119,6 +119,7 @@ export function probe(
 ): LandlockEnforcement {
   const result = spawnSync(launcher, ['--probe'], {
     timeout: options.timeoutMs ?? 2000,
+    killSignal: 'SIGKILL',
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
   })

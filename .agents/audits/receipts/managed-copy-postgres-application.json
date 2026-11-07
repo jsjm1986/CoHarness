@@ -1,0 +1,14 @@
+{
+  "name": "managed-copy-postgres-application",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/run-managed-copy-postgres.py",
+  "startedAt": "2026-10-25T11:08:02.946405+00:00",
+  "seconds": 5.083,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a624ab3fb39c6b12f284e49096327ab3960ca73af3ebf0dd9fe49d9c666ddca8",
+  "inputsAfter": "a624ab3fb39c6b12f284e49096327ab3960ca73af3ebf0dd9fe49d9c666ddca8",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "d7cf246a8443bdafe141c6b4f05436ea7ea73dfd46cdf486283a5e4484710122",
+  "outputTail": "waiting for server to start.... done\nserver started\nReused owned PostgreSQL18 cluster on56818; existing audit data retained.\nwaiting for server to shut down.... done\nserver stopped\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  4 passed | 17 skipped (21)\n   Start at  19:08:05\n   Duration  2.03s (transform 446ms, setup 0ms, import 551ms, tests 1.40s, environment 0ms)\n\nPrivate backup-I/O database dropped; original audit database retained; owned cluster stopped=True.\n"
+}

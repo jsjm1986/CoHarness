@@ -40,6 +40,7 @@ function bench(over: {
     archivedById: {},
     current: SESSION,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {},
     jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,

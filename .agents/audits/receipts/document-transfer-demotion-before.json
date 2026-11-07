@@ -1,0 +1,14 @@
+{
+  "name": "document-transfer-demotion-before",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/document-transfer.spec.ts -t 'stops administrator fan-out'",
+  "startedAt": "2026-10-26T02:02:39.417390+00:00",
+  "seconds": 3.259,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ee3987ed96590efe6c223536b1b2168c7630a1a964f33aa9e6809a35c421b528",
+  "inputsAfter": "ee3987ed96590efe6c223536b1b2168c7630a1a964f33aa9e6809a35c421b528",
+  "postgresToolDirectory": null,
+  "outputSha256": "f36199228f9257b310a17751661d27a42920db0cb16c8d3fff57cec605659408",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/document-transfer.spec.ts (31 tests | 1 failed | 30 skipped) 29ms\n     × stops administrator fan-out after demotion even when project write memberships remain 28ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/document-transfer.spec.ts > Gateway document transfer broker > stops administrator fan-out after demotion even when project write memberships remain\nAssertionError: expected { version: 1, …(5) } to match object { targets: [ …(2) ] }\n(43 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n  {\n    \"targets\": [\n      {\n        \"items\": [\n          {\n-           \"error\": {\n-             \"code\": \"DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN\",\n-           },\n-           \"status\": \"failed\",\n+           \"status\": \"copied\",\n          },\n        ],\n      },\n      {\n        \"items\": [\n          {\n-           \"error\": {\n-             \"code\": \"DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN\",\n-           },\n-           \"status\": \"failed\",\n+           \"status\": \"copied\",\n          },\n        ],\n      },\n    ],\n  }\n\n ❯ tests/document-transfer.spec.ts:484:10\n    482|         },\n    483|         signal: new AbortController().signal,\n    484|       })).resolves.toMatchObject({ targets: [denied, denied] })\n       |          ^\n    485|       expect(fetch).toHaveBeenCalledTimes(2)\n    486|     } finally { vi.unstubAllGlobals() }\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 30 skipped (31)\n   Start at  10:02:42\n   Duration  402ms (transform 153ms, setup 0ms, import 245ms, tests 29ms, environment 0ms)\n\n"
+}

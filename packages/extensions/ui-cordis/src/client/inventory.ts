@@ -1,9 +1,9 @@
 /**
- * The host's definition registry as this page last read it, owned by the
+ * One Runtime's definition registry as this page last read it, owned by the
  * plugin's apply closure.
  *
- * The panel is a frame-wide surface, so it cannot derive this from any session:
- * the registry is global and the read is a single global call. The rows are
+ * A panel captures this source independently of later Session navigation.
+ * Definitions are global within the captured Runtime. The rows are
  * re-read rather than patched, because the wire announcements
  * (`@deepseek-ai/cordis/dynamic-package` / `/retract`) carry no labels and a definition
  * can appear or disappear between them — a patch-in-place cache would drift into

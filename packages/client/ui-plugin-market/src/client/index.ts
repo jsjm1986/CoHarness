@@ -40,8 +40,8 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => () => { controller.dispose() }, 'ui-plugin-market: controller')
   ctx.effect(() => {
     const disposers = [
-      ctx.remote.$on('plugin-market/changed', () => { controller.sourcesChanged() }),
-      ctx.remote.$on('plugin-manager/changed', () => { controller.bundlesChanged() }),
+      ctx.remote.$forTarget().$on('plugin-market/changed', () => { controller.sourcesChanged() }),
+      ctx.remote.$forTarget().$on('plugin-manager/changed', () => { controller.bundlesChanged() }),
       ctx.on('connection/reset', () => { controller.sourcesChanged() }),
     ]
     return () => { for (const dispose of disposers) dispose() }

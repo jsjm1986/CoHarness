@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-sdk-roundtrip-python",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_memory_model_snapshot.py -q",
+  "startedAt": "2026-10-24T01:51:11.994986+00:00",
+  "seconds": 6.416,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b51d366b36f3c9202639e34f6306d2e217e80cbfcff477bf489dcd9ef807e60b",
+  "inputsAfter": "b51d366b36f3c9202639e34f6306d2e217e80cbfcff477bf489dcd9ef807e60b",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

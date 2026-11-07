@@ -1,0 +1,14 @@
+{
+  "name": "document-file-owner-gateway-account",
+  "cwd": ".",
+  "command": "gateway/node_modules/.bin/vitest run --config gateway/vitest.config.ts gateway/tests/document-file-owner.spec.ts",
+  "startedAt": "2026-10-25T22:59:34.941711+00:00",
+  "seconds": 2.637,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8ae1007487692d78b6b507e6db973a1c83365ad7e870af1e7b40c53cf31c6b46",
+  "inputsAfter": "8ae1007487692d78b6b507e6db973a1c83365ad7e870af1e7b40c53cf31c6b46",
+  "postgresToolDirectory": null,
+  "outputSha256": "3b273100bdd67b45d1d8efdbc6fda526f5ae39e75f2b02eb0a4aac8f230d8358",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\nNo test files found, exiting with code 1\n\nfilter: gateway/tests/document-file-owner.spec.ts\ninclude: tests/**/*.spec.ts\nexclude:  **/node_modules/**, **/.git/**\n\n"
+}

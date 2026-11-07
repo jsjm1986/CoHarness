@@ -1,0 +1,25 @@
+- dialog "Switch personal or project scope":
+  - banner:
+    - button "Close":
+      - img
+    - heading "Space center" [level=2]
+    - button "New project space":
+      - img
+  - text: Personal Only me
+  - tablist "Space center":
+    - tab "Switch space" [selected]
+    - tab "Manage spaces"
+  - tabpanel "Switch space":
+    - text: All spaces · 2
+    - searchbox "Search spaces or computers"
+    - text: Recent
+    - button "Personal"
+    - text: Projects
+    - button "Payments migration Compute computer"
+    - button "Refresh spaces"
+    - text: Space settings
+    - button "Open in a new tab"
+    - button "Favorite this space"
+    - button "Invitations and tasks":
+      - text: Invitations and tasks
+      - img

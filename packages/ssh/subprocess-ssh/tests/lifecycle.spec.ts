@@ -19,6 +19,7 @@ describe('SSH terminal allocation lifecycle', () => {
       if (name === stage) { entered.resolve(undefined); await continuation.promise }
     }
     ctx.provide('ssh', {
+      retainConsumer: (cleanup: () => Promise<void>) => cleanup,
       request: vi.fn(async (method: string) => {
         calls.push(method)
         if (method === 'process.prepare') {

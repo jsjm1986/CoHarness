@@ -1,0 +1,13 @@
+{
+  "name": "mcp-explicit-cleanup-types",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T16:24:47.422655+00:00",
+  "seconds": 7.777,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c5600c004d76e8396a2d7c9912c5babfc423145c4694e293d61d3aad532f117a",
+  "inputsAfter": "c5600c004d76e8396a2d7c9912c5babfc423145c4694e293d61d3aad532f117a",
+  "outputSha256": "11569d1326c6e4b270216d8b2be15b43b8b9c3eea8f6d8c5f438cbc1e8f1a05e",
+  "outputTail": "packages/experimental/browser-use-runtime/src/mcp.ts(158,25): error TS7006: Parameter 'inner' implicitly has an 'any' type.\npackages/experimental/browser-use-runtime/src/mcp.ts(158,32): error TS7006: Parameter 'resolved' implicitly has an 'any' type.\n"
+}

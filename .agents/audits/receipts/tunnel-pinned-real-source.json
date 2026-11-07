@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-pinned-real-source",
+  "cwd": ".",
+  "command": "node --import tsx/esm .agents/audits/.local/tunnel-pinned-install-acceptance.mjs src",
+  "startedAt": "2026-10-24T23:20:53.431978+00:00",
+  "seconds": 7.173,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9244a8a7d3e52287327d3d0784ca047cd4027428ebf74fd54bcd7e845f11bfda",
+  "inputsAfter": "9244a8a7d3e52287327d3d0784ca047cd4027428ebf74fd54bcd7e845f11bfda",
+  "postgresToolDirectory": null,
+  "outputSha256": "2b1e4006cd958fda377765dd16a8a39eec7b6a782539be3fdbbdd5822ddbec77",
+  "outputTail": "Pinned release: real download, SHA-256, extraction, private permissions, atomic publication and native version detection pass.\n"
+}

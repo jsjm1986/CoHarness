@@ -316,6 +316,13 @@ export interface PluginManagerState {
    */
   readonly refreshStatus: 'idle' | 'refreshing' | 'failed'
   readonly packages: readonly PackageView[]
+  /**
+   * The Host's running-profile entries from the same read as {@link packages}:
+   * the page resolves the `plugins.item` entries that name a patch row against
+   * this list, whose `patchId` and `readOnlyReason` say whether the row is
+   * switchable and whose `entryId` addresses it while it is off.
+   */
+  readonly plugins: readonly PluginInfo[]
   /** Package names and row keys with an action crossing the wire. */
   readonly busy: readonly string[]
   readonly notice: ManagerNotice | null
@@ -600,6 +607,7 @@ export class PluginManagerController {
   private inFlight: Promise<void> | undefined
   private rerun = false
   private generation = 0
+  private readonly catalogAbort = new AbortController()
   private disposed = false
   /** A successful managed-profile read remains usable even when it returned no bundles. */
   private hasCachedInventory = false
@@ -618,13 +626,13 @@ export class PluginManagerController {
   })
 
   /**
-   * @param ctx - the tab plugin's context, whose `remote.pluginManager` and `remote.pluginInventory` namespaces answer.
+   * @param ctx - the tab plugin's context, whose `remote.pluginManager` namespace answers.
    */
   constructor(
     private readonly ctx: ClientContext,
   ) {
     this.store = createSnapshotStore<PluginManagerState>({
-      status: 'idle', refreshStatus: 'idle', packages: [], busy: [], notice: null, manage: true,
+      status: 'idle', refreshStatus: 'idle', packages: [], plugins: [], busy: [], notice: null, manage: true,
       install: IDLE_INSTALL, confirm: null, highlight: null,
     })
   }
@@ -640,6 +648,7 @@ export class PluginManagerController {
   /** Stop publishing and drop every late settlement. */
   dispose(): void {
     this.disposed = true
+    this.catalogAbort.abort()
     this.registryRead = undefined
     this.request = undefined
     this.generation += 1
@@ -929,52 +938,38 @@ export class PluginManagerController {
   private async read(): Promise<void> {
     try {
       do {
+        if (this.disposed) return
         this.rerun = false
         const generation = ++this.generation
         if (this.getSnapshot().status === 'idle') this.patch({ status: 'loading' })
-        // The manager Remote is mounted whether or not the Host manages a
-        // profile; the inventory says whether it does.
-        const inventory = await this.ctx.remote.pluginInventory.list()
-        if (generation !== this.generation) return
-        if (!inventory.ok) {
-          this.patch({ status: 'error' })
-          continue
-        }
-        if (inventory.value.managementAvailable !== true) {
-          this.hasCachedInventory = false
-          this.patch({ status: 'unavailable', packages: [] })
-          continue
-        }
-        const [bundles, plugins, access] = await Promise.all([
-          this.ctx.remote.pluginManager.listBundles(),
-          this.ctx.remote.pluginManager.listPlugins(),
-          // An older Host's generated client lacks `access` and throws
-          // synchronously; that is the same fallback as a refused answer.
-          Promise.resolve().then(() => this.ctx.remote.pluginManager.access()).catch(() => undefined),
-        ])
-        if (generation !== this.generation) return
-        if (!bundles.ok || !plugins.ok) {
-          // A deployment-level management policy refuses every manager read and
-          // write with one code; it is not a transport problem to retry, and a
-          // stale grant leaves no cached cards behind.
-          if ((!plugins.ok && plugins.error.code === 'plugin-management/forbidden')
-            || (!bundles.ok && bundles.error.code === 'plugin-management/forbidden')) {
-            this.hasCachedInventory = false
-            this.patch({ status: 'denied', packages: [] })
+        try {
+          const catalog = await this.ctx.remote.pluginManager.catalog(false, this.catalogAbort.signal)
+          if (generation !== this.generation) return
+          if (!catalog.ok) {
+            if (catalog.error.code === 'plugin-management/forbidden') {
+              this.hasCachedInventory = false
+              this.patch({ status: 'denied', packages: [], plugins: [] })
+            } else this.patch({ status: 'error' })
             continue
           }
+          if (!catalog.value.managementAvailable) {
+            this.hasCachedInventory = false
+            this.patch({ status: 'unavailable', packages: [], plugins: [] })
+            continue
+          }
+          const { bundles, plugins, manage } = catalog.value
+          this.hasCachedInventory = true
+          this.patch({
+            status: 'ready', manage,
+            refreshStatus: this.getSnapshot().refreshStatus === 'refreshing' ? 'refreshing' : 'idle',
+            packages: sortPackages(bundles.map(bundle => packageView(bundle, plugins))),
+            plugins,
+          })
+        } catch (error) {
+          if (generation !== this.generation) return
           this.patch({ status: 'error' })
-          continue
+          this.ctx.logger.error(error)
         }
-        this.hasCachedInventory = true
-        this.patch({
-          status: 'ready',
-          // An older Host without the access remote answers transport failure;
-          // its mutations still carry their own refusal.
-          manage: access?.ok === true ? access.value.manage : true,
-          refreshStatus: this.getSnapshot().refreshStatus === 'refreshing' ? 'refreshing' : 'idle',
-          packages: sortPackages(bundles.value.map(bundle => packageView(bundle, plugins.value))),
-        })
       } while (this.shouldRerun())
     } finally {
       this.inFlight = undefined

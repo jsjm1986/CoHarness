@@ -11,7 +11,7 @@ kind: "package-bundle"
 
 ## 概述
 
-当委派工作需要在父会话工作区中的真实无人值守 Codex 会话内运行时，把 `@deepseek-ai/dsh-subagent-codex` 安装进 Profile。每次委派都会为一个自包含文本任务使用全新且隔离的 Codex 线程，并且只返回其最终答案或安全失败诊断。原生 Codex 配置和身份验证继续作为权威来源，而 `permissionMode` 选择非交互式审批和沙箱行为。Bundle 会提供兼容的原生 Codex 载荷，但只有配置委派工具后才会向模型公开相应能力。
+当委派工作需要在父会话工作区中的真实无人值守 Codex 会话内运行时，把 `@deepseek-ai/dsh-subagent-codex` 安装进 Profile。一次性委派会为一个自包含文本任务使用全新且隔离的 Codex 线程，并且只返回其最终答案或安全失败诊断。独立运行保留原生 Codex 配置与身份验证，受管运行使用父级模型路由，而 `permissionMode` 选择非交互式审批和沙箱行为。Bundle 会提供兼容的原生 Codex 载荷，但只有配置委派工具后才会向模型公开相应能力。
 
 ## 目录
 
@@ -42,7 +42,7 @@ kind: "package-bundle"
 <a id="capabilities-and-context"></a>
 ## 能力与上下文
 
-本提供方不声明任何可选的启动时能力，并报告 `inheritsParentContext: false`。Codex 会接收独立文本任务和父会话 cwd，但不会接收父会话的对话、角色设定、工具筛选器、深度策略或结构化输出约定。临时 Codex 线程 ID 与轮次 ID 仅在此次运行内部可见，绝不会持久化到父会话。
+本提供方不声明任何可选的启动时能力，并报告 `inheritsParentContext: false`。Codex 会接收独立文本任务和父会话 cwd，但不会接收父会话的对话、角色设定、工具筛选器、深度策略或结构化输出约定。原生线程 ID 与轮次 ID 用于路由本次运行的 app-server 通信。受管推理会按下文记录其原生模型输入。
 
 <a id="configuration"></a>
 ## 配置
@@ -50,6 +50,12 @@ kind: "package-bundle"
 | 配置键 | 默认值 | 含义 |
 |---|---|---|
 | `providerName` | `codex` | `ctx.subagents` 中的非空注册名称；每个已挂载实例都需要唯一值。 |
+| `modelProvider` | 受管运行采用父级选定路由 | 已注册的父级 Responses 路由；显式配置即启用受管推理。 |
+| `model` | 受管运行采用父级选定模型 | 该注册路由上的模型；独立运行省略时继承原生设置。 |
+| `modelRequestBytes` | `8388608` | 子级请求字节数上限。 |
+| `modelResponseBytes` | `67108864` | 提供方响应字节数上限。 |
+| `modelRequestTimeoutMs` | `120000` | 已认证 HTTP 请求体的时限；到期在模型准入前返回 `504 TIMEOUT`。不超过 `MAX_TIMER_DELAY_MS`。 |
+| `modelPendingRequests` | `32` | 每次运行的连接及待处理请求数正整数上限。 |
 | `env` | `{}` | 显式指定的子进程环境，叠加在由子进程 seam 清除凭证后的父环境之上。 |
 | `permissionMode` | `never` | 为该提供方实例的每个线程固定原生非交互审批与沙箱模式。 |
 | `disposeGraceMs` | `3000` | 共享进程树责任方各终止层级之间的宽限期，单位为毫秒且须为正有限值，并不得大于仓库共享的 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)；随后资源释放会等待整棵进程树退出。 |
@@ -57,8 +63,14 @@ kind: "package-bundle"
 | `memberCwd` | 成员 Session cwd | 持续成员的工作区覆盖值，在其执行目标上验证。 |
 | `remoteCommand` | `codex` | 在 SSH 目标内解析的预装程序；本机继续使用随包固定的程序。 |
 
+受管运行把每次原生 Responses 请求交给发起 Agent 已注册的模型适配器。仅安装执行权限服务的父级也使用此路径。每个请求在持久化检查点前记录 `subagent/codex-model-request`，单独获取父级额度，并在排队和凭据等待后重新检查父级与注册策略。模型能力查询结束后也会在监听器启动前复核保留的策略。替换或撤下任一保留的资源所有者都会拒绝后续模型请求；恢复准入后需启动新的子运行时。父级执行作用域保留 Session 与参与者归属。子级仅接收私有回环凭据，上游凭据留在父级。原生 WebSocket 推理与内部请求重试被禁用。不支持的路由会拒绝执行。 无效 JSON 和替换的请求字段返回 `400 INVALID_REQUEST`；意外的父级失败以固定安全消息返回 `502 SERVER`。Session 持久化检查点失败会阻止上游派发。参见[模型控制决策](../../../.agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.zh.md)。
+
+受管 SSH 运行使用发起 Agent 的 standing SSH 连接，将远端回环端口转发至同一个父级模型监听器。远端程序只接收临时桥接凭据和预装的 `remoteCommand`，上游身份验证保留在 Harness 主机。服务器必须允许远端 TCP 转发。缺少 realm 连接或转发被拒绝时，启动失败。连接清理会在释放 SSH 转发所有者之前等待模型请求收尾；取消与失败处理见 [SSH 包](../../ssh/ssh/README.zh.md)。
+
 <a id="persistent-members"></a>
 ## 持续成员
+
+Codex 成员路由属于编排，外层轮次不占模型额度，也不作为原生模型计费。发布前，绑定存储固定原生认证方式或精确的受管提供方及模型；省略时继承发起父级的选择。后续轮次及冷恢复保留该选择，即使父级或实例设置发生变化。成员通过同一提供方实例再次委派时，省略的 `modelProvider` 或 `model` 继承已保存的上游；显式实例设置覆盖新委派的对应值。每个原生请求在实际成员 Session 和捕获的参与者名下记录并计量。恢复只读取 rollout，不打开模型监听器或进程。缺少模型选择的旧绑定保持原样，须新建成员。
 
 SSH 使用目标机器上的 `remoteCommand`，不会发送 Host 的 Node 或包路径。远端待决轮次无法通过 Host 的 rollout 证明结果，因此保持未知且不自动重发；正常后续提示仍使用远端持久线程。
 
@@ -78,7 +90,7 @@ SSH 使用目标机器上的 `remoteCommand`，不会发送 Host 的 Node 或包
 | `approve-for-me` | `approvalPolicy: on-request`、`approvalsReviewer: auto_review`、`sandbox: workspace-write` | 由 Codex 自动评审权限请求，不等待人工。 |
 | `dangerously-bypass-approvals-and-sandbox` | `approvalPolicy: never`、`sandbox: danger-full-access` | 跳过审批与 sandbox；必须显式选择该值。 |
 
-生产环境会解析锁定的 `@openai/codex@0.153.4` 依赖所声明的 `codex` bin，并使用当前 Node 可执行文件启动该 JavaScript wrapper。Wrapper 会选择匹配的原生平台载荷；提供方既不检查也不回退 `PATH` 中的宿主 `codex`。父会话 cwd、`HOME` 与 `CODEX_HOME` 继续让原生 Codex 配置和身份验证保持权威，而提供方只覆盖选定线程的 approval／reviewer／sandbox 字段。其他项目、模型、provider、MCP、hook、skill 与账户设置仍由原生机制负责。本插件不选择模型、不创建 `CODEX_HOME`、不执行登录，也不探测账户。子进程 seam 会先移除具有凭证特征的环境变量，再应用显式 `env` 覆盖。
+生产环境会解析锁定的 `@openai/codex@0.153.4` 依赖所声明的 `codex` bin，并使用当前 Node 可执行文件启动该 JavaScript wrapper。Wrapper 会选择匹配的原生平台载荷；提供方既不检查也不回退 `PATH` 中的宿主 `codex`。独立运行通过父会话 cwd、`HOME` 与 `CODEX_HOME` 保留原生 Codex 配置和身份验证，此时提供方只覆盖选定线程的 approval／reviewer／sandbox 字段。其他项目、模型、provider、MCP、hook、skill 与账户设置仍由原生机制负责。独立模式不创建 `CODEX_HOME`、不执行登录，也不探测账户。子进程 seam 会先移除具有凭证特征的环境变量，再应用显式 `env` 覆盖。
 
 本包是可选的 Profile Bundle。将它安装进目标 Profile 后重启该 Profile；安装会把官方 wrapper 与一个兼容的原生平台载荷带入该 Profile，而包所声明的 `cordis.patch.yml` 层只注册休眠的 `codex` Host provider，不会启动 Codex 进程。移除该包后，下一次 Profile 启动会撤回这一 provider 及其私有运行时闭包。
 
@@ -140,7 +152,7 @@ dsh --profile <name>
 
 生产环境的协议层有意只实现这一单次执行约定所需的 app-server 方法。运行时依赖与六个 optional-dependency alias 均锁定到 `@openai/codex@0.153.4` / `codex-cli 0.153.4`。普通安装会按当前操作系统与 CPU 选择一个载荷。对于当前 darwin-arm64 载荷，`npm pack --dry-run --json @openai/codex@0.153.4-darwin-arm64` 报告压缩包为 115,672,312 字节、解包后为 288,140,243 字节。该包包含原生 `codex`、`codex-code-mode-host`、`rg` 与 `zsh` 资源；其他平台可能不同，这些数值只用于披露而不是安装阈值。
 
-生成的 schema 证据与包测试会固定全部十六种 error-info variant、HTTP status 所在位置、六个生命周期阶段、进程结果、终止原因映射、unknown 回退、脱敏、权限顺序、取消、并发与清理聚合。无密钥真实产品测试会驱动包内 wrapper 连接回环 Responses fixture，并观测包内 argv、确切的 Bearer 密钥、原始任务、逐字节完全一致的最终回答、线程级 `never` 对环境中 `on-request` 的覆盖、自动评审启动、不产生文件副作用的无人值守拒绝、真实 `internalServerError`、测试拥有临时存储中的显式危险绕过写入、携带安全退出事实的进程／协议失败，以及 wrapper／原生进程完全停稳。同一层级还会证明两个命名实例保留彼此独立的环境与原生模式。
+生成的 schema 证据与包测试会固定全部十六种 error-info variant、HTTP status 所在位置、六个生命周期阶段、进程结果、终止原因映射、unknown 回退、脱敏、权限顺序、取消、并发与清理聚合。无密钥真实产品测试会驱动包内 wrapper 连接回环 Responses fixture，并观测包内 argv、确切的 Bearer 密钥、原始任务、逐字节完全一致的最终回答、线程级 `never` 对环境中 `on-request` 的覆盖、自动评审启动、不产生文件副作用的无人值守拒绝、真实 `internalServerError`、测试拥有临时存储中的显式危险绕过写入、携带安全退出事实的进程／协议失败，以及 wrapper／原生进程完全停稳。同一层级还会证明两个命名实例保留彼此独立的环境与原生模式。仅启用资源控制的组合覆盖一次性运行和恢复成员的显式与继承路由、逐请求归属，以及单模型槽位下的全部许可结算。
 
 如果安装时省略 optional dependencies、当前平台不受支持，或所选载荷缺失，第一次委派会在 `initialize` 阶段以安全 `unknown` 类别和已观测到的进程结果失败。原始 wrapper 文本只保留在 Host stderr；提供方既不会探测宿主 CLI，也不会用它重试。独立 wrapper fixture 会另行证明原生载荷失败与不存在宿主回退。
 
@@ -178,6 +190,8 @@ Codex 子级会在一个全新的临时线程中，以单个轮次接收这些�
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
+- **受管模型控制**：外部启动和成员轮次遵守[共享父级控制限制](../subagent/README.zh.md#delegated-policy)。
+
 - **每次运行均新建一个进程、一个线程和一个轮次**：不支持续接、恢复、池化、进度流或产品会话持久化。
 - **静态选择实例**：Profile 配置项固定提供方名称与工具绑定；调用无法动态选择提供方，而且每个公开工具都需要唯一的 `toolName`。
 - **身份验证与账户状态仍由原生机制管理**：Bundle 会提供 CLI，但不会创建账户、登录、信任项目或改写 Codex 设置；配置与身份验证失败会公开其生命周期阶段与安全的 `unknown` 回退，而不会增加单独的公开分类体系。
@@ -186,7 +200,7 @@ Codex 子级会在一个全新的临时线程中，以单个轮次接收这些�
 - **没有人工审批路径**：已知的无人值守审批请求会被拒绝，未知服务器请求会以默认拒绝方式使运行失败；三种 Profile 模式都不会创建 DSH 交互通道或逐次调用 allow 策略。
 - **assistant 载荷仅包含最终文本**：失败运行可以额外公开独立的安全诊断；推理、过程说明、中间消息、工具通信、用量信息、原始 stderr 和工作区差异不会进入父会话，通用 Job id、通知与状态来自共享作业运行时。
 - **没有可选的共享能力**：对于本提供方，共享服务会拒绝 `agentPreset`、`agentOptions`、输出 schema 和 harness 深度强制约束。
-- **没有按实际经过时间触发的超时或副作用回滚**：长时间运行的工作由调用方取消，且取消前已更改的文件或外部系统不会恢复原状。
+- **没有整体轮次时限或副作用回滚**：长时间运行的工作由调用方取消，且取消前已更改的文件或外部系统不会恢复原状。
 
 <a id="dev-note"></a>
 ### 开发备注

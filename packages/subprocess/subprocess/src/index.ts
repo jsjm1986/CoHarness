@@ -8,11 +8,17 @@
  * @module @deepseek-ai/dsh-subprocess
  */
 
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context, Service, symbols } from '@deepseek-ai/cordis'
 import { proxyEnvironmentForChild } from '@deepseek-ai/dsh-http-proxy'
+import { ResourceAdmissionError, resourceBudgetOf, type ResourceBudget, type ResourceLease } from '@deepseek-ai/dsh-resource-budget'
 import { DSH_ENV_PREFIX } from './types.ts'
 import type { SubprocessHandle, SubprocessSpawnSpec } from './types.ts'
 import type { SubprocessTerminalEnvironment, SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from './types.ts'
+
+/** Provider-owned cleanup proof consumed before a failed allocation reaches its caller. */
+class QuiescentAllocationFailure extends Error {
+  constructor(readonly failure: unknown) { super('Subprocess allocation cleanup confirmed', { cause: failure }) }
+}
 
 export { DSH_ENV_PREFIX } from './types.ts'
 export type {
@@ -94,7 +100,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /**
- * Abstract subprocess service. Subclass, implement {@link spawn}, and load the
+ * Abstract subprocess service. Subclass, implement its allocation methods, and load the
  * subclass as a plugin — it registers as `ctx.subprocess` (one implementation
  * per context; loading a second throws, which is cordis' standard
  * duplicate-service behavior).
@@ -102,7 +108,9 @@ declare module '@deepseek-ai/cordis' {
  * Implementations must honor these semantics:
  * - Executable paths belong to one execution world shared with the mounted
  *   filesystem provider.
- * - {@link spawn} returns a live handle synchronously. Target identity remains
+ * - {@link spawn} waits for resource admission and verifies its original provider before allocation.
+ *   A provider withdrawn or replaced during the wait refuses allocation and returns the unused grant.
+ *   Target identity remains
  *   provider-private; `done` resolves with the spawned command's exit facts and
  *   may reject for spawn or provider failures.
  * - Collect-mode readers are offset-based and non-consuming, so independent
@@ -123,8 +131,81 @@ declare module '@deepseek-ai/cordis' {
  *   when the top-level process exits.
  */
 export abstract class SubprocessRuntime extends Service {
+  private readonly allocationLifetime = new AbortController()
+  private readonly pending = new Set<Promise<unknown>>()
+
   constructor(ctx: Context) {
     super(ctx, 'subprocess')
+    ctx.effect(() => async () => {
+      this.allocationLifetime.abort(new Error('Subprocess provider disposed'))
+      while (this.pending.size > 0) await Promise.allSettled([...this.pending])
+    })
+  }
+
+  private track<T>(work: Promise<T>): Promise<T> {
+    this.pending.add(work)
+    void work.then(() => { this.pending.delete(work) }, () => { this.pending.delete(work) })
+    return work
+  }
+
+  private async admission(spec: Pick<SubprocessSpawnSpec, 'signal' | 'sessionId' | 'resourceOrigin'>): Promise<{
+    owner: ResourceBudget | undefined
+    lease: ResourceLease | undefined
+    signal: AbortSignal
+  }> {
+    const caller = spec.signal === undefined
+      ? this.allocationLifetime.signal : AbortSignal.any([spec.signal, this.allocationLifetime.signal])
+    caller.throwIfAborted()
+    const owner = resourceBudgetOf(this.ctx)
+    const lease = await owner?.acquire({ kind: 'process', signal: caller,
+      ...(spec.sessionId === undefined ? {} : { sessionId: spec.sessionId }),
+      ...(spec.resourceOrigin === undefined ? {} : { origin: spec.resourceOrigin }),
+    })
+    const signal = lease === undefined ? caller : AbortSignal.any([caller, lease.signal])
+    return { owner, lease, signal }
+  }
+
+  /** Refuse a cancelled grant or a resource owner changed before provider allocation. */
+  private assertAdmission(owner: ResourceBudget | undefined, signal: AbortSignal): void {
+    signal.throwIfAborted()
+    const current = resourceBudgetOf(this.ctx)
+    const original = (value: ResourceBudget | undefined): ResourceBudget | undefined =>
+      (value as (ResourceBudget & { [symbols.original]?: ResourceBudget }) | undefined)?.[symbols.original] ?? value
+    if (original(current) !== original(owner)) {
+      throw new ResourceAdmissionError('unavailable', 'Process resource admission changed; retry with its current provider.')
+    }
+  }
+
+  /**
+   * Retain admission at provider entry for checks after asynchronous preparation.
+   * @param spec - allocation request carrying the shared service's cancellation signal.
+   * @returns a synchronous check to call immediately before physical start dispatch.
+   */
+  protected captureAdmissionCheck(spec: Pick<SubprocessSpawnSpec, 'signal'>): () => void {
+    const owner = resourceBudgetOf(this.ctx)
+    const signal = spec.signal ?? this.allocationLifetime.signal
+    return () => { this.assertAdmission(owner, signal) }
+  }
+
+  /**
+   * Reject an allocation whose provider has confirmed all physical work stopped.
+   * @param failure - original allocation error to preserve after permit completion.
+   * @returns never; the public allocation rejects with the original failure after releasing its permit.
+   */
+  protected rejectAfterCleanup(failure: unknown): never {
+    throw new QuiescentAllocationFailure(failure)
+  }
+
+  private async rejectAllocation(error: unknown, lease: ResourceLease | undefined): Promise<never> {
+    const confirmed = error instanceof QuiescentAllocationFailure
+    const failure = confirmed ? error.failure : error
+    try {
+      if (confirmed) await lease?.release()
+      else await lease?.uncertain()
+    } catch (completionError) {
+      throw new AggregateError([failure, completionError], 'Subprocess allocation and resource accounting failed.')
+    }
+    throw failure
   }
 
   /**
@@ -155,10 +236,44 @@ export abstract class SubprocessRuntime extends Service {
    * Start one managed child process from a fully-specified spec; this seam
    * applies no defaults.
    * @param spec - argv, directory, stdio dispositions, grace, cancellation, and environment.
-   * @returns the live process handle (streams/readers, signalling, outcome promise).
-   * @throws synchronously when pre-aborted or when argv, cwd, environment, or grace is invalid before handle creation.
+   * @returns the live process handle after admission and allocation; rejection may retain uncertain accounting.
    */
-  abstract spawn(spec: SubprocessSpawnSpec): SubprocessHandle
+  spawn(spec: SubprocessSpawnSpec): Promise<SubprocessHandle> {
+    return this.track(this.allocateProcess(spec))
+  }
+
+  private async allocateProcess(spec: SubprocessSpawnSpec): Promise<SubprocessHandle> {
+    const { owner, lease, signal } = await this.admission(spec)
+    try { this.assertAdmission(owner, signal) } catch (error) { await lease?.release(); throw error }
+    let handle: SubprocessHandle
+    try { handle = await this.spawnProcess({ ...spec, signal }) } catch (error) {
+      return this.rejectAllocation(error, lease)
+    }
+    if (lease === undefined) return handle
+    const waitForExit = async (bound?: AbortSignal): Promise<boolean> => {
+      let exited: boolean
+      try { exited = await handle.waitForExit(bound) } catch (error) {
+        await lease.uncertain()
+        throw error
+      }
+      if (exited) await lease.release()
+      else await lease.uncertain()
+      return exited
+    }
+    const observe = (): Promise<unknown> => waitForExit()
+    void this.track(handle.done.then(observe, observe)).catch((error: unknown) => { this.ctx.logger.error(error) })
+    return {
+      stdin: handle.stdin, stdout: handle.stdout, stderr: handle.stderr, control: handle.control,
+      collected: handle.collected, done: handle.done, terminate: () => { handle.terminate() }, waitForExit,
+    }
+  }
+
+  /**
+   * Allocate a provider-owned process after admission; failures may leave unconfirmed work.
+   * @param spec - fully specified allocation with combined owner cancellation.
+   * @returns a handle whose waitForExit observes every process in its managed range.
+   */
+  protected abstract spawnProcess(spec: SubprocessSpawnSpec): SubprocessHandle | Promise<SubprocessHandle>
 
   /**
    * Allocate a real terminal and start one owned process session. This is the
@@ -167,7 +282,58 @@ export abstract class SubprocessRuntime extends Service {
    * @param spec - fully specified argv, cwd, environment, dimensions, grace, and allocation cancellation.
    * @returns the live terminal handle after allocation succeeds.
    */
-  abstract spawnTerminal(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle>
+  spawnTerminal(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle> {
+    return this.track(this.allocateTerminal(spec))
+  }
+
+  private async allocateTerminal(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle> {
+    const allocation = new AbortController()
+    const cancelled = (): void => { allocation.abort(spec.signal?.reason) }
+    spec.signal?.addEventListener('abort', cancelled, { once: true })
+    if (spec.signal?.aborted) cancelled()
+    try {
+      const terminal = await this.allocateTerminalSession({ ...spec, signal: allocation.signal })
+      if (spec.signal?.aborted) { await terminal.terminate(); spec.signal.throwIfAborted() }
+      return terminal
+    } finally { spec.signal?.removeEventListener('abort', cancelled) }
+  }
+
+  private async allocateTerminalSession(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle> {
+    const { owner, lease, signal } = await this.admission(spec)
+    try { this.assertAdmission(owner, signal) } catch (error) { await lease?.release(); throw error }
+    let handle: SubprocessTerminalHandle
+    try { handle = await this.spawnTerminalProcess({ ...spec, signal }) } catch (error) {
+      return this.rejectAllocation(error, lease)
+    }
+    if (lease === undefined) return handle
+    const terminate = async (): Promise<void> => {
+      try { await handle.terminate() } catch (error) {
+        await lease.uncertain()
+        throw error
+      }
+      signal.removeEventListener('abort', onAbort)
+      await lease.release()
+    }
+    const onAbort = (): void => {
+      void this.track(terminate()).catch((error: unknown) => { this.ctx.logger.error(error) })
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) onAbort()
+    void this.track(handle.done.then(terminate, terminate)).catch((error: unknown) => { this.ctx.logger.error(error) })
+    return {
+      pid: handle.pid, output: handle.output, done: handle.done,
+      write: data => handle.write(data), resize: (cols, rows) => handle.resize(cols, rows),
+      inspectActivity: () => handle.inspectActivity(), inspectForeground: () => handle.inspectForeground(),
+      signalForeground: value => handle.signalForeground(value), terminate,
+    }
+  }
+
+  /**
+   * Allocate a provider-owned terminal after admission; failures may leave unconfirmed work.
+   * @param spec - fully specified allocation with combined owner cancellation.
+   * @returns a terminal whose termination confirms whole-session quiescence.
+   */
+  protected abstract spawnTerminalProcess(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle>
 }
 
 export default SubprocessRuntime

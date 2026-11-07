@@ -99,6 +99,23 @@ describe('highlightLines', () => {
 })
 
 describe('ReadBlock rows', () => {
+  it('wraps a capped plain-text window without visiting hidden lines', () => {
+    let reads = 0
+    const returned = new Proxy(lines(10_000), {
+      get(target, property, receiver) {
+        if (typeof property === 'string' && /^\d+$/.test(property)) reads += 1
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    })
+    const view = render(<ReadBlock lines={returned} totalLines={10_000} />)
+    expect(rowTexts(view.container)).toHaveLength(DEFAULT_READ_MAX_LINES)
+    reads = 0
+    fireEvent.click(screen.getByRole('button', { name: '自动换行' }))
+    expect(rowTexts(view.container)).toHaveLength(DEFAULT_READ_MAX_LINES)
+    expect(view.container.querySelector('[data-code-wrap="true"]')).not.toBeNull()
+    expect(reads).toBeLessThanOrEqual(DEFAULT_READ_MAX_LINES)
+  })
+
   it('renders one gutter-numbered row per line, keeping the file line numbers', () => {
     const view = render(<ReadBlock label="a.ts" lines={lines(3, 41)} totalLines={3} />)
     expect(gutters(view.container)).toEqual(['41', '42', '43'])

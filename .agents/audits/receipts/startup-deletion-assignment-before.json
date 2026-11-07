@@ -1,0 +1,14 @@
+{
+  "name": "startup-deletion-assignment-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts -t 'startup reconciliation'",
+  "startedAt": "2026-10-24T00:12:28.446603+00:00",
+  "seconds": 4.372,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a7e99802acc938ea881289b289dca6ab0263c0cb63fb4a3802b82d6358f94c7d",
+  "inputsAfter": "a7e99802acc938ea881289b289dca6ab0263c0cb63fb4a3802b82d6358f94c7d",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "f7253064b7f4c944c159edbfde52cdab369fce5140a237ff6b1314df9fb9c82e",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-service-postgres.spec.ts (20 tests | 1 failed | 19 skipped) 231ms\n     × does not recreate a deleted account assignment during startup reconciliation 188ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > does not recreate a deleted account assignment during startup reconciliation\nAssertionError: expected 1 to be +0 // Object.is equality\n\n- Expected\n+ Received\n\n- 0\n+ 1\n\n ❯ tests/project-service-postgres.spec.ts:111:54\n    109|     expect(await users.isDeleted(f.member)).toBe(true)\n    110|     expect((await pool.query('SELECT 1 FROM harness.instances WHERE or…\n    111|       [f.context.organizationId, member])).rowCount).toBe(0)\n       |                                                      ^\n    112|   })\n    113|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 19 skipped (20)\n   Start at  08:12:31\n   Duration  1.65s (transform 1.02s, setup 0ms, import 1.30s, tests 231ms, environment 0ms)\n\n"
+}

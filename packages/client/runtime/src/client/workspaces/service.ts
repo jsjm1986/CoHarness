@@ -1,6 +1,10 @@
 /** WorkspaceRuntime projects the Workspace object manager for UI consumers. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import { clientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+import type { SessionRuntimeTarget } from '../contract/sessions.ts'
+import type { PersonalRuntimeDirectory } from '../personal-directory.ts'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {
@@ -12,7 +16,8 @@ import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.ts'
 import type { IWorkspaces, StartSessionOptions } from '../contract/workspaces.ts'
 import { commitSessionNavigation } from '../navigation.ts'
-import { WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
+import { WorkspaceManager, type WorkspaceArchiveSnapshot, type WorkspaceListPhase } from './manager.ts'
+import { prepareGatewayRuntime } from '../prepare-runtime.ts'
 
 /** Generate one opaque browser draft reservation id. */
 function newDraftId(): SessionDraftId {
@@ -32,10 +37,10 @@ interface ActiveDraft {
 
 const ACTIVE_DRAFTS_KEY = 'dsh.workspace.drafts.v1'
 
-function loadActiveDrafts(): Map<WorkspaceId, ActiveDraft> {
-  if (typeof localStorage === 'undefined') return new Map()
+function loadActiveDrafts(storage: Storage | undefined, name: string): Map<WorkspaceId, ActiveDraft> {
+  if (storage === undefined) return new Map()
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(ACTIVE_DRAFTS_KEY) ?? '{}')
+    const parsed: unknown = JSON.parse(storage.getItem(name) ?? '{}')
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return new Map()
     const result = new Map<WorkspaceId, ActiveDraft>()
     for (const [workspaceId, value] of Object.entries(parsed)) {
@@ -56,12 +61,12 @@ function loadActiveDrafts(): Map<WorkspaceId, ActiveDraft> {
   }
 }
 
-function saveActiveDrafts(drafts: ReadonlyMap<WorkspaceId, ActiveDraft>): void {
-  if (typeof localStorage === 'undefined') return
+function saveActiveDrafts(drafts: ReadonlyMap<WorkspaceId, ActiveDraft>, storage: Storage | undefined, name: string): void {
+  if (storage === undefined) return
   try {
     const value: Record<string, ActiveDraft> = {}
     for (const [workspaceId, draft] of drafts) value[workspaceId] = draft
-    localStorage.setItem(ACTIVE_DRAFTS_KEY, JSON.stringify(value))
+    storage.setItem(name, JSON.stringify(value))
   } catch {
     // A private-mode or quota failure only disables recovery; the live draft remains usable.
   }
@@ -70,6 +75,14 @@ function saveActiveDrafts(drafts: ReadonlyMap<WorkspaceId, ActiveDraft>): void {
 /** Workspace list plus the two-baseline readiness and default-target projection. */
 export interface WorkspaceListState {
   items: readonly WorkspaceView[]
+  /** Runtime captured when a directory operation opens; null denotes the bootstrap Host. */
+  directoryRuntime?: SessionRuntimeTarget | null
+  /** Authorized metadata-only personal Runtime groups; absent outside the unified personal view. */
+  computerGroups?: readonly PersonalRuntimeDirectory[]
+  /** Exact owning Runtime for each projected Workspace identity. */
+  workspaceRuntimeIds?: Readonly<Record<string, string>>
+  /** Central catalog load state; a failure retains the preceding directory. */
+  directoryState?: 'loading' | 'ready' | 'error'
   /**
    * Registry-global archive set in Host order: grouping surfaces hide these
    * sessions everywhere (workspace groups and the ungrouped bucket) while
@@ -91,6 +104,9 @@ export interface WorkspaceListState {
   error: RpcError | null
   /** True only after both workspace.list and session.list have succeeded. */
   baselinesReady: boolean
+  /** First default navigation awaits baselines or its selected Session;
+   * absent after completion, failure, supersession or disposal. */
+  initialSelectionPending?: true
   /** Most recently active Workspace, derived without changing `items` order. */
   recentWorkspaceId: WorkspaceId | undefined
 }
@@ -127,6 +143,143 @@ export class WorkspaceArchiveError extends Error {
 
 /** Real Workspace object layer and Host actions. */
 export class WorkspaceRuntime implements IWorkspaces {
+  private externalItems: WorkspaceView[] = []
+  private readonly externalOwners = new Map<WorkspaceId, { runtime: SessionRuntimeTarget; workspaceId: WorkspaceId }>()
+  private computerGroups: readonly PersonalRuntimeDirectory[] | undefined
+  private groupComputers = true
+  private directoryState: WorkspaceListState['directoryState']
+  private baseRuntimeId = ''
+  private readonly foreignPins = new Map<string, readonly SessionId[]>()
+  private readonly foreignPinRequests = new Map<string, number>()
+  /** Refresh central metadata; the installed directory owner supplies this callback. */
+  refreshPersonalDirectory: () => Promise<void> = async () => {}
+
+  /** Publish directory state while retaining cached metadata.
+   * @param state - central metadata request state.
+   */
+  setDirectoryState(state: WorkspaceListState['directoryState']): void { this.directoryState = state; this.project() }
+
+  /** Install foreign Workspace identities without opening connections.
+   * @param groups - currently authorized personal Runtime metadata.
+   * @param baseRuntimeId - verified bootstrap Runtime identity.
+   * @param groupComputers - whether the entry exposes computer groups.
+   */
+  installPersonalDirectory(groups: readonly PersonalRuntimeDirectory[], baseRuntimeId: string, groupComputers = true): void {
+    this.groupComputers = groupComputers
+    this.externalOwners.clear()
+    this.externalItems = []
+    this.computerGroups = groups.length === 0 ? undefined : groups
+    this.baseRuntimeId = baseRuntimeId
+    for (const group of groups) {
+      if (group.runtime.runtimeId === baseRuntimeId) continue
+      for (const item of group.items) {
+        const workspaceId = `dsh-workspace:${group.runtime.runtimeId}:${encodeURIComponent(item.workspaceId)}` as WorkspaceId
+        this.externalOwners.set(workspaceId, { runtime: group.runtime, workspaceId: item.workspaceId })
+        this.externalItems.push({ ...item, workspaceId, sessionIds: item.sessionIds.map(id => clientSessionKey(group.runtime, id)) })
+      }
+    }
+    this.project()
+  }
+
+  /** Reproject retained Workspaces when entry policy changes.
+   * @param enabled - whether to group computers.
+   */
+  setComputerGrouping(enabled: boolean): void { this.groupComputers = enabled; this.project() }
+
+  private workspaceRequest(workspaceId: WorkspaceId): { workspaceId: WorkspaceId; runtimeTarget?: SessionRuntimeTarget } {
+    const owner = this.externalOwners.get(workspaceId)
+    return owner === undefined ? { workspaceId } : { workspaceId: owner.workspaceId, runtimeTarget: owner.runtime }
+  }
+
+  /** Resolve the Runtime owning a foreign Workspace.
+   * @param workspaceId - projected Workspace identity.
+   * @returns exact Runtime, or undefined for the bootstrap Host.
+   */
+  runtimeForWorkspace(workspaceId: WorkspaceId): SessionRuntimeTarget | undefined {
+    return this.externalOwners.get(workspaceId)?.runtime
+  }
+
+  private foreignApi(workspaceId: WorkspaceId): IApiClient | undefined {
+    const owner = this.externalOwners.get(workspaceId)
+    if (owner === undefined) return undefined
+    const connection = this.rootCtx.get('connection') as ConnectionHandle
+    const api = connection.forTarget?.(owner.runtime).api
+    if (api === undefined) throw new Error('Workspace Runtime connection is unavailable')
+    return api
+  }
+
+  private selectedTarget(): SessionRuntimeTarget | undefined {
+    const current = this.sessions.list.getSnapshot().current
+    return current === undefined ? undefined : this.sessions.runtimeTargetFor?.(current)
+  }
+
+  private selectedApi(runtimeTarget?: SessionRuntimeTarget | null): IApiClient {
+    const target = runtimeTarget === undefined ? this.selectedTarget() : runtimeTarget ?? undefined
+    if (target === undefined) return this.api
+    const api = (this.rootCtx.get('connection') as ConnectionHandle).forTarget?.(target).api
+    if (api === undefined) throw new Error('Selected Runtime connection is unavailable')
+    return api
+  }
+
+  private async preparedApi(runtimeTarget?: SessionRuntimeTarget | null, signal?: AbortSignal): Promise<IApiClient> {
+    const target = runtimeTarget === undefined ? this.selectedTarget() : runtimeTarget ?? undefined
+    if (target !== undefined) await prepareGatewayRuntime(this.rootCtx.get('connection') as ConnectionHandle | undefined, target, signal)
+    signal?.throwIfAborted()
+    return this.selectedApi(target ?? null)
+  }
+
+  /**
+   * Create on the captured computer with explicit Workspace membership.
+   * @param target - exact Runtime owning the new conversation.
+   * @param workspaceId - projected Workspace chosen on that Runtime; omission uses its Host default directory.
+   * @param signal - owning navigation cancellation, checked before publishing a result.
+   * @returns a runtime-qualified Session identity for navigation.
+   */
+  async createRuntimeSession(target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal): Promise<SessionId> {
+    signal?.throwIfAborted()
+    const create = this.sessions.createSession?.bind(this.sessions)
+    if (create === undefined) throw new Error('Runtime conversation creation is unavailable')
+    let originalId: WorkspaceId
+    if (workspaceId === undefined) {
+      const api = await this.preparedApi(target, signal)
+      const description = await api.host.describe({}, signal)
+      if (!description.result.ok) throw new WorkspaceCreateError(description.result.error)
+      signal?.throwIfAborted()
+      const registration = await api.workspace.create({ path: description.result.value.cwd }, signal)
+      if (!registration.result.ok) throw new WorkspaceCreateError(registration.result.error)
+      signal?.throwIfAborted()
+      const view = registration.result.value.workspace
+      originalId = view.workspaceId
+      if (target.runtimeId === this.baseRuntimeId) await this.manager.refresh()
+      else this.presentRuntimeWorkspace(target, view)
+    } else {
+      this.requireWorkspace(workspaceId)
+      const owner = this.externalOwners.get(workspaceId)
+      if ((owner?.runtime.runtimeId ?? this.baseRuntimeId) !== target.runtimeId) throw new Error('Workspace belongs to another Runtime')
+      originalId = owner?.workspaceId ?? workspaceId
+    }
+    signal?.throwIfAborted()
+    const id = await create(target, signal, { workspaceId: originalId })
+    signal?.throwIfAborted()
+    return id
+  }
+
+  private presentRuntimeWorkspace(runtime: SessionRuntimeTarget, view: WorkspaceView): WorkspaceView {
+    const workspaceId = `dsh-workspace:${runtime.runtimeId}:${encodeURIComponent(view.workspaceId)}` as WorkspaceId
+    this.externalOwners.set(workspaceId, { runtime, workspaceId: view.workspaceId })
+    const projected = { ...view, workspaceId, sessionIds: view.sessionIds.map(id => clientSessionKey(runtime, id)) }
+    this.externalItems = [...this.externalItems.filter(item => item.workspaceId !== workspaceId), projected]
+    this.project()
+    return projected
+  }
+
+  private adoptForeign(workspaceId: WorkspaceId, view: WorkspaceView): WorkspaceView {
+    const owner = this.externalOwners.get(workspaceId)
+    if (owner === undefined) throw new Error('Foreign Workspace target was withdrawn')
+    const projected = { ...view, workspaceId, sessionIds: view.sessionIds.map(id => clientSessionKey(owner.runtime, id)) }
+    this.externalItems = this.externalItems.map(item => item.workspaceId === workspaceId ? projected : item)
+    this.project(); return projected
+  }
   /** UI-facing immutable projection; the manager remains wire truth. */
   readonly list: SnapshotStore<WorkspaceListState>
   /** Workspace baseline and frame owner. */
@@ -142,7 +295,8 @@ export class WorkspaceRuntime implements IWorkspaces {
     readonly attempt: Promise<SessionId>
   }>()
   /** Draft reservations survive a reload without storing prompt text or credentials. */
-  private readonly activeDrafts = loadActiveDrafts()
+  private readonly activeDrafts = new Map<WorkspaceId, ActiveDraft>()
+  private draftStorageKey: string | undefined
   /** Guards the runtime-owned one-shot initial-selection subscription. */
   private initialSelectionStarted = false
 
@@ -155,6 +309,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     // Whole-set echoes install only for sessions owned by the runtime this
     // mirror tracks; a session-addressed call routed elsewhere returns a
     // foreign registry's set, which its own runtime frames own.
+    this.restoreDrafts()
     this.manager = new WorkspaceManager(api, id => this.sessions.runtimeTargetFor?.(id) === undefined)
     this.list = createSnapshotStore<WorkspaceListState>({
       items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'pending', error: null,
@@ -163,7 +318,50 @@ export class WorkspaceRuntime implements IWorkspaces {
     })
     this.manager.subscribe(() => { this.project() })
     this.sessions.list.subscribe(() => { this.project() })
+    const stopForeign = this.sessions.workspaceSnapshots?.subscribe(() => {
+      for (const { target, state } of this.sessions.workspaceSnapshots?.getSnapshot() ?? []) {
+        if (target.kind !== 'personal' || !this.computerGroups?.some(group => runtimeTargetKey(group.runtime) === runtimeTargetKey(target))) continue
+        const previous = new Set([...this.externalOwners]
+          .filter(([, owner]) => runtimeTargetKey(owner.runtime) === runtimeTargetKey(target)).map(([id]) => id))
+        this.externalItems = this.externalItems.filter(item => !previous.has(item.workspaceId))
+        for (const id of previous) this.externalOwners.delete(id)
+        for (const item of state.items) {
+          const workspaceId = `dsh-workspace:${target.runtimeId}:${encodeURIComponent(item.workspaceId)}` as WorkspaceId
+          this.externalOwners.set(workspaceId, { runtime: target, workspaceId: item.workspaceId })
+          this.externalItems.push({ ...item, workspaceId, sessionIds: item.sessionIds.map(id => clientSessionKey(target, id)) })
+        }
+        const key = runtimeTargetKey(target)
+        this.foreignPins.set(key, state.pinnedSessionIds.map(id => clientSessionKey(target, id)))
+        this.foreignPinRequests.set(key, (this.foreignPinRequests.get(key) ?? 0) + 1)
+      }
+      this.project()
+    })
+    rootCtx.effect(() => () => { stopForeign?.() }, 'workspaces: foreign Workspace projections')
     rootCtx.reflect.provide('workspaces', this, undefined)
+  }
+
+  private draftStorage(): { storage: Storage | undefined; name: string } | undefined {
+    // Programmatic clients can instantiate this service without a browser Location.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition
+    const runtimeId = new URLSearchParams(globalThis.location?.search).get('dshRuntime')
+    if (runtimeId === null) return { storage: globalThis.localStorage, name: ACTIVE_DRAFTS_KEY }
+    const accountId = this.rootCtx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+    if (accountId === undefined) return undefined
+    return { storage: globalThis.sessionStorage, name: `dsh.workspace.drafts.v2.account:${accountId}.runtime:${runtimeId}` }
+  }
+
+  private restoreDrafts(): void {
+    const owner = this.draftStorage()
+    if (owner === undefined || owner.name === this.draftStorageKey) return
+    this.activeDrafts.clear()
+    for (const [id, draft] of loadActiveDrafts(owner.storage, owner.name)) this.activeDrafts.set(id, draft)
+    this.draftStorageKey = owner.name
+  }
+
+  private persistDrafts(): void {
+    const owner = this.draftStorage()
+    if (owner === undefined || owner.name !== this.draftStorageKey) return
+    saveActiveDrafts(this.activeDrafts, owner.storage, owner.name)
   }
 
   /**
@@ -183,6 +381,7 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @returns the reused or newly created session id.
    */
   async connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId> {
+    this.restoreDrafts()
     const workspace = this.requireWorkspace(workspaceId)
     // Coalesce concurrent connects: a create's summary lands without cwd
     // until the host frame arrives, so a second call inside that window
@@ -214,9 +413,9 @@ export class WorkspaceRuntime implements IWorkspaces {
       ? active
       : { draftId: newDraftId(), sessionId: newDraftSessionId(), workspacePath: workspace.path }
     this.activeDrafts.set(workspaceId, draft)
-    saveActiveDrafts(this.activeDrafts)
+    this.persistDrafts()
     const attempt = this.sessions.createOrReuse({
-      workspaceId,
+      ...this.workspaceRequest(workspaceId),
       draftId: draft.draftId,
       sessionId: draft.sessionId,
       ...(options?.agentPreset !== undefined ? { agentPreset: options.agentPreset } : {}),
@@ -232,7 +431,7 @@ export class WorkspaceRuntime implements IWorkspaces {
             this.activeDrafts.set(workspaceId, { ...current, sessionId: original })
           }
         }
-        saveActiveDrafts(this.activeDrafts)
+        this.persistDrafts()
         return sessionId
       })
       .finally(() => {
@@ -263,7 +462,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.requireWorkspace(workspaceId)
     const inflight = this.connecting.get(workspaceId)
     if (inflight !== undefined && inflight.fresh === true) return inflight.attempt
-    const attempt = this.sessions.create({ workspaceId })
+    const attempt = this.sessions.create(this.workspaceRequest(workspaceId))
       .finally(() => {
         if (this.connecting.get(workspaceId)?.attempt === attempt) this.connecting.delete(workspaceId)
       })
@@ -327,22 +526,44 @@ export class WorkspaceRuntime implements IWorkspaces {
       throw new Error('workspaces.startInitialSelection: already started')
     }
     this.initialSelectionStarted = true
-    const navigation = this.sessions.beginNavigation()
-    let state: 'waiting' | 'opening' | 'done' = 'waiting'
+    const lifetime = new AbortController()
+    const navigation = AbortSignal.any([this.sessions.beginNavigation(), lifetime.signal])
+    type InitialSelectionState = 'waiting' | 'opening' | 'failed' | 'done'
+    let state: InitialSelectionState = 'waiting'
+    let failedBaseline: { workspaces: object; sessions: object } | undefined
     let disposed = false
+    const setState = (next: InitialSelectionState): void => {
+      state = next
+      if (next !== 'failed') failedBaseline = undefined
+      const pending = next === 'waiting' || next === 'opening'
+      const snapshot = this.list.getSnapshot()
+      if ((snapshot.initialSelectionPending === true) === pending) return
+      const value = { ...snapshot }
+      if (pending) value.initialSelectionPending = true
+      else delete value.initialSelectionPending
+      this.list.set(value)
+    }
     const reconcile = (): void => {
-      if (disposed || navigation.aborted || state !== 'waiting') return
+      if (disposed || navigation.aborted || (state !== 'waiting' && state !== 'failed')) return
       const workspace = this.list.getSnapshot()
-      if (!workspace.baselinesReady) return
       const sessions = this.sessions.list.getSnapshot()
+      if (state === 'failed' && failedBaseline !== undefined
+        && failedBaseline.workspaces === this.manager.getSnapshot() && failedBaseline.sessions === sessions) return
+      if (!workspace.baselinesReady) {
+        if (workspace.state === 'error') {
+          failedBaseline = { workspaces: this.manager.getSnapshot(), sessions }
+          setState('failed')
+        } else setState('waiting')
+        return
+      }
       const current = sessions.current
       // Startup is history-first across the whole registry. Keep
       // recentWorkspaceId as the New Session target, where an empty Workspace
       // is still a valid destination, but do not let a newer blank/subagent
       // row hide an older visible conversation in another Workspace.
       const target = recentHistoryWorkspace(
-        workspace.items, sessions.byId, workspace.archivedSessionIds,
-      ) ?? workspace.recentWorkspaceId
+        workspace.items.filter(item => !this.externalOwners.has(item.workspaceId)), sessions.byId, workspace.archivedSessionIds,
+      ) ?? workspace.items.find(item => !this.externalOwners.has(item.workspaceId))?.workspaceId
       if (current !== undefined) {
         // A saved blank re-adopts under the preset its log recorded through
         // the same reuse path a Workspace connect takes: an unclean exit may
@@ -353,10 +574,10 @@ export class WorkspaceRuntime implements IWorkspaces {
           ? undefined
           : workspace.items.find(item => item.path === summary.cwd && item.sessionIds.includes(current))
         if (owner === undefined || summary === undefined) {
-          state = 'done'
+          setState('done')
           return
         }
-        state = 'opening'
+        setState('opening')
         void this.sessions.create({
           workspaceId: owner.workspaceId,
           sessionId: current,
@@ -365,21 +586,28 @@ export class WorkspaceRuntime implements IWorkspaces {
         }).then((sessionId) => {
           if (disposed || navigation.aborted) return
           return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
-            if (sessionId !== current) this.sessions.open(sessionId)
-            state = 'done'
+            // The captured current is stale after the reuse flight; the
+            // re-adopted blank supersedes ambient drift but never a selection
+            // the user explicitly committed while it was in flight.
+            const live = this.sessions.list.getSnapshot().current
+            if (sessionId !== live && !this.sessions.isActivated(live)) {
+              this.sessions.open(sessionId, { activate: false })
+            }
+            setState('done')
           })
         }).catch((reason: unknown) => {
           if (disposed || navigation.aborted) return
-          state = 'waiting'
+          failedBaseline = { workspaces: this.manager.getSnapshot(), sessions: this.sessions.list.getSnapshot() }
+          setState('failed')
           console.warn('saved blank Session restore failed:', reason)
         })
         return
       }
       if (target === undefined) {
-        state = 'done'
+        setState('done')
         return
       }
-      state = 'opening'
+      setState('opening')
       void this.openWorkspace(target).then((sessionId) => {
         if (disposed || navigation.aborted) return
         return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
@@ -388,20 +616,34 @@ export class WorkspaceRuntime implements IWorkspaces {
             || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
             throw new Error('Session was archived during initial selection')
           }
-          if (snapshot.current === undefined) this.sessions.open(sessionId)
-          state = 'done'
+          if (snapshot.current === undefined) this.sessions.open(sessionId, { activate: false })
+          setState('done')
         })
       }).catch((reason: unknown) => {
         if (disposed || navigation.aborted) return
-        state = 'waiting'
+        failedBaseline = { workspaces: this.manager.getSnapshot(), sessions: this.sessions.list.getSnapshot() }
+        setState('failed')
         console.warn('initial workspace selection failed:', reason)
       })
     }
     const unsubscribe = this.list.subscribe(reconcile)
-    reconcile()
-    return () => {
-      disposed = true
+    const cancel = (): void => {
       unsubscribe()
+      setState('done')
+    }
+    navigation.addEventListener('abort', cancel, { once: true })
+    if (navigation.aborted) cancel()
+    else {
+      setState('waiting')
+      reconcile()
+    }
+    return () => {
+      if (disposed) return
+      disposed = true
+      navigation.removeEventListener('abort', cancel)
+      unsubscribe()
+      lifetime.abort()
+      setState('done')
     }
   }
 
@@ -415,7 +657,8 @@ export class WorkspaceRuntime implements IWorkspaces {
    * definition ({@link connectFreshSession}); draft-preparation options keep
    * the reconnect arm ({@link connectWorkspace}), so a landed draft the
    * Workspace already knows stays open. Connect failures are non-fatal
-   * (console diagnostics plus `onFailure`; the current view stays usable).
+   * (console diagnostics plus `onFailure`). The originating composer is held
+   * until preparation settles; its draft and any running task remain owned.
    * @param workspaceId - explicit target Workspace for scoped actions.
    * @param options - draft initialization for the landed Session and the
    * rejected-connect observer.
@@ -425,40 +668,49 @@ export class WorkspaceRuntime implements IWorkspaces {
     const workspace = this.list.getSnapshot()
     const sessions = this.sessions.list.getSnapshot()
     const current = sessions.current
+    const selectedRuntime = this.selectedTarget()
     const currentWorkspaceId = current === undefined
       ? undefined
       : workspace.items.find(item => item.sessionIds.includes(current))?.workspaceId
-        ?? sessions.byId[current]?.workspaceId
-    const target = workspaceId ?? currentWorkspaceId ?? workspace.recentWorkspaceId
-    if (target === undefined) {
+        ?? workspace.items.find(item => item.workspaceId === sessions.byId[current]?.workspaceId)?.workspaceId
+        ?? workspace.items.find(item => item.path === sessions.byId[current]?.cwd
+          && this.externalOwners.get(item.workspaceId)?.runtime.runtimeId === selectedRuntime?.runtimeId)?.workspaceId
+    const target = workspaceId ?? currentWorkspaceId ?? (selectedRuntime === undefined ? workspace.recentWorkspaceId : undefined)
+    if (target === undefined && selectedRuntime === undefined) {
       this.sessions.clear()
       return
     }
-    const navigation = this.sessions.beginNavigation()
-    const creating = prompt !== undefined || clearPreviousDraft === true
-      ? this.connectWorkspace(target)
-      : this.connectFreshSession(target)
-    void creating.then(
-      (sessionId) => {
-        if (navigation.aborted) return
+    const navigation = this.sessions.beginNavigation({ blockInputFor: current })
+    const create = () => {
+      if (target !== undefined) return prompt !== undefined || clearPreviousDraft === true
+        ? this.connectWorkspace(target) : this.connectFreshSession(target)
+      if (selectedRuntime === undefined) throw new Error('New conversation requires a Runtime')
+      return this.sessions.create({ runtimeTarget: selectedRuntime })
+    }
+    const perform = async () => {
+      const sessionId = await create()
+      if (navigation.aborted) return
+      if (this.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
+        || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
+      return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
         if (this.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
           || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
-        return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
-          if (this.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
-            || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
-          this.sessions.open(sessionId)
-          // Draft initialization is a prefill only: nothing is sent, and the
-          // input hub applies it when (or if) the Session's composer exists.
-          if (prompt !== undefined || clearPreviousDraft === true) {
-            this.rootCtx.emit('conversation/draft-initialize', {
-              sessionId,
-              ...(prompt !== undefined ? { prompt } : {}),
-              ...(clearPreviousDraft === true ? { clearPreviousDraft: true } : {}),
-            })
-          }
-        })
-      },
-    ).catch((reason: unknown) => {
+        this.sessions.open(sessionId)
+        // Draft initialization is a prefill only: nothing is sent, and the
+        // input hub applies it when (or if) the Session's composer exists.
+        if (prompt !== undefined || clearPreviousDraft === true) {
+          this.rootCtx.emit('conversation/draft-initialize', {
+            sessionId,
+            ...(prompt !== undefined ? { prompt } : {}),
+            ...(clearPreviousDraft === true ? { clearPreviousDraft: true } : {}),
+          })
+        }
+      })
+    }
+    const runtime = target === undefined ? selectedRuntime : this.externalOwners.get(target)?.runtime
+    const creating = runtime !== undefined && this.sessions.usingRuntime !== undefined
+      ? this.sessions.usingRuntime(runtime, navigation, perform) : perform()
+    void creating.finally(() => { this.sessions.finishNavigation(navigation) }).catch((reason: unknown) => {
       console.warn('new session failed:', reason)
       onFailure?.(reason)
     })
@@ -466,21 +718,30 @@ export class WorkspaceRuntime implements IWorkspaces {
 
   /**
    * Register an existing path as a Workspace.
-   * @param input - the Host create payload.
+   * @param input - directory and captured Runtime; null uses the bootstrap Host, omission uses current selection.
    * @returns the created or idempotently resolved Workspace.
    */
-  async create(input: { path: string }): Promise<WorkspaceView> {
-    const result = await this.manager.create(input)
+  async create(input: { path: string; runtimeTarget?: SessionRuntimeTarget | null }): Promise<WorkspaceView> {
+    const runtime = input.runtimeTarget === undefined ? this.selectedTarget() : input.runtimeTarget ?? undefined
+    if (runtime !== undefined) {
+      const api = await this.preparedApi(runtime)
+      const { result } = await api.workspace.create({ path: input.path })
+      if (!result.ok) throw new WorkspaceCreateError(result.error)
+      return this.presentRuntimeWorkspace(runtime, result.value.workspace)
+    }
+    const result = await this.manager.create({ path: input.path })
     if (!result.ok) throw new WorkspaceCreateError(result.error)
     return this.presentWorkspace(result.value.workspace)
   }
 
   /**
    * Open the Host's native directory picker (the `native` capability).
+   * @param runtimeTarget - captured Runtime; null uses the bootstrap Host, omission uses current selection.
    * @returns the selected path, or null when the user cancelled.
    */
-  async pickDirectory(): Promise<string | null> {
-    const response = await this.api.host.pickDirectory({})
+  async pickDirectory(runtimeTarget?: SessionRuntimeTarget | null): Promise<string | null> {
+    const api = await this.preparedApi(runtimeTarget)
+    const response = await api.host.pickDirectory({})
     if (!response.result.ok) {
       throw new Error(`directory picker failed: ${response.result.error.message}`)
     }
@@ -491,10 +752,12 @@ export class WorkspaceRuntime implements IWorkspaces {
    * List one directory level through the Host's `browse` capability.
    * @param path - absolute directory to list; absent lists the Host home directory.
    * @param signal - aborts the wire request (and the Host's scan) when the caller supersedes it.
+   * @param runtimeTarget - captured Runtime; null uses the bootstrap Host, omission uses current selection.
    * @returns the level's listing with breadcrumb ancestry.
    */
-  async listDirectory(path?: string, signal?: AbortSignal): Promise<DirectoryListing> {
-    const response = await this.api.host.listDirectory(path === undefined ? {} : { path }, signal)
+  async listDirectory(path?: string, signal?: AbortSignal, runtimeTarget?: SessionRuntimeTarget | null): Promise<DirectoryListing> {
+    const api = await this.preparedApi(runtimeTarget, signal)
+    const response = await api.host.listDirectory(path === undefined ? {} : { path }, signal)
     if (!response.result.ok) throw new DirectoryBrowseError(response.result.error)
     return response.result.value
   }
@@ -503,10 +766,12 @@ export class WorkspaceRuntime implements IWorkspaces {
    * Create one child directory through the Host's `browse` capability.
    * @param path - absolute existing parent directory.
    * @param name - single non-blank path segment.
+   * @param runtimeTarget - captured Runtime; null uses the bootstrap Host, omission uses current selection.
    * @returns the created directory's absolute path.
    */
-  async createDirectory(path: string, name: string): Promise<string> {
-    const response = await this.api.host.createDirectory({ path, name })
+  async createDirectory(path: string, name: string, runtimeTarget?: SessionRuntimeTarget | null): Promise<string> {
+    const api = await this.preparedApi(runtimeTarget)
+    const response = await api.host.createDirectory({ path, name })
     if (!response.result.ok) throw new DirectoryBrowseError(response.result.error)
     return response.result.value.path
   }
@@ -516,7 +781,7 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param path - absolute or host-resolvable path.
    */
   async openPath(path: string): Promise<void> {
-    const response = await this.api.host.openPath({ path })
+    const response = await this.selectedApi().host.openPath({ path })
     if (!response.result.ok) {
       throw new Error(`path open failed: ${response.result.error.message}`)
     }
@@ -529,6 +794,12 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @returns the renamed Workspace view.
    */
   async rename(workspaceId: WorkspaceId, title: string): Promise<WorkspaceView> {
+    const api = this.foreignApi(workspaceId)
+    if (api !== undefined) {
+      const { result } = await api.workspace.rename({ workspaceId: this.workspaceRequest(workspaceId).workspaceId, title })
+      if (!result.ok) throw new Error(result.error.message)
+      return this.adoptForeign(workspaceId, result.value.workspace)
+    }
     const result = await this.manager.rename(workspaceId, title)
     if (!result.ok) throw new Error(`workspace rename failed: ${result.error.code}: ${result.error.message}`)
     return this.presentWorkspace(result.value.workspace)
@@ -540,6 +811,13 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param workspaceId - target workspace.
    */
   async delete(workspaceId: WorkspaceId): Promise<void> {
+    const api = this.foreignApi(workspaceId)
+    if (api !== undefined) {
+      const { result } = await api.workspace.delete({ workspaceId: this.workspaceRequest(workspaceId).workspaceId })
+      if (!result.ok) throw new Error(result.error.message)
+      this.externalItems = this.externalItems.filter(item => item.workspaceId !== workspaceId)
+      this.externalOwners.delete(workspaceId); this.project(); return
+    }
     const result = await this.manager.delete(workspaceId)
     if (!result.ok) throw new Error(`workspace delete failed: ${result.error.code}: ${result.error.message}`)
   }
@@ -550,6 +828,32 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param beforeWorkspaceId - Anchor workspace; omitted appends.
    */
   async insertBefore(workspaceId: WorkspaceId, beforeWorkspaceId?: WorkspaceId): Promise<void> {
+    const api = this.foreignApi(workspaceId)
+    if (api !== undefined) {
+      const owner = this.externalOwners.get(workspaceId)
+      if (owner === undefined) throw new Error('Workspace Runtime was withdrawn')
+      const anchor = beforeWorkspaceId === undefined ? undefined : this.externalOwners.get(beforeWorkspaceId)
+      if (beforeWorkspaceId !== undefined
+        && (anchor === undefined || runtimeTargetKey(owner.runtime) !== runtimeTargetKey(anchor.runtime))) {
+        throw new Error('Workspaces cannot move between Runtimes')
+      }
+      const { result } = await api.workspace.insertBefore({ workspaceId: owner.workspaceId,
+        ...(anchor === undefined ? {} : { beforeWorkspaceId: anchor.workspaceId }) })
+      if (!result.ok) throw new Error(result.error.message)
+      const positions = new Map(result.value.workspaceIds.map((id, index) => [id, index]))
+      const inRuntime = this.externalItems.filter(item =>
+        this.externalOwners.get(item.workspaceId)?.runtime.runtimeId === owner.runtime.runtimeId)
+        .sort((left, right) => (positions.get(this.workspaceRequest(left.workspaceId).workspaceId) ?? 0)
+          - (positions.get(this.workspaceRequest(right.workspaceId).workspaceId) ?? 0))
+      let index = 0
+      this.externalItems = this.externalItems.map((item) => {
+        if (this.externalOwners.get(item.workspaceId)?.runtime.runtimeId !== owner.runtime.runtimeId) return item
+        const next = inRuntime[index++]
+        if (next === undefined) throw new Error('Workspace order is incomplete')
+        return next
+      })
+      this.project(); return
+    }
     const result = await this.manager.insertBefore(workspaceId, beforeWorkspaceId)
     if (!result.ok) throw new Error(`workspace reorder failed: ${result.error.code}: ${result.error.message}`)
   }
@@ -587,8 +891,10 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param sessionId - session to pin.
    */
   async pinSession(sessionId: SessionId): Promise<void> {
+    const request = this.beginForeignPin(sessionId)
     const result = await this.manager.pinSession(sessionId)
     if (!result.ok) throw new Error(`session pin failed: ${result.error.code}: ${result.error.message}`)
+    this.installForeignPin(request, result.value.pinnedSessionIds)
   }
 
   /**
@@ -599,8 +905,24 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param sessionId - pinned session to unpin.
    */
   async unpinSession(sessionId: SessionId): Promise<void> {
+    const request = this.beginForeignPin(sessionId)
     const result = await this.manager.unpinSession(sessionId)
     if (!result.ok) throw new Error(`session unpin failed: ${result.error.code}: ${result.error.message}`)
+    this.installForeignPin(request, result.value.pinnedSessionIds)
+  }
+
+  private beginForeignPin(id: SessionId): { target: SessionRuntimeTarget; seq: number } | undefined {
+    const target = this.sessions.runtimeTargetFor?.(id)
+    if (target === undefined) return undefined
+    const key = runtimeTargetKey(target), seq = (this.foreignPinRequests.get(key) ?? 0) + 1
+    this.foreignPinRequests.set(key, seq)
+    return { target, seq }
+  }
+
+  private installForeignPin(request: { target: SessionRuntimeTarget; seq: number } | undefined, ids: readonly SessionId[]): void {
+    if (request === undefined || this.foreignPinRequests.get(runtimeTargetKey(request.target)) !== request.seq) return
+    this.foreignPins.set(runtimeTargetKey(request.target), ids.map(id => clientSessionKey(request.target, id)))
+    this.project()
   }
 
   /**
@@ -615,6 +937,22 @@ export class WorkspaceRuntime implements IWorkspaces {
     sessionId: SessionId,
     beforeSessionId?: SessionId,
   ): Promise<WorkspaceView> {
+    const api = this.foreignApi(workspaceId)
+    if (api !== undefined) {
+      const owner = this.externalOwners.get(workspaceId)
+      if (owner === undefined) throw new Error('Workspace Runtime was withdrawn')
+      const raw = (id: SessionId): SessionId => {
+        const address = parseClientSessionKey(id)
+        if (address === undefined || runtimeTargetKey(address.runtime) !== runtimeTargetKey(owner.runtime)) {
+          throw new Error('Sessions cannot move between Runtimes')
+        }
+        return address.sessionId
+      }
+      const { result } = await api.workspace.insertSessionBefore({ workspaceId: owner.workspaceId, sessionId: raw(sessionId),
+        ...(beforeSessionId === undefined ? {} : { beforeSessionId: raw(beforeSessionId) }) })
+      if (!result.ok) throw new Error(result.error.message)
+      return this.adoptForeign(workspaceId, result.value.workspace)
+    }
     const result = await this.manager.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     if (!result.ok) throw new Error(`workspace move failed: ${result.error.code}: ${result.error.message}`)
     return this.presentWorkspace(result.value.workspace)
@@ -636,9 +974,20 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.manager.handleHostEnvelope(envelope)
   }
 
-  /** Rebuild the Workspace baseline after connection. */
-  handleConnected(): void {
-    this.manager.handleConnected()
+  /**
+   * Rebuild the Workspace baseline after connection.
+   * @returns the archive snapshot produced by the baseline read, or undefined when none applies.
+   */
+  handleConnected(): Promise<WorkspaceArchiveSnapshot | undefined> {
+    const runtimeId = (this.rootCtx.get('connection') as ConnectionHandle | undefined)
+      ?.hostDescription.getSnapshot()?.runtimeTarget?.runtimeId
+    if (runtimeId !== undefined) this.baseRuntimeId = runtimeId
+    return this.manager.handleConnected()
+  }
+
+  /** Invalidate pending Workspace baseline work when its connection generation ends. */
+  handleDisconnected(): void {
+    this.manager.handleDisconnected()
   }
 
   private presentWorkspace(workspace: WorkspaceView): WorkspaceView {
@@ -649,7 +998,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     const raw = this.manager.getSnapshot()
     const key = (id: SessionId): SessionId => this.sessions.keyFor?.(id) ?? id
     const workspace = { ...raw,
-      items: raw.items.map(item => this.presentWorkspace(item)),
+      items: [...raw.items.map(item => this.presentWorkspace(item)), ...this.externalItems],
       archivedSessionIds: raw.archivedSessionIds.map(key),
     }
     const sessions = this.sessions.list.getSnapshot()
@@ -657,7 +1006,7 @@ export class WorkspaceRuntime implements IWorkspaces {
       const summary = sessions.byId[key(draft.sessionId)]
       if (summary !== undefined && !summary.blank) this.activeDrafts.delete(workspaceId)
     }
-    saveActiveDrafts(this.activeDrafts)
+    this.persistDrafts()
     const baselinesReady = workspace.phase === 'ready' && sessions.phase === 'ready'
     // An archived current selection clears into the New Session view state —
     // a hidden row must not stay open behind the list. Sweeping here covers
@@ -668,14 +1017,23 @@ export class WorkspaceRuntime implements IWorkspaces {
       this.sessions.clear()
     }
     this.list.set({
-      items: workspace.items,
+      items: this.groupComputers || this.computerGroups === undefined ? workspace.items : workspace.items.filter(item =>
+        (this.externalOwners.get(item.workspaceId)?.runtime.runtimeId ?? this.baseRuntimeId)
+          === (this.selectedTarget()?.runtimeId ?? this.baseRuntimeId)),
+      directoryRuntime: this.selectedTarget() ?? null,
+      ...(this.computerGroups === undefined ? {} : { workspaceRuntimeIds: Object.fromEntries(workspace.items.map(item =>
+        [item.workspaceId, this.externalOwners.get(item.workspaceId)?.runtime.runtimeId ?? this.baseRuntimeId])) }),
+      ...(this.computerGroups === undefined || !this.groupComputers ? {} : { computerGroups: this.computerGroups }),
+      ...(this.directoryState === undefined ? {} : { directoryState: this.directoryState }),
       archivedSessionIds: workspace.archivedSessionIds,
-      pinnedSessionIds: workspace.pinnedSessionIds.map(key),
+      pinnedSessionIds: [...workspace.pinnedSessionIds.map(key), ...[...this.foreignPins].filter(([target]) =>
+        this.computerGroups?.some(group => runtimeTargetKey(group.runtime) === target)).flatMap(([, ids]) => ids)],
       ...(workspace.archiveRevision === undefined ? {} : { archiveRevision: workspace.archiveRevision }),
       state: workspace.state,
       phase: workspace.phase,
       error: workspace.error,
       baselinesReady,
+      ...(this.list.getSnapshot().initialSelectionPending === true ? { initialSelectionPending: true as const } : {}),
       recentWorkspaceId: baselinesReady ? recentWorkspace(workspace.items, sessions.byId) : undefined,
     })
   }

@@ -1,4 +1,5 @@
 /** The public configuration applier restarts an isolated real Gateway and confirms its new revision. */
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -15,7 +16,7 @@ import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.t
 import { PostgresMaintenanceService } from '../src/postgres/maintenance-service.ts'
 import { NodeConfigurationStore, readNodeConfiguration } from '../src/node-config-store.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 const execute = promisify(execFile)
 const sourceEntry = resolve(import.meta.dirname, '../src/index.ts')
@@ -32,7 +33,6 @@ async function freePort(): Promise<number> {
 
 describePg('independent node configuration process', () => {
   beforeAll(async () => {
-    if (!/(_test|_accept|_acceptance)(\?|$)/u.test(databaseUrl!)) throw new Error('disposable PostgreSQL database required')
     directory = await mkdtemp(join(tmpdir(), 'hgw-node-process-'))
     pool = createPostgresPool(databaseUrl!, { max: 3 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
@@ -51,6 +51,8 @@ describePg('independent node configuration process', () => {
       HGW_PROJECT_RUNTIMES_ROOT: join(directory, 'project-runtimes'), HGW_DEFAULT_ENV_FILE: '',
       HGW_NODE_HEARTBEAT_MS: '100', HGW_READINESS_TIMEOUT_MS: '4000',
       TSX_TSCONFIG_PATH: resolve(import.meta.dirname, '../tsconfig.run.json'), PATH: `${bin}:${process.env.PATH ?? ''}` })
+    const installedEnvironment = join(directory, 'service-environment.json')
+    await writeFile(installedEnvironment, JSON.stringify(env), { mode: 0o600 })
     const driver = join(directory, 'service.mjs')
     await writeFile(driver, `import { spawn } from 'node:child_process';
 import { readFile, writeFile, open } from 'node:fs/promises';
@@ -67,7 +69,7 @@ if (previous) {
 if (process.argv.includes('stop-owned-fixture')) process.exit(0);
 const log = await open(${JSON.stringify(join(directory, 'gateway.log'))}, 'a', 0o600);
 const child = spawn(process.execPath, ['--import', ${JSON.stringify(import.meta.resolve('tsx/esm'))}, ${JSON.stringify(sourceEntry)}],
- { cwd: ${JSON.stringify(resolve(import.meta.dirname, '..'))}, env: process.env, detached: true, stdio: ['ignore', log.fd, log.fd] });
+ { cwd: ${JSON.stringify(resolve(import.meta.dirname, '..'))}, env: JSON.parse(await readFile(${JSON.stringify(installedEnvironment)}, 'utf8')), detached: true, stdio: ['ignore', log.fd, log.fd] });
 await writeFile(pidFile, String(child.pid), { mode: 0o600 }); child.unref(); await log.close();
 `, { mode: 0o600 })
     const wrapper = `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(driver)} "$@"\n`
@@ -94,8 +96,8 @@ await writeFile(pidFile, String(child.pid), { mode: 0o600 }); child.unref(); awa
   it('switches the actual listener only after a node-bound request and quiesced maintenance', async () => {
     const cfg = testConfig(directory, env), context = await resolvePostgresRuntimeContext(pool, cfg.organizationSlug, cfg.computeNodeName)
     const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs), store = new NodeConfigurationStore(context, cfg, env, nodeConfigurationAuthority(context))
-    const initial = await store.view(), nextPort = await freePort()
-    await store.save(context, initial.revision, { ...initial.desired, HGW_PORT: String(nextPort) })
+    const initial = await store.view(1), nextPort = await freePort()
+    await store.save(context, initial.revision, { ...initial.desired, HGW_PORT: String(nextPort) }, 1)
     await store.requestApply(context, 1, 1)
     await maintenance.enterMaintenance(null, 'configuration acceptance')
     await vi.waitFor(async () => { expect((await maintenance.state()).writersQuiesced).toBe(true) }, { timeout: 5000 })
@@ -114,12 +116,12 @@ await writeFile(pidFile, String(child.pid), { mode: 0o600 }); child.unref(); awa
 
   it('rejects an occupied port before publishing the candidate and leaves the existing Gateway healthy', async () => {
     const cfg = testConfig(directory, env), context = await resolvePostgresRuntimeContext(pool, cfg.organizationSlug, cfg.computeNodeName)
-    const store = new NodeConfigurationStore(context, cfg, env, nodeConfigurationAuthority(context)), previous = await store.view()
+    const store = new NodeConfigurationStore(context, cfg, env, nodeConfigurationAuthority(context)), previous = await store.view(1)
     const occupied = createServer()
     await new Promise<void>(ready => { occupied.listen(0, '127.0.0.1', ready) })
     const port = (occupied.address() as AddressInfo).port
     try {
-      await store.save(context, previous.revision, { ...previous.desired, HGW_PORT: String(port) })
+      await store.save(context, previous.revision, { ...previous.desired, HGW_PORT: String(port) }, 1)
       await store.requestApply(context, previous.revision + 1, 1)
       await expect(execute(process.execPath, ['--import', import.meta.resolve('tsx/esm'), configEntry, 'apply'], { env, timeout: 20_000 }))
         .rejects.toMatchObject({ code: 1, killed: false, stdout: expect.stringContaining('configuration-port-unavailable') })
