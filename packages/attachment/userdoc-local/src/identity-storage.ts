@@ -251,8 +251,10 @@ export class DocumentIdentityStorage {
    * @returns after the marker rewrites to persistent descriptors; volume-less hosts and refuted witnesses throw.
    */
   async recoverDomainMount(rootId: UserDocRootId): Promise<void> {
+    /* v8 ignore start -- the recovery body requires a POSIX volume id; win32 lanes can only reach the refusal. */
     if (this.state.volume === undefined) throw new Error('Mount recovery requires persistent filesystem UUIDs.')
     await this.bindDomain(rootId, false, true)
+    /* v8 ignore stop */
   }
 
   /**
