@@ -29,6 +29,7 @@ describePg('PostgreSQL digest model administration', () => {
       const actor = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
         VALUES($1,'administrator','Administrator','/unused') RETURNING id,public_id`, [organizationId])).rows[0]!
       await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [organizationId, actor.id])
+      await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [actor.id])
       const provider = (await pool.query<{ id: string }>(`INSERT INTO harness.model_providers(organization_id,provider_key,display_name,protocol,base_url,auth_mode,status)
         VALUES($1,'org-shared','Fixture provider','openai-completions','https://provider.invalid/v1','none','enabled') RETURNING id`, [organizationId])).rows[0]!.id
       for (const model of ['own-model', 'space model']) await pool.query(`INSERT INTO harness.model_catalog(organization_id,provider_key,model_key,display_name,provider_id)

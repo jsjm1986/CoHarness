@@ -64,7 +64,7 @@ try {
         await transfer()
         if (change === 'readonly-member') await projects.setMember(project.id, actor.id, 'ro', keeper.id)
       }
-      const collaboration = new PostgresCollaborationService(context), entered = Promise.withResolvers(), gate = Promise.withResolvers()
+      const collaboration = new PostgresCollaborationService(context, context.nodeId), entered = Promise.withResolvers(), gate = Promise.withResolvers()
       release = () => gate.resolve()
       const holder = operation === 'detail' ? collaboration : projects
       const key = operation === 'list' ? 'getByIds' : operation === 'detail' ? 'projectForUser'

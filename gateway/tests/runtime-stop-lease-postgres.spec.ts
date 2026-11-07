@@ -39,6 +39,7 @@ describePg('process-owned destructive Runtime operations', () => {
     const user = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
       VALUES($1,'actor','Actor',$2) RETURNING id,public_id`, [organizationId, root])).rows[0]!
     await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [organizationId, user.id])
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [user.id])
     await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)',
       [organizationId, context.nodeId, user.id])
     const project = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.projects(organization_id,name)

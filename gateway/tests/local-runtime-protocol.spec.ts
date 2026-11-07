@@ -58,6 +58,6 @@ it('does not accept a UUID delivered after startup cancellation', async () => {
 })
 
 it('refuses an unsupported host without accepting a kernel identity', async () => {
-  Object.defineProperty(process, 'platform', { ...platform, value: 'win32' })
-  await expect(localKernelBootId()).rejects.toThrow('Recoverable local runtime ownership is unsupported on win32')
+  Object.defineProperty(process, 'platform', { ...platform, value: 'freebsd' })
+  await expect(localKernelBootId()).rejects.toThrow('Recoverable local runtime ownership is unsupported on freebsd')
 })

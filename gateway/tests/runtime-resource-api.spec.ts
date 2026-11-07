@@ -43,7 +43,7 @@ describePg('Runtime resource HTTP admission', () => {
 
   async function stewardFixture() {
     const f = await fixture()
-    await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [f.project.uuid])
+    await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [f.project.uuid, f.context.nodeId])
     await pool.query('DELETE FROM harness.project_members WHERE project_id=$1', [f.project.uuid])
     const otherNode = (await pool.query<{ id: string }>(`INSERT INTO harness.compute_nodes(organization_id,name)
       VALUES($1,'Other Steward computer') RETURNING id`, [f.organizationId])).rows[0]!.id

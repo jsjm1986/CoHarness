@@ -51,6 +51,7 @@ try {
         const owner = await users.create({ username: 'archive-owner', password: 'pw-12345678', role: 'admin' })
         const actor = await users.create({ username: 'administrator', password: 'pw-12345678', role: 'admin' })
         await users.changeOwnPassword(actor.id, 'pw-12345678')
+        await users.changeOwnPassword(owner.id, 'pw-12345678')
         repository = new PostgresInstanceRepository(context, cfg.instancePortBase)
         manager = phase === 'queued-start' ? new InstanceManager(repository, cfg, { launch: async () => { launchAttempts += 1; throw new Error('Withdrawn archive reader attempted Runtime dispatch') } }) : new InstanceManager(repository, cfg)
         await manager.stateOf(owner.id)

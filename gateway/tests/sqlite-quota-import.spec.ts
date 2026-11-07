@@ -25,6 +25,7 @@ async function fixture() {
   try {
     const users = new UserService(db, testConfig(root))
     const admin = await users.create({ username: 'administrator', password: 'pw-12345678', role: 'admin' })
+    await users.changeOwnPassword(admin.id, 'pw-12345678')
     const target = await users.create({ username: 'member', password: 'pw-12345678' })
     const governance = new ModelGovernanceService(db)
     governance.setQuota('role', 'user', 50, 90)

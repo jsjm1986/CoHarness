@@ -50,6 +50,7 @@ try {
     HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE_NAME: name, HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)) })
   const cfgA = configuration('computer-a'), cfg = configuration('computer-b'), usersA = new PostgresUserService(a, cfgA)
   const admin = await usersA.create({ username: 'administrator', password: 'pw-12345678', role: 'admin' })
+  await usersA.changeOwnPassword(admin.id, 'pw-12345678')
   const user = await usersA.create({ username: 'executor', password: 'pw-12345678' })
   const stranger = await usersA.create({ username: 'stranger', password: 'pw-12345678' })
   const repositoryA = new PostgresInstanceRepository(a, cfgA.instancePortBase), repositoryB = new PostgresInstanceRepository(b, cfg.instancePortBase)

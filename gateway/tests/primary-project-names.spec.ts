@@ -31,6 +31,7 @@ it.skipIf(!url)('grants the same opaque name to exact authorized callers and con
     const file=join(dir,'keys')
     const users=new PostgresUserService(ctx,testConfig(dir))
     const actor=await users.create({username:'operator',password:'fixture-pass-234',role:'admin'})
+    await users.changeOwnPassword(actor.id,'fixture-pass-235')
     const foreign=await users.create({username:'other',password:'fixture-pass-345'})
     const key=randomBytes(32)
     await writeFile(file,JSON.stringify({version:1,organizationId:org,ownerNodeId:one,keys:{first:key.toString('base64')}}),{mode:0o600})

@@ -866,7 +866,9 @@ jobs:
       # tsconfig paths instead.
       - name: Build Gateway
         run: npm run build:check --prefix gateway
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Build private PostgreSQL maintenance adapters
+        timeout-minutes: 5
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
           HGW_GATEWAY_LIB_DIR: ../lib-ci/gateway/src
@@ -903,7 +905,9 @@ jobs:
           docker pull postgres:17.6-bookworm
           node tests/run-node-content-postgres.mjs
         working-directory: gateway
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Test peer takeover recovery on disposable volumes
+        timeout-minutes: 5
         run: |
           command -v restic || sudo apt-get install -y --no-install-recommends restic
           HGW_TEST_RESTIC="$(command -v restic)" node tests/run-node-content-postgres.mjs --recovery

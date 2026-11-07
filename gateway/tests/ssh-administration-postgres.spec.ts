@@ -31,6 +31,7 @@ describePg('PostgreSQL SSH administrator and project sharing authority', () => {
         const account = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
           VALUES($1,$2::text,$2::text,'/unused') RETURNING id,public_id`, [organizationId, role])).rows[0]!
         await pool.query('INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,$3)', [organizationId, account.id, role])
+        await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [account.id])
         accounts.push(account)
       }
       const admin = accounts[0]!, owner = accounts[1]!, actorId = Number(admin.public_id), ownerId = Number(owner.public_id)

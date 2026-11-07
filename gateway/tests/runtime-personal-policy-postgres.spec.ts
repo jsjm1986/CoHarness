@@ -137,7 +137,7 @@ describePg('PostgreSQL personal Runtime policy', () => {
     const f = await fixture()
     try {
       const project = (await pool.query<{ id: string; public_id: string }>(
-        "INSERT INTO harness.projects(organization_id,name,kind) VALUES($1,'Reserved control','steward') RETURNING id,public_id", [f.context.organizationId],
+        "INSERT INTO harness.projects(organization_id,name,kind,steward_node_id) VALUES($1,'Reserved control','steward',$2) RETURNING id,public_id", [f.context.organizationId, f.context.nodeId],
       )).rows[0]!
       await pool.query('INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path) VALUES($1,$2,$3,$4,$4)',
         [f.context.organizationId, project.id, f.context.nodeId, f.root])

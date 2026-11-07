@@ -31,7 +31,9 @@ it.skipIf(!database)('refuses to revive a retired placed Runtime or change its u
       await tx.query('UPDATE harness.runtime_environments SET retired_at=NULL WHERE id=$1',[runtime])
       await expect(tx.query(NODE_CONTENT_RESTORE_SUFFIX)).rejects.toThrow(/project writer epoch/u)
       await tx.query('ROLLBACK TO same_assignment')
-      // pg_restore loads table data before recreating application triggers.
+      // pg_restore loads table data before recreating application triggers;
+      // the deferred placement-origin check must fire before triggers can drop.
+      await tx.query('SET CONSTRAINTS ALL IMMEDIATE')
       await tx.query('ALTER TABLE harness.project_content_placement DISABLE TRIGGER USER')
       await tx.query('DELETE FROM harness.project_content_placement WHERE runtime_id=$1',[runtime])
       await tx.query('ALTER TABLE harness.project_content_placement ENABLE TRIGGER USER')

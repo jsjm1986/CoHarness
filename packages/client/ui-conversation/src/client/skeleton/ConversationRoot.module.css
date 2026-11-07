@@ -1043,7 +1043,7 @@
   text-overflow: ellipsis;
 }
 .pendingStatus[data-intent-phase='unavailable'], .pendingStatus[data-intent-phase='denied'] {
-  color: var(--dsw-alias-state-critical);
+  color: var(--dsw-alias-state-error-primary);
 }
 .pendingSpinner {
   box-sizing: border-box;
@@ -1052,6 +1052,7 @@
   border: 2px solid var(--dsw-alias-state-business-primary);
   border-top-color: transparent;
   border-radius: 50%;
+  corner-shape: round;
   animation: pendingSpin 0.8s linear infinite;
 }
 @keyframes pendingSpin { to { transform: rotate(360deg); } }

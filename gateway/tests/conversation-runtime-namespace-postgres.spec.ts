@@ -33,6 +33,7 @@ describePg('Runtime-qualified PostgreSQL Session storage', () => {
       const user = (await pool.query<{ id: string; public_id: string }>("INSERT INTO harness.users(organization_id,username,display_name,home_path) VALUES($1,'owner','Owner','/tmp/session-owner') RETURNING id,public_id", [organizationId])).rows[0]!
       const other = (await pool.query<{ id: string; public_id: string }>("INSERT INTO harness.users(organization_id,username,display_name,home_path) VALUES($1,'participant','Participant','/tmp/participant') RETURNING id,public_id", [organizationId])).rows[0]!
       await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role,status) VALUES($1,$2,'member','active'),($1,$3,'member','active')", [organizationId, user.id, other.id])
+      await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false),($2,'fixture',false)", [user.id, other.id])
       for (const computerIndex of organizationIndex === 0 ? [0, 1] : [0]) {
         const label = `organization-${organizationIndex}-computer-${computerIndex}`
         const nodeId = (await pool.query<{ id: string }>("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2) RETURNING id", [organizationId, label])).rows[0]!.id

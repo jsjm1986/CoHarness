@@ -1346,7 +1346,7 @@ describe('gateway server', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ projects: [{ projectId: 991, nodeName: 'Ubuntu', canManage: true,
       owner: { id: 1, username: 'root-admin' }, origin: 'user' }] })
-    expect(deps.projects.getByIds).toHaveBeenCalledWith([991], 'directory')
+    expect(deps.projects.getByIds).toHaveBeenCalledWith([991])
     expect(details).not.toHaveBeenCalled()
   })
 

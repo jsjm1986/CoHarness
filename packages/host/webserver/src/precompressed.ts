@@ -82,22 +82,27 @@ export function precompressBody(
 }
 
 /**
- * Accept-Encoding codings the client advertised, in client preference order,
- * restricted to the codings a {@link PrecompressedBody} can serve.
+ * Accept-Encoding codings the client advertised, quality-ordered with server
+ * preference breaking ties, restricted to the codings a {@link PrecompressedBody}
+ * can serve.
  * @param acceptEncoding - the request's `accept-encoding` header value.
  * @returns supported codings best-first (empty: serve identity).
  */
 export function acceptableEncodings(acceptEncoding: string | string[] | undefined): PrecompressedCoding[] {
   if (acceptEncoding === undefined) return []
   const value = Array.isArray(acceptEncoding) ? acceptEncoding.join(', ') : acceptEncoding
-  return new Negotiator({ headers: { 'accept-encoding': value } }).encodings(['br', 'gzip']) as PrecompressedCoding[]
+  // @types/negotiator omits the maintained 1.0 encoding-preference option.
+  const negotiator = new Negotiator({ headers: { 'accept-encoding': value } }) as Negotiator & {
+    encodings(available: readonly string[], options?: { preferred: readonly string[] }): string[]
+  }
+  return negotiator.encodings(['br', 'gzip'], { preferred: ['br', 'gzip'] }) as PrecompressedCoding[]
 }
 
 /**
  * Pick the best settled variant for one request's Accept-Encoding header.
- * The server prefers Brotli over gzip among the codings the client accepted
- * (a `q=0` exclusion is honored; quality ordering is not), and a preferred
- * coding still compressing falls through to a ready one or identity.
+ * Client quality ordering wins; equal-quality codings prefer Brotli over gzip
+ * (matching the socket compression middleware), and a preferred coding still
+ * compressing falls through to a ready one or identity.
  * @param body - the immutable body and its background variants.
  * @param acceptEncoding - the request's `accept-encoding` header value.
  * @returns the ready { coding, body } best matching the client's acceptance,
@@ -107,9 +112,7 @@ export function selectVariant(
   body: PrecompressedBody,
   acceptEncoding: string | string[] | undefined,
 ): { coding: PrecompressedCoding; body: Promise<Buffer> } | undefined {
-  const accepted = new Set(acceptableEncodings(acceptEncoding))
-  for (const coding of ['br', 'gzip'] as const) {
-    if (!accepted.has(coding)) continue
+  for (const coding of acceptableEncodings(acceptEncoding)) {
     const variant = body.variant(coding)
     if (variant !== undefined) return { coding, body: variant }
   }
