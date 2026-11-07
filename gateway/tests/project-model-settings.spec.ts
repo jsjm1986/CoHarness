@@ -52,7 +52,7 @@ async function setup() {
     namespaces: [{ ns: 'llm-pi-ai' as const, schema: {}, value: { providers: {} }, base: { providers: {} }, user: { providers: {} }, applies: 'live' as const, secrets: [], revision: 1 }],
     providers: [], models: { groups: [], failures: [] },
   })
-  const governance = {
+  const governance = Object.assign({} as GatewayModelGovernanceService, {
     policyForProject: vi.fn(async () => ({ version: 1, defaultAllowed: false, models: [], providers: [] })),
     issueIntakeToken: vi.fn(async () => 'token'),
     subjectForIntakeToken: vi.fn(async () => ({ kind: 'project' as const, id: project.id })),
@@ -66,7 +66,7 @@ async function setup() {
     describeProjectCredentials: vi.fn(async (_id: number, refs: string[]) => Object.fromEntries(refs.map(ref => [ref, { configured: false, source: 'project' as const, writable: true as const }]))),
     setProjectCredential: vi.fn(async () => {}), unsetProjectCredential: vi.fn(async () => {}),
     discoverProjectModels: vi.fn(async () => []),
-  } as unknown as GatewayModelGovernanceService
+  })
   const deps: GatewayDeps = {
     cfg, auth: new AuthService(db, cfg), users, projects, collaboration,
     audit: new AuditService(db), instances: new InstanceManager(db, cfg), governance,

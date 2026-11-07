@@ -260,9 +260,6 @@
   "gateway/tests/port-allocation.spec.ts": {
     "1e1b7628047614ed41d5cb4b05c630ba7c3e66625c4fabe99995d40a27026cc8": 5
   },
-  "gateway/tests/project-model-settings.spec.ts": {
-    "f82a4f6b409fadf03fb568e1333ead8ffb919763ce08cc47eea330b21441ed1d": 1
-  },
   "gateway/tests/push-notifications.spec.ts": {
     "144911224fd9123c853aa8087c87b24791fcb7009abfcfa3f08c674066dafcec": 1,
     "745d9e0c797a3a0ea3814f285f95a52b15f5095a8bc83c47c192aa8c1f8c18bc": 1,
@@ -1591,13 +1588,12 @@
   "packages/host/apiproxy/src/api/sessions.schema.ts": {
     "27fbe0348a5438286ab8ff517ede7d36a2cc71934edc9bc14df136c060c4f34b": 1,
     "386b11e2992514574875eed187aae50c3a5708e0c287646a6720bbe33fe62301": 1,
-    "40e66e60e5d5d8384efc6b2913bd540ab7a2b73bf5ad9271edb164d4902a566f": 1,
     "5bbe9bdd82c0ab07ec12a4157ba2a5a9fa69940108c953b7fba4c17fd230e7f0": 1,
     "634ea12b67c444379693ac225d25f8e1ddd41da78a2d456a35e338cdcacaef6a": 1,
     "893eba2a3a0cb7242bc9060dc83316b79b7d3415c755f82d975acbc532244015": 1,
     "a288679a4dcd49ed1fea620d9f3442c1f518406ad8d2d49dba1fafe8a45fbcbd": 1,
     "c91242106532428ca88ceb95e4b0632e7220fb992224bc740f1f21a1fad42e99": 1,
-    "de07da784fbcd6aa63ca9178f06d4e4af9884002e44c17fe236ad13fc43c3b5f": 7
+    "de07da784fbcd6aa63ca9178f06d4e4af9884002e44c17fe236ad13fc43c3b5f": 6
   },
   "packages/host/apiproxy/src/api/settings.schema.ts": {
     "08b803bf05a9d71f47634f544b97173af12049462a1913c555dd7a3c2a66e04f": 1

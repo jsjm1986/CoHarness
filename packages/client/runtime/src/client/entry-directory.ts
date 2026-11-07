@@ -38,7 +38,7 @@ function environments(input: unknown, account: number): { entries: Environment[]
       || typeof node.status !== 'string' || typeof owner.name !== 'string' || typeof owner.id !== 'number' || !Number.isSafeInteger(owner.id)
       || (owner.kind !== 'personal' && owner.kind !== 'project')) throw new Error('Invalid authorized Runtime')
     if (owner.kind === 'personal' && owner.id !== account) continue
-    const location = { runtimeId: row.id, nodeId: node.id as unknown as NonNullable<SessionRuntimeTarget['nodeId']>, nodeName: node.name }
+    const location = { runtimeId: row.id, nodeId: String(node.id) as NonNullable<SessionRuntimeTarget['nodeId']>, nodeName: node.name }
     const target: SessionRuntimeTarget = owner.kind === 'personal' ? { kind: 'personal', ...location }
       : { kind: 'project', projectId: owner.id, projectName: row.metadataOnNode === true ? `#${owner.id}` : owner.name, ...location }
     entries.push({ target, status: node.status, observedState: row.observedState,

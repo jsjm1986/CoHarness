@@ -118,7 +118,7 @@ describe('discoverModelsAtEndpoint', () => {
     const fetch = vi.fn(async () => new Response(new ReadableStream({ cancel: cancelled }), { status: 302, headers: { location } }))
     vi.stubGlobal('fetch', fetch)
     await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example', apiKey: 'synthetic-key', headers: { 'x-route-secret': 'synthetic-header' } }))
-      .rejects.toMatchObject({ code: 'DISCOVERY_FAILED', message: expect.stringContaining('configured origin') as unknown })
+      .rejects.toMatchObject({ code: 'DISCOVERY_FAILED', message: expect.stringContaining('configured origin') })
     expect(fetch).toHaveBeenCalledOnce()
     expect(cancelled).toHaveBeenCalledOnce()
   })
@@ -127,7 +127,7 @@ describe('discoverModelsAtEndpoint', () => {
     const cancelled = vi.fn(), fetch = vi.fn(async () => new Response(new ReadableStream({ cancel: cancelled }), { status: 302, headers: { location: '/models' } }))
     vi.stubGlobal('fetch', fetch)
     await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example' })).rejects.toMatchObject({
-      code: 'DISCOVERY_FAILED', message: expect.stringContaining('redirect limit') as unknown,
+      code: 'DISCOVERY_FAILED', message: expect.stringContaining('redirect limit'),
     })
     expect(fetch).toHaveBeenCalledTimes(21)
     expect(cancelled).toHaveBeenCalledTimes(21)
@@ -145,7 +145,7 @@ describe('discoverModelsAtEndpoint', () => {
     const cancelled = vi.fn()
     stubResponse(new Response(new ReadableStream({ cancel: cancelled }), { status: 302, headers: { location: 'http://[' } }))
     await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example' })).rejects.toMatchObject({
-      code: 'DISCOVERY_FAILED', cause: expect.any(TypeError) as unknown,
+      code: 'DISCOVERY_FAILED', cause: expect.any(TypeError),
     })
     expect(cancelled).toHaveBeenCalledOnce()
     vi.unstubAllGlobals()

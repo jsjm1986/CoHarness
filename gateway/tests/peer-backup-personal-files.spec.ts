@@ -18,8 +18,8 @@ describe('personal file recovery',()=>{
     const binding={organizationId:randomUUID(),sourceNodeId:randomUUID(),targetNodeId:randomUUID(),policyId:randomUUID(),scopeId:runtime,revision:1}
     const limits={maxBytes:4<<20,maxRows:100},signal=AbortSignal.timeout(20000)
     let generation='2',released=0
-    const control={query:async(sql:string)=>sql.includes('SELECT FROM harness.node_user_accounts')?{rows:[],rowCount:0}:
-      {rows:[{account,username:'a',home,layout:'isolated',generation}],rowCount:1}} as unknown as Queryable
+    const control=Object.assign({} as Queryable,{query:async(sql:string)=>sql.includes('SELECT FROM harness.node_user_accounts')?{rows:[],rowCount:0}:
+      {rows:[{account,username:'a',home,layout:'isolated',generation}],rowCount:1}})
     try {
       for(const path of [join(owned,'sessions'),join(owned,'storages'),foreign,work,stage])await mkdir(path,{recursive:true})
       await writeFile(join(owned,'sessions','same.jsonl'),'original committed session\n')

@@ -35,7 +35,7 @@ export class PeerSnapshotOwner implements PeerBackupExporter {
     payload: string,
     signal: AbortSignal,
     capture?: PeerCapture,
-  ) {
+  ): Promise<unknown> {
     if (
       !isAbsolute(this.executable) ||
       (await realpath(this.executable)) !== resolve(this.executable) ||
@@ -70,7 +70,7 @@ export class PeerSnapshotOwner implements PeerBackupExporter {
         signal,
         128 * 1024,
       )
-      return JSON.parse(stdout) as unknown
+      return JSON.parse(stdout)
     } catch {
       signal.throwIfAborted()
       throw new PeerBackupError(503, 'peer-backup/snapshot-owner-unavailable')

@@ -144,7 +144,7 @@ describePg('recovery retreat resolution', () => {
 
   /** A volume whose fence query returns the given row; the retreat resolver issues exactly one volume read. */
   function volume(fence?: { schedule_digest: string; files_digest: string; generation: number; stop_operation_id: string }) {
-    const tx = { query: async () => ({ rows: fence === undefined ? [] : [fence] }) } as unknown as PoolClient
+    const tx = Object.assign({} as PoolClient, { query: async () => ({ rows: fence === undefined ? [] : [fence] }) })
     return {
       readVolume: async <T>(work: (db: PoolClient) => Promise<T>) => work(tx),
       writeVolume: async <T>(work: (db: PoolClient) => Promise<T>) => work(tx),

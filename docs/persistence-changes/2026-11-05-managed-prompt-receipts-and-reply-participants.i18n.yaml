@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-05-managed-prompt-receipts-and-reply-participants.md
 document:
-  en: 29d4fd8e70bb6257c343be76ea4bd71fac3ff5c7
-  zh: f61252c3e84399a9ee09217afe709f698bdc7606
+  en: b9f914708777dcc47164974e1d8d16be09182392
+  zh: ebcf8783101af2db0729b95ceb60c34577dcc8c2
 /:
   en: 3d5a424ae7d7e46b
   zh: c22a8e4a62d8cc1a

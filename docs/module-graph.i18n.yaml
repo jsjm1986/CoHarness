@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/module-graph.md
 document:
-  en: 741c08d6f6ffeba39c320078e5f6670fd21920bd
-  zh: 2ada323c46de1b0c129556fb506baaa5ce48c860
+  en: 9b65cbc16b2a427a28efdcb979e2f39263c1284f
+  zh: 2aaed1b70a715396af702cf833a3f8f01b13e90d
 /:
   en: 6b06a1af5ffbdefb
   zh: 3718d990c23682de

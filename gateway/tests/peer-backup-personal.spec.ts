@@ -19,7 +19,7 @@ it.each([1, 2, 3])('projects scoped personal WAL data and draft recovery for sou
     revision: 1,
   }
   const owner = 412
-  const control = { query: async () => ({ rows: [{ public_id: String(owner) }], rowCount: 1 }) } as unknown as Queryable
+  const control = Object.assign({} as Queryable, { query: async () => ({ rows: [{ public_id: String(owner) }], rowCount: 1 }) })
   const output = join(root, 'payload')
   const exporter = new PeerPersonalExporter(control, root, { maxBytes: 4 << 20, maxRows: 100, reserveBytes: 1 << 20 })
   await mkdir(join(root, 'personal-directory'))

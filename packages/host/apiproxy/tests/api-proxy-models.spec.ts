@@ -824,7 +824,7 @@ it('verifies the exact durable inbox event while later Session events commit, an
         get(target, prop): unknown {
           if (prop === 'read') return read
           if (prop === 'close') return close
-          return Reflect.get(target, prop, target) as unknown
+          return Reflect.get(target, prop, target)
         },
       })
     })

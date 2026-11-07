@@ -16,7 +16,7 @@ export const imageMediaTypeSchema = z.union([
 export const promptContentPartSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string() }),
   z.object({ type: z.literal('image'), mediaType: imageMediaTypeSchema, data: z.string(), name: z.string().optional() }),
-  z.object({ type: z.literal('document'), docId: z.string().min(1) as unknown as z.ZodType<UserDocIdType> }),
+  z.object({ type: z.literal('document'), docId: z.string().min(1).transform((value): UserDocIdType => value as UserDocIdType) }),
 ])
 
 /**

@@ -9,11 +9,11 @@ import { OperationTimings, observeOperationSql, timeOperation } from '../src/ope
 it('preserves callback and promise results and bounds the operation ring without storing the request or SQL',async()=>{
   const ring=new OperationTimings(2)
   const secret='private-customer-title'
-  const db={query(_sql:string,callback?: (err:null,value:number)=>void) {
+  const db=Object.assign({} as PoolClient,{query(_sql:string,callback?: (err:null,value:number)=>void) {
     if(callback) {callback(null,7);return}
     return Promise.resolve(8)
-  }}
-  observeOperationSql(db as unknown as PoolClient,'content')
+  }})
+  observeOperationSql(db,'content')
   const http=createServer((req,res)=>{ void ring.run(req,res,async()=>{
     await timeOperation('authorize',async()=>{
       await new Promise<void>(done=>db.query(secret,(_e,result)=>{expect(result).toBe(7);done()}))

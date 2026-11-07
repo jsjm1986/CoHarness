@@ -551,7 +551,7 @@ export async function readVerifiedPeerManagedFiles(
     stat = await lstat(file)
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 16 * 1024 * 1024)
     throw new PeerBackupError(409, 'peer-backup/invalid-file-manifest')
-  const raw = JSON.parse(await readFile(file, 'utf8')) as unknown
+  const raw: unknown = JSON.parse(await readFile(file, 'utf8'))
   const envelope = z
     .object({ platform: z.enum(['win32', 'posix']), snapshot: z.unknown() })
     .strict()

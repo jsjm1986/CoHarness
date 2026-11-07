@@ -1,4 +1,4 @@
--- Preserve the source identity and catalogue provenance when an approved account's existing directory stays in place.
+-- Preserve the source identity and catalogue metadata when an approved account's existing directory stays in place.
 ALTER TABLE node_content.document_entries ADD COLUMN previously_legacy boolean;
 CREATE TABLE node_content.personal_document_imports(
   organization_id uuid NOT NULL,node_id uuid NOT NULL,user_id uuid NOT NULL,root_id uuid PRIMARY KEY,volume_id uuid NOT NULL,

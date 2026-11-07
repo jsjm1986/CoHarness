@@ -378,7 +378,7 @@ export const sessionPromptRequestSchema = z.object({
   requestId: rpcIdSchema.optional(),
   durable: z.literal(true).optional(),
 }).refine(input => input.durable !== true || (input.requestId !== undefined && input.requestId.length > 0 && input.requestId.length <= 256),
-  { message: 'durable prompt admission requires a bounded requestId' }) as unknown as z.ZodType<RequestPayload<'session.prompt'>>
+  { message: 'durable prompt admission requires a bounded requestId' })
 
 /** Receipt lookup for one immutable browser intent in the authenticated Session. */
 export const sessionPromptStatusRequestSchema = z.object({ sessionId: sessionIdSchema, requestId: rpcIdSchema.refine(id => id.length > 0 && id.length <= 256), confirmInput: z.literal(true).optional() }) satisfies z.ZodType<Wire<RequestPayload<'session.promptStatus'>>>
