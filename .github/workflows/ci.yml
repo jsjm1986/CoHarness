@@ -862,6 +862,11 @@ jobs:
           HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_dump"]'
           HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_restore"]'
         run: npm run test:postgres --prefix gateway
+      - name: Test node content volumes on a disposable cluster
+        run: |
+          docker pull postgres:17.6-bookworm
+          node tests/run-node-content-postgres.mjs
+        working-directory: gateway
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence

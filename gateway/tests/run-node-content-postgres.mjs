@@ -80,7 +80,7 @@ try {
   const governanceUrl = url.href
   url.pathname = '/hgw_node_content_test'
   const suites=[activity?'tests/node-resource-budget-postgres.spec.ts':recovery?'tests/peer-backup-takeover-postgres.spec.ts':'tests/node-content-postgres.spec.ts']
-  if (!activity && !recovery) suites.push('tests/archive-pool-postgres.spec.ts')
+  if (!activity && !recovery) suites.push('tests/archive-pool-postgres.spec.ts', 'tests/node-content-discard-postgres.spec.ts')
   if (legacy) suites.push('tests/conversation-runtime-namespace-postgres.spec.ts','tests/execution-runtime-isolation-postgres.spec.ts',
     'tests/project-activity-postgres.spec.ts','tests/project-progress-postgres.spec.ts')
   const command=operations?[join(gateway,'tests/run-built-node-service.mjs')]:entry?[join(gateway,'tests/fixtures/physical-project-gateway.mjs')]:
