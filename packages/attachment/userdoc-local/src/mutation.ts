@@ -98,12 +98,38 @@ export class DocumentMutationExecutor {
     return withFileLock(this.storage.mutationPath, async () => {
       if (!this.initialized) {
         await admitDocumentWrite(this.admit, async () => {
-          await this.storage.bindDomain(this.store.rootId)
-          this.store.bindStorage(this.storage.binding)
+          try {
+            await this.storage.bindDomain(this.store.rootId)
+          } catch (conflict) {
+            try {
+              await this.storage.recoverDomainMount(this.store.rootId)
+            } catch {
+              throw conflict
+            }
+          }
+          try {
+            this.store.bindStorage(this.storage.binding)
+          } catch (conflict) {
+            try {
+              this.store.recoverMount(this.storage.binding)
+            } catch {
+              throw conflict
+            }
+          }
           await ensureIdentityDirectory(this.storage, 'anchors')
         })
         this.initialized = true
-      } else await this.storage.bindDomain(this.store.rootId, false)
+      } else {
+        try {
+          await this.storage.bindDomain(this.store.rootId, false)
+        } catch (conflict) {
+          try {
+            await this.storage.recoverDomainMount(this.store.rootId)
+          } catch {
+            throw conflict
+          }
+        }
+      }
       return operation()
     })
   }

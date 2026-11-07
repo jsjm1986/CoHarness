@@ -116,8 +116,21 @@ export class DocumentIdentityFs {
         const version = database.prepare('PRAGMA user_version').get()?.user_version
         if (version === 2 || version === 3) {
           const legacy = new DocumentIdentityStore(root, database, 'read')
-          legacy.verifyLegacyStorage(storage.binding)
-          await storage.bindDomain(legacy.rootId)
+          try {
+            legacy.verifyLegacyStorage(storage.binding)
+          } catch (conflict) {
+            if (!(conflict instanceof DocumentIdentityConflict)) throw conflict
+            legacy.verifyLegacyStorage(storage.binding, true)
+          }
+          try {
+            await storage.bindDomain(legacy.rootId)
+          } catch (conflict) {
+            try {
+              await storage.recoverDomainMount(legacy.rootId)
+            } catch {
+              throw conflict
+            }
+          }
         }
         const store = new DocumentIdentityStore(root, database)
         return new DocumentIdentityFs(root, database, new DocumentMutationExecutor(storage, store, admit), storage)

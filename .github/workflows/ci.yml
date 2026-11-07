@@ -538,6 +538,13 @@ jobs:
       # for the full graph the gateway typecheck lane compiles, and the runtime
       # package step recreates the gateway/node_modules links exactly as
       # build-production does for a standalone release.
+      # Scoped consumer specs load the flock and directory bindings lazily
+      # even when the compiled-Gateway lane is skipped, so the host addon
+      # build stays unconditional while the library build below remains
+      # scoped to gateway_mode == 'full'.
+      - name: Build the native addon the scoped consumer specs require
+        run: pnpm run build:native-system
+
       - name: Build the workspace libraries and native addon the compiled Gateway consumes
         if: needs.pr-scope.outputs.gateway_mode == 'full'
         run: pnpm run build:native-system && pnpm run build:lib:host
