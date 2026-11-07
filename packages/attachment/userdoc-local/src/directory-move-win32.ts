@@ -65,14 +65,14 @@ export async function withWindowsDirectoryMove<T>(
       }
     }
     for (const path of parents) {
-      const handle = await native(create,
+      const handle = native(create,
         [toNamespacedPath(path), 0, 3, null, 3, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0],
         'CreateFileW', path, result => BigInt(result) === -1n)
       cleanups.push(() => {
         if (close(handle) === 0) throw windowsError('CloseHandle', lastError(), path)
       })
       const info = Buffer.alloc(52)
-      await native(inspect, [handle, info], 'GetFileInformationByHandle', path, result => result === 0)
+      native(inspect, [handle, info], 'GetFileInformationByHandle', path, result => result === 0)
       const attributes = info.readUInt32LE(0)
       if ((attributes & FILE_ATTRIBUTE_DIRECTORY) === 0 || (attributes & FILE_ATTRIBUTE_REPARSE_POINT) !== 0) {
         throw new Error('Document move requires real Windows parent directories.')
@@ -104,7 +104,7 @@ export async function withWindowsDirectoryMove<T>(
       sync: () => verify(),
       rename: async () => {
         await verify()
-        await native(rename, [toNamespacedPath(source), toNamespacedPath(target), MOVEFILE_WRITE_THROUGH],
+        native(rename, [toNamespacedPath(source), toNamespacedPath(target), MOVEFILE_WRITE_THROUGH],
           'MoveFileExW', source, result => result === 0)
         renamed = true
       },

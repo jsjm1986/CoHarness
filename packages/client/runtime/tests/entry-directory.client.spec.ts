@@ -42,7 +42,7 @@ it('searches only retained, currently authorized rows and keeps each selected se
   const primary = target(0), remote = target(1)
   const project = { kind: 'project', projectId: 9, runtimeId: id(3, 1) } as SessionRuntimeTarget
   const projectRow = { ...rows[1]!, id: project.runtimeId, owner: { kind: 'project', id: 9, name: 'Team' } }
-  const held = Promise.withResolvers<void>()
+  const held = Promise.withResolvers<undefined>()
   let revoked = false
   const read = vi.fn(async (path: string) => {
     const url = new URL(path, 'https://harness.invalid')
@@ -79,7 +79,7 @@ it('searches only retained, currently authorized rows and keeps each selected se
   await expect(directory.rows(project, { kind: 'conversations', q: 'denied' })).rejects.toThrow('Forbidden')
   expect(changed).toHaveBeenCalledOnce()
   unsubscribe()
-  held.resolve()
+  held.resolve(undefined)
   await expect(pending).rejects.toThrow('directory changed')
   expect(directory.target('9')).toBeUndefined()
   expect(directory.snapshot({ scope: '', q: 'undiscovered' })).toMatchObject({ projects: [], items: [] })
@@ -130,5 +130,5 @@ it('accepts both personal cursors from one owner and rejects a mismatched compan
   foreign = false
   expect((await load()).combined).toBe(true)
   expect(reader.snapshot()).toMatchObject({ items: [{ sessionId: 'my-conversation' }], personalWorkspaces: expect.arrayContaining([
-    expect.objectContaining({ workspacesCursor: 'next-folder', conversationsCursor: 'next-session' })]) })
+    expect.objectContaining({ workspacesCursor: 'next-folder', conversationsCursor: 'next-session' })]) as object })
 })

@@ -95,7 +95,8 @@ export function WorkbenchToolbar({
   const [deleteWorkbenchOpen, setDeleteWorkbenchOpen] = useState(false)
   const [workbenchName, setWorkbenchName] = useState('')
   const authority = catalogAuthority ?? stableAuthority
-  const revision = useSyncExternalStore(authority.subscribe, authority.getSnapshot, authority.getSnapshot)
+  const revision = useSyncExternalStore(
+    onChange => authority.subscribe(onChange), () => authority.getSnapshot(), () => authority.getSnapshot())
   const [receivedCatalog, setCatalog] = useState<WorkbenchCatalog | undefined>()
   const [receivedRevision, setReceivedRevision] = useState(revision)
   const catalog = revision === receivedRevision ? receivedCatalog : undefined

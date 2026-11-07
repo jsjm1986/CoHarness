@@ -314,7 +314,8 @@ export class EntryDirectory {
     for (const row of this.entries.values()) {
       if (row.target.kind !== 'personal' || row.target.runtimeId === undefined) continue
       if (row.target.nodeId !== undefined && row.target.nodeId === this.active?.nodeId) continue
-      if (row.target.nodeId !== undefined && !nodes.add(row.target.nodeId)) continue
+      if (row.target.nodeId !== undefined && nodes.has(row.target.nodeId)) continue
+      if (row.target.nodeId !== undefined) nodes.add(row.target.nodeId)
       if (runtimeTargetKey(row.target) === (this.active && runtimeTargetKey(this.active))) continue
       void this.rows(row.target, { kind: 'workspaces', includeConversations: true }).catch(() => {})
     }

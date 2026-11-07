@@ -158,7 +158,7 @@ export class DeploymentContextRuntime {
     }
     let foreground: Promise<void> | undefined
     const focus = (): void => {
-      if (globalThis.document?.visibilityState === 'hidden') {
+      if (globalThis.document.visibilityState === 'hidden') {
         foreground = undefined
         clearTimeout(this.timer)
       } else if (foreground === undefined) {

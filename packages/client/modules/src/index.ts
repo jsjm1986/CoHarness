@@ -1234,7 +1234,7 @@ export class ClientModuleRegistry extends Service {
         headers: {
           'content-type': response.contentType,
           'cache-control': IMMUTABLE_CACHE,
-          vary: 'accept-encoding',
+          vary: 'Accept-Encoding',
           ...(variant === undefined ? {} : { 'content-encoding': variant.coding }),
         },
         ...(method === 'HEAD' ? {} : { body: await (variant?.body ?? response.body.identity()) }),

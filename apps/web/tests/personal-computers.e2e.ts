@@ -189,7 +189,7 @@ it('confirms an ambiguous send on the original personal Runtime without resubmit
     expect(sends).toHaveLength(1)
     expect((status.request().postDataJSON() as { payload: unknown }).payload).toEqual({ ...sends[0], confirmInput: true })
     expect((await status.json() as { result: unknown }).result).toEqual({ ok: true,
-      value: { state: 'accepted', inputProof: expect.stringMatching(/^[0-9a-f]{64}$/u) } })
+      value: { state: 'accepted', inputProof: expect.stringMatching(/^[0-9a-f]{64}$/u) as object } })
     await expect.poll(() => editor.inputValue()).toBe('')
     expect(fixture.receipts.filter(row => row.path === '/api/admit/v1/session.prompt').map(row => row.runtimeId)).toEqual([target])
   } finally { await browser.close(); await fixture.close() }

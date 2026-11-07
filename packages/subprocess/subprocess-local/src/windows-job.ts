@@ -99,7 +99,7 @@ class WindowsJobOwner implements BoundProcessOwner {
       this.failAndKill(new Error('Windows Job runner did not process its terminate request'), true)
     }, RUNNER_TERMINATE_TIMEOUT_MS)
     deadline.unref()
-    void this.exited.then(() => clearTimeout(deadline), () => clearTimeout(deadline))
+    void this.exited.then(() => { clearTimeout(deadline) }, () => { clearTimeout(deadline) })
     if (!this.runner.connected) {
       // No result can ever arrive over a dead channel; fail fast while the
       // armed deadline still covers a wedged process holding its Job.

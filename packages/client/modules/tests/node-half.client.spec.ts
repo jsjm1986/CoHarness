@@ -833,7 +833,7 @@ describe('client bundle activation', () => {
     const identity = await routeRequest(route, url, 'GET', 'identity')
     expect(identity.status).toBe(200)
     expect(identity.headers?.['content-encoding']).toBeUndefined()
-    expect(identity.headers?.vary).toBe('accept-encoding')
+    expect(identity.headers?.vary).toBe('Accept-Encoding')
     const plain = identity.body
 
     // Variants compress in the background; poll until Brotli settles.
@@ -1015,7 +1015,7 @@ describe('client bundle activation', () => {
     expect(singleMap.headers).toEqual({
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'public, max-age=31536000, immutable',
-      vary: 'accept-encoding',
+      vary: 'Accept-Encoding',
     })
     expect(JSON.parse(singleMap.body.toString('utf8'))).toMatchObject({
       version: 3,

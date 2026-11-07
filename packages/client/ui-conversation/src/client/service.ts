@@ -845,19 +845,18 @@ function revokePreview(url: string): void {
 /** Let a visible composer show the local echo before encoding images. Hidden tabs may suspend animation frames. */
 function beforeImageEncoding(signal?: AbortSignal): Promise<void> {
   const doc = globalThis.document
-  if (doc?.hidden) return Promise.resolve()
+  if (doc.hidden) return Promise.resolve()
   if (typeof requestAnimationFrame !== 'function') return new Promise((resolve) => { setTimeout(resolve, 0) })
   return new Promise((resolve) => {
-    let frame: number | undefined
     const finish = () => {
-      if (frame !== undefined) globalThis.cancelAnimationFrame?.(frame)
-      doc?.removeEventListener('visibilitychange', visibility)
+      globalThis.cancelAnimationFrame(frame)
+      doc.removeEventListener('visibilitychange', visibility)
       signal?.removeEventListener('abort', finish)
       resolve()
     }
-    const visibility = () => { if (doc?.hidden) finish() }
-    doc?.addEventListener('visibilitychange', visibility)
+    const visibility = () => { if (doc.hidden) finish() }
+    doc.addEventListener('visibilitychange', visibility)
     signal?.addEventListener('abort', finish, { once: true })
-    frame = requestAnimationFrame(finish)
+    const frame = requestAnimationFrame(finish)
   })
 }

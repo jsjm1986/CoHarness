@@ -18,7 +18,7 @@ describe('entry request owners', () => {
     const stable = 'd621f467-8677-4165-9062-14cb446b36c9'
     const privateValue = 'synthetic untrusted/ID material'
     vi.stubGlobal('fetch', vi.fn(async (_url: URL, init: RequestInit) => {
-      const body = JSON.parse(String(init.body)) as { rpcId: string; method: string; payload: Record<string, unknown> }
+      const body = JSON.parse(init.body as string) as { rpcId: string; method: string; payload: Record<string, unknown> }
       expect(init.priority).toBe('high')
       const id = new Headers(init.headers).get('x-dsh-operation-id')
       expect(id).toMatch(/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/iu)
@@ -60,7 +60,7 @@ describe('entry request owners', () => {
     await expect(owner.projectMetadata(node, [ref, ref])).rejects.toThrow()
     expect(request).not.toHaveBeenCalled()
     await expect(owner.projectMetadata(node, [ref])).resolves.toEqual([item])
-    expect(String(request.mock.calls[0]![0])).toContain(`/account/api/project-metadata?dshNode=${node}&ids=9`)
+    expect(request.mock.calls[0]![0]).toContain(`/account/api/project-metadata?dshNode=${node}&ids=9`)
     expect(new Headers(request.mock.calls[0]![1].headers).get('x-dsh-expected-principal-id')).toBe('7')
     for (const items of [[], [item, item], [{ ...item, projectId: 10 }], [{ ...item, nodeId: target.runtimeId }],
       [{ ...item, runtimeId: node }], [{ ...item, rootPath: '' }]]) {
@@ -100,7 +100,7 @@ it('loads separate personal pages concurrently after a legacy computer omits the
   const catalog = { items: [{ id: runtimeId, owner: { kind: 'personal', id: 7, name: 'Me' },
     node: { id: '20000000-0000-4000-8000-000000000001', name: 'Computer', status: 'active' }, observedState: 'stopped' }], nextCursor: null }
   const served: string[] = []
-  const gate = Promise.withResolvers<void>()
+  const gate = Promise.withResolvers<undefined>()
   let hold = false
   vi.stubGlobal('fetch', vi.fn(async (path: string) => {
     const url = new URL(path, 'https://harness.invalid')
@@ -110,7 +110,8 @@ it('loads separate personal pages concurrently after a legacy computer omits the
     if (hold) await gate.promise
     return Response.json({ runtimeId, items: [], workspaces: [], nextCursor: null })
   }))
-  const owner = new GatewayEntryRequests({ ...connection, hostDescription: { getSnapshot: () => ({ runtimeTarget: target }) } } as ConnectionHandle, () => 7, () => true)
+  const owner = new GatewayEntryRequests(
+    { ...connection, hostDescription: { getSnapshot: () => ({ runtimeTarget: target }) } } as ConnectionHandle, () => 7, () => true)
   try {
     await owner.catalog()
     await owner.personalRows(target)
@@ -120,6 +121,6 @@ it('loads separate personal pages concurrently after a legacy computer omits the
     served.length = 0; hold = true
     const flight = owner.personalRows(target)
     await vi.waitFor(() => { expect(served).toEqual(['workspaces', 'conversations']) })
-    gate.resolve(); await flight
-  } finally { gate.resolve(); await owner.dispose() }
+    gate.resolve(undefined); await flight
+  } finally { gate.resolve(undefined); await owner.dispose() }
 })
