@@ -8,6 +8,7 @@ import type { PoolClient } from 'pg'
 import { z } from 'zod'
 import type { NodeContentStore } from './node-content-store.ts'
 import { peerProjectTables } from './peer-backup-project-export.ts'
+import { projectScopedTables } from './node-content-project-tables.ts'
 import { PeerBackupError } from './peer-backup-repository.ts'
 import { peerCaptureSchema, type PeerBackupDrill } from './peer-backup-restic.ts'
 import { recoveryBinding, type PeerRecoveryOperation } from './peer-backup-takeover.ts'
@@ -33,7 +34,7 @@ export interface ReplacementFiles {
 // Physical OS identifiers are replaced only after inspecting this computer's own files.
 const relationNames = peerProjectTables.filter((table) => table !== 'spaces' && table !== 'project_file_anchors')
 
-const scopeByProject = new Set<string>(['project_journal', 'project_journal_state', 'project_journal_requests'])
+const scopeByProject = projectScopedTables
 const fail = (code: string): never => {
   throw new PeerBackupError(409, 'peer-backup/' + code)
 }

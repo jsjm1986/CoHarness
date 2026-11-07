@@ -7,6 +7,7 @@ import type { Pool, PoolClient } from 'pg'
 import { isDatabaseContentionError, isTransientDatabaseError, transaction, type Queryable } from './postgres/database.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
 import { NodeContentPublication } from './node-content-publication.ts'
+import { peerProjectTables, projectScopedTables } from './node-content-project-tables.ts'
 import { checkedNodeContentVersions, nodeContentMigrations } from './node-content-manifest.ts'
 import { NodeContentUnavailable } from './node-content-error.ts'
 import { assertLocalMount } from './node-local-mount.ts'
@@ -240,7 +241,16 @@ export class NodeContentStore {
           AND NOT EXISTS(SELECT FROM node_content.execution_sessions e WHERE e.organization_id=s.organization_id AND e.runtime_id=s.runtime_id) FOR UPDATE OF s`,
         [org,projectId,runtimeId,node,this.options.volumeId])
         if (!candidate.rowCount) return false
-        await local.query('DELETE FROM node_content.project_name_versions WHERE organization_id=$1 AND project_id=$2 AND runtime_id=$3',[org,projectId,runtimeId])
+        // bindNewProject's assertReady populates children beyond spaces —
+        // document_roots and project_file_anchors at minimum — and their
+        // non-cascading foreign keys turn a spaces-only delete into a thrown
+        // 23503, leaving the orphan permanent. Delete every project-scoped
+        // table in reverse dependency order before the parent row; journal
+        // tables key by project rather than runtime.
+        for (const table of peerProjectTables.slice(1).reverse()) {
+          const projectKey = projectScopedTables.has(table)
+          await local.query(`DELETE FROM node_content."${table}" WHERE organization_id=$1 AND ${projectKey?'project_id':'runtime_id'}=$2`,[org,projectKey?projectId:runtimeId])
+        }
         await local.query('DELETE FROM node_content.spaces WHERE organization_id=$1 AND project_id=$2 AND runtime_id=$3',[org,projectId,runtimeId])
         return true
       })

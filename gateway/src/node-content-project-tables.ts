@@ -1,0 +1,38 @@
+/** Complete source-owned relational domains in dependency order for scoped export, isolated restoration, and orphan discard. */
+export const peerProjectTables = [
+  'spaces',
+  'conversation_sessions',
+  'conversation_events',
+  'conversation_append_batches',
+  'conversation_search',
+  'conversation_participants',
+  'conversation_interaction_responses',
+  'conversation_migrations',
+  'conversation_migrated_events',
+  'conversation_draft_reservations',
+  'conversation_archive_records',
+  'content_files',
+  'composer_drafts',
+  'execution_sessions',
+  'execution_inputs',
+  'execution_relays',
+  'execution_scopes',
+  'workspace_catalog',
+  'project_journal',
+  'project_journal_state',
+  'project_journal_requests',
+  'project_journal_materials',
+  'document_roots',
+  'document_entries',
+  'document_events',
+  'document_receipts',
+  'project_name_versions',
+  'plugin_states',
+  'project_file_anchors',
+  'conversation_archive_search',
+  'conversation_archive_commands',
+  'conversation_archive_file_cleanup',
+] as const
+
+/** Project tables keyed by (organization_id, project_id) rather than (organization_id, runtime_id). */
+export const projectScopedTables = new Set<string>(['project_journal', 'project_journal_state', 'project_journal_requests'])
