@@ -4,7 +4,10 @@ import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
-import { scrubbedGatewayChildEnv } from '../lib/child-environment.js'
+
+// The production build emits gateway/lib; the standalone CI lane compiles the
+// same sources into gateway/lib-ci, so the lib root is overridable.
+const { scrubbedGatewayChildEnv } = await import(new URL(`${process.env.HGW_GATEWAY_LIB_DIR ?? '../lib'}/child-environment.js`, import.meta.url).href)
 
 const { values } = parseArgs({ options: { 'pg-config': { type: 'string', default: 'pg_config' },
   cc: { type: 'string', default: process.platform === 'win32' ? 'cl.exe' : 'cc' } } })

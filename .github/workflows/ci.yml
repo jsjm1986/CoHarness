@@ -869,6 +869,7 @@ jobs:
       - name: Build private PostgreSQL maintenance adapters
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          HGW_GATEWAY_LIB_DIR: ../lib-ci/gateway/src
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libpq-dev postgresql-client
