@@ -366,6 +366,20 @@ export class SessionRuntimePool implements ISessions {
       ...(target.nodeId === undefined && metadata.nodeId !== undefined ? { nodeId: metadata.nodeId } : {}),
       ...(target.nodeName === undefined && metadata.nodeName !== undefined ? { nodeName: metadata.nodeName } : {}) }
     const key = targetKey(target)
+    // A mid-handshake entry owns itself while an acquisition is in flight;
+    // releaseUnused honors runtimeOperations and must not reap it under the
+    // caller. Each returned closure drops exactly one claim.
+    const holdOpening = (): (() => void) => {
+      const owner = this.runtimeOperations.get(key) ?? { references: 0 }
+      owner.references++
+      this.runtimeOperations.set(key, owner)
+      let dropped = false
+      return () => {
+        if (dropped) return
+        dropped = true
+        if (--owner.references === 0) this.runtimeOperations.delete(key)
+      }
+    }
     const currentEntry = (): RuntimeEntry | undefined => {
       const entry = this.entries.get(key)
       const node = entry?.target.nodeId ?? entry?.connection?.hostDescription.getSnapshot()?.runtimeTarget?.nodeId
@@ -424,6 +438,12 @@ export class SessionRuntimePool implements ISessions {
       let rejectReady: (error: unknown) => void = () => {}
       entry.ready = new Promise<void>((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
       entry.rejectReady = rejectReady
+      // A prepared acquisition returns the entry unproven; keep it out of
+      // releaseUnused until its handshake settles or the deadline rejects it.
+      if (prepared) {
+        const born = holdOpening()
+        void entry.ready.then(born, born)
+      }
       const loop = connection.start({
         onMuxEnvelope: (envelope: Parameters<Runtime['handleMuxEnvelope']>[0]) => {
           if (this.accountInvalidated || this.entries.get(establishedEntry.key) !== establishedEntry) return
@@ -489,9 +509,18 @@ export class SessionRuntimePool implements ISessions {
       )
     }
     try {
-      if (!prepared) await this.waitForRuntime(entry, signal)
+      if (!prepared) {
+        const wait = holdOpening()
+        try {
+          await this.waitForRuntime(entry, signal)
+        } finally {
+          wait()
+        }
+      }
     } catch (error) {
-      if (!signal.aborted) { this.releaseEntry(entry); this.rebuild() }
+      if (!signal.aborted) this.releaseEntry(entry)
+      else this.releaseUnused(this.stagedIds)
+      this.rebuild()
       throw error
     }
     if (this.entries.get(key) !== entry) return undefined
@@ -879,7 +908,9 @@ export class SessionRuntimePool implements ISessions {
     const baseEntry = [...this.entries.values()].find(entry => entry.runtime === this.base)
     if (baseEntry === undefined) return
     if (targetKey(baseEntry.target) === targetKey(target)) {
-      if (baseEntry.target.nodeId && target.nodeId && baseEntry.target.nodeId !== target.nodeId) return
+      // A verified descriptor carrying a different nodeId is a real migration:
+      // the identity fence already adopted it, and retaining the stale node
+      // leaves every prepared/explicit call pinning the wrong computer.
       if (baseEntry.target.nodeId !== target.nodeId || baseEntry.target.nodeName !== target.nodeName
         || target.kind === 'project' && target.projectName !== undefined && (baseEntry.target.kind !== 'project' || baseEntry.target.projectName !== target.projectName)) {
         baseEntry.target = target; this.rebuild()
@@ -889,8 +920,10 @@ export class SessionRuntimePool implements ISessions {
     this.beginNavigation()
     const collision = this.entries.get(targetKey(target))
     if (collision !== undefined && collision !== baseEntry) throw new Error('Bootstrap target already has a live runtime')
-    baseEntry.runtime.setPresentationKey(id => clientSessionKey(target, id), target)
+    // The fence call can throw; apply it before mutating the presentation key
+    // so a rejected retarget never leaves a half-applied entry.
     this.baseConnection.setBaseTarget?.(target)
+    baseEntry.runtime.setPresentationKey(id => clientSessionKey(target, id), target)
     const archived = this.archivedByTarget.get(baseEntry.key)
     this.entries.delete(baseEntry.key)
     this.archivedByTarget.delete(baseEntry.key)
