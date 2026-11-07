@@ -791,8 +791,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       // a stand-in for session validation and the ordinary path runs instead.
       const path = new URL(req.url ?? '/', 'http://gateway').pathname
       if (claims !== null && forwardRequestMatches(claims, { method: req.method, path, sessionToken: token })) {
-        // /api traffic revalidates the session downstream; gateway-local
-        // mutations would otherwise be forensically identical to the user's.
+        // Acceptance requires the bound session cookie itself; gateway-local
+        // (non-/api) mutations journal their own row because no downstream
+        // revalidation distinguishes them from the user's own traffic.
         if (!path.startsWith('/api/')) {
           void Promise.resolve(audit.write({ userId: claims.user.id, action: 'auth.forwarded',
             methodPath: `${req.method ?? ''} ${path}`, ip: clientIp(req),

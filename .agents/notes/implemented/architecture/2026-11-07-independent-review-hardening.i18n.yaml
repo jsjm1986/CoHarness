@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-07-independent-review-hardening.md
 document:
-  en: 3af6c29183115ce96da8fb9279e043554f5e48df
-  zh: 82dde0962e95fe661672e8e0cb357fb71cb55a3a
+  en: 29df6e12f6dcbe9ac1c322d3b81ec1445c32e2c3
+  zh: 3b59dc11a4b915b360cde15a54534b81889ce781
 /agent-note-independent-review-hardening-across-node-deployment-and-admin-surfaces:
   en: edc71216ecf73beb
   zh: 2f803fc47d2a428a
 /agent-note-independent-review-hardening-across-node-deployment-and-admin-surfaces/problem:
-  en: e36cc9eaeebd577a
-  zh: b216169b1d6f6cad
+  en: 6cf05167e8628264
+  zh: dc5fed7b284116f3
 /agent-note-independent-review-hardening-across-node-deployment-and-admin-surfaces/decision:
-  en: b60bd07217b24102
-  zh: 6ed147501bd6b8fc
+  en: 2cc3a14adaf6bd82
+  zh: 38d09203915bdc56
 /agent-note-independent-review-hardening-across-node-deployment-and-admin-surfaces/alternatives-considered:
   en: 4032f448beb62312
   zh: 79bfe4816787a6e6
@@ -21,5 +21,5 @@ document:
   en: cd86624cba47d7a4
   zh: 01c43446d277f291
 /agent-note-independent-review-hardening-across-node-deployment-and-admin-surfaces/verification:
-  en: c5328fba77ac3861
-  zh: 1a1d94df3835bf5e
+  en: 401df1e84064acc2
+  zh: 62fda58f3be328e6
