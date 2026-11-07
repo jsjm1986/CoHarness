@@ -43,8 +43,12 @@ Browsers call `workspaceFiles.renderOffice` through the existing [ApiProxy](../.
 | `maxOutputBytes` | `104857600` | Maximum complete PDF bytes. |
 | `maxImageResolution` | `192` | Maximum raster-image DPI; overrides the kit default of `144`. |
 | `fontFallbacks` | Kit defaults | Ordered font-family preference groups; each group requires at least two names containing non-whitespace characters. |
+| `fontMetadataCacheDirectory` | Kit defaults | Absolute derived font metadata cache directory; `false` disables disk reuse. |
+| `maxFontMetadataCacheBytes` | `33554432` | Maximum persisted and reusable per-file font metadata bytes. |
 
 The [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-office-to-pdf) owns the full font, archive, and image settings. `fontDirectories` accepts absolute directories; omission uses the kit platform defaults. Explicit `fontFallbacks` replaces the kit's default groups. Installed requested fonts retain precedence, and other system fonts remain eligible for uncovered glyphs. Native engines can select installed metric-compatible fonts before these preferences.
+
+The kit re-enumerates font sources and checks physical file identities before reusing derived metadata; the cache contains no original font bytes or document content. A missing or unusable cache falls back to source inspection. Share an explicit directory only among processes with equivalent operating-system privileges; retain separate caches across system users. The [local-runtime decision](../../../.agents/notes/implemented/architecture/2026-10-26-local-runtime-office-font-metadata.md) defines Gateway composition.
 
 The [bounded conversion decision](../../../.agents/notes/implemented/architecture/2026-09-15-bounded-office-conversion.md) explains queue admission, cache limits, and shared cancellation.
 
@@ -62,9 +66,13 @@ The defaults retain 8 PDFs/128 MiB and 64 source aliases, admit 32 readers and 8
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+Workspace installations apply the [Node-entry import patch](../../../.agents/notes/implemented/simplification/2026-10-28-office-node-entry-fontkit-import.md) to kit `0.1.1`. Provider imports omit an unused main-thread font parser; conversion Workers retain their parser imports.
+
 Invalid engine metadata, missing required assets, and conversion errors reject the request instead of switching engines. The shared WASM engine uses LibreOffice's CPU image filter. Native conversion uses its separate platform engine.
 
 The ApiProxy file reader owns request authorization and cancellation; the converter owns admitted reads, conversion, cache, and engine teardown. Source-read failures pass through, and conversion failures expose a classified reason without engine diagnostics.
+
+After a production build, run `node node_modules/tsx/dist/cli.mjs packages/document/office-to-pdf/tests/font-metadata.perf.ts` from the repository root to compare new private homes with a shared derived metadata directory. The serial diagnostic uses fresh plain-Node processes and a fixed synthetic Latin/CJK DOCX. It reports conversion/disposal time and Node RSS, excluding authentication, network, browser rendering and native subprocess memory; it adds no timing threshold.
 
 </details>
 

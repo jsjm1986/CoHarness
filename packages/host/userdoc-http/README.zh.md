@@ -64,7 +64,7 @@ Cordis 插件与 Gateway broker 各自持有 `UserDocHttpScope`，在释放存�
 
 - **自身不提供认证** —— route 继承 Connection 的可达性与同源策略；把 Web server 暴露到回环之外的部署必须在网关提供认证。
 - **旧的当前运行时列表未建立索引** —— 提供方可能为了完整响应扫描整个根目录；Gateway 的作用域列表对大型工作区使用有界分页。
-- **下载默认使用附件 disposition** —— `inline=1` 只对图片、PDF 和文本媒体生效，并为预览 viewer 附带严格的内容策略。
+- **下载默认使用 attachment disposition** — `inline=1` 只允许图片、PDF 与文本媒体。只有内联 `application/pdf` 响应允许同源 frame 祖先；其他内联类型保留 `frame-ancestors 'none'`。所有内联响应保留 `default-src 'none'`、原有图片策略及不带许可项的 CSP `sandbox`，并继续通过带 `nosniff`、私有且不缓存的响应流式传输。根据存储文件名推导的媒体类型不会验证 PDF 结构；浏览器 PDF 阅读器负责解析这些字节。[PDF 嵌入决策](../../../.agents/notes/implemented/bug-fix/2026-10-23-native-document-pdf-framing.zh.md)记录依据与浏览器验证。
 - **临时上传会话有保留期限，已发布文档没有自动过期** —— 未完成会话按本地后端策略清理，已完成文档仍需用户删除。
 
 <a id="dev-note"></a>

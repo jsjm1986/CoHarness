@@ -2046,6 +2046,7 @@ async function download(host: UserDocHttpHost, req: UserDocRequest, res: UserDoc
     opened = await host.userDocs.openRead(docId)
     if (requestState.disconnected === true) return
     const inline = url.searchParams.get('inline') === '1' && inlinePreviewMedia(opened.ref.mediaType)
+    const frameAncestors = inline && opened.ref.mediaType === 'application/pdf' ? "'self'" : "'none'"
     const headers = {
       'content-type': opened.ref.mediaType,
       'content-length': String(opened.ref.bytes),
@@ -2055,7 +2056,9 @@ async function download(host: UserDocHttpHost, req: UserDocRequest, res: UserDoc
       ...(opened.ref.identity === undefined ? {} : {
         [USERDOC_IDENTITY_HEADER]: Buffer.from(JSON.stringify(opened.ref.identity)).toString('base64url'),
       }),
-      ...(inline ? { 'content-security-policy': "default-src 'none'; img-src 'self' data:; frame-ancestors 'none'; sandbox" } : {}),
+      ...(inline ? {
+        'content-security-policy': `default-src 'none'; img-src 'self' data:; frame-ancestors ${frameAncestors}; sandbox`,
+      } : {}),
       // Stored bytes are the contract: no-transform keeps the response
       // compression layer from hiding content-length or rewriting the body.
       'cache-control': 'private, no-store, no-transform',

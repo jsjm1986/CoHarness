@@ -10,11 +10,16 @@
  * is what makes a reload safe. The seats' components have their own specs.
  */
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { act, render } from '@testing-library/react'
+import { createElement } from 'react'
+import type { ReactNode } from 'react'
 import { Context } from '@deepseek-ai/cordis'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { clientSessionKey, createSnapshotStore, ProjectUiPolicyRuntime, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewportSnapshot, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '../src/client/index.ts'
 import type { GuideInjected, SidebarRightInjected } from '../src/client/index.ts'
 import { apply as hostApply } from '../src/index.ts'
@@ -23,7 +28,7 @@ import { SidebarRightTabRegistry } from '../src/client/tab-registry.ts'
 import type { createSidebarRightStore } from '../src/client/stores.ts'
 import type { RightbarActions } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
 import { RightbarSeat } from '../src/client/shell/SidebarRight.tsx'
-import { RightbarRoot } from '../src/client/shell/RightbarRoot.tsx'
+import { RightbarRoot, type RightbarRootInjected } from '../src/client/shell/RightbarRoot.tsx'
 import { ExpandButton } from '../src/client/shell/ExpandButton.tsx'
 import { GuideBody } from '../src/client/tabs/guide/GuideBody.tsx'
 import { GuideTitle } from '../src/client/tabs/guide/GuideTitle.tsx'
@@ -91,6 +96,9 @@ async function boot(sessionId = SESSION, runtime: SessionRuntimeTarget = { kind:
     }),
   }
   ctx.provide('sessions', sessions as never)
+  ctx.provide('conversationViewport', {
+    snapshot: createSnapshotStore<ConversationViewportSnapshot>({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }),
+  } as never)
   const policy = new ProjectUiPolicyRuntime()
   const description = createSnapshotStore({ executionAuthorityRequired: false })
   ctx.provide('projectUiPolicy', policy)
@@ -106,7 +114,33 @@ async function boot(sessionId = SESSION, runtime: SessionRuntimeTarget = { kind:
     if (entry.inject === undefined) throw new Error(`expected ${entry.name} to inject`)
     return entry.inject(sessionId)
   }
-  return { ctx, registered, dictionaries, layout, resources, fiber, seat, injectedOf, policy, description, sessions }
+  const root = injectedOf(seat('rightbar')) as RightbarRootInjected
+  root.selectView(sessionId)
+  return {
+    ctx, registered, dictionaries, layout, resources, fiber, seat, injectedOf, policy, description, sessions,
+    selectView: root.selectView,
+  }
+}
+
+/** Mount the registered root over the plugin's real foreground owner and observable sources. */
+function mountRoot(booted: Awaited<ReturnType<typeof boot>>, targetSessionId: SessionId) {
+  const root = booted.injectedOf(booted.seat('rightbar')) as RightbarRootInjected
+  const props: Omit<Parameters<typeof RightbarRoot>[0], 'targetSessionId'> = {
+    SessionProvider: ((owner: { children: (sessionId: string) => ReactNode; sessionId: string }) =>
+      owner.children(owner.sessionId)) as never,
+    renderSlot: (() => createElement('span', { 'data-pinned-test-body': '' })) as never,
+    useSessions: bindSnapshotSelector(booted.sessions.list) as never,
+    useWorkspaces: vi.fn() as never,
+    usePanelInfo: vi.fn() as never,
+    useViews: bindSnapshotSelector(root.hooks.views),
+    useViewport: bindSnapshotSelector(root.hooks.viewport),
+    mountView: root.mountView,
+    selectView: root.selectView,
+    width: 713, viewportWidth: 1567, canShow: true,
+  }
+  const mounted = render(createElement(RightbarRoot, { ...props, targetSessionId }))
+  onTestFinished(() => { mounted.unmount() })
+  return { root, props, mounted }
 }
 
 function layoutStorage(): Map<string, string> {
@@ -159,18 +193,81 @@ describe('ui-sidebar-right apply', () => {
     expect(seat('conversation.session.header.corner').store).toBe(seat('rightbar.session').store)
   })
 
-  it('names the selected Session as on screen', async () => {
-    const { ctx, sessions } = await boot()
-    // The bench boots with SESSION already selected: the plugin names it on screen.
+  it('names the root-selected Session as on screen', async () => {
+    const { ctx, sessions, selectView } = await boot()
     expect(ctx.sidebarRight.mounted.getSnapshot()).toBe(SESSION)
     sessions.list.set({ current: undefined, byId: {} })
+    selectView(undefined)
     expect(ctx.sidebarRight.mounted.getSnapshot()).toBeUndefined()
     sessions.list.set({ current: SESSION, byId: { [SESSION]: { id: SESSION } } })
+    selectView(SESSION)
     expect(ctx.sidebarRight.mounted.getSnapshot()).toBe(SESSION)
   })
 
+  it('keeps the frame-pinned Sidebar foreground while the active Conversation changes', async () => {
+    const booted = await boot()
+    const { ctx, sessions, fiber } = booted
+    const other = 's-pinned-other' as SessionId
+    const { root, props, mounted } = mountRoot(booted, SESSION)
+    const pinned = root.hooks.views.getSnapshot()[0]!
+    const pinnedRelease = vi.spyOn(pinned.reference, 'release')
+    expect(ctx.sidebarRight.mounted.getSnapshot()).toBe(SESSION)
+    const selected: (SessionId | undefined)[] = []
+    act(() => { sessions.list.set({ current: other, byId: { [SESSION]: { id: SESSION }, [other]: { id: other } } }) })
+    selected.push(ctx.sidebarRight.mounted.getSnapshot())
+    act(() => { sessions.list.set({ ...sessions.list.getSnapshot(), byId: { ...sessions.list.getSnapshot().byId } }) })
+    selected.push(ctx.sidebarRight.mounted.getSnapshot())
+    expect(selected).toEqual([SESSION, SESSION])
+    expect(mounted.container.querySelector<HTMLElement>(`[data-sidebar-right-session="${SESSION}"]`)?.hidden).toBe(false)
+    expect(sessions.retain).not.toHaveBeenCalledWith(other, expect.objectContaining({ source: 'sidebarView' }))
+    act(() => { mounted.rerender(createElement(RightbarRoot, props)) })
+    expect(ctx.sidebarRight.mounted.getSnapshot()).toBe(other)
+    expect(mounted.container.querySelector<HTMLElement>(`[data-sidebar-right-session="${other}"]`)?.hidden).toBe(false)
+    expect(pinnedRelease).toHaveBeenCalledOnce()
+    const unpinned = root.hooks.views.getSnapshot()[0]!
+    const unpinnedRelease = vi.spyOn(unpinned.reference, 'release')
+    act(() => { sessions.list.set({ current: undefined, byId: {} }) })
+    expect(ctx.sidebarRight.mounted.getSnapshot()).toBeUndefined()
+    expect(root.hooks.views.getSnapshot()).toEqual([])
+    expect(unpinnedRelease).toHaveBeenCalledOnce()
+    await act(async () => { await fiber.dispose() })
+    expect(ctx.get('sidebarRight')).toBeUndefined()
+    expect(root.hooks.views.getSnapshot()).toEqual([])
+    expect(pinnedRelease).toHaveBeenCalledOnce()
+    expect(unpinnedRelease).toHaveBeenCalledOnce()
+  })
+
+  it('releases the foreground and retained Sidebar references once when the plugin unloads', async () => {
+    const booted = await boot()
+    const { ctx, sessions, fiber } = booted
+    const { root, props, mounted } = mountRoot(booted, SESSION)
+    const first = root.hooks.views.getSnapshot()[0]!
+    const firstRelease = vi.spyOn(first.reference, 'release')
+    const lifetime = new AbortController()
+    onTestFinished(() => { lifetime.abort() })
+    const release = first.retainTab('retained-preview' as TabId, lifetime.signal)
+    onTestFinished(release)
+    const other = 's-retained-other' as SessionId
+    act(() => { sessions.list.set({ current: other, byId: { [SESSION]: { id: SESSION }, [other]: { id: other } } }) })
+    act(() => { mounted.rerender(createElement(RightbarRoot, props)) })
+    const second = root.hooks.views.getSnapshot().find(view => view.sessionId === other)!
+    const secondRelease = vi.spyOn(second.reference, 'release')
+    expect(root.hooks.views.getSnapshot().map(view => view.sessionId)).toEqual([other, SESSION].sort())
+    expect(firstRelease).not.toHaveBeenCalled()
+    expect(secondRelease).not.toHaveBeenCalled()
+    await act(async () => { await fiber.dispose() })
+    expect(ctx.get('sidebarRight')).toBeUndefined()
+    expect(root.hooks.views.getSnapshot()).toEqual([])
+    expect(firstRelease).toHaveBeenCalledOnce()
+    expect(secondRelease).toHaveBeenCalledOnce()
+    release()
+    lifetime.abort()
+    expect(firstRelease).toHaveBeenCalledOnce()
+    expect(secondRelease).toHaveBeenCalledOnce()
+  })
+
   it('hands the panel seat the frame report, the room rule, the opens, the observable registry, and the Tab domain', async () => {
-    const { ctx, layout, sessions, seat, injectedOf } = await boot()
+    const { ctx, layout, sessions, seat, injectedOf, selectView } = await boot()
     const injected = injectedOf(seat('rightbar.session')) as SidebarRightInjected
     // The frame learns the composition of expanded and presentation, nothing else.
     injected.syncPresentation({ shown: true, track: true, fullscreen: false })
@@ -219,6 +316,7 @@ describe('ui-sidebar-right apply', () => {
     expect(panes()).toHaveLength(2)
     injected.toggleFullscreen()
     sessions.list.set({ current: undefined, byId: {} })
+    selectView(undefined)
     expect(() => { ctx.sidebarRight.toggleExpanded() }).toThrow('no session surface is mounted')
   })
 
@@ -299,6 +397,59 @@ describe('ui-sidebar-right apply', () => {
     await fiber.dispose()
   })
 
+  it('rejects resource opening during account verification before same-account restoration can discard it', async () => {
+    const values = layoutStorage()
+    const { ctx, seat, description, policy, fiber } = await boot()
+    description.set({ executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(1)
+    ctx.sidebarRightTabs.register({ id: 'workspace-file', kind: 'workspace-file', patterns: ['dsh-resource://file/**'], title: () => 'Synthetic file' })
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    const html = `dsh-resource://file/session/${SESSION}/existing.html`
+    const pdf = `dsh-resource://file/session/${SESSION}/broken.pdf`
+    ctx.sidebarRight.openSessionResource(SESSION, html, { kind: 'workspace-file' })
+    const original = ctx.sidebarRight.tabDomain.occurrence(SESSION, ctx.sidebarRight.tabsIn(SESSION)[0]!)
+    const saved = [...values.entries()]
+    expect(saved).toHaveLength(1)
+    policy.setVerifiedAccountId(undefined)
+    const unverified = instance.getSnapshot()
+    expect(unverified.bySession).toEqual({})
+    let refusal: unknown
+    try { ctx.sidebarRight.openSessionResource(SESSION, pdf, { kind: 'workspace-file' }) }
+    catch (error) { refusal = error }
+    const afterOpen = instance.getSnapshot()
+    const opened = Object.values(afterOpen.bySession[SESSION]?.layout.tabs ?? {}).find(tab => tab.contentId === pdf)
+    const occurrence = opened === undefined ? undefined : ctx.sidebarRight.tabDomain.occurrence(SESSION, opened)
+    for (const open of [
+      () => { ctx.sidebarRight.openResource(pdf, { kind: 'workspace-file' }) },
+      () => { ctx.sidebarRight.openResourceIn(SESSION, pdf, { kind: 'workspace-file' }) },
+      () => { original.tabActions.openResource(pdf) },
+    ]) expect(open).toThrow('resource.verifying')
+    policy.setVerifiedAccountId(1)
+    const restored = Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs).map(tab => tab.contentId)
+    expect([...values.entries()]).toEqual(saved)
+    expect({
+      rejected: refusal instanceof Error,
+      openedWhileUnverified: opened?.contentId,
+      openedOccurrenceAborted: occurrence?.signal.aborted,
+      restored,
+    }).toEqual({ rejected: true, openedWhileUnverified: undefined, openedOccurrenceAborted: undefined, restored: [html] })
+    expect(afterOpen).toBe(unverified)
+    expect(refusal).toMatchObject({ message: 'resource.verifying' })
+    ctx.sidebarRight.openSessionResource(SESSION, pdf, { kind: 'workspace-file' })
+    expect(ctx.sidebarRight.active()?.contentId).toBe(pdf)
+    expect(ctx.sidebarRight.tabsIn(SESSION).map(tab => tab.contentId)).toEqual([html, pdf])
+    ctx.sidebarRight.openResource(html, { kind: 'workspace-file' })
+    expect(ctx.sidebarRight.active()?.contentId).toBe(html)
+    policy.setVerifiedAccountId(2)
+    expect(instance.getSnapshot().bySession).toEqual({})
+    expect(ctx.sidebarRight.openTabs.getSnapshot()).toEqual([])
+    expect(values.size).toBe(1)
+    policy.setVerifiedAccountId(1)
+    expect(ctx.sidebarRight.tabsIn(SESSION).map(tab => tab.contentId)).toEqual([html, pdf])
+    await fiber.dispose()
+  })
+
   it('ends old occurrences when two verified accounts restore the same tab id directly', async () => {
     const { ctx, seat, description, policy, fiber } = await boot()
     description.set({ executionAuthorityRequired: true })
@@ -365,7 +516,7 @@ describe('ui-sidebar-right apply', () => {
   })
 
   it('routes tool details through the bar binding and collapses on close', async () => {
-    const { ctx, seat, layout, sessions, fiber } = await boot()
+    const { ctx, seat, layout, sessions, fiber, selectView } = await boot()
     const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
     const instance = handle.create(SESSION)
     const binding = layout.bindRightbar.mock.calls[0]?.[0] as RightbarActions
@@ -382,6 +533,7 @@ describe('ui-sidebar-right apply', () => {
     binding.openDetails(undefined, { callId: 'call-2' })
     expect(() => { binding.openDetails(SESSION, undefined) }).toThrow('require an explicit Session and call')
     sessions.list.set({ current: undefined, byId: {} })
+    selectView(undefined)
     expect(() => { binding.openDetails(undefined, { callId: 'call-3' }) }).toThrow('require an explicit Session and call')
 
     binding.close(SESSION)

@@ -192,6 +192,8 @@ export class SessionManager {
   /** Mutations arriving after a list request starts are replayed over its response. */
   private listMutations: SessionListMutation[] | null = null
   private readonly addresses = new Map<SessionId, SubagentAddress>()
+  /** Sessions whose live Agent was published by an explicit open; reconnect re-publishes them. */
+  private readonly activated = new Set<SessionId>()
   private readonly catalogs = new Map<SessionId, SubagentCatalogSnapshot>()
   private readonly catalogInflight = new Map<SessionId, CatalogInflight>()
   /** Catalog owners whose membership changed while a pull was in flight: one trailing refresh after it settles. */
@@ -288,6 +290,36 @@ export class SessionManager {
   }
 
   /**
+   * Publish the live Agent behind an explicitly selected Session on the Host.
+   * Presentations that arrived without a user navigation — startup restore of
+   * the current Session, retained panes — stay cold; this fires only
+   * from the selection boundary the user committed. Idempotent server-side, so
+   * re-selecting an already live Session is a no-op. The intent is retained so
+   * a reconnect can re-publish the Agent the restart took with it.
+   * @param sessionId - the Session just selected through {@link select}.
+   */
+  activate(sessionId: SessionId): void {
+    // Catalog-addressed identities belong to subagent routing; the Host fences
+    // their generic activation, so a retained address means never ask.
+    if (this.addresses.has(sessionId)) return
+    this.activated.add(sessionId)
+    void this.api.sessions.activate({ sessionId }).then(
+      () => undefined,
+      (error: unknown) => { console.warn('[web-runtime] session activation failed:', error) },
+    )
+  }
+
+  /**
+   * Whether an explicit open published the Session's Agent during this
+   * connection lifetime; ambient presentations and restores never qualify.
+   * @param sessionId - candidate Session identity.
+   * @returns `true` when the Session's Agent was published by an explicit open.
+   */
+  isActivated(sessionId: SessionId): boolean {
+    return this.activated.has(sessionId)
+  }
+
+  /**
    * Select a healthy child through its durable direct-parent address.
    * @param address - catalog-derived parent and child ids.
    */
@@ -379,8 +411,8 @@ export class SessionManager {
   }
 
   /**
-   * Lazy build: return the existing instance or construct one (no auto-open —
-   * open is triggered by the container's select callback).
+   * Return or construct the resident instance without opening history.
+   * The service owns view acquisitions and a saved root's startup read.
    * @param sessionId - the session to get.
    * @returns the resident instance.
    */
@@ -1110,6 +1142,9 @@ export class SessionManager {
     if (selectedAddress !== undefined) void this.refreshSubagents(selectedAddress.parentSessionId)
     if (this.selected !== undefined) void this.refreshSubagents(this.selected)
     for (const parentSessionId of this.openCatalogs) void this.refreshSubagents(parentSessionId)
+    // Re-publish the Agent a restart took: only identities that already went
+    // through explicit activation, so a session restored cold stays cold.
+    if (this.selected !== undefined && this.activated.has(this.selected)) this.activate(this.selected)
     this.scheduleResync()
   }
 

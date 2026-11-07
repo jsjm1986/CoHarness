@@ -23,7 +23,7 @@ it('accepts an incoming invitation while viewing another read-only project witho
     listInvitations={listInvitations} listUsers={listUsers} acceptInvitation={acceptInvitation}
     onCreated={onCreated} onClose={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: t('manager.accept') }))
-  await waitFor(() =>{  expect(screen.queryByText(incoming.projectName)).toBeNull() })
+  await waitFor(() => { expect(screen.queryByText(incoming.projectName)).toBeNull() })
   expect(acceptInvitation).toHaveBeenCalledExactlyOnceWith(incoming.id)
   expect(listInvitations.mock.calls).toEqual([[], []])
   expect(listUsers).not.toHaveBeenCalled()
@@ -58,14 +58,13 @@ it('retains incoming invitations when reading the managed project invitations fa
 it('retains the selected recipient and explains missing computer permission when issuing an invitation', async () => {
   const inviteMember = vi.fn().mockRejectedValue(new CollaborationRequestError(403, 'invitation-computer-required'))
   render(<ProjectManagerModal open mode="members" projectId={9} canManage currentUserId={7} t={t}
-    listInvitations={async () => []} listUsers={async () => [{ id: 8, username: 'zhou', displayName: '周工' }]}
+    initialView="compose" listInvitations={async () => []} listUsers={async () => [{ id: 8, username: 'zhou', displayName: '周工' }]}
     inviteMember={inviteMember} onCreated={vi.fn()} onClose={vi.fn()} />)
-  await screen.findByRole('option', { name: '周工' })
-  const recipient = screen.getByLabelText(t('manager.usernameLabel')) as HTMLSelectElement
-  fireEvent.change(recipient, { target: { value: 'zhou' } })
+  fireEvent.click(await screen.findByLabelText(/选择成员 选择要邀请的成员/))
+  fireEvent.click(await screen.findByRole('menuitem', { name: /周工/ }))
   fireEvent.click(screen.getByRole('button', { name: t('manager.invite') }))
   expect((await screen.findByRole('alert')).textContent).toBe(t('manager.computerRequired'))
-  expect(recipient.value).toBe('zhou')
+  expect(screen.getByLabelText(/选择成员 周工/).textContent).toContain('周工')
   expect(inviteMember).toHaveBeenCalledWith(9, 'zhou', 'rw')
 })
 
@@ -118,7 +117,7 @@ it('retains an open project name and refuses its remote computer after this entr
   expect(screen.getByLabelText(t('manager.nameLabel'))).toHaveProperty('value', '尚未创建的项目')
   const create = screen.getByRole('button', { name: t('manager.create') })
   expect(create).toHaveProperty('disabled', true)
-  fireEvent.submit(create.closest('form')!)
+  fireEvent.submit(screen.getByLabelText(t('manager.nameLabel')).closest('form')!)
   expect(createProject).not.toHaveBeenCalled()
   view.rerender(<ProjectManagerModal {...props} open={false} allowedNodeId={'a' as never} />)
   view.rerender(<ProjectManagerModal {...props} allowedNodeId={'a' as never} />)
@@ -126,5 +125,5 @@ it('retains an open project name and refuses its remote computer after this entr
   expect(screen.queryByLabelText(t('manager.computerLabel'))).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: t('manager.create') }))
   expect(createProject).toHaveBeenCalledExactlyOnceWith('本机新项目', undefined)
-  await waitFor(() =>{  expect(props.onCreated).toHaveBeenCalledWith(19) })
+  await waitFor(() => { expect(props.onCreated).toHaveBeenCalledWith(19) })
 })

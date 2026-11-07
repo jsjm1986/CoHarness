@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-admin-page-read-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-admin-page-read-ownership.md
+document:
+  en: 07065fe4732aa3312bf1dc4e69bdd8c6a8aa6267
+  zh: 49c42f086a02a18d3a3974a02f400cc5e7b0e2cc
+/agent-note-administrator-page-read-ownership:
+  en: d7d6e34728ccd2ee
+  zh: f5cb3ca15bd50137
+/agent-note-administrator-page-read-ownership/problem:
+  en: 673ee4454bf7dd81
+  zh: 76b6a1c02f134d6b
+/agent-note-administrator-page-read-ownership/decision:
+  en: 33afb6d91f62f869
+  zh: ad01b4abea70e0fb
+/agent-note-administrator-page-read-ownership/evidence-and-verification:
+  en: eb45a300e4e4dca1
+  zh: df42004f7ebefbf7
+/agent-note-administrator-page-read-ownership/alternatives-considered:
+  en: 9929034545dc89c8
+  zh: d1c2935f7c5cfbf8
+/agent-note-administrator-page-read-ownership/consequences:
+  en: ca1272adba494c48
+  zh: 6454463493a1d047

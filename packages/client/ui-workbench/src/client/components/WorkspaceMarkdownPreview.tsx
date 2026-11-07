@@ -10,7 +10,7 @@ import type {} from '../markdown/locales.ts'
 import { splitFrontmatter } from '../contract/markdown/frontmatter.ts'
 import type { FrontmatterFieldsProps } from '../markdown/frontmatter-fields.tsx'
 import { useWorkspacePreviewRead } from '../contract/preview/use-preview-read.ts'
-import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import type { WorkspacePreviewActionLabels, WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import { WorkspacePreviewChrome } from './WorkspacePreviewChrome.tsx'
 import css from './Workbench.module.css'
 
@@ -41,7 +41,7 @@ export function WorkspaceMarkdownPreview({ request, read, resource, markdownT, c
   resource: WorkspacePreviewResource
   markdownT: PropsLocale<'sidebarMarkdown'>['t']
   close: () => void
-  labels: { close: string; reload: string; loading: string; changed: string }
+  labels: WorkspacePreviewActionLabels & { loading: string; changed: string }
 }) {
   const input = useMemo(() => resource.metadata.value?.version, [resource.metadata.value?.version])
   const readAll = useMemo(() => async (version: string, signal: AbortSignal): Promise<MarkdownResult> => {

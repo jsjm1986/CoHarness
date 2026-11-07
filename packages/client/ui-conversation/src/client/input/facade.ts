@@ -476,6 +476,7 @@ export class SessionInputShell implements SessionInput {
 
   /** Teardown: abort any in-flight attempt and stop accepting async settlements. */
   dispose(): void {
+    this.mirrorFn = undefined
     const unsubscribe = this.queueUnsubscribe
     this.queueUnsubscribe = undefined
     unsubscribe?.()
@@ -494,9 +495,11 @@ export class SessionInputShell implements SessionInput {
    * Restore an empty, editable input from persisted data and bind its mirror.
    * An existing draft or live submission takes precedence. Binding immediately
    * persists the current semantic draft, including input prepared before mount.
+   * The store writer remains bound until this input is disposed, including
+   * while its Conversation view is hidden. It must not capture view-local state.
    * @param write - store draft write.
    * @param initialDraft - optional JSON-parsed draft from the session store.
-   * @returns the unbind disposer.
+   * @returns an optional early-release disposer for a shorter-lived store owner.
    */
   bindMirror(write: (draft: string | DraftSnapshot) => void, initialDraft?: unknown): () => void {
     if (this.snapshot.draft === '' && initialDraft !== undefined) {

@@ -48,3 +48,12 @@ it.skipIf(process.platform === 'win32')('refuses to publish stop after a native 
   expect(control.hasExited()).toBe(false)
   expect((await store.read())?.phase).toBe('reserved')
 })
+
+it.skipIf(process.platform === 'win32')('reports retained capacity after deadline-killed native commands', async () => {
+  const { store } = await fixture(), control = new LocalRuntimeControl(store, 60)
+  const killed = Object.assign(new Error('native command exceeded its deadline'), { killed: true })
+  native.localLinuxRuntimeEmpty.mockRejectedValue(killed); native.stopLocalLinuxRuntime.mockRejectedValue(killed)
+  await expect(control.terminate(0)).rejects.toThrow('capacity remains occupied')
+  expect(control.hasExited()).toBe(false)
+  expect((await store.read())?.phase).toBe('reserved')
+})

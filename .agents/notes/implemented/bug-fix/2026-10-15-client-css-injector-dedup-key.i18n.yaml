@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-client-css-injector-dedup-key.md
 document:
-  en: 502bfcf0552f4acc87d3d40e5a04594eb4c317b6
-  zh: d6ffe29773118d7bf56281aa626d8145453ca0eb
+  en: 40dfcf8e45ff51161dbeb8a5268d3eba16a075b1
+  zh: d36d5a84c59a4eed605369564cac79a78d4bbb6e
 /agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path:
   en: 07aaae8057ef9d6d
   zh: 47659f454e8b1c57
 /agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/problem:
-  en: 0d3d2204ec128a27
-  zh: 42f5ebf337ab18c1
+  en: 1df26be61a6581b3
+  zh: 443e6ed96102f6f6
 /agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/decision:
-  en: 0707d752800e9c47
-  zh: 1c885cf2a14a0dea
+  en: 3f40e58a58e70f03
+  zh: 0286ec2734c7c855
 /agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/alternatives-considered:
-  en: e717e9f5a42bdebc
-  zh: 51c5d5c9bfd1a037
+  en: 69f05d0b77ea622a
+  zh: 370b2ca88c79a3c1
 /agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/consequences:
-  en: 661f0eccce5b3a69
-  zh: c2606ea07e5c8d5e
+  en: 46201f04f7a45e4f
+  zh: 0f0f4d38ddeed013
 /agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/verification:
-  en: 44c6c335157f00ba
-  zh: f2031b30a14740e5
+  en: 10eb017a55952a45
+  zh: ed25868225e9d810

@@ -108,10 +108,18 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
     const fit = () => {
       if (size === undefined) return
       const { inlineSize: width, blockSize: height } = size
-      const offset = side === 'right' ? 0 : align === 'end' ? width : width / 2
-      const left = Math.max(edgeMargin, Math.min(pos.x - offset, window.innerWidth - edgeMargin - width))
-      const fitsBelow = pos.bottom + gap + height <= window.innerHeight - edgeMargin
-      const fitsAbove = pos.top - gap - height >= edgeMargin
+      // Anchors inside a dialog fit to its surface, not the bare viewport: a
+      // bubble escaping the modal reads as detached from its owner.
+      const hostRect = anchor.current?.closest('[role="dialog"]')?.getBoundingClientRect()
+      const minX = (hostRect?.left ?? 0) + edgeMargin
+      const maxX = (hostRect?.right ?? window.innerWidth) - edgeMargin
+      const minY = (hostRect?.top ?? 0) + edgeMargin
+      const maxY = (hostRect?.bottom ?? window.innerHeight) - edgeMargin
+      if (placement === 'right' && pos.x + width > maxX) placement = 'bottom'
+      const offset = placement === 'right' ? 0 : align === 'end' ? width : width / 2
+      const left = Math.max(minX, Math.min(pos.x - offset, maxX - width))
+      const fitsBelow = pos.bottom + gap + height <= maxY
+      const fitsAbove = pos.top - gap - height >= minY
       if (placement === 'bottom' && !fitsBelow && fitsAbove) placement = 'top'
       else if (placement === 'top' && !fitsAbove && fitsBelow) placement = 'bottom'
       el.style.left = `${left + offset}px`

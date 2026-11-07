@@ -5,7 +5,7 @@ import { Button, IconWarningOutline16, Tooltip } from '@deepseek-ai/dsh-client-u
 import fortuneCss from '@fortune-sheet/react/dist/index.css?inline'
 import type { ExcelFormat } from './format.ts'
 import type { ExcelPreview } from './model.ts'
-import type { LoadedExcelBodyProps } from './LazyExcelBody.tsx'
+import type { LoadedExcelBodyProps } from './viewer.ts'
 import { parseExcel } from './parse.ts'
 import css from './ExcelBody.module.css'
 

@@ -2,16 +2,66 @@
 /** Session terminal recovery hides ordinary work and keeps failed lookup retryable. */
 import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { TerminalRecovery } from '../src/client/TerminalRecovery.tsx'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
-function props(restore: () => Promise<void>): Parameters<typeof TerminalRecovery>[0] {
-  // The renderer supplies Session shares; recovery needs only the injected callback and copy.
-  return { restore, t: makeTranslate(en) } as Parameters<typeof TerminalRecovery>[0]
+function props(restore: Parameters<typeof TerminalRecovery>[0]['restore'], ownership: SnapshotStore<string | undefined> = createSnapshotStore<string | undefined>('owner')): Parameters<typeof TerminalRecovery>[0] {
+  // The renderer supplies Session shares; recovery reads its private ownership hook.
+  return { restore, useOwnership: bindSnapshotSelector(ownership), t: makeTranslate(en) } as Parameters<typeof TerminalRecovery>[0]
 }
+
+it('waits for verified ownership and recovers automatically when the account becomes ready', async () => {
+  const ownership = createSnapshotStore<string | undefined>(undefined)
+  const restore = vi.fn(async () => {})
+  const view = render(<TerminalRecovery {...props(restore, ownership)} />)
+  expect(restore).not.toHaveBeenCalled()
+  expect(view.container.childElementCount).toBe(0)
+  await act(async () => { ownership.set('account:1') })
+  expect(restore).toHaveBeenCalledOnce()
+  expect(view.container.childElementCount).toBe(0)
+})
+
+it('retires the previous account attempt and its error when ownership is withdrawn and replaced', async () => {
+  const ownership = createSnapshotStore<string | undefined>('account:1')
+  const previous = Promise.withResolvers<undefined>()
+  const restore = vi.fn<Parameters<typeof TerminalRecovery>[0]['restore']>()
+    .mockImplementationOnce(() => previous.promise).mockResolvedValue(undefined)
+  const view = render(<TerminalRecovery {...props(restore, ownership)} />)
+  try {
+    const original = restore.mock.calls[0]![0]
+    await act(async () => { ownership.set(undefined) })
+    expect(original.aborted).toBe(true)
+    expect(restore).toHaveBeenCalledOnce()
+    expect(view.container.childElementCount).toBe(0)
+    await act(async () => { ownership.set('account:2') })
+    expect(restore).toHaveBeenCalledTimes(2)
+    await act(async () => { previous.reject(new Error('Previous account failed')); await Promise.allSettled([previous.promise]) })
+    expect(view.container.childElementCount).toBe(0)
+  } finally {
+    previous.resolve(undefined)
+    await act(async () => { await Promise.allSettled([previous.promise]) })
+  }
+})
+
+it('aborts the recovery consumer when the composer unmounts', async () => {
+  const pending = Promise.withResolvers<undefined>()
+  const restore = vi.fn<Parameters<typeof TerminalRecovery>[0]['restore']>(() => pending.promise)
+  const view = render(<TerminalRecovery {...props(restore)} />)
+  try {
+    const signal = restore.mock.calls[0]![0]
+    view.unmount()
+    expect(signal.aborted).toBe(true)
+    pending.resolve(undefined)
+    await act(async () => { await pending.promise })
+  } finally {
+    pending.resolve(undefined)
+    await act(async () => { await pending.promise })
+  }
+})
 
 it('restores on mount without adding controls during a successful lookup', async () => {
   const pending = Promise.withResolvers<undefined>()

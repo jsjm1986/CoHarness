@@ -25,6 +25,7 @@ const listState = (ids: string[], current?: string): SessionListState => ({
   archivedById: {},
   current: current === undefined ? undefined : sid(current),
   phase: 'ready',
+  state: 'idle', error: null,
   subagentsByParent: {},
   jobsBySession: {},
   observedJobs: {},

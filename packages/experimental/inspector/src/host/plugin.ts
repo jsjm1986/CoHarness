@@ -13,7 +13,9 @@ import { resolveInspectorOptions, startInspector, type InspectorHandle, type Ins
 import type { InspectorClientBootstrap } from '../shared/bridge/messages/control.ts'
 import { createInspectorService } from '../shared/service.ts'
 import { publishCordisTree } from './inspection/cordis.ts'
-import { INSPECTOR_BOOTSTRAP_PATH, INSPECTOR_CLIENT_QUERY, readInspectorClientSelection } from '../shared/web.ts'
+import {
+  INSPECTOR_BOOTSTRAP_PATH, INSPECTOR_CLIENT_QUERY, INSPECTOR_SOURCE_SCOPE_QUERY, readInspectorClientSelection,
+} from '../shared/web.ts'
 import { disposeInspectorResources } from '../shared/dispose.ts'
 import { ResourceAdmissionError, resourceBudgetOf, type ResourceBudget } from '@deepseek-ai/dsh-resource-budget'
 import { InspectorStartupCleanupError } from './bridge/controller.ts'
@@ -193,7 +195,8 @@ export async function apply(ctx: Context, config: HostPluginConfig): Promise<voi
           const endpoint = new URL(target)
           try {
             const selected = readInspectorClientSelection(new URL(req.url ?? '/', 'http://inspector.invalid'))
-            if (selected !== undefined) endpoint.searchParams.set(INSPECTOR_CLIENT_QUERY, selected)
+            if (selected === null) endpoint.searchParams.set(INSPECTOR_SOURCE_SCOPE_QUERY, 'host')
+            else if (selected !== undefined) endpoint.searchParams.set(INSPECTOR_CLIENT_QUERY, selected)
           } catch (error) {
             void error // Invalid selectors must not open an unfiltered connection.
             socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')

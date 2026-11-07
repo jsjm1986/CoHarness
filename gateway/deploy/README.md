@@ -168,6 +168,8 @@ Set explicit writable `HGW_PROJECT_RUNTIMES_ROOT`, `HGW_PRINCIPAL_KEY_DIR`, and 
 
 Gateway startup waits with bounded exponential backoff when PostgreSQL is temporarily unavailable (`HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` and `HGW_DATABASE_STARTUP_RETRY_MAX_MS`). Credential, migration checksum, and inactive-organization errors are not retried. Keep the PostgreSQL container under its `unless-stopped` policy and run `docker compose up -d --wait` after Docker Desktop or host recovery; the Gateway must remain unready until the database and selected organization/node are available.
 
+The default database client reports peer EOF before local shutdown as `08006`, including after TLS negotiation, so connection or startup-query interruption can enter the existing retry policy. It preserves PostgreSQL refusal codes and TLS verification failures; intentional connection shutdown does not report a connection failure. Ordinary data queries still propagate failure without automatic repetition; conversation reads use their existing temporary-dependency error. Explicitly supplied custom `Client` implementations own their transport errors.
+
 ## Upgrades and backup
 
 [Current-node configuration](node-configuration/README.md) covers administrator settings, the independent configuration worker and local recovery. Saving and applying are separate actions.

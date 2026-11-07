@@ -22,6 +22,8 @@ Status: implemented
 
 `apply` 变为异步，因为 `BrowserAuth.create` 要等待凭证记录。Web 服务器注册下沉进 `ctx.inject(['webServer'], ...)`，非 Web 组合只保留 RPC 注册表而无需 HTTP 面。测试与脚手架助手经 `authorizeIndex` 在进程内铸 cookie；Node 侧 `hostFetch` 显式附带。
 
+活动事件连接续租保留相同的初始准入与用途限制；[socket 所有的 principal 决策](2026-10-23-event-stream-principal-renewal.zh.md) 拥有资格复核、有界私有合批和签名期限。
+
 ## Alternatives considered
 
 **只保留信任围栏作为唯一准入。** 围栏能挡 DNS rebinding，但 `--trusted-host` 打开监听后挡不住 LAN 对端或信任列表之外的本地进程调用 `/api`。会话与文件系统授权需要真正的凭证，而不是可达性。

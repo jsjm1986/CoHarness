@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto'
-import { copyFile, cp, lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,8 +12,8 @@ const mode = process.argv[2]
 assert.ok(mode === 'src' || mode === 'lib')
 const repo = new URL('../../../../../', import.meta.url), artifact = mode === 'src' ? 'src/index.ts' : 'lib/index.js'
 const entry = name => new URL(`packages/${name}/${artifact}`, repo)
-const { boot, StartupError } = await import(entry('boot/app-boot'))
-const { LocalUserDocFs, recoverDocumentIdentityMount } = await import(entry('attachment/userdoc-local'))
+const { boot } = await import(entry('boot/app-boot'))
+const { LocalUserDocFs } = await import(entry('attachment/userdoc-local'))
 const { UserDocDirectoryId, UserDocUploadOwnerId, UserDocError } = await import(entry('attachment/userdoc'))
 const { serveGatewayDocumentStore } = await import(new URL(`packages/attachment/userdoc-gateway/${mode === 'src' ? 'src/server.ts' : 'lib/server.js'}`, repo))
 const { DirectoryHandle } = await import(new URL(`native/system/packages/entry/${mode === 'src' ? 'src/directory.ts' : 'lib/directory.js'}`, repo))
@@ -33,7 +33,6 @@ let engine = createEngine(), ctx
 const { publicKey } = generateKeyPairSync('ed25519'), token = 'owned-mount-runtime-token'
 const lifetime = new AbortController(), work = new Set(), failures = []
 const expectedWarmFailures = new Set()
-let legacyRefusalExpected = false, legacyRefusals = 0
 const scopes = new Map([7, 9].map(id => [`mount-${id}:${randomUUID()}`, id]))
 const metadata = createServer((request, response) => {
   const task = Promise.resolve().then(async () => {
@@ -44,10 +43,7 @@ const metadata = createServer((request, response) => {
         const owner = envelope.authority.kind === 'execution' ? scopes.get(`${envelope.authority.sessionId}:${envelope.authority.scopeId}`) : undefined
         if (envelope.operation.kind !== 'describe' && owner === undefined) throw new UserDocError('Missing fixture actor.', 'DOCUMENT_PERMISSION_DENIED')
         return actor.run(owner === undefined ? undefined : UserDocUploadOwnerId(`user:${owner}`), async () => {
-          try { await engine.warm() } catch (error) {
-            if (legacyRefusalExpected) { expectedWarmFailures.add(error); legacyRefusals++ }
-            throw error
-          }
+          await engine.warm()
           return operation({ store: engine, signal, ...(owner === undefined ? {} : { ownerId: UserDocUploadOwnerId(`user:${owner}`) }), async finish() {} })
         })
       },
@@ -104,26 +100,13 @@ try {
   assert.equal((await ctx.userDocs.inspectUpload(upload.uploadId)).receivedBytes, 2)
   select(9); await assert.rejects(ctx.userDocs.inspectUpload(upload.uploadId), { code: 'DOCUMENT_UPLOAD_NOT_FOUND' }); select(7)
   output({ operation: 'persistent-remount', providerReady: true, identityPreserved: true, ownerPreserved: true, foreignResume: 'denied' })
-  await stop(); const device = await remount(true)
-  const entries = []
-  const capture = async path => {
-    const info = await lstat(path, { bigint: true }), object = { device, inode: String(info.ino) }
-    if (info.isDirectory()) { entries.push({ path, object }); for (const leaf of await readdir(path)) if (!leaf.endsWith('.lock')) await capture(join(path, leaf)) }
-    else { const bytes = await readFile(path); entries.push({ path, object, sizeBytes: bytes.length,
-      sha256: createHash('sha256').update(bytes).digest('hex'), modifiedAt: Number(info.mtimeNs) / 1e6 }) }
-  }
-  for (const path of Object.values(locations)) await capture(path)
-  const originalDatabase = join(root, 'immutable-database.sqlite'); await copyFile(databasePath, originalDatabase)
+  await stop(); await remount(true)
   engine = createEngine()
-  let refused = false; legacyRefusalExpected = true
-  try { await start(); refused = ctx.get('userDocs') === undefined } catch (error) { assert(error instanceof StartupError); refused = true }
-  assert.equal(refused, true); assert.equal(legacyRefusals, 1); legacyRefusalExpected = false; await stop()
-  await recoverDocumentIdentityMount(locations, { databasePath: originalDatabase, entries })
-  engine = createEngine(); await start(); select(7)
+  await start(); select(7)
   assert.deepEqual((await ctx.userDocs.stat(saved.docId)).identity, saved.identity)
   assert.equal((await ctx.userDocs.inspectUpload(upload.uploadId)).receivedBytes, 2)
   select(9); await assert.rejects(ctx.userDocs.inspectUpload(upload.uploadId), { code: 'DOCUMENT_UPLOAD_NOT_FOUND' }); select(7)
-  output({ operation: 'verified-legacy-recovery', refusedBeforeRecovery: true, providerReady: true, identityPreserved: true, receivedBytes: 2, foreignResume: 'denied' })
+  output({ operation: 'remount-healed', selfHealedOnOpen: true, providerReady: true, identityPreserved: true, receivedBytes: 2, foreignResume: 'denied' })
   await stop(); const copied = join(root, 'copied'); await cp(domain, copied, { recursive: true })
   engine = createEngine({ root: join(copied, 'documents'), filesRoot: join(copied, 'files'), stateRoot: join(copied, 'state') })
   await assert.rejects(engine.warm())

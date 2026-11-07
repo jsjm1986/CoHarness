@@ -115,7 +115,7 @@ async function openBlankSession(target: Page): Promise<void> {
     const current = await currentView.evaluateAll(views => views[0]?.getAttribute('data-sidebar-right-session') ?? null)
     return current !== null && current !== previous
   }).toBe(true)
-  expect(await target.getByText('DONE', { exact: true }).count()).toBe(0)
+  await expect.poll(async () => target.getByText('DONE', { exact: true }).count(), { timeout: 15_000 }).toBe(0)
 }
 
 /** Open the activity tab through the right Sidebar guide capsule. */

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-client-build-environment.md
 document:
-  en: 45ed6c8bc68e0f08157fb56a91ae4f6165e6e431
-  zh: bb9633721401f66b443a65253dcbc0241f45d328
+  en: cb76f6109ac1f2561e745c0c9146eeeb9192074a
+  zh: deac81188d40fd77143c278acf9ae18d2bb48a87
 /agent-note-build-time-public-environment-variables-for-client-business-code:
   en: 4d29a3aedda524d9
   zh: ec01b79cee38328a
@@ -12,8 +12,8 @@ document:
   en: d8601194f318bdbf
   zh: 6d0fc71962d298dd
 /agent-note-build-time-public-environment-variables-for-client-business-code/decision:
-  en: 14c37ad0d48efe5f
-  zh: 4a9ca7dd2eb5d366
+  en: e09903e0a2cb2dd2
+  zh: 9ce96628cc6e2b66
 /agent-note-build-time-public-environment-variables-for-client-business-code/alternatives-considered:
   en: 4cd79df7ef9fc831
   zh: b5b2915879320aed

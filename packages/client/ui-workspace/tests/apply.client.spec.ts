@@ -38,6 +38,7 @@ const sessionState = (items: readonly SessionSummary[], archived: readonly Sessi
   archivedById: Object.fromEntries(archived.map(item => [item.id, item])),
   current: undefined,
   phase: 'ready',
+  state: 'idle', error: null,
   subagentsByParent: {},
   jobsBySession: {},
   observedJobs: {},
@@ -112,10 +113,14 @@ async function bench() {
   // keeps its identity between reads.
   let workspaceSnapshot = workspaceState([])
   let sessionSnapshot = sessionState([])
+  let currentScopeSnapshot: SessionListState | undefined
+  const refreshSessions = vi.fn(async () => {})
+  const refreshWorkspaces = vi.fn(async () => {})
   const subscribe = () => () => {}
   const workspacesSubscribe = vi.fn(subscribe)
   ctx.provide('workspaces', {
     list: { getSnapshot: () => workspaceSnapshot, subscribe: workspacesSubscribe },
+    refresh: refreshWorkspaces,
     create,
     startSession,
     createRuntimeSession,
@@ -133,6 +138,8 @@ async function bench() {
   ctx.provide('sessions', {
     retainInfo: () => createSnapshotStore({ referenceCount: 0, retainedBy: {} }),
     list: { getSnapshot: () => sessionSnapshot, subscribe },
+    currentScopeList: { getSnapshot: () => currentScopeSnapshot ?? sessionSnapshot, subscribe },
+    refresh: refreshSessions,
     beginNavigation,
     open,
     retain,
@@ -171,9 +178,11 @@ async function bench() {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, startSession, createRuntimeSession, refreshPersonalDirectory, usingRuntime, rename,
     insertSessionBefore, open, selectPanel, search, renameSession, binding, retain, using, fork,
     archiveSession, unarchiveSession, pinSession, unpinSession, workspacesSubscribe,
+    refreshSessions, refreshWorkspaces,
     viewportState, replaceActive,
     setWorkspaces: (snapshot: WorkspaceListState): void => { workspaceSnapshot = snapshot },
     setSessions: (snapshot: SessionListState): void => { sessionSnapshot = snapshot },
+    setCurrentScopeSessions: (snapshot: SessionListState): void => { currentScopeSnapshot = snapshot },
   }
 }
 
@@ -218,6 +227,34 @@ function viewInstance(slots: SlotRegistry) {
 const settled = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0) })
 
 describe('ui-workspace apply', () => {
+  it('retries only failed lists in the authenticated current space', async () => {
+    const b = await bench()
+    try {
+      declare(b.slots, 'sidebar.workspaces')
+      await b.ctx.plugin({ inject: [...inject], apply }).await()
+      const injected = faceOf(b.slots.entries('sidebar.workspaces')[0]!) as WorkspaceBrowserInjected
+      const failure = { code: 'internal' as const, message: 'synthetic list failure', details: {} }
+      b.setSessions({ ...sessionState([]), state: 'error', error: failure })
+      b.setCurrentScopeSessions(sessionState([]))
+      injected.retryLists()
+      expect(b.refreshSessions).not.toHaveBeenCalled()
+      expect(b.refreshWorkspaces).not.toHaveBeenCalled()
+      b.setCurrentScopeSessions({ ...sessionState([]), state: 'error', error: failure })
+      injected.retryLists()
+      expect(b.refreshSessions).toHaveBeenCalledTimes(1)
+      expect(b.refreshWorkspaces).not.toHaveBeenCalled()
+      b.setCurrentScopeSessions({ ...sessionState([]), state: 'loading' })
+      b.setWorkspaces({ ...workspaceState([]), state: 'error', error: failure })
+      injected.retryLists()
+      expect(b.refreshSessions).toHaveBeenCalledTimes(1)
+      expect(b.refreshWorkspaces).toHaveBeenCalledTimes(1)
+      b.setCurrentScopeSessions({ ...sessionState([]), state: 'error', error: failure })
+      injected.retryLists()
+      expect(b.refreshSessions).toHaveBeenCalledTimes(2)
+      expect(b.refreshWorkspaces).toHaveBeenCalledTimes(2)
+    } finally { await b.ctx.fiber.dispose() }
+  })
+
   it('computer creation finishes when its conversation opens without waiting for directory metadata', async () => {
     const b = await bench()
     declare(b.slots, 'sidebar.workspaces')

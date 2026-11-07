@@ -70,6 +70,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
   private controlChannels = new Set<Duplex>()
   /** Unload's exit-listener disposer remains available until retained native owners and control endpoints are gone. */
   private retireHostExit: (() => void) | undefined
+  private hostExitListener: (() => void) | undefined
   /** Test hook: process, spill, and platform operations forwarded to spawnSubprocess. */
   internals: SpawnInternals = {}
   /** Provider-lifetime latch suppressing repeated weaker-containment warnings. */
@@ -93,9 +94,9 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     super(ctx)
     ctx.effect(() => {
       const onHostExit = (): void => { this.terminateForHostExit() }
-      process.prependListener('exit', onHostExit)
+      this.hostExitListener = onHostExit
+      this.armHostExit()
       return async () => {
-        this.retireHostExit = () => { process.off('exit', onHostExit) }
         try { await this.disposeManagedProcesses() }
         finally { this.retireHostExitIfQuiescent() }
       }
@@ -104,6 +105,18 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
 
   /** Spill failures reach the plugin logger; the log line is the only trace of why a result has no spill path. */
   private readonly reportSpillFailure = logSpillFailure(this.ctx.logger, 'subprocess-local')
+
+  /**
+   * Register the host-exit cleanup while a tracked target exists. Retirement
+   * releases the listener when every set empties; the next spawn re-arms it so
+   * an idle gap cannot leave a later launch without exit protection.
+   */
+  private armHostExit(): void {
+    if (this.retireHostExit !== undefined || this.hostExitListener === undefined) return
+    const listener = this.hostExitListener
+    process.prependListener('exit', listener)
+    this.retireHostExit = () => { process.off('exit', listener) }
+  }
 
   private retireHostExitIfQuiescent(): void {
     if (this.live.size > 0 || this.terminals.size > 0 || this.controlChannels.size > 0) return
@@ -224,9 +237,11 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       if (linuxScope !== undefined) this.watchLinuxScopeStart(handle.done, linuxScope.generation)
     }
     this.live.add(handle)
+    this.armHostExit()
     const control = handle.control
     if (control !== undefined) {
       this.controlChannels.add(control)
+      this.armHostExit()
       control.once('close', () => { this.controlChannels.delete(control); this.retireHostExitIfQuiescent() })
     }
     // Release ownership only once the whole managed range is gone, not at direct-child
@@ -367,6 +382,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       spec.shellActivity === true,
     )
     this.terminals.add(handle)
+    this.armHostExit()
     if (linuxScope !== undefined) this.watchLinuxScopeStart(handle.done, linuxScope.generation)
     const release = async (): Promise<void> => {
       // terminate() can wait on this direct-exit promise.

@@ -20,6 +20,9 @@ export function TerminalsPage() {
     failed: t('stateFailed'), stopping: t('stateStopping'),
   }
   const [targets, setTargets] = useState<Target[]>([])
+  const [projects, setProjects] = useState<ReadonlyArray<{ id: number; name: string }>>([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [projectsError, setProjectsError] = useState('')
   const [selected, setSelected] = useState('')
   const [runtime, setRuntime] = useState<RuntimeCatalogEntry>()
   const [runtimeAvailable, setRuntimeAvailable] = useState(false)
@@ -35,7 +38,15 @@ export function TerminalsPage() {
 
   useEffect(() => {
     let disposed = false
-    void Promise.all([listUsers(), listProjects()]).then(([users, projects]) => {
+    setLoadingProjects(true); setProjectsError('')
+    const projectRead = listProjects().then(rows => {
+      if (!disposed) setProjects(rows)
+      return rows
+    }).catch((cause: unknown) => {
+      if (!disposed) setProjectsError(messageOf(cause))
+      throw cause
+    }).finally(() => { if (!disposed) setLoadingProjects(false) })
+    void Promise.all([listUsers(), projectRead]).then(([users, projects]) => {
       if (disposed) return
       setTargets([...users.map(user => ({ kind: 'user' as const, id: user.id, label: t('targetUser', { name: user.displayName, username: user.username }) })),
         ...projects.map(project => ({ kind: 'project' as const, id: project.id, label: t('targetProject', { name: project.name }) }))])
@@ -73,7 +84,9 @@ export function TerminalsPage() {
 
   return <div className="page">
     <PageHeader title={t('pageTitle')} description={t('pageDescription')} />
-    <TerminalPermissions />
+    <TerminalPermissions projects={{
+      items: projects, loading: loadingProjects, error: projectsError, reload: () => setOwnerReload(value => value + 1),
+    }} />
     <Section title={t('sectionProcesses')}>
       <ErrorBanner message={error} />
       <div className="formGrid">

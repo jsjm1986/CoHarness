@@ -25,13 +25,14 @@ function Manager({ target, invalidate, composition, t }: { target: PluginManagem
       if (frame.type === 'log') controller.appendLog(frame.chunk)
       else if (frame.type === 'progress') controller.installProgress(frame.progress)
     }, invalidate)
-    const controller = new PluginManagerController({ remote })
+    const controller = new PluginManagerController({ remote, onCatalog: composition.acceptCatalog, onWriteSettled: composition.refresh })
+    const unbindLiveRefresh = composition.bindLiveRefresh(() => controller.load())
     const settings = new ProfileSettingsController(remote.settings)
     setOwner({ controller, settings, abort })
     const refresh = () => { void controller.load() }
     window.addEventListener('focus', refresh)
-    return () => { controller.dispose(); settings.dispose(); abort.abort(); window.removeEventListener('focus', refresh) }
-  }, [target, invalidate])
+    return () => { unbindLiveRefresh(); controller.dispose(); settings.dispose(); abort.abort(); window.removeEventListener('focus', refresh) }
+  }, [target, invalidate, composition.acceptCatalog, composition.bindLiveRefresh, composition.refresh])
   return owner === null ? <LoadingState label={t('pageConnecting')} /> : <ManagerView controller={owner.controller} settings={owner.settings} composition={composition} t={t} />
 }
 function ManagerView({ controller, settings, composition, t }: { controller: PluginManagerController; settings: ProfileSettingsController; composition: PluginComposition; t: Translate }) {
@@ -41,10 +42,6 @@ function ManagerView({ controller, settings, composition, t }: { controller: Plu
   const configuration = useSyncExternalStore(settings.state.subscribe, settings.state.getSnapshot, settings.state.getSnapshot)
   const ledger = useSyncExternalStore(settings.ledger.subscribe, settings.ledger.getSnapshot, settings.ledger.getSnapshot)
   useEffect(() => { if (state.status !== 'idle' && state.status !== 'loading') void settings.load() }, [state.packages, state.status, settings])
-  // A manager-side write moves the same composition the matrix and row controls display.
-  const compositionRef = useRef(composition)
-  useEffect(() => { compositionRef.current = composition })
-  useEffect(() => { if (state.busy.length === 0) compositionRef.current.refresh() }, [state.busy])
   return <><ErrorBanner message={configuration.error} />
     {configuration.error ? <Button onClick={() => { void settings.load() }}>{t('configReload')}</Button> : null}
     {configuration.loading ? <LoadingState label={t('configLoading')} /> : null}
@@ -177,8 +174,10 @@ function CompositionView({ composition, open, t }: { readonly composition: Plugi
 export function PluginsPage() {
   const t = useMemo(() => translatePlugin(adminLanguage()), [])
   const [userTargets, setUserTargets] = useState<Array<{ key: string; kind: 'user' | 'project'; id: number; label: string }>>([])
-  const { projects: projectChoices, setProjects, readNames, moreNames } = useProjectChoices()
-  const targets = useMemo(() => [...userTargets, ...projectChoices.map(project => ({ key: `project:${project.id}`, kind: 'project' as const, id: project.id, label: t('targetProject', { name: project.name }) }))], [userTargets, projectChoices, t])
+  const { projects, setProjects, readNames, moreNames } = useProjectChoices()
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [projectsError, setProjectsError] = useState('')
+  const targets = useMemo(() => [...userTargets, ...projects.map(project => ({ key: `project:${project.id}`, kind: 'project' as const, id: project.id, label: t('targetProject', { name: project.name }) }))], [userTargets, projects, t])
   const [selected, setSelected] = useState('')
   const navigation = useProtectedNavigation()
   const [runtime, setRuntime] = useState<RuntimeCatalogEntry>()
@@ -191,12 +190,21 @@ export function PluginsPage() {
   const invalidate = useCallback((message: string) => {
     generation.current++; setBinding(null); setLoading(false); setError(message)
   }, [])
+  const reloadOwners = () => { setBinding(null); setReload(value => value + 1) }
   useEffect(() => {
     let disposed = false
-    void Promise.all([listUsers(), listProjects(undefined, 'directory')]).then(([users, projects]) => {
+    setLoadingProjects(true); setProjectsError('')
+    const projectRead = listProjects(undefined, 'directory').then(rows => {
+      if (!disposed) setProjects(rows)
+      return rows
+    }).catch((cause: unknown) => {
+      if (!disposed) setProjectsError(String(cause))
+      throw cause
+    }).finally(() => { if (!disposed) setLoadingProjects(false) })
+    void Promise.all([listUsers(), projectRead]).then(([users]) => {
       if (disposed) return
-      setProjects(projects)
       setUserTargets(users.map(user => ({ key: `user:${user.id}`, kind: 'user' as const, id: user.id, label: t('targetUser', { name: user.displayName }) })))
+      setError('')
     }).catch(cause => { if (!disposed) setError(String(cause)) })
     return () => { disposed = true }
   }, [reload, t])
@@ -241,7 +249,7 @@ export function PluginsPage() {
       {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} t={t} />}
     </Section>
     {binding === null ? null : <div className="adminRouteContent" inert={!runtimeAvailable || undefined} aria-disabled={!runtimeAvailable || undefined}><BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} /></div>}
-    <PluginPermissions />
+    <PluginPermissions projects={{ items: projects, loading: loadingProjects, error: projectsError, reload: reloadOwners }} />
   </div>
 }
 

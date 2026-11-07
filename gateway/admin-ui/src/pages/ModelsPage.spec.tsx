@@ -1,10 +1,12 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORGANIZATION_MODEL_SETTINGS_SCHEMA } from '../../../src/organization-model-settings-schema.ts'
 import * as api from '../api.ts'
 import { PendingEditsProvider } from '../pending-edits.tsx'
 import { ModelsPage } from './ModelsPage.tsx'
+import { OrganizationModelsEditor } from '../components/OrganizationModelsEditor.tsx'
 
 vi.mock('../api.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api.ts')>()
@@ -134,6 +136,7 @@ describe('ModelsPage', () => {
       effective: { version: 1, defaultAllowed: false, models: [] },
       overrides: [],
     })
+    vi.mocked(api.getDigestModelSettings).mockResolvedValue({ model: null, candidates: [] })
     vi.mocked(api.saveModel).mockResolvedValue(undefined)
     vi.mocked(api.setModelAccess).mockResolvedValue(undefined)
   })
@@ -214,7 +217,7 @@ describe('ModelsPage', () => {
       provider: 'org-primary',
       baseURL: profile.baseURL,
       api: profile.api,
-    })))
+    }), expect.any(AbortSignal)))
     expect(await screen.findByText('chat-probed')).toBeTruthy()
   })
 

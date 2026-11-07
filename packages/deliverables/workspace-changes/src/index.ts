@@ -221,8 +221,9 @@ export function apply(ctx: Context, config: Config): void {
         reviewStore: store,
         /* v8 ignore start -- the POSIX execution world is exercised only by POSIX-gated suites. */
         ...execution === undefined ? {} : { execution },
+        git: execution === undefined ? localGit : gitResolver(execution),
         /* v8 ignore stop */
-        git: execution === undefined ? localGit : gitResolver(execution), tempRoot: tmpdir(), maxFiles: config.maxFiles,
+        tempRoot: tmpdir(), maxFiles: config.maxFiles,
         maxFileBytes: config.maxFileBytes, diffTimeoutMs: config.diffTimeoutMs,
         warn: (message) => { ctx.logger.warn(message) },
       })
@@ -263,7 +264,7 @@ export function apply(ctx: Context, config: Config): void {
     if (!storageRechecked.has(agent.session)) {
       try { await store.probe(agent.id, storageState.requiredBytes) } catch (error) {
         recorder.failStorage(turn, error)
-        throw new Error('Historical review storage is not ready. Resolve its capacity or access problem before continuing.')
+        throw new Error('Historical review storage is not ready. Resolve its capacity or access problem before continuing.', { cause: error })
       }
       lifetime.signal.throwIfAborted()
       storageRechecked.add(agent.session)

@@ -218,36 +218,6 @@ describe('resetConnected (reconnect hard)', () => {
   })
 })
 
-describe('warm', () => {
-  it('launches a pull from cold, again after failure, and never over pending/ready', async () => {
-    const { dir, pull, countOf } = bench()
-    dir.warm(S1)
-    expect(countOf(S1)).toBe(1)
-    dir.warm(S1) // pending → no second pull
-    expect(countOf(S1)).toBe(1)
-
-    pull(S1, 0).reject(new Error('boom'))
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(dir.status(S1)).toBe('failed')
-    dir.warm(S1) // failed → retry
-    expect(countOf(S1)).toBe(2)
-
-    pull(S1, 1).resolve(CMDS)
-    await Promise.resolve()
-    await Promise.resolve()
-    dir.warm(S1) // ready → no-op
-    expect(countOf(S1)).toBe(2)
-  })
-
-  it('warms keys independently', () => {
-    const { dir, countOf } = bench()
-    dir.warm(S2)
-    expect(countOf(S2)).toBe(1)
-    expect(countOf(S1)).toBe(0)
-  })
-})
-
 describe('ensureReady (per key)', () => {
   const signal = () => new AbortController().signal
 

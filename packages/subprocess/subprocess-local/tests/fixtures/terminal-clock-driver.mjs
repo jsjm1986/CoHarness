@@ -130,6 +130,19 @@ for (const scenario of selected === 'all' ? ['normal', 'frozen', 'recovery', 'pa
         if (unreadable && args[0] === '/bin/ps') { observationRefusals++; throw expected }
         return originalCommand(...args)
       }
+      // The failed unload's host-exit finalizer may force-stop live members
+      // where identity signalling survives the observation fault: /bin/ps is
+      // already refused on darwin, and on linux each signal's identity fence
+      // reads the target's own stat row — refuse the sibling's so its shell
+      // provably survives and stays unconfirmed for the retention checks
+      // below, instead of racing the kill's done→release() settle edge.
+      if (process.platform === 'linux') {
+        const siblingStat = `/proc/${sibling.pid}/stat`
+        filesystem.readFileSync = (...args) => {
+          if (unreadable && args[0] === siblingStat) { observationRefusals++; throw expected }
+          return originalReadFile(...args)
+        }
+      }
       syncBuiltinESMExports()
       unreadable = true
       await ctx.fiber.dispose()

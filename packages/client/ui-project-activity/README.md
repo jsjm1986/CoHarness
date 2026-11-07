@@ -11,6 +11,8 @@ Project activity plugin, browser half: a right-Sidebar tab type (`activity`) tha
 
 The tab type follows the selected Session’s owning Runtime; unqualified standalone Sessions use the page’s project policy. The apply body subscribes to Session selection and policy changes, so the guide entry appears for project Sessions and leaves for personal Sessions. Each body captures its owner once: feed pages, journal reads, manual generation and conversation links retain the complete Runtime UUID even when another browser tab changes the scope cookie. The Gateway checks current access for every request. View state remains Session-scoped. A `400`/`404` on the progress route renders as a feature-off page. The Host half is inert; the plugin mounts through the Client loader only.
 
+Conversation markers use the shared theme palette to identify conversations; their colors do not indicate task status.
+
 The `/client` exports are the plugin body (`apply`/`inject`), the feed wire types, the store factory and state types, and the injected face.
 
 ## Summary

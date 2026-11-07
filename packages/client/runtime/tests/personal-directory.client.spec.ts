@@ -125,7 +125,7 @@ it('creates in a bootstrap Workspace before the personal directory has loaded', 
       canOpenPath: true, runtimeTarget: target(1) })
     f.api.onWorkspaceList = async () => ok({ items: [workspace] })
     f.api.onCreate = async () => ok({ sessionId: raw })
-    f.workspaces.handleConnected()
+    void f.workspaces.handleConnected()
     await Promise.all([f.workspaces.refresh(), f.base.refresh()])
     const created = await f.workspaces.createRuntimeSession(target(1), workspace.workspaceId)
     expect(created).toBe(clientSessionKey(target(1), raw))
@@ -316,14 +316,78 @@ it('lets a new navigation supersede the saved target while the initial directory
   } finally { await f.ctx.fiber.dispose() }
 })
 
-it('keeps the bootstrap connection pinned when the same Runtime is reported on another computer', async () => {
+it('adopts the migrated computer on the bootstrap target while stale requests stay rejected', async () => {
   const f = await fixture()
   const moved = { ...target(1), nodeId: target(2).nodeId, nodeName: target(2).nodeName }
   try {
     f.sessions.setBaseRuntimeTarget(moved)
-    expect(f.sessions.bootstrapRuntimeTarget()).toEqual(target(1))
-    await expect(f.sessions.ensureSession(moved, 'reassigned' as SessionId)).rejects.toThrow('different computer')
+    expect(f.sessions.bootstrapRuntimeTarget()).toEqual(moved)
     expect(f.forTarget).not.toHaveBeenCalled()
+  } finally { await f.ctx.fiber.dispose() }
+})
+
+it('does not overwrite a completed user selection when the saved restore lands late', async () => {
+  const storage = new Map<string, string>()
+  const rawSaved = 'saved-on-b' as SessionId, rawLocal = 'picked-local' as SessionId
+  const saved = clientSessionKey(target(2), rawSaved)
+  const picked = clientSessionKey(target(1), rawLocal)
+  storage.set(`dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`, JSON.stringify({ sessionId: saved }))
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  vi.stubGlobal('sessionStorage', { getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value) } })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  f.api.onList = async () => ok({ items: [{ sessionId: rawLocal, updatedAt: 1, running: false, blank: false }] })
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: rawSaved, updatedAt: 1, running: false, blank: false }] })
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : new Response(JSON.stringify({ activeRuntime: target(1),
+      personalWorkspaces: [group(1), group(2)], items: [{ sessionId: rawSaved, runtime: target(2),
+        title: 'Saved on B', updatedAt: 1, blank: false }] }), { headers: { 'content-type': 'application/json' } })))
+  try {
+    await f.base.refresh()
+    // The user selection commits before the ambient restore begins.
+    f.sessions.open(rawLocal)
+    expect(f.sessions.list.getSnapshot().current).toBe(picked)
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+      executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    // The restore sees the committed selection and yields before opening B's
+    // runtime at all: the committed user's Session keeps the current slot.
+    await vi.waitFor(() => { expect(f.workspaces.list.getSnapshot().directoryState).toBe('ready') })
+    expect(f.remoteApi.callsOf('session.history')).toHaveLength(0)
+    expect(f.sessions.list.getSnapshot().current).toBe(picked)
+  } finally { await f.ctx.fiber.dispose() }
+})
+
+it('still restores the saved Session over an ambient selection the user never committed', async () => {
+  const storage = new Map<string, string>()
+  const rawSaved = 'saved-on-b' as SessionId, rawLocal = 'ambient-local' as SessionId
+  const saved = clientSessionKey(target(2), rawSaved)
+  storage.set(`dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`, JSON.stringify({ sessionId: saved }))
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  vi.stubGlobal('sessionStorage', { getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value) } })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  f.api.onList = async () => ok({ items: [{ sessionId: rawLocal, updatedAt: 1, running: false, blank: false }] })
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: rawSaved, updatedAt: 1, running: false, blank: false }] })
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : new Response(JSON.stringify({ activeRuntime: target(1),
+      personalWorkspaces: [group(1), group(2)], items: [{ sessionId: rawSaved, runtime: target(2),
+        title: 'Saved on B', updatedAt: 1, blank: false }] }), { headers: { 'content-type': 'application/json' } })))
+  try {
+    await f.base.refresh()
+    // An ambient selection (startup restore, retained pane) never activated
+    // its Agent, so the account's last personal selection still supersedes it.
+    f.sessions.open(rawLocal, { activate: false })
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+      executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(saved) })
   } finally { await f.ctx.fiber.dispose() }
 })
 

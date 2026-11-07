@@ -6,6 +6,7 @@ import { runGatewayChildCommand } from './child-command.ts'
 import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerLease, type LocalRuntimeOwnerRecord } from './local-runtime-owner.ts'
 import { localKernelBootId } from './local-runtime-protocol.ts'
 import { localLinuxRuntimeEmpty, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
+import { isDeadlineKilledCommand } from './child-command.ts'
 
 const POLL_MS = 25
 
@@ -68,7 +69,13 @@ export class LocalRuntimeControl implements InstanceProc {
         }
       }
       if (record.nativeRange === 'linux-slice' && record.bootId === bootId && performance.now() >= forceAfter) {
-        await stopLocalLinuxRuntime(record, Math.max(1, Math.floor(Math.min(deadline - performance.now(), this.timeoutMs))))
+        try {
+          await stopLocalLinuxRuntime(record, Math.max(1, Math.floor(Math.min(deadline - performance.now(), this.timeoutMs))))
+        } catch (error) {
+          // A deadline-killed native command is one more unconfirmed round; the
+          // loop deadline alone reports the retained capacity.
+          if (!isDeadlineKilledCommand(error)) throw error
+        }
       }
       if (process.platform === 'win32' && record.bootId === bootId && record.groupPid !== undefined
         && performance.now() >= forceAfter) {
@@ -99,8 +106,14 @@ export class LocalRuntimeControl implements InstanceProc {
         await this.sweepOrphans(current.groupPid)
       }
       if (current.nativeRange === 'linux-slice') {
-        if (!await localLinuxRuntimeEmpty(current, this.timeoutMs)) return false
-        await stopLocalLinuxRuntime(current, this.timeoutMs)
+        try {
+          if (!await localLinuxRuntimeEmpty(current, this.timeoutMs)) return false
+          await stopLocalLinuxRuntime(current, this.timeoutMs)
+        } catch (error) {
+          // A deadline-killed slice query could not confirm absence.
+          if (!isDeadlineKilledCommand(error)) throw error
+          return false
+        }
       }
       await this.store.cancel()
       if (current.phase !== 'stopped') {

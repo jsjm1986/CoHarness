@@ -13,6 +13,7 @@ import {
   type ProjectAuthorityView,
   type ProjectReadAuthorityView,
   type ProjectScopeView,
+  type ProjectThemePolicy,
 } from '../collaboration.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 import { publicNumber } from './runtime-context.ts'
@@ -159,7 +160,11 @@ export class PostgresCollaborationService {
   }
 
   async projectsForUser(userId: number): Promise<ProjectScopeView[]> {
-    return (await this.projectAuthorities(userId, undefined, true)).map(({ administrator: _, ...project }) => project)
+    const nodeScoped = this.catalogEntryNodeId !== undefined
+    return (await this.projectAuthorities(userId, undefined, true)).map(
+      ({ administrator: _, canManage: _c, uiThemePolicy: _t, origin: _o, owner: _w, nodeId, nodeName, ...project }) =>
+        nodeScoped ? { ...project, nodeId, nodeName } : project,
+    )
   }
 
   /** Final browser read admission uses current directory authority without loading node-owned names or paths. */

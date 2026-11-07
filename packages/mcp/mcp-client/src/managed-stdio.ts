@@ -139,7 +139,7 @@ export class McpProcessOwner {
     return this.stopping ??= (async () => {
       this.lifetime.abort(new Error('MCP process owner disposed'))
       const results = await Promise.allSettled([...this.active].map(transport => transport.close()))
-      const failures: unknown[] = results.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
+      const failures: unknown[] = results.flatMap((result): unknown[] => result.status === 'rejected' ? [result.reason] : [])
       if (failures.length > 0) throw new AggregateError(failures, 'MCP managed process cleanup failed')
     })().catch((error: unknown) => { this.stopping = undefined; throw error })
   }

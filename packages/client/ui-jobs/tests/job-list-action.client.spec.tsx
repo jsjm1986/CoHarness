@@ -51,6 +51,7 @@ function props(
     archivedById: {},
     current: SESSION,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {},
     jobsBySession: jobs.length > 0 ? { [SESSION]: jobs } : {},
     // The pooled aggregate qualifies observed rows with the runtime scope;

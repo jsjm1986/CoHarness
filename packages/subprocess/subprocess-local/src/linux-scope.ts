@@ -629,6 +629,17 @@ function signalChildGroup(child: ReturnType<typeof spawn>, signal: 'SIGTERM' | '
   return signalLinuxDirectProcess(child.pid as number, () => process.kill(child.pid as number, signal))
 }
 
+/**
+ * Runner environment scoped to this launch's private directory: the host
+ * `TMPDIR` can name an unusable path (a regular file, a removed mount), while
+ * the source-mode loader and runner internals still need a writable temporary
+ * location before the request is consumed. The launch directory is private
+ * (0700) and removed with the launch files.
+ */
+function scopeRunnerEnvironment(files: LinuxLaunchFiles, invocation: RunnerInvocation): NodeJS.ProcessEnv {
+  return { ...runnerEnvironment(files.requestPath, invocation), TMPDIR: files.directory }
+}
+
 /** Linux PTY invocation and owner for the exact one-shot scope/bootstrap. */
 export interface LinuxTerminalScopeLaunch {
   command: string
@@ -663,7 +674,7 @@ export function prepareLinuxTerminalScope(
     command: internals.systemdRun ?? 'systemd-run',
     args,
     cwd: process.cwd(),
-    env: runnerEnvironment(files.requestPath, invocation),
+    env: scopeRunnerEnvironment(files, invocation),
     bindOwner: direct => new SystemdScopeOwner(
       `${unitBase}.scope`,
       startup,
@@ -704,7 +715,7 @@ export function launchLinuxScope(
   try {
     child = (internals.spawn ?? spawn)(internals.systemdRun ?? 'systemd-run', args, {
       cwd: process.cwd(),
-      env: runnerEnvironment(files.requestPath, invocation),
+      env: scopeRunnerEnvironment(files, invocation),
       stdio: runnerStdio(spec, false),
       detached: true,
     })

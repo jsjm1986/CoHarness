@@ -562,6 +562,7 @@ export class SlotRegistry extends Service {
       sessions: {
         list: sessions.list,
         provideInfo: sessions.currentProvideInfo,
+        ...(sessions.provideInfoRevision === undefined ? {} : { provideInfoRevision: sessions.provideInfoRevision }),
         provideInfoFor: id => sessions.provideInfoFor(id as SessionId),
       },
       workspaces: { list: workspaces.list },

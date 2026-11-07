@@ -89,16 +89,6 @@ export class CommandDirectory {
   }
 
   /**
-   * Fire-and-forget prewarm of one session (the command source's scope-birth
-   * warm hook lands here).
-   * @param sessionId - session key.
-   */
-  warm(sessionId: SessionId): void {
-    const entry = this.entry(sessionId)
-    if (entry.state === 'cold' || entry.state === 'failed') void this.refresh(sessionId)
-  }
-
-  /**
    * Request a fresh catalog, sharing one RPC and coalescing pending invalidations.
    * A ready snapshot serves during a soft refresh; a reset drops it immediately.
    * @param sessionId - session key.

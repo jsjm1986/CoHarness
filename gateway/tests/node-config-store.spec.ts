@@ -38,6 +38,23 @@ it('keeps saved settings unapplied across restarts and rejects stale or wrong-no
   expect(await readFile(f.cfg.nodeConfigFile, 'utf8')).not.toContain('postgresql:')
 })
 
+it('retains validated private event renewal settings in the node configuration owner', async () => {
+  const f = await fixture(), initial = await f.store.view(1)
+  expect(initial.desired).toMatchObject({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'true',
+    HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS: '10000', HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS: '5000', HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '64' })
+  const desired = { ...initial.desired, HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'false',
+    HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS: '4000', HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS: '2000', HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '16' }
+  await f.store.save(f.identity, initial.revision, desired, 1)
+  const second = new NodeConfigurationStore(f.identity, f.cfg, f.env, isolatedNodeConfigurationAuthority)
+  await second.initialize()
+  expect((await second.view(1)).desired).toEqual(desired)
+  const legacy = { ...desired } as Record<string, unknown>
+  for (const key of ['HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED', 'HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH']) delete legacy[key]
+  expect(parseNodeSettingValues(legacy, { ...f.env, HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '8' })).toMatchObject({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'true', HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '8' })
+  expect(() => parseNodeSettingValues({ ...desired, HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'yes' }, f.env)).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED')
+  expect(() => parseNodeSettingValues({ ...desired, HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '1025' }, f.env)).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH')
+})
+
 it('queues exactly the reviewed revision and prevents edits while an apply is pending', async () => {
   const f = await fixture(), initial = await f.store.view(1)
   await expect(f.store.requestApply(f.identity, 0, 1)).rejects.toThrow('already-applied')

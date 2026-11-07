@@ -1851,17 +1851,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
     if (pathname === '/account/api/context' && req.method === 'GET') {
       res.setHeader('cache-control', 'no-store')
-      const [resolved, scopes] = await Promise.all([
-        selectedContext(),
-        deps.collaboration?.projectsForUser(user.id) ?? Promise.resolve([]),
-      ])
-      // `projectsForUser` already establishes the membership set. Use one
-      // scoped batch detail query for owner flags instead of scanning the
-      // organization catalog or issuing one detail query per membership.
+      const resolved = await selectedContext()
+      const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
+      // Membership resolution supplies the authorized ids for owner and theme metadata.
       const scopedIds = scopes.map(scope => scope.projectId)
-      const scopedDetails = deps.projects.getByIds === undefined
-        ? (scopedIds.length === 0 ? [] : await deps.projects.list())
-        : await deps.projects.getByIds(scopedIds, 'directory')
+      const scopedDetails = deps.projects.getScopeMetadataByIds !== undefined
+        ? await deps.projects.getScopeMetadataByIds(scopedIds)
+        : deps.projects.getByIds === undefined
+          ? (scopedIds.length === 0 ? [] : await deps.projects.list())
+          : await deps.projects.getByIds(scopedIds)
       const details = new Map(scopedDetails.map(project => [project.id, project]))
       const projects = await Promise.all(scopes.map(async (scope) => {
         const detail = details.get(scope.projectId)
@@ -2773,6 +2771,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     const settlePerformance = performanceObserver.beginRequest('websocket')
     let upgradeStatus = 400
     socket.once('close', (hadError: boolean) => { settlePerformance(upgradeStatus, hadError) })
+    // The handler owns this socket until a channel or proxy adopts it, and the
+    // authorization window awaits a database round-trip: a peer reset in that
+    // window would otherwise reach 'error' with no listener and take down the
+    // process. The 'close' listener above still records the failed upgrade.
+    socket.on('error', () => {})
     const finish = async (): Promise<void> => {
       const pathname = new URL(req.url ?? '/', 'http://x').pathname
       if (pathname === NODE_CHANNEL_PATH) {

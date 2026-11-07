@@ -24,8 +24,9 @@ import {
   hostFileApplicationsValueSchema, hostListDirectoryValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema,
 } from '../api/host.schema.ts'
 import {
-  sessionCancelValueSchema,
+  sessionActivateValueSchema,
   sessionAttachmentValueSchema,
+  sessionCancelValueSchema,
   sessionCreateResultSchema,
   sessionForkValueSchema,
   sessionHistoryIndexValueSchema,
@@ -100,6 +101,7 @@ export interface IApiClient {
     attachment(payload: RequestPayload<'session.attachment'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.attachment'>>>
     updateQueue(payload: RequestPayload<'session.updateQueue'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.updateQueue'>>>
     cancel(payload: RequestPayload<'session.cancel'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.cancel'>>>
+    activate(payload: RequestPayload<'session.activate'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.activate'>>>
   }
   subagents: {
     history(payload: RequestPayload<'subagent.history'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.history'>>>
@@ -203,6 +205,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.attachment': sessionAttachmentValueSchema,
   'session.updateQueue': sessionUpdateQueueValueSchema,
   'session.cancel': sessionCancelValueSchema,
+  'session.activate': sessionActivateValueSchema,
   'subagent.history': historyWireValueSchema,
   'jobs.output': jobsOutputValueSchema,
   'jobs.kill': jobsKillValueSchema,
@@ -356,11 +359,15 @@ function requestSignalLease(
 }
 
 /** URL base for in-process handler injection (fake authority, opencode precedent). */
-/** HTTP failure before an RPC envelope is received; response bodies remain unread. */
+/** Transport failure before an RPC envelope; HTTP error bodies remain unread. Status zero means no response and unknown server effects. */
 export class ApiTransportError extends Error {
-  constructor(readonly status: number, path: string) {
-    super(`transport failure for ${path}: HTTP ${String(status)}`)
+  /** Request loss and explicit HTTP authorization denial remain distinct machine-readable failures. */
+  readonly code: 'request-unavailable' | 'access-revoked' | undefined
+
+  constructor(readonly status: number, path: string, options?: ErrorOptions) {
+    super(status === 0 ? `transport failure for ${path}: no HTTP response` : `transport failure for ${path}: HTTP ${String(status)}`, options)
     this.name = 'ApiTransportError'
+    this.code = status === 0 ? 'request-unavailable' : status === 401 || status === 403 ? 'access-revoked' : undefined
   }
 }
 
@@ -823,6 +830,7 @@ export abstract class AbstractApiClient implements IApiClient {
     attachment: (payload, signal) => this.callUnary('session.attachment', payload, signal),
     updateQueue: (payload, signal) => this.callUnary('session.updateQueue', payload, signal),
     cancel: (payload, signal) => this.callUnary('session.cancel', payload, signal),
+    activate: (payload, signal) => this.callUnary('session.activate', payload, signal),
   }
 
   readonly subagents: IApiClient['subagents'] = {

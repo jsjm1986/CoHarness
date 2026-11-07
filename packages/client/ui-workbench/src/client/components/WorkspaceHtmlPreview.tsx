@@ -8,7 +8,7 @@ import type { ReadWorkspaceFileData } from '../contract/html/read-relative.ts'
 import { MAX_TOTAL_BYTES } from '../contract/html/pack.ts'
 import type {} from '../html/locales.ts'
 import { useWorkspacePreviewRead } from '../contract/preview/use-preview-read.ts'
-import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import type { WorkspacePreviewActionLabels, WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import { WorkspacePreviewChrome } from './WorkspacePreviewChrome.tsx'
 import css from './Workbench.module.css'
 
@@ -66,14 +66,14 @@ export function WorkspaceHtmlPreview({ request, resource, read, htmlT, renderHtm
   renderHtml: RenderWorkspaceHtml
   htmlT: PropsLocale<'sidebarHtml'>['t']
   close: () => void
-  labels: { close: string; reload: string; changed: string }
+  labels: WorkspacePreviewActionLabels & { changed: string }
 }) {
   const input = useMemo(() => resource.metadata.value?.version, [resource.metadata.value?.version])
   const readFile = useMemo(() => (version: string, signal: AbortSignal) =>
     read({ resource: request, version, maxBytes: MAX_TOTAL_BYTES }, signal), [read, request])
   const state = useWorkspacePreviewRead({ request, resource, input, read: readFile })
   const { result, error, denied, lifetime } = state
-  const data = useMemo(() => result === undefined ? undefined : workspaceFileBytes(result), [result])
+  const data = useMemo(() => result === undefined ? undefined : workspaceFileBytes(result.bytes), [result])
   const failure = error ?? resource.metadata.error
   return <WorkspacePreviewChrome request={request} resource={resource} state={state}
     className={css.filePreview} message={failure?.message} hasContent={data !== undefined}

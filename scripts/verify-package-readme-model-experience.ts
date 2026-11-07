@@ -46,6 +46,7 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  * blocks. A package moves on or off this list with its context behavior.
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+  'packages/context/resource-budget': { kind: 'none', reason: 'The admission Service Definition constructs no model input; concrete execution consumers own model-visible results.' },
   'packages/api/remote-desktop-controller': { kind: 'none', reason: 'The BFF namespace serves human operators; no method result enters a model request.' },
   'packages/client/ui-remote-desktop': { kind: 'none', reason: 'The desktop viewer and attach flow are human-operated surfaces.' },
   'packages/remote-desktop/remote-desktop-stream': { kind: 'none', reason: 'The transport mount relays human screen and input frames.' },

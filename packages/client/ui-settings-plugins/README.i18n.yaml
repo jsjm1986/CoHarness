@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-settings-plugins/README.md
 document:
-  en: db9c6bc4b34fb937c7cf07f39d10003c902a1d75
-  zh: 0b861f6094dc1cc56aad6912686b5d4f7a5a17a2
+  en: 2b37ceab5ff0c743b090d50c1aced377dd3b2d26
+  zh: c014d03bed186c62dac0620119d2cf5d5d87facb
 /:
   en: 70fcbb55853a15d6
   zh: 61495d48365178df
@@ -24,8 +24,8 @@ document:
   en: d944391a7dd5320b
   zh: aa00f85ae001fc3d
 /dsh-client-ui-settings-plugins/writes:
-  en: df9f323c49a0eef5
-  zh: 2c6f91e4430b99da
+  en: e6a9a771b8c4e44d
+  zh: 9a908b8f1717399e
 /dsh-client-ui-settings-plugins/model-experience:
   en: 6b7c6f82ab6c8435
   zh: 3328550d96a6368b

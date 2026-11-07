@@ -4,7 +4,7 @@ import fs, { lstat, readFile, unlink, writeFile } from 'node:fs/promises'
 import type { PathLike } from 'node:fs'
 import { syncBuiltinESMExports } from 'node:module'
 import { createHash } from 'node:crypto'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { boot, resolveConfigPath } from '@deepseek-ai/dsh-app-boot'
 import { DOCUMENT_MIGRATION_FAILED_CODE, DOCUMENT_TRASH_NOT_FOUND_CODE, DOCUMENT_UPLOAD_NOT_FOUND_CODE,
   UserDocDirectoryId, UserDocError } from '@deepseek-ai/dsh-userdoc'
@@ -80,7 +80,8 @@ try {
   const originalLink = fs.link
   const originalRename = fs.rename
   const occupy = async (source: PathLike, target: PathLike): Promise<void> => {
-    if (source === hidden && target === restored.path) {
+    // Linux publication uses /proc/self/fd descriptor paths; match the leaf names, not spellings.
+    if (basename(String(source)) === basename(hidden) && basename(String(target)) === basename(restored.path)) {
       await writeFile(restored.path, 'concurrent upload', { flag: 'wx' })
     }
   }
@@ -115,7 +116,8 @@ try {
   const originalOpen = fs.open
   let waiting = true
   fs.open = async (...args: Parameters<typeof originalOpen>) => {
-    if (args[0] === `${manifestPath}.lock` && waiting) {
+    // Linux pins the manifest through /proc/self/fd paths; match the lock leaf name.
+    if (basename(String(args[0])) === basename(`${manifestPath}.lock`) && waiting) {
       waiting = false
       lockEntered.resolve(undefined)
       await lockGranted.promise

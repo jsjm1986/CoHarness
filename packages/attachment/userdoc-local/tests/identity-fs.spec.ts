@@ -159,7 +159,9 @@ it.each([3, 4])('refuses a schema %s file-by-file copy before changing its ident
   expect(await f.owner.stat(original.docId)).toEqual(original)
 })
 
-it('refuses an existing connection after its metadata file is replaced', async () => {
+// Windows grants no FILE_SHARE_DELETE on the open SQLite handle, so replacing
+// the metadata file is impossible there — the scenario cannot occur natively.
+it.skipIf(process.platform === 'win32')('refuses an existing connection after its metadata file is replaced', async () => {
   const f = await fixture(), original = await f.publish()
   const database = join(f.locations.stateRoot, 'metadata.sqlite'), copied = join(f.locations.stateRoot, 'replacement.sqlite')
   await copyFile(database, copied)
@@ -421,7 +423,7 @@ it('retains ordinary files with directory-marker names when no private anchor pr
   expect(await readFile(join(f.root, name), 'utf8')).toBe('ordinary bytes')
 })
 
-it('keeps creator identity on in-place edits and refuses a previously selected revision', async () => {
+it('keeps the creator identity on in-place edits and refuses a previously selected revision', async () => {
   const f = await fixture(), original = await f.publish()
   await writeFile(join(f.root, original.docId), 'edited bytes')
   const edited = await f.owner.stat(original.docId)
@@ -454,7 +456,7 @@ it.each(['bytes', 'time'] as const)('refuses a directory selection after documen
   expect(await readFile(join(f.root, 'renamed', 'a.txt'), 'utf8')).toBe(content)
 })
 
-it('recovers a physically moved directory with a later in-place edit and preserves creator identity', async () => {
+it('recovers a physically moved directory with a later in-place edit and preserves the creator identity', async () => {
   const f = await fixture()
   await mkdir(join(f.root, 'folder'))
   const original = await f.publish('folder/a.txt')
@@ -475,7 +477,7 @@ it('recovers a physically moved directory with a later in-place edit and preserv
   await expect(stat(join(f.root, 'folder'))).rejects.toMatchObject({ code: 'ENOENT' })
 })
 
-it('assigns an unknown creator identity to an external identical-byte replacement instead of inheriting the old owner', async () => {
+it('assigns an unknown creator to an external identical-byte replacement instead of inheriting the old owner', async () => {
   const f = await fixture(), original = await f.publish()
   await unlink(join(f.root, original.docId)); await writeFile(join(f.root, original.docId), 'same bytes')
   const replacement = await f.owner.stat(original.docId)

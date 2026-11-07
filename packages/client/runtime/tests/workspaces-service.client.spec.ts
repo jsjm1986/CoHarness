@@ -87,6 +87,55 @@ it('retries failed workspace recovery writes and skips unchanged indices on subs
 })
 
 describe('WorkspaceManager', () => {
+  it('discards a disconnected baseline and lets the next generation refresh independently', async () => {
+    const api = new FakeApiClient()
+    const old = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const next = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const list = vi.spyOn(api.workspace, 'list')
+    api.onWorkspaceList = () => old.promise
+    const manager = new WorkspaceManager(api)
+    const oldResult = manager.handleConnected()
+    const oldSignal = list.mock.calls[0]?.[1]
+    manager.handleDisconnected()
+    expect(oldSignal?.aborted).toBe(true)
+    api.onWorkspaceList = () => next.promise
+    const nextResult = manager.handleConnected()
+    next.resolve(ok({ items: [workspace('next')], archivedSessionIds: [], archiveRevision: 2 }))
+    await expect(nextResult).resolves.toEqual({ archivedSessionIds: [], archiveRevision: 2 })
+    old.resolve(ok({ items: [workspace('old')], archivedSessionIds: [sid('old')], archiveRevision: 9 }))
+    await expect(oldResult).resolves.toBeUndefined()
+    expect(manager.getSnapshot()).toMatchObject({ items: [workspace('next')], archivedSessionIds: [], archiveRevision: 2 })
+    expect(api.callsOf('workspace.list')).toHaveLength(2)
+    manager.handleDisconnected()
+  })
+
+  it('shares the installed archive revision after frame replay and retries a refused baseline', async () => {
+    const api = new FakeApiClient()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    api.onWorkspaceList = () => gate.promise
+    const manager = new WorkspaceManager(api)
+    const connected = manager.handleConnected()
+    const concurrent = manager.refresh()
+    manager.handleHostEnvelope({ rpcId: 'archive-newer' as never, payload: {
+      type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2,
+    } })
+    manager.handleHostEnvelope({ rpcId: 'workspace-newer' as never, payload: {
+      type: 'host/workspace-changed', workspace: workspace('newer'),
+    } })
+    gate.resolve(ok({ items: [workspace('baseline')], archivedSessionIds: [sid('stale')], archiveRevision: 1 }))
+    await expect(connected).resolves.toEqual({ archivedSessionIds: [], archiveRevision: 2 })
+    await concurrent
+    expect(manager.getSnapshot().items.map(item => item.workspaceId)).toEqual(['newer', 'baseline'])
+    expect(api.callsOf('workspace.list')).toHaveLength(1)
+    api.onWorkspaceList = async () => err({ code: 'internal', message: 'refused', details: {} })
+    await expect(manager.handleConnected()).resolves.toBeUndefined()
+    expect(manager.getSnapshot().state).toBe('error')
+    api.onWorkspaceList = async () => ok({ items: [], archivedSessionIds: [sid('recovered')], archiveRevision: 3 })
+    await expect(manager.handleConnected()).resolves.toEqual({ archivedSessionIds: [sid('recovered')], archiveRevision: 3 })
+    expect(api.callsOf('workspace.list')).toHaveLength(3)
+    manager.handleDisconnected()
+  })
+
   it('replays changed frames over hydration and adopts the durable order on refresh', async () => {
     const api = new FakeApiClient()
     const gate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
@@ -1342,8 +1391,91 @@ describe('startInitialSelection', () => {
     const api = new FakeApiClient()
     const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
-    return { api, sessions, workspaces }
+    return { api, sessions, workspaces, ctx }
   }
+
+  it('reports initial selection pending through both baselines and the held historical open', async () => {
+    const b = bench()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('recent', [sid('s-history')])] as never[] }))
+    b.api.onList = () => Promise.resolve(ok({ items: [
+      { sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, cwd: '/w/recent' },
+    ] as never[] }))
+    b.api.onHistory = () => history.promise
+    const stop = b.workspaces.startInitialSelection()
+    try {
+      expect(b.workspaces.list.getSnapshot()).toMatchObject({ initialSelectionPending: true })
+      await b.workspaces.refresh()
+      expect(b.workspaces.list.getSnapshot()).toMatchObject({ initialSelectionPending: true })
+      await b.sessions.refresh()
+      await vi.waitFor(() => { expect(b.api.callsOf('session.history')).toHaveLength(1) })
+      expect(b.workspaces.list.getSnapshot()).toMatchObject({ baselinesReady: true, initialSelectionPending: true })
+      history.resolve(ok({ events: [], hasMore: false }))
+      await vi.waitFor(() => { expect(b.sessions.list.getSnapshot().current).toBe('s-history') })
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
+    } finally {
+      stop()
+      history.resolve(ok({ events: [], hasMore: false }))
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it('ends pending feedback on a failed Workspace baseline and resumes it during an explicit retry', async () => {
+    const b = bench()
+    const recovery = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    b.api.onWorkspaceList = () => Promise.resolve(err({ code: 'internal', message: 'unavailable', details: {} }))
+    const stop = b.workspaces.startInitialSelection()
+    try {
+      await b.workspaces.refresh()
+      expect(b.workspaces.list.getSnapshot().state).toBe('error')
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
+      await b.sessions.refresh()
+      expect(b.api.callsOf('session.create')).toHaveLength(0)
+      b.api.onWorkspaceList = () => recovery.promise
+      const retry = b.workspaces.refresh()
+      await vi.waitFor(() => { expect(b.workspaces.list.getSnapshot().initialSelectionPending).toBe(true) })
+      recovery.resolve(ok({ items: [] }))
+      await retry
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
+      expect(b.sessions.list.getSnapshot().current).toBeUndefined()
+    } finally {
+      stop()
+      recovery.resolve(ok({ items: [] }))
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it('cancels only the startup navigation wait on disposal while another history owner completes', async () => {
+    const b = bench()
+    const retain = vi.spyOn(b.sessions, 'retain')
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('recent', [sid('s-history')])] as never[] }))
+    b.api.onList = () => Promise.resolve(ok({ items: [
+      { sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, cwd: '/w/recent' },
+    ] as never[] }))
+    b.api.onHistory = () => history.promise
+    const stop = b.workspaces.startInitialSelection()
+    let witness: ReturnType<typeof b.sessions.retain> | undefined
+    try {
+      await b.workspaces.refresh()
+      await b.sessions.refresh()
+      await vi.waitFor(() => { expect(b.api.callsOf('session.history')).toHaveLength(1) })
+      const initialSignal = retain.mock.calls.find(([, options]) => options?.source === 'controllerOperation')?.[1]?.signal
+      if (initialSignal === undefined) throw new Error('Initial selection did not retain its navigation signal')
+      witness = b.sessions.retain(sid('s-history'), { source: 'controllerOperation' })
+      stop()
+      expect(initialSignal.aborted).toBe(true)
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
+      history.resolve(ok({ events: [], hasMore: false }))
+      expect((await witness.ready).session.getSnapshot().openState).toBe('open')
+      expect(b.sessions.list.getSnapshot().current).toBeUndefined()
+    } finally {
+      stop()
+      history.resolve(ok({ events: [], hasMore: false }))
+      witness?.release()
+      await b.ctx.fiber.dispose()
+    }
+  })
 
   it('opens the recent Workspace history once baselines are ready', async () => {
     const b = bench()
@@ -1421,6 +1553,7 @@ describe('startInitialSelection', () => {
     await withCurrent.workspaces.refresh()
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(withCurrent.api.callsOf('session.create')).toHaveLength(0)
+    expect(withCurrent.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
     stopCurrent()
 
     const noRecent = bench()
@@ -1429,6 +1562,7 @@ describe('startInitialSelection', () => {
     await noRecent.sessions.refresh()
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(noRecent.api.callsOf('session.create')).toHaveLength(0)
+    expect(noRecent.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
     expect(() => noRecent.workspaces.startInitialSelection()).toThrow(/already started/)
     stopEmpty()
   })
@@ -1493,6 +1627,7 @@ describe('startInitialSelection', () => {
       await Promise.all([b.workspaces.refresh(), b.sessions.refresh()])
       await vi.waitFor(() => { expect(b.api.callsOf('session.create')).toHaveLength(1) })
       b.sessions.clear()
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
       creating.resolve(ok({ sessionId: sid('late-initial') }))
       await vi.waitFor(() => { expect(b.sessions.list.getSnapshot().ids).toContain('late-initial') })
       expect(b.sessions.list.getSnapshot().current).toBeUndefined()
@@ -1543,6 +1678,7 @@ describe('startInitialSelection', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(b.api.callsOf('session.create')).toHaveLength(1)
     expect(b.sessions.list.getSnapshot().current).toBeUndefined()
+    expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
 
     // Recovery: the next workspace-list change re-runs the reconcile.
     b.api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-retry') }))
@@ -1550,6 +1686,7 @@ describe('startInitialSelection', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(b.api.callsOf('session.create')).toHaveLength(2)
     expect(b.sessions.list.getSnapshot().current).toBe('s-retry')
+    expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
     stop()
   })
 })

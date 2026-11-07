@@ -8,10 +8,12 @@
  * exports compiled text for a plugin-owned lifecycle effect. The virtual
  * loaders register each real stylesheet as a watch dependency. SVG, PNG, and
  * WebP imports become watched base64 data URLs inside the bundle.
+ * CSS Modules scopes and injector keys use package-scoped source paths, so
+ * equivalent checkouts emit identical styles without losing watch dependencies.
  * Non-experimental client outputs reject experimental module and stylesheet
  * inputs, including origins recorded by chained source maps.
  */
-import { readFile, stat, utimes } from 'node:fs/promises'
+import { readFile, stat, utimes, writeFile } from 'node:fs/promises'
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import { createRequire, isBuiltin } from 'node:module'
 import { basename, dirname, extname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
@@ -19,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { Rolldown, type TsdownPlugin, type UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 import { optionalStringArray } from './modules/src/client/manifest.ts'
+import { stampClientArtifact } from './modules/src/artifact-revision.ts'
 import { PLATFORM_MODULES, PRELOADED_CLIENT_EXTERNALS } from './web/src/platform.ts'
 import { clientBuildEnvironmentDefines } from '../../scripts/client-build-environment.ts'
 import { BundleInputIsolation, physicalBundleInput } from '../../scripts/bundle-input-isolation.ts'
@@ -37,6 +40,13 @@ const INLINE_CSS_QUERY = '?inline'
 /** Image imports become base64 data URLs embedded in the plugin's own bundle. */
 const IMAGE_MEDIA_TYPES = new Map([['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.webp', 'image/webp']])
 
+/** Package-scoped stylesheet identity independent of the physical checkout root. */
+function stylesheetIdentity(id: string, fileId: string): string {
+  const boundary = fileId.lastIndexOf(SOURCE_MARKER)
+  const name = boundary < 0 ? basename(fileId) : fileId.slice(boundary + SOURCE_MARKER.length)
+  return `${id}/${name.split(sep).join('/')}`
+}
+
 /** Emit one plugin-owned style injector and an optional CSS Modules export. */
 function styleInjectionModule(
   id: string,
@@ -44,14 +54,9 @@ function styleInjectionModule(
   css: string,
   classMap?: Readonly<Record<string, string>>,
 ): string {
-  // Sibling directories can carry same-named stylesheets (tool/ToolDetails.module.css
-  // next to tool/components/ToolDetails.module.css); the src-relative path keeps
-  // their dedup keys distinct so neither file's rules are skipped.
-  const boundary = fileId.lastIndexOf(SOURCE_MARKER)
-  const name = boundary < 0 ? basename(fileId) : fileId.slice(boundary + SOURCE_MARKER.length)
   const source = [
     `const css = ${JSON.stringify(css)};`,
-    `const tagId = ${JSON.stringify(`${id}/${name}`)};`,
+    `const tagId = ${JSON.stringify(stylesheetIdentity(id, fileId))};`,
     'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
     '  const tag = document.createElement(\'style\');',
     `  tag.dataset.plugin = ${JSON.stringify(id)};`,
@@ -499,8 +504,15 @@ function asyncChunkRequirePlugin(): TsdownPlugin {
     },
     async writeBundle(outputOptions, bundle) {
       const entry = Object.values(bundle).find(output => output.type === 'chunk' && output.isEntry)
-      if (entry === undefined || outputOptions.dir === undefined) return
-      const entryPath = resolvePath(outputOptions.dir, entry.fileName)
+      const directory = outputOptions.dir
+      if (entry === undefined || directory === undefined) return
+      const entryPath = resolvePath(directory, entry.fileName)
+      const chunks = await Promise.all(Object.values(bundle).flatMap(output =>
+        output.type === 'chunk' && !output.isEntry
+          ? [readFile(resolvePath(directory, output.fileName), 'utf8').then(code => ({ fileName: output.fileName, code }))]
+          : [],
+      ))
+      await writeFile(entryPath, stampClientArtifact(await readFile(entryPath, 'utf8'), chunks))
       const current = await stat(entryPath)
       const completedAt = new Date(Math.max(Date.now(), current.mtimeMs + 1))
       await utimes(entryPath, current.atime, completedAt)
@@ -525,6 +537,8 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
     // Plugin code is fetched outside Vite's module graph, so its own bundle
     // must carry the TS/TSX mapping consumed by browser profiling tools.
     sourcemap: true,
+    // Cordis registration reads function names; only remove output formatting.
+    minify: { compress: false, mangle: false },
     clean: false,
     deps: {
       neverBundle: isRequested,
@@ -596,7 +610,7 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
         this.addWatchFile(fileId)
         const source = await readFile(fileId)
         const { code, exports: cssExports } = transform({
-          filename: fileId,
+          filename: stylesheetIdentity(id, fileId),
           code: source,
           cssModules: { pattern: '[hash]_[local]' },
           minify: true,
@@ -654,6 +668,8 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
     }],
     outputOptions: {
       entryFileNames: 'client.js',
+      minifyInternalExports: false,
+      comments: { legal: true, annotation: true, jsdoc: false },
       // The imported source basename becomes the published chunk name; package
       // files lists and artifact tests pin every intentional chunk.
       chunkFileNames: 'client.[name].js',

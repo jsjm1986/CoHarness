@@ -251,6 +251,15 @@ describe('document request authority', () => {
     expect(denied.body()).toMatchObject({ error: { code: 'COLLABORATION_FORBIDDEN' } })
   })
 
+  it('does not open inline PDF bytes without the current runtime collaboration authority', async () => {
+    const ctx = context('missing')
+    const denied = response()
+    await handleUserDocHttp(ctx, request('GET', `${USERDOC_HTTP_PATH}/content?id=preview.pdf&inline=1`), denied.res)
+    expect(denied.status()).toBe(503)
+    expect(denied.body()).toMatchObject({ error: { code: 'COLLABORATION_UNAVAILABLE' } })
+    expect(ctx.userDocs.openRead).not.toHaveBeenCalled()
+  })
+
   it('forwards only the versioned transfer metadata to the Gateway runtime', async () => {
     const requestSpy = vi.fn(async (path: string, init?: RequestInit) => {
       expect(path).toBe('/internal/runtime/documents/transfer')

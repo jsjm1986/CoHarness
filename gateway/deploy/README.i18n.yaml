@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/README.md
 document:
-  en: 77a4b0af2a520d82a957bee1bac510ddb604ab3b
-  zh: e05b5c2199745e190b64616a938b8e5d778c92cc
+  en: 8d4bbb4e391081aae547c2277aefe268ec62ffc3
+  zh: 14be74279c3b242fb0c83cb92edb61049af99832
 /production-deployment-runbook:
   en: bab9204fe333e354
   zh: dda096b4b8c30c4b
@@ -30,8 +30,8 @@ document:
   en: 6381007832bdb568
   zh: 6e4727e1fad60137
 /production-deployment-runbook/macos-variant-launchd-tunnel-entry:
-  en: a20ac5c0443ec2df
-  zh: 9c70de64f5c40a45
+  en: b5cb53b47020b9d0
+  zh: 93cf79f582399a55
 /production-deployment-runbook/upgrades-and-backup:
   en: 4c6a963ec9d3a868
   zh: eb865d6939e8d8ba

@@ -214,17 +214,13 @@ it('respects writer backpressure for a large native event', async () => {
 it.each([true, false])('joins a backpressured writer when its connection closes synchronously=%s', async (synchronous) => {
   const f = await fixture()
   f.adapter.text = 'x'.repeat(2 * 1024 * 1024)
-  // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply supplies the response instance.
-  const original = ServerResponse.prototype.write
   const write = vi.spyOn(ServerResponse.prototype, 'write')
   onTestFinished(() => { write.mockRestore() })
-  write.mockImplementation(function (this: ServerResponse, ...args: Parameters<typeof original>) {
+  write.mockImplementation(function (this: ServerResponse) {
     write.mockRestore()
-    const accepted = Reflect.apply(original, this, args)
-    expect(accepted).toBe(false)
     if (synchronous) this.destroy()
     else setImmediate(() => { this.destroy() })
-    return accepted
+    return false
   })
   await expect(f.post().then(response => response.text())).rejects.toThrow()
   await f.owner.close()

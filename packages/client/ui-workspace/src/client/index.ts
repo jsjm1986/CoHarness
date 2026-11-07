@@ -485,6 +485,11 @@ export function apply(ctx: ClientContext): void {
     // the current Session Workspace before the recent-Workspace fallback.
     startSession: (workspaceId) => { uiWorkspace.startSession(workspaceId) },
     open: openSession,
+    retryLists: () => {
+      const sessions = ctx.sessions.currentScopeList ?? ctx.sessions.list
+      if (sessions.getSnapshot().state === 'error') void ctx.sessions.refresh()
+      if (ctx.workspaces.list.getSnapshot().state === 'error') void ctx.workspaces.refresh()
+    },
     searchSessions,
     searchResultLimit: ctx.sessions.searchResultLimit,
     requestSessionRename,

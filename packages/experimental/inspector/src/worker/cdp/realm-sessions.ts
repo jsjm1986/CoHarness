@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { inspectorId } from '../../shared/identity.ts'
 import type { InspectorRealmId } from '../../shared/cdp/ids.ts'
 import type { InspectorSourceDescriptor } from '../../shared/bridge/messages/observation.ts'
-import type { InspectorSourceId } from '../../shared/bridge/ids.ts'
+import { isInspectorSourceSelected, type InspectorClientSelection } from '../../shared/web.ts'
 import type { InspectorRealmEvent, InspectorRealmRegistry } from '../inspection/realm-store.ts'
 import type { InspectorRealm, InspectorRealmSession } from '../inspection/realm.ts'
 import type { InspectorConnectionId } from './ids.ts'
@@ -23,7 +23,7 @@ export class InspectorRealmSessionSet {
   private readonly unsubscribeRealms: () => void
   private closed = false
 
-  constructor(private readonly realms: InspectorRealmRegistry, private readonly clientSourceId?: InspectorSourceId) {
+  constructor(private readonly realms: InspectorRealmRegistry, private readonly clientSourceId?: InspectorClientSelection) {
     for (const realm of realms.realms()) if (this.includes(realm)) this.open(realm)
     this.unsubscribeRealms = realms.subscribe((event) => { this.receiveRealm(event) })
   }
@@ -113,7 +113,7 @@ export class InspectorRealmSessionSet {
   }
 
   private includes(realm: InspectorRealm): boolean {
-    return this.clientSourceId === undefined || realm.descriptor.kind === 'host' || realm.descriptor.sourceId === this.clientSourceId
+    return isInspectorSourceSelected(this.clientSourceId, realm.descriptor)
   }
 
   private open(realm: InspectorRealm): InspectorRealmSession {

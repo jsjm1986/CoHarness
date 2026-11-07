@@ -1,0 +1,4 @@
+- button "Close preview"
+- button "Reload"
+- button "Previous page" [disabled]
+- button "Next page" [disabled]

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-content-stable-client-artifact-revisions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-content-stable-client-artifact-revisions.md
+document:
+  en: df7df113f1fe3880b9fb5bd82b8b2b3f34f9e366
+  zh: d3a80ea437bd5b880fb4327c0a05ab0a3899f459
+/agent-note-content-stable-client-artifact-revisions:
+  en: 21f3887048087301
+  zh: 27b5fbd807deabce
+/agent-note-content-stable-client-artifact-revisions/problem:
+  en: ae2afaa15b543162
+  zh: 9e5125b3861f44d6
+/agent-note-content-stable-client-artifact-revisions/decision:
+  en: e929cd8d4ae54264
+  zh: 9bd1b2566ec30923
+/agent-note-content-stable-client-artifact-revisions/alternatives-considered:
+  en: 3b519eefd8bf2762
+  zh: 6f255b17c9a25217
+/agent-note-content-stable-client-artifact-revisions/consequences:
+  en: a52bff336c8ca77b
+  zh: de80ab704e641c01
+/agent-note-content-stable-client-artifact-revisions/verification:
+  en: 97867801496f5fb3
+  zh: 0594efa91e77a418

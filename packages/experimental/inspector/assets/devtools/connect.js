@@ -6,6 +6,7 @@ if (entry.searchParams.get('disableLocaleInfoBar') === 'true') {
 if (!entry.searchParams.has('ws') && !entry.searchParams.has('wss')) {
   const endpoint = new URL('cdp', entry)
   for (const sourceId of entry.searchParams.getAll('clientSourceId')) endpoint.searchParams.append('clientSourceId', sourceId)
+  for (const scope of entry.searchParams.getAll('sourceScope')) endpoint.searchParams.append('sourceScope', scope)
   entry.searchParams.set(entry.protocol === 'https:' ? 'wss' : 'ws', endpoint.host + endpoint.pathname + endpoint.search)
 }
 if (!entry.searchParams.has('panel')) entry.searchParams.set('panel', 'console')

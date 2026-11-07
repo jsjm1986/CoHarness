@@ -43,7 +43,7 @@ Use `dsh-gateway-runtime` for the authenticated request context and private loop
 - Credentials and principal assertions fail closed at their parsing and request boundaries. The runtime bearer token is never exposed through the public service fields.
 - Consumers that read a private JSON response use `readGatewayResponseJson()` (or its byte-level companion) with a domain limit and optional `AbortSignal`; chunked bodies are cancelled when the limit or signal is reached, so `Content-Length` is not the only protection. Failed reads request cancellation without awaiting cleanup acknowledgement, preserve their original error, and release their reader lock. The transport owner still confirms physical shutdown independently.
 
-The `plugin-admin` purpose permits only declared profile-management HTTP methods plus `settings.describe` and `settings.mutate`. These settings methods recheck live administrator authority; mutations require a held revision and cannot edit account preferences. The purpose grants no native document opener, credential API, terminal or Session execution access.
+The `plugin-admin` purpose permits only declared profile-management HTTP methods, including the aggregate `pluginManager/catalog` read, plus `settings.describe` and `settings.mutate`. These settings methods recheck live administrator authority; mutations require a held revision and cannot edit account preferences. The purpose grants no native document opener, credential API, terminal or Session execution access.
 
 The `archive-read` purpose permits only `GET /api/internal/archive/read`. The `document-admin` purpose permits only `POST /api/documents/trash`, `POST /api/documents/restore` and `DELETE /api/documents/purge`. An administrator role does not extend these assertions to other operations; the receiving service still checks domain authorization. The Gateway's private runtime API independently requires an explicit purpose allowance before invoking a principal-bearing operation; unrelated callbacks receive no authority from these assertions.
 
@@ -79,7 +79,7 @@ None; the package never assembles or sends provider requests.
 
 - **Gateway-launched runtimes only** — loading the plugin without a valid private launch credential fails startup.
 - **Request context is not execution authority** — a retained `current()` principal identifies its originating dispatch. Background, delegated and restored work must use [Execution Authority](../execution-authority/README.md); an earlier request cannot establish current privilege.
-- **Short-lived assertions** — the shipped Gateway defaults `HGW_PRINCIPAL_ASSERTION_TTL_MS` to 30 seconds. A verified principal freezes its project scope mode until `expiresAt`; Session Consumers use `ctx.collaboration` for current membership and ACL decisions. The [Gateway](../../../gateway/README.md) owns proxy expiry and access invalidation.
+- **Short-lived assertions** — the shipped Gateway defaults `HGW_PRINCIPAL_ASSERTION_TTL_MS` to 30 seconds. A verified principal fixes its project scope mode; active event sockets may receive another short signature only after Gateway requalification. Session Consumers use `ctx.collaboration` for current membership and ACL decisions. The [Gateway](../../../gateway/README.md) owns proxy expiry and access invalidation.
 
 <a id="dev-note"></a>
 ### Dev Note

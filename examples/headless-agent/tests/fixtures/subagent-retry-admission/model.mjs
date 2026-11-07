@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { agentCarrier } from '@deepseek-ai/dsh-agent'
 import { LlmAdapter, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { applyLoopbackServerEffect } from '../../../../../snapshots/session/loopback-fixture-server.mjs'
@@ -107,15 +106,20 @@ export async function apply(ctx) {
           parent.session.append = originalAppend
           const firstTransport = transports[0]
           assert.ok(firstTransport)
+          const cleanupOccupied = () => {
+            let held = false
+            ctx.emit('subagent/cleanup-retry', parent, () => { held = true })
+            return held
+          }
           proof = { mode, firstFailed: first.isError === true, resourceRetained: firstTransport.open && !firstTransport.closed,
-            ownerBusy: ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent }) === 'busy' }
+            ownerBusy: cleanupOccupied() }
           const blocked = await call(2)
           Object.assign(proof, { anotherAdmissionRefused: blocked.isError === true, allocationsBeforeCleanup: starts })
           allowCleanup = true
           const after = await call(3)
           Object.assign(proof, { nextSucceeded: after.isError !== true, oldTransportClosed: firstTransport.closed,
             allocationsAfterCleanup: starts,
-            ownerReleased: ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent }) !== 'busy' })
+            ownerReleased: !cleanupOccupied() })
         }
         await writeFile(join(process.cwd(), 'subagent-retry-proof.json'), JSON.stringify(proof))
         const passed = mode === 'replacement'

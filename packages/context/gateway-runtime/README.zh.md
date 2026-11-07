@@ -43,7 +43,7 @@ kind: "package-reference"
 - 凭据和 principal 断言在各自的解析与请求边界失败关闭。运行时 bearer token 不会通过公开服务字段暴露。
 - 读取私有 JSON 响应的 Consumer 使用带领域上限和可选 `AbortSignal` 的 `readGatewayResponseJson()`（或字节级配套函数）；分块 body 超过上限或收到取消信号时会被取消，因此保护不只依赖 `Content-Length`。读取失败会发起取消，无须等待清理确认即可保留原始错误并释放 reader 锁；传输所有者仍须独立确认实际连接已关闭。
 
-`plugin-admin` 用途仅允许已声明的 Profile 管理 HTTP 方法以及 `settings.describe`、`settings.mutate`。设置方法会重新核验当前管理员权限；写入必须携带已读版本，且不能修改账户偏好。此用途不授予原生文档打开器、凭据 API、终端或会话执行权限。
+`plugin-admin` 用途仅允许已声明的 Profile 管理 HTTP 方法（包括聚合读取 `pluginManager/catalog`）以及 `settings.describe`、`settings.mutate`。设置方法会重新核验当前管理员权限；写入必须携带已读版本，且不能修改账户偏好。此用途不授予原生文档打开器、凭据 API、终端或会话执行权限。
 
 `archive-read` 用途仅允许 `GET /api/internal/archive/read`。`document-admin` 用途仅允许 `POST /api/documents/trash`、`POST /api/documents/restore` 和 `DELETE /api/documents/purge`。管理员角色不会把这些断言的权限扩展到其他操作；接收服务仍会检查业务权限。Gateway 的私有运行时 API 会独立检查端点是否明确允许该用途，再调用携带 principal 的操作；这些断言不会向无关回调授予权限。
 
@@ -80,7 +80,7 @@ kind: "package-reference"
 
 - **仅限 Gateway 启动的运行时** — 未提供有效私有启动凭据时加载插件会导致启动失败。
 - **请求上下文不是执行授权** — 保留的 `current()` 主体标识起始分发。后台、委派和恢复工作必须使用 [Execution Authority](../execution-authority/README.zh.md)；先前请求不能证明当前特权。
-- **短期断言** — Gateway 的交付默认值把 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 设为 30 秒。已验证主体会固定其项目 scope 模式直到 `expiresAt`；Session 消费方使用 `ctx.collaboration` 取得当前成员身份与 ACL 决定。代理过期和访问失效处理由 [Gateway](../../../gateway/README.zh.md) 负责。
+- **短期断言** — Gateway 的交付默认值把 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 设为 30 秒。已验证主体会固定其项目 scope 模式；活动事件 socket 只有在 Gateway 重新验证资格后才能取得另一份短期签名。Session 消费方使用 `ctx.collaboration` 取得当前成员身份与 ACL 决定。代理过期和访问失效处理由 [Gateway](../../../gateway/README.zh.md) 负责。
 
 <a id="dev-note"></a>
 ### 开发备注

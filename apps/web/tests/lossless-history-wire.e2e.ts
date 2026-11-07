@@ -22,6 +22,7 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/lossless-history-wire', 
 const INITIAL_EXPECTED = fileURLToPath(new URL('./snapshots/lossless-history-wire/initial.expected.md', import.meta.url))
 const EXPANDED_EXPECTED = fileURLToPath(new URL('./snapshots/lossless-history-wire/expanded.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
+const WEB_HISTORY_PAGE_TARGET_BYTES = 262_144
 const SEED_ID = 'lossless-history-wire-web-e2e'
 const LARGE_TURNS = 6
 const DELTA_REPETITIONS = 1_600
@@ -621,7 +622,7 @@ describe('web e2e: lossless history wire pagination', () => {
     await scaffold?.close()
   })
 
-  it('exposes one full logical history and a default-target physical tail page', async () => {
+  it('exposes one full logical history and a Web-target physical tail page', async () => {
     expect(DEFAULT_HISTORY_PAGE_TARGET_BYTES).toBe(131_072)
     expect(seed.appendMessageCount).toBe(MESSAGE_MARKERS.length)
     expect(seed.appendMessageCount).toBeLessThan(50)
@@ -654,7 +655,8 @@ describe('web e2e: lossless history wire pagination', () => {
     })
     expect(response.ok).toBe(true)
     const physical = parseWirePage(await response.text())
-    expect(physical.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
+    expect(physical.bytes).toBeGreaterThan(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
+    expect(physical.bytes).toBeLessThanOrEqual(WEB_HISTORY_PAGE_TARGET_BYTES)
     expect(physical.recordCount).toBeGreaterThan(0)
     expect(physical.attemptRecordCount).toBeGreaterThan(0)
     expect(physical.hasMore).toBe(true)
@@ -683,7 +685,7 @@ describe('web e2e: lossless history wire pagination', () => {
     const conversationPhysical = parseWirePage(await conversationResponse.text(), undefined, 'conversation')
     expect(conversationPhysical.omittedSpanCount).toBeGreaterThan(0)
     expect(conversationPhysical.attemptRecordCount).toBeLessThan(physical.attemptRecordCount)
-    expect(conversationPhysical.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
+    expect(conversationPhysical.bytes).toBeLessThanOrEqual(WEB_HISTORY_PAGE_TARGET_BYTES)
   }, 60_000)
 
   it('renders the conversation-tier Chat without settled assistant attempts', async () => {
@@ -716,7 +718,7 @@ describe('web e2e: lossless history wire pagination', () => {
     })
     expect(firstBrowserPage?.omittedSpanCount).toBeGreaterThan(0)
     expect(firstBrowserPage?.attemptRecordCount).toBe(0)
-    expect(firstBrowserPage?.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
+    expect(firstBrowserPage?.bytes).toBeLessThanOrEqual(WEB_HISTORY_PAGE_TARGET_BYTES)
     expect(firstBrowserPage?.hasMore).toBe(true)
 
     // The settled turn folds its tool row behind the turn-process disclosure.
@@ -791,7 +793,6 @@ describe('web e2e: lossless history wire pagination', () => {
       await expect.poll(() => markerCount(page), { timeout: 20_000 })
         .toBeGreaterThan(beforeMarkerCount)
     }
-    expect(loadOlderOperations).toBeGreaterThanOrEqual(1)
     await expect.poll(() => page.getByRole('button', { name: 'Load earlier' }).count(), {
       timeout: 10_000,
     }).toBe(0)
@@ -802,7 +803,7 @@ describe('web e2e: lossless history wire pagination', () => {
     }
     const olderConversationPages = (await Promise.all(historyReads))
       .filter(current => current.detail === 'conversation' && current.beforeSeq !== undefined)
-    expect(olderConversationPages.length).toBeGreaterThanOrEqual(loadOlderOperations)
+    expect(olderConversationPages.length).toBeGreaterThanOrEqual(Math.max(1, loadOlderOperations))
 
     const beforeFill = (await Promise.all(historyReads)).length
     await page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
@@ -852,7 +853,7 @@ describe('web e2e: lossless history wire pagination', () => {
     const fullPages = pages.filter(current => current.detail === 'full')
     expect(fullPages.length).toBeGreaterThanOrEqual(1)
     expect(fullPages.every(current =>
-      current.bytes <= DEFAULT_HISTORY_PAGE_TARGET_BYTES)).toBe(true)
+      current.bytes <= WEB_HISTORY_PAGE_TARGET_BYTES)).toBe(true)
     expect(pages.reduce((total, current) => total + current.attemptRecordCount, 0))
       .toBeGreaterThanOrEqual(2)
 

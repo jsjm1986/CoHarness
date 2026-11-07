@@ -224,6 +224,8 @@ export type WorkspaceBrowserInjected = {
   startSession: (workspaceId?: WorkspaceId) => void
   /** Open a real Session. */
   open: (sessionId: SessionId) => void | Promise<void>
+  /** Retry failed Session and Workspace baselines in the authenticated current space. */
+  retryLists: () => void
   /**
    * Search current visible conversation messages. The Host fixes the result
    * bound; `hasMore` means the query needs narrowing.

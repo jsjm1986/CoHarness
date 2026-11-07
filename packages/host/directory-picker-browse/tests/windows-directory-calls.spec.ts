@@ -95,16 +95,16 @@ it('opens roots and one UTF-16 child with synchronous, handle-relative, no-repar
     expect(await calls.openRoot('\\\\?\\C:\\')).toBe(11)
     expect(await calls.child(11, '目录', false)).toBe(12)
     const request = state.creates[0]
-    expect(request?.[1]).toBe(0x001000a0)
+    expect(request?.[1]).toBe(0x001000a4)
     expect(request?.[2]).toMatchObject({ RootDirectory: 11, Attributes: 0x1040,
       ObjectName: { Length: 4, MaximumLength: 4, Buffer: Buffer.from('目录', 'utf16le') } })
     expect(request?.slice(6, 9)).toEqual([7, 1, 0x00200021])
     await calls.child(11, 'created', true)
     expect(state.creates[1]?.[7]).toBe(2)
-    expect(state.creates[1]?.[1]).toBe(0)
+    expect(state.creates[1]?.[1]).toBe(0x001000a4)
     expect(await calls.reader(11)).toBe(12)
     expect(state.creates[2]?.[1]).toBe(0x00100081)
-    expect(state.creates[2]?.[2]).toMatchObject({ RootDirectory: 11, ObjectName: { Buffer: Buffer.from('.', 'utf16le') } })
+    expect(state.creates[2]?.[2]).toMatchObject({ RootDirectory: 11, ObjectName: { Buffer: Buffer.from('', 'utf16le') } })
     expect(await calls.identity(11)).toEqual({ device: '7', inode: String(1n << 32n | 42n) })
     await calls.close(12)
   } finally { calls.unload() }

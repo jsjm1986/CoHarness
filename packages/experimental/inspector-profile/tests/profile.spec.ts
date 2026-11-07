@@ -20,7 +20,9 @@ describe('Inspector profile bundle', () => {
     })
     expect(yaml.load(readFileSync(new URL(`../${manifest.dsh.bundle.patch}`, import.meta.url), 'utf8'), {
       schema: entryListSchema,
-    })).toEqual([{ insert: [
+    })).toEqual([{ id: 'modules', config: { applicationBatchGroups: [[
+      '@deepseek-ai/dsh-experimental-inspector', '@deepseek-ai/dsh-experimental-session-inspector',
+    ]] } }, { insert: [
       {
         id: 'experimental-inspector', name: '@deepseek-ai/dsh-experimental-inspector',
         disabled: false, config: { captureFetch: true },

@@ -46,14 +46,34 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+/** Parent of `filename` to retry after a realpath ENOENT, rethrowing any other lookup failure. */
+function missingEntryParent(filename: string, error: unknown): string {
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  const parent = dirname(filename)
+  if (parent === filename) throw error
+  return parent
+}
+
 function canonicalPath(filename: string): string {
   // Node's ESM resolver uses the JS realpath implementation; native realpath
   // expands Windows short names differently and would miss its cache keys.
   try { return realpathSync(filename) } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    const parent = dirname(filename)
-    if (parent === filename) throw error
-    return resolve(canonicalPath(parent), basename(filename))
+    return resolve(canonicalPath(missingEntryParent(filename, error)), basename(filename))
+  }
+}
+
+// Deduping by one canonical spelling misses aliases whose own realpath keeps a
+// different name form — a junction stores its short-name target, so JS and
+// native realpaths disagree on Windows exactly where two spellings of one file
+// must collide. Register every real spelling of the deepest existing ancestor.
+function canonicalSpellings(filename: string): string[] {
+  try {
+    const spellings = [realpathSync(filename)]
+    const native: unknown = Reflect.get(realpathSync, 'native')
+    if (typeof native === 'function') spellings.push(String(Reflect.apply(native, realpathSync, [filename])))
+    return [...new Set(spellings)]
+  } catch (error) {
+    return canonicalSpellings(missingEntryParent(filename, error)).map(path => resolve(path, basename(filename)))
   }
 }
 
@@ -295,7 +315,7 @@ class Hmr extends Service {
    * @returns Disposer closing this registration and waiting for its pending refresh.
    */
   async watchConfig(filename: string, refresh: () => Promise<void>): Promise<() => Promise<void>> {
-    const paths = [resolve(filename), canonicalPath(filename)]
+    const paths = [...new Set([resolve(filename), ...canonicalSpellings(filename)])]
     if (paths.some(path => this.configPaths.has(path))) throw new Error(`config path already registered: ${filename}`)
     for (const path of paths) this.configPaths.add(path)
     try {

@@ -28,7 +28,7 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
   })
   const calls = {
     focus: vi.fn(), remove: vi.fn(), ratios: vi.fn(), reorder: vi.fn(),
-    collapse: vi.fn(), solo: vi.fn(), maximize: vi.fn(), enabled: vi.fn(),
+    collapse: vi.fn(), solo: vi.fn(), maximize: vi.fn(),
   }
   // Header owner shares arrive in pane order; the session scope binds the id
   // outside the owner share, so the harness aligns capture order to paneIds.
@@ -57,7 +57,8 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     useDraftFailures={bindSnapshotSelector(createSnapshotStore<readonly { sessionId: SessionId; versionUnavailable: boolean }[]>([]))}
     useViewportAvailable={bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} })}
     useSessions={bindSnapshotSelector(createSnapshotStore<SessionListState>(
-      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }))}
+      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+        state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }))}
     useWorkspaces={bindSnapshotSelector(createSnapshotStore<WorkspaceListState>(
       { items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined }))}
     usePanelInfo={bindSnapshotSelector(createSnapshotStore({ activePanelId: null }))}
@@ -68,7 +69,6 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     onViewportCollapse={calls.collapse}
     onViewportSolo={calls.solo}
     onViewportMaximize={calls.maximize}
-    onViewportEnabled={calls.enabled}
     t={t}
   />)
   const headers = (): Record<string, unknown>[] => headerOwners.slice(-store.getSnapshot().paneIds.length)

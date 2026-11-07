@@ -2583,6 +2583,11 @@
   .documentName,.quickAttach,.menuDownload { min-height: var(--dsw-touch-target); }
 }
 
+.shell > :first-child { position: relative; }
+.shell > :first-child > button { position: absolute; right: 12px; top: 8px; width: 32px; min-height: 32px; }
+.crumb { font-weight: 400; color: var(--dsw-alias-label-secondary); }
+.groupDate { background: transparent; border: 0; }
+@media (max-width: 767px) { .shell > :first-child > button { right: 8px; top: 4px; width: 44px; min-height: 44px; } }
 
 .crumb { font-weight: 400; color: var(--dsw-alias-label-secondary); }
 .groupDate { background: transparent; border: 0; }

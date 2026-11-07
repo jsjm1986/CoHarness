@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-experimental-inspector-port.md
 document:
-  en: cefa3912f987c75f3c8ae32a22b9450ea6f46502
-  zh: b9e55cc2c00d2c2548db56dfc73a399e0b344021
+  en: 5182cdcbd686d391296bd09648bc02e2cf8ce80a
+  zh: d85e93d24a4401160b573775cf5b85c2f672b91d
 /agent-note-experimental-inspector-port-through-fork-seams:
   en: e69714cd12eacd66
   zh: 9206f38df4653ad2
@@ -12,8 +12,8 @@ document:
   en: 3741b39fa178c086
   zh: 7be04aeb0ac887ba
 /agent-note-experimental-inspector-port-through-fork-seams/decision:
-  en: d9d912d1551cabc9
-  zh: 6352d5184cc572e0
+  en: 29e969f730076b3f
+  zh: 0ab1f3fc2e9abea6
 /agent-note-experimental-inspector-port-through-fork-seams/alternatives-considered:
   en: 5f9c1f45e10ced65
   zh: 7b95d60e65b7b49c

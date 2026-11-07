@@ -1,10 +1,10 @@
 /**
  * The session standard-props provide channel: provider roster, bundle
  * materialization (fail-loud on undeclared/missing/duplicate members), the
- * static no-session projection, and the atomic current-session projection
- * observable. One implementation — SessionRuntime drives it from wire
- * truth, the test runtime's sessions double drives it from fixtures — so
- * the materialization rules and the projection semantics cannot drift
+ * static no-session projection, atomic current-session projection, and
+ * explicit-bundle lifetime revision. One implementation — SessionRuntime
+ * drives it from wire truth, the test runtime's sessions double drives it from
+ * fixtures — so the materialization rules and the projection semantics cannot drift
  * between production and the test bench.
  */
 import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
@@ -34,6 +34,10 @@ export class SessionProvideChannel {
   private currentSnapshot: SessionMaybeProvideInfo
   /** Projection subscribers (plain cell: bundles hold live session sources, so no store freeze may touch them). */
   private readonly listeners = new Set<() => void>()
+  private revision = 0
+  private readonly revisionListeners = new Set<() => void>()
+  /** Lifecycle and roster revision for selectors borrowing an explicit Session bundle. */
+  readonly provideInfoRevision: HostObservable<number>
 
   /**
    * Atomic current-session provide projection: selection changes and
@@ -60,6 +64,13 @@ export class SessionProvideChannel {
       subscribe: (fn) => {
         this.listeners.add(fn)
         return () => { this.listeners.delete(fn) }
+      },
+    }
+    this.provideInfoRevision = {
+      getSnapshot: () => this.revision,
+      subscribe: (fn) => {
+        this.revisionListeners.add(fn)
+        return () => { this.revisionListeners.delete(fn) }
       },
     }
   }
@@ -119,6 +130,14 @@ export class SessionProvideChannel {
     }
   }
 
+  /** Publish after the owner commits a bundle acquisition, release, or complete roster rebuild. */
+  publishRevision(): void {
+    this.revision++
+    for (const listener of [...this.revisionListeners]) {
+      try { listener() } catch (error) { console.error('sessions.provideInfoRevision subscriber failed:', error) }
+    }
+  }
+
   /**
    * Materialize the standard-props bundle for one session (fails loud on
    * undeclared, missing, and duplicate member names).
@@ -169,6 +188,7 @@ export class SessionProvideChannel {
     this.maybeInfoCache = this.materializeMaybeInfo()
     this.host.rebuildBundles()
     this.publishCurrent()
+    this.publishRevision()
   }
 
   /** Build the static no-session kit and reject duplicate declared names. */

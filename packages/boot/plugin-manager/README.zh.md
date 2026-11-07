@@ -30,6 +30,10 @@ kind: "package-reference"
 
 基于 base 的 profile 提供管理服务。在 Web 中，侧边栏的**插件**页（ui-plugin-manager）管理 profile 的组合包及其能唯一定位的行；设置 → 插件只保留各插件的配置页签。Agent 预设条目保持只读。`plugin_manager` 工具提供相同操作，在 Creator 模式中启用。其他预设仍默认禁用。 每个工具操作都要求 `danger-full-access` 或本次调用的批准。在较低沙箱模式下，`ask` 会请求审批；`never`、拒绝、取消或审批渠道不可用时均不执行。批准不改变会话的权限模式。profile 变更跨会话持久化，已安装的 Host 代码在宿主进程内运行，不受工作区沙箱限制。依赖构建脚本仍需单独批准。
 
+Web 组合还挂载 `@deepseek-ai/dsh-plugin-manager/catalog`。该只读入口在没有受管 profile 时也提供 `pluginManager/catalog(includeEntryMetadata?, signal?)`，返回 `managementAvailable: false`、`manage: false` 以及空的 `bundles`、`plugins`，不读取 profile 文件。存在管理器时，入口在启动现有组合包、条目与权限读取之前，以及返回结果之前检查读取权限。拒绝读取时返回原有错误；可读的 profile 可以返回 `manage: false`。传输层的管理员断言仍在调用前核验，包括未托管的 Host。结果不保证来自一个原子 profile 修订，也不跨请求缓存。取消或销毁服务会阻止晚到结果发布，并等待已经启动的读取完成；这些单项读取自身不接受取消。现有 `listBundles`、`listPlugins`、`access` 方法继续可用。`listPlugins` 读取当前 Runtime 条目，不检查 Agent 预设组合；完整的 `pluginInventory/list` 继续用于预设诊断。[目录决策](../../../.agents/notes/implemented/architecture/2026-10-23-plugin-management-catalog.zh.md)说明此组合方式。
+
+`catalog` 与 `listPlugins(includeMetadata?)` 默认包含 Runtime 条目的显示元数据。`catalog(false, signal)` 与 `listPlugins(false)` 省略条目元数据及其资源读取，同时保留当前条目顺序、阶段、启用状态和 patch 控制信息。目录中的组合包及其声明行仍包含完整元数据。工作台页面的显示字段来自组合包行和 Client 注册，因此选择此投影；Admin 组成矩阵保留完整条目元数据。完整清单仍解析当前资源，不跨请求缓存。
+
 未使用 Agent 预设的部署在 profile patch 中启用工具；使用预设的会话由其预设中的 `tool-plugin-manager` 条目控制。
 
 ```yaml

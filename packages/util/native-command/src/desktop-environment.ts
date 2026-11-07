@@ -1,6 +1,7 @@
 /** Read-only desktop-session observation; does not capture screens, request permissions or start a driver. */
 import { readdir, readFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+// The probed paths are Linux-canonical, so the posix joiner is correct on any test host.
+import { join } from 'node:path/posix'
 
 /** Session detection is separate from desktop transport, OS permissions and application authorization. */
 export interface DesktopEnvironment {

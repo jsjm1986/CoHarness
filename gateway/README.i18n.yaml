@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
 document:
-  en: 95b95e3a36a8f5757a153827d0c8e44e007e93d5
-  zh: 800ac1143817ceef059356479da88a704c539ddc
+  en: af25c5ed59f9a82b49471a0fffeaafdfd929d294
+  zh: d767781851aa0b4a78496939b5eae58e7716c461
 /harness-gateway:
   en: d06b73ef2a831bb8
   zh: 8a3e3f0d5c13677e
@@ -12,23 +12,23 @@ document:
   en: b40c722ed37855ef
   zh: 6b8592f779bb25fd
 /harness-gateway/configuration-environment-variables-see-src-config-ts:
-  en: a20017183d393f6f
-  zh: 64545609e5b462e3
+  en: abd1825f34828d71
+  zh: ff0269e0ea868592
 /harness-gateway/performance-and-runtime-admission:
-  en: 0924d85a545a5074
-  zh: 60c70915220b1192
+  en: 66736425d2f8be96
+  zh: 44766ae36bac4615
 /harness-gateway/public-access-tunnel:
   en: 9a0ccbb5ac6faa3b
   zh: cb1140ec9b72f093
 /harness-gateway/admin-console-and-project-grants:
-  en: 61ae2261e983594f
-  zh: b93cb5464a2045a0
+  en: 178ee81999c57007
+  zh: 800a82d2943d73b3
 /harness-gateway/admin-console-and-project-grants/project-progress:
   en: 6e1585e64119d4ea
   zh: 39f2bbc0c3749326
 /harness-gateway/plugin-management:
-  en: 44ec9ebc7e288aee
-  zh: 5040cf211a5305ac
+  en: f99fc581cdfda8f8
+  zh: 5de8495477e7fbd4
 /harness-gateway/steward-maintenance-space:
   en: 70ff1f2e23a128d2
   zh: 0978c42d651ff3ea
@@ -39,8 +39,8 @@ document:
   en: 2d9728bb7d41117a
   zh: 7fbf5c4367836bff
 /harness-gateway/project-collaborative-conversations:
-  en: b44517cf9c471efc
-  zh: 066fbe4acab24e45
+  en: 397af66f68721cc0
+  zh: 2f7cbd1e55cd1875
 /harness-gateway/model-governance-and-usage-accounting:
   en: f917166e964631c2
   zh: efbc4b1bca40b1fe
@@ -48,8 +48,8 @@ document:
   en: c27f5b4776762617
   zh: fbaeb983a8ff22b4
 /harness-gateway/deployment-maintenance-and-coordinated-restore:
-  en: 3fefb19bb7204b32
-  zh: 74088ecdd9998b71
+  en: 5c743a4c9b3a1800
+  zh: d2b4c85a6ad9d4c1
 /harness-gateway/access-revocation-across-gateways:
   en: e063983a3abb3e64
   zh: 30f2872ee4b8e7cc

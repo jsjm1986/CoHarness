@@ -8,6 +8,7 @@ import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.t
 import { PostgresModelGovernanceService } from '../src/postgres/model-governance-service.ts'
 import { OrganizationModelCredentialCipher } from '../src/organization-model-credentials.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
+import { removeFixtureOrganization } from './postgres-fixture-cleanup.ts'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
@@ -40,16 +41,7 @@ describePg('infrastructure model usage', () => {
       expect(contributors.rows).toEqual([])
       expect(contributors.unattributed).toMatchObject({ calls: 1, totalTokens: 13 })
     } finally {
-      const tables = (await pool.query<{ table_name: string }>("SELECT table_name FROM information_schema.columns WHERE table_schema='harness' AND column_name='organization_id' AND table_name<>'organizations'")).rows
-      for (let pass = 0; pass < 12; pass++) {
-        let blocked = false
-        for (const { table_name: table } of tables) {
-          try { await pool.query(`DELETE FROM harness."${table.replaceAll('"', '""')}" WHERE organization_id=$1`, [organization]) }
-          catch (error) { if ((error as { code?: string }).code === '23503') blocked = true; else throw error }
-        }
-        if (!blocked) break
-      }
-      await pool.query('DELETE FROM harness.organizations WHERE id=$1', [organization])
+      await removeFixtureOrganization(pool, organization)
     }
   })
 })

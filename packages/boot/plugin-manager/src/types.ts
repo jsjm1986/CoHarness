@@ -375,6 +375,16 @@ export interface PluginManagementAccess {
   manage: boolean
 }
 
+/** One live authorized management read; absence of a profile returns empty lists and no mutation grant. */
+export interface PluginManagementCatalog extends PluginManagementAccess {
+  /** Whether this Host currently has persistent profile management. */
+  managementAvailable: boolean
+  /** The same bundle records exposed by the existing list operation. */
+  bundles: BundleInfo[]
+  /** Current plugin entries and control availability; display metadata is absent when `includeEntryMetadata` is false. */
+  plugins: PluginInfo[]
+}
+
 /** What changed in the profile, for consumers that show it. */
 export interface PluginChange {
   /** The operation that changed it; `desired-state` is a convergence the state store drove, not a caller's operation. */

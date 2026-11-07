@@ -1,8 +1,8 @@
 /** Shared-project activity tab through the shipped Web composition. */
 
 import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Browser, BrowserContext, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
@@ -88,7 +88,7 @@ async function mockActivityGateway(target: Page, day = '2026-10-23'): Promise<vo
 /** Open a fresh conversation so the reveal click visibly switches panes. */
 async function openBlankSession(target: Page): Promise<void> {
   await target.getByRole('button', { name: 'New session' }).first().click()
-  expect(await target.getByText('DONE', { exact: true }).count()).toBe(0)
+  await target.getByText('DONE', { exact: true }).waitFor({ state: 'hidden' })
 }
 
 /** Open the activity tab through the right Sidebar guide capsule. */
@@ -150,6 +150,7 @@ describe('project activity tab', () => {
     await feed.getByText(ANSWER_TEXT, { exact: true }).waitFor()
     await feed.getByText('Zhou', { exact: true }).waitFor()
     await feed.getByText('chose', { exact: true }).waitFor()
+    await feed.getByRole('button', { name: 'Today Zhou · Lin 2', exact: true }).waitFor()
 
     // The folded line expands to the detail card; the question shows there.
     await feed.getByText(ANSWER_TEXT, { exact: true }).click()

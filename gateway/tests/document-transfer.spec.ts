@@ -176,6 +176,67 @@ function responseForTargetChunk(): Response {
 }
 
 describe('Gateway document transfer broker', () => {
+  it.each([
+    ['application/pdf', true, "'self'", 'inline'],
+    ['application/pdf; charset=binary', true, "'self'", 'inline'],
+    ['application/pdf', false, "'none'", 'attachment'],
+    ['text/html', true, "'none'", 'inline'],
+    ['image/svg+xml', true, "'none'", 'inline'],
+    ['text/plain', true, "'none'", 'inline'],
+    ['application/pdfx', true, "'none'", 'attachment'],
+    ['application/octet-stream', true, "'none'", 'attachment'],
+  ] as const)('keeps type-specific scope framing for %s with inline=%s', async (mediaType, inline, ancestors, disposition) => {
+    const runtime = fixture()
+    const operationRef = vi.fn(async () => {})
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('bytes', { headers: {
+      'content-type': mediaType,
+      'content-length': '5',
+      'content-disposition': 'attachment',
+      'content-security-policy': "frame-ancestors 'none'",
+    } })))
+    const handler = createGatewayDocumentScopeHandler({
+      ...runtime.dependencies,
+      instances: { ensureRunning: runtime.ensureRunning, operationRef },
+    })
+    const request = Object.assign(Readable.from([]), {
+      method: 'GET', headers: {},
+      url: `/api/documents/scope/content?scope=project%3A41&id=preview.pdf${inline ? '&inline=1' : ''}`,
+    })
+    const response = await handler({
+      user: USER, request: request as never, pathname: '/api/documents/scope/content',
+      operation: 'content', scope: { kind: 'project', projectId: 41 }, signal: new AbortController().signal,
+    })
+    expect(response?.headers.get('content-security-policy')).toBe(
+      `default-src 'none'; img-src 'self' data:; frame-ancestors ${ancestors}; sandbox`,
+    )
+    expect(response?.headers.get('content-disposition')).toBe(disposition)
+    expect(response?.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(response?.headers.get('cache-control')).toBe('private, no-store')
+    expect(response?.headers.get('content-type')).toBe(mediaType)
+    expect(response?.headers.get('content-length')).toBe('5')
+    expect(await response?.text()).toBe('bytes')
+    expect(operationRef.mock.calls).toEqual([
+      [{ kind: 'project', id: 41 }, 1, 2], [{ kind: 'project', id: 41 }, -1, 2],
+    ])
+  })
+
+  it('refuses inline PDF content before forwarding for a non-member project', async () => {
+    const runtime = fixture()
+    runtime.projectForUser.mockResolvedValueOnce(null)
+    const send = vi.fn()
+    vi.stubGlobal('fetch', send)
+    const handler = createGatewayDocumentScopeHandler(runtime.dependencies)
+    const request = Object.assign(Readable.from([]), {
+      method: 'GET', headers: {}, url: '/api/documents/scope/content?id=preview.pdf&inline=1',
+    })
+    await expect(handler({
+      user: USER, request: request as never, pathname: '/api/documents/scope/content',
+      operation: 'content', scope: { kind: 'project', projectId: 41 }, signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: 'COLLABORATION_FORBIDDEN', status: 403 })
+    expect(send).not.toHaveBeenCalled()
+    expect(runtime.ensureRunning).not.toHaveBeenCalled()
+  })
+
   it('times out stalled scope metadata and releases its runtime lease', async () => {
     const runtime = fixture()
     const operationRef = vi.fn(async () => {})
@@ -885,6 +946,89 @@ describe('Gateway document transfer broker', () => {
         documents: [{ docId }],
       },
     })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_LIMIT' })
+  })
+
+  it.each([{ kind: 'personal' }, { kind: 'project', projectId: 41 }] as const)(
+    'plans nested documents from their source directories in $kind scope', async (source) => {
+      const runtime = fixture()
+      const requests: { directory: string | null; cursor: string | null; limit: string | null }[] = []
+      const fetch = vi.fn(async (input: string) => {
+        const url = new URL(input)
+        const directory = url.searchParams.get('directory')
+        const cursor = url.searchParams.get('cursor')
+        requests.push({ directory, cursor, limit: url.searchParams.get('limit') })
+        const docId = directory === 'deep'
+          ? cursor === null ? 'deep/alpha.txt' : 'deep/omega.txt'
+          : directory === 'beta' ? 'beta/gamma.txt'
+          : cursor === null ? 'unrelated.txt' : 'root.txt'
+        return new Response(JSON.stringify({
+          documents: [{ docId, name: docId.split('/').at(-1), bytes: 5, mediaType: 'text/plain', modifiedAt: 1 }],
+          ...(cursor === null && directory !== 'beta' ? { nextCursor: 'second-page' } : {}),
+        }), { status: 200 })
+      })
+      vi.stubGlobal('fetch', fetch)
+      const documents = ['deep/alpha.txt', 'root.txt', 'beta/gamma.txt', 'deep/omega.txt'].map(docId => ({ docId }))
+      const payload = { version: 1, source, target: { kind: 'project', projectId: 43 }, directory: 'destination', documents }
+      const plan = await runtime.plan({ subject: SUBJECT, principal: PRINCIPAL, payload })
+      try {
+        expect(plan.documents.map(document => document.docId)).toEqual(documents.map(document => document.docId))
+        expect(plan.directory).toBe('destination')
+        expect(requests).toEqual([
+          { directory: 'deep', cursor: null, limit: '100' },
+          { directory: 'deep', cursor: 'second-page', limit: '100' },
+          { directory: '', cursor: null, limit: '100' },
+          { directory: '', cursor: 'second-page', limit: '100' },
+          { directory: 'beta', cursor: null, limit: '100' },
+        ])
+      } finally {
+        runtime.projectForUser.mockResolvedValueOnce(null)
+        await expect(runtime.commit({
+          request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+          payload: { ...payload, planId: plan.planId }, signal: new AbortController().signal,
+        })).rejects.toMatchObject({ code: 'COLLABORATION_FORBIDDEN', status: 403 })
+      }
+    },
+  )
+
+  it('rejects a repeating cursor within a source directory', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ documents: [], nextCursor: 'repeat' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    await expect(runtime.plan({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 43 },
+        documents: [{ docId: 'deep/missing.txt' }],
+      },
+    })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_FAILED', status: 502 })
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps one metadata page budget across source directories', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn(async (input: string) => {
+      const url = new URL(input)
+      const directory = url.searchParams.get('directory')
+      const page = Number(url.searchParams.get('cursor') ?? '0')
+      const complete = directory === 'first' && page === 249
+      return new Response(JSON.stringify({
+        documents: complete ? [{
+          docId: 'first/source.txt', name: 'source.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1,
+        }] : [],
+        ...(complete ? {} : { nextCursor: String(page + 1) }),
+      }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetch)
+    await expect(runtime.plan({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 43 },
+        documents: [{ docId: 'first/source.txt' }, { docId: 'second/source.txt' }],
+      },
+    })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_FAILED', status: 502 })
+    expect(fetch).toHaveBeenCalledTimes(500)
   })
 
   it('validates plan limits and rejects a process-wide byte budget', async () => {

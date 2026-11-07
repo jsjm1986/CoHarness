@@ -1240,7 +1240,7 @@ describe('gateway server', () => {
     expect(await response.json()).toEqual(emptyUsageSummary)
   })
 
-  it('builds account context owner flags from one project catalog read', async () => {
+  it.each(['personal', 'cookie-project', 'target-project'] as const)('builds %s account context from one scope resolution and one project catalog read', async (selection) => {
     const { deps, base } = await setup()
     const project = await deps.projects.create({ name: 'context-project', createdBy: 1 })
     deps.collaboration = {
@@ -1256,16 +1256,22 @@ describe('gateway server', () => {
     } satisfies GatewayCollaborationService
     const list = vi.spyOn(deps.projects, 'list')
     const detail = vi.spyOn(deps.projects, 'getById')
+    const membership = vi.spyOn(deps.collaboration, 'projectForUser')
     const cookie = await login(base, 'root-admin', 'pw-12345678')
 
-    const response = await fetch(`${base}/account/api/context`, { headers: { cookie } })
+    const target = selection === 'target-project' ? `?dshTarget=project:${project.id}` : ''
+    const selectedCookie = selection === 'cookie-project' ? `${cookie}; hgw_scope=project:${project.id}` : cookie
+    const response = await fetch(`${base}/account/api/context${target}`, { headers: { cookie: selectedCookie } })
     expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
     expect(await response.json()).toMatchObject({
+      scope: selection === 'personal' ? { kind: 'personal' } : {
+        kind: 'project', projectId: project.id, projectName: project.name, mode: 'rw', canManage: true,
+      },
       projects: [expect.objectContaining({ name: 'context-project', canManage: true })],
     })
-    // The collaboration stub supplies the membership set; one catalog read
-    // supplies all owner rows, with no per-project detail read.
     expect(list).toHaveBeenCalledTimes(1)
+    expect(membership).toHaveBeenCalledTimes(selection === 'personal' ? 0 : 1)
     expect(detail).not.toHaveBeenCalled()
   })
 

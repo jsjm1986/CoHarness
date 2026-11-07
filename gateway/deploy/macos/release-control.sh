@@ -82,13 +82,16 @@ validate_release() {
     # required at first session lock, not at boot; require the host platform's
     # payloads so an incomplete release is refused before it goes live. Legacy
     # source releases predate the addon and stay exempt below.
-    local -a native_paths=()
+    local -a native_paths=(
+      native/system/packages/entry/lib/index.js
+      native/system/packages/entry/lib/flock.js
+    )
     case "$(uname -s)-$(uname -m)" in
-      Darwin-arm64)         native_paths=(native/system/packages/darwin-arm64/bin/system.node) ;;
-      Darwin-x86_64)        native_paths=(native/system/packages/darwin-x64/bin/system.node) ;;
-      Linux-x86_64)         native_paths=(native/system/packages/linux-x64/bin/landlock-run native/system/packages/linux-x64/bin/glibc/system.node native/system/packages/linux-x64/bin/musl/system.node) ;;
+      Darwin-arm64)         native_paths+=(native/system/packages/darwin-arm64/bin/system.node) ;;
+      Darwin-x86_64)        native_paths+=(native/system/packages/darwin-x64/bin/system.node) ;;
+      Linux-x86_64)         native_paths+=(native/system/packages/linux-x64/bin/landlock-run native/system/packages/linux-x64/bin/glibc/system.node native/system/packages/linux-x64/bin/musl/system.node) ;;
       Linux-aarch64|Linux-arm64)
-                            native_paths=(native/system/packages/linux-arm64/bin/landlock-run native/system/packages/linux-arm64/bin/glibc/system.node native/system/packages/linux-arm64/bin/musl/system.node) ;;
+                            native_paths+=(native/system/packages/linux-arm64/bin/landlock-run native/system/packages/linux-arm64/bin/glibc/system.node native/system/packages/linux-arm64/bin/musl/system.node) ;;
       *) fail "unsupported host for native-artifact check: $(uname -s)/$(uname -m)" ;;
     esac
     for required in "${native_paths[@]}"; do
@@ -199,6 +202,21 @@ validate_release() {
     return 0
   fi
   fail "release has no complete compiled Gateway payload: $release"
+}
+
+activation_target() {
+  local requested="$1"
+  # Preserve the mutable alias name before canonical_directory resolves it.
+  while [[ "$requested" == */ || "$requested" == */. ]]; do
+    if [[ "$requested" == */. ]]; then requested="${requested%/.}"
+    else requested="${requested%/}"; fi
+  done
+  [[ "${requested##*/}" != 'current' ]] || fail "current is not an immutable release directory"
+  local release
+  release="$(canonical_directory "$1")" || fail "release directory not found: $1"
+  assert_direct_release "$release"
+  validate_release "$release"
+  printf '%s\n' "$release"
 }
 
 current_release() {
@@ -332,12 +350,19 @@ run_node_config() {
 }
 
 activate_release() {
-  [[ $# -eq 1 ]] || fail 'usage: release-control.sh activate <release-directory>'
+  case "$#" in
+    1) ;;
+    3) [[ "$2" == '--rollback-target' ]] || fail 'usage: release-control.sh activate <release-directory> [--rollback-target <release-directory>]' ;;
+    *) fail 'usage: release-control.sh activate <release-directory> [--rollback-target <release-directory>]' ;;
+  esac
   load_environment
   local release
-  release="$(canonical_directory "$1")" || fail "release directory not found: $1"
-  assert_direct_release "$release"
-  validate_release "$release"
+  release="$(activation_target "$1")"
+  local rollback=''
+  if [[ $# -eq 3 ]]; then
+    rollback="$(activation_target "$3")"
+    [[ "$rollback" != "$release" ]] || fail 'rollback target must differ from the activated release'
+  fi
 
   ACTIVATION_LOCK="$RELEASES_ROOT/.activation.lock"
   mkdir "$ACTIVATION_LOCK" 2>/dev/null || fail "another release operation holds $ACTIVATION_LOCK"
@@ -347,6 +372,7 @@ activate_release() {
   local previous_pid=''
   local previous_children=''
   previous="$(current_release || true)"
+  if [[ -z "$rollback" ]]; then rollback="$previous"; fi
   previous_pid="$(launch_pid || true)"
   if [[ -n "$previous_pid" ]]; then previous_children="$(descendant_pids "$previous_pid")"; fi
   switch_current "$release"
@@ -375,18 +401,18 @@ activate_release() {
   local failed_children=''
   if [[ -n "$failed_pid" ]]; then failed_children="$(descendant_pids "$failed_pid")"; fi
   terminate_pids "$failed_children"
-  if [[ -z "$previous" ]]; then
+  if [[ -z "$rollback" ]]; then
     fail "release $(basename "$release") failed health verification and no previous release exists"
   fi
-  switch_current "$previous"
+  switch_current "$rollback"
   if launchctl kickstart -k "$DOMAIN/$LABEL"; then
     terminate_pids "$failed_children"
   fi
   if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 \
-    && wait_for_release "$previous" "$failed_pid"; then
-    fail "release $(basename "$release") failed health verification; restored $(basename "$previous")"
+    && wait_for_release "$rollback" "$failed_pid"; then
+    fail "release $(basename "$release") failed health verification; restored $(basename "$rollback")"
   fi
-  fail "release $(basename "$release") failed health verification and rollback did not become healthy"
+  fail "release $(basename "$release") failed health verification and rollback $(basename "$rollback") did not become healthy"
 }
 
 prune_release() {
@@ -445,5 +471,5 @@ case "${1:-}" in
   activate) shift; activate_release "$@" ;;
   prune) shift; prune_release "$@" ;;
   status) shift; [[ $# -eq 0 ]] || fail 'status accepts no arguments'; status ;;
-  *) fail 'usage: release-control.sh {run|config <watch|status|apply|recover>|activate <release>|prune <release>|status}' ;;
+  *) fail 'usage: release-control.sh {run|config <watch|status|apply|recover>|activate <release> [--rollback-target <release>]|prune <release>|status}' ;;
 esac

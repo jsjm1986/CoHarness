@@ -520,12 +520,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     {
       id: 'webserver',
-      // Preserve the shipped response-compression policy while using an
-      // ephemeral port in this scaffold; a patch replaces the row's complete
-      // config.
+      // Preserve shipped encoding negotiation with low-effort codecs and an
+      // ephemeral port; a patch replaces the row's complete config.
       config: {
-        host: '127.0.0.1', port: 0, compression: 'gzip',
-        compressionLevel: 1, compressionThresholdBytes: 1024,
+        host: '127.0.0.1', port: 0, compression: 'auto',
+        compressionLevel: 1, compressionBrotliQuality: 1, compressionThresholdBytes: 1024,
       },
     },
     // The bundle's web-runtime row resolves the same built dist under test

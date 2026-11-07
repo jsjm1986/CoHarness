@@ -44,6 +44,7 @@ const sessionState = (items: readonly SessionSummary[], overrides: Partial<Sessi
   archivedById: {},
   current: undefined,
   phase: 'ready',
+  state: 'idle', error: null,
   subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
   currentAddress: undefined,
   ...overrides,
@@ -95,6 +96,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     actions: store.actions,
     startSession: vi.fn(),
     open: vi.fn(),
+    retryLists: vi.fn(),
     searchSessions: vi.fn(async () => ({ items: [], hasMore: false })),
     searchResultLimit: 20,
     requestSessionRename: controls.rename,
@@ -221,7 +223,7 @@ describe('WorkspaceBrowser', () => {
     const b = mount({ useWorkspaces: hook(pending) })
     act(() => {
       b.store.actions.setGroupExpanded('deleted', true)
-      b.store.actions.syncSessionOrderAccount('deleted', ['session'], { session: 1 })
+      b.store.actions.syncSessionOrderAccounts([{ accountKey: 'deleted', order: ['session'], updatedAt: { session: 1 } }])
     })
     expect(b.store.getSnapshot().groupExpansion).toEqual({ deleted: true })
 
@@ -1000,6 +1002,36 @@ describe('WorkspaceBrowser', () => {
       fireEvent.click(input.parentElement as HTMLElement)
       expect(document.activeElement).toBe(input)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels workbench-hidden content search and resumes the retained query when the browser returns', async () => {
+    vi.useFakeTimers()
+    const pending: (() => void)[] = []
+    const searchSessions = vi.fn<WorkspaceBrowserProps['searchSessions']>((_query, _signal) =>
+      new Promise((resolve) => { pending.push(() => { resolve({ items: [], hasMore: false }) }) }))
+    let b: ReturnType<typeof mount> | undefined
+    try {
+      b = mount({ searchSessions })
+      const input = screen.getByPlaceholderText<HTMLInputElement>('搜索会话…')
+      fireEvent.change(input, { target: { value: 'retained query' } })
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledOnce()
+      const firstSignal = searchSessions.mock.calls[0]![1]
+      rerender(b, { useViewport: hook({ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }) })
+      expect(firstSignal.aborted).toBe(true)
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledOnce()
+      rerender(b, { useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }) })
+      expect(input.value).toBe('retained query')
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledTimes(2)
+      expect(searchSessions.mock.calls[1]![0]).toBe('retained query')
+      expect(searchSessions.mock.calls[1]![1].aborted).toBe(false)
+    } finally {
+      b?.view.unmount()
+      await act(async () => { for (const resolve of pending) resolve() })
       vi.useRealTimers()
     }
   })

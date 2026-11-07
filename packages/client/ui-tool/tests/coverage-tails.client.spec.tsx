@@ -33,6 +33,7 @@ function listStore() {
     archivedById: {},
     current: undefined,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })

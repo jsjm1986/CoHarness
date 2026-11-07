@@ -505,6 +505,35 @@ describe('connection node half', () => {
     await fiber.dispose()
   })
 
+  it.each([undefined, false, true])('forwards runtime and unary timing only when enabled (%s)', async (serverTiming) => {
+    const apiProxy = {
+      sessions: {
+        async list(request: Parameters<ApiProxy['sessions']['list']>[0]) {
+          return { rpcId: request.rpcId, result: { ok: true as const, value: { items: [] } } }
+        },
+      },
+    } as unknown as ApiProxy
+    const { routes, connection, dispose } = await mounted(serverTiming === undefined ? {} : { serverTiming }, apiProxy)
+    try {
+      const result = fakeResponse()
+      await routes[0]!.handler(fakePost({
+        host: '127.0.0.1:3080', cookie: browserCookie(connection, '127.0.0.1:3080'),
+      }, '/api/session.list', {
+        type: 'client-request', rpcId: 'timed-list', method: 'session.list', payload: {},
+      }), result.response)
+      expect(result.state.status).toBe(200)
+      if (serverTiming === true) {
+        expect(result.state.headers?.['server-timing'])
+          .toMatch(/^dsh_rpc;dur=\d+\.\d{2}, dsh_conn;dur=\d+\.\d{2}$/)
+      } else {
+        expect(result.state.headers?.['server-timing']).toBeUndefined()
+      }
+      expect(JSON.parse(String(result.state.body))).toEqual({
+        type: 'server-response', rpcId: 'timed-list', result: { ok: true, value: { items: [] } },
+      })
+    } finally { await dispose() }
+  })
+
   it('applies historyPageTargetBytes to physical session.history responses', async () => {
     const page = {
       events: ['oldest', 'middle', 'newest'].map((text, seq) => ({

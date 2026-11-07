@@ -1,9 +1,8 @@
 /**
- * Host transport for Web client graph changes and rebuilt bundles. One interval
- * stat-polls every graph row's client bundle (polling by design: network mounts
- * deliver no inotify events), reports changes through
- * `clientModules.rebuilt(id)`, and serves the `/plugins/events` SSE channel
- * broadcasting graph/rebuilt frames to the browser half (src/client/).
+ * Host transport for Web client graph changes and rebuilt bundles. Optional
+ * artifact polling supports network mounts without inotify delivery; the
+ * `/plugins/events` SSE channel carries graph/rebuilt frames and idle comments
+ * to the browser half (src/client/).
  * The Web composition mounts this transport for live graph updates;
  * a development rebuild watcher also supplies bundle changes.
  */
@@ -26,17 +25,22 @@ export const name = 'client-hmr'
 /** Required services: the client graph and Web route registry. */
 export const inject = ['clientModules', 'webServer']
 
+const MAX_TIMER_DELAY_MS = 2_147_483_647
+
 /** Plugin config, validated by the same-named schemastery schema. */
 export interface Config {
   /** Poll client artifacts for rebuilds; graph delivery remains active when false (default true). */
   watchArtifacts?: boolean
   /** Bundle stat-poll interval in milliseconds (default 500, the build-side watcher's polling default). */
   pollIntervalMs?: number
+  /** Interval between graph-stream keepalive comments in milliseconds (default 15000, positive timer integer). */
+  keepAliveIntervalMs?: number
 }
 
 export const Config: z<Config> = z.object({
   watchArtifacts: z.boolean().default(true),
   pollIntervalMs: z.number().step(1).min(1).default(500),
+  keepAliveIntervalMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(15_000),
 })
 
 /** Serialize one frame as an SSE data line. */
@@ -71,6 +75,7 @@ function sameBundleStat(left: WatchedBundleStat, right: WatchedBundleStat): bool
 export function apply(ctx: Context, config: Config): void {
   // schemastery's .default() guarantees the field is set after validation.
   const pollIntervalMs = config.pollIntervalMs as number
+  const keepAliveIntervalMs = config.keepAliveIntervalMs as number
 
   // --- bundle watch: one HMR-owned stat poll ------------------------------
   const watched = new Map<string, WatchedBundle>()
@@ -160,24 +165,62 @@ export function apply(ctx: Context, config: Config): void {
 
   // --- /plugins/events SSE channel ----------------------------------------
   const connections = new Set<ServerResponse>()
+  let keepAliveTimer: ReturnType<typeof setInterval> | undefined
+  let stopping = false
+
+  const stopKeepAlive = (): void => {
+    clearInterval(keepAliveTimer)
+    keepAliveTimer = undefined
+  }
+
+  const removeConnection = (res: ServerResponse): void => {
+    connections.delete(res)
+    if (connections.size === 0) stopKeepAlive()
+  }
+
+  const failConnection = (res: ServerResponse, error: unknown): void => {
+    ctx.logger.warn(error)
+    res.destroy()
+    if (![...connections].some(connection => !connection.destroyed && !connection.writableEnded)) stopKeepAlive()
+  }
+
+  const startKeepAlive = (): void => {
+    if (stopping || keepAliveTimer !== undefined || connections.size === 0) return
+    keepAliveTimer = setInterval(() => {
+      let writable = false
+      for (const res of connections) {
+        if (res.destroyed || res.writableEnded) continue
+        writable = true
+        if (res.writableNeedDrain) continue
+        try { res.write(': keep-alive\n\n') } catch (error) { failConnection(res, error) }
+      }
+      if (!writable) stopKeepAlive()
+    }, keepAliveIntervalMs)
+    keepAliveTimer.unref()
+  }
 
   const publishGraph = (): void => {
     const line = sseData({ type: 'graph', graph: ctx.clientModules.graph() })
-    for (const res of connections) res.write(line)
+    for (const res of connections) if (!res.destroyed && !res.writableEnded) res.write(line)
   }
 
   const connect = (res: ServerResponse): void => {
+    if (stopping || res.destroyed || res.writableEnded) { res.destroy(); return }
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
       'connection': 'keep-alive',
     })
-    // Comment line on open so clients/proxies see a live channel even when
-    // no rebuild ever happens; EventSource frame parsing skips it naturally.
-    res.write(': connected\n\n')
     connections.add(res)
+    const onError = (error: Error): void => { failConnection(res, error) }
+    res.on('error', onError)
+    res.once('close', () => {
+      res.removeListener('error', onError)
+      removeConnection(res)
+    })
+    res.write(': connected\n\n')
     res.write(sseData({ type: 'graph', graph: ctx.clientModules.graph() }))
-    res.on('close', () => { connections.delete(res) })
+    startKeepAlive()
   }
 
   ctx.effect(() => {
@@ -198,13 +241,19 @@ export function apply(ctx: Context, config: Config): void {
     const unsubscribeGraph = ctx.clientModules.onGraphChanged(publishGraph)
     const unsubscribe = ctx.clientModules.onRebuilt((id, rev) => {
       const line = sseData({ type: 'rebuilt', id, rev })
-      for (const res of connections) res.write(line)
+      for (const res of connections) if (!res.destroyed && !res.writableEnded) res.write(line)
     })
-    return () => {
+    return async () => {
+      stopping = true
+      stopKeepAlive()
       unsubscribeGraph()
       unsubscribe()
       disposeRoute()
-      for (const res of connections) res.destroy()
+      await Promise.all([...connections].map(async (res) => {
+        const closed = res.closed ? Promise.resolve() : new Promise<void>((resolve) => { res.once('close', resolve) })
+        res.destroy()
+        await closed
+      }))
       connections.clear()
     }
   }, 'client-hmr: /plugins/events channel')

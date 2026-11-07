@@ -10,7 +10,7 @@ import type { Entry, EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import z from '@deepseek-ai/schemastery'
 import { TypertRemoteService, Remote, RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
-import { pluginEntryId, readPluginInventory } from '@deepseek-ai/dsh-host-plugin-inventory'
+import { pluginEntryId, readRuntimePluginEntries } from '@deepseek-ai/dsh-host-plugin-inventory'
 import {
   readPluginMeta, readProfileManifest, resolveBundleDir, loadOverlayPatches, composeEntries,
   readProfilePatches, OPTIONAL_BUNDLES, bundlePatchPaths,
@@ -340,14 +340,14 @@ export class PluginManager extends TypertRemoteService {
   }
 
   /** Read current plugins, including why a row cannot be changed through the profile patch.
+   * @param includeMetadata Whether to read each entry's display resources; defaults to true. False returns controls without metadata.
    * @returns Current runtime entries with persistent patch targets.
    */
   @Remote
-  async listPlugins(): Promise<PluginInfo[]> {
+  async listPlugins(includeMetadata?: boolean): Promise<PluginInfo[]> {
     await this.authorize('read')
     const rows = flatten(composeEntries([readProfilePatches('dsh', this.profile)]))
-    const snapshot = await readPluginInventory(this.ctx)
-    return snapshot.entries.map((entry) => {
+    return readRuntimePluginEntries(this.ctx, includeMetadata !== false).map((entry) => {
       const actual = [...this.ctx.loader.entries()].find(row => row.id === entry.entryId)
       const candidates = rows.filter(row => row.id === actual?.options.id)
       const candidate = candidates[0]

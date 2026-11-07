@@ -512,11 +512,13 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-client-connection`
 
 - `inject`: `credentials`
-- `source`: [`packages/client/connection/src/index.ts:111`](../packages/client/connection/src/index.ts)
+- `source`: [`packages/client/connection/src/index.ts:113`](../packages/client/connection/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment's non-loopback serving authorities. */
 export interface ConnectionConfig {
+  /** Include runtime dispatch and unary processing durations in Server-Timing; disabled by default. */
+  serverTiming?: boolean
   /** Deadline for bounded browser unary RPC calls in milliseconds. */
   rpcTimeoutMs?: number
   /** Browser generation recovery timing delivered through the served index. */
@@ -533,8 +535,6 @@ export interface ConnectionConfig {
     generationReadyWarnMs?: number
     /** Hard readiness deadline in milliseconds. */
     generationReadyTimeoutMs?: number
-    /** Concurrent explicit Runtime preparations admitted per browser document. */
-    maxConcurrentEntryRequests?: number
   }
   /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
@@ -565,7 +565,7 @@ export interface ConnectionConfig {
 ## `@deepseek-ai/dsh-client-hmr`
 
 - `inject`: `clientModules` · `webServer`
-- `source`: [`packages/client/hmr/src/index.ts:30`](../packages/client/hmr/src/index.ts)
+- `source`: [`packages/client/hmr/src/index.ts:31`](../packages/client/hmr/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config, validated by the same-named schemastery schema. */
@@ -574,9 +574,32 @@ export interface Config {
   watchArtifacts?: boolean
   /** Bundle stat-poll interval in milliseconds (default 500, the build-side watcher's polling default). */
   pollIntervalMs?: number
+  /** Interval between graph-stream keepalive comments in milliseconds (default 15000, positive timer integer). */
+  keepAliveIntervalMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-hmr -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-modules -->
+<a id="deepseek-aidsh-client-modules"></a>
+
+## `@deepseek-ai/dsh-client-modules`
+
+- `inject`: `loader`
+- `source`: [`packages/client/modules/src/index.ts:47`](../packages/client/modules/src/index.ts)
+
+```ts config-catalog
+/** Startup transport grouping; module application keeps the declared graph order. */
+export interface Config {
+  /**
+   * Package sets transported separately from ungrouped application entries.
+   * Omission keeps one URL-bounded application sequence. Inactive packages contribute nothing;
+   * active members retain their graph order, and bootstrap packages cannot be grouped here.
+   */
+  applicationBatchGroups?: string[][]
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-modules -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-shortcuts -->
 <a id="deepseek-aidsh-client-shortcuts"></a>
@@ -1354,7 +1377,7 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-gateway-execution`
 
 - `inject`: `gatewayRuntime` · `agents` · `sessions` · `sessionQuery` · `permissionPresets` · `sandboxPolicy` · `sessionProjections`
-- `source`: [`packages/context/gateway-execution/src/index.ts:35`](../packages/context/gateway-execution/src/index.ts)
+- `source`: [`packages/context/gateway-execution/src/index.ts:34`](../packages/context/gateway-execution/src/index.ts)
 
 ```ts config-catalog
 /** Reconnection applies to authorization updates, never to model or tool effects. */
@@ -1379,7 +1402,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-gateway-runtime`
 
 - `inject`: `connection`
-- `source`: [`packages/context/gateway-runtime/src/index.ts:477`](../packages/context/gateway-runtime/src/index.ts)
+- `source`: [`packages/context/gateway-runtime/src/index.ts:492`](../packages/context/gateway-runtime/src/index.ts)
 
 ```ts config-catalog
 /** Managed readiness and Workspace metadata publication settings. */
@@ -1438,7 +1461,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-hmr`
 
 - `refs`: `ChokidarOptions` (`chokidar`)
-- `source`: [`packages/boot/hmr/src/index.ts:61`](../packages/boot/hmr/src/index.ts)
+- `source`: [`packages/boot/hmr/src/index.ts:76`](../packages/boot/hmr/src/index.ts)
 
 ```ts config-catalog
 /** Module roots and watcher timing, with Chokidar deployment options. */
@@ -1542,7 +1565,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-apiproxy`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `directoryPicker` · `llm` · `sessions` · `subagents` · `sessionQuery` · `tools` · `userQuestions` · `workspaceRegistry`
-- `source`: [`packages/host/apiproxy/src/index.ts:59`](../packages/host/apiproxy/src/index.ts)
+- `source`: [`packages/host/apiproxy/src/index.ts:60`](../packages/host/apiproxy/src/index.ts)
 
 ```ts config-catalog
 /** Gateway plugin configuration. */
@@ -1567,6 +1590,10 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
+  /** Maximum verified cold summaries retained; zero disables reuse. */
+  coldSummaryCacheMaxEntries?: number
+  /** Maximum encoded source-identity and summary bytes retained; zero disables reuse. */
+  coldSummaryCacheMaxBytes?: number
   /** Maximum bytes retained by one remote Workspace file operation. */
   workspaceFileMaxBytes?: number
   /** Maximum lines returned by one remote Workspace text page. */
@@ -1584,7 +1611,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-directory-picker-browse`
 
-- `source`: [`packages/host/directory-picker-browse/src/index.ts:321`](../packages/host/directory-picker-browse/src/index.ts)
+- `source`: [`packages/host/directory-picker-browse/src/index.ts:323`](../packages/host/directory-picker-browse/src/index.ts)
 
 ```ts config-catalog
 /** Validated plugin configuration. */
@@ -1651,7 +1678,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-webserver`
 
-- `source`: [`packages/host/webserver/src/index.ts:76`](../packages/host/webserver/src/index.ts)
+- `source`: [`packages/host/webserver/src/index.ts:78`](../packages/host/webserver/src/index.ts)
 
 ```ts config-catalog
 /** Web server listen, TLS, and response-compression config. */
@@ -1677,11 +1704,15 @@ export interface Config {
    * over plain HTTP.
    */
   tls?: TlsConfig
-  /** Response compression for socket-backed HTTP requests. @default 'none' */
-  compression?: 'none' | 'gzip'
+  /** Socket HTTP encoding policy: auto negotiates Brotli, gzip, or identity; gzip excludes Brotli. @default 'none' */
+  compression?: 'none' | 'gzip' | 'auto'
   /** Gzip DEFLATE level from 0 through 9. @default 1 */
   compressionLevel?: number
-  /** Minimum known response length eligible for gzip; unknown-length streams are eligible. @default 1024 */
+  /** Brotli quality from 0 through 11 when auto selects Brotli. @default 4 */
+  compressionBrotliQuality?: number
+  /** Brotli sliding-window bits from 10 through 24 when auto selects Brotli. @default 22 */
+  compressionBrotliWindowBits?: number
+  /** Minimum known response length eligible for compression; eligible media types with unknown lengths may compress. @default 1024 */
   compressionThresholdBytes?: number
 }
 
@@ -2044,7 +2075,7 @@ export type PiAiThinkingTokenBudgetField = NonNullable<OpenAICompletionsCompat['
 
 - `inject`: `llm`
 - `refs`: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · [`SystemPromptUpdate`](../packages/llm/llm/src/index.ts) · [`ToolUpdate`](../packages/llm/llm/src/index.ts)
-- `source`: [`packages/test-support/llm-replay/src/index.ts:1230`](../packages/test-support/llm-replay/src/index.ts)
+- `source`: [`packages/test-support/llm-replay/src/index.ts:1271`](../packages/test-support/llm-replay/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the {@link ReplayConfig} inputs, each defaulting to its `DSH_SNAPSHOT_*` env var in `apply`. */
@@ -2388,6 +2419,10 @@ export interface Config {
   maxUncompressedBytes: number
   /** Absolute font roots; omission uses the kit's platform defaults. */
   fontDirectories?: string[]
+  /** Absolute derived font metadata cache directory; omission keeps kit defaults, false disables disk reuse. */
+  fontMetadataCacheDirectory?: string | false
+  /** Maximum persisted and reusable per-file font metadata bytes. */
+  maxFontMetadataCacheBytes: number
   /** Ordered font-family preference groups; omission retains the kit defaults. */
   fontFallbacks?: string[][]
   /** Maximum physical font files indexed by each converter. */
@@ -3040,7 +3075,7 @@ export type JsonlCompression = 'zstd' | 'none'
 ## `@deepseek-ai/dsh-session-persistence-sqlite`
 
 - `inject`: `sessions`
-- `source`: [`packages/session/session-persistence-sqlite/src/index.ts:42`](../packages/session/session-persistence-sqlite/src/index.ts)
+- `source`: [`packages/session/session-persistence-sqlite/src/index.ts:43`](../packages/session/session-persistence-sqlite/src/index.ts)
 
 ```ts config-catalog
 /** Plugin configuration. */
@@ -5093,7 +5128,6 @@ export interface Config {
 | `@deepseek-ai/dsh-browser-use` | — | [`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts) |
 | `@deepseek-ai/dsh-client-file-upload` | `agents` · `attachments` · `commands` · `connection` | [`packages/client/file-upload/src/index.ts`](../packages/client/file-upload/src/index.ts) |
 | `@deepseek-ai/dsh-client-locale` | — | [`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts) |
-| `@deepseek-ai/dsh-client-modules` | `loader` | [`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts) |
 | `@deepseek-ai/dsh-client-runtime` | — | [`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-agent-preset` | — | [`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-attachment` | — | [`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts) |

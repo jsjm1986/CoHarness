@@ -14,6 +14,8 @@ The browser supplies a `conversationViewport` capability that keeps a bounded se
 
 The existing `conversation` slot remains the sole render authority. It declares an explicit `conversation.pane` child plus workbench toolbar, empty-state, and pane-header children. Each pane is rendered through the renderer's explicit SessionProvider binding, so the existing conversation slots and session-scoped stores are reused without importing presentation implementations across plugins.
 
+Explicit SessionProvider instances observe `provideInfoRevision`, which is published after bundle installation, removal or roster replacement. The runtime pool forwards lifecycle changes from every retained runtime. Each selector resolves its own identity-stable bundle; late bindings become visible without focus changes, while unrelated bundles and current selection remain unchanged. The revision is an observation signal, not a binding or cache identity.
+
 `SessionRuntime` retains the current Session stage and an additional staged set. Staged Sessions open their bounded history windows and receive the existing stream updates; removing a pane releases its browser window but never cancels its Session. A masked current selection remains staged until the selection moves or the user clears it.
 
 The independent `@deepseek-ai/dsh-client-ui-workbench` package contributes only its Cordis service consumer and slot entries. The conversation root declares the viewport store and shares its framework-owned instance with the provider through `slots.bindStore()`. That store contains Session ids, mode, active id, and ratios under `dsh.conversation.workbench.v1`; rehydration reconciles ids with the current Session list before staging them.
@@ -29,6 +31,8 @@ Personal Runtimes publish root summaries from the existing `session.list` into t
 **Create one Gateway connection per Workspace or aggregate account project scopes.** The account catalog is metadata-only and ACL-filtered. A pane starts one target-aware connection for its selected project runtime, preserving that runtime's principal, sandbox, approval, and event stream instead of merging foreign Sessions into the current runtime.
 
 **Keep only the current Session staged and reload each pane on focus.** That loses live updates and repeats the slow history open the workbench is meant to remove. The staged set keeps four bounded windows while preserving the existing per-Session retention limit.
+
+**Replace the current provide bundle to refresh another pane.** This invalidates selection-driven consumers even when their data is unchanged. Explicit selectors instead observe lifecycle publication and retain their own unchanged bundle references.
 
 **Store pane state in a module singleton or window global.** This would outlive Cordis plugin fibers and violate reload isolation. The root registration owns a framework-managed store instance with the repository's bounded local persistence behavior.
 

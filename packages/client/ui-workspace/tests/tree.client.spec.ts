@@ -21,7 +21,8 @@ const list = (...items: SessionSummary[]): SessionListState => ({
   byId: Object.fromEntries(items.map(item => [item.id, item])),
   archivedById: {},
   current: undefined,
-  phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+  phase: 'ready',
+  state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
 })
 /**
  * The pooled runtime's real shape: archived summaries leave `ids`/`byId` for
@@ -32,7 +33,8 @@ const partitionedList = (live: readonly SessionSummary[], archives: readonly Ses
   byId: Object.fromEntries(live.map(item => [item.id, item])),
   archivedById: Object.fromEntries(archives.map(item => [item.id, item])),
   current: undefined,
-  phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+  phase: 'ready',
+  state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
 })
 const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView => ({
   workspaceId: wid(id), path: `/projects/${id}`, title,
@@ -762,7 +764,7 @@ describe('createWorkspaceViewStore', () => {
     store.actions.setGroupBy('flat')
     store.actions.setOrderBy('updated')
     store.actions.setGroupExpanded('alpha', true)
-    store.actions.syncSessionOrderAccount('alpha', ['two', 'one'], { one: 1, two: 2 })
+    store.actions.syncSessionOrderAccounts([{ accountKey: 'alpha', order: ['two', 'one'], updatedAt: { one: 1, two: 2 } }])
     store.actions.setSessionOrder('alpha', ['one', 'two'])
     expect(store.getSnapshot().groupBy).toBe('flat')
     expect(store.getSnapshot()).toMatchObject({
@@ -778,8 +780,10 @@ describe('createWorkspaceViewStore', () => {
     store.actions.setGroupExpanded('', true)
     store.actions.setGroupExpanded('alpha', true)
     store.actions.setGroupExpanded('deleted', true)
-    store.actions.syncSessionOrderAccount('alpha', ['alpha-session'], { 'alpha-session': 2 })
-    store.actions.syncSessionOrderAccount('deleted', ['deleted-session'], { 'deleted-session': 1 })
+    store.actions.syncSessionOrderAccounts([
+      { accountKey: 'alpha', order: ['alpha-session'], updatedAt: { 'alpha-session': 2 } },
+      { accountKey: 'deleted', order: ['deleted-session'], updatedAt: { 'deleted-session': 1 } },
+    ])
 
     store.actions.retainAccountKeys(['', 'alpha'])
 
@@ -794,8 +798,10 @@ describe('createWorkspaceViewStore', () => {
     const sessions = list(
       summary('one', 1), summary('two', 2), summary('three', 3), summary('loose', 4),
     )
-    store.actions.syncSessionOrderAccount('alpha', ['two', 'one'], {})
-    store.actions.syncSessionOrderAccount(UNGROUPED_KEY, ['loose'], {})
+    store.actions.syncSessionOrderAccounts([
+      { accountKey: 'alpha', order: ['two', 'one'], updatedAt: {} },
+      { accountKey: UNGROUPED_KEY, order: ['loose'], updatedAt: {} },
+    ])
 
     store.actions.pinSessionOrder('three', ['alpha', FLAT_SESSION_ORDER_KEY], {
       members: {

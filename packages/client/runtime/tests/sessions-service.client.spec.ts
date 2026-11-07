@@ -54,6 +54,40 @@ async function feedList(b: Bench, rows: FeedRow[]): Promise<void> {
 }
 
 describe('list store projection', () => {
+  it('projects the existing baseline activity and failure through an explicit retry', async () => {
+    const b = bench()
+    const first = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const retry = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const operations: Promise<void>[] = []
+    const failure = { code: 'internal' as const, message: 'synthetic list failure', details: {} }
+    try {
+      expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'pending', state: 'idle', error: null })
+      b.api.onList = () => first.promise
+      operations.push(b.svc.refresh())
+      await vi.waitFor(() => {
+        expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'pending', state: 'loading', error: null })
+      })
+      first.resolve(err(failure))
+      await operations[0]
+      expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'pending', state: 'error', error: failure })
+
+      b.api.onList = () => retry.promise
+      operations.push(b.svc.refresh(), b.svc.refresh())
+      await vi.waitFor(() => {
+        expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'pending', state: 'loading', error: null })
+      })
+      expect(b.api.callsOf('session.list')).toHaveLength(2)
+      retry.resolve(ok({ items: [] }))
+      await Promise.all(operations)
+      expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'ready', state: 'idle', error: null, ids: [] })
+    } finally {
+      first.resolve(ok({ items: [] }))
+      retry.resolve(ok({ items: [] }))
+      await Promise.allSettled(operations)
+      await b.ctx.fiber.dispose()
+    }
+  })
+
   it('keeps unrelated summaries stable when one Session changes', async () => {
     const b = bench()
     try {
@@ -470,6 +504,187 @@ describe('cell (render-layer session kit)', () => {
       expect(historyCalls.map(c => (c.payload as { sessionId: string }).sessionId)).toEqual(['s1'])
     } finally {
       vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe('saved root history prefetch', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  function restore(address = false): Bench {
+    const storage = new Map([['dsh.sessions.current', JSON.stringify({
+      sessionId: 'saved',
+      ...(address ? { subagentAddress: { parentSessionId: 'parent', childSessionId: 'saved', mode: 'continuable' } } : {}),
+    })]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    return bench()
+  }
+
+  const savedRows = () => ok({ items: [{ sessionId: sid('saved'), updatedAt: 1, running: false, blank: true }] })
+
+  it.each(['history first', 'list first'] as const)('overlaps the saved opening and list while admitting only the list-validated view: %s', async (order) => {
+    const b = restore()
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onList = () => list.promise
+    b.api.onHistory = () => history.promise
+    let reference: ReturnType<SessionRuntime['retain']> | undefined
+    try {
+      b.svc.beginNavigation() // Workspace's initial-selection intent precedes connection readiness.
+      b.svc.handleConnected()
+      expect(b.api.callsOf('session.list')).toHaveLength(1)
+      const openingSignal = b.api.lastHistorySignal
+      expect(b.api.callsOf('session.history')).toEqual([{ sessionId: 'saved', maxMessages: 50, detail: 'conversation' }])
+      expect(b.svc.list.getSnapshot().current).toBeUndefined()
+      expect(b.svc.binding(sid('saved'))).toBeUndefined()
+      expect(b.svc.retainInfo(sid('saved')).getSnapshot().referenceCount).toBe(0)
+      expect(b.api.callsOf('session.historyIndex')).toHaveLength(0)
+      expect(b.api.callsOf('session.create')).toHaveLength(0)
+      expect(b.api.callsOf('session.prompt')).toHaveLength(0)
+      if (order === 'history first') {
+        history.resolve(ok({ events: [], hasMore: false }))
+        await history.promise
+        expect(b.svc.binding(sid('saved'))).toBeUndefined()
+        expect(b.api.callsOf('session.historyIndex')).toHaveLength(0)
+      }
+      list.resolve(savedRows())
+      await b.svc.refresh()
+      reference = b.svc.retain(sid('saved'), { source: 'controllerOperation' })
+      expect(b.svc.list.getSnapshot().current).toBe('saved')
+      b.svc.beginNavigation()
+      expect(openingSignal?.aborted).toBe(false)
+      expect(b.api.callsOf('session.history')).toHaveLength(1)
+      history.resolve(ok({ events: [], hasMore: false }))
+      await reference.ready
+      expect(reference.binding.session.getSnapshot().openState).toBe('open')
+      expect(b.api.callsOf('session.history')).toHaveLength(1)
+    } finally {
+      list.resolve(savedRows())
+      history.resolve(ok({ events: [], hasMore: false }))
+      reference?.release()
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it.each(['navigation', 'disconnect', 'identity', 'archive'] as const)('retires the unshown generation on %s and ignores its late history', async (cause) => {
+    const b = restore()
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onList = () => list.promise
+    b.api.onHistory = () => history.promise
+    try {
+      b.svc.handleConnected()
+      const oldSignal = b.api.lastHistorySignal
+      expect(oldSignal?.aborted).toBe(false)
+      if (cause === 'navigation') b.svc.beginNavigation()
+      else if (cause === 'disconnect') b.svc.handleDisconnected()
+      else if (cause === 'identity') b.svc.setPresentationKey(id => id)
+      else b.svc.releaseSelection()
+      expect(oldSignal?.aborted).toBe(true)
+      expect(b.svc.binding(sid('saved'))).toBeUndefined()
+      b.api.onHistory = async () => ok({ events: [], hasMore: false })
+      list.resolve(savedRows())
+      await b.svc.refresh()
+      if (cause === 'archive') {
+        expect(b.svc.list.getSnapshot().current).toBeUndefined()
+        expect(b.svc.binding(sid('saved'))).toBeUndefined()
+      } else {
+        const reference = b.svc.retain(sid('saved'), { source: 'controllerOperation' })
+        try {
+          await reference.ready
+          const binding = reference.binding
+          history.resolve(ok({ events: [{ event: {
+            type: 'user/message', seq: 0, time: 1, surfaceOp: 'append',
+            data: createUserMessage({ content: [{ type: 'text', text: 'retired history' }], source: { kind: 'user' } }),
+          } }] as never[], hasMore: false }))
+          await history.promise
+          expect(b.svc.binding(sid('saved'))).toBe(binding)
+          expect(binding.eventSource.getSnapshot().entries).toEqual([])
+          expect(b.api.callsOf('session.history')).toHaveLength(2)
+        } finally { reference.release() }
+      }
+    } finally {
+      list.resolve(savedRows())
+      history.resolve(ok({ events: [], hasMore: false }))
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it.each(['missing', 'failed'] as const)('releases a saved opening when the first list is %s', async (outcome) => {
+    const b = restore()
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onList = () => list.promise
+    b.api.onHistory = () => history.promise
+    try {
+      b.svc.handleConnected()
+      const signal = b.api.lastHistorySignal
+      list.resolve(outcome === 'missing' ? ok({ items: [] }) : err({ code: 'internal', message: 'list unavailable', details: {} }))
+      await b.svc.refresh()
+      expect(signal?.aborted).toBe(true)
+      expect(b.svc.list.getSnapshot().current).toBeUndefined()
+      expect(b.svc.binding(sid('saved'))).toBeUndefined()
+      expect(b.api.callsOf('session.historyIndex')).toHaveLength(0)
+    } finally {
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it('does not prefetch a saved selection cleared before the connection is ready', async () => {
+    const b = restore()
+    try {
+      b.svc.clear()
+      b.svc.handleConnected()
+      await b.svc.refresh()
+      expect(b.api.callsOf('session.history')).toHaveLength(0)
+      expect(b.svc.list.getSnapshot().current).toBeUndefined()
+    } finally { await b.ctx.fiber.dispose() }
+  })
+
+  it('keeps an addressed child on its catalog-validated opening path', async () => {
+    const b = restore(true)
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    b.api.onList = () => list.promise
+    try {
+      b.svc.handleConnected()
+      expect(b.api.callsOf('session.history')).toHaveLength(0)
+      expect(b.api.callsOf('subagent.history')).toHaveLength(0)
+    } finally {
+      list.resolve(ok({ items: [] }))
+      await b.svc.refresh()
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it('joins the cancelled unshown opening before disposing the Client root', async () => {
+    const b = restore()
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onList = () => list.promise
+    b.api.onHistory = () => history.promise
+    let disposed = false
+    let disposal: Promise<void> | undefined
+    try {
+      b.svc.handleConnected()
+      disposal = b.ctx.fiber.dispose().then(() => { disposed = true })
+      await Promise.resolve()
+      expect(b.api.lastHistorySignal?.aborted).toBe(true)
+      expect(disposed).toBe(false)
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      await disposal
+      expect(disposed).toBe(true)
+      expect(b.svc.binding(sid('saved'))).toBeUndefined()
+    } finally {
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      await disposal
+      await b.ctx.fiber.dispose()
     }
   })
 })

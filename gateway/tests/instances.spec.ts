@@ -805,6 +805,8 @@ describe('InstanceManager', () => {
       + '- insert: []\n'
       + '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
       + '- id: api-gateway\n  inject: [executionAuthority]\n'
+      + '- id: connection\n  config:\n    serverTiming: true\n'
+      + `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(join(root, 'state', 'cache', 'office-font-metadata'))}\n`
       + "- insert:\n    - id: desktop-availability\n      name: '@deepseek-ai/dsh-gateway-execution/desktop-availability'\n"
       + `- id: remote-desktop-vnc\n  config:\n    endpointsFile: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'endpoints.json'))}\n`
       + `    grantsFile: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'grants.jsonl'))}\n`
@@ -831,6 +833,20 @@ describe('InstanceManager', () => {
     expect(readFileSync(join(modules, 'dsh-model-governance', 'lib', 'index.js'), 'utf8')).toBe(
       "export default 'refreshed'\n",
     )
+  })
+
+  it('retains runtime-local font caches when shared metadata is disabled', async () => {
+    const { root, alice, manager } = await setup({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: 'off' })
+    await manager.ensureRunning(alice, 'explicit')
+    expect(readFileSync(join(root, 'users', 'alice', 'dsh', 'cordis.patch.yml'), 'utf8'))
+      .not.toContain('fontMetadataCacheDirectory')
+  })
+
+  it('disables runtime response timing with node performance observation', async () => {
+    const { root, alice, manager } = await setup({ HGW_PERFORMANCE_ENABLED: 'false' })
+    await manager.ensureRunning(alice, 'explicit')
+    expect(readFileSync(join(root, 'users', 'alice', 'dsh', 'cordis.patch.yml'), 'utf8'))
+      .toContain('- id: connection\n  config:\n    serverTiming: false\n')
   })
 
   it('appends the administrator permission overlay after the restricted guard patch', async () => {

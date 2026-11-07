@@ -736,13 +736,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'rebuilt(id: string): string | undefined',
-        description: 'Publish one completed bundle generation (the HMR watch\'s registration hook — the only entry point through which build changes reach the graph). Unchanged mtime, ctime and size preserve the graph without reading the bundle.',
+        description: 'Publish one completed bundle generation (the HMR watch\'s registration hook — the only entry point through which build changes reach the graph). Unchanged mtime, ctime and size preserve the graph without reading the bundle. Marked entries also preserve it when filesystem metadata changes without changing content.',
         parameters: [{ name: 'id', description: 'entry id (package name).' }],
         returns: 'the current artifact rev, or undefined for an unknown id.',
       },
       {
         signature: 'onRebuilt(listener: (id: string, rev: string) => void): () => void',
-        description: 'Subscribe to bundle rebuilds; fires only when artifact metadata changes the rev.',
+        description: 'Subscribe to bundle rebuilds; fires only when the published artifact revision changes.',
         parameters: [{ name: 'listener', description: 'receives the entry id and its new bundle rev.' }],
         returns: 'the unsubscriber.',
       },
@@ -2008,9 +2008,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'Saved and runtime outcomes. Startup-only profiles require restart.',
       },
       {
-        signature: '@Remote async listPlugins(): Promise<PluginInfo[]>',
+        signature: '@Remote async listPlugins(includeMetadata?: boolean): Promise<PluginInfo[]>',
         description: 'Read current plugins, including why a row cannot be changed through the profile patch.',
-        parameters: [],
+        parameters: [{ name: 'includeMetadata', description: 'Whether to read each entry\'s display resources; defaults to true. False returns controls without metadata.' }],
         returns: 'Current runtime entries with persistent patch targets.',
       },
       {
@@ -2084,6 +2084,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Unload and remove a profile-owned bundle dependency through dsh plugin\'s pnpm path.',
         parameters: [{ name: 'name', description: 'Installed dependency name.' }, { name: 'signal', description: 'Cancellation from the calling tool or Remote transport.' }],
         returns: 'Removal diagnostics and the remaining profile state.',
+      },
+    ],
+  },
+  {
+    key: 'pluginManagerCatalog',
+    summary: 'Aggregate the existing profile reads without allocating a second management owner or cache.',
+    description: 'Aggregate the existing profile reads without allocating a second management owner or cache.',
+    methods: [
+      {
+        signature: '@Remote catalog(includeEntryMetadata?: boolean, signal?: AbortSignal): Promise<PluginManagementCatalog>',
+        description: 'Read current profile availability, mutation authority, bundles, and entries. Transport authorization precedes invocation, including the administrator assertion. A missing profile reads no files; a refused read publishes no catalog.',
+        parameters: [{ name: 'includeEntryMetadata', description: 'whether to read runtime entry display resources; defaults to true. False keeps bundle and row metadata.' }, { name: 'signal', description: 'optional request cancellation; when absent, service disposal still cancels publication and drains reads.' }],
+        returns: 'live catalog values, without an atomic profile-revision guarantee.',
       },
     ],
   },
@@ -4323,15 +4336,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the transformed body.',
       },
       {
-        signature: 'collectIndexInjections(): IndexInjection[]',
+        signature: 'collectIndexInjections(request?: IncomingMessage): IndexInjection[]',
         description: 'Collect live structured index rows in listener activation order.',
-        parameters: [],
+        parameters: [{ name: 'request', description: 'index request for request-owned rows; omission collects only request-independent rows.' }],
         returns: 'the fresh mutable row table after all listeners have appended.',
       },
       {
-        signature: 'renderIndex(html: string): string',
+        signature: 'renderIndex(html: string, request?: IncomingMessage): string',
         description: 'Render structured rows first, then legacy raw HTML transforms.',
-        parameters: [{ name: 'html', description: 'the raw index.html body.' }],
+        parameters: [{ name: 'html', description: 'the raw index.html body.' }, { name: 'request', description: 'index request for request-owned rows; omission collects only request-independent rows.' }],
         returns: 'the rendered body with current injections and transforms applied.',
       },
     ],
@@ -5261,10 +5274,10 @@ export const EVENT_API: readonly EventApiEntry[] = [
   {
     name: 'webserver/index-inject',
     mode: 'emit',
-    signature: '\'webserver/index-inject\'(table: IndexInjection[]): void',
+    signature: '\'webserver/index-inject\'(table: IndexInjection[], request?: IncomingMessage): void',
     summary: 'Collect structured index rows for one fresh index render.',
     description: 'Collect structured index rows for one fresh index render. Listeners append JSON-safe rows to the mutable table; the fallback owner renders the completed table before applying legacy raw HTML transforms.',
-    parameters: [{ name: 'table', description: 'the fresh row table for this index response.' }],
+    parameters: [{ name: 'table', description: 'the fresh row table for this index response.' }, { name: 'request', description: 'the current index request; absent for request-independent collection.' }],
   },
   {
     name: 'workflow/agent-end',
@@ -5800,7 +5813,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ConnectionRequestBoundary',
-    declaration: 'export interface ConnectionRequestBoundary {\n    kind: \'http\' | \'upgrade\';\n    headers: IncomingHttpHeaders;\n    method?: string;\n    pathname?: string;\n    url?: string;\n}',
+    declaration: 'export interface ConnectionRequestBoundary {\n    kind: \'http\' | \'upgrade\';\n    headers: IncomingHttpHeaders;\n    method?: string;\n    pathname?: string;\n    url?: string;\n    signal?: AbortSignal;\n}',
   },
   {
     name: 'ConnectionRequestRejection',
@@ -6292,7 +6305,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GatewayRequestPrincipal',
-    declaration: 'export interface GatewayRequestPrincipal {\n    assertion: string;\n    claims: GatewayPrincipalClaims;\n}',
+    declaration: 'export interface GatewayRequestPrincipal {\n    assertion: string;\n    claims: GatewayPrincipalClaims;\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'GatewayRuntimeIdentity',
@@ -7201,6 +7214,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PluginManagementCapability',
     declaration: 'export type PluginManagementCapability = \'read\' | \'manage\';',
+  },
+  {
+    name: 'PluginManagementCatalog',
+    declaration: 'export interface PluginManagementCatalog extends PluginManagementAccess {\n    managementAvailable: boolean;\n    bundles: BundleInfo[];\n    plugins: PluginInfo[];\n}',
   },
   {
     name: 'PluginOptions',
@@ -9284,7 +9301,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WebBootEntry',
-    declaration: 'export interface WebBootEntry {\n    id: string;\n    url: string;\n    rev: string;\n    inject?: string[];\n    immediately?: boolean;\n    external?: string[];\n}',
+    declaration: 'export interface WebBootEntry {\n    id: string;\n    url: string;\n    rev: string;\n    chunks?: Record<string, string>;\n    inject?: string[];\n    immediately?: boolean;\n    external?: string[];\n}',
   },
   {
     name: 'WebBootGraph',
@@ -9449,10 +9466,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkflowStopReason',
     declaration: 'export type WorkflowStopReason = \'completed\' | \'cancelled\' | \'error\';',
-  },
-  {
-    name: 'WorkspaceArchiveSnapshot',
-    declaration: 'export interface WorkspaceArchiveSnapshot {\n    readonly revision: number;\n    readonly archivedSessionIds: readonly SessionId[];\n}',
   },
   {
     name: 'WorkspaceChangedFile',

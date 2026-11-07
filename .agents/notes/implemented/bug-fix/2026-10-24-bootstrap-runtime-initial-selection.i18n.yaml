@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-bootstrap-runtime-initial-selection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-bootstrap-runtime-initial-selection.md
+document:
+  en: 1597eac1305cd4d1a204950ab8d5fb763bd8166a
+  zh: fa86d1cc0a4d869b877bffa0b0863cabb2986bd2
+/agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity:
+  en: 03b87c6842325239
+  zh: fa1c83c00c54c596
+/agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity/problem:
+  en: 643b386117ff32c0
+  zh: 39da15d9fcf65e31
+/agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity/decision:
+  en: e764830e5506b2f2
+  zh: 5e983e383cc556f4
+/agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity/alternatives-considered:
+  en: 087264693af281c4
+  zh: f6382a1413e90fb6
+/agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity/consequences:
+  en: b4cdddcecaab92d4
+  zh: 7eeb0ddd01399fad
+/agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity/verification:
+  en: 46667056df1161b2
+  zh: 861fe5977b73cffd

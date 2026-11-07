@@ -141,7 +141,11 @@ export class ClientEntries {
     if (!this.release.matches) return Promise.resolve()
     this.desired = {
       ...this.desired,
-      modules: this.desired.modules.map(row => row.id === id ? { ...row, rev } : row),
+      modules: this.desired.modules.map((row) => {
+        if (row.id !== id || row.rev === rev) return row
+        const { chunks: _chunks, ...owner } = row
+        return { ...owner, rev }
+      }),
     }
     return this.enqueue(async () => {
       const desired = this.desired.modules.find(row => row.id === id)

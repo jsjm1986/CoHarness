@@ -26,6 +26,8 @@ const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', impo
 const CHANGED_EXPECTED = join(SNAPSHOT_DIR, 'changed.expected.md')
 const LINKED_LINE_EXPECTED = join(SNAPSHOT_DIR, 'linked-line.expected.md')
 const MARKDOWN_EXPECTED = join(SNAPSHOT_DIR, 'markdown.expected.md')
+const HTML_EXPECTED = join(SNAPSHOT_DIR, 'html.expected.md')
+const HTML_TOO_LARGE_EXPECTED = join(SNAPSHOT_DIR, 'html-too-large.expected.md')
 const MODE = webSnapshotMode()
 const TINY_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
@@ -81,8 +83,14 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await writeFile(join(workspaceDir, 'links.txt'), linkedLines.join('\n'))
     await writeFile(join(workspaceDir, 'guide.md'), '---\nname: guide\ndescription: Packed markdown preview\n---\n\n# Guide\n\nPacked **markdown** preview.\n')
     await mkdir(join(workspaceDir, 'assets'), { recursive: true })
-    await writeFile(join(workspaceDir, 'assets/app.js'), 'document.body.dataset.packed = "yes"\n')
-    await writeFile(join(workspaceDir, 'page.html'), '<!doctype html><p>HTML body</p><script src="assets/app.js"></script>\n')
+    const assets = Array.from({ length: 8 }, (_value, index) => `assets/app-${String(index)}.js`)
+    for (const asset of assets) {
+      await writeFile(join(workspaceDir, asset), 'document.body.dataset.packed = String(Number(document.body.dataset.packed ?? 0) + 1)\n')
+    }
+    await writeFile(join(workspaceDir, 'page.html'), '<!doctype html><p>HTML body</p>'
+      + assets.map(asset => `<script src="${asset}"></script>`).join('') + '\n')
+    await writeFile(join(workspaceDir, 'oversized.js'), Buffer.alloc(4 * 1024 * 1024 + 1, 65))
+    await writeFile(join(workspaceDir, 'oversized.html'), '<!doctype html><script src="oversized.js"></script>\n')
     await writeFile(join(workspaceDir, 'pixel.png'), TINY_PNG)
     await writeFile(join(workspaceDir, 'large.svg'), [
       '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">',
@@ -158,6 +166,14 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await compareOrRefreshGolden(MARKDOWN_EXPECTED, markdownSnapshot, MODE)
 
     await filesButton.click()
+    const dependencyReads = { stat: 0, readBytes: 0 }
+    page.on('request', (request) => {
+      const method = new URL(request.url()).pathname.split('.').at(-1)
+      if (method !== 'stat' && method !== 'readBytes') return
+      const body = JSON.parse(request.postData() ?? '{}') as { payload?: { path?: string } }
+      if (body.payload?.path !== undefined && assets.includes(body.payload.path)) dependencyReads[method] += 1
+    })
+    const htmlStarted = performance.now()
     await browserDialog.getByRole('treeitem', { name: 'page.html' }).click()
     const htmlDialog = page.getByRole('region', { name: 'page.html', exact: true })
     const htmlFrame = htmlDialog.locator('iframe[data-workspace-html-preview]')
@@ -165,7 +181,29 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     expect(await htmlFrame.getAttribute('sandbox')).toBe('allow-scripts')
     const packedFrame = page.frameLocator('iframe[data-workspace-html-preview]')
     await expect.poll(async () => packedFrame.locator('p').textContent(), { timeout: 15_000 }).toBe('HTML body')
-    await expect.poll(async () => packedFrame.locator('body').getAttribute('data-packed'), { timeout: 15_000 }).toBe('yes')
+    await expect.poll(async () => packedFrame.locator('body').getAttribute('data-packed'), { timeout: 15_000 }).toBe('8')
+    console.info('WORKSPACE_HTML_PREPARATION', JSON.stringify({
+      assets: assets.length, dependencyReads, clickToReadyMs: performance.now() - htmlStarted,
+      clock: 'automation click through all eight scripts executing; no model or public tunnel',
+    }))
+    expect(dependencyReads).toEqual({ stat: 0, readBytes: 8 })
+    await compareOrRefreshGolden(HTML_EXPECTED, await packedFrame.locator('body').ariaSnapshot(), MODE)
+    await filesButton.click()
+    const [refusal] = await Promise.all([
+      page.waitForResponse((response) => {
+        if (!new URL(response.url()).pathname.endsWith('/workspaceFiles.readBytes')) return false
+        const request = JSON.parse(response.request().postData() ?? '{}') as { payload?: { path?: string } }
+        return request.payload?.path === 'oversized.js'
+      }),
+      browserDialog.getByRole('treeitem', { name: 'oversized.html', exact: true }).click(),
+    ])
+    const body = await refusal.json() as { result: { ok: boolean; error: { code: string } } }
+    expect(body.result).toMatchObject({ ok: false, error: { code: 'workspace-file/too-large' } })
+    const failedHtml = page.getByRole('region', { name: 'oversized.html', exact: true })
+    await failedHtml.getByRole('alert').waitFor()
+    expect(await failedHtml.locator('iframe').count()).toBe(0)
+    await compareOrRefreshGolden(HTML_TOO_LARGE_EXPECTED,
+      await captureStableAria(page, 'section[aria-label="oversized.html"]', scaffold.workspaceCwd), MODE)
     await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).click()
     await preview.waitFor({ timeout: 15_000 })
 
@@ -234,6 +272,6 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     expect(await page.locator('[data-slot-error]').count()).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['changed.expected.md', 'linked-line.expected.md', 'markdown.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['changed.expected.md', 'linked-line.expected.md', 'markdown.expected.md', 'html.expected.md', 'html-too-large.expected.md'])
   }, 120_000)
 })

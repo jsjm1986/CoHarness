@@ -51,7 +51,7 @@ interface GatewayPrincipalClaims {
 }
 ```
 
-Each root-conversation authorization and readable-session filter queries the Gateway against the current PostgreSQL organization role and project membership. Removing a member, changing `rw` to `ro`, or removing administrator authority therefore affects the next Session ACL check. An operation without a Session ACL uses the scope mode captured in its principal; that mode cannot outlive `expiresAt`. The Gateway default is 30 seconds, proxied HTTP requests receive a new principal, and long-lived Host and Typert streams close at expiry before reconnecting.
+Each root-conversation authorization and readable-session filter queries the Gateway against the current PostgreSQL organization role and project membership. Removing a member, changing `rw` to `ro`, or removing administrator authority therefore affects the next Session ACL check. An operation without a Session ACL uses the scope mode captured in its principal; that mode cannot outlive `expiresAt`. The Gateway default is 30 seconds and proxied HTTP requests receive a new principal. Registered mux/host event sockets may receive another short signature through private requalification; other retained operations keep their original expiry. The [event-principal decision](../../.agents/notes/implemented/architecture/2026-10-23-event-stream-principal-renewal.md) owns renewal and cancellation.
 
 ## Private runtime channel
 
@@ -72,6 +72,18 @@ interface ConnectionRequestBoundary {
   pathname?: string
   /** Full request URL as sent by the client; carriers that cannot set headers declare credentials and modes in its query. */
   url?: string
+  /** Socket-owned close/error lifetime on upgrades; absent on carriers without a retained socket. */
+  signal?: AbortSignal
+}
+```
+
+```ts type-equiv
+/** Deployment-owned private renewal pacing; signed expiry always remains authoritative. */
+interface StreamPrincipalRenewalConfig {
+  enabled: true
+  intervalMs: number
+  requestTimeoutMs: number
+  maxBatchSize: number
 }
 ```
 
@@ -84,6 +96,8 @@ interface GatewayRuntimeCredential {
   runtime: GatewayRuntimeIdentity
   token: string
   principalPublicKey: string
+  /** Present only when this managed release enables private event-connection renewal. */
+  streamPrincipalRenewal?: StreamPrincipalRenewalConfig
 }
 ```
 
@@ -94,6 +108,8 @@ After signature, lifetime, organization, scope, runtime identity, and generation
 interface GatewayRequestPrincipal {
   assertion: string
   claims: GatewayPrincipalClaims
+  /** Finite socket authority for a renewable event connection; absent for fixed HTTP assertions. */
+  readonly signal?: AbortSignal
 }
 ```
 
@@ -181,15 +197,15 @@ interface CollaborationSessionCreation {
 
 ## Captured authority
 
-Consumers capture authority while an authenticated request is current, then retain that immutable participant and provider lifetime for the operation. Authorization and readable-session filtering consult the Gateway; `signal` aborts when the issuing provider unloads. `claimInteraction()` returns `true` only for the first transaction that commits one approval or question outcome.
+Consumers capture authority while an authenticated request is current, then retain that immutable participant and provider lifetime for the operation. Authorization and readable-session filtering consult the Gateway; `signal` aborts when the issuing provider unloads or its retained event socket ends. `expiresAt` exposes the current verified signature deadline without changing participant permissions. `claimInteraction()` returns `true` only for the first transaction that commits one approval or question outcome.
 
 ```ts type-equiv
 /** Principal-bound collaboration operations safe to retain for one request or stream lifetime. */
 interface CollaborationAuthority {
   readonly participant: CollaborationParticipant
-  /** Assertion expiry; long-lived streams reconnect no later than this instant. */
+  /** Current signed expiry; only a verified socket-bound renewal may advance it. */
   readonly expiresAt: number
-  /** Aborts when the provider that issued this authority unloads. */
+  /** Aborts on provider disposal or when retained socket authority expires or closes. */
   readonly signal: AbortSignal
 
   /**

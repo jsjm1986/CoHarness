@@ -2,6 +2,7 @@
  * Assembled plugin approval: a real built `dsh --profile web` serving the
  * management page, the profile's real pinned pnpm, a file-source bundle whose
  * install script pnpm blocks, and the allow-and-retry path through the browser.
+ * The private profile disables public registry probing for the offline file install.
  */
 
 import { existsSync } from 'node:fs'
@@ -113,6 +114,12 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
     const addon = join(home, 'addon')
     const built = join(profileDir, 'node_modules', ADDON, 'built.txt')
     await mkdir(profileDir, { recursive: true })
+    await writeFile(join(home, 'cordis.patch.yml'), [
+      '- id: ui-plugin-manager',
+      '  config:',
+      '    registryProbeEnabled: false',
+      '',
+    ].join('\n'))
     await writeFile(join(profileDir, 'pnpm-workspace.yaml'), [
       'packages:',
       '  - .',

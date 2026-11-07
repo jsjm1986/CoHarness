@@ -128,8 +128,9 @@ function attachPersistence<T>(api: StoreApi<T>, name: string, kind: 'local' | 's
   // Non-browser runs (node e2e booting the client tree) have no localStorage:
   // persistence silently disables — same contract as a storage failure, minus
   // the per-store console noise a ReferenceError would produce.
+  const globals = globalThis as { sessionStorage?: Storage; localStorage?: Storage }
   let storage: Storage | undefined
-  try { storage = kind === 'session' ? globalThis.sessionStorage : globalThis.localStorage }
+  try { storage = kind === 'session' ? globals.sessionStorage : globals.localStorage }
   catch (error) { console.error(`snapshot store '${name}' storage unavailable:`, error); return }
   if (storage === undefined) return
   try {

@@ -70,7 +70,7 @@ async function fixture() {
   return { locations, reference, active, trash, databasePath, markerPath, oldDevice, reopen, volume }
 }
 
-it.skipIf(process.platform === 'win32')('requires explicit verified recovery for legacy evidence and preserves later purge history and delivery cursors', async () => {
+it.skipIf(process.platform === 'win32')('heals an inode-proven legacy remount on open and preserves later purge history and delivery cursors', async () => {
   const f = await fixture()
   const database = new DatabaseSync(f.databasePath)
   let records: ReturnType<DocumentIdentityStore['list']>, projection: ReturnType<DocumentIdentityStore['projectionChanges']>
@@ -88,8 +88,6 @@ it.skipIf(process.platform === 'win32')('requires explicit verified recovery for
     records = store.list()
     projection = store.projectionChanges({ sequence: 0, ordinal: 0 }, { limit: 50, maxBytes: 65536 })
   } finally { database.close() }
-  await expect(f.reopen()).rejects.toThrow()
-  await recoverDocumentIdentityMount(f.locations, f.reference)
   const next = await f.reopen()
   expect((await next.stat(f.active.docId)).identity).toEqual(f.active.identity)
   expect((await next.listTrash())[0]).toMatchObject({ trashId: f.trash.trashId, identity: f.trash.identity })
@@ -162,6 +160,22 @@ it.skipIf(process.platform === 'win32').each(['copied-root', 'copied-database', 
   await expect(recoverDocumentIdentityMount(f.locations, f.reference)).rejects.toThrow()
   expect(await readFile(f.databasePath)).toEqual(before)
   expect(await readFile(f.markerPath)).toEqual(marker)
+})
+
+it.skipIf(process.platform === 'win32')('refuses a legacy remount without persistent volume evidence and a remount whose inodes changed', async () => {
+  const f = await fixture()
+  f.volume.mockResolvedValue(undefined)
+  const before = await readFile(f.databasePath), marker = await readFile(f.markerPath)
+  await expect(f.reopen()).rejects.toThrow()
+  expect(await readFile(f.databasePath)).toEqual(before)
+  expect(await readFile(f.markerPath)).toEqual(marker)
+  f.volume.mockResolvedValue(VOLUME)
+  const g = await fixture()
+  const database = new DatabaseSync(g.databasePath)
+  try {
+    database.prepare('UPDATE document_identity_storage SET documents_inode=?,files_inode=?').run('99999991', '99999992')
+  } finally { database.close() }
+  await expect(g.reopen()).rejects.toThrow('binding changed')
 })
 
 it.skipIf(process.platform === 'win32')('retries after marker commit and a refused metadata migration without losing retained bytes', async () => {

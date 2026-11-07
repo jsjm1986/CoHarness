@@ -21,13 +21,15 @@ async function fixture() {
   const forbidden: RpcError = { code: 'collaboration-forbidden', message: 'denied', details: { action: 'write', reason: 'forbidden', sessionId: id } }
   const authorize = vi.fn(async (): Promise<{ authority: undefined } | { error: RpcError }> => ({ authority: undefined }))
   const resolve = vi.fn(async (): Promise<{ agent: Agent } | { error: RpcError }> => ({ agent }))
+  const agentsGet = vi.fn((want: SessionId) => want === id ? agent : undefined)
+  ctx.provide('agents', { get: agentsGet } as never)
   ctx.provide('computerUseAuthorization', { run: async (_execution, operation) => operation(new AbortController().signal), confirmation: { read, set } })
   let api!: ReturnType<typeof createDesktopApi>
   const fiber = ctx.plugin((inner: Context) => { api = createDesktopApi(inner, { authorize, agent: resolve, signal: signal => signal }) })
   await fiber
   onTestFinished(async () => { await fiber.dispose() })
   const handler = toFetchHandler({ desktop: api } as ApiProxy), client = new InProcessApiClient(handler)
-  return { ctx, fiber, api, handler, client, id, agent, value, read, set, authorize, resolve, forbidden }
+  return { ctx, fiber, api, handler, client, id, agent, value, read, set, authorize, resolve, agentsGet, forbidden }
 }
 
 it.each(['headless', 'disabled'] as const)('reports %s availability through the wire and refuses confirmation before the policy', async (unavailableReason) => {
@@ -103,9 +105,17 @@ it('refuses a private or read-only Session before resolving an Agent or reading 
 it('refuses missing Sessions and authority revoked during the read', async () => {
   const f = await fixture()
   f.resolve.mockResolvedValueOnce({ error: { code: 'session-not-found', message: 'missing', details: { sessionId: f.id } } })
-  expect((await f.client.desktop.status({ sessionId: f.id })).result.ok).toBe(false)
+  expect((await f.client.desktop.confirm({ sessionId: f.id, rootSessionId: f.value.rootSessionId, nodeId: 'node', desktop: 'screen', confirmed: true })).result.ok).toBe(false)
   f.authorize.mockResolvedValueOnce({ authority: undefined }).mockResolvedValueOnce({ error: f.forbidden })
   expect((await f.client.desktop.status({ sessionId: f.id })).result).toEqual({ ok: false, error: f.forbidden })
+})
+
+it('reports no consent for a Session without a live Agent instead of resuming one', async () => {
+  const f = await fixture()
+  f.agentsGet.mockReturnValue(undefined)
+  expect((await f.client.desktop.status({ sessionId: f.id })).result).toEqual({ ok: true, value: null })
+  expect(f.resolve).not.toHaveBeenCalled()
+  expect(f.read).not.toHaveBeenCalled()
 })
 
 it('reports unconfigured consent and refuses saves through the same public methods', async () => {

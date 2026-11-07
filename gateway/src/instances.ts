@@ -771,7 +771,11 @@ export class InstanceManager {
   }
 
   async stateOf(target: RuntimeTargetInput): Promise<string> {
-    return this.repository.stateOf(await this.address(target))
+    try { return this.repository.stateOf(await this.address(target)) }
+    catch (error) {
+      if (error instanceof RuntimeStartBlockedError && error.reason === 'unavailable') return 'stopped'
+      throw error
+    }
   }
 
   /**
@@ -1283,6 +1287,10 @@ export class InstanceManager {
       }
       patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
       patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
+      patchText += `- id: connection\n  config:\n    serverTiming: ${String(this.cfg.performanceEnabled)}\n`
+      if (this.cfg.officeFontMetadataCacheDirectory !== undefined) {
+        patchText += `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(this.cfg.officeFontMetadataCacheDirectory)}\n`
+      }
       patchText += "- insert:\n    - id: desktop-availability\n      name: '@deepseek-ai/dsh-gateway-execution/desktop-availability'\n"
       // Remote-desktop providers share the gateway's administration files so
       // grants and endpoints managed in /admin take effect in every runtime.
@@ -1371,6 +1379,7 @@ export class InstanceManager {
         runtime: { ...runtime.target, generation },
         token: runtimeToken,
         principalPublicKey: this.security.principalPublicKey,
+        ...(this.cfg.streamPrincipalRenewal.enabled ? { streamPrincipalRenewal: this.cfg.streamPrincipalRenewal } : {}),
       })
       const resources = this.resources
       try { proc = await this.launcher.start({

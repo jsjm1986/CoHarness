@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { coharnessClientBuildEnvironment, officialClientBuildEnvironment, writeClientBuildRecord, type ClientBuildProfile } from './client-build-environment.ts'
 import type { BuildArtifactManifest } from './build-artifacts.ts'
+import { stampClientArtifact } from '../packages/client/modules/src/artifact-revision.ts'
 
 const script = fileURLToPath(new URL('./build-artifacts.ts', import.meta.url))
 const tsx = import.meta.resolve('tsx/esm')
@@ -85,7 +86,7 @@ function fixture(options: { appDirectory?: string; appOutput?: string; appExport
   }
   write('.typecheck/host.tsbuildinfo', '{}')
   write('packages/core/probe/lib/typert.host.js', 'export const models = []\n')
-  write('packages/client/probe/lib/client.js', 'export const client = true\n')
+  write('packages/client/probe/lib/client.js', stampClientArtifact('export const client = true\n', []))
   write('apps/cli/lib/bin.js', '#!/usr/bin/env node\n')
   chmodSync(join(root, 'apps/cli/lib/bin.js'), 0o755)
   write('apps/web/dist/index.html', '<!doctype html><title>fixture</title>')

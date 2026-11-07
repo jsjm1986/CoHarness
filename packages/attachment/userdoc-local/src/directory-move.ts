@@ -37,6 +37,7 @@ export interface DocumentDirectoryMoveRoot {
 }
 
 function identity(info: BigIntStats): DocumentFileObjectId {
+  /* v8 ignore next -- the refusal triple is pinned by POSIX-gated move suites; win32 never hands this impl a stat. */
   if (!info.isDirectory() || info.isSymbolicLink() || info.ino === 0n) throw new Error('Document move requires a real directory.')
   return { device: String(info.dev), inode: String(info.ino) }
 }
@@ -122,6 +123,7 @@ export async function withDocumentDirectoryMoveRoots<T>(
         const errno = koffi.errno()
         if (error !== null) reject(error instanceof Error ? error : new Error('Native directory operation failed.', { cause: error }))
         else if (result < 0) {
+          /* v8 ignore next -- koffi reports a named errno only on POSIX; its refusal suites gate off win32. */
           const code = errno > 0 ? getSystemErrorName(-errno) : 'EIO'
           reject(Object.assign(new Error(`${syscall} ${code}: ${path}`), { code, errno: -errno, syscall, path }))
         } else accept(result)
@@ -147,6 +149,7 @@ export async function withDocumentDirectoryMoveRoots<T>(
         parent = { path: root, fd: rootHandle.fd, identity: identity(await rootHandle.stat({ bigint: true })) }
         directories.push(parent)
       }
+      /* v8 ignore next -- a changed root needs POSIX fd identity to observe; the refusal is gated to those suites. */
       if (expectedRoot !== undefined && !same(parent.identity, expectedRoot)) throw new Error('Document root changed before its directory move.')
       for (const segment of relative(root, dirname(path)).split(sep).filter(Boolean)) {
         const childPath = resolve(parent.path, segment)

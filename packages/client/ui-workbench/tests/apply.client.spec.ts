@@ -96,7 +96,7 @@ async function harness(services: HarnessServices = {}) {
     list: { getSnapshot: () => ({ current: A as SessionId | undefined }) },
   }
   const sidebarRight = { openSessionResource: vi.fn() }
-  const layout = { focusRightbar: vi.fn() }
+  const layout = { focusRightbar: vi.fn(), selectPanel: vi.fn() }
   const tabTypes: { canOpen(address: string): boolean; title(address: string): string }[] = []
   ctx.provide('sidebarRight', sidebarRight as never)
   ctx.provide('sidebarRightTabs', { register: (spec: never) => { tabTypes.push(spec); return () => {} } } as never)
@@ -147,6 +147,50 @@ async function harness(services: HarnessServices = {}) {
 }
 
 describe('workbench navigation lifecycle', () => {
+  it.each([
+    { entry: 'toolbar', target: A, selection: 'same-current pane' },
+    { entry: 'toolbar', target: 'q' as SessionId, selection: 'another pane' },
+    { entry: 'sidebar', target: A, selection: 'same-current pane' },
+    { entry: 'sidebar', target: 'q' as SessionId, selection: 'another pane' },
+  ])('explicit Conversation navigation reveals $selection through the $entry entry', async ({ entry, target }) => {
+    const h = await harness()
+    try {
+      h.snapshot.set({ mode: 'workbench', paneIds: [A, 'q' as SessionId], activePaneId: A,
+        paneRatios: [0.5, 0.5], collapsedIds: [] })
+      expect(h.sessions.list.getSnapshot().current).toBe(A)
+      if (entry === 'toolbar') h.actions.focusSession(target)
+      else {
+        const face = (h.slots.entries('sidebar.workspaces.workbench')[0]!.inject as unknown as () => {
+          focusPane(id: SessionId): void
+        })()
+        face.focusPane(target)
+      }
+      expect(h.viewport.focus).toHaveBeenCalledExactlyOnceWith(target)
+      expect(h.layout.selectPanel).toHaveBeenCalledExactlyOnceWith(null)
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('explicit Conversation navigation reveals the existing single view when leaving the workbench sidebar', async () => {
+    const h = await harness()
+    try {
+      h.snapshot.set({ mode: 'workbench', paneIds: [A], activePaneId: A, paneRatios: [1], collapsedIds: [] })
+      const face = (h.slots.entries('sidebar.workspaces.workbench')[0]!.inject as unknown as () => {
+        exitWorkbench(): void
+      })()
+      face.exitWorkbench()
+      expect(h.viewport.setMode).toHaveBeenCalledExactlyOnceWith('single')
+      expect(h.layout.selectPanel).toHaveBeenCalledExactlyOnceWith(null)
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
   it('retains every named legacy layout until explicit owners are selected and prepares only the active panes', async () => {
     const f = await savedLegacyWorkbench(), other = 'b' as SessionId
     const project = { kind: 'project' as const, projectId: 7 }
@@ -693,6 +737,44 @@ describe('workspace file serving', () => {
       h.snapshot.set({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })
       expect(h.actions.filesAvailable()).toBe(true)
       h.actions.openFiles()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['md', 'pdf', 'docx', 'xlsx'])('selects the originating pane before opening its %s preview', async (extension) => {
+    const h = await harness({ connection: connection(), workspaceResources: { hasProvider: () => true } })
+    const origin = 'second' as SessionId
+    const path = `report.${extension}`
+    const request = { ...openRequest, sessionId: origin, path, address: workspaceResourceAddress(origin, path) }
+    h.snapshot.set({ mode: 'workbench', paneIds: [A, origin], activePaneId: A,
+      paneRatios: [0.5, 0.5], collapsedIds: [] })
+    h.sidebarRight.openSessionResource.mockImplementation(() => {
+      expect(h.viewport.focus).toHaveBeenCalledExactlyOnceWith(origin)
+    })
+    try {
+      expect(h.ctx.bail('workspace/resource-open', request)).toBe(true)
+      expect(h.sidebarRight.openSessionResource).toHaveBeenCalledExactlyOnceWith(origin, request.address, { kind: 'workspace-file' })
+      expect(h.layout.focusRightbar).toHaveBeenCalledExactlyOnceWith(origin)
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each([
+    { name: 'single-session view', mode: 'single' as const, included: true, pendingIdentity: false },
+    { name: 'unstaged Session', mode: 'workbench' as const, included: false, pendingIdentity: false },
+    { name: 'unverified restored layout', mode: 'workbench' as const, included: true, pendingIdentity: true },
+  ])('opens a preview without changing pane selection for a $name', async ({ mode, included, pendingIdentity }) => {
+    const h = await harness({ connection: connection(), workspaceResources: { hasProvider: () => true } })
+    const origin = 'second' as SessionId
+    const request = { ...openRequest, sessionId: origin, address: workspaceResourceAddress(origin, openRequest.path) }
+    h.snapshot.set({ mode, paneIds: included ? [A, origin] : [A], activePaneId: A,
+      paneRatios: included ? [0.5, 0.5] : [1], collapsedIds: [], ...(pendingIdentity ? { pendingIdentity: true as const } : {}) })
+    try {
+      expect(h.ctx.bail('workspace/resource-open', request)).toBe(true)
+      expect(h.viewport.focus).not.toHaveBeenCalled()
+      expect(h.sidebarRight.openSessionResource).toHaveBeenCalledExactlyOnceWith(origin, request.address, { kind: 'workspace-file' })
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
     } finally { await h.ctx.fiber.dispose() }
   })
 

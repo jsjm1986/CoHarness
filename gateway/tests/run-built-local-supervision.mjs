@@ -75,11 +75,14 @@ try {
     return nativeKill(pid, signal)
   }
   try {
-    await new LocalRuntimeControl(store, 200).terminate(0)
+    // Native slice records run a real systemctl round trip per poll; a cold
+    // user manager on a loaded runner exceeds a 200ms command budget, so the
+    // control deadline must fit the platform probe, not just the POSIX path.
+    await new LocalRuntimeControl(store, 2_000).terminate(0)
     assert.equal(denied, 1)
     transcript.push('A transient denied group observation waits for confirmed absence.')
     permanent = true
-    const uncertain = new LocalRuntimeControl(store, 200)
+    const uncertain = new LocalRuntimeControl(store, 2_000)
     await assert.rejects(uncertain.terminate(0), /capacity remains occupied/u)
     assert.equal(uncertain.hasExited(), false)
     transcript.push('Persistent denied group observations retain uncertain occupancy.')

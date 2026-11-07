@@ -1,6 +1,7 @@
 /** Disk output, resource bounds, and cancellation around the external kit. */
 import { access, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import type { Converter, ConverterOptions } from '@deepseek-ai/libreoffice-kit'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -51,9 +52,31 @@ it('preserves the kit font defaults when font configuration is omitted', async (
   await provider.convert(request)
   expect(kit.create.mock.calls[0]![0]).not.toHaveProperty('fontDirectories')
   expect(kit.create.mock.calls[0]![0]).not.toHaveProperty('fontFallbacks')
+  expect(kit.create.mock.calls[0]![0]).not.toHaveProperty('fontMetadataCacheDirectory')
   expect(Config({ fontDirectories: [] }).fontDirectories).toEqual([])
   expect(Config({ fontFallbacks: [] }).fontFallbacks).toEqual([])
   expect(() => Config({ fontDirectories: [''] })).toThrow()
+})
+
+it.each([false, join(tmpdir(), 'office-font-metadata')] as const)('passes explicit font metadata cache settings %j to the kit', async (directory) => {
+  const provider = await mount({ fontMetadataCacheDirectory: directory, maxFontMetadataCacheBytes: 8192 })
+  await provider.convert(request)
+  expect(kit.create).toHaveBeenCalledWith(expect.objectContaining({
+    fontMetadataCacheDirectory: directory, maxFontMetadataCacheBytes: 8192,
+  }))
+})
+
+it.each(['relative/cache', join(tmpdir(), 'cache\0invalid')])('rejects invalid font metadata cache directory %j', (directory) => {
+  expect(() => new OfficeToPdf(ctx, Config({ fontMetadataCacheDirectory: directory })))
+    .toThrow('fontMetadataCacheDirectory must be an absolute path or false')
+  expect(kit.create).not.toHaveBeenCalled()
+})
+
+it('rejects invalid font metadata byte limits before allocating a converter', () => {
+  for (const bytes of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    expect(() => Config({ maxFontMetadataCacheBytes: bytes })).toThrow()
+  }
+  expect(kit.create).not.toHaveBeenCalled()
 })
 
 it.each([

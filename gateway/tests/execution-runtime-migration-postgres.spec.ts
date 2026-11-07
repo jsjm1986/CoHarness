@@ -86,9 +86,15 @@ describePg('execution Runtime migration', () => {
       .toEqual([{ runtime_id: runtimeId }, { runtime_id: runtimeId }])
     expect((await db.query('SELECT runtime_id FROM harness.execution_sessions WHERE runtime_public_id=$1', [actors[1]!.public_id])).rows)
       .toEqual([{ runtime_id: null }, { runtime_id: null }])
-    expect(await runMigrations(db, migrations)).toEqual({ applied: [96, 97], current: 97 })
-    expect(await history()).toEqual(before)
-    expect(await runMigrations(db, migrations)).toEqual({ applied: [], current: 97 })
+    const through97 = await mkdtemp(join(tmpdir(), 'execution-before-authority-'))
+    try {
+      for (const name of await readdir(migrations)) if (/^\d+.*\.sql$/u.test(name) && Number(name.slice(0, 3)) <= 97) {
+        await copyFile(join(migrations, name), join(through97, name))
+      }
+      expect(await runMigrations(db, through97)).toEqual({ applied: [96, 97], current: 97 })
+      expect(await history()).toEqual(before)
+      expect(await runMigrations(db, through97)).toEqual({ applied: [], current: 97 })
+    } finally { await rm(through97, { recursive: true, force: true }) }
     for (const table of tables.slice(1)) {
       expect((await db.query(`SELECT runtime_id FROM harness.${table} WHERE runtime_public_id=$1`, [actors[0]!.public_id])).rows).toEqual([{ runtime_id: runtimeId }])
       expect((await db.query(`SELECT runtime_id FROM harness.${table} WHERE runtime_public_id=$1`, [actors[1]!.public_id])).rows).toEqual([{ runtime_id: null }])

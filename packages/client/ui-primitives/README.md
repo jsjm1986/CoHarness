@@ -27,6 +27,7 @@ Use `dsh-client-ui-primitives` to build web-client controls and render agent out
 - [Diff rendering](#diff-rendering)
 - [Search results](#search-results)
 - [Web retrieval](#web-retrieval)
+- [JSON inspection](#json-inspection)
 - [Compatibility](#compatibility)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -65,7 +66,7 @@ Use `dsh-client-ui-primitives` to build web-client controls and render agent out
 <a id="read-rendering"></a>
 ## Read rendering
 
-`ReadBlock` renders a returned file window as a line-numbered, syntax-highlighted code surface: a bold path (or presenter-supplied title) banner with a copy control, then the content lines with their file line numbers in a gutter (a windowed read keeps the file's own numbering, so a read past an offset starts above 1). A `totalLines` exceeding the window count draws a `showing N of M` note, and the body collapses to a head slice plus a tail slice past `maxLines` (default 16, the TerminalBlock split arithmetic) behind an expand button. Highlighting runs through the same shiki path as `CodeBlock` and is deferred until the block first enters the viewport. Rationale: [the web read card note](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card.md).
+`ReadBlock` renders a returned file window as a line-numbered, syntax-highlighted code surface: a bold path (or presenter-supplied title) banner with a copy control, then the content lines with their file line numbers in a gutter (a windowed read keeps the file's own numbering, so a read past an offset starts above 1). A `totalLines` exceeding the window count draws a `showing N of M` note, and the body collapses to a head slice plus a tail slice past `maxLines` (default 16, the TerminalBlock split arithmetic) behind an expand button. Collapsed row preparation visits only the visible head and tail; expansion and copying use the complete returned window. Highlighting runs through the same shiki path as `CodeBlock`, is deferred until the block first enters the viewport, and retains grammar context across collapsed lines. Rationale: [the web read card note](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card.md).
 
 <a id="diff-rendering"></a>
 ## Diff rendering
@@ -83,6 +84,11 @@ Use `dsh-client-ui-primitives` to build web-client controls and render agent out
 ## Web retrieval
 
 `WebBlock` renders a completed web retrieval, one component for both kinds of the `web` render intent (discriminated by `kind`). A `search` shows an optional provider answer (through `MarkdownText`) above an ordered citation list: each source is a safe external link labelled by its title, or its hostname, falling back to the raw URL when the URL does not parse or has no hostname (a `file:`/`data:` URL) so a label is never blank; its snippet and publication date render below it. Only http(s) URLs become anchors (`target`/`rel` set) — the http(s) subset of the allowlist `MarkdownText` applies to untrusted links (it also permits `mailto:`, excluded here); any other URL renders as plain text. The whole list renders in one fixed-height scroll container (`max-height: 320px`, `overflow-y: auto`), so a list taller than that scrolls vertically in place instead of growing the card; `<li value>` pins each source's citation number, contiguous from 1, rather than leaving it to the `<ol>`'s implicit count. When a search legitimately returns no answer and no sources, the card shows an explicit empty-state note rather than a blank `<ol>` (the chat row does not surface the raw result content). A `fetch` shows a compact summary: the linked final URL and its HTTP status. Both mark a capped retrieval. Rationale: [the web result card note](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.md) and [the source scroll note](../../../.agents/notes/implemented/feature/2026-08-03-web-search-source-scroll.md).
+
+<a id="json-inspection"></a>
+## JSON inspection
+
+`JsonTree` renders read-only JSON with keyboard navigation and value, JSON, and property-path copying. Collapsed previews show at most four object fields or five array entries at each of two preview levels; deeper containers show an ellipsis without reading their child values. Expanding a container exposes every entry, and copying includes the complete selected value regardless of its preview.
 
 <a id="compatibility"></a>
 ## Compatibility

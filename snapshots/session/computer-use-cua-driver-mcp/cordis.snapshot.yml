@@ -51,6 +51,7 @@
     - id: computer-use-cua-driver-mcp
       name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'
       config:
+        desktopMode: enabled
         command: !!js process.execPath
         args: [driver.mjs, .dsh/computer-use-fixture]
         reconnect:

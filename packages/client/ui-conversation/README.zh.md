@@ -17,6 +17,8 @@ kind: "package-reference"
 
 滚动区域在未被覆盖的两侧边槽中提供窄版内容宽度拖拽手柄：每条静置 hit 条是 10px、仅响应主按键的目标，停靠在内容列外侧 24px 处，并以 24px 安全区抵住窗口边缘为上限；其上有一条安静的 2px 指示条，仅在被捕获的拖拽期间跟随指针。只有 View 中具体绘制的元素可以提升到静置手柄之上；透明的全宽包裹层保持在下方，绝不认领空白边槽。Chat 将该规则应用到表格元素，而受列约束的工具卡片无需提升。手柄上的滚轮动作会转发到对话滚动容器，像素、行与页增量都换算为该容器自身的单位，Ctrl+滚轮保持浏览器缩放手势。sticky 编辑器在其整条底部带内位于静置条之上，已捕获的拖拽会将其指示条抬升到该带之上直至释放（[手柄样式](src/client/skeleton/ConversationRoot.module.css)）。
 
+初始工作区选择尚未完成且没有当前 Session 时，页面只显示居中的加载指示，隐藏过早的工作区选择提示，并保留已挂载的编辑器；工作台导航仍可从页首操作。已有当前空白会话时，历史读取期间仍显示 Hero；确认没有工作区、取消或选择失败后，恢复普通操作入口。
+
 Hero 本身就是“新建对话”入口——它的编辑器即草稿——因此工作区行只保留 Workspace 选择器（使用作用域图标而非文件夹，避免与工作台的文件控件并置时被误读为文件操作）。选择 Workspace 仍然优先打开历史；明确的新建会话操作保留在侧边栏入口和每个真实 Workspace 行上，走既有的空白会话复用路径，因此选择历史会话后不会失去开始新聊天的入口。
 
 `conversation.hero.agentPreset` 插槽接收可选的 Session ID，预设控件据此访问所选 Runtime。
@@ -31,7 +33,9 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 
 浏览器标签页暂停绘制时，文字和已附加的文档引用仍可发送。编码图片前，可见的输入区会先显示待发送消息。切到后台后仍会继续编码。
 
-根作用域的 `conversation` 入口声明 `conversation.content`（允许当前 Session 缺席的 Component Factory，其 `views` 局部位置默认渲染 `conversation.session`），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。旧布局等待完整身份验证时发布 `pendingIdentity`，在对账完成前拒绝布局编辑，不会把未保存的改动报告为成功。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
+根作用域的 `conversation` 入口声明 `conversation.content`（允许当前 Session 缺席的 Component Factory，其 `views` 局部位置默认渲染 `conversation.session`），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。已注册的工作台控件在其他主面板显示时仍持有这些窗口。单会话模式、贡献卸载和已验证身份撤销会释放额外窗口；保存的具名成员保留，不随传输撤销而删除，恢复前须重新通过目录验证。若第 3 版记录的所有具名布局均无面板，则恢复时无需读取账户目录。具名工作台的选择独立于面板变化持久化，即使两个布局的面板、焦点和比例完全相同也会保存选择。切换布局会选中其中已验证的活动 Session；复制时保留活动面板及其比例。旧布局等待完整身份验证时发布 `pendingIdentity`，在对账完成前拒绝布局编辑，不会把未保存的改动报告为成功。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
+
+在 Workbench 的标签和堆叠布局中，每个包含展开面板的行都会填满可用宽度。一个展开面板与 46px 折叠身份细条并排时也如此。这些呈现方式保留已保存的面板比例，面板回到更宽的一行时按该比例分配相对宽度。
 
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 

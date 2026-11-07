@@ -453,9 +453,9 @@ describePg('Admin business PostgreSQL regressions', () => {
       const owner = await f.user()
       const service = new ConversationArchiveService(f.context)
       await pool.query(`INSERT INTO harness.conversation_sessions(
-        id,organization_id,creator_user_id,session_format_version,created_at,updated_at,visibility,root_session_id)
-        VALUES('real-root',$1,$2,3,now(),now(),'personal','real-root'),
-              ('child-1',$1,$2,3,now(),now(),'personal','real-root')`, [f.organizationId, owner.uuid])
+        id,organization_id,creator_user_id,session_format_version,created_at,updated_at,visibility,root_session_id,parent_session_id)
+        VALUES('real-root',$1,$2,3,now(),now(),'personal','real-root',NULL),
+              ('child-1',$1,$2,3,now(),now(),'personal','real-root','real-root')`, [f.organizationId, owner.uuid])
       await expect(service.syncRuntimeSnapshot(snapshot(runtimeOf(owner), {
         archivedSessionIds: ['child-1'],
         sessions: [{ sessionId: 'child-1', header: { parentSession: 'fake-root' } }],

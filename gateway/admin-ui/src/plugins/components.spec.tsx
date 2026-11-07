@@ -92,7 +92,7 @@ function mockComposition(overrides: Partial<PluginComposition> = {}): PluginComp
     entries: [], bundleRows: [], error: '', notice: '', busy: false, busyRow: '',
     draft: null, dirty: false, applied: false, pending: 0,
     setEntryDesired: vi.fn(), setBundleDesired: vi.fn(), applyLive: vi.fn(async () => {}),
-    save: vi.fn(async () => {}), discard: vi.fn(), refresh: vi.fn(),
+    save: vi.fn(async () => {}), discard: vi.fn(), refresh: vi.fn(), acceptCatalog: vi.fn(), bindLiveRefresh: vi.fn(() => () => {}),
     ...overrides,
   }
 }

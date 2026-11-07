@@ -16,23 +16,24 @@ import type {
 type Method = TypertRemoteMethod<object, unknown> | TypertRemoteMethod<object, unknown, 'stream', unknown>
 type Parameter = TypertRemoteParameterSpec & { readonly wire: string }
 type Index = Pick<TypertRemoteInfo, 'descriptors' | 'methods'>
+type InputRuntime = Pick<typeof z, 'strictObject'>
 
 /**
  * Retain one generated definition per endpoint without constructing parsers or projections.
  * The class instance builds its shared descriptor/method index on first access;
  * input schemas and JSON Schema projections are cached only when requested.
  * @param spec - compiler-produced method facts and Zod factories.
- * @param zod - the generated artifact's Zod runtime for named-input parsers.
+ * @param zod - the generated artifact's strict-object constructor for named-input parsers.
  * @returns a lazy, mountable info instance with no registration or transport effects.
  */
-export function createTypertRemoteInfo(spec: TypertRemoteSpec, zod: typeof z): TypertRemoteInfo {
+export function createTypertRemoteInfo(spec: TypertRemoteSpec, zod: InputRuntime): TypertRemoteInfo {
   return new RemoteInfo(spec, zod)
 }
 
 class RemoteInfo implements TypertRemoteInfo {
   private index?: Index
 
-  constructor(private readonly spec: TypertRemoteSpec, private readonly zod: typeof z) {}
+  constructor(private readonly spec: TypertRemoteSpec, private readonly zod: InputRuntime) {}
 
   get package(): string { return this.spec.package }
   get descriptors(): readonly InvocationDescriptor[] { return this.resolve().descriptors }
@@ -104,7 +105,7 @@ class NamedInput implements TypertRemoteValue<object> {
   constructor(
     private readonly parameters: readonly Parameter[],
     private readonly strict: boolean,
-    private readonly zod: typeof z,
+    private readonly zod: InputRuntime,
   ) {}
 
   private codec(parameter: Parameter): TypertRemoteCodecSpec {

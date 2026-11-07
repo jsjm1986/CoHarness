@@ -24,6 +24,7 @@ import type {
   PluginInstallLogChunk,
   PluginInstallProgress,
   PluginInstallRequestId,
+  PluginManagementCatalog,
   PluginRegistries,
   PluginSpecInspection,
   ReadOnlyReason,
@@ -504,6 +505,7 @@ export class PluginManagerController {
   private inFlight: Promise<void> | undefined
   private rerun = false
   private generation = 0
+  private readonly catalogAbort = new AbortController()
   private disposed = false
   /** A successful managed-profile read remains usable even when it returned no bundles. */
   private hasCachedInventory = false
@@ -519,10 +521,14 @@ export class PluginManagerController {
   })
 
   /**
-   * @param ctx - the tab plugin's context, whose `remote.pluginManager` and `remote.pluginInventory` namespaces answer.
+   * @param ctx - remote calls plus optional accepted-catalog and settled-write observers; omitted observers leave publication local to this store.
    */
   constructor(
-    private readonly ctx: { remote: PluginManagementRemote },
+    private readonly ctx: {
+      remote: PluginManagementRemote
+      onCatalog?: (catalog: PluginManagementCatalog) => void
+      onWriteSettled?: () => void
+    },
   ) {
     this.store = createSnapshotStore<PluginManagerState>({
       status: 'idle', refreshStatus: 'idle', packages: [], busy: [], notice: null,
@@ -541,6 +547,7 @@ export class PluginManagerController {
   /** Stop publishing and drop every late settlement. */
   dispose(): void {
     this.disposed = true
+    this.catalogAbort.abort()
     this.registryRead = undefined
     this.request = undefined
     this.generation += 1
@@ -764,37 +771,37 @@ export class PluginManagerController {
   private async read(): Promise<void> {
     try {
       do {
+        if (this.disposed) return
         this.rerun = false
         const generation = ++this.generation
         if (this.getSnapshot().status === 'idle') this.patch({ status: 'loading' })
-        // The manager Remote is mounted whether or not the Host manages a
-        // profile; the inventory says whether it does.
-        const inventory = await this.ctx.remote.pluginInventory.list()
-        if (generation !== this.generation) return
-        if (!inventory.ok) {
+        try {
+          const catalog = await this.ctx.remote.pluginManager.catalog(true, this.catalogAbort.signal)
+          if (generation !== this.generation) return
+          if (!catalog.ok) {
+            if (catalog.error.code === 'plugin-management/forbidden') {
+              this.hasCachedInventory = false
+              this.patch({ status: 'error', packages: [] })
+            } else this.patch({ status: 'error' })
+            continue
+          }
+          this.ctx.onCatalog?.(catalog.value)
+          if (!catalog.value.managementAvailable) {
+            this.hasCachedInventory = false
+            this.patch({ status: 'unavailable', packages: [] })
+            continue
+          }
+          const { bundles, plugins } = catalog.value
+          this.hasCachedInventory = true
+          this.patch({
+            status: 'ready',
+            refreshStatus: this.getSnapshot().refreshStatus === 'refreshing' ? 'refreshing' : 'idle',
+            packages: sortPackages(bundles.map(bundle => packageView(bundle, plugins))),
+          })
+        } catch {
+          if (generation !== this.generation) return
           this.patch({ status: 'error' })
-          continue
         }
-        if (inventory.value.managementAvailable !== true) {
-          this.hasCachedInventory = false
-          this.patch({ status: 'unavailable', packages: [] })
-          continue
-        }
-        const [bundles, plugins] = await Promise.all([
-          this.ctx.remote.pluginManager.listBundles(),
-          this.ctx.remote.pluginManager.listPlugins(),
-        ])
-        if (generation !== this.generation) return
-        if (!bundles.ok || !plugins.ok) {
-          this.patch({ status: 'error' })
-          continue
-        }
-        this.hasCachedInventory = true
-        this.patch({
-          status: 'ready',
-          refreshStatus: this.getSnapshot().refreshStatus === 'refreshing' ? 'refreshing' : 'idle',
-          packages: sortPackages(bundles.value.map(bundle => packageView(bundle, plugins.value))),
-        })
       } while (this.shouldRerun())
     } finally {
       this.inFlight = undefined
@@ -1087,6 +1094,7 @@ export class PluginManagerController {
       this.patch({ notice: failedNotice(error, subject, ++this.noticeSeq) })
     } finally {
       this.patch({ busy: this.getSnapshot().busy.filter(entry => entry !== key) })
+      if (!this.disposed) this.ctx.onWriteSettled?.()
     }
     await this.load()
   }

@@ -153,6 +153,19 @@ export class GatewayPrincipalSigner {
     return this.signPrincipal(input, this.ttlMs)
   }
 
+  /**
+   * Sign an ordinary event-connection assertion, capped by login expiry and 30 seconds.
+   * @param input - current server-owned user, scope and runtime generation.
+   * @param notAfter - existing login deadline, never extended by renewal.
+   * @returns compact signed assertion whose lifetime is at most 30 seconds.
+   */
+  issueStream(input: Omit<PrincipalInput, 'purpose'>, notAfter = Number.MAX_SAFE_INTEGER): string {
+    const now = input.now ?? Date.now()
+    const lifetimeMs = Math.min(this.ttlMs, 30_000, notAfter - now)
+    if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs <= 0) throw new Error('stream principal deadline has elapsed')
+    return this.signPrincipal({ ...input, now }, lifetimeMs)
+  }
+
   /** Bind a profile operation to its server-owned deadline; runtime role checks remain mandatory. */
   issuePluginManagement(input: Omit<PrincipalInput, 'purpose'>, lifetimeMs: number): string {
     if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs <= 0) throw new Error('management lifetime must be a positive safe integer')

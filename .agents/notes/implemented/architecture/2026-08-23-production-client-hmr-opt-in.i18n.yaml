@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-23-production-client-hmr-opt-in.md
 document:
-  en: 8b816ee73085c7f83d0e1736afce01b792db1087
-  zh: d2ef23aba5593cde8f24c7feccb51e9a6472402f
+  en: 0af4dcbe69466a68ab5ce0b846e4942e48e0f401
+  zh: b3d123361eecbf0d2af9606a84cfda622b6f056d
 /agent-note-production-client-artifact-polling-is-opt-in:
   en: fc61ab27ea592f59
   zh: 81b20b16bc5d2cf1
@@ -12,11 +12,11 @@ document:
   en: 902539aca480ed85
   zh: d7d8eb42155ab430
 /agent-note-production-client-artifact-polling-is-opt-in/decision:
-  en: c093008fd3ddc455
-  zh: 3399d7d83fb65fe9
+  en: 36ef0e0caebb8dec
+  zh: fca7d9914e487eec
 /agent-note-production-client-artifact-polling-is-opt-in/alternatives-considered:
   en: ee69e30e1ae4c615
   zh: db5ad98962ace595
 /agent-note-production-client-artifact-polling-is-opt-in/consequences:
-  en: 4b67b94b86f73faf
-  zh: 4a21bfa75e3f3eff
+  en: bbc452384f77b6fe
+  zh: 7793f9d4d1ce6d8d

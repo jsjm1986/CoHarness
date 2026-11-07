@@ -69,8 +69,9 @@ it('requires configured policy activation before signed managed Web readiness', 
     try { await stopChild() } finally {
       coordinator.closeAllConnections()
       try {
-        if (coordinator.listening) await new Promise<void>((resolve, reject) =>
-          coordinator.close((error) =>{  error === undefined ? resolve() : reject(error) }))
+        if (coordinator.listening) await new Promise<void>((resolve, reject) => {
+          coordinator.close((error) => { if (error === undefined) resolve(); else reject(error) })
+        })
       } finally { await rm(root, { recursive: true, force: true }) }
     }
   })

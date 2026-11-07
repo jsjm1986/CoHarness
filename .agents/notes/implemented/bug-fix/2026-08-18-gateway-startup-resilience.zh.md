@@ -12,15 +12,23 @@ macOS Gateway 可能在 PostgreSQL 容器仍在启动或短暂不可用时被拉
 
 Gateway 启动只对暂时性的 PostgreSQL 连接和服务器不可用错误采用可配置的有界指数退避。凭据错误、migration 校验差异和未激活的企业记录仍然立即失败。重试循环支持在 supervisor 替换进程时中止，诊断日志只记录数据库错误码，不记录连接 URL。
 
+[默认数据库客户端](../../../../gateway/src/postgres/client.ts) 观察 pg 初始流及协商后的 TLS 流上的对端 EOF。对端在本地结束写入前关闭连接时，客户端用 `08006` 销毁该流，使连接和查询都保留结构化故障。本地主动关闭、PostgreSQL 拒绝码及 TLS 验证错误保持各自的处理方式。普通查询不会自动重复执行；会话读取沿用已有的依赖故障分类。错误分类不解析消息文本，自定义 `Client` 实现继续拥有其传输流。流观察器在关闭时移除，TLS 观察器随客户端结束而移除。
+
+`08006` 是 SQLSTATE 的[连接故障分类](https://www.postgresql.org/docs/17/errcodes-appendix.html)。pg 会在扩展查询 Sync 之后忽略部分 `ECONNRESET` 和 `EPIPE`；连接故障码能够保留该路径的 EOF，无需检查驱动私有状态。其他套接字错误保持原有处理方式。
+
 本地启动器采用[独立且可恢复的监督](../architecture/2026-10-25-local-runtime-supervisor.zh.md)。[Runtime 准入](../architecture/2026-10-23-gateway-runtime-admission.zh.md)在协调器初始化时保留尚未确认终止的存活记录。受控 release 部署还会把 Gateway 与子进程命令固定到同一个不可变 release，并在激活前验证新进程。
 
 ## 验证
 
 数据库重试测试覆盖瞬时故障恢复、有界延迟、包装错误、非瞬时错误快速失败、诊断脱敏和 supervisor 中止。Gateway 配置测试覆盖重试默认值、覆盖项和无效窗口。现有 release-control 测试覆盖不可变 release 启动、激活回滚和拒绝清理仍被旧运行时使用的 release。
 
+真实 pg 连接通过隔离的回环对端覆盖认证前 EOF、启动查询中 EOF、凭据拒绝后 EOF、不带错误码的 TLS 拒绝、经验证的 TLS 协商及 EOF、证书主机名拒绝、主动关闭和 supervisor 取消。夹具分配临时端口及一次性证书目录，并等待连接和监听器清理完成。
+
 ## 曾考虑的替代方案
 
 **重试所有启动错误。** 否决，因为凭据错误、migration 漂移和未激活的部署记录需要立即让运维看到，而不是无限等待。
+
+**根据 pg 错误消息分类。** 否决，因为显示文本没有稳定的机器标识，无码故障也可能来自配置。传输观察器在 pg 创建通用关闭错误前确认对端 EOF。
 
 **把全部数据库重试交给 launchd。** 否决，因为 Gateway 会留下平台特定的启动行为，也无法区分 PostgreSQL 瞬时故障与无效配置。
 

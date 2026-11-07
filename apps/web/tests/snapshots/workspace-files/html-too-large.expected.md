@@ -1,0 +1,4 @@
+- region "oversized.html":
+  - button "Close preview"
+  - button "Reload"
+  - alert: This HTML document could not be previewed.

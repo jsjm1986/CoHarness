@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-05-upgrade-socket-error-guard.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-05-upgrade-socket-error-guard.md
+document:
+  en: c8d8bccb0537989f458b539c96bbc81f490421ab
+  zh: b287afe40c5b0844401faf0970e423ab0899584a
+/agent-note-absorb-peer-resets-on-pre-adoption-upgrade-sockets:
+  en: 37a84386c2d897c8
+  zh: f34c14a076c27088
+/agent-note-absorb-peer-resets-on-pre-adoption-upgrade-sockets/problem:
+  en: 92ae457e9d52b5be
+  zh: 16a3aa56c31e68c3
+/agent-note-absorb-peer-resets-on-pre-adoption-upgrade-sockets/decision:
+  en: 2e85b5745d995ddb
+  zh: 3e351c49ec82c81d
+/agent-note-absorb-peer-resets-on-pre-adoption-upgrade-sockets/alternatives-considered:
+  en: a65b3feb88aee89d
+  zh: e0594d61b99ac2a9
+/agent-note-absorb-peer-resets-on-pre-adoption-upgrade-sockets/consequences:
+  en: d9ebe6b9eb88509d
+  zh: 5e3f7da870a2c7a5
+/agent-note-absorb-peer-resets-on-pre-adoption-upgrade-sockets/verification:
+  en: 85466644d38fe2e1
+  zh: c67926771837ca54

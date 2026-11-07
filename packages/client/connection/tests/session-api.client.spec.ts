@@ -34,7 +34,7 @@ describe('Session API routing', () => {
 })
 
 it.each([
-  ['sessions', 'history'], ['sessions', 'historyIndex'], ['sessions', 'selectModel'], ['sessions', 'rename'], ['sessions', 'fork'],
+  ['sessions', 'activate'], ['sessions', 'history'], ['sessions', 'historyIndex'], ['sessions', 'selectModel'], ['sessions', 'rename'], ['sessions', 'fork'],
   ['sessions', 'attachment'], ['sessions', 'updateQueue'], ['sessions', 'cancel'], ['desktop', 'status'], ['desktop', 'confirm'],
   ['workspace', 'archiveSession'], ['workspace', 'unarchiveSession'], ['workspace', 'insertSessionBefore'],
   ['workspace', 'pinSession'], ['workspace', 'unpinSession'],

@@ -531,6 +531,28 @@ jobs:
       - name: Install Gateway dependencies
         run: npm ci --prefix gateway
 
+      # The built resource-admission lane compiles gateway source through the
+      # tsconfig paths, which point at emitted workspace declarations, and then
+      # executes the compiled graph, which imports the workspace runtime
+      # entries. The host library build emits declarations and runtime bundles
+      # for the full graph the gateway typecheck lane compiles, and the runtime
+      # package step recreates the gateway/node_modules links exactly as
+      # build-production does for a standalone release.
+      # Scoped consumer specs load the flock and directory bindings lazily
+      # even when the compiled-Gateway lane is skipped, so the host addon
+      # build stays unconditional while the library build below remains
+      # scoped to gateway_mode == 'full'.
+      - name: Build the native addon the scoped consumer specs require
+        run: pnpm run build:native-system
+
+      - name: Build the workspace libraries and native addon the compiled Gateway consumes
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: pnpm run build:native-system && pnpm run build:lib:host
+
+      - name: Link the compiled Gateway's runtime packages
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: pnpm exec tsx scripts/gateway-runtime-packages.ts
+
       - name: Test Gateway execution through Loader and PostgreSQL
         id: gateway-execution
         if: needs.pr-scope.outputs.gateway_mode == 'full'
@@ -555,6 +577,14 @@ jobs:
       - name: Run keyless compatibility, snapshot, and artifact gates
         run: pnpm run check:ci:consumers:scoped
 
+      # The lifecycle tests materialize the policy bundles into staged
+      # instance homes; the ci face emits transpile-only because this lane has
+      # no workspace lib/types for them. model-governance's lib is committed.
+      - name: Build the policy bundles used by Gateway lifecycle tests
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: |
+          gateway/node_modules/.bin/tsc -p plugins/dsh-directory-guard/tsconfig.ci.json
+          gateway/node_modules/.bin/tsc -p plugins/dsh-steward-tools/tsconfig.ci.json
       - name: Test compiled Gateway and Web lifecycle
         if: needs.pr-scope.outputs.gateway_mode == 'full'
         env:
@@ -821,8 +851,13 @@ jobs:
       # installs it immutably instead of hand-linking node_modules rows.
       - name: Install workspace dependencies for declaration emit
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Emit type declarations the Gateway paths consume
-        run: node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/llm/llm packages/attachment/userdoc packages/attachment/userdoc-local packages/host/userdoc-http
+      # The emitted lib/types graph feeds the tsconfig paths and vitest
+      # aliases, while the emitted modules' own workspace imports resolve
+      # through real package exports to the bundled lib entries, and spawned
+      # fixtures exercise the flock and directory bindings; the library build
+      # and host addon produce both artifact planes.
+      - name: Build the workspace libraries and native addon the Gateway graph consumes
+        run: pnpm run build:native-system && pnpm run build:lib:host
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their
@@ -1426,9 +1461,14 @@ jobs:
   # DSH_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
   # and the all-checks-passed verdict above.
   windows-native:
-    needs: pr-scope
+    # The static lane is the cheap supersede fence: a stale run is cancelled
+    # before this two-hour job starts, so it cannot become an unkillable job
+    # holding the concurrency slot. On push/schedule node-24 does not exist and
+    # its empty result lets the always() conditions decide.
+    needs: [pr-scope, node-24]
     if: >-
-      always() && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
+      always() && (needs.node-24.result != 'failure' && needs.node-24.result != 'cancelled')
+      && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
       || github.event_name == 'schedule'
       || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_native_windows == 'true'))
@@ -1503,6 +1543,9 @@ jobs:
 
       - name: Run complete native Windows gate inventory
         shell: pwsh
+        # Below the job budget so a wedged gate cannot occupy the slot for the
+        # full 120 minutes before GitHub's own cancellation lands.
+        timeout-minutes: 90
         run: pnpm run check:ci:windows-complete
       - name: Preserve gate evidence
         if: always()

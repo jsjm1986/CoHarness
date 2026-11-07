@@ -33,7 +33,7 @@ it('reads policy from this origin and keeps a secondary entry local even when ag
   expect(f.runtime.getSnapshot()).toMatchObject({ phase: 'ready', showComputer: true, aggregateComputers: false,
     context: { entry: { nodeId: b }, role: 'computer', scope: 'local' } })
   expect(fetcher.mock.calls[0]?.[0]).toBe('/account/api/deployment/context')
-  expect(fetcher.mock.calls[0]?.[1].headers['x-dsh-expected-principal-id']).toBe('7')
+  expect((fetcher.mock.calls[0]?.[1] as { headers: Record<string, string> }).headers['x-dsh-expected-principal-id']).toBe('7')
   expect(f.forTarget).not.toHaveBeenCalled()
 })
 
@@ -75,7 +75,7 @@ it('does not drop a second mode change while the follow-up snapshot is still in 
   const f = fixture()
   const invalidated = f.runtime.invalidate()
   first.resolve(Response.json(response('1')))
-  await vi.waitFor(() =>{  expect(fetcher).toHaveBeenCalledTimes(2) })
+  await vi.waitFor(() => { expect(fetcher).toHaveBeenCalledTimes(2) })
   expect(f.runtime.invalidate()).toBe(invalidated)
   second.resolve(Response.json(response('2')))
   await invalidated
@@ -97,7 +97,7 @@ it('refreshes visible metadata on the configured interval and preserves the last
 it('times out a stalled initial read, reports it, and retries without waiting for a focus event', async () => {
   vi.useFakeTimers(); vi.spyOn(console, 'error').mockImplementation(() => {})
   const fetcher = vi.fn().mockImplementationOnce((_url, init: RequestInit) => new Promise((_resolve, reject) => {
-    init.signal!.addEventListener('abort', () =>{  reject(new DOMException('Cancelled', 'AbortError')) }, { once: true })
+    init.signal!.addEventListener('abort', () => { reject(new DOMException('Cancelled', 'AbortError')) }, { once: true })
   })).mockResolvedValue(Response.json(response('2')))
   vi.stubGlobal('fetch', fetcher)
   const f = fixture()
@@ -115,7 +115,7 @@ it('discards a response from the previous account and joins every cancelled requ
   const f = fixture()
   f.policy.setVerifiedAccountId(8)
   await f.runtime.refresh()
-  expect(fetcher.mock.calls[1]?.[1].headers['x-dsh-expected-principal-id']).toBe('8')
+  expect((fetcher.mock.calls[1]?.[1] as { headers: Record<string, string> }).headers['x-dsh-expected-principal-id']).toBe('8')
   let disposed = false
   const stop = stops.shift()!(); void stop.then(() => { disposed = true })
   await Promise.resolve(); expect(disposed).toBe(false)

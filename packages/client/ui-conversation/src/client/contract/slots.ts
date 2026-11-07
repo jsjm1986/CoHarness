@@ -1003,7 +1003,6 @@ export interface ConversationViewportInjected {
   /** Collapse every pane except one, or restore all when soloed. */
   onViewportSolo: (sessionId: SessionId) => void
   onViewportMaximize: (sessionId: SessionId, maximized: boolean) => void
-  onViewportEnabled: (enabled: boolean) => void
   onIntentInput: (id: string, text: string) => void
   onIntentRetry: (id: string) => void
   onIntentHide: () => void
@@ -1031,7 +1030,7 @@ export type ConversationSessionSlotProps =
   PropsRuntime<'conversation.session'>
   & PropsRenderSlots<'conversation.view'>
   & PropsStore<ChatStore>
-  & ConversationSessionInjected
+  & InjectFace<ConversationSessionInjected>
 
 /** Full strict-session header props: shared store, tabs/actions render shares, navigation, and locale. */
 export type ConversationSessionHeaderSlotProps =

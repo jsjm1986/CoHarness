@@ -134,8 +134,10 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     const recovered = new LocalLauncher(f.cfg).attach(f.runtime); handles.push(recovered)
     expect(await recovered.isAlive?.()).toBe(true)
     await (await fetch(`http://127.0.0.1:${runtime.port}/exit`)).arrayBuffer()
-    await vi.waitFor(async () => expect(await recovered.isAlive?.()).toBe(false), { timeout: 30_000 })
-    expect((await f.store.read())?.phase).toBe('stopped')
+    await vi.waitFor(async () => {
+      expect(await recovered.isAlive?.()).toBe(false)
+      expect((await f.store.read())?.phase).toBe('stopped')
+    }, { timeout: 30_000 })
   })
 
   it('reaps a descendant after its direct runtime exits while leaving inherited output pipes open', async () => {
@@ -158,7 +160,9 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     const original = await readFile(f.store.recordPath, 'utf8')
     const record = JSON.parse(original) as { url: string }
     // Port 0 cannot name an allocated listener; no unrelated host port is acquired.
-    await writeFile(f.store.recordPath, JSON.stringify({ ...record, phase, url: 'http://127.0.0.1:0/' }))
+    // The record claims process-group containment: a native slice claim would hand
+    // termination a kernel-authoritative path that needs no reachable endpoint.
+    await writeFile(f.store.recordPath, JSON.stringify({ ...record, phase, url: 'http://127.0.0.1:0/', nativeRange: undefined }))
     try {
       await expect(new LocalRuntimeControl(f.store, 100).terminate(0)).rejects.toThrow('capacity remains occupied')
       expect(await (await fetch(`http://127.0.0.1:${runtime.port}`)).text()).toBe('owned-runtime')
@@ -171,6 +175,9 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     await handle.terminate(0)
     await absent(runtime.pid)
     const record = (await f.store.read())!
+    // The scenario exercises process-group containment: strip the native slice
+    // claim so stop evidence cannot take the kernel-authoritative systemctl path.
+    await writeFile(f.store.recordPath, JSON.stringify({ ...record, nativeRange: undefined }))
     const recovered = new LocalRuntimeControl(f.store, 200)
     const original = process.kill
     let denied = 0

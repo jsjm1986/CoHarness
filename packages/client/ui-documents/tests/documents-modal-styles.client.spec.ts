@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 const modal = readFileSync(fileURLToPath(new URL('../src/client/DocumentsModal.module.css', import.meta.url)), 'utf8')
 const preview = readFileSync(fileURLToPath(new URL('../src/client/DocumentPreview.module.css', import.meta.url)), 'utf8')
 const sheet = readFileSync(fileURLToPath(new URL('../src/client/DocumentsMobileSheet.module.css', import.meta.url)), 'utf8')
+const destination = readFileSync(fileURLToPath(new URL('../src/client/DocumentDestinationPicker.module.css', import.meta.url)), 'utf8')
 
 function dialogBlock(source: string): string {
   const match = source.match(/\.dialog\s*\{[^}]*\}/)
@@ -37,6 +38,7 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/@media \(pointer: coarse\)[\s\S]*\.newFolder,[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
     expect(modal).toMatch(/\.overviewActions\s*\{[\s\S]*display:\s*flex/)
     expect(modal).toMatch(/\.scopeNotice\s*\{[\s\S]*border-radius:[\s\S]*background:\s*var\(--dsw-alias-bg-layer-2\)/)
+    expect(destination).toMatch(/\.option\s*\{[^}]*min-height:\s*44px/)
   })
 
   it('keeps the selected destructive action readable on its primary fill', () => {
@@ -117,6 +119,8 @@ describe('DocumentsModal.module.css', () => {
   })
 
   it('reserves a separate track for scrollbars beside navigation options and lists', () => {
+    expect(destination).toMatch(/\.options\s*\{[^}]*padding:\s*2px 6px 2px 0[^}]*scrollbar-gutter:\s*stable/)
+    expect(destination).toMatch(/\.option\s*\{[^}]*box-sizing:\s*border-box/)
     expect(modal).toMatch(new RegExp([
       '\\.list,[\\s\\S]*\\.overviewList,[\\s\\S]*\\.trashList\\s*\\{',
       '[\\s\\S]*padding-inline-end:\\s*6px[\\s\\S]*scrollbar-gutter:\\s*stable both-edges',

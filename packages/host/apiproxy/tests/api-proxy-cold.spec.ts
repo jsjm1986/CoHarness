@@ -8,6 +8,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { SESSION_FORMAT_VERSION, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setImmediate as nextEventLoopTurn } from 'node:timers/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore from '@deepseek-ai/dsh-session'
@@ -699,6 +700,64 @@ describe('cold history recovery view', () => {
     expect(response.result.value.events.at(-1)?.event.type).toBe('session/end-seed')
     expect(response.result.value.hasMore).toBe(false)
     expect(readPage).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['cancelled', 'baseline failure'] as const)('joins the detached revision probe after %s', async (outcome) => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-cancelled-revision-probe')
+    const meta = header(sessionId, 1000)
+    const revision = SessionPersistenceRevision('pending-probe:1')
+    const probe = Promise.withResolvers<SessionPersistenceRevision>()
+    const probeStarted = Promise.withResolvers<undefined>()
+    const projection = Promise.withResolvers<never>()
+    const projectionStarted = Promise.withResolvers<undefined>()
+    const controller = new AbortController()
+    ctx.provide('sessionPersistence', {
+      list: async () => [{ header: meta }],
+      listHeaders: async () => [meta],
+      locate: () => undefined,
+      readPage: async (): Promise<SessionPersistencePage> => ({
+        meta, revision, events: [userMessage(1, 'tail')], startSeq: 1, endSeq: 1,
+        hasMore: true, nextCursor: 'pending-next' as never, uncompressedBytes: 512,
+      }),
+      revision: async (_id: SessionId, signal?: AbortSignal) => {
+        probeStarted.resolve(undefined)
+        const value = await probe.promise
+        signal?.throwIfAborted()
+        return value
+      },
+    } as never)
+    ctx.provide('sessionQuery', {
+      observeSession: async () => {
+        projectionStarted.resolve(undefined)
+        return await projection.promise
+      },
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+    let pending: ReturnType<typeof api.sessions.history> | undefined
+    let settled = false
+    try {
+      pending = api.sessions.history(request({ sessionId, detail: 'conversation', maxMessages: 1 }), controller.signal)
+      void pending.then(() => { settled = true }, () => { settled = true })
+      await Promise.all([probeStarted.promise, projectionStarted.promise])
+      const failure = outcome === 'cancelled' ? new DOMException('Browser disconnected', 'AbortError') : new Error('projection read failed')
+      if (outcome === 'cancelled') controller.abort(failure)
+      projection.reject(failure)
+      // Let the rejected baseline and its request continuation finish their microtasks.
+      await nextEventLoopTurn()
+      expect(settled).toBe(false)
+      probe.resolve(revision)
+      const response = await pending
+      expect(response.result).toMatchObject({ ok: false, error: { code: outcome === 'cancelled' ? 'cancelled' : 'internal' } })
+      expect(ctx.sessions.get(sessionId)).toBeUndefined()
+    } finally {
+      projection.reject(new Error('fixture closed'))
+      probe.resolve(revision)
+      await pending
+      await ctx.fiber.dispose()
+    }
   })
 
   it('reuses a detached conversation tail through the persistence revision', async () => {

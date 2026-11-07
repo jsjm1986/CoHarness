@@ -74,10 +74,15 @@ function bench(
     pending?: ClientBundleRegistration[]
     defaultTransport?: boolean
     chunks?: Record<string, Factory | null>
+    /** Revision-specific chunk scripts, captured before any transport gate. */
+    chunkBundles?: Record<string, Factory | null>
+    /** Holds script-load completion after a chunk registers its factory. */
+    afterChunkRegistration?: (url: string) => Promise<void>
     /** Remaining transport rejections per URL (the `<script>` error event). */
     transportFailures?: Record<string, number>
     /** URLs whose script loads but registers only the listed ids (a runtime throw after those registrations). */
     registerOnly?: Record<string, string[]>
+    applicationBatches?: { url: string; entries: string[] }[]
   } = {},
 ): Bench {
   const fetched: string[] = []
@@ -87,6 +92,7 @@ function bench(
   const transportFailures = { ...opts.transportFailures }
   const loadBundle = async (url: string): Promise<void> => {
     fetched.push(url)
+    const declaredChunk = opts.chunkBundles?.[url]
     if (opts.gated?.includes(url) === true) {
       await new Promise<void>((resolve) => { gates.set(url, resolve) })
     }
@@ -98,15 +104,17 @@ function bench(
     if (sibling !== null) {
       const id = sibling[1] as string
       const chunk = sibling[2] as string
-      const factory = opts.chunks?.[`${id}/${chunk}`]
+      const factory = opts.chunkBundles !== undefined && Object.hasOwn(opts.chunkBundles, url)
+        ? declaredChunk : opts.chunks?.[`${id}/${chunk}`]
       if (factory != null) win.__ModuleLoader__?.load({ id, chunk, factory })
+      await opts.afterChunkRegistration?.(url)
       return
     }
-    const batchIds = url === BOOTSTRAP_URL
+    const batchIds = opts.applicationBatches?.find(batch => batch.url === url)?.entries ?? (url === BOOTSTRAP_URL
       ? entries.filter(entry => entry.initialUrl === BOOTSTRAP_URL).map(entry => entry.id)
       : url === APPLICATION_URL
         ? entries.filter(entry => entry.initialUrl === APPLICATION_URL).map(entry => entry.id)
-        : undefined
+        : undefined)
     const parsed = new URL(url, 'http://dsh.invalid')
     const combo = parsed.search.startsWith('??') ? parsed.search.slice(2).split('&', 1)[0] : undefined
     const singleId = combo?.split(',').length === 1 && combo.endsWith('/client.js')
@@ -125,9 +133,11 @@ function bench(
     ...(bootstrapEntries.length === 0 ? [] : [{
       phase: 'bootstrap' as const, url: BOOTSTRAP_URL, rev: 'bootstrap', entries: bootstrapEntries,
     }]),
-    ...(applicationEntries.length === 0 ? [] : [{
+    ...(opts.applicationBatches?.map((batch, index) => ({
+      phase: 'application' as const, url: batch.url, rev: `application-${String(index)}`, entries: batch.entries,
+    })) ?? (applicationEntries.length === 0 ? [] : [{
       phase: 'application' as const, url: APPLICATION_URL, rev: 'application', entries: applicationEntries,
-    }]),
+    }])),
   ]
   const loader = target.create({
     boot: {
@@ -156,6 +166,36 @@ describe('Cordis plugin face', () => {
 })
 
 describe('lazy CJS arrival', () => {
+  it('materializes dependencies in graph order across independently arriving transport groups', async () => {
+    const shared = comboUrl(['base', 'consumer'], 'shared')
+    const optional = comboUrl(['optional'], 'optional')
+    const executed: string[] = []
+    const b = bench([
+      row('base', { initialUrl: shared }),
+      row('optional', { initialUrl: optional, external: ['base'] }),
+      row('consumer', { initialUrl: shared, external: ['optional'] }),
+    ], {
+      base: () => {
+        executed.push('base')
+        return { value: 'base' }
+      },
+      optional: (require) => {
+        const base = require('base') as { value: string }
+        executed.push('optional')
+        return { value: `${base.value}:optional` }
+      },
+      consumer: (require) => {
+        const dependency = require('optional') as { value: string }
+        executed.push('consumer')
+        return dependency
+      },
+    }, { applicationBatches: [{ url: shared, entries: ['base', 'consumer'] }, { url: optional, entries: ['optional'] }] })
+    expect(executed).toEqual([])
+    await expect(b.loader.import('consumer', '', {})).resolves.toEqual({ value: 'base:optional' })
+    expect(executed).toEqual(['base', 'optional', 'consumer'])
+    expect(b.fetched).toEqual([shared, optional])
+  })
+
   it('drains registrations queued by parser-blocking preload scripts into the same live facade', async () => {
     const b = bench([row('runtime')], {}, {
       pending: [{ id: 'runtime', factory: () => ({ marker: 'preloaded' }) }],
@@ -318,6 +358,102 @@ describe('lazy CJS arrival', () => {
     const [left, right] = await Promise.all([first, second])
     expect(left).toBe(right)
     expect(b.fetched.filter(fetched => fetched === url)).toHaveLength(1)
+  })
+
+  it('loads a published chunk at its executable revision', async () => {
+    const revision = 'a'.repeat(64)
+    const b = bench([row('a', { chunks: { 'client.terminal.js': revision } })], {
+      a: req => ({ load: () => req.async('./client.terminal.js') }),
+    }, { chunks: { 'a/client.terminal.js': () => ({ marker: 'terminal' }) } })
+    const entry = await b.loader.import('a', '', {}) as { load: () => Promise<unknown> }
+    await expect(entry.load()).resolves.toEqual({ marker: 'terminal' })
+    expect(b.fetched.at(-1)).toBe(chunkUrl('a', 'client.terminal.js', revision))
+  })
+
+  it('rejects a relative chunk absent from its published table', async () => {
+    const b = bench([row('a', { chunks: {} })], {
+      a: req => ({ load: () => req.async('./client.terminal.js') }),
+    })
+    const entry = await b.loader.import('a', '', {}) as { load: () => Promise<unknown> }
+    await expect(entry.load()).rejects.toThrow('absent from its owner\'s published chunk table')
+    expect(b.fetched).toEqual([APPLICATION_URL])
+  })
+
+  it('uses the owner URL until a replacement revision has a matching graph chunk table', async () => {
+    const b = bench([row('a', { chunks: { 'client.terminal.js': 'a'.repeat(64) } })], {
+      a: req => ({ load: () => req.async('./client.terminal.js') }),
+    }, { chunks: { 'a/client.terminal.js': () => ({ marker: 'replacement' }) } })
+    const stale = await b.loader.import('a', '', {}) as { load: () => Promise<unknown> }
+    b.loader.invalidate('a', 'replacement')
+    await expect(stale.load()).resolves.toEqual({ marker: 'replacement' })
+    expect(b.fetched.at(-1)).toBe(chunkUrl('a', 'client.terminal.js', 'replacement'))
+  })
+
+  it('settles an obsolete same-URL arrival before any waiter materializes replacement code', async () => {
+    const revision = 'a'.repeat(64)
+    const url = chunkUrl('a', 'client.terminal.js', revision)
+    const gated = [url]
+    let registered!: () => void
+    const firstRegistration = new Promise<void>((resolve) => { registered = resolve })
+    let finish!: () => void
+    const finishFirstTransport = new Promise<void>((resolve) => { finish = resolve })
+    let registrations = 0
+    const materialize = vi.fn(() => ({ marker: 'current' }))
+    const b = bench([row('a', { chunks: { 'client.terminal.js': revision } })], {
+      a: req => ({ load: () => req.async('./client.terminal.js') }),
+    }, {
+      gated,
+      chunks: { 'a/client.terminal.js': materialize },
+      afterChunkRegistration: async () => {
+        if (++registrations !== 1) return
+        registered()
+        await finishFirstTransport
+      },
+    })
+    const old = await b.loader.import('a', '', {}) as { load: () => Promise<unknown> }
+    const first = old.load()
+    const second = old.load()
+    b.gates.get(url)!()
+    await firstRegistration
+    b.loader.invalidate('a')
+    const current = await b.loader.import('a', '', {}) as { load: () => Promise<unknown> }
+    const third = current.load()
+    const fourth = current.load()
+    gated.length = 0
+    finish()
+
+    const results = await Promise.all([first, second, third, fourth])
+    for (const result of results) expect(result).toBe(results[0])
+    expect(await current.load()).toBe(results[0])
+    expect(b.loader.loadCache.get('a/client.terminal.js')?.exports).toBe(results[0])
+    expect(materialize).toHaveBeenCalledTimes(1)
+    expect(b.fetched.filter(fetched => fetched === url)).toHaveLength(2)
+  })
+
+  it('does not publish changed-code leftovers from a delayed older chunk URL', async () => {
+    const oldUrl = chunkUrl('a', 'client.terminal.js', 'a'.repeat(64))
+    const nextUrl = chunkUrl('a', 'client.terminal.js', 'changed')
+    const oldFactory = vi.fn(() => ({ marker: 'old' }))
+    const nextFactory = vi.fn(() => ({ marker: 'new' }))
+    const b = bench([row('a', { chunks: { 'client.terminal.js': 'a'.repeat(64) } })], {
+      a: req => ({ load: () => req.async('./client.terminal.js') }),
+    }, {
+      gated: [oldUrl],
+      chunkBundles: { [oldUrl]: oldFactory, [nextUrl]: nextFactory },
+    })
+    const old = await b.loader.import('a', '', {}) as { load: () => Promise<unknown> }
+    const oldLoad = old.load()
+    b.loader.invalidate('a', 'changed')
+    const current = await b.loader.import('a', '', {}) as { load: () => Promise<unknown> }
+    const newLoad = current.load()
+    expect(b.fetched).not.toContain(nextUrl)
+    b.gates.get(oldUrl)!()
+    const [left, right] = await Promise.all([oldLoad, newLoad])
+    expect(left).toBe(right)
+    expect(right).toEqual({ marker: 'new' })
+    expect(oldFactory).not.toHaveBeenCalled()
+    expect(nextFactory).toHaveBeenCalledTimes(1)
+    expect(await current.load()).toBe(right)
   })
 
   it('uses a pending replacement revision for a stale entry closure', async () => {
@@ -631,6 +767,19 @@ describe('failure modes', () => {
 })
 
 describe('boot manifest wire', () => {
+  it('carries optional chunk revisions and rejects malformed chunk tables', () => {
+    const wire = {
+      rev: 'graph', entries: [{ id: 'a', url: '/a', rev: '1', chunks: { 'client.lazy.js': 'a'.repeat(64) } }],
+      batches: [{ phase: 'application', url: '/batch.js', rev: 'batch', entries: ['a'] }],
+    }
+    expect(parseBootManifest(wire).modules[0]!.chunks).toEqual(wire.entries[0]!.chunks)
+    for (const chunks of [
+      null, [], 'bad', { '../client.lazy.js': 'a'.repeat(64) }, { 'client.lazy.js': 'bad' }, { 'client.lazy.js': 3 },
+    ]) {
+      expect(() => parseBootManifest({ ...wire, entries: [{ ...wire.entries[0], chunks }] })).toThrow('chunks')
+    }
+  })
+
   it('normalizes absent shared-module fields and carries the declared ones', () => {
     const manifest = parseBootManifest({
       rev: 'graph',

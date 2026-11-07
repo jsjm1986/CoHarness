@@ -25,6 +25,7 @@ const MODE = webSnapshotMode()
 interface DraftInitHandle {
   initializations(): number
   startSession(workspaceId: string | undefined, options: { prompt?: string; clearPreviousDraft?: boolean }): void
+  selectedIn(workspaceId: string | undefined): string | undefined
   reusable(workspaceId: string | undefined, sessionId: string | undefined): boolean
 }
 
@@ -77,6 +78,18 @@ describe('web e2e: Session draft initialization', () => {
       const value = localStorage.getItem('dsh.sessions.current')
       return value === null ? undefined : (JSON.parse(value) as { sessionId?: string }).sessionId
     })
+  }
+
+  /**
+   * The selection once it belongs to the Workspace the gesture started: an
+   * ambient startup restore can publish a foreign Session first, so a plain
+   * `selected()` read can capture a Session the test did not start.
+   */
+  async function selectedIn(page: Page, workspaceId: string): Promise<string | undefined> {
+    return page.evaluate(
+      wid => (window as typeof window & { __draftInit?: DraftInitHandle }).__draftInit?.selectedIn(wid),
+      workspaceId,
+    )
   }
 
   async function composerText(page: Page): Promise<string> {
@@ -138,7 +151,7 @@ describe('web e2e: Session draft initialization', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-draft-init-plain'))
 
     await startSession(page, wid, {})
-    await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBeUndefined()
+    await expect.poll(() => selectedIn(page, wid), { timeout: 15_000 }).not.toBeUndefined()
     await expect.poll(() => composerText(page)).toBe('')
   })
 
@@ -147,10 +160,9 @@ describe('web e2e: Session draft initialization', () => {
     await writeFile(join(scaffold.workspaceCwd, 'structured', 'reference target.md'), 'draft reference\n')
     const page = await openPage()
     onTestFailed(() => saveFailureShot(page, 'web-e2e-draft-init-reference'))
-    const previous = await selected(page)
     await startSession(page, wid, {})
-    await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBe(previous)
-    const sessionId = await selected(page)
+    await expect.poll(() => selectedIn(page, wid), { timeout: 15_000 }).not.toBeUndefined()
+    const sessionId = await selectedIn(page, wid)
     const input = page.locator('textarea:enabled').first()
     await input.fill('@reference')
     const menu = page.getByRole('listbox', { name: 'Trigger suggestions', exact: true })
@@ -214,8 +226,18 @@ describe('web e2e: Session draft initialization', () => {
     const page = await openPage()
     onTestFailed(() => saveFailureShot(page, 'web-e2e-draft-init-admission-failure'))
     await startSession(page, wid, {})
-    await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBeUndefined()
-    const sessionId = await selected(page)
+    await expect.poll(() => selectedIn(page, wid), { timeout: 15_000 }).not.toBeUndefined()
+    const sessionId = await selectedIn(page, wid)
+    onTestFailed(async () => {
+      if (sessionId === undefined) return
+      const types = (await hostEvents(sessionId)).map(event => event.type)
+      const live = scaffold.ctx.sessions.get(SessionId(sessionId))
+      const agent = scaffold.ctx.agents.get(SessionId(sessionId))
+      console.log('[draft-init] host events at failure:', sessionId, JSON.stringify(types),
+        'live:', live === undefined ? 'unattached' : JSON.stringify(live.snapshotEvents().map(event => event.type)),
+        'agent:', agent === undefined ? 'none'
+          : `session===live:${agent.session === live} ${JSON.stringify(agent.session.snapshotEvents().map(event => event.type))}`)
+    })
     const stop = scaffold.ctx.on('agent/pre-step', ({ agent }, next) => {
       if (agent.id === sessionId) throw new Error('The workspace is unavailable before input admission.')
       return next()

@@ -7,9 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-协议消费层：客户端插件的 apply 会挂载 `ctx.connection`（共享 API 客户端 + 当前页面的 loopback 状态 + 可观察且按 generation 生效的 `hostDescription` + 单消费方流循环启动器）；导出表层携带协议约定类型、`AbstractApiClient` 抽象，以及循环的 sink／配置类型。每次就绪握手成功后，都会在 `onConnected` 之前发布完整的 `host.describe` 值；握手完成前收到的帧会一直缓存到该回调返回，使重连消费者可以先清理旧 generation 状态，再接收重放的交互。generation 失效或显式 stop 会清空它，因此原生能力消费者不会保留已经断线的判断。浏览器载体以 HTTP POST 发送 unary／respond，并为 `events.mux` 与 `events.host` 各开一条只下行的 WebSocket；进程内载体满足同一双流抽象。Host half 持有唯一 `/api` route 及其 Fetch bridge；已注册的 Typert interceptor 会先认领自己的 Remote endpoint，未认领请求再回退 API Proxy。Loopback hostname 判定逻辑留在包内部：`/api` Host fence 与 WebSocket upgrade 会直接使用它，其他客户端插件则消费派生的 `ctx.connection.isLoopback` 状态。node 半侧的 `/api` 路由让特权方法集（`host.pickDirectory`、`host.openPath`，以及整个配置面——`settings.describe`/`openDocument`/`update`/`replace`/`mutate` 与 `credentials.describe`/`set`/`unset`；读取与原生操作也在内，因为 describe 会返回已暴露的配置、打开操作会作用于 Host 桌面，而探测任意引用会报出某条凭据来自何处——以及 agent（智能体） preset 的创作面——`agentPresets/read`、`agentPresets/copy`、`agentPresets/deletePreset` 与仅存的 `agentPreset.openDocument` RPC，以及 Remote 载体上的 `llm/discoverModels`（与其 dotted 同名方法并列）——因为组装指明了一个会话所运行的插件，读取它是侦察，而 copy/delete/openDocument 管理名单并驱动宿主桌面（创作只有复制一种写入，因此这些方法都不接收组装文本或路径）；`agentPresets/list` 与 `agentPresets/select` 不在其中——名单只携带 id 与信任级别，而选择一个 preset 并不比 `session.create` 自带的 `agentPreset` 多给任何能力，何况默认 preset 本就带着 bash）以空信任表过信任 fence，从而钉在回环——已声明的 `trustedHosts` 授权可达其余全部方法，而这些方法在真正的认证层出现之前仍只限回环本机。平台载体与 ConnectionController 循环属于包内部；apply 负责选择并驱动它们。下行边界见 [WebSocket 下行载体 Agent Note](../../../.agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.zh.md)。
-
-标签页通过 `maxConcurrentEntryRequests` 限制入口请求并发数。账号、Runtime 和操作参数共同标识可复用的请求。关闭一个视图只取消该读者，最后一个读者离开时才释放请求。
+协议消费层：客户端插件的 apply 会挂载 `ctx.connection`（共享 API 客户端 + 当前页面的 loopback 状态 + 可观察且按 generation 生效的 `hostDescription` + 单消费方流循环启动器）；导出表层携带协议约定类型、`AbstractApiClient` 抽象，以及循环的 sink／配置类型。每次就绪握手成功后，先调用 `onBeforeConnected`，再发布 connected 状态和完整的 `host.describe` 值，随后调用 `onConnected`；缓存帧仍保留到该回调返回。消费者在描述订阅者恢复私有资源前撤回旧 generation 状态。在第一个回调中停止或替换 generation 会阻止其发布。generation 失效或显式 stop 会清空它，因此原生能力消费者不会保留已经断线的判断。浏览器载体以 HTTP POST 发送 unary／respond，并为 `events.mux` 与 `events.host` 各开一条只下行的 WebSocket；进程内载体满足同一双流抽象。Host half 持有唯一 `/api` route 及其 Fetch bridge；已注册的 Typert interceptor 会先认领自己的 Remote endpoint，未认领请求再回退 API Proxy。Loopback hostname 判定逻辑留在包内部：`/api` Host fence 与 WebSocket upgrade 会直接使用它，其他客户端插件则消费派生的 `ctx.connection.isLoopback` 状态。node 半侧的 `/api` 路由让特权方法集（`host.pickDirectory`、`host.openPath`，以及整个配置面——`settings.describe`/`openDocument`/`update`/`replace`/`mutate` 与 `credentials.describe`/`set`/`unset`；读取与原生操作也在内，因为 describe 会返回已暴露的配置、打开操作会作用于 Host 桌面，而探测任意引用会报出某条凭据来自何处——以及 agent（智能体） preset 的创作面——`agentPresets/read`、`agentPresets/copy`、`agentPresets/deletePreset` 与仅存的 `agentPreset.openDocument` RPC，以及 Remote 载体上的 `llm/discoverModels`（与其 dotted 同名方法并列）——因为组装指明了一个会话所运行的插件，读取它是侦察，而 copy/delete/openDocument 管理名单并驱动宿主桌面（创作只有复制一种写入，因此这些方法都不接收组装文本或路径）；`agentPresets/list` 与 `agentPresets/select` 不在其中——名单只携带 id 与信任级别，而选择一个 preset 并不比 `session.create` 自带的 `agentPreset` 多给任何能力，何况默认 preset 本就带着 bash）以空信任表过信任 fence，从而钉在回环——已声明的 `trustedHosts` 授权可达其余全部方法，而这些方法在真正的认证层出现之前仍只限回环本机。平台载体与 ConnectionController 循环属于包内部；apply 负责选择并驱动它们。下行边界见 [WebSocket 下行载体 Agent Note](../../../.agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.zh.md)。
 
 `ConnectionHandle.forTarget(target)` 会为经过认证的 Gateway 运行时目标创建独立的浏览器 API 和流所有者。目标会作为 `dshTarget` 选择器附在 HTTP、WebSocket 和通用 RPC 请求上；调用方仍必须从账户目录取得目标，Gateway 会在签发 principal 前重新校验成员关系。
 
@@ -21,7 +19,11 @@ kind: "package-reference"
 
 一个页面固定其已验证的 Gateway 账号。只有文档身份约束拥有连接时，才提供可选的 `onPrincipalChange` 清理回调；显式传输和 fixture carrier 不声明这一能力。fetch 包装仅覆盖同源 `/api` 和 `/account/api/` 请求，携带 `x-dsh-expected-principal-id`；socket 等待首次 HTTP 身份结果后携带 `dshPrincipal` 建连。Gateway 将其与已认证用户比较，并返回 `x-dsh-principal-id`。明确不一致、认证被撤销或引导运行时访问被拒绝时，旧请求先中止，Runtime 所有的 Session 与 slot 状态撤下，然后重载页面。临时连接失败导致身份缺失不会被当成另一个账号。不带预期身份字段的旧客户端继续遵守服务端授权。
 
-解码后的 Host 描述先固定页面的引导 runtime，再开放依赖作用域的请求与 socket。未显式指定 runtime 的请求使用该固定目标，包括项目活动分页；其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；池化连接使用自身的 Runtime，不采用首页目标。显式指定文档电脑的地址和公共链接保留原目标。
+已认证的 Gateway HTML 提供带版本的账号 ID 与 Runtime 目标，在网络初始化之前固定页面。两条事件 socket 与 `host.describe` 可以并行建立，但描述校验与两条物理连接全部成功后，业务帧和连接基线才会可见。账号或描述中的 Runtime 不一致会撤下页面。存在但畸形的输入会使插件加载失败；输入缺省时保留先描述、后建连的握手。fixture 与显式载体忽略这份 HTTP 输入。未显式指定 runtime 的请求使用该固定目标，包括项目活动分页；其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；公共链接保持不变。
+
+`ConnectionHandle.documentIdentity` 提供已校验的账号与初始 Runtime，用于划分浏览器状态的存储命名空间。独立页面、fixture 与显式载体不提供该值。派生目标 handle 共享原始页面的身份，该值不授予目标访问权限。
+
+fetch 包装把原生请求拒绝标识为 `ApiTransportError`，状态为 `0`、代码为 `request-unavailable`；它保留原因且不重试。这只标识未收到 HTTP 响应，不表示已诊断为断网或已知服务端结果。已取消的请求保留 signal 的原因；身份失败和响应解码缺陷不归类为网络失败。HTTP 与 RPC 失败语义见 [fetch 传输器](../../host/apiproxy/README.zh.md)。
 
 ## 概述
 
@@ -65,7 +67,11 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 
 `/api/events.mux` 与 `/api/events.host` 各接受一条 WebSocket upgrade，并只向浏览器发送对应的 `ServerRequest` 文本消息；客户端不会在这些 socket 上发送业务数据。任一 socket 结束都会使当前 connection generation 失败并重建两条流，连接就绪仍要求两条 socket 均已打开且 `host.describe` HTTP 调用成功。Host teardown 会终止两条 socket、中止各自的 source，并等待 source 清理完成后再返回。普通网络 GET 这些路径会返回 426，不保留 SSE（Server-Sent Events）回退；`toFetchHandler` 的 SSE 编解码只服务进程内同构载体。
 
-`connection/request` 是 Host 侧包围每个已通过浏览器信任栅栏请求的 waterfall。它接收请求进入时的 Node header，以及取值为 `http` 或 `upgrade` 的 `kind`，并在 RPC 分发或事件流开启前完成。认证与请求上下文监听器必须将 header 视为不可变值，并调用 `next()` 让独立插件组合；不委托会阻止后续监听器与载体处理器运行。
+`onFailure` 保留原始 `kind` 和 `error`，并为首次非预期终结附加可选 `diagnostic` 元数据：来源、固定原因分类、opening／connected 阶段、相对耗时，以及可取得的 WebSocket `closeCode`／`wasClean`。普通流 EOF 会报告不带 HTTP 状态的固定 transport error；正常 Client 取消不报告故障。重试 warning 只包含这份元数据，不包含 URL、query、关闭原因文本、错误文本、payload 或 Session ID。`clientGeneration` 仅统计当前 Controller 的连接尝试，不代表 Host 进程代次；关闭码本身不能定位 TLS、代理或服务端故障。首次故障归因的理由见[载体决策](../../../.agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.zh.md)。
+
+`connection/request` 是 Host 侧包围每个已通过浏览器信任栅栏请求的 waterfall。它接收请求进入时的 Node header，以及取值为 `http` 或 `upgrade` 的 `kind`，并在 RPC 分发或事件流开启前完成。认证与请求上下文监听器必须将 header 视为不可变值，并调用 `next()` 让独立插件组合；不委托会阻止后续监听器与载体处理器运行。 upgrade 分发还提供由 socket 所有的 `signal`，在关闭或错误时中止；保留事件流权限的监听器必须使用该信号作为生命周期，而不能使用 waterfall 完成时间。
+
+Host 配置项 `serverTiming: true` 为 ApiProxy 回退 POST 响应添加固定名称的数值 `Server-Timing` 指标，默认为 `false`。`dsh_conn` 从 Runtime 请求通过信任检查后开始，覆盖请求上下文 waterfall、请求体接收及响应构造；`dsh_rpc` 覆盖一元负载校验、调用及 JSON 构造。waterfall 前的浏览器信任拒绝、Gateway 处理、网络传输、响应体消费、GET 流／下载和已注册 Remote 路由不在这些计时内。响应头不包含请求标识、路径或内容。Gateway 根据 `HGW_PERFORMANCE_ENABLED` 提供该选项；[计时决策](../../../.agents/notes/implemented/architecture/2026-10-26-runtime-unary-timing.zh.md)定义解读方式。
 
 <a id="model-experience"></a>
 ## 模型体验

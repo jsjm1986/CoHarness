@@ -35,6 +35,7 @@ function bench() {
   const session = createSnapshotStore<ConversationSnapshot>(snapshotOf({ openTurn: 1 }))
   const list = createSnapshotStore<SessionListState>({
     ids: [SID], byId: { [SID]: summary() }, archivedById: {}, current: SID, phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const binding = { sessionId: SID, session } as unknown as SessionBinding

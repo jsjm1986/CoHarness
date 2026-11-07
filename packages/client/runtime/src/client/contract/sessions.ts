@@ -95,8 +95,21 @@ export interface ISessions {
   readonly list: ObservableSnapshot<SessionListState>
   /** Current authenticated space list; unlike list, it excludes staged workbench targets. */
   readonly currentScopeList?: ObservableSnapshot<SessionListState>
+  /**
+   * Refresh the authenticated current space's Session baseline, sharing an in-flight pull.
+   * Additional workbench targets are unaffected. Failures remain in list state/error;
+   * the arrival phase and previously received rows stay available.
+   * @returns completion of the current or newly started attempt; account withdrawal completes without a read.
+   */
+  refresh(): Promise<void>
   /** Atomic current-session provide projection (the renderer host's `sessions.provideInfo` feed). */
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  /**
+   * Monotonic revision after bundle acquisition, final release, provider-roster changes,
+   * or runtime ownership changes. Explicit Session selectors reread `provideInfoFor`
+   * and retain an unchanged bundle's identity. Older hosts may omit this source.
+   */
+  readonly provideInfoRevision?: HostObservable<number>
   /** Resolve the standard-props bundle without selecting or staging a Session.
    * @param id - listed or retained Session identity.
    * @returns the bundle, or undefined when the identity cannot be resolved.
@@ -109,10 +122,13 @@ export interface ISessions {
    */
   readonly searchResultLimit: number
   /**
-   * Select a session as current.
+   * Select a session as current. Explicit selection publishes the Session's
+   * live Agent on the Host; automatic selection paths (startup restore,
+   * retained panes) pass `activate: false` so their presentations stay cold.
    * @param id - session id (must exist in the list; unknown ids fail loud).
+   * @param options - `activate: false` keeps the presented Session cold.
    */
-  open(id: SessionId): void
+  open(id: SessionId, options?: { activate?: boolean }): void
   /**
    * Open a healthy catalog child through its exact direct-parent address.
    * @param address - catalog-derived parent and child ids.
@@ -256,9 +272,10 @@ export interface ISessions {
    */
   createPreparedSession?(target: SessionRuntimeTarget, options: import('./session-create.ts').SessionCreateOptions, signal: AbortSignal): Promise<{ sessionId: SessionId; workspace: WorkspaceView }>
   /** Discover an account-visible Session in its target runtime before retaining history.
+   * Concurrent verification shares a pending Workspace read; later calls repull after settlement.
    * @param target - account runtime that owns the session's workbench binding.
    * @param id - listed session identity to materialize.
-   * @param signal - cancels discovery without releasing other consumers of the runtime.
+   * @param signal - cancels only this discovery; absent callers use the runtime lifetime.
    * @returns true for a listed, unarchived Session; metadata or authorization failures reject.
    */
   ensureSession?(target: SessionRuntimeTarget, id: SessionId, signal?: AbortSignal): Promise<boolean>
@@ -270,6 +287,8 @@ export interface ISessions {
    */
   createSession?(target: SessionRuntimeTarget, signal?: AbortSignal, options?: import('./session-create.ts').SessionCreateOptions): Promise<SessionId>
   /** Reconcile the bootstrap connection with the account's current scope.
+   * The first declaration preserves startup navigation; later target changes supersede it.
+   * Previously cancelled user navigation remains cancelled.
    * @param target - runtime the account scope now resolves to.
    */
   setBaseRuntimeTarget?(target: SessionRuntimeTarget): void

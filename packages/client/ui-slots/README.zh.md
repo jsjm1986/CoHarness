@@ -29,7 +29,7 @@ store 家族（输入 `defineStore` 规范／输出 `StoreHandle<T, A>`）为 st
 
 `SlotCore` 在构造时预置 `'root'` slot，并强制执行加载时验证（注册未声明 slot、重复声明子项、在两个 scope 下使用同一个共享 handle、chain 注册缺少 `select`，这些情况都在 register 时抛出）。条目的 disposer 会递归移除其声明的子 slot：账本行、贡献和 store 挂载都会随同一生命周期结束而移除。每个 key 还携带一个 declaration epoch（声明代次），它只在声明与移除时递增；运行时将其用于 [`ctx.slots.inject`](../runtime/README.zh.md#slot-declaration-injection)，且与普通条目版本相互独立。`renderer.ts` 携带安装约定（`SlotRenderer`、`SlotRendererHost`）以及 `StaleAuthorizationError`／`SlotOwnershipError`；ui-renderer 同时持有实现及其插件生命周期安装。实时检视使用严格区分的 `type: 'slot' | 'factory'` 节点，并将 Factory 的子 Slot 嵌套在其定义之下；Factory 崩溃走普通监督通道上报，且幂等 effect 仅在 React 提交之后才保留各渲染位置的 Store handle。定义／occurrence 模型见 [Component Factories 笔记](../../../.agents/notes/implemented/architecture/2026-09-10-component-factories-and-local-slots.zh.md)。
 
-`SessionAreaProps.sessionId` 可将 SessionProvider 显式绑定到某个 Session。省略时跟随当前选择；无法解析的 ID 渲染空分支。渲染器解析该 Session 的 provide bundle（含 projection 和 input 数据源），并通过现有 provide 通知通道观察提供方 roster 变化。
+`SessionAreaProps.sessionId` 可将 SessionProvider 显式绑定到某个 Session。省略时跟随当前选择；无法解析的 ID 渲染空分支。渲染器解析该 Session 的 provide bundle（含 projection 和 input 数据源）。Host 可提供 `sessions.provideInfoRevision`，独立于当前选择通知 bundle 的安装、移除与提供方 roster 变化；未提供时使用当前 bundle 通知。选择器保持其他窗格未变 bundle 的身份。
 
 ## 概述
 

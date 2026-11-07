@@ -77,12 +77,15 @@ describePg('archive Runtime namespace migration', () => {
         : 'SELECT to_jsonb(row) record FROM harness.conversation_archive_file_cleanup row ORDER BY id')).rows,
     })
     const before = await history(false)
-    const through97 = join(root!, 'through97')
-    await mkdir(through97)
-    for (const name of await readdir(migrations)) if (/^\d+.*\.sql$/u.test(name) && Number(name.slice(0, 3)) <= 97) await copyFile(join(migrations, name), join(through97, name))
-    expect(await runMigrations(db, through97)).toEqual({ applied: [97], current: 97 })
-    expect(await history(true)).toEqual(before)
-    expect(await runMigrations(db, through97)).toEqual({ applied: [], current: 97 })
+    const through97 = await mkdtemp(join(tmpdir(), 'archive-through-namespace-'))
+    try {
+      for (const name of await readdir(migrations)) if (/^\d+.*\.sql$/u.test(name) && Number(name.slice(0, 3)) <= 97) await copyFile(join(migrations, name), join(through97, name))
+      expect(await runMigrations(db, through97)).toEqual({ applied: [97], current: 97 })
+      expect(await history(true)).toEqual(before)
+      expect(await runMigrations(db, through97)).toEqual({ applied: [], current: 97 })
+    } finally { await rm(through97, { recursive: true, force: true }) }
+    // The service runs against the current schema: later namespace migrations add the
+    // generated `runtime_namespace` columns its detail reads join on.
     await runMigrations(db, migrations)
     const legacy = (await db.query<{ archive_id: ConversationArchiveId; root_session_id: string; runtime_id: RuntimeId | null }>('SELECT archive_id,root_session_id,runtime_id FROM harness.conversation_archive_records ORDER BY root_session_id')).rows
     expect(new Set(legacy.map(row => row.archive_id)).size).toBe(3)

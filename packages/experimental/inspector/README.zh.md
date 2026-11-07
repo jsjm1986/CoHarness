@@ -35,9 +35,9 @@ kind: "package-reference"
 
 组合包将 `experimental-inspector` 设置为 `disabled: false`，并设置 `captureFetch: true`。Host 可选的 `--inspect` 参数处理仅负责打开外部 Chrome 窗口，不控制 Inspector 是否运行。
 
-启用此组件后，按 **Ctrl/Cmd+Shift+.** 可展开或收起整宽底部面板中的 **NodeJS 诊断**，无需选中 Session。拖动上边缘可调整面板高度，占用上方内容的可用空间；收起和切换页面时保留所选高度。聚焦分隔条后也可使用上/下方向键、Home 和 End。iframe 首次展开时加载，收起、切换 Session 或主面板时保持挂载；卸载此组件会重置前端。X 按钮和快捷键会在原打开控件仍连接时恢复其焦点。iframe 自动连接当前 Host 并打开 Console；不包含手动 Connection 面板。每个内嵌前端的 Console、Sources 和 Cordis 树只显示 Host 与嵌入它的页面所对应的 Client；打印的 `devtools://` 链接仍显示全部 Client。
+启用此组件后，按 **Ctrl/Cmd+Shift+.** 可展开或收起整宽底部面板中的 **NodeJS 诊断**，无需选中 Session。拖动上边缘可调整面板高度，占用上方内容的可用空间；收起和切换页面时保留所选高度。聚焦分隔条后也可使用上/下方向键、Home 和 End。iframe 首次展开时加载，收起、切换 Session 或主面板时保持挂载；卸载此组件会重置前端。X 按钮和快捷键会在原打开控件仍连接时恢复其焦点。iframe 自动连接当前 Host 并打开 Console；不包含手动 Connection 面板。每个内嵌前端的 Console、Sources 和 Cordis 树只显示 Host 与嵌入它的页面所对应的 Client。不符合 Client 检查条件的 origin 仍保留此面板，标注**仅 Host**，不显示任何 Client；打印的 `devtools://` 链接仍显示全部 Client。
 
-Host 在相对于应用根目录的 `inspector/devtools/devtools_app.html` 路径提供镜像后的 DevTools 前端，沿用现有 Web 登录鉴权。`inspector/devtools` 前缀重定向到该入口；GET 和 HEAD 提供文件，缺失资源返回 404，其他方法返回 405。其 `cdp` WebSocket 路由鉴权同一浏览器会话，只转发到当前 Inspector 的 Worker page target。底部面板将已声明的页面 `clientSourceId` 传给入口及自动 WebSocket 端点，重连时继续选择同一逻辑 Client。没有选择参数时包含全部 Client；指定 Client 不在线时保留 Host；空值或重复参数以 400 拒绝升级。显式 `ws` 或 `wss` query 参数覆盖自动端点及其选择范围。
+Host 在相对于应用根目录的 `inspector/devtools/devtools_app.html` 路径提供镜像后的 DevTools 前端，沿用现有 Web 登录鉴权。`inspector/devtools` 前缀重定向到该入口；GET 和 HEAD 提供文件，缺失资源返回 404，其他方法返回 405。其 `cdp` WebSocket 路由鉴权同一浏览器会话，只转发到当前 Inspector 的 Worker page target。底部面板将已声明的页面 `clientSourceId` 传给入口及自动 WebSocket 端点，重连时继续选择同一逻辑 Client。没有选择参数时包含全部 Client；指定 Client 不在线时保留 Host；`sourceScope=host` 排除全部 Client。空值、重复、无效参数，或同时指定 scope 与 Client 参数时，以 400 拒绝升级。显式 `ws` 或 `wss` query 参数覆盖自动端点及其选择范围。
 
 构建使用官方 `chrome-devtools-frontend@1.0.1638082` TypeScript 源码及根 workspace 固定的 [Vite 依赖](../../../package.json)。该 npm 快照是 Chromium 150 发布分支的祖先，不是其后续稳定版的逐字节副本。[源码配置](scripts/devtools/source.ts)与包清单共同固定版本。普通 npm 安装提供源码和工具链；构建不需要 appspot、下载或启动浏览器，也不需要提取 PAK。workspace 安装和发布包安装都不运行 DevTools 下载 hook。
 
@@ -54,7 +54,11 @@ Host 在基础设施进程准入前保留资源提供者，并在原生分配前
 
 Host 插件启动 Worker 并连接专用 `MessagePort`。Client 使用注入或主动获取的浏览器 source 参数，直接向 Worker 打开带鉴权的 WebSocket，不接收 DevTools URL。Chrome DevTools 连接 Worker 的 CDP WebSocket。每条 DevTools 连接在 Worker 中独占一个连接 Host 主线程的 `node:inspector.Session`，因此 Host JavaScript 暂停时仍可调试 Host。
 
+Client 在申请 source 或启动 collector 之前，按 Worker 的规则检查当前页面 origin：`localhost`、`127.0.0.1`、IPv6 loopback，或 `clientOrigins` 中的精确条目。Host 会在注入和主动获取的 bootstrap 数据中携带这些额外 origin。其他页面不创建 Client source、ingest socket 或重连定时器，也不提供 Client `ctx.inspector`；其底部面板采用仅 Host 范围。连接重置时会重新检查准入条件，先释放不再符合条件的既有 source，再替换面板。
+
 源码树遵循这些执行环境：`client/` 与 `host/` 提供镜像的适配器 entry path，`worker/` 只包含 Worker thread orchestration 与 Chrome protocol 状态，`shared/` 包含与环境无关的 Cordis 和 network model、规范化 realm 后端接口及内部 bridge protocol。Worker 侧 Client 与 Host 适配器镜像放在 `worker/realms/` 下；其中的 Client 适配器仍然在 Worker 中执行。
+
+Client 启动使用的 bootstrap、准入判断与异步加载的底部面板 source 选择逻辑分别导入。两条 Client 入口不经过合并的 Host/Worker 导出模块；[准入决策](../../../.agents/notes/implemented/bug-fix/2026-10-23-inspector-client-origin-admission.zh.md)说明 bundle 加载约束。
 
 Host 与 Client producer 发送内部观测记录，不发送 CDP 消息。记录包含 source generation、sequence、source 时钟时间、topic 和 JSON payload。Worker 验证每个进程或网络帧，独占 source 状态与保留历史，并把已识别 topic 转换成标准 CDP domain。
 
@@ -103,7 +107,7 @@ Worker 监听后，Host 会记录一个 `devtools://` URL。同一个 Worker 提
 <a id="observation-api"></a>
 ## 观测 API
 
-两个插件端都提供同一个服务：
+Host 与符合准入条件的 Client 端提供同一个服务：
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'

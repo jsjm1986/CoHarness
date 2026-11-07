@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
 import { ConversationNodeAssembler } from '../src/client/sessions/conversation-assembler.ts'
 import type {
-  ConversationEventInput, ConversationMatch, ConversationNodeContext,
+  ConversationEventInput, ConversationLocationDataSource, ConversationMatch, ConversationNodeContext,
   ConversationNodeDefinition, ConversationViewDefinition, ConversationViewNode,
 } from '../src/client/contract/conversation.ts'
 
@@ -95,6 +96,14 @@ function input(event: SessionEvent): ConversationEventInput {
   return { event, view: undefined }
 }
 
+function transient(seq: number, attempt = 'retiring'): ConversationEventInput {
+  return { event: {
+    type: 'assistant/live-chunk', seq, time: 1_700_000_000_000 + seq,
+    data: { attemptId: LlmAttemptId(attempt), turn: 1, step: 0,
+      chunk: { type: 'text-delta', index: 0, text: 'live' } },
+  }, view: undefined }
+}
+
 function chatSnapshot(assembler: ConversationNodeAssembler): TestSnapshot | undefined {
   return assembler.snapshot('chat') as TestSnapshot | undefined
 }
@@ -124,6 +133,208 @@ function fallbackDefinition(start: () => string): ConversationNodeDefinition<str
 }
 
 describe('ConversationNodeAssembler', () => {
+  it('retires a live attempt without replaying or rebuilding unrelated historical Contexts', () => {
+    const starts = vi.fn((_context: ConversationNodeContext<number>, match: ConversationMatch) => match.event.seq)
+    const updates = vi.fn((_context: ConversationNodeContext<number>, match: ConversationMatch) => match.event.seq)
+    const builds = vi.fn((context: ConversationNodeContext<number>) => node(context, context.state))
+    const matches = vi.fn((event: ConversationEventInput['event']) => {
+      if (event.type === 'user/message') return { id: String(event.seq), role: 'start' as const }
+      if (event.type === 'step/start') return { id: 'active', role: 'start' as const }
+      if (event.type === 'assistant/live-chunk' || event.type === 'assistant/message') {
+        return { id: 'active', role: 'update' as const }
+      }
+      return null
+    })
+    const definition: ConversationNodeDefinition<number> = {
+      kind: 'message', target: 'chat', match: matches, start: starts, update: updates, buildViewNode: builds,
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]), new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([
+      ...Array.from({ length: 240 }, (_, seq) => input(at(seq, 'user/message', {}))),
+      input(at(240, 'turn/start', { turn: 1 })),
+      input(at(241, 'step/start', { turn: 1, step: 0 })),
+    ], false)
+    assembler.flush()
+    const history = [...chatSnapshot(assembler)!.nodes.values()].slice(0, 240)
+    const attemptId = LlmAttemptId('settlement-probe')
+    assembler.append({ event: {
+      type: 'assistant/live-chunk', seq: 241.5, time: 1_700_000_000_242,
+      data: { attemptId, turn: 1, step: 0, chunk: { type: 'text-delta', index: 0, text: 'live' } },
+    }, view: undefined })
+    assembler.flush()
+    starts.mockClear()
+    updates.mockClear()
+    builds.mockClear()
+    matches.mockClear()
+
+    expect(assembler.settleAssistant(attemptId, input(at(242, 'assistant/message', { turn: 1, step: 0 })))).toBe('immediate')
+    assembler.flush()
+
+    expect(matches).toHaveBeenCalledTimes(1)
+    expect(starts).toHaveBeenCalledTimes(1)
+    expect(updates).toHaveBeenCalledTimes(1)
+    expect(builds).toHaveBeenCalledTimes(1)
+    for (const previous of history) expect(chatSnapshot(assembler)!.nodes.get(previous.key)).toBe(previous)
+    expect(chatSnapshot(assembler)!.nodes.get('7:messageactive')?.data).toBe(242)
+  })
+
+  it('removes transient-only Contexts and their published Location data without retaining stale Nodes', () => {
+    let dataSource: ConversationLocationDataSource<Readonly<ScopeProbeStepData> | undefined> | undefined
+    const definition: ConversationNodeDefinition<number> = {
+      kind: 'scope-probe', target: 'chat',
+      match: event => event.type === 'assistant/live-chunk' ? { id: event.data.attemptId, role: 'start' } : null,
+      start: (_context, match) => match.event.seq,
+      update: context => context.state,
+      buildViewNode: (context) => {
+        if (context.start?.location.kind === 'step') {
+          dataSource = context.start.location.step.data.source('scope-probe')
+        }
+        return node(context, context.state)
+      },
+      buildLocationData: (context, scope) => scope !== 'step' ? null : {
+        kind: 'step', turn: 1, step: 0, key: 'scope-probe', value: { value: context.state ?? -1 },
+      },
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]), new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([
+      input(at(0, 'turn/start', { turn: 1 })), input(at(1, 'step/start', { turn: 1, step: 0 })), transient(1.5),
+    ], false)
+    assembler.flush()
+    const data = (chatSnapshot(assembler)!.nodes.values().next().value?.data)
+    expect(data).toBe(1.5)
+    const snapshots: unknown[] = []
+    const source = dataSource!
+    const dispose = source.subscribe(() => { snapshots.push(source.getSnapshot()) })
+    try {
+      assembler.settleAssistant(LlmAttemptId('retiring'))
+      expect(assembler.flush()).toBe(true)
+      expect(chatSnapshot(assembler)!.order).toEqual([])
+      expect(source.getSnapshot()).toBeUndefined()
+      expect(snapshots).toEqual([undefined])
+      assembler.rebuildRegistry()
+      assembler.flush()
+      expect(chatSnapshot(assembler)!.order).toEqual([])
+      expect(assembler.settleAssistant(LlmAttemptId('retiring'))).toBe('none')
+    } finally { dispose() }
+  })
+
+  it('withdraws a Node whose remaining durable Context no longer has visible output', () => {
+    const definition: ConversationNodeDefinition<number> = {
+      kind: 'partial', target: 'chat',
+      match: event => event.type === 'step/start' || event.type === 'assistant/live-chunk'
+        ? { id: 'one', role: event.type === 'step/start' ? 'start' : 'update' } : null,
+      start: () => 0,
+      update: () => 1,
+      buildViewNode: context => context.state === 1 ? node(context, 'visible') : null,
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]), new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([input(at(0, 'step/start', { turn: 1, step: 0 })), transient(0.5)], false)
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toHaveLength(1)
+    assembler.settleAssistant(LlmAttemptId('retiring'))
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toEqual([])
+    assembler.append(transient(0.75, 'next'))
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toHaveLength(1)
+    assembler.settleAssistant(LlmAttemptId('next'))
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toEqual([])
+  })
+
+  it('rebinds predecessor readers after retiring their nearest transient-only Context', () => {
+    const owner: ConversationNodeDefinition<number> = {
+      kind: 'owner',
+      match: event => event.type === 'assistant/live-chunk'
+        ? { id: event.data.attemptId, role: 'start' }
+        : event.type === 'command/run' ? { id: String(event.seq), role: 'start' } : null,
+      start: (_context, match) => match.event.seq,
+      update: context => context.state,
+    }
+    const dependent: ConversationNodeDefinition<number> = {
+      kind: 'dependent', target: 'chat',
+      match: event => event.type === 'command/done' ? { id: 'one', role: 'start' } : null,
+      start: (_context, _match, reader) => reader.previous<number>('owner')?.state ?? -1,
+      update: context => context.state,
+      buildViewNode: context => node(context, context.state),
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([owner, dependent]), new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([
+      input(at(0, 'command/run', {})), transient(0.5), input(at(1, 'command/done', {})),
+    ], false)
+    assembler.flush()
+    expect([...chatSnapshot(assembler)!.nodes.values()][0]?.data).toBe(0.5)
+    assembler.settleAssistant(LlmAttemptId('retiring'))
+    assembler.flush()
+    expect([...chatSnapshot(assembler)!.nodes.values()][0]?.data).toBe(0)
+  })
+
+  it('withdraws a predecessor reader whose visible state disappears with its transient-only owner', () => {
+    const owner: ConversationNodeDefinition<number> = {
+      kind: 'owner',
+      match: event => event.type === 'assistant/live-chunk' ? { id: event.data.attemptId, role: 'start' } : null,
+      start: (_context, match) => match.event.seq,
+      update: context => context.state,
+    }
+    const dependent: ConversationNodeDefinition<number> = {
+      kind: 'dependent', target: 'chat',
+      match: event => event.type === 'command/done' ? { id: 'one', role: 'start' } : null,
+      start: (_context, _match, reader) => reader.previous<number>('owner')?.state ?? -1,
+      update: context => context.state,
+      buildViewNode: context => context.state === -1 ? null : node(context, context.state),
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([owner, dependent]), new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([transient(0.5), input(at(1, 'command/done', {}))], false)
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toHaveLength(1)
+    assembler.settleAssistant(LlmAttemptId('retiring'))
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toEqual([])
+  })
+
+  it('retains another attempt while retiring chunks installed by prepend and registry rebuild', () => {
+    const definition = fallbackDefinition(() => 'entry')
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]), new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([transient(1.5, 'second')], true)
+    assembler.flush()
+    assembler.prepend([transient(0.5, 'first')], false)
+    assembler.flush()
+    assembler.rebuildRegistry()
+    assembler.flush()
+    assembler.settleAssistant(LlmAttemptId('first'))
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toEqual(['8:fallback1.5'])
+    assembler.settleAssistant(LlmAttemptId('second'))
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toEqual([])
+  })
+
+  it('retires an unflushed baseline and rematches an existing durable settlement replacement', () => {
+    const definition = fallbackDefinition(() => 'entry')
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]), new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([transient(0.5), input(at(1, 'assistant/attempt', { turn: 1, step: 0 }))], false)
+    assembler.settleAssistant(LlmAttemptId('retiring'))
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toEqual(['8:fallback1'])
+    assembler.settleAssistant(LlmAttemptId('unknown'), input(at(1, 'assistant/attempt', { turn: 2, step: 1 })))
+    assembler.flush()
+    expect(chatSnapshot(assembler)!.order).toEqual(['8:fallback1'])
+  })
+
   it('appends through an exact business-id Context without replaying unrelated Contexts', () => {
     const starts = vi.fn((
       _context: ConversationNodeContext<{ callSeq: number; results: number }>,

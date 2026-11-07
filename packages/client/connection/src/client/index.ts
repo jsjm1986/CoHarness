@@ -4,6 +4,9 @@
  * controller with its sinks.
  */
 import { createBrowserIdentityFence, type BrowserIdentityFence } from './identity-fence.ts'
+import { parseDocumentIdentity, type ConnectionDocumentIdentity } from './document-identity.ts'
+
+export type { ConnectionDocumentIdentity } from './document-identity.ts'
 import { sessionAddressApi } from './session-api.ts'
 export { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -126,6 +129,7 @@ export interface ClientTransportHooks {
 interface ClientTransportGlobal {
   __DSH_TRANSPORT__?: ClientTransportHooks
   __DSH_CONNECTION_RECOVERY__?: unknown
+  __DSH_DOCUMENT_IDENTITY__?: unknown
   __DSH_CONNECTION_RPC_TIMEOUT_MS__?: unknown
 }
 
@@ -155,6 +159,8 @@ export interface ConnectionInstallOptions {
   readonly rpcTimeoutMs?: number
   /** Page location; omit for a non-browser composition. */
   readonly location?: ConnectionLocation
+  /** Authenticated HTML account/Runtime input; absent or non-browser carriers retain describe-first admission. */
+  readonly documentIdentity?: unknown
 }
 
 function targetKey(target: ConnectionRuntimeTarget): string {
@@ -168,6 +174,8 @@ function targetKey(target: ConnectionRuntimeTarget): string {
  * started handle the runtime pool drives instead of a second unstarted loop.
  */
 interface ConnectionShared {
+  /** Immutable page identity; target handles retain the originating document's identity. */
+  readonly documentIdentity?: ConnectionDocumentIdentity
   /** Fetch-identity fence for the page; absent in fixture or explicit-transport mode. */
   readonly identity?: BrowserIdentityFence
   root: ConnectionHandle | undefined
@@ -178,7 +186,7 @@ interface ConnectionShared {
   /** Translate declared Remote Session arguments to the wire form of their owning runtime. */
   mapRemote?: ((endpoint: string, args: Readonly<Record<string, unknown>>, scopeWire?: string) =>
   Readonly<Record<string, unknown>>) | undefined
-  /** Runtime target the bootstrap handshake verified; bounds the root handle's key. */
+  /** Runtime target established by authenticated HTML or the bootstrap handshake; bounds the root handle's key. */
   baseTarget?: ConnectionRuntimeTarget
   /** Subscribers notified when the bootstrap runtime target is declared. */
   targetListeners?: Set<(target: ConnectionRuntimeTarget) => void>
@@ -192,6 +200,8 @@ interface ConnectionShared {
  * is ready — connection stays consumer-agnostic).
  */
 export interface ConnectionHandle {
+  /** Authenticated HTML account and initial Runtime; absent for legacy, fixture, and explicit transports. */
+  readonly documentIdentity?: ConnectionDocumentIdentity
   /** Resolved connection budgets reused by entry metadata reads; configurable through connection.recovery. */
   readonly metadataTiming: { requestTimeoutMs: number; retryAfterMs: number }
   /** Document's configured ceiling on concurrent explicit Runtime preparations. */
@@ -372,6 +382,7 @@ function createConnectionHandle(
     metadataTiming: { requestTimeoutMs: bootstrapRecovery.generationReadyTimeoutMs, retryAfterMs: bootstrapRecovery.backoffMaxMs },
     entryRequestLimit: bootstrapRecovery.maxConcurrentEntryRequests,
     interactions,
+    ...(sharedState.documentIdentity === undefined ? {} : { documentIdentity: sharedState.documentIdentity }),
     wireApi: api,
     get api() { return sharedState.originalSession === undefined ? api : routedApi },
     ...(accountPreferences === undefined ? {} : { accountPreferences }),
@@ -515,6 +526,7 @@ function createConnectionHandle(
  * timing every later `start` merges over.
  * @param ctx - client Cordis context.
  * @param options - physical carrier, reconnect timing, and page location.
+ * @throws when supplied document identity is malformed for a browser HTTP install.
  */
 export function installConnection(ctx: Context, options: ConnectionInstallOptions = {}): void {
   const pageLocation = options.location
@@ -528,7 +540,12 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
   const identity = fixtureClient === undefined && transport === undefined && pageLocation?.origin !== undefined
     && /^https?:\/\//u.test(pageLocation.origin)
     ? createBrowserIdentityFence(nativeFetch, pageLocation.origin, () => { pageLocation.reload?.() }, pageLocation.search) : undefined
+  const documentIdentity = identity === undefined ? undefined : parseDocumentIdentity(options.documentIdentity)
   if (identity !== undefined) {
+    if (documentIdentity !== undefined) {
+      identity.confirm(documentIdentity.principalId)
+      identity.setRuntimeTarget(documentIdentity.runtimeTarget)
+    }
     globalThis.fetch = identity.fetch
     ctx.effect(() => () => {
       identity.dispose()
@@ -564,7 +581,11 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
     interactions,
     accountPreferences,
     projectModelSettings,
-    { root: undefined, handles: new Map(), ...(identity === undefined ? {} : { identity }) },
+    {
+      root: undefined, handles: new Map(),
+      ...(identity === undefined ? {} : { identity }),
+      ...(documentIdentity === undefined ? {} : { documentIdentity, baseTarget: documentIdentity.runtimeTarget }),
+    },
     undefined,
     carrier,
   )
@@ -586,6 +607,7 @@ export function apply(ctx: Context): void {
     ...(recovery === undefined ? {} : { recovery }),
     ...(rpcTimeoutMs === undefined ? {} : { rpcTimeoutMs }),
     ...(pageLocation === undefined ? {} : { location: pageLocation }),
+    ...(globals.__DSH_DOCUMENT_IDENTITY__ === undefined ? {} : { documentIdentity: globals.__DSH_DOCUMENT_IDENTITY__ }),
   })
 }
 

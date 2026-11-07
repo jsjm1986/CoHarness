@@ -13,6 +13,8 @@ kind: "package-reference"
 
 账户工作台在此对象层上增加惰性的 `SessionRuntimePool`。池只为当前账户聚合列表和标准 props 查询，每个目标运行时仍保留自己的 API client、ConnectionController、SessionManager、事件流和 scope 资源。目标只有在 Gateway 校验成员关系并签发绑定 generation 的 principal 后才会接入；移除面板只释放其引用，不会停止 Host 任务。独立消费方持有引用期间，目标连接继续保留。 Runtime 的来源快照、目标和可见会话集合都未变化时，复用该 Runtime 的会话列表。工作区通知只在草稿变化或前次写入需要重试时保存标签页恢复索引。
 
+已认证的浏览器页面将引导连接的选择保存到 `dsh.sessions.current.v2.<accountId>.<target>`，其中 `<target>` 为 `personal` 或 `project-<projectId>`。每个空间在初始列表请求期间并行恢复自己的历史，账号与 Runtime 基线仍决定其可见性。没有作用域记录的首次访问沿用历史优先的默认选择。未分作用域的浏览器记录保留但不被接纳；独立 Host、fixture 和显式载体继续使用 `dsh.sessions.current`。
+
 直接读取 JSON 的浏览器消费方共用 Host carrier 的流式 reader；它会在解析前拒绝声明长度或实际分块超过默认 16 MiB 的 body。该 helper 只负责传输上限，不替代端点自己的响应校验。
 
 对于每条可到达本地根 Agent 或可继续子 Agent 的提示词，运行时都会采样浏览器当前的 `Intl.DateTimeFormat().resolvedOptions().timeZone`，并只把该值附加到这一次 Session 或 subagent 提示词 RPC。该值既不缓存，也不包含在 Session 创建或 fork 状态中，因此旅行与并发标签页都能保留消息本地的来源信息。浏览器若无法提供非空时区，会在本地拒绝该提示词，而不会悄然使用部署状态代替。
@@ -32,6 +34,8 @@ kind: "package-reference"
 明确打开目录或 Session 时，通过现有账号范围接口准备已停止的受管 Runtime，目标为操作捕获的 UUID。请求不导航页面，也不更新共享选择 Cookie；元数据发现保持被动。取消信号与引导连接配置的元数据时限共同约束准备过程；返回其他目标时直接失败，不替换分配。
 
 从电脑入口新建对话时，`WorkspaceRuntime.createRuntimeSession` 使用操作捕获的 Runtime 和所选工作区。空电脑先注册目标 Host 的默认目录，再创建 Session。创建请求明确包含工作区归属，属于其他 Runtime 的工作区会被拒绝。导航持有目标直到历史打开；后续目录元数据刷新不延长对话的就绪等待。
+
+同一运行时的并发 `ensureSession` 调用只共享尚未完成的 Workspace 归档读取，包括其他运行时的初始归档同步。读取完成后即丢弃，后续验证重新拉取。每个调用者可独立取消，最后一个调用者取消未完成的读取；重连、目标释放、账号撤回或销毁阻止迟到响应安装归档事实。带版本的归档帧优先于较旧响应。
 
 引导连接明确失去授权时，先撤下池内所有 Session，再由 Connection 执行页面清理与重载。其他 runtime 被拒绝只撤下该 runtime。普通重连失败保留当前账号已授权的缓存。
 
@@ -75,7 +79,7 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 
 `WorkspaceResourceRegistry` 按明确的 runtime 目标和 Session 相对资源地址保留元数据。启动连接使用独立的 `base` 身份；各项目连接在 Host 握手声明支持文件后，以自己的 API client 注册 `workspaceResourceProvider(api)`。文件请求不从当前焦点面板推导目标。Host 的 `workspaceFileMaxResources` 配置限制每个 runtime 保留的记录数；空闲记录按使用顺序淘汰，全部记录活跃时拒绝超限接入。
 
-订阅与 pin 共用元数据读取，最后一个持有者释放时取消未完成读取。文件变化由现有 Host 流交付，打开更多文件不会增加流。重连取消旧代次请求并复核保留的元数据，版本不同则标记 changed，直到显式重新加载。临时失败保留元数据，权限拒绝、provider 移除或 runtime 移除会清除它。预览内容只保存在视图中，通过有界且带版本保护的 RPC 读取。
+订阅与 pin 共用元数据读取，最后一个持有者释放时取消未完成读取。文件变化由现有 Host 流交付，打开更多文件不会增加流。重连取消旧代次请求并复核活跃元数据；空闲资源若保留连接不可用的失败，在连接恢复后再次被订阅或 pin 时复核。版本不同则标记 changed，直到显式重新加载。临时失败保留元数据，权限拒绝、provider 移除或 runtime 移除会清除它。权限失败使用稳定错误代码，包括 HTTP 401/403 对应的 `access-revoked`；未收到 HTTP 响应的请求不能授权另一次读取。预览内容只保存在视图中，通过有界且带版本保护的 RPC 读取。
 
 `source(request)` 暴露原生 `getSnapshot`/`subscribe` 快照协议，消费方通过渲染器的 `keyedHooks` 机制绑定它，而不直接持有 registry。
 
@@ -95,26 +99,40 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 
 `binding()`、`scope()` 和 `provideInfoFor()` 只借用仍被持有的代次。`retainInfo(id)` 观察不可变的来源计数，不创建 scope 或读取历史；同 ID 重建后，观察源身份仍稳定。会话选择与 Workbench 适配器共用这一分配器。输入草稿和正在提交的操作分别持有引用，使切换视图不会丢失输入。目录移除不释放这些所有者；明确撤权仍必须销毁所属运行时。
 
+`provideInfoRevision` 通知 provide bundle 的安装、退役或重建，也覆盖运行时池中的非当前 Session。其数字快照不含历史或绑定对象。显式渲染选择器随该数据源变化解析自身 bundle；`currentProvideInfo` 保持由当前选择确定的身份。
+
 私有浏览器呈现记录的所有者通过 `sessionPersistenceKey` 区分已验证主体、运行时和原始 Session id。读取要求会话当前在目录中可见。按代次发布的 Host 元数据重新连接时，文档已确认的 Gateway 账号保留私有键；账号失效时撤销该归属。明确的 `forget` 意图允许在目录撤下后，以当前主体清理已退役记录；它不恢复读取权限，也不允许未验证账号删除数据。
 
 每个 scope 的对象身份独立于持久 Session id。作用域事件分发与 `sessionOf()` 必须匹配确切代次，因此异步清理不会把旧 context 路由到替代对象。详见[所有权决策](../../../.agents/notes/implemented/architecture/2026-09-23-client-session-references.zh.md)。
 
 `beginNavigation()` 取代尚未完成的视图选择意图，并返回取消信号。传入 `{ blockInputFor: sessionId }` 会为来源 Session 发布当前标签页内的输入锁定；`finishNavigation(signal)` 只解除该意图自己的锁定。新会话准备期间保留原视图、草稿和运行任务，同时拒绝向原对话提交，直至准备结束。异步导航在加载完成后、选择视图前检查信号；`open`、`openSubagent`、`clear`、目标切换与明确拒绝访问都会使旧意图失效。被取代的请求仍将已完成的 Host 操作保留在目录中，并保留当前视图和草稿。插件发起的请求还须响应插件销毁。
 
+每次连接通过校验后，在 connected 状态与 Host 描述可见前先发出 `connection/will-reset`。消费者同步撤回旧的客户端验证，描述订阅者才能恢复私有布局。Runtime 随后发出 `connection/reset`，再准备新的 Workspace／Session 列表基线或已保存历史的所有权。首次连接通过校验后，Runtime 会在读取 Session 列表基线的同时打开已保存普通根 Session 的会话尾页。这一个尚未展示的窗口不创建 Client scope、引用、历史索引或 Agent。目录与 Workspace 归档投影仍决定最终选择；首次获准获取的引用接管同一次打开。导航、目标或账号撤销、断连、基线缺失或失败，以及根节点销毁都会释放尚未接管的窗口。Runtime 持有尚未完成的读取直到结束，根节点销毁会等待它。带地址的子会话仍走目录确认后的恢复路径。
+
 `commitSessionNavigation()` 在打开尝试完成前持有目标，确认历史可用后只提交当前意图。接收视图先获取自己的引用，再释放临时引用。加载失败保留原视图；取消同时抑制过期提交和过期错误。`SessionReference.ready` 的语义不变：它表示尝试结束，不等同于加载成功。
 
 <a id="workspace-and-session-lists"></a>
 ## Workspace 与 Session 列表
 
+`WorkspaceRuntime.startInitialSelection()` 在等待首次列表基线及准备好的 Session 时，通过工作区列表发布可选标记 `initialSelectionPending`。完成、被新导航取代、工作区基线读取失败、准备失败或释放都会移除标记。释放只取消本次导航等待，不影响其他历史读取者；失败后仅在权威列表输入变化时重试。
+
 未变化的 Session 行在 runtime 和账号池中保留相同的 `SessionSummary` 引用，因此选择器可用 `Object.is` 比较行。manager 行或所属 runtime 描述变化时会产生新摘要；项目标签、可见性和项目归属均参与失效判断。[投影决策](../../../.agents/notes/implemented/architecture/2026-10-23-client-list-projection-reuse.zh.md)记录了身份与缓存生命周期规则。
 
 Workspace 和 Session 列表各自具有单调的 `pending` → `ready` 基线阶段，也有各自的刷新活动／错误状态。列表请求期间到达的增量插入或更新／移除／顺序帧与一元变更回显会在其响应之上回放。每次成功的 Workspace 基线都会重新建立 Host 持久 Workspace 顺序，因此重连会接纳该客户端离线期间提交的变更。`WorkspaceRuntime.insertBefore` 会立即安装乐观顺序；只有最新一元回声可以替换它，更新的 Host 顺序帧优先于旧回声，而最新请求被拒时会恢复最近一次由 Host 确认的顺序，不会恢复更早且尚未提交的拖拽。已移除的 Workspace id 会保留进程本地删除标记，避免延迟到达的 changed 帧将其复活。Workspace 新近程度只在两条基线都 ready 后派生，且绝不改变 Workspace 列表顺序。
+
+首次验证引导 Runtime 身份时，会保留尚未完成的初始 Workspace 选择。它仍等待两个权威列表与历史打开完成；此前被用户清空或导航取消的意图不会恢复。`connection/reset` 以 `initialConnection: true` 标记首次握手；后续握手传入 `false`，省略参数则请求普通重新验证。后续目标变化会取消待完成导航及尚未被接管的已保存历史读取。详见[引导选择决策](../../../.agents/notes/implemented/bug-fix/2026-10-24-bootstrap-runtime-initial-selection.zh.md)。
+
+`SessionListState.state` 和 `error` 直接投影 manager 的基线活动与最近失败，独立于 `phase`。池化汇总列表报告已鉴权基础 Runtime 的活动；`currentScopeList` 排除额外工作台目标。`sessions.refresh()` 与 `workspaces.refresh()` 复用各自所有者尚未完成的基线读取，通过既有列表状态发布失败，不因 wire 或传输失败拒绝 Promise。账户授权撤回后的显式 Session 刷新不执行读取。
+
+每一代引导连接在 Workspace 所有者与 Session 池的归档分区之间共用一次 `workspace.list` 基线。共享结果包含 Workspace 帧回放与版本合并后的归档事实；读取失败或取消时不发布结果。断线与销毁会使待完成基线失效，迟到结果不能更新新一代连接或其他目标。并发刷新调用方加入同一项待完成操作，已完成结果不跨连接代次缓存。其他运行时保留各自的基线所有者。
+
+Session 刷新保留已有身份的相对顺序，并将新行放在 Host 基线中紧随其后的最近已知身份之前。索引化的锚点以线性工作量合并替换目录；首次成功基线直接采用 Host 顺序。
 
 `SessionSummary.pendingInteraction` 将阻塞 Session 的实时用户操作分类为 `approval`、`plan-review` 或 `question`。`SessionManager` 依据稳定的请求标识跟踪可应答请求的 requested/resolved mux 帧，即使 `Session` 对象尚未实例化也不例外；实例化前的缓冲会保留每个仍有效的请求，替换回放产生的重复项，并移除已解决的请求，因此打开 Session 时，列表状态始终有一个对应的可应答 `PendingWait`。审批与问题并发时，第一个 pending 问题具有更高的呈现优先级，以匹配 composer 路由；只有满足 plan-review composer 二元呈现约束的请求才会保留独立的 `plan-review` 状态。该状态的作用域限定在连接代次内：断连时清除，mux 打开时的回放只恢复仍处于 pending 的请求。
 
 `WorkspaceRuntime.delete(workspaceId)` 在一元响应成功后从客户端投影中移除注册记录；对应的 `host/workspace-removed` 帧具有幂等性，并负责同步其他标签页。Session 状态与当前 Session selection 相互独立，因此 Workspace 消失后，其已纳入客户端投影的 Session 会立即投影到 Ungrouped 下。
 
-`WorkspaceListState.archivedSessionIds` 镜像 Host 的注册表级全局归档集合（一个按 Host 顺序的 `readonly SessionId[]`，仅在成员变化时才替换；需要 O(1) 查询的消费方自建临时 Set）。带版本的 carrier 携带 `archiveRevision`：更新 revision 会替换集合；接受过版本快照后，旧的无版本或过期 carrier 会被忽略。这个可 reset 的规则让 Gateway Admin 能恢复会话，同时阻止旧响应重新隐藏或复活错误的行。`WorkspaceRuntime.archiveSession(sessionId)` 通过 wire 归档；投影层在当前 selection 落入集合时清空为 New Session 视图状态。各分组视图在所有位置隐藏集合成员，而会话行本身仍留在列表 store 中。
+`WorkspaceListState.archivedSessionIds` 镜像 Host 的注册表级全局归档集合（一个按 Host 顺序的 `readonly SessionId[]`，仅在成员变化时才替换；需要 O(1) 查询的消费方自建临时 Set）。Workspace 镜像与引导 Session 分区会合并旧式无版本或相同 revision 的归档事实；带版本的 carrier 携带 `archiveRevision`，更新 revision 会替换集合。接受过版本快照后，旧的无版本或过期 carrier 会被忽略。这个可 reset 的规则让 Gateway Admin 能恢复会话，同时阻止旧响应重新隐藏或复活错误的行。`WorkspaceRuntime.archiveSession(sessionId)` 通过 wire 归档；投影层在当前 selection 落入集合时清空为 New Session 视图状态。各分组视图在所有位置隐藏集合成员，而会话行本身仍留在列表 store 中。
 
 SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 observable；ui-renderer 创建钩子。Workspace 业务状态不会进入 `SessionListState` 或条目 store。
 
@@ -158,6 +176,8 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 每个 `Session` 都把连续事件窗口交给 `ConversationNodeAssembler`。`open()` 与 `loadOlder()` 在该会话尚未补全时请求 `detail: 'conversation'`；`ensureHistoryDetail()` 拉取 `detail: 'full'` 并按 seq 合并。窗口的 `baseSeq` 与尾部包含 `omittedSpans`，因此 conversation 档空洞不是 mux 缺口（[两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)）。处于舞台的会话从 `historyWindowMode: 'tail'` 开始；接受 prompt 或观察到 `running` 后在后台最多补齐 `LIVE_HISTORY_RETAINED_PAGES` 页更早页面（[有界活动窗口](../../../.agents/notes/implemented/bug-fix/2026-09-03-bounded-live-window-and-incremental-reconnect.zh.md)），空闲且处于舞台的阅读器接近顶部时会自动请求一页更早历史。较早历史控件在自动分页失败或触及上限时保留为无障碍重试入口。释放最后一个引用会销毁浏览器窗口；再次获取引用时重新读取尾页。模型请求和实时事件流不等待补齐。普通会话在第一页完成后还会异步请求有界的 `session.historyIndex`；索引只包含轮次范围和简短预览，尚未驻留的标记会先读取所需的更早页面再跳转。插件注册业务 Definition，把单个事件映射为稳定的 `{kind, id}`，在唯一 start 事件处创建 State，折叠有关联的 update，再为已注册的视图目标构造最终节点。Assembler 负责 Context 索引、只读前序 Context 查询，以及引用稳定的 Turn/Step Location 索引。实时 append 只对每个 Definition 求值一次，并且只更新命中的 Context；加载更早分页时保留已有 Context 与节点身份，只匹配新 prepend 的事件，并重放前序依赖或 Location 事实发生变化的 Context。完整替换仅用于首次打开、舞台重进、对仍在加载的窗口的重连，以及恢复的尾页不再与窗口相接的情况；对已打开窗口的重连和其余缺口修复都会把恢复的尾页合并进现有窗口，不会丢弃已显示历史。
 
 `IncrementalAssistantBlocks` 用追加的 chunk 片段维护助手输出。文本、推理和工具参数前缀只在消费方请求快照时拼接并清理，因此长流不会在每个 chunk 上复制完整前缀。
+
+Assistant 尝试退役时会移除其瞬时匹配，仅重放受影响的 Context 及前驱读取者；无关历史 Node 保持身份不变。仅由瞬时内容构成的 Context 消失时，其 Location 数据也一并移除；现有 upsert 协议无法表达删除时，视图使用缓存的未变 Node 进行替换。时间线重新索引仍遍历已加载窗口。
 
 连接 generation 恢复后，`SessionManager` 会对驻留会话的历史重建执行 single-flight，同时最多允许四个并发，并优先当前选中的会话。断开连接会丢弃排队工作；进行中的读取由 Session generation 栅栏取消。scope dispose 还会在释放 Session 实例前取消未完成的初始 history 读取。
 

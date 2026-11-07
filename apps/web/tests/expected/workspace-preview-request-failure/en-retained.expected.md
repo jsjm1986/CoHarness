@@ -1,0 +1,4 @@
+- button "Reload"
+- alert: Could not update the preview. The previous content is still shown. Check the connection and reload.
+- heading "Previous document" [level=1]
+- paragraph: Authorized preview.

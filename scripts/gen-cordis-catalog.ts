@@ -58,6 +58,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   userTerminalAuthorization: 'collaboration.md',
   userTerminalAdministration: 'collaboration.md',
   pluginManager: 'boot.md',
+  pluginManagerCatalog: 'boot.md',
   pluginMarket: 'boot.md',
   pluginRegistryProbe: 'boot.md',
   profileContext: 'boot.md',
@@ -289,6 +290,7 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
   'command/executed': 'client-face local command acknowledgment — packages/client/ui-commands/README.md owns the API',
   'workspace/resource-open': 'client-face file preview request — packages/client/ui-workbench/README.md owns the API',
   'connection/reset': 'client-face transport signal — packages/client/runtime/README.md owns the API',
+  'connection/will-reset': 'client-face pre-publication transport signal — packages/client/runtime/README.md owns the API',
   'locale/change': 'client-face locale switch signal — packages/client/locale/README.md owns the API',
   'slash/input-begin-command': 'client-face slash-input protocol — packages/client/ui-input-trigger/README.md owns the API',
   'slash/input-consume-token': 'client-face slash-input protocol — packages/client/ui-input-trigger/README.md owns the API',
@@ -897,6 +899,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   MarketSearchResult: 'boot.md',
   MarketSort: 'boot.md',
   PluginManagementAccess: 'boot.md',
+  PluginManagementCatalog: 'boot.md',
   PluginManagementCapability: 'boot.md',
   PluginDesiredState: 'boot.md',
   PluginDesiredStateSnapshot: 'boot.md',
@@ -931,6 +934,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 
 /** Project types deliberately documented outside the subsystems catalog. */
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
+  IncomingMessage: 'Node HTTP request forwarding is owned by packages/host/webserver/README.md',
   TerminalShell: 'Browser terminal shell profiles are owned by packages/api/terminal-controller/README.md',
   TerminalEnvironment: 'Browser terminal environment fields are owned by packages/api/terminal-controller/README.md',
   WebTerminalInfo: 'Browser terminal metadata is owned by packages/api/terminal-controller/README.md',

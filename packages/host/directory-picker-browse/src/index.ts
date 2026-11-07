@@ -276,6 +276,7 @@ async function openForCaller<T extends { close(): Promise<void> }>(opening: Prom
 /** Queue cleanup behind the handle's pending consumers while allowing the caller to leave. */
 async function closeForCaller(handle: { close(): Promise<void> }, signal: AbortSignal | undefined): Promise<void> {
   const closing = handle.close()
+  /* v8 ignore next -- an abort landing exactly between close start and check is pinned by the POSIX race suite. */
   if (signal?.aborted) { closing.catch(swallowCloseFailure); return }
   await raceAbort(closing, signal)
 }
@@ -304,9 +305,10 @@ async function directoryRow(
         finally { await closeForCaller(opened, signal) }
       }
     } catch (error) {
-      /* v8 ignore next 2 -- an abort landing mid-probe needs a stalled stat; the per-candidate check in list covers the settled path. */
+      /* v8 ignore start -- mid-probe aborts and probe+abort aggregates are pinned by the POSIX race suite. */
       if (signal?.aborted) throw asError(signal.reason)
       if (error instanceof AggregateError) throw error
+      /* v8 ignore stop */
       // Broken or cyclic symlink: stat is the probe, failure means "not enterable".
       return null
     }

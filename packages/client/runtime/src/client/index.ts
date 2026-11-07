@@ -264,12 +264,20 @@ declare module '@deepseek-ai/cordis' {
      */
     'slots/changed'(key: string): void
     /**
+     * A ready connection generation is about to publish its Host description.
+     * Listeners synchronously withdraw prior-generation client state before description consumers run.
+     * @mode emit
+     * @param initialConnection - true only before this runtime's first connected callback.
+     */
+    'connection/will-reset'(initialConnection: boolean): void
+    /**
      * A connection generation was (re-)established. Wire-derived caches must
      * treat their state as stale and repull (commands directory; the queue
      * mirrors reset themselves through the session resync path).
      * @mode emit
+     * @param initialConnection - true only for this runtime's first handshake; omitted resets require revalidation.
      */
-    'connection/reset'(): void
+    'connection/reset'(initialConnection?: boolean): void
     /**
      * Open one Session-relative Workspace file in the browser.
      * @param request - owning Session and relative resource address.
@@ -411,9 +419,14 @@ export function apply(ctx: Context): void {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),
   }
+  const identity = connection.documentIdentity
+  const selectionPersistenceKey = identity === undefined ? undefined
+    : `dsh.sessions.current.v2.${String(identity.principalId)}.${identity.runtimeTarget.kind === 'personal'
+      ? 'personal' : `project-${String(identity.runtimeTarget.projectId)}`}`
   const baseSessions = new SessionRuntime(ctx, connection.wireApi ?? connection.api, ctx.remote, conversation, {
     provideService: false,
     hostDescription: connection.hostDescription,
+    ...(selectionPersistenceKey === undefined ? {} : { selectionPersistenceKey }),
   })
   const sessions = new SessionRuntimePool(ctx, baseSessions, connection, ctx.remote, conversation)
   ctx.effect(() => {
@@ -448,6 +461,7 @@ export function apply(ctx: Context): void {
     () => workspaces.startInitialSelection(),
     'runtime: initial Workspace selection',
   )
+  let initialConnection = true
   const loop = connection.start({
     onMuxEnvelope: (envelope) => {
       sessions.handleMuxEnvelope(envelope)
@@ -465,10 +479,15 @@ export function apply(ctx: Context): void {
         if (frame.event === 'permission-presets/catalog-changed') permissionCatalog.invalidateFor(connection)
       }
     },
+    onBeforeConnected: () => { ctx.emit('connection/will-reset', initialConnection) },
     onConnected: (description) => {
-      sessions.handleConnected(description)
-      workspaces.handleConnected()
-      ctx.emit('connection/reset')
+      // Authority withdrawal can cancel pending navigation, including an
+      // unshown saved-history window. Finish it before preparing fresh reads.
+      const initial = initialConnection
+      initialConnection = false
+      ctx.emit('connection/reset', initial)
+      const workspaceBaseline = workspaces.handleConnected()
+      sessions.handleConnected(description, workspaceBaseline)
     },
     onFailure: (failure) => { sessions.handleConnectionFailure(failure) },
     onStateChange: (state) => {
@@ -477,11 +496,12 @@ export function apply(ctx: Context): void {
       // onConnected, so this is the safe moment to drop generation-scoped
       // interaction state.
       if (state === 'reconnecting') {
+        workspaces.handleDisconnected()
         sessions.handleDisconnected()
       }
     },
   })
-  ctx.effect(() => () => { loop.stop() }, 'runtime: connection stream loop')
+  ctx.effect(() => () => { workspaces.handleDisconnected(); loop.stop() }, 'runtime: connection stream loop')
 }
 
 /** Local Session owners; plugins extend this map for independent consumers. */

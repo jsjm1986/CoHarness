@@ -8,7 +8,7 @@
  * anything else is shown but refuses to open. The header uses the shared
  * PathLabel for the root, followed by reload and workspace directory actions.
  */
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { RpcError } from '@deepseek-ai/dsh-client-connection/client'
 import type {
@@ -105,6 +105,8 @@ function Entry({ parent, entry, tree }: { parent: string; entry: WorkspaceFileEn
 function Level({ path, tree }: { path: string; tree: TreeContext }): ReactNode {
   const { state, t } = tree
   const level = state.levels[path]
+  const listed = level?.kind === 'ready' ? level.level.entries : undefined
+  const entries = useMemo(() => listed === undefined ? [] : orderEntries(listed), [listed])
   if (level === undefined || level.kind === 'loading') {
     return <li className={css.note} data-files-row="loading">{t('loading')}</li>
   }
@@ -115,7 +117,6 @@ function Level({ path, tree }: { path: string; tree: TreeContext }): ReactNode {
       </li>
     )
   }
-  const entries = orderEntries(level.level.entries)
   return (
     <>
       {level.failure !== undefined && <li className={css.note} data-files-row="failed">{failureLine(t, level.failure)}</li>}

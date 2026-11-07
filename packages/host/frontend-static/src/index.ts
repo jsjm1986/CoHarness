@@ -11,7 +11,7 @@
  * @module @deepseek-ai/dsh-host-frontend-static
  */
 
-import type { ServerResponse } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
@@ -98,6 +98,7 @@ export async function serveStatic(
   options?: StaticServeOptions,
 ): Promise<void> {
   const target = resolve(normalize(join(distRoot, pathname)))
+  const index = target === distRoot || target === distIndex
   // Traversal rejection: the target must be distRoot itself (`/`) or stay under
   // it. `sep`, not '/': resolve() emits backslash paths on Windows, where a '/'
   // suffix would reject every legitimate subpath as traversal.
@@ -110,7 +111,7 @@ export async function serveStatic(
   let file: Buffer | undefined
   let type: string
   try {
-    if (target === distRoot || target === distIndex) {
+    if (index) {
       if (!authorizeIndex()) return
       body = await renderIndex()
       type = HTML_MIME
@@ -146,7 +147,7 @@ export async function serveStatic(
   }
   res.writeHead(200, {
     'content-type': type,
-    ...(IMMUTABLE_ASSET_PATH.test(pathname)
+    ...(index ? { 'cache-control': 'no-store' } : IMMUTABLE_ASSET_PATH.test(pathname)
       ? {
         'cache-control': 'public, max-age=31536000, immutable',
         vary: 'accept-encoding',
@@ -166,8 +167,8 @@ export function apply(ctx: Context, config: Config): void {
   const distIndex = config.distIndex
   const distRoot = dirname(distIndex)
   // Insert after all index transforms so the base precedes every resource reference.
-  const renderIndex = async (): Promise<string> => {
-    const body = ctx.webServer.renderIndex(await readFile(distIndex, 'utf8'))
+  const renderIndex = async (request: IncomingMessage): Promise<string> => {
+    const body = ctx.webServer.renderIndex(await readFile(distIndex, 'utf8'), request)
     return body.replace(/<head(?:\s[^>]*)?>/i, open => `${open}<base href="./">`)
   }
   const bodies = new Map<string, StaticBodyEntry>()
@@ -187,7 +188,7 @@ export function apply(ctx: Context, config: Config): void {
       distRoot,
       distIndex,
       () => ctx.connection.authorizeIndex(req, res),
-      renderIndex,
+      () => renderIndex(req),
       {
         acceptEncoding: req.headers['accept-encoding'],
         bodies,

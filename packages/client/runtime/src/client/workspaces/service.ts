@@ -16,7 +16,7 @@ import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.ts'
 import type { IWorkspaces, StartSessionOptions } from '../contract/workspaces.ts'
 import { commitSessionNavigation } from '../navigation.ts'
-import { mergeWorkspaceLocation, WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
+import { mergeWorkspaceLocation, WorkspaceManager, type WorkspaceArchiveSnapshot, type WorkspaceListPhase } from './manager.ts'
 import { prepareGatewayRuntime } from '../prepare-runtime.ts'
 
 /** Generate one opaque browser draft reservation id. */
@@ -108,6 +108,9 @@ export interface WorkspaceListState {
   error: RpcError | null
   /** True only after both workspace.list and session.list have succeeded. */
   baselinesReady: boolean
+  /** First default navigation awaits baselines or its selected Session;
+   * absent after completion, failure, supersession or disposal. */
+  initialSelectionPending?: true
   /** Most recently active Workspace, derived without changing `items` order. */
   recentWorkspaceId: WorkspaceId | undefined
 }
@@ -559,14 +562,36 @@ export class WorkspaceRuntime implements IWorkspaces {
       throw new Error('workspaces.startInitialSelection: already started')
     }
     this.initialSelectionStarted = true
-    const navigation = this.sessions.beginNavigation()
-    let state: 'waiting' | 'opening' | 'done' = 'waiting'
+    const lifetime = new AbortController()
+    const navigation = AbortSignal.any([this.sessions.beginNavigation(), lifetime.signal])
+    type InitialSelectionState = 'waiting' | 'opening' | 'failed' | 'done'
+    let state: InitialSelectionState = 'waiting'
+    let failedBaseline: { workspaces: object; sessions: object } | undefined
     let disposed = false
+    const setState = (next: InitialSelectionState): void => {
+      state = next
+      if (next !== 'failed') failedBaseline = undefined
+      const pending = next === 'waiting' || next === 'opening'
+      const snapshot = this.list.getSnapshot()
+      if ((snapshot.initialSelectionPending === true) === pending) return
+      const value = { ...snapshot }
+      if (pending) value.initialSelectionPending = true
+      else delete value.initialSelectionPending
+      this.list.set(value)
+    }
     const reconcile = (): void => {
-      if (disposed || navigation.aborted || state !== 'waiting') return
+      if (disposed || navigation.aborted || (state !== 'waiting' && state !== 'failed')) return
       const workspace = this.list.getSnapshot()
-      if (!workspace.baselinesReady) return
       const sessions = this.sessions.list.getSnapshot()
+      if (state === 'failed' && failedBaseline !== undefined
+        && failedBaseline.workspaces === this.manager.getSnapshot() && failedBaseline.sessions === sessions) return
+      if (!workspace.baselinesReady) {
+        if (workspace.state === 'error') {
+          failedBaseline = { workspaces: this.manager.getSnapshot(), sessions }
+          setState('failed')
+        } else setState('waiting')
+        return
+      }
       const current = sessions.current
       // Startup is history-first across the whole registry. Keep
       // recentWorkspaceId as the New Session target, where an empty Workspace
@@ -585,10 +610,10 @@ export class WorkspaceRuntime implements IWorkspaces {
           ? undefined
           : workspace.items.find(item => item.path === summary.cwd && item.sessionIds.includes(current))
         if (owner === undefined || summary === undefined) {
-          state = 'done'
+          setState('done')
           return
         }
-        state = 'opening'
+        setState('opening')
         void this.sessions.create({
           workspaceId: owner.workspaceId,
           sessionId: current,
@@ -597,21 +622,28 @@ export class WorkspaceRuntime implements IWorkspaces {
         }).then((sessionId) => {
           if (disposed || navigation.aborted) return
           return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
-            if (sessionId !== current) this.sessions.open(sessionId)
-            state = 'done'
+            // The captured current is stale after the reuse flight; the
+            // re-adopted blank supersedes ambient drift but never a selection
+            // the user explicitly committed while it was in flight.
+            const live = this.sessions.list.getSnapshot().current
+            if (sessionId !== live && !this.sessions.isActivated(live)) {
+              this.sessions.open(sessionId, { activate: false })
+            }
+            setState('done')
           })
         }).catch((reason: unknown) => {
           if (disposed || navigation.aborted) return
-          state = 'waiting'
+          failedBaseline = { workspaces: this.manager.getSnapshot(), sessions: this.sessions.list.getSnapshot() }
+          setState('failed')
           console.warn('saved blank Session restore failed:', reason)
         })
         return
       }
       if (target === undefined) {
-        state = 'done'
+        setState('done')
         return
       }
-      state = 'opening'
+      setState('opening')
       void this.openWorkspace(target).then((sessionId) => {
         if (disposed || navigation.aborted) return
         return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
@@ -620,20 +652,34 @@ export class WorkspaceRuntime implements IWorkspaces {
             || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
             throw new Error('Session was archived during initial selection')
           }
-          if (snapshot.current === undefined) this.sessions.open(sessionId)
-          state = 'done'
+          if (snapshot.current === undefined) this.sessions.open(sessionId, { activate: false })
+          setState('done')
         })
       }).catch((reason: unknown) => {
         if (disposed || navigation.aborted) return
-        state = 'waiting'
+        failedBaseline = { workspaces: this.manager.getSnapshot(), sessions: this.sessions.list.getSnapshot() }
+        setState('failed')
         console.warn('initial workspace selection failed:', reason)
       })
     }
     const unsubscribe = this.list.subscribe(reconcile)
-    reconcile()
-    return () => {
-      disposed = true
+    const cancel = (): void => {
       unsubscribe()
+      setState('done')
+    }
+    navigation.addEventListener('abort', cancel, { once: true })
+    if (navigation.aborted) cancel()
+    else {
+      setState('waiting')
+      reconcile()
+    }
+    return () => {
+      if (disposed) return
+      disposed = true
+      navigation.removeEventListener('abort', cancel)
+      unsubscribe()
+      lifetime.abort()
+      setState('done')
     }
   }
 
@@ -981,12 +1027,20 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.manager.handleHostEnvelope(envelope)
   }
 
-  /** Rebuild the Workspace baseline after connection. */
-  handleConnected(): void {
+  /**
+   * Rebuild the Workspace baseline after connection.
+   * @returns the archive snapshot produced by the baseline read, or undefined when none applies.
+   */
+  handleConnected(): Promise<WorkspaceArchiveSnapshot | undefined> {
     const runtimeId = (this.rootCtx.get('connection') as ConnectionHandle | undefined)
       ?.hostDescription.getSnapshot()?.runtimeTarget?.runtimeId
     if (runtimeId !== undefined) this.baseRuntimeId = runtimeId
-    this.manager.handleConnected()
+    return this.manager.handleConnected()
+  }
+
+  /** Invalidate pending Workspace baseline work when its connection generation ends. */
+  handleDisconnected(): void {
+    this.manager.handleDisconnected()
   }
 
   private presentWorkspace(workspace: WorkspaceView): WorkspaceView {
@@ -1034,6 +1088,7 @@ export class WorkspaceRuntime implements IWorkspaces {
       phase: workspace.phase,
       error: workspace.error,
       baselinesReady,
+      ...(this.list.getSnapshot().initialSelectionPending === true ? { initialSelectionPending: true as const } : {}),
       recentWorkspaceId: baselinesReady ? recentWorkspace(workspace.items, sessions.byId) : undefined,
     })
   }

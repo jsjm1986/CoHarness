@@ -303,6 +303,20 @@ function profileModelsOf(profile: Record<string, unknown>): Array<Record<string,
   return value.map((model, index) => jsonObject(model, `models[${index}]`))
 }
 
+/** Match profile lookup order when legacy settings contain duplicate model ids. */
+function indexedProfileModels(profile: Record<string, unknown>): Map<unknown, Record<string, unknown>> {
+  const models = new Map<unknown, Record<string, unknown>>()
+  for (const model of profileModelsOf(profile)) {
+    if (!models.has(model.id)) models.set(model.id, model)
+  }
+  return models
+}
+
+interface RuntimeProviderProjection {
+  provider: RuntimeModelProvider
+  models: Map<unknown, Record<string, unknown>>
+}
+
 interface UsageTotalsRow {
   input: string
   output: string
@@ -2725,15 +2739,15 @@ export class PostgresModelGovernanceService {
         AND model.enabled
       WHERE provider.organization_id=$1 AND provider.source='managed' AND provider.status='enabled'
       ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId])
-    const providers = new Map<string, RuntimeModelProvider>()
+    const providers = new Map<string, RuntimeProviderProjection>()
     for (const row of result.rows) {
-      const profile = runtimeManagedProfile(row.profile)
-      // Runtime validation requires an embedded profile URL to equal the
-      // canonical Provider URL; older settings may retain a trailing slash.
-      if (profile.baseURL !== undefined) profile.baseURL = row.base_url
-      let provider = providers.get(row.provider)
-      if (provider === undefined) {
-        provider = {
+      let projection = providers.get(row.provider)
+      if (projection === undefined) {
+        const profile = runtimeManagedProfile(row.profile)
+        // Runtime validation requires an embedded profile URL to equal the
+        // canonical Provider URL; older settings may retain a trailing slash.
+        if (profile.baseURL !== undefined) profile.baseURL = row.base_url
+        const provider: RuntimeModelProvider = {
           provider: row.provider,
           displayName: row.display_name,
           driver: 'pi-ai',
@@ -2744,10 +2758,10 @@ export class PostgresModelGovernanceService {
           models: [],
           scope: 'organization',
         }
-        providers.set(row.provider, provider)
+        projection = { provider, models: indexedProfileModels(profile) }
+        providers.set(row.provider, projection)
       }
-      const configured = profileModelsOf(profile)
-        .find(model => model.id === row.model_id)
+      const configured = projection.models.get(row.model_id)
       const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
       const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
       const input = Array.isArray(configured?.input)
@@ -2762,7 +2776,7 @@ export class PostgresModelGovernanceService {
       const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
         ? configured.compat as RuntimeModelProvider['models'][number]['compat']
         : undefined
-      provider.models.push({
+      projection.provider.models.push({
         id: row.model_id,
         name: row.model_name,
         ...contextWindow === undefined ? {} : { contextWindow },
@@ -2772,7 +2786,7 @@ export class PostgresModelGovernanceService {
         ...compat === undefined ? {} : { compat },
       })
     }
-    return [...providers.values()]
+    return [...providers.values()].map(projection => projection.provider)
   }
 
   /** Project-owned Provider projection, with runtime-prefixed route ids. */
@@ -2797,14 +2811,14 @@ export class PostgresModelGovernanceService {
         AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
       WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.status='enabled'
       ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId, projectInternalId])
-    const providers = new Map<string, RuntimeModelProvider>()
+    const providers = new Map<string, RuntimeProviderProjection>()
     for (const row of result.rows) {
       const runtimeProvider = projectRuntimeProviderKey(projectId, row.provider)
-      const profile = runtimeManagedProfile(row.profile)
-      if (profile.baseURL !== undefined) profile.baseURL = row.base_url
-      let provider = providers.get(runtimeProvider)
-      if (provider === undefined) {
-        provider = {
+      let projection = providers.get(runtimeProvider)
+      if (projection === undefined) {
+        const profile = runtimeManagedProfile(row.profile)
+        if (profile.baseURL !== undefined) profile.baseURL = row.base_url
+        const provider: RuntimeModelProvider = {
           provider: runtimeProvider,
           displayName: row.display_name,
           driver: 'pi-ai',
@@ -2816,9 +2830,10 @@ export class PostgresModelGovernanceService {
           scope: 'project',
           projectId,
         }
-        providers.set(runtimeProvider, provider)
+        projection = { provider, models: indexedProfileModels(profile) }
+        providers.set(runtimeProvider, projection)
       }
-      const configured = profileModelsOf(profile).find(model => model.id === row.model_id)
+      const configured = projection.models.get(row.model_id)
       const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
       const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
       const input = Array.isArray(configured?.input)
@@ -2833,7 +2848,7 @@ export class PostgresModelGovernanceService {
       const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
         ? configured.compat as RuntimeModelProvider['models'][number]['compat']
         : undefined
-      provider.models.push({
+      projection.provider.models.push({
         id: row.model_id,
         name: row.model_name,
         ...contextWindow === undefined ? {} : { contextWindow },
@@ -2843,6 +2858,6 @@ export class PostgresModelGovernanceService {
         ...compat === undefined ? {} : { compat },
       })
     }
-    return [...providers.values()]
+    return [...providers.values()].map(projection => projection.provider)
   }
 }

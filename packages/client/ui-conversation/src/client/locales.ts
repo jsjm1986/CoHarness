@@ -204,6 +204,7 @@ export const zh = {
   'hero.headline': 'COHARNESS',
   'hero.preview': '预览版',
   'hero.chooseWorkspace': '选择工作区',
+  'hero.loadingWorkspace': '正在加载工作区',
 
   'workspace.selectFailed': '无法打开该工作区：{message}（{code}）',
   'workspace.discard.title': '切换工作区并放弃未发送内容？',
@@ -908,6 +909,7 @@ export const en = {
   'hero.headline': 'COHARNESS',
   'hero.preview': 'Preview',
   'hero.chooseWorkspace': 'Choose workspace',
+  'hero.loadingWorkspace': 'Loading workspace',
 
   'workspace.selectFailed': 'Could not open the workspace: {message} ({code})',
   'workspace.discard.title': 'Discard unsent content and switch?',

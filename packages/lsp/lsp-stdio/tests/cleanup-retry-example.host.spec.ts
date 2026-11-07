@@ -18,7 +18,11 @@ it('retries failed language-server cleanup before allocating its replacement', a
     ], { cwd: root, timeout: 30_000, killSignal: 'SIGKILL', env: { ...process.env,
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), TMPDIR: root,
       TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
-    } })
+    } }).catch((error: unknown) => {
+      const detail = error as { stdout?: string; stderr?: string; message: string }
+      detail.message += `\nstdout:\n${detail.stdout}\nstderr:\n${detail.stderr}`
+      throw detail
+    })
     await expect(result.stdout).toMatchFileSnapshot(resolve(import.meta.dirname, 'expected/cleanup-retry.jsonl'))
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 40_000)

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-localized-plugin-metadata-channel.md
 document:
-  en: bd92f2dfe152b0be5aa5b4bf37e5100b244af0f9
-  zh: cd0d778f21da094b0b5eb5aa37f18f8a69936f40
+  en: 311f5f37799fbdc3396f70fd18c9cb5e5f336a6c
+  zh: d2fb4c3866819e719a0d60555ca07d8e32669ef3
 /agent-note-localized-plugin-metadata-travels-the-host-projection-not-package-locale-dictionaries:
   en: 40ed7e370dd729fc
   zh: 707df85a71335e3d
@@ -12,8 +12,8 @@ document:
   en: f17cb7eab5b9cc2b
   zh: cae3f2737461e62d
 /agent-note-localized-plugin-metadata-travels-the-host-projection-not-package-locale-dictionaries/decision:
-  en: bc59fbc8fc7db7ff
-  zh: 81a464f3a79af5bc
+  en: 641d4f1161693bd9
+  zh: f3b9c6fb7dd9f8cc
 /agent-note-localized-plugin-metadata-travels-the-host-projection-not-package-locale-dictionaries/alternatives-considered:
   en: 5e63f2d6efc09b75
   zh: d66931c74bf1d2dc

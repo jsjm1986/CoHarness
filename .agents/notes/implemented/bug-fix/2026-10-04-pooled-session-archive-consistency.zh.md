@@ -16,6 +16,8 @@ Status: implemented
 
 **归档准入由执行器负责。** `session.prompt` 和 `session.updateQueue` 的 edit/steer 操作在解析 Agent 前，以及异步内容转换或执行身份标记完成后，再次通过 `archivedInputError` 检查，在输入插入前的最后一个同步准入点以 `session-archived` 拒绝已归档的目标。队列移除与取消仍然可用；未组合 `workspaceRegistry` 的运行时没有归档集合。`readableArchivedSessionSet` 在异步 ACL 过滤前捕获一次 `archiveSnapshot()`，并在 `workspace.list`、`workspace.archiveSession` 和 `workspace.unarchiveSession` 响应中，将该快照的修订号与其经过过滤的 id 一起返回。
 
+**在同一运行时条目内共享待完成的重拉。** 初始归档同步与并发 `ensureSession` 调用使用同一个尚未完成的 Workspace 读取。每个等待者独立拥有取消权，最后一个等待者取消未完成的请求。读取完成后即移除，不为后续验证缓存权限或归档事实。重连、目标释放、账号撤回和销毁取消读取，已取消响应不能安装事实。归档修订号阻止较旧响应替换较新的推送快照。工作台窗格恢复和会话选择共用此路径。
+
 ## 涉及文件
 
 - `packages/client/runtime/src/client/sessions/pool.ts` — 归档帧/重拉同步进 `archivedByTarget`，多目标 `search` 扇出与重键。
@@ -26,6 +28,8 @@ Status: implemented
 - `packages/client/ui-schedule/src/client/session-link.ts`、`ui-conversation/src/client/{apply,viewport}.ts`、`ui-settings-unarchive-sessions/src/client/ArchivedSessionsSection.tsx`、`ui-workbench/src/client/components/WorkbenchToolbar.tsx` — 归档并集读取。
 
 ## 考虑过的替代方案
+
+**保留已完成的 Workspace 响应。** 保留响应能减少后续读取，却可能放行刚被归档的 Session 或掩盖权限变化。只共享待完成的操作能减少重复读取，无需增加有效期，也不替代 Host 准入。
 
 **仅在前端或初次请求时拒绝。** 两者都无法保护直接调用方，也无法保护插入前被挂起的请求；执行器的最后一次同步检查依据注册表当前的归档成员关系执行拒绝。
 

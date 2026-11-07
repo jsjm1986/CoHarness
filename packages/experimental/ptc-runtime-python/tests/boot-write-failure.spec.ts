@@ -342,7 +342,7 @@ describe('PythonPtcRuntime — controlled subprocess pipes', () => {
     const fiber = await ctx.plugin(PythonPtcRuntime)
 
     expect(probeSpawn).toHaveBeenCalledWith(expect.objectContaining({
-      argv: expect.arrayContaining(['-I', '-c']), resourceOrigin: 'infrastructure', signal: expect.any(AbortSignal),
+      argv: expect.arrayContaining(['-I', '-c']) as string[], resourceOrigin: 'infrastructure', signal: expect.any(AbortSignal) as AbortSignal,
     }))
     await fiber.dispose()
   })

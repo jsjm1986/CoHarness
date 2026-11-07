@@ -16,7 +16,8 @@ function mount() {
   const settings = new ConversationDisplaySettings(scope.scope)
   const props: WorkbenchDisplayRowProps = {
     useSessions: bindSnapshotSelector(createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+      state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({
       items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,

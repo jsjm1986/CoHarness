@@ -24,12 +24,14 @@
  */
 
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { clientChunkRevision, clientChunkRevisions, clientContentRevision, clientExecutableSource } from './artifact-revision.ts'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Service } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
 import { precompressBody, selectVariant } from '@deepseek-ai/dsh-host-webserver'
@@ -41,6 +43,16 @@ export { stripClientSuffix } from './client/manifest.ts'
 export type {
   BootManifest, BootModuleRow, BootPluginRow, WebBootBatch, WebBootBatchPhase, WebBootEntry, WebBootGraph,
 } from './client/manifest.ts'
+
+/** Startup transport grouping; module application keeps the declared graph order. */
+export interface Config {
+  /**
+   * Package sets transported separately from ungrouped application entries.
+   * Omission keeps one URL-bounded application sequence. Inactive packages contribute nothing;
+   * active members retain their graph order, and bootstrap packages cannot be grouped here.
+   */
+  applicationBatchGroups?: string[][]
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -153,12 +165,6 @@ interface ComboResource {
   bundle: Buffer
 }
 
-/** One package-local `client.*.js` chunk folded into its entry's revision. */
-interface ClientArtifactChunk {
-  fileName: string
-  bundle: Buffer
-}
-
 /** One lazily materialized immutable response body and its precompressed variants. */
 interface LazyResponse {
   contentType: string
@@ -185,14 +191,11 @@ const MAX_COMBO_URL_BYTES = 3 * 1024
 const HASH_REVISION_LENGTH = 12
 const COMBO_REVISION_PLACEHOLDER = '0'.repeat(HASH_REVISION_LENGTH)
 
-/** Source-map trailer emitted by tsdown at the end of every client bundle. */
-const SOURCE_MAP_TRAILER = /(?:\r?\n)?\/\/# sourceMappingURL=[^\r\n]*(?:\r?\n)?$/
 /** Debugger source name appended to page bundles in the WebWorker image. */
-const SOURCE_URL_TRAILER = /(?:\r?\n)?\/\/# sourceURL=([^\r\n]+)(?:\r?\n)?$/
+const SOURCE_URL_TRAILER = /(?:^|\r?\n)\/\/# sourceURL=([^\s"'`\\*]+)(?:\r?\n)?$/
 /** Published package-local client chunk names accepted by the on-demand route. */
 const CLIENT_CHUNK = /^client\.[A-Za-z0-9][A-Za-z0-9._-]*\.js$/
 /** Every `client.js` sibling the revision commits to: chunks and all source maps. */
-const ARTIFACT_SIBLING = /^client(?:\.[A-Za-z0-9][A-Za-z0-9._-]*)?\.js(?:\.map)?$/
 
 /** Resolve `exports["./client"]` to a relative path, accepting the string and one-level conditional forms. */
 function clientExportOf(pkgName: string, exportsField: unknown): string | undefined {
@@ -219,18 +222,10 @@ function framedHash(domain: string, parts: readonly (string | Buffer)[]): string
   return hash.digest('hex').slice(0, HASH_REVISION_LENGTH)
 }
 
-/**
- * Identify an entry's build by its served bytes: the entry bundle plus every
- * `client.js` sibling (chunks and source maps) in filename order. Identical
- * artifacts on different computers produce identical revisions, so their URLs
- * share caches; a stale revision names bytes this table no longer holds and
- * is rejected instead of served newer content.
- */
-function artifactRevision(snapshot: { bundle: Buffer; chunks: readonly ClientArtifactChunk[] }): string {
-  return framedHash('plugin-artifact', [
-    snapshot.bundle,
-    ...snapshot.chunks.flatMap(chunk => [chunk.fileName, chunk.bundle]),
-  ])
+/** Marked compiler output uses content identity; unmarked packages retain filesystem revisions. */
+function artifactRevision(baseline: ClientArtifactBaseline, bundle: Buffer): string {
+  return clientContentRevision(bundle)
+    ?? framedHash('plugin-artifact', [String(baseline.mtimeMs), String(baseline.ctimeMs), String(baseline.size)])
 }
 
 /**
@@ -253,7 +248,7 @@ function comboUrl(ids: readonly string[], rev: string, sourceMap = false): strin
   return comboPath(ids, rev, sourceMap).slice(1)
 }
 
-/** Absolute request path of one package-local chunk under the same revision as its entry. */
+/** Absolute request path of one package-local chunk under its executable or legacy owner revision. */
 function chunkPath(id: string, fileName: string, rev: string, sourceMap = false): string {
   return `/plugins/${id}/${fileName}${sourceMap ? '.map' : ''}?rev=${rev}`
 }
@@ -294,6 +289,58 @@ function partitionComboRecords(records: readonly WebPluginRecord[]): WebPluginRe
   return chunks
 }
 
+/** Validate package selectors before a Loader creates the service. */
+function validateApplicationBatchGroups(groups: string[][]): string[][] {
+  const assigned = new Set<string>()
+  for (const group of groups) {
+    if (group.length === 0) throw new Error('client-modules: an application batch group must name at least one package')
+    for (const id of group) {
+      if (exactPackageSpecifier(id) !== id || /[?&#,\s]/u.test(id)) {
+        throw new Error(`client-modules: application batch group needs a bare package name: ${JSON.stringify(id)}`)
+      }
+      if (PARSER_PRELOAD_IDS.some(bootstrapId => bootstrapId === id)) {
+        throw new Error(`client-modules: bootstrap package ${id} cannot belong to an application batch group`)
+      }
+      if (assigned.has(id)) throw new Error(`client-modules: repeated application batch package ${id}`)
+      assigned.add(id)
+    }
+  }
+  return groups
+}
+
+/** Resolve absent configuration to the ungrouped application sequence. */
+function resolveApplicationBatchGroups(config: Config): ReadonlyMap<string, number> {
+  const assignments = new Map<string, number>()
+  for (const [index, group] of (config.applicationBatchGroups ?? []).entries()) {
+    for (const id of group) assignments.set(id, index)
+  }
+  return assignments
+}
+
+/** Preserve graph order inside each transport group; ungrouped entries arrive in their own batches. */
+function applicationRecordGroups(
+  records: readonly WebPluginRecord[],
+  assignments: ReadonlyMap<string, number>,
+): readonly (readonly WebPluginRecord[])[] {
+  if (assignments.size === 0) return [records]
+  const ungrouped: WebPluginRecord[] = []
+  const grouped = new Map<number, WebPluginRecord[]>()
+  for (const record of records) {
+    const index = assignments.get(record.entry.id)
+    if (index === undefined) {
+      ungrouped.push(record)
+      continue
+    }
+    let group = grouped.get(index)
+    if (group === undefined) {
+      group = []
+      grouped.set(index, group)
+    }
+    group.push(record)
+  }
+  return [ungrouped, ...[...grouped].sort(([left], [right]) => left - right).map(([, group]) => group)]
+}
+
 /** Executable source plus the generated-file name used when no authored map exists. */
 interface PreparedSource {
   source: string
@@ -304,8 +351,7 @@ interface PreparedSource {
 function prepareSource(resource: ComboResource): PreparedSource {
   let source = resource.bundle.toString('utf8')
   const sourceUrl = SOURCE_URL_TRAILER.exec(source)?.[1]
-  source = source.replace(SOURCE_URL_TRAILER, '').replace(SOURCE_MAP_TRAILER, '')
-  if (!source.endsWith('\n')) source += '\n'
+  source = clientExecutableSource(source)
   const fallbackSource = sourceUrl === undefined
     ? `/plugins/${resource.id}/${resource.fileName}`
     : /^(?:[A-Za-z][A-Za-z\d+.-]*:|\/)/.test(sourceUrl) ? sourceUrl : `/${sourceUrl}`
@@ -472,11 +518,12 @@ function buildBatch(
 }
 
 /** Graph row for one bundle rev (url carries the rev as its cache-busting query). */
-function graphRow(id: string, rev: string, fields: WebBootRowFields): WebBootEntry {
+function graphRow(id: string, rev: string, fields: WebBootRowFields, chunks?: Record<string, string>): WebBootEntry {
   return {
     id,
     url: comboUrl([id], rev),
     rev,
+    ...(chunks === undefined ? {} : { chunks }),
     ...(fields.inject !== undefined ? { inject: fields.inject } : {}),
     ...(fields.immediately ? { immediately: true } : {}),
     ...(fields.external.length > 0 ? { external: fields.external } : {}),
@@ -590,12 +637,16 @@ window.__ModuleLoader__={
  */
 export class ClientModuleRegistry extends Service {
   static inject = ['loader']
+  static Config: z<Config> = z.object({
+    applicationBatchGroups: z.transform(z.array(z.array(z.string())), validateApplicationBatchGroups).default([]),
+  })
 
   /**
    * Host release identity published in every graph: this package's version, which releases share
    * with the CLI, and the source commit the client build fixes into the built Host artifact.
    */
   private readonly release: WebBootRelease
+  private readonly applicationBatchGroups: ReadonlyMap<string, number>
   private readonly table = new Map<string, WebPluginRecord>()
   private readonly sources = new Map<string, ClientPackageSource>()
   // Resolution is entry-local: the same specifier can resolve differently in
@@ -615,11 +666,13 @@ export class ClientModuleRegistry extends Service {
    * Build the service: subscribe, seed, and run the activation flush.
    * Bundle routes follow the optional Web carrier's injected lifecycle.
    * @param ctx - plugin context carrying Loader and an optional Web carrier.
+   * @param config - validated transport groups; omission leaves application entries ungrouped.
    */
-  constructor(ctx: Context) {
+  constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'clientModules')
+    this.applicationBatchGroups = resolveApplicationBatchGroups(config)
     const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
-    // The client build fixes this read into the built Host artifact.
+    // The Node build fixes this read into the built Host artifact.
     const commit = process.env.DSH_CLIENT_COMMIT_HASH
     this.release = commit === undefined ? { version } : { version, commit }
     // Subscribe before seeding so a fiber arriving mid-activation lands in the
@@ -710,26 +763,23 @@ export class ClientModuleRegistry extends Service {
   /**
    * Publish one completed bundle generation (the HMR watch's registration
    * hook — the only entry point through which build changes reach the graph).
-   * Unchanged mtime, ctime and size preserve the graph without reading the
-   * bundle; a stat delta re-reads the artifact and derives the revision from
-   * its bytes, so a byte-identical rewrite keeps the published URLs.
+   * Unchanged mtime, ctime and size preserve the graph without reading the bundle.
+   * Marked entries also preserve it when filesystem metadata changes without changing content.
    * @param id - entry id (package name).
    * @returns the current artifact rev, or undefined for an unknown id.
    */
   rebuilt(id: string): string | undefined {
     const record = this.table.get(id)
     if (record === undefined) return undefined
-    const stat = this.captureArtifactBaseline(record.meta.clientPath)
-    const baseline = record.baseline
-    if (stat.mtimeMs === baseline.mtimeMs && stat.ctimeMs === baseline.ctimeMs && stat.size === baseline.size) {
-      return record.entry.rev
-    }
-    const snapshot = this.initialBundleSnapshot(id, record.meta.clientPath)
-    record.baseline = snapshot.baseline
-    const rev = artifactRevision(snapshot)
+    const baseline = this.captureArtifactBaseline(record.meta.clientPath)
+    if (baseline.mtimeMs === record.baseline.mtimeMs && baseline.ctimeMs === record.baseline.ctimeMs
+      && baseline.size === record.baseline.size) return record.entry.rev
+    const bundle = readFileSync(record.meta.clientPath)
+    const rev = artifactRevision(baseline, bundle)
+    record.baseline = baseline
     if (rev === record.entry.rev) return rev
-    record.entry = graphRow(id, rev, record.meta)
-    record.bundle = snapshot.bundle
+    record.entry = graphRow(id, rev, record.meta, clientChunkRevisions(bundle))
+    record.bundle = bundle
     this.composed = this.compose()
     for (const notify of this.rebuildListeners) {
       // Containment: rebuilt() runs inside the HMR watch callback — a
@@ -745,7 +795,7 @@ export class ClientModuleRegistry extends Service {
   }
 
   /**
-   * Subscribe to bundle rebuilds; fires only when artifact metadata changes the rev.
+   * Subscribe to bundle rebuilds; fires only when the published artifact revision changes.
    * @param listener - receives the entry id and its new bundle rev.
    * @returns the unsubscriber.
    */
@@ -779,8 +829,10 @@ export class ClientModuleRegistry extends Service {
     for (const records of partitionComboRecords(bootstrap)) {
       artifacts.push(buildBatch('bootstrap', records, this.readSourceMap))
     }
-    for (const records of partitionComboRecords(application)) {
-      artifacts.push(buildBatch('application', records, this.readSourceMap))
+    for (const group of applicationRecordGroups(application, this.applicationBatchGroups)) {
+      for (const records of partitionComboRecords(group)) {
+        artifacts.push(buildBatch('application', records, this.readSourceMap))
+      }
     }
 
     const batchResponses = new Map<string, LazyResponse>()
@@ -969,30 +1021,16 @@ export class ClientModuleRegistry extends Service {
    */
   private initialBundleSnapshot(pkgName: string, clientPath: string): {
     bundle: Buffer
-    chunks: ClientArtifactChunk[]
     baseline: ClientArtifactBaseline
   } {
-    let baseline: ClientArtifactBaseline
-    let bundle: Buffer
     try {
-      baseline = this.captureArtifactBaseline(clientPath)
-      bundle = readFileSync(clientPath)
+      const baseline = this.captureArtifactBaseline(clientPath)
+      const bundle = readFileSync(clientPath)
+      return { bundle, baseline }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       throw new MissingClientBundleError(pkgName, clientPath, error)
     }
-    const directory = dirname(clientPath)
-    const chunks: ClientArtifactChunk[] = []
-    for (const fileName of readdirSync(directory).sort()) {
-      if (fileName === 'client.js' || !ARTIFACT_SIBLING.test(fileName)) continue
-      try {
-        chunks.push({ fileName, bundle: readFileSync(join(directory, fileName)) })
-      } catch (error) {
-        // A sibling removed between listing and reading is absent from this generation.
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-      }
-    }
-    return { bundle, chunks, baseline }
   }
 
   /** Report a failed background encoding; the dropped variant leaves the ready codings and identity served. */
@@ -1069,9 +1107,9 @@ export class ClientModuleRegistry extends Service {
     if (this.table.get(packageName)?.sourceKey === source.sourceKey) return false
     // Startup and HMR share revisions so unchanged artifacts survive a server restart.
     const snapshot = this.initialBundleSnapshot(packageName, source.meta.clientPath)
-    const rev = artifactRevision(snapshot)
+    const rev = artifactRevision(snapshot.baseline, snapshot.bundle)
     this.table.set(packageName, {
-      entry: graphRow(packageName, rev, source.meta),
+      entry: graphRow(packageName, rev, source.meta, clientChunkRevisions(snapshot.bundle)),
       loaderName: source.loaderName,
       sourceKey: source.sourceKey,
       meta: source.meta,
@@ -1109,12 +1147,13 @@ export class ClientModuleRegistry extends Service {
     this.notifyGraphChanged()
   }
 
-  /** Match an exact current-revision package-local chunk URL without reading its file. */
+  /** Match an exact published chunk or current owner revision without reading its file. */
   private chunkRequest(requestUrl: URL): {
     record: WebPluginRecord
     fileName: string
     sourceMap: boolean
     resourceUrl: string
+    chunkRevision: string | undefined
   } | undefined {
     const resourceUrl = `${requestUrl.pathname}${requestUrl.search}`
     for (const record of this.table.values()) {
@@ -1124,8 +1163,11 @@ export class ClientModuleRegistry extends Service {
       const sourceMap = requested.endsWith('.map')
       const fileName = sourceMap ? requested.slice(0, -'.map'.length) : requested
       if (!CLIENT_CHUNK.test(fileName)) return undefined
-      if (resourceUrl !== chunkPath(record.entry.id, fileName, record.entry.rev, sourceMap)) return undefined
-      return { record, fileName, sourceMap, resourceUrl }
+      const chunkRevision = record.entry.chunks?.[fileName]
+      if (record.entry.chunks !== undefined && chunkRevision === undefined) return undefined
+      if (resourceUrl !== chunkPath(record.entry.id, fileName, record.entry.rev, sourceMap)
+        && (chunkRevision === undefined || resourceUrl !== chunkPath(record.entry.id, fileName, chunkRevision, sourceMap))) return undefined
+      return { record, fileName, sourceMap, resourceUrl, chunkRevision }
     }
     return undefined
   }
@@ -1134,17 +1176,18 @@ export class ClientModuleRegistry extends Service {
   private chunkResponse(requestUrl: URL): LazyResponse | undefined {
     const request = this.chunkRequest(requestUrl)
     if (request === undefined) return undefined
-    const { record, fileName, sourceMap, resourceUrl } = request
+    const { record, fileName, sourceMap, resourceUrl, chunkRevision } = request
     const clientPath = join(dirname(record.meta.clientPath), fileName)
     if (!existsSync(clientPath)) return undefined
-    const mapKey = chunkPath(record.entry.id, fileName, record.entry.rev, true)
-    const resource = (): ComboResource => ({
-      id: record.entry.id,
-      rev: record.entry.rev,
-      clientPath,
-      fileName,
-      bundle: readFileSync(clientPath),
-    })
+    const revision = chunkRevision ?? record.entry.rev
+    const mapKey = chunkPath(record.entry.id, fileName, revision, true)
+    const resource = (): ComboResource => {
+      const bundle = readFileSync(clientPath)
+      if (chunkRevision !== undefined && clientChunkRevision(bundle.toString('utf8')) !== chunkRevision) {
+        throw new Error(`client-modules: ${record.entry.id}/${fileName} does not match its published chunk revision; ${CLIENT_BUNDLE_BUILD_INSTRUCTION}`)
+      }
+      return { id: record.entry.id, rev: revision, clientPath, fileName, bundle }
+    }
     const response: LazyResponse = sourceMap
       ? {
         body: precompressBody(lazyBody(() => buildComboSourceMap([resource()], this.readSourceMap, fileName)), this.precompressError),
@@ -1155,6 +1198,18 @@ export class ClientModuleRegistry extends Service {
         body: precompressBody(lazyBody(() => buildComboScript([resource()], mapKey.slice(`/plugins/${record.entry.id}/`.length))), this.precompressError),
         contentType: 'text/javascript; charset=utf-8',
       }
+    const materialize = response.body.identity.bind(response.body)
+    response.body = {
+      ...response.body,
+      identity: async () => {
+        try {
+          return await materialize()
+        } catch (error) {
+          if (this.responses.get(resourceUrl) === response) this.responses.delete(resourceUrl)
+          throw error
+        }
+      },
+    }
     this.responses.set(resourceUrl, response)
     return response
   }

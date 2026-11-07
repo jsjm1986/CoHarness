@@ -66,6 +66,8 @@ function verifyArtifacts(): void {
     'plugins/dsh-steward-tools/lib/query.js',
     'plugins/dsh-steward-tools/cordis.patch.yml',
     'packages/context/archive-gateway/lib/index.js',
+    'native/system/packages/entry/lib/index.js',
+    'native/system/packages/entry/lib/flock.js',
   ]) requireFile(resolve(root, path), failures)
   if (!gatewayRuntimePackageLinksValid(root)) {
     failures.push(resolve(root, 'gateway/node_modules/@deepseek-ai'))

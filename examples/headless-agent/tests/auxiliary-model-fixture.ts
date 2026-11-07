@@ -44,6 +44,6 @@ export async function withAuxiliaryModelHarness(
     await run(harness, options)
   } finally {
     try { await harness?.close() }
-    finally { await rm(cwd, { recursive: true, force: true }) }
+    finally { if (!process.env.DSH_AUX_KEEP_CWD) await rm(cwd, { recursive: true, force: true }) }
   }
 }

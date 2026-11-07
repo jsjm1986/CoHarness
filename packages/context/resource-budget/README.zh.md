@@ -40,19 +40,11 @@ Gateway 在 `/internal/runtime/resources/` 下实现已鉴权的注册、请求�
 <a id="model-experience"></a>
 ## 模型体验
 
-### 资源许可
-
-#### 模型看到什么
-
-无。`ResourceBudget` 接口不声明 prompt section、工具 schema 或模型可见结果。
-
-#### Token 影响
-
-无。许可请求包含执行元数据，不包含模型输入。
+没有直接影响；`ResourceBudget` 接口不声明 prompt section、工具 schema 或模型可见结果。
 
 #### KV Cache 影响
 
-无。服务调用不改变模型请求内容。
+无；服务调用不改变模型请求内容。
 
 ## 已知限制与后续工作
 

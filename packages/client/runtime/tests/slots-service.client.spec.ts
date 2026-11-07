@@ -87,13 +87,13 @@ function fakeHandle(persist?: string) {
  * same call — 'root' is single, so the one occupant is also the declarer),
  * and pull the host face out through renderSlot('root').
  */
-function captureHost(bench: Bench, children?: object): SlotRendererHost {
+function captureHost(bench: Bench, children?: object, sessions = fakeSessions()): SlotRendererHost {
   let host: SlotRendererHost | undefined
   bench.erased.install({
     renderRoot: (h: SlotRendererHost) => { host = h; return 'rendered' },
   })
   bench.erased.register({ name: 'root', ...(children !== undefined ? { children } : {}) }, C)
-  bench.ctx.reflect.provide('sessions', fakeSessions())
+  bench.ctx.reflect.provide('sessions', sessions)
   bench.ctx.reflect.provide('workspaces', fakeWorkspaces())
   bench.erased.renderSlot('root', {})
   if (host === undefined) throw new Error('renderer never received the host')
@@ -632,6 +632,17 @@ describe('host face', () => {
     const host = captureHost(bench)
     expect(host.sessions.list.getSnapshot()).toMatchObject({ ids: [] })
     expect(host.sessions.provideInfo.getSnapshot()).toMatchObject({ sessionId: undefined })
+  })
+
+  it('forwards the explicit Session provide revision source without replacing it', async () => {
+    const bench = await boot()
+    const revision = { getSnapshot: () => 3, subscribe: () => () => {} }
+    try {
+      const sessions = { ...fakeSessions(), provideInfoRevision: revision }
+      const host = captureHost(bench, undefined, sessions)
+      expect(host.sessions.provideInfoRevision).toBe(revision)
+      expect(host.sessions.provideInfoRevision?.getSnapshot()).toBe(3)
+    } finally { await bench.ctx.fiber.dispose() }
   })
 
   it('exposes the independent Workspace list source', async () => {

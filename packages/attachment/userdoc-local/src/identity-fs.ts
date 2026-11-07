@@ -1,7 +1,7 @@
 /** Identity-aware document operations; one owner retains the database until every admitted operation settles. */
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import { lstat, mkdir, open, readFile, readdir, unlink } from 'node:fs/promises'
 import { Readable } from 'node:stream'
 import { basename, join, relative, resolve, sep } from 'node:path'
@@ -26,6 +26,7 @@ import { assertInside, assertNestedDirectories, docIdFor, pathForDirectoryId, pa
 import { listDocDirectory, listDocFiles, resolveDocTarget, saveDocFile } from './store.ts'
 import { mediaTypeFor } from './media-type.ts'
 import { readLegacyTrashRecords } from './trash.ts'
+import { loadNodeSqlite } from '@deepseek-ai/dsh-session-persistence-sqlite'
 import type { DocumentProjectionBatch, DocumentProjectionCursor, DocumentProjectionReadOptions } from './projection.ts'
 import { admitDocumentWrite } from './admission.ts'
 import type { UserDocBackgroundWrite } from './upload.ts'
@@ -109,13 +110,27 @@ export class DocumentIdentityFs {
           if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
         }
         await storage.metadataFile()
+        const { DatabaseSync } = await loadNodeSqlite()
         const database = new DatabaseSync(path)
         connection = database
         const version = database.prepare('PRAGMA user_version').get()?.user_version
         if (version === 2 || version === 3) {
           const legacy = new DocumentIdentityStore(root, database, 'read')
-          legacy.verifyLegacyStorage(storage.binding)
-          await storage.bindDomain(legacy.rootId)
+          try {
+            legacy.verifyLegacyStorage(storage.binding)
+          } catch (conflict) {
+            if (!(conflict instanceof DocumentIdentityConflict)) throw conflict
+            legacy.verifyLegacyStorage(storage.binding, true)
+          }
+          try {
+            await storage.bindDomain(legacy.rootId)
+          } catch (conflict) {
+            try {
+              await storage.recoverDomainMount(legacy.rootId)
+            } catch {
+              throw conflict
+            }
+          }
         }
         const store = new DocumentIdentityStore(root, database)
         return new DocumentIdentityFs(root, database, new DocumentMutationExecutor(storage, store, admit), storage)

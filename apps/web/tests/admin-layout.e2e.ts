@@ -43,7 +43,7 @@ const inside = (inner: Box, outer: Box) => {
   expect(bottom(inner)).toBeLessThanOrEqual(bottom(outer) + 1)
 }
 
-it('keeps admin form controls aligned inside their sections', async () => {
+it('keeps admin controls inside their sections and navigation reachable on short screens', async () => {
   const root = await mkdtemp(join(tmpdir(), 'admin-layout-'))
   const cleanup: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
   try {
@@ -163,7 +163,8 @@ it('keeps admin form controls aligned inside their sections', async () => {
         const luminance = (rgb: number[]): number => rgb.slice(0, 3).reduce((sum, value, index) => {
           const channel = value / 255
           return sum + (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
-            * [0.2126, 0.7152, 0.0722][index]
+            // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- Gateway browser types use a separate compiler program.
+            * [0.2126, 0.7152, 0.0722][index]!
         }, 0)
         return elements.filter(element => element.getBoundingClientRect().height > 0).map((element) => {
           const style = getComputedStyle(element)
@@ -227,6 +228,23 @@ it('keeps admin form controls aligned inside their sections', async () => {
     ])
 
     expect(errors).toEqual([])
+
+    await page.setViewportSize({ width: 1280, height: 720 })
+    const sidebar = page.locator('aside.sidebar')
+    const logout = sidebar.getByRole('button', { name: '退出登录' })
+    inside(await boxOf(logout), { x: 0, y: 0, width: 1280, height: 720 })
+    const audit = sidebar.getByRole('link', { name: '审计', exact: true })
+    await audit.focus()
+    inside(await boxOf(audit), { x: 0, y: 0, width: 1280, height: 720 })
+    await audit.press('Enter')
+    await page.waitForURL(`${base}/admin/audit`)
+    await compareOrRefreshGolden(
+      resolve('apps/web/tests/expected/admin-layout/sidebar-short.expected.md'),
+      await sidebar.ariaSnapshot(),
+      webSnapshotMode(),
+    )
+    await logout.click()
+    await page.waitForURL(`${base}/login`)
   } finally {
     for (const clean of cleanup.reverse()) await clean()
   }

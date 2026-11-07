@@ -48,6 +48,7 @@ export class ModelDirectoryResolver extends Service {
     modelName: string,
     capability: ModelInputCapability | undefined,
   ) => string) | undefined
+  private readonly formatTransportError: ((operation: 'load' | 'select') => string) | undefined
 
   /**
    * @param ctx - owning root context (the service registers itself as `models`).
@@ -61,6 +62,7 @@ export class ModelDirectoryResolver extends Service {
       modelName: string,
       capability: ModelInputCapability | undefined,
     ) => string
+    formatTransportError?: (operation: 'load' | 'select') => string
   }) {
     super(ctx, 'modelDirectories')
     this.blockReason = config.blockReason
@@ -90,6 +92,7 @@ export class ModelDirectoryResolver extends Service {
       sessionId,
       () => sessions.subagentAddress(sessionId) === undefined,
       this.formatSelectionError,
+      this.formatTransportError,
     )
     live.directories.set(sessionId, directory)
     const remote = (actx.get('remote') as Context['remote']).$forTarget(target)

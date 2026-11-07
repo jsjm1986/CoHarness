@@ -20,7 +20,7 @@ import LocalCredentials from '@deepseek-ai/dsh-credentials-local'
 import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import * as FrontendStatic from '@deepseek-ai/dsh-host-frontend-static'
 import HttpServer from '@deepseek-ai/dsh-host-webserver'
-import type { GatewayPrincipalClaims, GatewayRuntimeCredential } from '../../src/index.ts'
+import type { GatewayPrincipalClaims, GatewayRuntimeCredential, GatewayRequestPrincipal } from '../../src/index.ts'
 import GatewayRuntime from '../../src/index.ts'
 
 /** One mux/host event source that stays open until the downlink closes. */
@@ -47,20 +47,26 @@ export interface GatewayComposition {
 
 /**
  * Boot the deployed runtime composition under a private credential and port.
- * @param options - shared-project identity and external Gateway origin for the scenario.
+ * @param options - shared-project identity, private test transport, renewal pacing, and event-admission observer.
  * @returns the composed context, its assertion issuer, and its loopback origin.
  */
-export async function loadGatewayComposition(
-  options: { projectId?: number; gatewayUrl?: string; requiredPlugins?: string[] } = {},
-): Promise<GatewayComposition> {
+export async function loadGatewayComposition(options: {
+  runtime?: GatewayRuntimeCredential['runtime']
+  projectId?: number
+  gatewayUrl?: string
+  requiredPlugins?: string[]
+  streamPrincipalRenewal?: GatewayRuntimeCredential['streamPrincipalRenewal']
+  onEvent?: (principal: GatewayRequestPrincipal, signal: AbortSignal) => void
+} = {}): Promise<GatewayComposition> {
   const pair = generateKeyPairSync('ed25519')
   const credential: GatewayRuntimeCredential = {
     version: 1,
     gatewayUrl: options.gatewayUrl ?? 'http://127.0.0.1:8899',
+    ...(options.streamPrincipalRenewal === undefined ? {} : { streamPrincipalRenewal: options.streamPrincipalRenewal }),
     organization: 'acme',
-    runtime: options.projectId === undefined
+    runtime: options.runtime ?? (options.projectId === undefined
       ? { kind: 'user', id: 9, generation: 7 }
-      : { kind: 'project', id: options.projectId, generation: 7 },
+      : { kind: 'project', id: options.projectId, generation: 7 }),
     token: 'runtime-secret',
     principalPublicKey: pair.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
   }
@@ -73,7 +79,7 @@ export async function loadGatewayComposition(
       organization: 'acme',
       user: { id: 9, username: 'lin', displayName: 'Lin', role: 'user' },
       scope: credential.runtime.kind === 'project'
-        ? { kind: 'project', projectId: credential.runtime.id, projectName: 'Compiler', mode: 'rw' }
+        ? { kind: 'project', projectId: credential.runtime.id, projectName: 'Fixture project', mode: 'rw' }
         : { kind: 'personal' },
       runtime: credential.runtime,
       issuedAt: now,
@@ -135,12 +141,11 @@ export async function loadGatewayComposition(
       }
     },
   }
-  const apiProxy = {
-    events: {
-      mux: (_request: unknown, signal: AbortSignal) => idle(signal),
-      host: (_request: unknown, signal: AbortSignal) => idle(signal),
-    },
-  } as unknown as ApiProxy
+  const eventSource = (_request: unknown, signal: AbortSignal) => {
+    options.onEvent?.(ctx.gatewayRuntime.requireCurrent(), signal)
+    return idle(signal)
+  }
+  const apiProxy = { events: { mux: eventSource, host: eventSource } } as unknown as ApiProxy
   ctx.provide('apiProxy', apiProxy)
 
   const previousFile = process.env.DSH_GATEWAY_CREDENTIAL_FILE

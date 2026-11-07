@@ -155,7 +155,7 @@ describe('UserDetailPage', () => {
     expect(await screen.findByText('用户 · Alice')).toBeTruthy()
     expect(screen.getByRole('button', { name: '编辑账号' })).toBeTruthy()
     expect(screen.queryByText('/home/alice')).toBeNull()
-    await act(async () => { profile.reject(new Error('selected computer unavailable')) })
+    await act(async () => { void profile.promise.catch(() => {}); profile.reject(new Error('selected computer unavailable')) })
     expect(await screen.findByText('selected computer unavailable')).toBeTruthy()
     expect(screen.getByRole('button', { name: '编辑账号' })).toBeTruthy()
     expect(screen.getByText('当前环境使用权限')).toBeTruthy()

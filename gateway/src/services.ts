@@ -43,6 +43,7 @@ import type {
   ProjectDetail,
   ProjectInvitation,
   ProjectRow,
+  ProjectScopeMetadata,
   ProjectThemePolicy,
   UserProjectMembership,
 } from './projects.ts'
@@ -68,6 +69,12 @@ export interface GatewayAuthService {
    * @returns current account identity, or null at or after either expiry or after revocation.
    */
   validate(token: string): Awaitable<UserRow | null>
+  /**
+   * Check an existing stream's login without updating activity or either login deadline.
+   * @param token - original login token owned by the Gateway socket registry.
+   * @returns current user and existing earliest deadline, or null when ineligible.
+   */
+  qualifyForStream(token: string): Awaitable<import('./auth.ts').StreamSessionQualification | null>
   revoke(token: string): Awaitable<void>
 }
 
@@ -140,6 +147,12 @@ export interface GatewayProjectService {
   getById(id: number, display?: 'directory'): Awaitable<ProjectDetail | null>
   /** Batch detail lookup used by account catalog pages to avoid N+1 queries. */
   getByIds?(ids: readonly number[], display?: 'directory'): Awaitable<ProjectDetail[]>
+  /**
+   * Read active node-local scope metadata without member lists or counts.
+   * @param ids - public project ids already authorized by the caller.
+   * @returns Available owner, origin and theme fields for those projects.
+   */
+  getScopeMetadataByIds?(ids: readonly number[]): Awaitable<ProjectScopeMetadata[]>
   /**
    * Seed the reserved steward space once or return the existing row. The
    * steward project has no member rows; admission comes from the steward

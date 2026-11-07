@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconLoadingOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { parseClientSessionKey, SessionCreateError, type ConversationIntent, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationContentProps, ConversationSlotProps, ConversationViewsProps, InputZone, WorkbenchLayoutPreset,
@@ -377,8 +377,11 @@ export function ConversationContent({
     }
     wasPreparing.current = preparing
   }, [preparing])
-  const settling = !preparing && sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
-    && summaryBlank !== true
+  // Initial navigation and unread history retain the mounted composer until its layout is known.
+  // A current summary-proven blank Session keeps its Hero while history opens.
+  const initialSelectionPending = sessionId === undefined && workspaces.initialSelectionPending === true
+  const settling = !preparing && (initialSelectionPending || (sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
+    && summaryBlank !== true))
   const hero = !preparing && (sessionId === undefined
     || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true)))
   const zone: InputZone | undefined =
@@ -403,7 +406,7 @@ export function ConversationContent({
 
   const heroWorkspaceRow = (
     <div className={css.heroWorkspaceRow}>
-      {headerLeading}
+      {initialSelectionPending ? null : headerLeading}
       <WorkspaceChip
         buttonRef={pickerAnchor}
         label={chipTitle}
@@ -490,7 +493,8 @@ export function ConversationContent({
   // on the fallback alone would leave Question/Approval panels at the content
   // end off-screen when the user is not pinned to the floor.
   const composerSeat = (
-    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer">
+    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer"
+      aria-hidden={initialSelectionPending || undefined}>
       {preparing ? composerBar : composer}
     </div>
   )
@@ -582,9 +586,15 @@ export function ConversationContent({
       data-phase={phase}
       data-chat-fill={displaySettings.chatFullWidth || undefined}
     >
+      {initialSelectionPending && headerLeading !== undefined && (
+        <header className={css.header}><div className={css.titleRow}>{headerLeading}</div></header>
+      )}
       {variant === 'embedded' || preparing ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading, toolsHostId, toolsActive })}
       <div className={css.scrollRegion} data-conversation-session={preparing ? undefined : sessionId} data-conversation-region="chat">
-        <div className={css.scrollBody} data-conversation-scroll="">
+        {initialSelectionPending && <div className={css.initialLoading} role="status" aria-label={t('hero.loadingWorkspace')}>
+          <span aria-hidden="true"><IconLoadingOutline16 size={24} className={css.initialLoadingIcon} /></span>
+        </div>}
+        <div className={css.scrollBody} data-conversation-scroll="" aria-busy={initialSelectionPending || undefined}>
           {sessionId === undefined || preparing ? null : <Views compact={compact} />}
           {composerSeat}
         </div>
@@ -638,10 +648,6 @@ export function ConversationRoot(props: ConversationRootProps) {
   const intents = props.useConversationIntents(value => value)
   const pending = intents.active
   const draftFailures = props.useDraftFailures(value => value)
-  useEffect(() => {
-    props.onViewportEnabled(available)
-    return () => { props.onViewportEnabled(false) }
-  }, [available, props.onViewportEnabled])
   const [maximizedId, setMaximizedId] = useState<SessionId | undefined>()
   const [width, setWidth] = useState<number | undefined>()
   /** Single-pane tab presentation chosen from the layout preset menu. */

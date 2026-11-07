@@ -93,6 +93,10 @@ export function apply(ctx: ClientContext): void {
     if (!sameResourceRuntime(target, request.runtimeTarget)) {
       throw new WorkspaceResourceError('access-revoked', 'Workspace resource runtime no longer owns this Session')
     }
+    const current = viewport.snapshot.getSnapshot()
+    if (current.mode === 'workbench' && current.pendingIdentity !== true && current.paneIds.includes(request.sessionId)) {
+      viewport.focus(request.sessionId)
+    }
     ctx.sidebarRight.openSessionResource(request.sessionId, request.address, {
       kind: 'workspace-file', ...(request.line === undefined ? {} : { params: { line: request.line } }),
     })
@@ -142,7 +146,11 @@ export function apply(ctx: ClientContext): void {
         excelT: ctx.locale.bind('sidebarExcel'),
         excelLimits: config.excel,
         keyedHooks: { workspaceResource: sourceFor },
-        reloadResource: request => ctx.workspaceResources.source(request).reload(),
+        reloadResource: async (request) => {
+          const source = ctx.workspaceResources.source(request)
+          await source.reload()
+          return source.getSnapshot().status === 'live'
+        },
         revokeResource: (request, message) => {
           ctx.workspaceResources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
         },
@@ -221,12 +229,14 @@ export function apply(ctx: ClientContext): void {
       const gatewayEntries = ctx.get('gatewayEntryRequests')
       return {
         hooks: { deployment: ctx.deploymentContext },
-        ...(gatewayEntries === undefined ? {} : { catalogAuthority: gatewayEntries.catalogAuthority, moreComputers: (signal: AbortSignal) => gatewayEntries.moreComputers(signal),
+        ...(gatewayEntries === undefined ? {} : { catalogAuthority: gatewayEntries.catalogAuthority,
+          moreComputers: (signal: AbortSignal) => gatewayEntries.moreComputers(signal),
           readProjectDisplay: (scope: string, signal: AbortSignal) => gatewayEntries.selectedProjectDisplay(scope, signal),
           readCatalog: async (signal: AbortSignal, visible?: { scope?: string; q?: string; cursor?: string }) =>
             parseWorkbenchCatalog(await gatewayEntries.catalog(signal, visible)) }),
         listWorkbenches: () => wb.listWorkbenches?.() ?? [],
         currentWorkbench: () => wb.currentWorkbench?.(),
+        needsCatalogRestore: () => wb.needsCatalogRestore?.() ?? false,
         createWorkbench: (name: string) => wb.createWorkbench?.(name) ?? '',
         renameWorkbench: (id: string, name: string) => { wb.renameWorkbench?.(id, name) },
         duplicateWorkbench: (id: string, name: string) => wb.duplicateWorkbench?.(id, name) ?? '',
@@ -234,7 +244,7 @@ export function apply(ctx: ClientContext): void {
         switchWorkbench: (id: string) => { wb.switchWorkbench?.(id) },
         chooseSession: (item: import('./catalog.ts').WorkbenchConversation, replace: boolean, signal?: AbortSignal) =>
           chooseSession(item, replace, AbortSignal.any([ctx.sessions.beginNavigation(), ...(signal === undefined ? [] : [signal])])),
-        focusSession: (id: SessionId) => { viewport.focus(id) },
+        focusSession: (id: SessionId) => { ctx.layout.selectPanel(null); viewport.focus(id) },
         createSession: async (target: SessionRuntimeTarget, replace: boolean, signal?: AbortSignal) => {
           signal?.throwIfAborted()
           if (viewport.snapshot.getSnapshot().pendingIdentity === true) return { ok: false as const, reason: 'unknown' as const }
@@ -425,10 +435,10 @@ export function apply(ctx: ClientContext): void {
         // Row tiles resolve the same per-pane steward tone as the pane header.
         projectPolicy: ctx.get('projectUiPolicy') ?? ABSENT_PROJECT_POLICY,
       },
-      focusPane: (sessionId) => { viewport.focus(sessionId) },
+      focusPane: (sessionId) => { ctx.layout.selectPanel(null); viewport.focus(sessionId) },
       removePane: (sessionId) => { viewport.remove(sessionId) },
       setPaneRatios: (ratios) => { viewport.setPaneRatios(ratios) },
-      exitWorkbench: () => { viewport.setMode('single') },
+      exitWorkbench: () => { ctx.layout.selectPanel(null); viewport.setMode('single') },
     }),
   }, WorkbenchSidebar))
   ctx.slots.inject('conversation.workbench.pane.header', () => ctx.slots.register({

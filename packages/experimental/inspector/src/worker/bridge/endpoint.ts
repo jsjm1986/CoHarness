@@ -6,8 +6,7 @@ import type { Duplex } from 'node:stream'
 import { WebSocketServer, type RawData, type WebSocket } from 'ws'
 import type { InspectorWorkerConfig } from '../../shared/bridge/messages/control.ts'
 import type { WorkerToSourceFrame } from '../../shared/bridge/messages/observation.ts'
-import type { InspectorSourceId } from '../../shared/bridge/ids.ts'
-import { readInspectorClientSelection } from '../../shared/web.ts'
+import { isInspectorClientOriginAllowed, readInspectorClientSelection, type InspectorClientSelection } from '../../shared/web.ts'
 import { CdpSession } from '../cdp/session.ts'
 import type { CdpTransport } from '../cdp/protocol.ts'
 import type { NetworkDomain } from '../cdp/domains/network/session.ts'
@@ -124,7 +123,7 @@ export class InspectorEndpoint {
       return
     }
     if (url.pathname === `/devtools/page/${this.config.targetId}`) {
-      let clientSourceId: InspectorSourceId | undefined
+      let clientSourceId: InspectorClientSelection
       try {
         clientSourceId = readInspectorClientSelection(url)
       } catch (error) {
@@ -146,7 +145,7 @@ export class InspectorEndpoint {
     socket.destroy()
   }
 
-  private acceptCdp(socket: WebSocket, clientSourceId: InspectorSourceId | undefined): void {
+  private acceptCdp(socket: WebSocket, clientSourceId: InspectorClientSelection): void {
     const transport: CdpTransport = {
       send: (payload) => {
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(payload))
@@ -223,13 +222,7 @@ export class InspectorEndpoint {
     if (!protocols.includes(this.config.clientToken)) return false
     const origin = request.headers.origin
     if (origin === undefined) return true
-    if (this.config.clientOrigins.includes(origin)) return true
-    try {
-      const hostname = new URL(origin).hostname
-      return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
-    } catch {
-      return false
-    }
+    return isInspectorClientOriginAllowed(origin, this.config.clientOrigins)
   }
 
   private target(): object {

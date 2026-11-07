@@ -19,6 +19,13 @@ type SessionOrderSource = {
   rowState: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>
 }
 
+/** One account's reconciled order and activity baseline, committed with its sibling accounts. */
+type SessionOrderAccountUpdate = {
+  accountKey: string
+  order: string[]
+  updatedAt: Record<string, number>
+}
+
 /** Session-list grouping mode: workspace sections, a directory-nested workspace tree, or one flat recency list. */
 export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat'
 /** Session order: user-arranged only, or user-arranged plus activity promotion. */
@@ -47,6 +54,10 @@ type WorkspaceViewActions = {
   setOrderBy: (draft: WorkspaceViewState, mode: SessionOrderBy) => void
   setGroupExpanded: (draft: WorkspaceViewState, key: string, expanded: boolean) => void
   retainAccountKeys: (draft: WorkspaceViewState, workspaceKeys: readonly string[]) => void
+  syncSessionOrderAccounts: (
+    draft: WorkspaceViewState,
+    updates: readonly SessionOrderAccountUpdate[],
+  ) => void
   syncSessionOrderAccount: (
     draft: WorkspaceViewState,
     accountKey: string,
@@ -94,7 +105,13 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
           Object.entries(d.sessionUpdatedAtByAccount).filter(([key]) => retained.has(key)),
         )
       },
-      syncSessionOrderAccount: (d, accountKey: string, order: string[], updatedAt: Record<string, number>) => {
+      syncSessionOrderAccounts: (d, updates) => {
+        for (const { accountKey, order, updatedAt } of updates) {
+          d.sessionOrderByAccount[accountKey] = order
+          d.sessionUpdatedAtByAccount[accountKey] = updatedAt
+        }
+      },
+      syncSessionOrderAccount: (d, accountKey, order, updatedAt) => {
         d.sessionOrderByAccount[accountKey] = order
         d.sessionUpdatedAtByAccount[accountKey] = updatedAt
       },

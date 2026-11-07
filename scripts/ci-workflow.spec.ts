@@ -194,7 +194,9 @@ describe('CI workflow', () => {
     expect(windowsNative.if).toContain("github.event_name == 'schedule'")
     expect(windowsNative.if).toContain("github.ref == 'refs/heads/master'")
     expect(windowsNative.if).toContain("needs.pr-scope.outputs.proof_native_windows == 'true'")
-    expect(windowsNative.needs).toBe('pr-scope')
+    expect(windowsNative.needs).toEqual(['pr-scope', 'node-24'])
+    expect(windowsNative.if).toContain("needs.node-24.result != 'failure'")
+    expect(windowsNative.if).toContain("needs.node-24.result != 'cancelled'")
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })

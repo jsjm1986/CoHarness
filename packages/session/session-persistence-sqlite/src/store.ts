@@ -508,8 +508,11 @@ async function validateDatabaseFileIfPresent(path: string): Promise<void> {
 
 let nodeSqlite: Promise<typeof import('node:sqlite')> | undefined
 
-/** Load Node SQLite once so concurrent stores share one warning-filter lifetime. */
-function loadNodeSqlite(): Promise<typeof import('node:sqlite')> {
+/**
+ * Load Node SQLite once so concurrent stores share one warning-filter lifetime.
+ * @returns the memoized `node:sqlite` module promise.
+ */
+export function loadNodeSqlite(): Promise<typeof import('node:sqlite')> {
   nodeSqlite ??= importNodeSqlite()
   return nodeSqlite
 }

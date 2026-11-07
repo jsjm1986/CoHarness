@@ -6967,7 +6967,7 @@
         "packages/bundle/web-app/tests/web-app.spec.ts",
         "packages/bundle/web-app/tsconfig.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/bundle/web-app",
@@ -9700,7 +9700,7 @@
         "packages/compaction/command-compact/locale/zh.json",
         "packages/compaction/command-compact/package.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/compaction/command-compact",
@@ -9793,7 +9793,7 @@
         "packages/compaction/compaction-image-offload/src/index.ts",
         "packages/compaction/compaction-image-offload/tests/image-offload.spec.ts"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/compaction/compaction-image-offload",
@@ -9884,7 +9884,7 @@
         "packages/context/agent-instructions/tests/agent-instructions.spec.ts",
         "packages/context/agent-instructions/tsconfig.json"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/context/agent-instructions",
@@ -10776,7 +10776,7 @@
         "packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts",
         "packages/experimental/browser-use-chrome-devtools-mcp/tsconfig.json"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/experimental/browser-use-chrome-devtools-mcp",
@@ -10804,7 +10804,7 @@
         "packages/experimental/browser-use-playwright-mcp/src/index.ts",
         "packages/experimental/browser-use-playwright-mcp/tsconfig.json"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/experimental/browser-use-playwright-mcp",
@@ -13380,7 +13380,7 @@
         "packages/interaction/commands/tests/invariant.spec.ts",
         "packages/interaction/commands/tsconfig.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/interaction/commands",
@@ -13474,7 +13474,7 @@
         "packages/interaction/user-approval/tsconfig.json",
         "packages/interaction/user-approval/tsdown.config.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/interaction/user-approval",
@@ -14158,7 +14158,7 @@
         "packages/preset/agent-preset/skills/cordis-plugin-development/templates/mcp/package.json",
         "packages/preset/agent-preset/tests/skills.spec.ts"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "localDisposition": "Upstream preset authoring skill pack (skills/templates/locales) carried in P5 alongside the registry split; the fork js-yaml line is 5.x. The fork file-model presets keep their embedded skills, so the packaged skills serve upstream-style declared presets.",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
@@ -14254,7 +14254,7 @@
         "packages/ptc-runtime/ptc-runtime/src/types.ts",
         "packages/ptc-runtime/ptc-runtime/tests/service.spec.ts"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/ptc-runtime/ptc-runtime",
@@ -14389,7 +14389,7 @@
         "packages/sandbox/sandbox-local/locale/zh.json",
         "packages/sandbox/sandbox-local/package.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/sandbox/sandbox-local",
@@ -14778,7 +14778,7 @@
         "packages/session/session-checkpoint-policy/tests/crash-recovery.e2e.ts",
         "packages/session/session-checkpoint-policy/tests/fixtures/crash-child.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/session/session-checkpoint-policy",
@@ -16981,7 +16981,7 @@
         "packages/test-support/llm-mock-server/src/index.ts",
         "packages/test-support/llm-mock-server/tests/server.spec.ts"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/test-support/llm-mock-server",
@@ -17212,7 +17212,7 @@
         "packages/typert/loader/tests/lazy-info.spec.ts",
         "packages/typert/loader/tests/loader.spec.ts"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/typert/loader",
@@ -17278,7 +17278,7 @@
         "packages/typert/registry/tests/typert.spec.ts",
         "packages/typert/registry/tsdown.config.ts"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/typert/registry",
@@ -17516,7 +17516,7 @@
         "packages/util/launch-environment/README.zh.md",
         "packages/util/launch-environment/package.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/util/launch-environment",
@@ -18123,7 +18123,7 @@
         "packages/workflow/workflow/tests/invariant.spec.ts",
         "packages/workflow/workflow/tsconfig.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/workflow/workflow",

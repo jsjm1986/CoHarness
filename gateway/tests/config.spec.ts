@@ -28,6 +28,32 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ HGW_LAUNCHER: 'systemd', HGW_PROJECT_PATH_ROOTS: '/srv/projects/',
       HGW_USER_PROJECTS_ROOT: '/srv/projects/child/..' })).toThrow('strict descendant')
   })
+  it('shares font metadata only among local runtimes and accepts an explicit opt-out', () => {
+    const cfg = loadConfig({})
+    expect(cfg.officeFontMetadataCacheDirectory).toBe(resolve(cfg.stateRoot, 'cache', 'office-font-metadata'))
+    expect(loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: '/private/fonts/cache' }).officeFontMetadataCacheDirectory)
+      .toBe('/private/fonts/cache')
+    expect(loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: 'off' }).officeFontMetadataCacheDirectory).toBeUndefined()
+    const systemd = { HGW_LAUNCHER: 'systemd', HGW_PROJECT_PATH_ROOTS: '/srv/projects' }
+    expect(loadConfig(systemd).officeFontMetadataCacheDirectory).toBeUndefined()
+    expect(() => loadConfig({ ...systemd, HGW_OFFICE_FONT_METADATA_CACHE_DIR: '/private/fonts/cache' }))
+      .toThrow('HGW_OFFICE_FONT_METADATA_CACHE_DIR requires HGW_LAUNCHER=local')
+    for (const path of ['', 'relative/cache', '/cache\0invalid']) {
+      expect(() => loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: path })).toThrow('HGW_OFFICE_FONT_METADATA_CACHE_DIR')
+    }
+  })
+
+  it('validates bounded private event principal renewal settings', () => {
+    expect(loadConfig({}).streamPrincipalRenewal).toEqual({ enabled: true, intervalMs: 10000, requestTimeoutMs: 5000, maxBatchSize: 64 })
+    expect(loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'false' }).streamPrincipalRenewal.enabled).toBe(false)
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'yes' })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED')
+    for (const key of ['HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '1025' })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH')
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS')
+  })
+
   it('retains local browser recovery deadlines and validates node-specific overrides', () => {
     expect(loadConfig({})).toMatchObject({ runtimeBrowserReadyTimeoutMs: 15000, runtimeBrowserStreamTimeoutMs: 3000, runtimeBrowserRpcTimeoutMs: 30000 })
     expect(loadConfig({ HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS: '120000', HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS: '60000', HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS: '120000' }))

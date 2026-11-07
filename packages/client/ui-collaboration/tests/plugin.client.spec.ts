@@ -8,7 +8,7 @@ import { ConversationShareAction, type ConversationShareInjected } from '../src/
 import { LogoutButton } from '../src/client/LogoutButton.tsx'
 import { ReadOnlyComposer } from '../src/client/ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlInjected } from '../src/client/ScopeControl.tsx'
-import type { CollaborationContext } from '../src/client/collaboration-client.ts'
+import { CollaborationClient, type CollaborationContext } from '../src/client/collaboration-client.ts'
 import { apply, inject } from '../src/client/index.ts'
 
 const baseContext: CollaborationContext = {
@@ -41,7 +41,7 @@ function conversationDetail(sessionId: string, visibility: 'project' | 'private'
   }
 }
 
-async function bench(context: CollaborationContext, documentIdentity = false) {
+async function bench(context: CollaborationContext, documentIdentity = false, initialResponse?: Promise<Response>) {
   const ctx = new Context()
   const policy = new ProjectUiPolicyRuntime()
   ctx.provide('projectUiPolicy', policy)
@@ -62,7 +62,7 @@ async function bench(context: CollaborationContext, documentIdentity = false) {
     },
   } as never, () => null)
   const originalFetch = globalThis.fetch
-  const fetcher = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+  const fetcher = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
     const path = typeof input === 'string'
       ? input
       : input instanceof URL ? input.href : input.url
@@ -75,6 +75,7 @@ async function bench(context: CollaborationContext, documentIdentity = false) {
     }
     return Promise.resolve(new Response(null, { status: 204 }))
   })
+  if (initialResponse !== undefined) fetcher.mockReturnValueOnce(initialResponse)
   globalThis.fetch = fetcher
   const fiber = ctx.plugin({ inject: [...inject], apply })
   try {
@@ -82,23 +83,118 @@ async function bench(context: CollaborationContext, documentIdentity = false) {
     const scopeEntry = ctx.slots.entries('sidebar.footer.action')
       .find(entry => entry.component === ScopeControl)!
     const scope = (scopeEntry.inject as unknown as () => ScopeControlInjected)()
-    await vi.waitFor(() => { expect(scope.hooks.collaboration.getSnapshot().status).toBe('ready') })
-    return { ctx, policy, fiber, fetcher, scope, restore: () => { globalThis.fetch = originalFetch } }
+    if (initialResponse === undefined) {
+      await vi.waitFor(() => { expect(scope.hooks.collaboration.getSnapshot().status).toBe('ready') })
+    } else {
+      await vi.waitFor(() => { expect(fetcher).toHaveBeenCalledOnce() })
+    }
+    return { ctx, policy, fiber, fetcher, scope, restore: () => { globalThis.fetch = originalFetch },
+      contextCalls: () => fetcher.mock.calls.filter(([input]) => (typeof input === 'string' ? input
+        : input instanceof URL ? input.href : input.url) === '/account/api/context') }
   } catch (error) {
-    globalThis.fetch = originalFetch
+    try { await fiber.dispose() }
+    finally { globalThis.fetch = originalFetch }
     throw error
   }
 }
 
 describe('ui-collaboration apply', () => {
-  it('retains document-owned account persistence during a transport renewal while withdrawing permissions', async () => {
+  it('keeps fresh account proof on the first handshake and withdraws it on reconnect', async () => {
+    const b = await bench(baseContext)
+    try {
+      b.ctx.emit('connection/will-reset', true)
+      b.ctx.emit('connection/reset', true)
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBe(baseContext.user.id)
+      expect(b.contextCalls()).toHaveLength(1)
+
+      b.fetcher.mockResolvedValueOnce(new Response(null, { status: 401 }))
+      b.ctx.emit('connection/will-reset', false)
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      expect(b.contextCalls()).toHaveLength(1)
+      b.ctx.emit('connection/reset', false)
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      await vi.waitFor(() => { expect(b.contextCalls()).toHaveLength(2) })
+      await vi.waitFor(() => { expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false) })
+
+      b.ctx.emit('connection/reset', true)
+      await vi.waitFor(() => { expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true) })
+      expect(b.contextCalls()).toHaveLength(3)
+    } finally {
+      await b.fiber.dispose()
+      b.restore()
+    }
+  })
+
+  it('joins a pending initial account request without aborting it at the first handshake', async () => {
+    const pending = Promise.withResolvers<Response>()
+    const b = await bench(baseContext, false, pending.promise)
+    const signal = b.contextCalls()[0]?.[1]?.signal
+    try {
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      b.ctx.emit('connection/will-reset', true)
+      b.ctx.emit('connection/reset', true)
+      expect(signal?.aborted).toBe(false)
+      expect(b.contextCalls()).toHaveLength(1)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      pending.resolve(Response.json(baseContext))
+      await vi.waitFor(() => { expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true) })
+      expect(b.policy.getSnapshot().verifiedAccountId).toBe(baseContext.user.id)
+      expect(b.contextCalls()).toHaveLength(1)
+    } finally {
+      pending.resolve(Response.json(baseContext))
+      try { await b.fiber.dispose() }
+      finally { b.restore() }
+    }
+  })
+
+  it('aborts pre-publication account reads and requires a new verified result after reconnect reset', async () => {
+    const b = await bench(baseContext)
+    const old = Promise.withResolvers<Response>()
+    const fresh = Promise.withResolvers<Response>()
+    b.fetcher.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise)
+    try {
+      const collaboration = b.scope.hooks.collaboration
+      if (!(collaboration instanceof CollaborationClient)) throw new Error('Fixture does not own the collaboration client')
+      const previous = collaboration.load()
+      await vi.waitFor(() => { expect(b.contextCalls()).toHaveLength(2) })
+      const oldSignal = b.contextCalls()[1]?.[1]?.signal
+      b.ctx.emit('connection/will-reset', false)
+      expect(oldSignal?.aborted).toBe(true)
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      expect(b.policy.getSnapshot().accountPermissions).toBe('unknown')
+      expect(b.contextCalls()).toHaveLength(2)
+
+      b.ctx.emit('connection/reset', false)
+      await vi.waitFor(() => { expect(b.contextCalls()).toHaveLength(3) })
+      expect(b.contextCalls()[2]?.[1]?.signal?.aborted).toBe(false)
+      old.resolve(Response.json({ ...baseContext, user: { ...baseContext.user, id: 11 } }))
+      await previous
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      fresh.resolve(Response.json(baseContext))
+      await vi.waitFor(() => { expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true) })
+      expect(b.policy.getSnapshot().verifiedAccountId).toBe(baseContext.user.id)
+      expect(b.contextCalls()).toHaveLength(3)
+    } finally {
+      old.resolve(Response.json(baseContext))
+      fresh.resolve(Response.json(baseContext))
+      try { await b.fiber.dispose() }
+      finally { b.restore() }
+    }
+  })
+  it('withdraws account persistence during a transport renewal and restores it on re-verification', async () => {
     const b = await bench(baseContext, true)
     const response = Promise.withResolvers<Response>()
     try {
       expect(b.policy.getSnapshot().verifiedAccountId).toBe(7)
       b.fetcher.mockImplementationOnce(() => response.promise)
       b.ctx.emit('connection/reset')
-      expect(b.policy.getSnapshot()).toMatchObject({ verifiedAccountId: 7, accountPermissions: 'unknown' })
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      expect(b.policy.getSnapshot().accountPermissions).toBe('unknown')
       response.resolve(Response.json(baseContext))
       await vi.waitFor(() => { expect(b.policy.getSnapshot().accountPermissions).toBe('standard') })
       expect(b.policy.getSnapshot().verifiedAccountId).toBe(7)
@@ -262,20 +358,20 @@ describe('ui-collaboration apply', () => {
       b.restore()
     }
   })
-})
 
-it('keeps project read-only policy scoped to its pane while allowing personal creation', async () => {
-  const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
-  const b = await bench({ ...baseContext, scope: { kind: 'personal' }, projects: [{ ...baseContext.projects[0]!, mode: 'ro' }] })
-  try {
-    const entry = b.ctx.slots.entries('conversation.composer').find(candidate => candidate.component === ReadOnlyComposer)!
-    const select = entry.select as (owner: ComposerChainProps) => unknown
-    const owner = (kind: 'personal' | 'project'): ComposerChainProps => ({ interactions: [], session: conversationSnapshot(clientSessionKey(kind === 'personal' ? { kind } : { kind, projectId: 9 }, 'same' as SessionId)) })
-    expect(select(owner('personal'))).toBeNull()
-    expect(select(owner('project'))).toBe('project-read-only')
-    const personal: SessionCreateOptions = { runtimeTarget: { kind: 'personal' } }
-    expect(await b.ctx.waterfall('sessions/prepare-create', personal, () => Promise.resolve(personal))).toEqual(personal)
-    const project: SessionCreateOptions = { runtimeTarget: { kind: 'project', projectId: 9 } }
-    await expect(b.ctx.waterfall('sessions/prepare-create', project, () => Promise.resolve(project))).rejects.toThrow('read-only')
-  } finally { b.restore() }
+  it('keeps project read-only policy scoped to its pane while allowing personal creation', async () => {
+    const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+    const b = await bench({ ...baseContext, scope: { kind: 'personal' }, projects: [{ ...baseContext.projects[0]!, mode: 'ro' }] })
+    try {
+      const entry = b.ctx.slots.entries('conversation.composer').find(candidate => candidate.component === ReadOnlyComposer)!
+      const select = entry.select as (owner: ComposerChainProps) => unknown
+      const owner = (kind: 'personal' | 'project'): ComposerChainProps => ({ interactions: [], session: conversationSnapshot(clientSessionKey(kind === 'personal' ? { kind } : { kind, projectId: 9 }, 'same' as SessionId)) })
+      expect(select(owner('personal'))).toBeNull()
+      expect(select(owner('project'))).toBe('project-read-only')
+      const personal: SessionCreateOptions = { runtimeTarget: { kind: 'personal' } }
+      expect(await b.ctx.waterfall('sessions/prepare-create', personal, () => Promise.resolve(personal))).toEqual(personal)
+      const project: SessionCreateOptions = { runtimeTarget: { kind: 'project', projectId: 9 } }
+      await expect(b.ctx.waterfall('sessions/prepare-create', project, () => Promise.resolve(project))).rejects.toThrow('read-only')
+    } finally { b.restore() }
+  })
 })

@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-外壳插件提供唯一的三栏 AppFrame、拖动尺寸与窄屏抽屉。它在 `root` 下声明左侧 `sidebar`、中间 `conversation`、右侧 `rightbar`、浮动层及移动顶栏操作。四会话 Workbench 保持为唯一的中间会话容器；右侧栏的标签、分栏与开合由 [ui-sidebar-right](../ui-sidebar-right/README.zh.md) 管理，框架只消费其呈现报告并分配空间。主题呈现器负责配色、别名 token、字号、字体列表与 document 元数据。
+外壳插件提供唯一的三栏 AppFrame、拖动尺寸与窄屏抽屉。它在 `root` 下声明左侧 `sidebar`、中间 `conversation`、右侧 `rightbar`、浮动层及移动顶栏操作。四会话 Workbench 保持为唯一的中间会话容器；右侧栏的标签、分栏与开合由 [ui-sidebar-right](../ui-sidebar-right/README.zh.md) 管理，框架只消费其呈现报告并分配空间。列宽与调整条立即到达最终位置，恢复面板时不会让会话文字沿中间宽度反复重排。主题呈现器负责配色、别名 token、字号、字体列表与 document 元数据。
 
 框架发布 `data-viewport` 与 `--dsw-viewport-height`，以支持窄窗格和屏幕键盘。medium 模式保留导航控制栏，右侧栏覆盖中间内容；compact 模式使用左侧抽屉和全屏辅助栏。遮罩和 Escape 将关闭请求交给标签状态所有者，不直接改写另一份开合状态。侧边抽屉关闭后恢复顶栏开关焦点。框架尺寸不写入 localStorage，Session 标签的恢复规则由右侧栏负责。
 
@@ -15,7 +15,7 @@ kind: "package-reference"
 
 `/client` 导出表层包含插件主体（`apply`／`inject`）、`LayoutController` 和 owner-share 接口（包括 `MobileHeaderActionOwnerProps`）。AppFrame、面板 store 与让步求解器仍属于包内部。
 
-`layout.openDetails(sessionId, target)` 把工具调用交给唯一的辅助栏所有者；`target.callId` 明确指定调用，标签不依赖聊天中当前选中的调用。`layout.focusRightbar(sessionId)` 只切换辅助栏目标，不改变中间窗格选择。辅助栏向框架报告是否显示、是否占轨道以及是否全屏；折叠不会结束 Host Session。
+`layout.openDetails(sessionId, target)` 把工具调用交给唯一的辅助栏所有者；`target.callId` 明确指定调用，标签不依赖聊天中当前选中的调用。`layout.focusRightbar(sessionId)` 只切换辅助栏目标，不改变中间窗格选择。该 Session 被选中后，再离开它会释放框架目标，侧栏随之显示新选中对话保留的标签。辅助栏向框架报告是否显示、是否占轨道以及是否全屏；折叠不会结束 Host Session。
 
 ## 概述
 

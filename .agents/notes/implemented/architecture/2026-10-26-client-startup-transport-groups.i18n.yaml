@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-26-client-startup-transport-groups.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-26-client-startup-transport-groups.md
+document:
+  en: ee315be9768d6a33f3dea6bab097e17d771e08b0
+  zh: 64148eee1efed65d8f00c9b24f04714de8f319f1
+/agent-note-explicit-startup-transport-groups-preserve-shared-application-responses:
+  en: d54c8ef546bafb22
+  zh: e91eff26d2cfa418
+/agent-note-explicit-startup-transport-groups-preserve-shared-application-responses/problem:
+  en: fdbdf77a2fcc4316
+  zh: 99b87f2ee91da5c7
+/agent-note-explicit-startup-transport-groups-preserve-shared-application-responses/decision:
+  en: 397612849d908127
+  zh: b879e45a83c8ed46
+/agent-note-explicit-startup-transport-groups-preserve-shared-application-responses/alternatives-considered:
+  en: e106c808004ba732
+  zh: bacb4a81b0016db5
+/agent-note-explicit-startup-transport-groups-preserve-shared-application-responses/consequences:
+  en: 885d73ac28812f57
+  zh: ec735aa25055e0cc

@@ -31,7 +31,7 @@ Profile 管理固定属于浏览器文档的启动 Runtime，只接收该 Runtim
 
 空间不足时，页头将整个操作组移到下一行。操作文案保持单行，信息按钮紧随副标题文字。
 
-管理的读写都过 Host 的管理员授权：部署未授予时，每个 `pluginManager.*` 调用都返回 `plugin-management/forbidden`，页面显示拒绝视图而不是空列表。**刷新**控件仍然可用，新的授权在下一次读取时生效，无需重载页面。
+Host 在返回目录之前执行读取策略。拒绝读取时返回 `plugin-management/forbidden`，页面显示拒绝视图并清空缓存卡片。可读目录中的 `manage: false` 保留浏览能力并禁用变更控件。**刷新**控件仍然可用，新的授权在下一次读取时生效，无需重载页面。
 
 页面还报告本浏览器页自身的模块同步状态：同步进行中显示状态行，导入或卸载失败的条目出现在失败面板中并附带重试操作。重试只重跑本页面的模块图，不改动 Host 的启用状态。
 
@@ -126,7 +126,7 @@ Host 入口通过生成的 Remote 接口暴露 `pluginRegistryProbe.fastest()`�
 
 ### store
 
-`PluginManagerController` 拥有组合包视图、忙碌键、提示、安装进度和卸载确认。每次读取先问清单 Host 是否管理着 profile，再把 `listBundles` 与 `listPlugins` 合成每个组合包一份视图，其行携带存活条目的启停状态与 fiber 阶段。它合并重叠读取，在操作后、收到 `plugin-manager/changed` 时以及重连后刷新，并在销毁后忽略晚到结果。安装输出按 job id 分组。安装对话框沿 `idle → checking → starting → running → done | failed` 推进，`cancelling` 与 `applying` 按 Host 的报告呈现，安装或取消响应丢失时进入 `unconfirmed`；已确认的 `applying` 阶段不会倒退。通过 `waitForInstall` 恢复结果，无活动请求时结束为 `unknown`；checking 与所有活动阶段使用 ongoing，最终页面使用 done 或 error。检查在一个 `AbortController` 下运行，返回编辑或关闭会中止它并丢弃其结果；运行只能通过 `pluginManager.cancelInstall` 停止。关闭会隐藏任务而保留其状态。如果取消请求先于安装到达，在进度或输出确认该请求后会再次请求取消。Host 无法应用的变更、要等重启的变更——给出原因时随提示说明——以及被更高层覆盖的变更，都是会自行消失的 toast。
+`PluginManagerController` 拥有组合包视图、忙碌键、提示、安装进度和卸载确认。首次加载或刷新只发一次 `pluginManager.catalog` 请求，将其中的组合包和插件合成每个组合包一份视图，其行携带存活条目的启停状态与 fiber 阶段。profile 不可用时清空列表；普通传输失败保留缓存卡片。控制器拥有目录读取的取消信号，销毁后丢弃晚到结果；目录入口缺失会报错，不回退到旧读取方式。它合并重叠读取，在操作后、收到 `plugin-manager/changed` 时以及重连后刷新，并在销毁后忽略晚到结果。安装输出按 job id 分组。安装对话框沿 `idle → checking → starting → running → done | failed` 推进，`cancelling` 与 `applying` 按 Host 的报告呈现，安装或取消响应丢失时进入 `unconfirmed`；已确认的 `applying` 阶段不会倒退。通过 `waitForInstall` 恢复结果，无活动请求时结束为 `unknown`；checking 与所有活动阶段使用 ongoing，最终页面使用 done 或 error。检查在一个 `AbortController` 下运行，返回编辑或关闭会中止它并丢弃其结果；运行只能通过 `pluginManager.cancelInstall` 停止。关闭会隐藏任务而保留其状态。如果取消请求先于安装到达，在进度或输出确认该请求后会再次请求取消。Host 无法应用的变更、要等重启的变更——给出原因时随提示说明——以及被更高层覆盖的变更，都是会自行消失的 toast。
 
 ### 配置 slot
 

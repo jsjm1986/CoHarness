@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { resumableUpload } from '../src/index.ts'
+import { resumableUpload, type ResumableUploadOptions } from '../src/index.ts'
 
 const ref = { docId: 'notes.txt' as never, path: '', name: 'notes.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1 }
 const uploadId = '00000000-0000-4000-8000-000000000000'
@@ -44,12 +44,146 @@ function installXhr(): MockXhr[] {
   return instances
 }
 
+function beginVerification(
+  states: Array<'verifying' | 'complete'>,
+  { expiresInMs = 60_000, abortOnVerification }: { expiresInMs?: number; abortOnVerification?: Error } = {},
+) {
+  const xhrs = installXhr()
+  const controller = new AbortController()
+  const file = new File(['hello'], 'notes.txt')
+  const startedAt = Date.now()
+  const statusReadAt: number[] = []
+  const requests: Array<{ method: string; url: string }> = []
+  let verificationStarted: () => void = () => {}
+  const verifying = new Promise<void>((resolve) => { verificationStarted = resolve })
+  const session = {
+    uploadId, name: file.name, directoryId: '', bytes: file.size, fingerprint: 'x', chunkBytes: 65536,
+    receivedBytes: 0, expiresAt: startedAt + expiresInMs, state: 'uploading' as const,
+  }
+  const options: ResumableUploadOptions = {
+    requestJson: async <T>(input: RequestInfo | URL, init?: RequestInit) => {
+      const url = urlOf(input)
+      requests.push({ method: init?.method ?? 'GET', url })
+      if (url.endsWith('/complete')) return { ...session, receivedBytes: file.size, state: 'verifying' } as T
+      if (init?.method === 'POST') return session as T
+      statusReadAt.push(Date.now())
+      const state = states[Math.min(statusReadAt.length - 1, states.length - 1)] ?? 'verifying'
+      return { ...session, receivedBytes: file.size, state, ...(state === 'complete' ? { ref } : {}) } as T
+    },
+    networkError: () => new Error('offline'),
+    responseError: (status, body) => new Error(`${String(status)}:${String(body)}`),
+  }
+  const pending = resumableUpload(file, '' as never, controller.signal, (_loaded, _total, phase) => {
+    if (phase !== 'verifying') return
+    if (abortOnVerification !== undefined) controller.abort(abortOnVerification)
+    verificationStarted()
+  }, options)
+  const settled = pending.then(() => undefined, () => undefined)
+  return { controller, file, startedAt, statusReadAt, requests, xhrs, states, options, verifying, pending, settled }
+}
+
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   try { globalThis.localStorage?.clear() } catch { /* jsdom may expose an opaque origin */ }
 })
 
 describe('resumableUpload', () => {
+  it('reads the first verification status without a scheduled delay', async () => {
+    vi.useFakeTimers()
+    const upload = beginVerification(['complete'])
+    try {
+      await upload.verifying
+      await vi.advanceTimersByTimeAsync(0)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      await expect(upload.pending).resolves.toEqual(ref)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it('waits 500 ms between later verification status reads', async () => {
+    vi.useFakeTimers()
+    const upload = beginVerification(['verifying', 'complete'])
+    try {
+      await upload.verifying
+      await vi.advanceTimersByTimeAsync(0)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      expect(vi.getTimerCount()).toBe(1)
+      await vi.advanceTimersByTimeAsync(499)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(upload.pending).resolves.toEqual(ref)
+      expect(upload.statusReadAt).toEqual([upload.startedAt, upload.startedAt + 500])
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it('aborts a later verification wait and resumes the same session', async () => {
+    vi.useFakeTimers()
+    const upload = beginVerification(['verifying', 'complete'])
+    try {
+      await upload.verifying
+      await vi.advanceTimersByTimeAsync(0)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      const reason = new Error('cancel verification wait')
+      upload.controller.abort(reason)
+      await expect(upload.pending).rejects.toBe(reason)
+      expect(vi.getTimerCount()).toBe(0)
+      const records = JSON.parse(globalThis.localStorage.getItem('dsh-userdoc-upload-sessions-v1') ?? '{}') as object
+      expect(Object.keys(records)).toHaveLength(1)
+
+      await expect(resumableUpload(upload.file, '' as never, undefined, undefined, upload.options)).resolves.toEqual(ref)
+      expect(upload.requests.at(-1)).toEqual({ method: 'GET', url: `/api/documents/uploads/${uploadId}` })
+      expect(upload.xhrs).toHaveLength(1)
+      expect(JSON.parse(globalThis.localStorage.getItem('dsh-userdoc-upload-sessions-v1') ?? '{}')).toEqual({})
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it('honors an abort before the first verification status read', async () => {
+    vi.useFakeTimers()
+    const reason = new Error('cancel before verification read')
+    const upload = beginVerification(['complete'], { abortOnVerification: reason })
+    try {
+      await upload.verifying
+      await expect(upload.pending).rejects.toBe(reason)
+      expect(upload.statusReadAt).toEqual([])
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
+  it.each([
+    { expiresInMs: 300, deadlineMs: 300, name: 'server expiry' },
+    { expiresInMs: 600_000, deadlineMs: 300_000, name: 'client verification deadline' },
+  ])('stops verification at the $name', async ({ expiresInMs, deadlineMs }) => {
+    vi.useFakeTimers()
+    const upload = beginVerification(['verifying'], { expiresInMs })
+    try {
+      await upload.verifying
+      await vi.advanceTimersByTimeAsync(0)
+      expect(upload.statusReadAt).toEqual([upload.startedAt])
+      await vi.advanceTimersByTimeAsync(deadlineMs)
+      await expect(upload.pending).rejects.toMatchObject({ status: 504, code: 'DOCUMENT_UPLOAD_VERIFY_TIMEOUT' })
+      expect(upload.statusReadAt.at(-1)).toBe(upload.startedAt + deadlineMs)
+      expect(vi.getTimerCount()).toBe(0)
+      expect(JSON.parse(globalThis.localStorage.getItem('dsh-userdoc-upload-sessions-v1') ?? '{}')).toEqual({})
+    } finally {
+      upload.controller.abort()
+      await upload.settled
+    }
+  })
+
   it('polls an accepted verification after its session retention timestamp passes', async () => {
     const calls: string[] = []
     const result = await resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {

@@ -728,6 +728,7 @@ const server = createGatewayServer(deps, {
     executionIdentity,
     nodeContent: contentVolume,
     workspaceCatalog,
+    renewStreamPrincipals: proxyHandlers.streamPrincipals?.renew.bind(proxyHandlers.streamPrincipals),
     documentStore: invocation => localDocuments.serveRuntimeStore(invocation),
     accessMonitor: localAccessMonitor,
     executionWatchHeartbeatMs: cfg.executionWatchHeartbeatMs,

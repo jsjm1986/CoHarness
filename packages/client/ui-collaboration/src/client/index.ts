@@ -5,7 +5,6 @@
  */
 import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, SessionCreateOptions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -90,15 +89,12 @@ export function apply(ctx: ClientContext): void {
     return
   })
   const projectUiPolicy = ctx.get('projectUiPolicy')
-  const documentIdentityOwned = (ctx.get('connection') as ConnectionHandle | undefined)?.onPrincipalChange !== undefined
   ctx.effect(() => {
     void collaboration.load().then(() => collaboration.loadEnvironments())
     const syncPolicy = (): void => {
       const snapshot = collaboration.getSnapshot()
       const context = snapshot.context
-      if (snapshot.contextVerified || !documentIdentityOwned) {
-        projectUiPolicy?.setVerifiedAccountId(snapshot.contextVerified ? context?.user.id : undefined)
-      }
+      projectUiPolicy?.setVerifiedAccountId(snapshot.contextVerified ? context?.user.id : undefined)
       const scope = context?.scope
       if (context?.environment !== undefined && snapshot.contextVerified && !snapshot.scopeBusy) {
         const location = { runtimeId: context.environment.id, nodeId: context.environment.nodeId,
@@ -132,7 +128,17 @@ export function apply(ctx: ClientContext): void {
       collaboration.dispose()
     }
   }, 'ui-collaboration: account context')
-  ctx.on('connection/reset', () => { collaboration.invalidateContext(); void collaboration.refresh().then(() => collaboration.loadEnvironments()) })
+  ctx.on('connection/will-reset', (initialConnection) => {
+    if (!initialConnection) collaboration.invalidateContext()
+  })
+  ctx.on('connection/reset', (initialConnection) => {
+    if (initialConnection === true) {
+      if (!collaboration.getSnapshot().contextVerified) void collaboration.load()
+      return
+    }
+    collaboration.invalidateContext()
+    void collaboration.refresh().then(() => collaboration.loadEnvironments())
+  })
 
   ctx.on('sessions/prepare-create', async (_options, next): Promise<SessionCreateOptions> => {
     const prepared = await next()

@@ -34,6 +34,7 @@ import type { RpcResult } from '@deepseek-ai/dsh-api-remotes/client'
 import { remoteSessionId, mapRemoteSessionIds } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { WorkspaceResourceError, workspaceResourceProvider } from '../workspace-resources.ts'
 import type { WorkspaceResourceTarget } from '../workspace-resources.ts'
+import type { WorkspaceArchiveSnapshot } from '../workspaces/manager.ts'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotStore } from '../contract/store.ts'
 import { WorkspaceManager } from '../workspaces/manager.ts'
 import type { RuntimeWorkspaceSnapshot } from '../contract/sessions-port.ts'
@@ -50,6 +51,13 @@ interface RuntimeEntry {
   stopResources?: (() => void) | undefined
   ready?: Promise<void>
   rejectReady?: (error: unknown) => void
+  generation?: number
+  archiveRevision?: number
+  archiveRead?: {
+    controller: AbortController
+    waiters: number
+    completion: Promise<void>
+  } | undefined
 }
 
 function runtimeScope(): void {}
@@ -73,6 +81,7 @@ export class SessionRuntimePool implements ISessions {
   readonly workspaceSnapshots = createSnapshotStore<readonly RuntimeWorkspaceSnapshot[]>([])
   private readonly workspaceManagers = new Map<string, { target: SessionRuntimeTarget; manager: WorkspaceManager }>()
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  readonly provideInfoRevision: HostObservable<number>
   private readonly entries = new Map<string, RuntimeEntry>()
   private readonly archivedByTarget = new Map<string, ReadonlySet<SessionId>>()
   private readonly sessionOwners = new Map<SessionId, RuntimeEntry>()
@@ -93,8 +102,13 @@ export class SessionRuntimePool implements ISessions {
   private aggregatePersonalDirectory = true
   private activeSession: SessionId | undefined
   private accountInvalidated = false
+  private baseGeneration = 0
+  private baseTargetEstablished = false
+  private baseArchiveRevision = 0
   private readonly provideListeners = new Set<() => void>()
   private currentProvideSnapshot: SessionMaybeProvideInfo
+  private provideRevision = 0
+  private readonly revisionListeners = new Set<() => void>()
 
   constructor(
     private readonly rootCtx: Context,
@@ -117,8 +131,15 @@ export class SessionRuntimePool implements ISessions {
         return () => { this.provideListeners.delete(listener) }
       },
     }
+    this.provideInfoRevision = {
+      getSnapshot: () => this.provideRevision,
+      subscribe: (listener) => {
+        this.revisionListeners.add(listener)
+        return () => { this.revisionListeners.delete(listener) }
+      },
+    }
     this.list = createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending', state: 'idle', error: null,
       subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     this.currentScopeList = createSnapshotStore<SessionListState>(this.list.getSnapshot())
@@ -146,6 +167,7 @@ export class SessionRuntimePool implements ISessions {
       stopRuntime?.()
       stopTargets?.()
       for (const entry of this.entries.values()) {
+        this.cancelArchiveRead(entry, new Error('Client runtime disposed'))
         entry.stop?.()
         entry.stopSubscriptions?.()
         entry.stopResources?.()
@@ -165,15 +187,29 @@ export class SessionRuntimePool implements ISessions {
       this.currentProvideSnapshot = entry.runtime.currentProvideInfo.getSnapshot()
       this.notifyProvide()
     })
-    entry.stopSubscriptions = () => { stopList(); stopProvide() }
+    const stopRevision = entry.runtime.provideInfoRevision.subscribe(() => {
+      if (this.accountInvalidated || this.entries.get(entry.key) !== entry) return
+      this.publishProvideRevision()
+    })
+    entry.stopSubscriptions = () => { stopList(); stopProvide(); stopRevision() }
     this.indexEntry(entry)
   }
 
   private indexEntry(entry: RuntimeEntry): void {
-    for (const [id, owner] of this.sessionOwners) if (owner.key === entry.key) this.sessionOwners.delete(id)
-    for (const id of Object.keys(entry.runtime.list.getSnapshot().byId) as SessionId[]) {
-      this.sessionOwners.set(clientSessionKey(entry.target, id), entry)
+    const ids = new Set<SessionId>((Object.keys(entry.runtime.list.getSnapshot().byId) as SessionId[])
+      .map(id => clientSessionKey(entry.target, id)))
+    let changed = false
+    for (const [id, owner] of this.sessionOwners) {
+      if (owner !== entry || ids.has(id)) continue
+      this.sessionOwners.delete(id)
+      changed = true
     }
+    for (const id of ids) {
+      if (this.sessionOwners.get(id) === entry) continue
+      this.sessionOwners.set(id, entry)
+      changed = true
+    }
+    if (changed) this.publishProvideRevision()
   }
 
   private ownerFor(id: SessionId): RuntimeEntry | undefined {
@@ -212,6 +248,13 @@ export class SessionRuntimePool implements ISessions {
   private notifyProvide(): void {
     for (const listener of [...this.provideListeners]) {
       try { listener() } catch (error) { console.error('[web-runtime] pooled provide listener failed:', error) }
+    }
+  }
+
+  private publishProvideRevision(): void {
+    this.provideRevision++
+    for (const listener of [...this.revisionListeners]) {
+      try { listener() } catch (error) { console.error('[web-runtime] pooled provide revision listener failed:', error) }
     }
   }
 
@@ -275,9 +318,10 @@ export class SessionRuntimePool implements ISessions {
       this.currentProvideSnapshot = nextProvide
       this.notifyProvide()
     }
+    const baseline = this.base.list.getSnapshot()
     this.list.set({
       ids, byId, archivedById, current: current !== undefined && byId[current] !== undefined ? current : undefined,
-      phase: this.base.list.getSnapshot().phase,
+      phase: baseline.phase, state: baseline.state, error: baseline.error,
       ...(this.base.list.getSnapshot().navigationBlockedSessionId === undefined ? {}
         : { navigationBlockedSessionId: this.base.list.getSnapshot().navigationBlockedSessionId }),
       subagentsByParent, jobsBySession, observedJobs,
@@ -455,8 +499,7 @@ export class SessionRuntimePool implements ISessions {
           manager.handleHostEnvelope(envelope)
           const frame = envelope.payload
           if (frame.type === 'host/archived-sessions-changed') {
-            this.archivedByTarget.set(establishedEntry.key, new Set(frame.archivedSessionIds))
-            this.rebuild()
+            this.installArchive(establishedEntry, frame)
           }
           if (frame.type === 'host/remote-event') {
             this.dispatchRemoteEvent(frame.event, frame.args, establishedEntry.target)
@@ -475,8 +518,12 @@ export class SessionRuntimePool implements ISessions {
             return
           }
           this.connectResources(establishedEntry, description)
+          const generation = establishedEntry.generation = (establishedEntry.generation ?? 0) + 1
+          this.cancelArchiveRead(establishedEntry, new Error('Target runtime connection changed'))
+          establishedEntry.archiveRevision = 0
           runtime.handleConnected()
           void runtime.refresh().then(() => {
+            if (this.entries.get(establishedEntry.key) !== establishedEntry || establishedEntry.generation !== generation) return
             if (runtime.list.getSnapshot().phase === 'ready') resolveReady()
             else rejectReady(new Error('target runtime session list unavailable'))
             return manager.refresh()
@@ -485,13 +532,15 @@ export class SessionRuntimePool implements ISessions {
               this.archivedByTarget.set(establishedEntry.key, new Set(manager.getSnapshot().archivedSessionIds))
               this.rebuild()
             }
-          }, rejectReady)
+          })
         },
         onFailure: (failure) => {
           if (this.entries.get(establishedEntry.key) === establishedEntry) this.resourceFailure(establishedEntry.target, failure)
         },
         onStateChange: (state: 'connected' | 'reconnecting') => {
           if (state !== 'reconnecting' || this.accountInvalidated || this.entries.get(establishedEntry.key) !== establishedEntry) return
+          establishedEntry.generation = (establishedEntry.generation ?? 0) + 1
+          this.cancelArchiveRead(establishedEntry, new Error('Target runtime disconnected'))
           this.rootCtx.get('workspaceResources')?.disconnect(establishedEntry.target)
           runtime.handleDisconnected()
         },
@@ -602,18 +651,90 @@ export class SessionRuntimePool implements ISessions {
     if (entry === undefined || entry.connection === undefined) throw new Error('target runtime unavailable for Session verification')
     const original = id
     if (!entry.runtime.list.getSnapshot().ids.includes(original)) return false
-    const { result } = await entry.connection.api.workspace.list({}, active)
+    await this.refreshArchive(entry, active)
     active.throwIfAborted()
-    if (!result.ok) {
-      if (result.error.code === 'collaboration-forbidden') throw new WorkspaceResourceError('access-revoked', result.error.message)
-      throw new Error(result.error.message)
-    }
     if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during Session verification')
-    // The repull is also the freshest archive set for this target; folding it
-    // keeps list.ids/byId correct when a change lands between push frames.
-    this.archivedByTarget.set(entry.key, new Set(result.value.archivedSessionIds))
+    return this.archivedByTarget.get(entry.key)?.has(original) !== true
+  }
+
+  /** Share only an outstanding archive repull; each caller owns its cancellation. */
+  private async refreshArchive(entry: RuntimeEntry, signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted()
+    let read = entry.archiveRead
+    if (read === undefined) {
+      const controller = new AbortController()
+      read = { controller, waiters: 0, completion: this.pullArchive(entry, controller.signal) }
+      entry.archiveRead = read
+      const pending = read
+      const clear = (): void => { if (entry.archiveRead === pending) entry.archiveRead = undefined }
+      void read.completion.then(clear, clear)
+    }
+    read.waiters++
+    const active = AbortSignal.any([signal, read.controller.signal, this.lifetime.signal])
+    let abort: (() => void) | undefined
+    try {
+      await new Promise<void>((resolve, reject) => {
+        abort = () => {
+          reject(active.reason instanceof Error ? active.reason : new Error('Workspace archive verification cancelled', { cause: active.reason }))
+        }
+        active.addEventListener('abort', abort, { once: true })
+        void read.completion.then(resolve, reject)
+        if (active.aborted) abort()
+      })
+      active.throwIfAborted()
+    } finally {
+      if (abort !== undefined) active.removeEventListener('abort', abort)
+      if (--read.waiters === 0) {
+        if (entry.archiveRead === read) entry.archiveRead = undefined
+        read.controller.abort(new Error('Workspace archive read has no remaining callers'))
+      }
+    }
+  }
+
+  private async pullArchive(entry: RuntimeEntry, signal: AbortSignal): Promise<void> {
+    if (entry.connection === undefined) throw new Error('Target runtime has no Workspace transport')
+    const owner = this.workspaceManagers.get(entry.key)
+    if (owner === undefined) {
+      const { result } = await entry.connection.api.workspace.list({}, AbortSignal.any([signal, this.lifetime.signal]))
+      signal.throwIfAborted()
+      this.lifetime.signal.throwIfAborted()
+      if (this.entries.get(entry.key) !== entry) throw new Error('Target runtime was released during Workspace read')
+      if (!result.ok) {
+        if (result.error.code === 'collaboration-forbidden') throw new WorkspaceResourceError('access-revoked', result.error.message)
+        throw new Error(result.error.message)
+      }
+      this.installArchive(entry, result.value)
+      return
+    }
+    const snapshot = await owner.manager.shareRefresh(signal)
+    signal.throwIfAborted()
+    this.lifetime.signal.throwIfAborted()
+    if (this.entries.get(entry.key) !== entry) throw new Error('Target runtime was released during Workspace read')
+    if (snapshot === undefined) {
+      const failure = owner.manager.getSnapshot().error
+      if (failure !== null) {
+        if (failure.code === 'collaboration-forbidden') throw new WorkspaceResourceError('access-revoked', failure.message)
+        throw new Error(failure.message)
+      }
+      throw new Error('Workspace archive read aborted before settlement')
+    }
+    this.installArchive(entry, snapshot)
+  }
+
+  private cancelArchiveRead(entry: RuntimeEntry, reason: Error): void {
+    const read = entry.archiveRead
+    entry.archiveRead = undefined
+    read?.controller.abort(reason)
+  }
+
+  private installArchive(entry: RuntimeEntry, snapshot: WorkspaceArchiveSnapshot): void {
+    if (entry.runtime === this.base) { this.installBaseArchive(entry.key, snapshot); return }
+    const revision = snapshot.archiveRevision
+    const current = entry.archiveRevision ?? 0
+    if (revision === undefined && current > 0 || revision !== undefined && revision < current) return
+    this.archivedByTarget.set(entry.key, new Set(snapshot.archivedSessionIds))
+    if (revision !== undefined) entry.archiveRevision = revision
     this.rebuild()
-    return !result.value.archivedSessionIds.includes(original)
   }
 
   private preparedApi(target: SessionRuntimeTarget): PreparedSessionApi {
@@ -727,6 +848,15 @@ export class SessionRuntimePool implements ISessions {
     return this.base.create(options).then(id => clientSessionKey(owner.target, id))
   }
 
+  /**
+   * Refresh the authenticated current space, reusing its in-flight Session baseline.
+   * @returns completion of the baseline attempt, or an immediate completion after account withdrawal.
+   */
+  refresh(): Promise<void> {
+    if (this.accountInvalidated) return Promise.resolve()
+    return this.base.refresh()
+  }
+
   /** Withdraw every visible Session before asynchronous account-change teardown begins. */
   invalidateAccount(): void {
     if (this.accountInvalidated) return
@@ -738,10 +868,12 @@ export class SessionRuntimePool implements ISessions {
     this.activeSession = undefined
     this.currentProvideSnapshot = this.base.unboundProvideInfo()
     const empty: SessionListState = { ids: [], byId: {}, archivedById: {}, current: undefined,
-      phase: 'pending', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
+      phase: 'pending', state: 'idle', error: null,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
     this.list.set(empty)
     this.currentScopeList.set(empty)
     this.notifyProvide()
+    this.publishProvideRevision()
     this.beginNavigation()
     this.lifetime.abort(new Error('Client account identity was invalidated'))
     for (const entry of this.entries.values()) {
@@ -791,32 +923,50 @@ export class SessionRuntimePool implements ISessions {
     this.base.handleHostEnvelope(envelope)
     if (envelope.payload.type === 'host/archived-sessions-changed') {
       const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
-      this.archivedByTarget.set(entry?.key ?? 'personal', new Set(envelope.payload.archivedSessionIds))
-      this.rebuild()
+      this.installBaseArchive(entry?.key ?? 'personal', envelope.payload)
     }
     if (envelope.payload.type === 'host/workspace-file-changed') this.rootCtx.get('workspaceResources')?.handleChange({ kind: 'base' }, { ...envelope.payload, sessionId: this.keyFor(envelope.payload.sessionId) })
   }
   /** Mark the base runtime connection as ready.
    * @param description - Host capabilities from the completed handshake.
+   * @param workspaceBaseline - this generation's installed Workspace archive facts;
+   *   absent callers rely on archive frames and do not issue a separate Workspace request.
    */
-  handleConnected(description?: HostDescription): void {
+  handleConnected(description?: HostDescription, workspaceBaseline?: Promise<WorkspaceArchiveSnapshot | undefined>): void {
     if (this.accountInvalidated) return
     if (description?.runtimeTarget !== undefined) this.setBaseRuntimeTarget(description.runtimeTarget)
     else if (description?.executionAuthorityRequired === true) throw new Error('Gateway runtime did not declare its Session identity')
+    this.baseTargetEstablished = true
     const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
+    if (entry !== undefined) this.cancelArchiveRead(entry, new Error('Base runtime connection changed'))
     if (entry !== undefined && description !== undefined) this.connectResources(entry, description)
     this.base.handleConnected()
-    void this.baseConnection.api.workspace.list({}).then(({ result }) => {
-      if (result.ok) {
-        // The base entry's key tracks its current target (re-keyed by
-        // setBaseRuntimeTarget); a hardcoded 'personal' would orphan the set.
-        this.archivedByTarget.set(entry?.key ?? 'personal', new Set(result.value.archivedSessionIds))
-        this.rebuild()
-      }
-    }, (error: unknown) => { console.error('[web-runtime] base workspace.list refresh failed:', error) })
+    const generation = ++this.baseGeneration
+    const key = entry?.key ?? 'personal'
+    void workspaceBaseline?.then((snapshot) => {
+      if (snapshot === undefined || generation !== this.baseGeneration || this.lifetime.signal.aborted
+        || entry !== undefined && entry.key !== key) return
+      this.installBaseArchive(key, snapshot)
+    }, (error: unknown) => { console.error('[web-runtime] shared Workspace baseline failed:', error) })
+  }
+
+  /** Keep base archive frames and the shared baseline under the Workspace owner's revision rules. */
+  private installBaseArchive(key: string, snapshot: WorkspaceArchiveSnapshot): void {
+    const revision = snapshot.archiveRevision
+    if (revision === undefined && this.baseArchiveRevision > 0
+      || revision !== undefined && revision < this.baseArchiveRevision) return
+    const next = revision === undefined || revision === this.baseArchiveRevision
+      ? new Set([...(this.archivedByTarget.get(key) ?? []), ...snapshot.archivedSessionIds])
+      : new Set(snapshot.archivedSessionIds)
+    if (revision !== undefined) this.baseArchiveRevision = revision
+    this.archivedByTarget.set(key, next)
+    this.rebuild()
   }
   /** Mark the base runtime connection as unavailable. */
   handleDisconnected(): void {
+    this.baseGeneration++
+    const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
+    if (entry !== undefined) this.cancelArchiveRead(entry, new Error('Base runtime disconnected'))
     this.rootCtx.get('workspaceResources')?.disconnect({ kind: 'base' })
     this.base.handleDisconnected()
   }
@@ -907,6 +1057,8 @@ export class SessionRuntimePool implements ISessions {
   setBaseRuntimeTarget(target: SessionRuntimeTarget): void {
     const baseEntry = [...this.entries.values()].find(entry => entry.runtime === this.base)
     if (baseEntry === undefined) return
+    const established = this.baseTargetEstablished
+    this.baseTargetEstablished = true
     if (targetKey(baseEntry.target) === targetKey(target)) {
       // A verified descriptor carrying a different nodeId is a real migration:
       // the identity fence already adopted it, and retaining the stale node
@@ -917,7 +1069,11 @@ export class SessionRuntimePool implements ISessions {
       }
       return
     }
-    this.beginNavigation()
+    // The first declaration resolves the bootstrap placeholder; later changes supersede navigation.
+    if (established) this.beginNavigation()
+    this.cancelArchiveRead(baseEntry, new Error('Base runtime target changed'))
+    this.baseGeneration++
+    this.baseArchiveRevision = 0
     const collision = this.entries.get(targetKey(target))
     if (collision !== undefined && collision !== baseEntry) throw new Error('Bootstrap target already has a live runtime')
     // The fence call can throw; apply it before mutating the presentation key
@@ -1038,17 +1194,32 @@ export class SessionRuntimePool implements ISessions {
     return source
   }
 
-  open(id: SessionId): void {
+  open(id: SessionId, options?: { activate?: boolean }): void {
     this.beginNavigation()
     const owner = this.ownerFor(id)
     if (owner === undefined) throw new Error(`sessions.select: unknown session ${id}`)
     this.activeSession = clientSessionKey(owner.target, this.originalId(id, owner))
-    owner.runtime.open(this.originalId(id, owner))
-    this.committedSelection.set({ sessionId: this.activeSession, ...(owner.target.nodeId ? { nodeId: owner.target.nodeId } : {}) })
+    owner.runtime.open(this.originalId(id, owner), options)
+    if (options?.activate !== false) {
+      this.committedSelection.set({ sessionId: this.activeSession, ...(owner.target.nodeId ? { nodeId: owner.target.nodeId } : {}) })
+    }
     this.currentProvideSnapshot = owner.runtime.currentProvideInfo.getSnapshot()
     this.rebuild()
     this.notifyProvide()
     if (this.personalDirectory) this.releaseUnused(this.stagedIds)
+  }
+
+  /**
+   * Whether the given Session was selected through an explicit open during
+   * this connection lifetime; ambient restores use it to yield a selection
+   * the user committed rather than superseding it.
+   * @param id - runtime-qualified Session identity.
+   * @returns `true` when the Session's Agent was published by an explicit open.
+   */
+  isActivated(id: SessionId | undefined): boolean {
+    if (id === undefined) return false
+    const owner = this.ownerFor(id)
+    return owner !== undefined && owner.runtime.isActivated(this.originalId(id, owner))
   }
 
   clear(): void {
@@ -1097,9 +1268,11 @@ export class SessionRuntimePool implements ISessions {
   private releaseEntry(entry: RuntimeEntry, failure = new Error('target runtime was released before it became ready')): void {
     if (entry.runtime === this.base || this.entries.get(entry.key) !== entry) return
     this.entries.delete(entry.key)
+    this.cancelArchiveRead(entry, failure)
     this.archivedByTarget.delete(entry.key)
     for (const [id, owner] of this.sessionOwners) if (owner === entry) this.sessionOwners.delete(id)
     this.rebuild()
+    this.publishProvideRevision()
     entry.stop?.()
     entry.stopSubscriptions?.()
     entry.stopResources?.()

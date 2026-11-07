@@ -101,14 +101,25 @@ describe('loadWorkbenchCatalog', () => {
     expect(catalog.activeRuntime).toEqual({ kind: 'personal' })
   })
 
-  it('forwards an abort signal and rejects on a failed status', async () => {
-    const signal = new AbortController().signal
-    const fetch = vi.fn(async () => okResponse)
+  it('lets a caller abandon its own wait while the shared pull completes for others', async () => {
+    let release!: (response: Response) => void
+    const gate = new Promise<Response>((resolve) => { release = resolve })
+    const fetch = vi.fn(() => gate)
     vi.stubGlobal('fetch', fetch)
-    await loadWorkbenchCatalog(signal)
-    expect(fetch).toHaveBeenCalledWith('/account/api/workbench/catalog', { headers: { accept: 'application/json' }, signal })
+    const controller = new AbortController()
+    const abandoned = loadWorkbenchCatalog(controller.signal)
+    const kept = loadWorkbenchCatalog()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith('/account/api/workbench/catalog', { headers: { accept: 'application/json' } })
+    controller.abort()
+    await expect(abandoned).rejects.toThrow()
+    release(okResponse)
+    await expect(kept).resolves.toMatchObject({ activeRuntime: { kind: 'personal' } })
+  })
+  it('rejects every waiter on a failed status', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503 }) as Response))
-    await expect(loadWorkbenchCatalog(signal)).rejects.toThrow('workbench catalog unavailable (503)')
+    await expect(loadWorkbenchCatalog()).rejects.toThrow('workbench catalog unavailable (503)')
+    await expect(loadWorkbenchCatalog(new AbortController().signal)).rejects.toThrow('workbench catalog unavailable (503)')
   })
 })
 

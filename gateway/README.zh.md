@@ -56,7 +56,11 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_PROJECT_PATH_ROOTS` | （`systemd` 必填） | 管理员宿主机浏览器显示且包含所有项目目录的逗号分隔、互不重叠 Linux 绝对根路径；禁止使用 `/` |
 | `HGW_PROJECT_RUNTIME_USER` | `harness-project` | 项目 scope systemd 单元使用的专用 Linux 账户 |
 | `HGW_PRINCIPAL_KEY_DIR` | `~/.harness-gateway/principal-keys` | 用于签发浏览器请求 principal 的仅所有者可读 Ed25519 密钥对 |
-| `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 秒 | 一份签名 principal 的生命周期；WebSocket 客户端会在过期前重连 |
+| `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 秒 | 一份请求 principal 的签名有效期；事件 WebSocket 的每次授权仍以 30 秒为上限 |
+| `HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED` | `true` | 仅通过私有运行时 API 续租已登记的 mux/host WebSocket |
+| `HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS` | `10000` | 续租间隔，同时不超过当前签名剩余有效期的一半 |
+| `HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS` | `5000` | 私有合批请求期限，同时不超过最早的签名到期时间 |
+| `HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH` | `64` | 每批连接 ID 上限；不超过 1,024 的正整数 |
 | `HGW_ACCESS_INVALIDATION_POLL_MS` | 1 秒 | 持久授权变更的兜底读取及重连间隔；通知与请求准入也会触发读取 |
 | `HGW_EXECUTION_WATCH_HEARTBEAT_MS` | 15 秒 | 运行时执行监视流的存活帧间隔；必须为正数且不超过 2,147,483,647 毫秒 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
@@ -86,7 +90,7 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_RUNTIME_MAX_RESIDENT` | 0 | 常驻与启动中 Runtime 预约的可选应急上限；`0` 禁用此上限 |
 | `HGW_RUNTIME_MAX_QUEUED` | 32 | 等待冷启动准入的 Runtime 数 |
 | `HGW_RUNTIME_QUEUE_WAIT_MS` | 30 秒 | 冷启动准入最长等待时间 |
-| `HGW_PERFORMANCE_ENABLED` | `true` | 启用有界累计请求与进程诊断；仅接受 `true` 或 `false` |
+| `HGW_PERFORMANCE_ENABLED` | `true` | 启用有界累计请求／进程诊断和受管 Runtime 的一元响应耗时；仅接受 `true` 或 `false` |
 | `HGW_PERFORMANCE_OPERATION_SAMPLES` | 256 | 每个 Gateway 在内存中保留的版本化对话操作耗时数量，最多 4096 条。管理员可按浏览器操作 UUID 查询 `GET /admin/api/performance/operations?id=<uuid>`。 |
 | `HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS` | 20 毫秒 | 原生事件循环延迟采样间隔 |
 | `HGW_UPSTREAM_TIMEOUT_MS` | 30 秒 | 单次 HTTP/WebSocket 代理操作或已转发的指定作用域文档元数据请求等待运行时上游的最长时间，最大 2,147,483,647 毫秒 |
@@ -97,6 +101,7 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS` | 30 秒 | 受管浏览器有界 RPC 期限；由用户控制完成的调用及持续流保留原有生命周期 |
 | `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` | 64 MiB | Gateway 保留或转发的运行时响应最大字节数 |
 | `HGW_LAUNCHER` | `local` | 实例启动驱动：`local`（macOS/Linux 开发监督进程）/ `systemd`（Linux 生产每用户单元） |
+| `HGW_OFFICE_FONT_METADATA_CACHE_DIR` | `local` 为 `<state-root>/cache/office-font-metadata`；`systemd` 未设置 | 本机运行时共享 Office 字体元数据的绝对目录；`off` 保留各运行时的 kit 缓存。`systemd` 拒绝显式共享目录。 |
 | `HGW_SYSTEMD_UNIT_DIR` | `/etc/systemd/system` | systemd 驱动写每用户单元文件的目录 |
 | `HGW_SYSTEMD_COMMAND_TIMEOUT_MS` | 120 秒 | 每个原生 systemctl 客户端的期限，须为正数且不超过 2,147,483,647 毫秒 |
 | `HGW_GUARD_PATCH` | `<仓库>/plugins/dsh-directory-guard/cordis.patch.yml` | 实体安装进每个实例的 directory-guard bundle 补丁；release 模式把它固定在 `HGW_RELEASE_ROOT` 内，`off` 可关闭 |
@@ -177,6 +182,9 @@ Gateway 初始化保留活跃分配及其容量预留。macOS/Linux 本地 Runti
 
 PostgreSQL 连接池统一限制原生查询、直接取连接和事务辅助函数的待取连接数量。准入耗尽返回 HTTP 503 和 `DB_CHECKOUT_QUEUE_FULL`；用量接收端在认证及入库期间都保留这一可重试状态，避免把过载期间的有效账单当作无效输入丢弃。[连接池决策](../.agents/notes/implemented/architecture/2026-10-23-postgres-checkout-admission.zh.md)说明计数和恢复规则。
 
+组织和项目的运行时 Provider 投影在每次查询结果内只规范化一次各 Provider 的 profile，并为配置的模型建立一次索引。重复的配置模型 ID 保留首项。复用随该结果结束，后续策略读取使用当前数据库行，不保留跨请求缓存。
+
+构建 Gateway 后，在仓库根目录运行 `npm exec -- tsx gateway/tests/runtime-provider-projection.perf.ts`，可针对构建后的投影执行离线诊断。它报告两种作用域下 16、64 和 256 个合成模型的 profile 克隆调用次数及被克隆模型条目数。诊断不包含数据库解码、认证、网络、Runtime 就绪和浏览器渲染；这些计数不证明端到端延迟或容量。
 Gateway 在 `/internal/runtime/resources/` 下协调持久化的节点准入。[Runtime 提供方](../packages/context/gateway-runtime/README.zh.md#resource-admission)在就绪前注册；实际 LLM 派发和子进程分配等待许可。排队许可重新检查捕获的权限。停止期间或账户权限撤销后，只有完成接口接受当前 Runtime bearer；确认进程范围终止后按其捕获的代次回收资源。绕过这些消费方直接分配 worker 的入口仍需接入；Runtime 常驻限制仍是独立控制项。
 
 只有已停止的实例记录可以领取新代次。停止状态变更与凭据清除必须匹配捕获的代次。凭据指纹区分备份恢复后重复出现的代次编号。Linux 使用 `harness-<runtime-key>@<generation>-<credential-hash>.service`；终止会先把该代次的单元原子替换为空的屏蔽文件，再等待 `systemctl stop`。保留这些屏蔽文件，以阻止迟到的启动命令重新激活已经确认停止的代次。终止同时屏蔽并停止旧式按用户命名的单元。停止、启动和升级通过实例管理执行，让凭据、记账和监督状态一起推进。
@@ -227,6 +235,9 @@ Linux 项目启动前，配置的执行账号必须已存在。Gateway 通过保
 
 成员为 `ro` 或 `rw`，普通用户的有效列表（私有 home 加成员身份，每条带 `label`）写入 `$DSH_HOME/directory-grants.json`。管理员在个人和项目 scope 都得到文件系统根目录的 `rw` 授权和 Full access 预设。该预设只改变 dsh 的应用内 sandbox 与审批旋钮；systemd 项目运行时仍受内核项目路径约束。角色变化会重写这份投影，并重启正在运行的个人实例。用户删除是逻辑删除：停止个人实例、释放其运行时端口分配、吊销会话、移除项目与模型访问、在登录和管理列表中隐藏账号，并保留审计、用量、对话和 home 历史；用户名保持占用。位于 `/admin/users/:id` 的用户详情页集中呈现单个账号的各项管理能力：资料、状态、运行时实例控制、SSH/终端/桌面/插件管理/记忆写入/维护空间资格、按模型的访问例外、显式项目成员身份，以及按用户的额度模式。
 
+管理员页面的读取由已挂载页面拥有。模型编辑器让镜像与 Provider／模型读取者共享尚未完成的设置读取，每次显式刷新建立新一轮读取；设置和凭据写入使复用失效，同时保留修订号折叠与冲突恢复。插件、终端和 SSH 权限选择器复用其页面的项目列表与重试操作。用量页显示服务端选择的初始月份，不将该应答当作另一次月份请求。重新打开页面会创建新所有者，这些合并不保留跨页面或跨账户缓存。[管理端读取所有权决策](../.agents/notes/implemented/architecture/2026-10-23-admin-page-read-ownership.zh.md) 规定时效与取消行为。
+
+管理端的用户、项目、模型、用量和审计页面共用一套视觉系统：克制的表面色、统一的页面与分区标题、状态徽标、共享指标卡、明确的加载/空状态/错误状态、键盘焦点环，以及用于变更操作的弹窗表单。项目详情包含成员、实例状态、生效的按路由模型授权（含全部开启与全部关闭）、项目默认跟随模式和单模型例外、自然月 token/成本/缺失用量汇总、回填已保存来源和上限的额度弹窗（包含明确的零额度与普通成员继承关系），以及额度来源、路径、发起方式、所有者、成员和生效模型的配置摘要。价格编辑器保留微元单价的六位小数，并与存储层共用十进制转换。个人 Provider 与模型登记使用带可见标签、明确 `YYYY-MM-DD` 日期格式以及应用/重置操作的筛选器，编辑草稿时不会为每个字符发起请求，日期无效时不会发起请求。视口宽度大于 `840px` 时，侧栏高度与视口一致，导航入口独立滚动，品牌和退出登录入口保持可见，数据表便于横向比较；宽度不超过 `840px` 时，侧栏变为吸顶品牌栏加单行固定底部导航，其中包含五个主要入口和通往其他全部功能的“更多”菜单，表格行切换为易读的卡片，模型视图控件保持单行。宽度不超过 `560px` 时，表单网格改为单列、操作按钮填满可用宽度，弹窗接近全屏并让正文独立滚动。SSH、Webhook 和部署表格使用有界横向滚动区域，触控、指针及键盘均能到达各项操作。粗指针控件预留 `44px` 触控目标，同时遵循深色配色和减少动画偏好。修改界面后运行 `npm run build --prefix gateway/admin-ui` 重新生成静态资源；运行中的网关直接提供生成后的 `gateway/public/admin` 文件，不需要数据库迁移。
 账号管理在事务及密码哈希等待后重新检查发起管理员。创建、资料或资格变更、角色或状态更新、密码重置及删除，都会在账号副作用前拒绝失效权限；删除还会在停止个人 Runtime 前检查。当前管理员仍受既有的禁止自删和最后管理员保护约束。自定义服务适配器遵循[账号权限升级指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/user-administration-authority/guide.zh.md)。
 
 管理端的用户、项目、模型、用量和审计页面共用一套视觉系统：克制的表面色、统一的页面与分区标题、状态徽标、共享指标卡、明确的加载/空状态/错误状态、键盘焦点环，以及用于变更操作的弹窗表单。项目详情包含成员、实例状态、生效的按路由模型授权（含全部开启与全部关闭）、项目默认跟随模式和单模型例外、自然月 token/成本/缺失用量汇总、回填已保存来源和上限的额度弹窗（包含明确的零额度与普通成员继承关系），以及额度来源、路径、发起方式、所有者、成员和生效模型的配置摘要。价格编辑器保留微元单价的六位小数，并与存储层共用十进制转换。个人 Provider 与模型登记使用带可见标签、明确 `YYYY-MM-DD` 日期格式以及应用/重置操作的筛选器，编辑草稿时不会为每个字符发起请求，日期无效时不会发起请求。视口宽度大于 `840px` 时，侧栏导航独立滚动，品牌与账户控件保持可见，数据表便于横向比较；宽度不超过 `840px` 时，侧栏变为吸顶品牌栏加单行固定底部导航，其中包含五个主要入口和通往其他全部功能的“更多”菜单，表格行切换为易读的卡片，模型视图控件保持单行。宽度不超过 `560px` 时，表单网格改为单列、操作按钮填满可用宽度，弹窗接近全屏并让正文独立滚动。SSH、Webhook 和部署表格使用有界横向滚动区域，触控、指针及键盘均能到达各项操作。粗指针控件预留 `44px` 触控目标，同时遵循深色配色和减少动画偏好。修改界面后运行 `npm run build --prefix gateway/admin-ui` 重新生成静态资源；运行中的网关直接提供生成后的 `gateway/public/admin` 文件，不需要数据库迁移。用户变更失败时，错误显示在当前弹窗内并保留草稿。用户、项目、文档、审计和个人登记的初次查询失败时显示错误，不宣称列表为空或数量为零。紧凑文档卡片提供具名详情按钮，身份验证字段在输入后仍保留可见标签。
@@ -308,6 +319,8 @@ SSH 目标元数据在 `/admin/ssh` 管理。可选的 `passwordRef` 是连接�
 
 `/admin/plugins` 选择用户或项目管理对象，绑定其在当前节点上的运行实例，适配上游管理流程，支持包检查、安装、脚本批准、取消、启停和移除。节点或代次不匹配时必须重新读取选择。页面不会启动已停止的实例。一个融合矩阵直接读写 PostgreSQL 中保存的运行时插件组合：「当前」列展示运行实例的插件清单，实例停止时展示 profile 文件最近观测到的状态，其中开关通过运行实例立即生效；「启动时」列以乐观 `revision` 起草受管理的 patch 行和组合包选择，冲突时重新读取最新已保存状态而不是覆盖，下一次启动把已保存的组合投影进 profile 文件，而正在运行的实例会在下一次发布时收敛到该状态。所选对象的插件管理资格可在页面内就地编辑；项目授权保留在独立区块。安装输出仅留在管理员请求中；传输丢失意味着结果未确认，不会自动重试。已注册的非账户设置以配置卡片呈现，继续使用现有设置所有者。表单显示解析值、继承值、归属和重启要求，只携带当前版本提交已编辑路径。秘密需明确选择保留、替换或移除本层值，绝不读回原值。发生冲突时保留草稿，管理员放弃后才能采用当前值。账户偏好仍在账户设置中管理。明确失去权限会清除私有操作流程及日志；旧目标迟到的响应不能使新目标失效。
 
+所选 Web 运行时通过一次 `pluginManager/catalog` 读取共同提供包页面和高级组成矩阵，结果由生成的校验器验证，并执行与现有管理端点相同的 Admin 断言检查。活动控制器把已接纳的 catalog 值发布给其绑定的组成；矩阵不再单独请求活动列表。持久启动状态仍独立读取，在真实管理写入完成后刷新，而不是因初始空闲状态刷新。重叠的启动状态读取只发布最新读取，已确认的保存会淘汰更早的读取。配置保留独立的 `settings.describe` 读取。切换目标会取消所拥有的读取，晚到的 catalog、状态和写入回复不能发布到替代代次。窗口重新聚焦和显式刷新保留控制器现有的新鲜读取与排队重读行为。
+
 干净的 Admin 检出需要根目录和 Admin 的锁定依赖。独立测试或构建前执行 `npm run prepare:remotes --prefix gateway/admin-ui`；完整根构建已经生成这两个 codec。浏览器门禁在共享运行时构建后构建 Admin 产物，并通过真实 Gateway 路由比较[安装区域快照](../apps/web/tests/plugin-administration.e2e.ts)。
 
 ## 维护中枢空间
@@ -353,6 +366,10 @@ Gateway 使用认证账户当前有效的企业和成员资格注册、删除 An
 未指定目标的普通登录直接进入原有 Harness 工作台。个人分配不唯一时，浏览器入口按入口电脑、保留的原个人存储、分配时间和 UUID 选择有权限的默认个人环境，不根据连接状态选择，也不启动其他 Runtime。显式 Runtime／所有者链接仍严格解析，每个标签页保留已捕获的目标。
 
 `POST /account/runtime/start` 失败时返回本地化、禁止缓存的 HTML。可重试的失败通过手动重试表单保留原 Runtime／项目；无效或被拒绝的目标提供环境选择。JSON scope API 保持机器可读。两种失败路径均不改写 scope Cookie，也不切换到其他环境。
+账户上下文响应复用当前 HTTP 请求已经验证的作用域。PostgreSQL 解析可访问项目后，批量读取其 owner、来源和主题元数据，不加载或计数成员名单。项目权限读取同时返回管理权限和主题元数据；代理准入和事件流续租分别重新检查当前权限。成员关系和管理标记遵循[上下文读取规则](../.agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.zh.md)。
+
+活动的 `/api/events.mux` 与 `/api/events.host` socket 将原登录会话、nonce、身份/权限快照、scope 和 Runtime generation 保留在 Gateway 所有的登记表中。携带私有运行时 bearer 的请求只有在同步访问监控并只读检查登录资格及成员身份后，才能续租这些仍活动的登记。续租不更新登录活动，也不延长任何登录期限；权限变化、监控中断、socket 关闭或 generation 替换都会终止连接。每份替代签名的有效期仍不超过 30 秒。普通 HTTP 断言保持固定到期。禁用续租或丢失响应都不会给 Runtime 增加有效期；事件流在最后一次验证的期限到达时关闭。设置通过下一次私有启动凭据交付给 Runtime。见[事件 principal 决策](../.agents/notes/implemented/architecture/2026-10-23-event-stream-principal-renewal.zh.md)。
+
 账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。只有个人会话目录和归档目录都读取完成，`personalComplete` 字段才为 true。个人 runtime 不可用时仍可返回经过 ACL 过滤的项目记录，但不完整的个人目录不能证明会话已删除，也不能移除已保存的个人窗格。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。
@@ -379,7 +396,7 @@ Session ACL 检查会在每次操作中查询当前成员身份。会话创建�
 
 注销、密码或账户权限、项目成员关系、会话可见性或项目删除提交后，处理该变更的 Gateway 会关闭匹配的在途通用代理响应与 WebSocket，其他目标保持连接。该 registry 属于单个 Gateway 进程；其他 Gateway 进程或直接数据库写入产生的变化，通过操作授权与 principal 续期重新检查，不由此 registry 广播。
 
-文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把来源身份写入持久审计日志。支持已授权的项目到项目复制；副本不会同步后续修改。运行时 JSON 响应与流式 body 受 `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` 限制，代理操作和文档元数据／生命周期请求受 `HGW_UPSTREAM_TIMEOUT_MS` 限制。文档请求停滞时会返回 HTTP 504 和 `DOCUMENT_SCOPE_TIMEOUT`，并释放 runtime lease；成功的内容流会持有 lease 直到 EOF 或取消，不受元数据截止时间截断。仅元数据的 transfer plan 五分钟后过期，并受进程（10,000 个计划／128 MiB）、企业（2,000 个计划／32 MiB）和操作者（100 个计划／8 MiB）三层的数量及序列化字节额度限制；计划被消费或过期时会释放全部三层计数。
+文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把来源身份写入持久审计日志。项目到项目复制要求源作用域可读、目标作用域可写，复制不提供实时同步。复制规划在每个选中 ID 的父目录查找源元数据，保留选择顺序并共享整个规划的分页预算；请求中的目标目录只用于目标。运行时 JSON 响应与流式 body 受 `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` 限制，代理操作和文档元数据／生命周期请求受 `HGW_UPSTREAM_TIMEOUT_MS` 限制。文档请求停滞时会返回 HTTP 504 和 `DOCUMENT_SCOPE_TIMEOUT`，并释放 runtime lease；成功的内容流会持有 lease 直到 EOF 或取消，不受元数据截止时间截断。仅元数据的 transfer plan 五分钟后过期，并受进程（10,000 个计划／128 MiB）、企业（2,000 个计划／32 MiB）和操作者（100 个计划／8 MiB）三层的数量及序列化字节额度限制；计划被消费或过期时会释放全部三层计数。
 
 其他操作者或企业提交计划被拒绝时，原所有者的有效复制计划会保留。每次源文件读取、上传请求和验证轮询都会复核发起账号及两侧作用域，再签发新的运行时 principal；管理员多目标分发也会复核当前角色。失败复制的取消请求使用配置的上游截止时间。参见[复制授权决策](../.agents/notes/implemented/feature/2026-08-24-cross-scope-document-workbench.zh.md)。
 
@@ -388,6 +405,8 @@ Session ACL 检查会在每次操作中查询当前成员身份。会话创建�
 Gateway 退出先关闭 Runtime 启动准入并取消待完成的容量和压力额度等待，再清空已接纳写入。已有就绪进程保持可用，直到既有 Runtime 停止阶段；已关闭的 manager 拒绝后续启动与热复用。
 
 文档服务关闭时先停止 broker 准入，再等待已接收的授权与 HTTP 工作。每个根目录都会保留其 HTTP 作用域、延后的目录队列和文件系统引擎，直到这些 Consumer 结束；所有作用域均尝试清理后，关闭会报告引擎清理失败。一个关闭阶段失败时会保留其原因，后续阶段仍会尝试清理；任一阶段失败都会使最终状态为失败。强制退出定时器会保持进程运行，直到清理结束或截止时间触发。
+
+本地与运行时转发的内容都保留[文档 HTTP 所有者按类型区分的内联预览策略](../packages/host/userdoc-http/README.zh.md#known-limitations-and-deferred-work)，包括同源的原生 PDF 嵌入。作用域和账户授权仍先于内容读取，普通下载保留 attachment disposition。
 
 浏览器使用的 `POST /api/documents/transfer/list` 由 Gateway 自己负责，而不再交给通用运行时代理。Gateway 先完成作用域检查，再从选定作用域的文档根直接应答，文档浏览不依赖目标运行时启动。就绪检查使用一次性 nonce，以及由运行时 bearer token 和身份派生的 HMAC 证明，而不是接受端口上的任意 HTTP 响应；运行时启动失败会返回经过认证的 JSON 错误，绝不会把浏览器重定向到回环运行时端口。作为最后一道代理保护，其他上游响应中的回环 `Location` 也会在返回公网响应前转换为同源路径。
 
@@ -445,6 +464,8 @@ Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview
 
 数据库维护使用私密连接输入；原生客户端需要单独构建 libpq 适配器，自定义 Docker／SSH 包装命令必须实现其就绪协议。安装、配置及取消语义见 [PostgreSQL 维护客户端参考](deploy/postgres/README.zh.md#private-maintenance-connections)。
 
+macOS 的 `release-control.sh activate <candidate> --rollback-target <directory>` 可预选一份完整 compiled 回退产物，其数据库兼容性由运维提前隔离验证。candidate 与 fallback 必须在任何切换或进程操作前解析为不同的 release 根直接子目录，且产物完整；拒绝 `current` 别名、缺失或不完整的产物及根外路径。失败时只恢复指定目标，并验证其 PID、工作目录和健康响应中的 release id；fallback 也不健康则报告失败，不再尝试其他旧 release。不带该选项时使用先前 release 回滚。旧 PID 与后代清理始终针对实际运行的 release。控制器只验证产物，不验证数据库兼容，也不读取或迁移数据库。见[受管 release 决策](../.agents/notes/implemented/process/2026-08-18-atomic-macos-gateway-releases.zh.md)。
+
 维护管理在读取和已提交的状态转换期间检查并保留当前活跃企业管理员资格。进入、退出和节点状态变更与操作记录一同提交，并发进入只产生一条窗口记录。恢复登记还将属于本企业、已验证且完整的备份保留到接受请求。已撤销的账号、角色或成员资格返回403；数据库意外失败返回503，不会提交一半的状态转换。可信独立应用器仍按其部署归属执行。
 
 写者收敛前，全部运行时进程必须确认已停止，已登记为离线的节点也不例外。部署页显示尚未停止的实例数量。管理员可在维护期间按所属用户或项目停止实例，也可停止指定 Runtime 代次；当前授权和代次检查仍然有效。恢复前的陈旧进程不能停止任何一种目标。恢复应用器在文件核对完成前持有独占数据库咨询锁。恢复 SQL 还持有自己的事务锁，并在变更前和提交前核验协调后端身份；本机 Docker 命令代理退出不能解除数据库互斥。失败的恢复保持 `restoring` 并阻止退出维护，可通过 `pg:deploy restore` 重试；只有完整文件核对通过后才返回维护状态。
@@ -458,6 +479,8 @@ PostgreSQL 命令子进程使用 Gateway 清理后的工具环境。无关的 Ga
 命令失败详情最多保留 stderr 的 8 KiB 完整 UTF-8 前缀；进程状态和命令上下文不计入该 stderr 字节上限。
 
 完整备份要求维护状态、运行时已停止，以及数据库数据操作租约。创建与校验在命令准入和注册记录写入期间保留认证管理员。配置预览也在发布 POST 读取结果前检查当前权限。校验与配置预览要求标准格式的注册记录 UUID；格式错误返回400，合法但不存在的身份返回404。撤权拒绝后续准入，不把有效备份误标失败；注册被拒绝前已捕获的文件保留供操作员清理。 用户删除导致运行实例行移除后，保留的用户仍是数据所有者；缺少该行时，本地归属必须以已确认的单组织、单节点拓扑为前提。创建账号在数据库事务内先登记将预建的文档目录，再创建目录，因此从未启动运行时的账号也在覆盖范围内。数据库提交失败时保留诊断文件，不把它们归到其他账号。每个运行时的存储提供者在 `DSH_MANAGED_DATA_MANIFEST` 中登记实际解析后的路径；配置改变后仍保留之前的路径。备份捕获获准根目录下的全部普通文件和空目录，以及节点所有的配置与凭据，并记录副本字节摘要、权限和所有者。会话保留全部已提交代次，包括损坏的原始记录；附件、User Documents、历史 Review、外部成员绑定和待投递的治理 outbox 记录保留各自所有者定义的存储。项目源码、SSH 工作区、未知文件和链接不会因递归打包状态目录而被认领。缺失清单、未批准的自定义根、符号链接逃逸或不完整快照均拒绝操作。文件复制拒绝零进度写入，在部分写入之间响应取消，并在同步后再次检查取消，再发布捕获摘要。完整数据包目前要求一个组织和一个计算节点；本机数据包不能证明其他节点文件系统已被覆盖。
+
+清单中记录的 `@deepseek-ai/dsh-agent-presets` 与 `@deepseek-ai/dsh-agent-preset-registry` 两个 owner 都仅覆盖精确的规范默认目录 `<runtime.dshHome>/.agent-presets`；此兼容不批准自定义根或未知 owner。收集只对物理备份根去重，不重写清单字节。迁移保留全部原始所有权记录，并对两个名称执行相同的 preset 配置检查。
 
 对于提供者记录未包含的历史根，节点管理员使用[受管数据记录格式](../packages/util/managed-data/README.zh.md)提供私有的 `HGW_MANAGED_DATA_APPROVAL_FILE`，owner 前缀为 `user:<public-id>/` 或 `project:<public-id>/`。复核当前和已停用的存储位置并停止写者后，执行 `pnpm pg:deploy inventory adopt --runtime user:<public-id>`（或 `project:<public-id>`）。此命令只追加明确批准的根，保留已有记录并登记采纳操作。批准也不能认领整个项目工作区或 Harness home。不会根据熟悉的目录名推断缺失记录。
 

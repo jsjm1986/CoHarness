@@ -7,11 +7,15 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
+所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, coldSummaryCacheMaxEntries?, coldSummaryCacheMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
 
 版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。
 
 `workspaceFiles.*` 在 Session 授权、canonical containment、符号链接检查和已组合的 `workspace-files/authorize` 目录策略通过后，读取 Session 相对文件。冷读取只加载 header。Host 在返回相对元数据、UTF-8 文本页或 Base64 窗口前复核文件身份与权限；可选版本保护拒绝混合版本分页。`host.describe.workspaceFiles` 声明支持情况与配置上限：默认每页／窗口 2 MiB、5,000 行、2,000 个目录项和 512 条 Client 元数据记录。Agent 工具继续拥有写入、CAS 与审计语义。
+
+文本页的偏移量和上限均按行计数。最后一页即使恰好达到行数上限，也会报告 `eof: true`。行窗口填满后检查已缓冲文本，或推进提供方迭代器，直到遇到下一个非空分块或结束；分页循环既不追加也不扫描下一行。所选页超过字节上限时仍会拒绝，而不是截断。
+
+`workspaceFiles.readBytes` 接受可选的完整文件大小上限 `maxFileBytes`，等于上限时允许读取。已知文件大小超限时，在提供方读取内容前拒绝；单窗口上限仍然生效。完整文件读取器可从首个字节窗口取得版本，再用该版本保护后续窗口，无需单独请求元数据。提供方未报告大小时，读取器仍约束累计字节数。
 
 `workspaceFiles.renderOffice` 复用文件域的授权、相对路径及版本检查。内容权限探测在查询转换缓存前执行；队列准入后进行有界字节窗口读取，返回前再次核验源文件和权限。结果包含 PDF、缺失字体及转换代次，不暴露 Host 路径或引擎诊断。转换限制由 [Office 提供方](../../document/office-to-pdf/README.zh.md)负责。
 
@@ -70,13 +74,13 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 组合 `ctx.collaboration` 后，项目 scope 下的 Session 操作会在观察或修改对话前授权被寻址的根对话，而列表、搜索结果、stream 发布、workspace 引用和已附加 Session 数量会过滤不可读 Session id。只依赖 scope 的写操作要求已捕获的 `rw` 模式，且项目路径会保持在已配置项目根内。Typert Remote 分发使用明确的项目 allowlist：`commands/list`、`fileReferences/list` 与 `sessionReferenceResolver/candidates` 需要 Session `read`；`commands/execute` 与 `goals/*` 需要 `write`；所有未分类或进程级 Remote 都会被拒绝。Host 扩展通过 `registerRemoteSessionPolicy(endpoint, policy)` 声明自己的 Session 级端点——同一名字二次声明会抛错，因此一个端点的访问类只有一个所有者——`lookupRemoteSessionPolicy` 把内建与已注册条目一并解析供分发、wire 映射与 `remoteSessionId` 使用。个人 principal 与没有协作授权要求的独立组合保留普通 API 行为。
 
-Mux 与 Host stream 仅合并尚未完成的授权请求。每批发布都会复核 Session 可读性，包括已入队的基线、workspace 引用、归档列表和 Session 范围的转发事件。先前读成功不会授权后续投递，中止会丢弃缓冲帧。
+Mux 与 Host stream 仅合并尚未完成的授权请求。每批发布都会复核 Session 可读性，包括已入队的基线、workspace 引用、归档列表和 Session 范围的转发事件。先前读成功不会授权后续投递，中止会丢弃缓冲帧。 每条流执行捕获权限的当前签名期限（包括已验证的 Gateway 事件连接续租），并在到期或权限取消时停止。
 
 调用任一事件流开启方法时都会立即安装监听器，不会等到首次拉取返回的 async iterable。这样可保留连接获准到载体开始消费之间的每一项已提交增量；迭代只负责排空已经开启的订阅，中止或 iterator return 会移除其监听器。
 
 首个回答认领待处理请求之前，系统会对照该请求校验问题响应。多选题的回答项可以同时携带 `selected` 中的请求选项标签与非空 `custom` 文本；单选题的回答项必须二选一。标签重复、标签未知、id 不匹配、批次不完整以及自定义文本为空都会以 `bad-response` 拒绝。
 
-`session.history` 会读取已附加 Session 的内存状态，或通过持久化的有界分页读取 detached 历史，而不会恢复或发布 agent，然后按追加来源的消息边界分页：`maxMessages` 统计以追加方式进入 surface 的 `user/message` 和 `assistant/message` 事件，因此仅供模型使用的替换副本不占用配额。每一页仍是一段连续的原始事件区间，从而让压缩（compaction）的仅日志 `compaction/summary` 记录与引用它的替换留在同一页。带索引的冷读取使用 512 KiB 持久化页，并把一次 Host 操作限制在 4 MiB 窗口内；长流尚未达到消息配额时，调用方可用 `beforeSeq` 继续读取。Web 的 `detail: 'conversation'` 尾页会在每个 Runtime 内按已附加／分离的来源类型、追加日志身份（分离来源还使用持久化 revision）、请求页大小和投影注册集 revision 放入有界缓存。分离来源校验使用按 id 查询的 `SessionPersistence.readRevision()`，不扫描会话目录；会话事件、工具注册表或投影 key 变化会使条目失效，其他历史请求仍走未缓存路径。冷读分页游走中出现 `dependency` 失败（打开动作自带的 resume 已附加该会话并追加了生命周期事件，或其他写入者改变了 revision）时，Host 先等待已宣告的进行中创建完成，再由此时已附加的日志提供数据，或按新 revision 重走一次分页，仍失败才把错误交给客户端。冷 projection baseline 折叠也享有同样的恢复：会话若在分页游走与折叠之间附加，tail 改从驻留日志切出，缓存写入随之丢弃已过时的分离 revision 对。没有 seek 分页实现的提供方保留兼容的完整检查路径。
+`session.history` 会读取已附加 Session 的内存状态，或通过持久化的有界分页读取 detached 历史，而不会恢复或发布 agent，然后按追加来源的消息边界分页：`maxMessages` 统计以追加方式进入 surface 的 `user/message` 和 `assistant/message` 事件，因此仅供模型使用的替换副本不占用配额。每一页仍是一段连续的原始事件区间，从而让压缩（compaction）的仅日志 `compaction/summary` 记录与引用它的替换留在同一页。带索引的冷读取使用 512 KiB 持久化页，并把一次 Host 操作限制在 4 MiB 窗口内；长流尚未达到消息配额时，调用方可用 `beforeSeq` 继续读取。Web 的 `detail: 'conversation'` 尾页会在每个 Runtime 内按已附加／分离的来源类型、追加日志身份（分离来源还使用持久化 revision）、请求页大小和投影注册集 revision 放入有界缓存。并行的读后 revision 检查会立即被观察，并在请求结束前等待完成，包括投影失败或取消的路径。分离来源校验使用按 id 查询的 `SessionPersistence.readRevision()`，不扫描会话目录；会话事件、工具注册表或投影 key 变化会使条目失效，其他历史请求仍走未缓存路径。冷读分页游走中出现 `dependency` 失败（打开动作自带的 resume 已附加该会话并追加了生命周期事件，或其他写入者改变了 revision）时，Host 先等待已宣告的进行中创建完成，再由此时已附加的日志提供数据，或按新 revision 重走一次分页，仍失败才把错误交给客户端。冷 projection baseline 折叠也享有同样的恢复：会话若在分页游走与折叠之间附加，tail 改从驻留日志切出，缓存写入随之丢弃已过时的分离 revision 对。没有 seek 分页实现的提供方保留兼容的完整检查路径。
 
 `session.historyIndex` 是导航条使用的独立提示性读取。它最多返回 2,000 个轮次范围及 160 个 Unicode code point 的问答预览；冷会话使用带索引的 persistence 提供方，结果绝不包含事件或流式 chunk 正文。浏览器在刷新期间保留上一次成功的索引；选择尚未加载的标记时，只读取到该标记所需的更早页面。
 

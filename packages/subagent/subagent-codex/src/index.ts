@@ -132,14 +132,22 @@ class CodexProvider implements SubagentProvider {
   readonly capabilities: SubagentCapabilities = NO_START_CAPABILITIES
   readonly inheritsParentContext = false
   readonly agentRouteDefaults?: Readonly<{ provider: string; model: string }>
+  readonly name: string
+  private readonly ctx: Context
+  private readonly config: ResolvedConfig
+  private readonly memberStore: ExternalBindingStore | undefined
 
   constructor(
-    readonly name: string,
-    private readonly ctx: Context,
-    private readonly config: ResolvedConfig,
+    name: string,
+    ctx: Context,
+    config: ResolvedConfig,
     memberRoute: string | undefined,
-    private readonly memberStore: ExternalBindingStore | undefined,
+    memberStore: ExternalBindingStore | undefined,
   ) {
+    this.name = name
+    this.ctx = ctx
+    this.config = config
+    this.memberStore = memberStore
     if (memberRoute !== undefined) {
       this.agentRouteDefaults = {
         provider: memberRoute,

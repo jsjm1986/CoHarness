@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-04-workspace-list-baseline-notices.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-04-workspace-list-baseline-notices.md
+document:
+  en: 8a2881efa00d352f016733729590c6b7daf930fb
+  zh: 85328c390316c71eb8edc3d5ef7bc5b12422df26
+/agent-note-session-list-publishes-its-baseline-lifecycle-on-the-region:
+  en: 2bb7a64990b9b58b
+  zh: 5653200d03f264c7
+/agent-note-session-list-publishes-its-baseline-lifecycle-on-the-region/problem:
+  en: f011533719adb5e3
+  zh: 82a3bbb2655b306a
+/agent-note-session-list-publishes-its-baseline-lifecycle-on-the-region/decision:
+  en: c818b36e5d04311c
+  zh: e6a66765ba3347b4
+/agent-note-session-list-publishes-its-baseline-lifecycle-on-the-region/alternatives-considered:
+  en: 0f65323866d22ce1
+  zh: 76c1fef22a8abf96
+/agent-note-session-list-publishes-its-baseline-lifecycle-on-the-region/consequences:
+  en: 526123c347b6c3b4
+  zh: 840dc1727ecceef0
+/agent-note-session-list-publishes-its-baseline-lifecycle-on-the-region/verification:
+  en: 4b48becc501340de
+  zh: 03037bfa552620b3

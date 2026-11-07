@@ -12,6 +12,7 @@ import type { BrowserAuth } from '@deepseek-ai/dsh-client-connection/src/browser
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, Config, inject, name, InspectorStartupCleanupError } from '../src/index.ts'
 import { startInspector, type InspectorHandle } from '../src/host/bridge/controller.ts'
+import { InspectorClientFixture } from './fixtures/client-source.host.ts'
 import { httpFetch } from './api-fetch.ts'
 
 type AssetMiddleware = (req: IncomingMessage, res: ServerResponse, next: (error?: unknown) => void) => void
@@ -343,6 +344,27 @@ describe('experimental Inspector Host DevTools routes', () => {
     await upgrade.handler(upgradeRequest(undefined, {}), pair.server, Buffer.alloc(0))
     await pair.closed
     expect(pair.received().length).toBe(0)
+  })
+
+  it('preserves a Host-only scope through the authenticated relay while another Client is present', async () => {
+    const { fiber, upgrades } = await mount()
+    await fiber.await()
+    const handle = await (vi.mocked(startInspector).mock.results[0]!.value as ReturnType<typeof startInspector>)
+    const client = await InspectorClientFixture.start(handle.endpoint.client)
+    try {
+      await vi.waitFor(async () => { expect((await context!.inspector.cordis.getTree()).clients).toHaveLength(1) })
+      const upgrade = upgrades.find(row => row.path === '/inspector/devtools/cdp')!
+      const pair = await socketPair()
+      const reply = readUpgrade(pair.client)
+      await upgrade.handler(upgradeRequest('/inspector/devtools/cdp?sourceScope=host', {}), pair.server,
+        clientTextFrame(JSON.stringify({ id: 1, method: 'DSHInspector.getSources' })))
+      const answered = await reply
+      const sources = answered.message.result as { sources: Array<{ kind: string }> }
+      expect(answered.status).toMatch(/^HTTP\/1\.1 101 /u)
+      expect(sources.sources.map(source => source.kind)).toEqual(['host'])
+      await fiber.dispose()
+      await pair.closed
+    } finally { await client.close() }
   })
 
   it('logs a rollback failure and still rejects initialization with the registration error', async () => {

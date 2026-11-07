@@ -39,6 +39,8 @@ export const remoteDefaultResponses: RemoteTable = {
     'dynamicCordisRunner/inventory': ok([]),
     // ui-plugin-inventory snapshot on first read.
     'pluginInventory/list': ok({ entries: [] }),
+    // ui-plugin-manager's one read on first page use; no profile under the mock.
+    'pluginManager/catalog': ok({ managementAvailable: false, manage: false, bundles: [], plugins: [] }),
     // ui-permission-presets `PermissionCatalogDirectory` on its first read for a connection generation.
     'permissionPresets/catalog': ok({ options: [] }),
     // command palette's descriptor pull before the first submission.

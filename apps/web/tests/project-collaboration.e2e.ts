@@ -191,10 +191,11 @@ async function mockGateway(page: Page | BrowserContext, mode: ProjectMode, optio
  */
 async function stagePrivateVisibility(page: Page): Promise<void> {
   const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
-  const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+  const scopePage = page.getByRole('dialog', { name: 'Switch personal or project scope' })
   await scopePage.waitFor({ timeout: 10_000 })
+  await scopePage.getByRole('tab', { name: 'Manage spaces' }).click()
   await scopePage.getByRole('button', { name: 'New conversation visibility' }).click()
-  await scopePage.getByRole('button', { name: /Only me/ }).click()
+  await scopePage.getByRole('radio', { name: /Only me/ }).click()
   await scope.click()
 }
 
@@ -345,7 +346,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     expect(protectedReads).toBe(0)
     expect(await dialog.getByRole('alert').count()).toBe(0)
     await compareOrRefreshGolden(INCOMING_INVITATION_EXPECTED,
-      await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), MODE)
+      await captureStableAria(page, '[role="dialog"]:not([aria-hidden="true"])', scaffold.workspaceCwd), MODE)
     await dialog.getByRole('button', { name: 'Accept', exact: true }).click()
     await expect.poll(() => accepted).toBe(true)
     await dialog.getByText('No pending invitations', { exact: true }).waitFor()
@@ -404,7 +405,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       const input = page.locator('textarea:enabled').last()
       await input.fill('Private draft restored after account verification')
       await expect.poll(() => page!.evaluate(() => Object.values(localStorage)
-        .some(value => value.includes('Private draft restored after account verification')))).toBe(true)
+        .some(value => String(value).includes('Private draft restored after account verification')))).toBe(true)
       blocked = true
       const warnings = tripwire.warnings.length
       await page.reload({ waitUntil: 'load' })
@@ -431,7 +432,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await scope.waitFor({ timeout: 10_000 })
     expect(await scope.textContent()).toContain('Payments migration')
     await scope.click()
-    const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+    const scopePage = page.getByRole('dialog', { name: 'Switch personal or project scope' })
     await scopePage.waitFor({ timeout: 10_000 })
     expect(await scopePage.getByRole('button', { name: 'Close', exact: true }).evaluate(element => element === document.activeElement)).toBe(true)
     expect(await page.locator('[data-sidebar-browsing]').evaluate(element => (element as HTMLElement).inert)).toBe(true)
@@ -446,7 +447,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await page.keyboard.press('Tab')
     // The grant text moved off the trigger into the page hero; the page stays
     // bounded to the browsing region rather than floating over it.
-    expect(await scopePage.textContent()).toContain('Can edit')
+    expect(await scopePage.getByRole('tab', { name: 'Switch space' }).count()).toBe(1)
     const pageBox = await scopePage.boundingBox()
     const viewport = page.viewportSize()
     if (pageBox === null || viewport === null) throw new Error('scope page geometry is unavailable')
@@ -527,7 +528,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
       await scope.waitFor({ timeout: 10_000 })
       await scope.click()
-      const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+      const scopePage = page.getByRole('dialog', { name: 'Switch personal or project scope' })
       await scopePage.waitFor({ timeout: 10_000 })
       await scopePage.getByRole('button', { name: /Audit platform/ }).click()
 
@@ -539,7 +540,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       await page.keyboard.press('Escape')
       expect(await dialog.isVisible()).toBe(true)
 
-      const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+      const snapshot = await captureStableAria(page, '[role="dialog"][aria-label="Switching scope"]', scaffold.workspaceCwd)
       await compareOrRefreshGolden(SWITCHING_EXPECTED, snapshot, MODE)
     } finally {
       releaseScope()
@@ -563,7 +564,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
     await scope.waitFor({ timeout: 10_000 })
     await scope.click()
-    const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+    const scopePage = page.getByRole('dialog', { name: 'Switch personal or project scope' })
     await scopePage.waitFor({ timeout: 10_000 })
     // Below 768px the drawer itself is the surface: the page covers it edge
     // to edge and its own scroll region carries the roster.
@@ -579,6 +580,113 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     expect(await scopePage.getByRole('button', { name: /Audit platform/ }).count()).toBe(0)
     expect(await scopePage.getByRole('button', { name: /Payments migration/ }).count()).toBe(1)
   }, 60_000)
+
+  it.each([390, 1280])('keeps project configuration and invitation operations intact at %ipx', async (width) => {
+    const phone = width < 768
+    page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'en-US', hasTouch: phone, isMobile: phone })
+    tripwire = watchConsole(page)
+    await mockGateway(page, 'rw')
+    const context = collaborationContext('rw')
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, route => route.fulfill({ json: {
+      ...context, projects: context.projects.map(project => ({ ...project, origin: 'admin', owner: null, canManage: true })),
+    } }))
+    let themePolicy = 'follow-user'
+    const themeBodies: string[] = []
+    const invitationBodies: string[] = []
+    let accepted = false
+    let sent = false
+    const incoming = {
+      id: 'incoming', projectId: 9, projectName: 'Payments migration',
+      invitee: { id: 7, username: 'lin', displayName: 'Lin' }, inviter: { id: 8, username: 'zhou', displayName: 'Zhou' },
+      mode: 'rw', status: 'pending', createdAt: '2026-10-01T00:00:00Z', expiresAt: null, respondedAt: null,
+    }
+    const outgoing = { ...incoming, id: 'outgoing', inviter: incoming.invitee, invitee: { id: 11, username: 'kai', displayName: 'Kai' }, mode: 'ro' }
+    await page.route(/\/account\/api\/projects\/9\/configuration$/, async (route) => {
+      if (route.request().method() === 'PATCH') {
+        themeBodies.push(route.request().postData() ?? '')
+        themePolicy = 'light'
+      }
+      await route.fulfill({ json: { project: { id: 9, name: 'Payments migration', origin: 'admin', owner: null, themePolicy }, canManage: true,
+        capabilities: { themePolicy: true, runtimeSettings: true, projectModels: true,
+          members: true, sshTargets: true, filesystem: false } } })
+    })
+    await page.route(/\/account\/api\/projects\/9\/ssh-targets$/, route => route.fulfill({ json: [] }))
+    await page.route(/\/account\/api\/users$/, route => route.fulfill({ json: [incoming.invitee, outgoing.invitee] }))
+    await page.route(/\/account\/api\/invitations\/count$/, route => route.fulfill({ json: { pending: accepted ? 0 : 1 } }))
+    await page.route(/\/account\/api\/(?:projects\/9\/)?invitations$/, async (route) => {
+      if (route.request().method() === 'POST') {
+        invitationBodies.push(route.request().postData() ?? '')
+        sent = true
+        await route.fulfill({ json: outgoing })
+      } else await route.fulfill({ json: [{ ...incoming, status: accepted ? 'accepted' : 'pending' }, ...sent ? [outgoing] : []] })
+    })
+    await page.route(/\/account\/api\/invitations\/incoming\/accept$/, async (route) => {
+      accepted = true
+      await route.fulfill({ status: 204 })
+    })
+    onTestFailed(() => saveFailureShot(page!, `web-e2e-space-center-${String(width)}`))
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    if (phone) await page.getByRole('button', { name: 'Open sidebar' }).click()
+    await page.getByRole('button', { name: 'Switch personal or project scope' }).click()
+    const scopePage = page.getByRole('dialog', { name: 'Switch personal or project scope' })
+    await scopePage.getByRole('button', { name: 'Project settings', exact: true }).click()
+    let dialog = page.getByRole('dialog', { name: 'Project settings', exact: true })
+    await dialog.getByText('Can manage project settings', { exact: true }).waitFor()
+    const settingsSnapshot = await captureStableAria(page, '[role="dialog"][aria-label="Project settings"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, phone ? 'configuration-phone.expected.md' : 'configuration.expected.md'), settingsSnapshot, MODE)
+    const bounds = await dialog.boundingBox()
+    expect(bounds?.width).toBeLessThanOrEqual(width)
+    if (phone) expect(bounds?.height).toBeCloseTo(844, 0)
+    await dialog.getByRole('button', { name: phone ? /Appearance.*default follows/ : 'Appearance', exact: !phone }).click()
+    dialog = page.getByRole('dialog', { name: phone ? 'Appearance' : 'Project settings', exact: true })
+    await dialog.getByRole('radio', { name: /Force light/ }).click()
+    await expect.poll(() => themeBodies).toEqual(['{"themePolicy":"light"}'])
+    await expect.poll(() => dialog.getByRole('radio', { name: /Force light/ }).isChecked()).toBe(true)
+    if (phone) {
+      await dialog.getByRole('button', { name: 'Back to project overview' }).click()
+      dialog = page.getByRole('dialog', { name: 'Project settings', exact: true })
+      await expect.poll(() => dialog.getByRole('button', { name: /Appearance.*default follows/ }).evaluate(element => element === document.activeElement)).toBe(true)
+    }
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await scopePage.getByRole('tab', { name: 'Manage spaces' }).click()
+    await scopePage.getByRole('button', { name: /Invitation center/ }).click()
+    dialog = page.getByRole('dialog', { name: 'Invitation center' })
+    await dialog.getByRole('button', { name: 'Accept', exact: true }).waitFor()
+    const invitationSnapshot = await captureStableAria(page, '[role="dialog"][aria-label="Invitation center"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, phone ? 'invitations-phone.expected.md' : 'invitations.expected.md'), invitationSnapshot, MODE)
+    await dialog.getByRole('button', { name: 'Accept', exact: true }).click()
+    await expect.poll(() => accepted).toBe(true)
+    await expect.poll(() => dialog.getByRole('button', { name: 'Accept', exact: true }).count()).toBe(0)
+    await dialog.getByRole('button', { name: 'Invite a member', exact: true }).click()
+    dialog = page.getByRole('dialog', { name: 'Invite a member' })
+    const memberPicker = dialog.getByRole('button', { name: /Select member/ })
+    await expect.poll(() => memberPicker.isEnabled()).toBe(true)
+    if (phone) await memberPicker.click()
+    else {
+      await memberPicker.focus()
+      await page.keyboard.press('Enter')
+      const search = page.getByRole('searchbox', { name: 'Search member name or username' })
+      await expect.poll(() => search.evaluate(element => element === document.activeElement)).toBe(true)
+      await search.fill('Kai')
+    }
+    await page.getByRole('menuitem', { name: /Kai/ }).click()
+    await dialog.getByRole('radio', { name: /Read only/ }).click()
+    await dialog.getByRole('button', { name: 'Send invitation', exact: true }).click()
+    await expect.poll(() => invitationBodies).toEqual(['{"username":"kai","mode":"ro"}'])
+    dialog = page.getByRole('dialog', { name: 'Invitation center' })
+    await dialog.getByText('Kai', { exact: true }).waitFor()
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await scopePage.getByRole('button', { name: 'New project space', exact: true }).click()
+    const createDialog = page.getByRole('dialog', { name: 'New project space', exact: true })
+    const projectName = createDialog.getByRole('textbox', { name: 'Project name', exact: true })
+    await projectName.waitFor()
+    if (phone) {
+      const fieldHeight = await projectName.evaluate(element => element.parentElement?.getBoundingClientRect().height ?? 0)
+      expect(fieldHeight).toBeGreaterThanOrEqual(44)
+    }
+    await createDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  }, 90_000)
 
   it('keeps project, preset, subagent, and utility actions on one desktop header row', async () => {
     page = await browser.newPage({ viewport: { width: 1024, height: 800 }, locale: 'en-US' })
@@ -688,7 +796,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await scope.waitFor({ timeout: 10_000 })
     expect(await scope.textContent()).toContain('Read only')
     await scope.click()
-    const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+    const scopePage = page.getByRole('dialog', { name: 'Switch personal or project scope' })
     await scopePage.waitFor({ timeout: 10_000 })
     expect(await scopePage.getByText('New conversation visibility', { exact: true }).count()).toBe(0)
     await page.keyboard.press('Escape')
@@ -706,7 +814,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
 
   it('keeps its snapshot inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'header-geometry.expected.md', 'incoming-invitation.expected.md', 'ownership-draft.expected.md', 'read-only.expected.md', 'scope-picker-mobile.expected.md', 'scope-picker.expected.md', 'sharing.expected.md', 'switching.expected.md',
+      'configuration-phone.expected.md', 'configuration.expected.md', 'header-geometry.expected.md', 'incoming-invitation.expected.md', 'invitations-phone.expected.md', 'invitations.expected.md', 'ownership-draft.expected.md', 'read-only.expected.md', 'scope-picker-mobile.expected.md', 'scope-picker.expected.md', 'sharing.expected.md', 'switching.expected.md',
     ])
     await assertFixtureInventory(PRIVATE_DRAFTS_DIR, ['private-drafts.expected.md'])
   })
@@ -723,10 +831,10 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
     releaseStep?.()
     stopGate?.()
     const failures: unknown[] = []
-    if (acquired.settled !== undefined) await acquired.settled.catch((error) => { failures.push(error) })
-    await acquired.context?.close().catch((error) => { failures.push(error) })
-    await acquired.browser?.close().catch((error) => { failures.push(error) })
-    await world.close().catch((error) => { failures.push(error) })
+    if (acquired.settled !== undefined) await acquired.settled.catch((error: unknown) => { failures.push(error) })
+    await acquired.context?.close().catch((error: unknown) => { failures.push(error) })
+    await acquired.browser?.close().catch((error: unknown) => { failures.push(error) })
+    await world.close().catch((error: unknown) => { failures.push(error) })
     if (failures.length > 0) throw new AggregateError(failures, 'space navigation cleanup failed')
   })
   await seedSession(world, await readFile(SEED, 'utf8'), SESSION_ID)
@@ -754,7 +862,7 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
 
   const openSpaces = async () => {
     await page.getByRole('button', { name: 'Switch personal or project scope', exact: true }).click()
-    const picker = page.getByRole('group', { name: 'Switch personal or project scope', exact: true })
+    const picker = page.getByRole('dialog', { name: 'Switch personal or project scope', exact: true })
     await picker.getByRole('button', { name: /Payments migration/ }).waitFor()
     return picker
   }
@@ -768,7 +876,7 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
   }
   let picker = await openSpaces()
   await compareOrRefreshGolden(join(NAV_SNAPSHOT_DIR, 'directory.expected.md'),
-    await captureStableAria(page, '[role="group"][aria-label="Switch personal or project scope"]', world.workspaceCwd), MODE)
+    await captureStableAria(page, '[role="dialog"][aria-label="Switch personal or project scope"]', world.workspaceCwd), MODE)
   await picker.getByRole('button', { name: 'Favorite this space', exact: true }).click()
   await picker.getByRole('button', { name: 'Remove favorite', exact: true }).waitFor()
   expect(await picker.getByText('Favorites', { exact: true }).isVisible()).toBe(true)

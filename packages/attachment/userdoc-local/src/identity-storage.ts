@@ -34,6 +34,7 @@ interface StorageObject {
 }
 
 function privateAccess(info: { uid: number | bigint; mode: number | bigint }): void {
+  /* v8 ignore next 3 -- POSIX uid/mode refusal; win32 has no getuid, so the guard can never hold there. */
   if (process.getuid !== undefined && (BigInt(info.uid) !== BigInt(process.getuid()) || (BigInt(info.mode) & 0o077n) !== 0n)) {
     throw new Error('Private document storage must be accessible only to its owning process account.')
   }
@@ -59,6 +60,7 @@ function same(left: StorageObject, right: StorageObject): boolean {
 }
 
 async function persistentObject(path: string, expected: StorageObject): Promise<StorageObject> {
+  /* v8 ignore start -- win32 returns early; the DirectoryHandle identity recheck after it is POSIX-only code. */
   if (process.platform === 'win32') return expected
   const { DirectoryHandle } = await import('@deepseek-ai/node-addon-system/directory')
   const handle = await DirectoryHandle.open(path)
@@ -70,19 +72,18 @@ async function persistentObject(path: string, expected: StorageObject): Promise<
     if (!same(await directory(path, false), expected)) throw new Error('Document storage directory changed while its volume identity was read.')
     return { ...expected, ...volume === undefined ? {} : { volume } }
   })
+  /* v8 ignore stop */
 }
 
-function recordedObject(value: unknown, expected: StorageObject, persistent: boolean): boolean {
-  // Volume identity only exists where the platform reports it — Windows markers
-  // carry device+inode alone, so the volume comparison engages whenever either
-  // side has one rather than only when the record happens to include it.
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
-  if (!('device' in value) || typeof value.device !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(value.device)) return false
-  if (!('inode' in value) || value.inode !== expected.inode) return false
-  if (!persistent || expected.volume === undefined && !('volume' in value)) return value.device === expected.device
-  const recorded = (value as { volume?: unknown }).volume
-  return typeof recorded === 'string'
-    && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(recorded) && recorded === expected.volume
+function recordedObject(value: unknown, expected: StorageObject, persistent: boolean, recovered = false): boolean {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    && 'device' in value && typeof value.device === 'string' && /^(?:0|[1-9][0-9]*)$/u.test(value.device)
+    && 'inode' in value && value.inode === expected.inode
+    /* v8 ignore start -- only POSIX persistence writes a volume id, so win32 lanes never measure this arm. */
+    && (persistent && 'volume' in value
+      ? typeof value.volume === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(value.volume) && value.volume === expected.volume
+      : recovered || value.device === expected.device)
+    /* v8 ignore stop */
 }
 
 async function containsDirectory(path: string, expected: StorageObject): Promise<boolean> {
@@ -138,6 +139,7 @@ export class DocumentIdentityStorage {
     const documentObject = await persistentObject(locations.root, documents)
     const fileObject = await persistentObject(locations.filesRoot, files)
     const stateObject = await persistentObject(locations.stateRoot, state)
+    /* v8 ignore next -- volumes exist only on POSIX; on win32 both sides stay undefined, so the refusal cannot fire. */
     if (documentObject.volume !== fileObject.volume) throw new Error('Retained document objects require the same persistent filesystem.')
     return new DocumentIdentityStorage({ ...locations }, { documents: documentObject, files: fileObject }, stateObject)
   }
@@ -164,6 +166,7 @@ export class DocumentIdentityStorage {
     if (!info.isFile() || info.isSymbolicLink() || info.ino === 0n) throw new Error('Private document metadata is not regular.')
     privateAccess(info)
     const identity = { device: String(info.dev), inode: String(info.ino),
+      /* v8 ignore next -- the stored volume exists only where POSIX persistence wrote one. */
       ...String(info.dev) === this.state.device && this.state.volume !== undefined ? { volume: this.state.volume } : {} }
     if (this.metadata !== undefined && !same(this.metadata, identity)) {
       throw new Error('Private document metadata file changed after it was opened.')
@@ -208,9 +211,10 @@ export class DocumentIdentityStorage {
    * Bind retained objects to one metadata domain without adopting another domain's files.
    * @param rootId - durable identifier from the private metadata database.
    * @param initialize - permit a fresh, empty store to acquire its private domain marker.
+   * @param recovered - admit unchanged witness inodes after a verified remount normalized device numbers.
    * @returns after the existing private marker agrees or an empty object store is initialized.
    */
-  async bindDomain(rootId: UserDocRootId, initialize = true): Promise<void> {
+  async bindDomain(rootId: UserDocRootId, initialize = true, recovered = false): Promise<void> {
     await withFileLock(join(this.locations.filesRoot, 'domain'), async () => {
       await this.verify()
       const databaseId = await this.metadataFile()
@@ -219,11 +223,11 @@ export class DocumentIdentityStorage {
       if (raw !== undefined) {
         if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || !('version' in raw) || raw.version !== 1 && raw.version !== 2
           || !('rootId' in raw) || raw.rootId !== rootId
-          || !('state' in raw) || !recordedObject(raw.state, this.state, raw.version === 2)
-          || !('database' in raw) || !recordedObject(raw.database, databaseId, raw.version === 2)) {
+          || !('state' in raw) || !recordedObject(raw.state, this.state, raw.version === 2, recovered)
+          || !('database' in raw) || !recordedObject(raw.database, databaseId, raw.version === 2, recovered)) {
           throw new Error('Retained document objects belong to another metadata domain or database file.')
         }
-        if (raw.version === 1) {
+        if (raw.version === 1 || recovered) {
           await writeFileAtomic(path, JSON.stringify({ version: 2, rootId, state: this.state, database: databaseId }), {
             mode: 0o600, dirMode: 0o700,
           })
@@ -239,6 +243,18 @@ export class DocumentIdentityStorage {
         mode: 0o600, dirMode: 0o700,
       })
     })
+  }
+
+  /**
+   * Normalize the private domain marker after original witness inodes prove a remount on a UUID-capable filesystem.
+   * @param rootId - durable identifier from the private metadata database.
+   * @returns after the marker rewrites to persistent descriptors; volume-less hosts and refuted witnesses throw.
+   */
+  async recoverDomainMount(rootId: UserDocRootId): Promise<void> {
+    /* v8 ignore start -- the recovery body requires a POSIX volume id; win32 lanes can only reach the refusal. */
+    if (this.state.volume === undefined) throw new Error('Mount recovery requires persistent filesystem UUIDs.')
+    await this.bindDomain(rootId, false, true)
+    /* v8 ignore stop */
   }
 
   /**

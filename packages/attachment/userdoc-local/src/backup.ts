@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { link, lstat, open, readFile, rename, rm, utimes } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import type { UserDocRootId } from '@deepseek-ai/dsh-userdoc'
 import { DocumentIdentityStore, type DocumentIdentityRecord } from './identity.ts'
@@ -11,7 +11,9 @@ import { DocumentIdentityStorage, type DocumentIdentityLocations } from './ident
 import { isInside, pathForDocId } from './name.ts'
 import { withDocumentHandle } from './handle.ts'
 import { replaceRecoveredFileWindows } from './directory-move-win32.ts'
+import { syncDocumentDirectory, syncDocumentFile } from './directory-sync.ts'
 import type { DocumentFileObjectId } from './file-object.ts'
+import { loadNodeSqlite } from '@deepseek-ai/dsh-session-persistence-sqlite'
 
 /** Immutable membership and digests from the deployment's verified complete snapshot. */
 export interface DocumentBackupEntry {
@@ -117,6 +119,7 @@ async function withVerifiedDomain<T>(
     await verifyFile(databasePath, entry(databasePath), original, signal)
     await verifyFile(markerPath, entry(markerPath), original, signal)
     const marker = await storage.domainMarker()
+    const { DatabaseSync } = await loadNodeSqlite()
     const database = new DatabaseSync(databasePath, { readOnly: original })
     try {
       const store = new DocumentIdentityStore(locations.root, database, 'read')
@@ -191,14 +194,9 @@ async function withVerifiedDomain<T>(
   })
 }
 
-async function syncRestoredFile(path:string):Promise<void>{
-  // FlushFileBuffers requires a writable Windows file handle. POSIX permits fsync on the verified read handle.
-  const flags=(process.platform==='win32'?constants.O_RDWR:constants.O_RDONLY)|constants.O_NOFOLLOW|constants.O_NONBLOCK
-  const handle=await open(path,flags)
-  await withDocumentHandle(handle,()=>handle.sync())
-}
-
 async function syncRestoreState(locations:DocumentIdentityLocations,directories:ReadonlySet<string>,databasePath:string):Promise<void>{
+  // Windows cannot rename over the live marker, so the durable marker commit
+  // rewrites it through a fsynced temporary and MoveFileEx's replace flag.
   if(process.platform==='win32'){
     const marker=join(locations.filesRoot,'domain.json')
     const temporary=join(locations.filesRoot,'.dsh-restore-'+randomUUID()+'.part')
@@ -208,13 +206,9 @@ async function syncRestoreState(locations:DocumentIdentityLocations,directories:
       await withDocumentHandle(handle,async()=>{await handle.writeFile(bytes);await handle.sync()})
       await replaceRecoveredFileWindows(temporary,marker)
     }finally{await rm(temporary,{ force:true })}
-  } else {
-    for(const directory of directories){
-      const handle=await open(directory,'r')
-      await withDocumentHandle(handle,()=>handle.sync())
-    }
   }
-  await syncRestoredFile(databasePath)
+  for(const directory of directories) await syncDocumentDirectory(directory)
+  await syncDocumentFile(databasePath)
 }
 
 /**
@@ -257,7 +251,7 @@ export async function restoreDocumentIdentityBackup(
     for (const item of retained) {
       await utimes(item.source, item.record.modifiedAt / 1000, item.record.modifiedAt / 1000)
       const info = await lstat(item.source, { bigint: true })
-      await syncRestoredFile(item.source)
+      await syncDocumentFile(item.source)
       records.push({ ...item.record, file: { device: String(info.dev), inode: String(info.ino) }, modifiedAt: Number(info.mtimeNs) / 1e6 })
     }
     signal?.throwIfAborted()
@@ -327,6 +321,7 @@ export async function recoverDocumentIdentityMount(
     if (String(savedObject.dev) === metadata.device && String(savedObject.ino) === metadata.inode) {
       throw new Error('Mount recovery cannot use a hard link to the live metadata as an independent snapshot.')
     }
+    const { DatabaseSync } = await loadNodeSqlite()
     const savedDatabase = new DatabaseSync(reference.databasePath, { readOnly: true })
     let rootId: UserDocRootId
     try {

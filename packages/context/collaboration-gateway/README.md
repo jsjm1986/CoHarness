@@ -25,7 +25,7 @@ Use `dsh-collaboration-gateway` as the Gateway-backed provider for the `dsh-coll
 <a id="runtime-contract"></a>
 ## Runtime contract
 
-- `capture()` freezes the current verified principal into an authority whose participant, expiry, and provider lifetime remain stable for the request or stream operation.
+- `capture()` retains the verified principal handle and fixes its participant identity and permissions for the operation. `expiresAt` reads the current signed deadline: only the [Gateway Runtime event-connection pool](../gateway-runtime/README.md#runtime-contract) may replace that signature. The authority signal combines provider disposal with the retained socket lifetime; HTTP principals keep their fixed deadline.
 - Project authorization, readable-session filtering, and interaction claims call `/internal/runtime/collaboration/*` with both the runtime bearer token and the captured principal. The captured abort signal reaches the request and response-body reader, so a cancelled history or stream does not keep decoding an ACL response. Unknown HTTP failures and malformed responses become `gateway-unavailable`.
 - Personal scope treats existing session ids as readable and interaction claims as accepted; project scope always asks the Gateway for the authoritative result.
 - Project root creation requires `rw` membership and runs under the requested visibility. Personal creation passes through without project metadata.

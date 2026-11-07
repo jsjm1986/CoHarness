@@ -64,6 +64,22 @@ describe('createChatStore', () => {
     expect(store.store.getSnapshot().inspect).toBeNull()
   })
 
+  it('stops the draft writer when its input is disposed', () => {
+    const mirror = vi.fn()
+    const shell = new SessionInputShell({
+      actx: {} as ClientContext,
+      defaultSink: vi.fn(),
+      commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: token => token },
+    })
+    shell.bindMirror(mirror)
+    shell.setDraft('unsent text')
+    expect(mirror).toHaveBeenLastCalledWith('unsent text')
+    shell.dispose()
+    const writes = mirror.mock.calls.length
+    shell.actions.setDraft('late edit from a released input')
+    expect(mirror).toHaveBeenCalledTimes(writes)
+  })
+
   it('persists per scope key and rehydrates a fresh instance', () => {
     const handle = persistentChat().handle
     const s1 = handle.create('sess-1')
@@ -217,11 +233,11 @@ describe('createChatStore', () => {
       expect(shell.snapshot.draft).toBe('verified saved draft')
       shell.setDraft('edited after restoration')
       expect(store.getSnapshot().draft).toBe('edited after restoration')
-      expect(JSON.parse(sessionStorage.getItem('verified-owner.tab.v1')!).draft).toBe('edited after restoration')
+      expect((JSON.parse(sessionStorage.getItem('verified-owner.tab.v1')!) as { draft?: unknown }).draft).toBe('edited after restoration')
       key = undefined
       fixture.refresh()
       expect(shell.snapshot.draft).toBe('')
-      expect(JSON.parse(localStorage.getItem('verified-owner')!).draft).toBe('edited after restoration')
+      expect((JSON.parse(localStorage.getItem('verified-owner')!) as { draft?: unknown }).draft).toBe('edited after restoration')
     } finally {
       unmirror()
       shell.dispose()

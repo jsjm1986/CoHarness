@@ -79,6 +79,8 @@ interface CredentialState {
   configured: boolean
   /** Whether `credentials.set` can affect it; false disables the control. */
   writable: boolean
+  /** Whether the configured hint is known, pending, or unavailable. */
+  status: 'unknown' | 'loading' | 'ready' | 'unavailable'
 }
 
 /** What the web-search card renders. */
@@ -101,6 +103,8 @@ export interface WebSearchCardState extends CardShell {
   apiKeyConfigured: boolean
   /** Whether the credentials domain accepts a write for it; false disables the control. */
   apiKeyWritable: boolean
+  /** Read status of the credential hint; unknown never means unconfigured. */
+  apiKeyStatus: CredentialState['status']
 }
 
 /** The registration-side face the web-search card's slot entry injects. */
@@ -111,6 +115,8 @@ export interface WebSearchCardFace extends CardActions {
   }
   /** Stage the API switch: true selects the Search and Fetch APIs, false Messages search with local fetch. */
   setSearchApi: (enabled: boolean) => void
+  /** Read the credential hint when the detailed configuration page becomes visible. */
+  ensureCredential: () => void
 }
 
 /** Settings scopes for the namespaces the card edits. */
@@ -143,8 +149,13 @@ export class WebSearchCardController {
   private readonly api: CardForm<WebApiSettings>
   private readonly store: SnapshotStore<WebSearchCardState>
   private readonly unsubscribe: (() => void)[]
-  private credential: CredentialState = { ref: '', configured: false, writable: true }
+  private credential: CredentialState = { ref: '', configured: false, writable: true, status: 'unknown' }
   private credentialRead = 0
+  private credentialActive = false
+  private credentialFlight: Promise<void> | undefined
+  private readonly readLifetime = new AbortController()
+  private readonly pending = new Set<Promise<void>>()
+  private readonly showCredential = () => { void this.ensureCredential() }
 
   /**
    * @param scopes - the bound settings scopes for the card's namespaces.
@@ -171,14 +182,10 @@ export class WebSearchCardController {
     // A staged switch can change which section names the key, without any
     // scope publishing; a scope change can rename the reference itself.
     const publish = () => {
-      this.store.set(this.projection())
-      if (this.ref() !== this.credential.ref) void this.readCredential()
+      if (this.credentialActive && this.ref() !== this.credential.ref) void this.readCredential()
+      else this.store.set(this.projection())
     }
-    this.unsubscribe = [
-      ...[this.selection, this.messages, this.api].map(form => form.subscribe(publish)),
-      ...[scopes.web, scopes.messages, scopes.api].map(scope => scope.subscribe(() => { void this.readCredential() })),
-    ]
-    void this.readCredential()
+    this.unsubscribe = [this.selection, this.messages, this.api].map(form => form.subscribe(publish))
   }
 
   /** Whether the Host serves both sections the switch needs. */
@@ -214,6 +221,7 @@ export class WebSearchCardController {
       apiKey: this.selection.field(API_KEY_FIELD),
       apiKeyConfigured: this.credential.configured,
       apiKeyWritable: this.credential.writable,
+      apiKeyStatus: this.credential.status,
     }
   }
 
@@ -230,24 +238,44 @@ export class WebSearchCardController {
    * settle out of order, so a response is published only while it still
    * answers for the reference in force.
    */
-  private async readCredential(): Promise<void> {
-    const generation = ++this.credentialRead
+  private readCredential(): Promise<void> {
+    if (this.isDisposed()) return Promise.resolve()
     const ref = this.ref()
+    const generation = ++this.credentialRead
     if (ref !== this.credential.ref) {
       // A new reference knows nothing yet; keeping the old answer would claim
       // the key is configured under a name nobody has checked.
-      this.credential = { ref, configured: false, writable: true }
-      this.store.set(this.projection())
+      this.credential = { ref, configured: false, writable: true, status: 'loading' }
+    } else {
+      this.credential = { ...this.credential, status: 'loading' }
     }
+    const promise = this.own(async () => {
+      await Promise.resolve()
+      if (this.isDisposed() || generation !== this.credentialRead) return
+      await this.fetchCredential(ref, generation)
+    })
+    this.credentialFlight = promise
+    this.store.set(this.projection())
+    void promise.then(() => {
+      if (this.credentialFlight === promise) this.credentialFlight = undefined
+    })
+    return promise
+  }
+
+  private async fetchCredential(ref: string, generation: number): Promise<void> {
     let response: Awaited<ReturnType<IApiClient['credentials']['describe']>>
     try {
-      response = await this.apiClient.credentials.describe({ refs: [ref] })
+      response = await this.apiClient.credentials.describe({ refs: [ref] }, this.readLifetime.signal)
     } catch (_credentialReadFailure) {
-      // The card stays usable without this: the key control simply reports the
-      // last state it knew, and a write still reaches the Host.
+      // The hint is optional; a failed read cannot establish whether a key exists.
+      this.credentialUnavailable(ref, generation)
       return
     }
-    if (generation !== this.credentialRead || !response.result.ok || ref !== this.ref()) return
+    if (this.isDisposed() || generation !== this.credentialRead || ref !== this.ref()) return
+    if (!response.result.ok) {
+      this.credentialUnavailable(ref, generation)
+      return
+    }
     const view = response.result.value.credentials[ref]
     const next: CredentialState = {
       ref,
@@ -255,10 +283,35 @@ export class WebSearchCardController {
       // An unknown reference is treated as writable: the control stays usable
       // and the Host is what refuses, rather than the card guessing a refusal.
       writable: view?.writable ?? true,
+      status: 'ready',
     }
-    if (next.configured === this.credential.configured && next.writable === this.credential.writable) return
     this.credential = next
     this.store.set(this.projection())
+  }
+
+  private credentialUnavailable(ref: string, generation: number): void {
+    if (this.isDisposed() || generation !== this.credentialRead || ref !== this.ref()) return
+    this.credential = { ...this.credential, status: 'unavailable' }
+    this.store.set(this.projection())
+  }
+
+  /**
+   * Activate credential hints for the detailed page; repeated consumers share an in-flight read.
+   * A failed hint can be retried when the page is reopened.
+   * @returns settlement of the current hint read, or immediate settlement when already current.
+   */
+  ensureCredential(): Promise<void> {
+    if (this.isDisposed()) return Promise.resolve()
+    if (this.credentialActive && this.credential.status !== 'unavailable') return this.credentialFlight ?? Promise.resolve()
+    this.credentialActive = true
+    return this.readCredential()
+  }
+
+  /** Refresh an activated hint for the newly connected target. */
+  resetConnection(): void {
+    if (!this.credentialActive || this.isDisposed()) return
+    this.credential = { ref: '', configured: false, writable: true, status: 'unknown' }
+    void this.readCredential()
   }
 
   /**
@@ -270,7 +323,7 @@ export class WebSearchCardController {
    * @param ref - the reference the Host reports as changed.
    */
   refreshCredential(ref: string): void {
-    if (ref !== this.credential.ref) return
+    if (!this.credentialActive || ref !== this.ref()) return
     void this.readCredential()
   }
 
@@ -288,10 +341,11 @@ export class WebSearchCardController {
     }
     return {
       hooks: { webSearchCard: this.store },
+      ensureCredential: this.showCredential,
       edit: (field, text) => { formOf(field).actions().edit(field, text) },
       resetField: (field) => { formOf(field).actions().resetField(field) },
       setSearchApi: (enabled) => { this.select(enabled) },
-      save: () => { void this.save() },
+      save: () => { if (!this.isDisposed()) void this.own(() => this.save()) },
       discard: () => {
         for (const form of [this.selection, this.messages, this.api]) form.actions().discard()
       },
@@ -322,13 +376,14 @@ export class WebSearchCardController {
    */
   private async save(): Promise<void> {
     const state = this.projection()
-    if (!state.available || state.invalid || state.saving) return
+    if (this.isDisposed() || !state.available || state.invalid || state.saving) return
     for (const form of [this.messages, this.api]) {
+      if (this.isDisposed()) return
       if (!form.shell().available || !form.shell().dirty) continue
       await form.save()
       if (form.shell().failed) return
     }
-    if (this.selection.shell().dirty) await this.selection.save()
+    if (!this.isDisposed() && this.selection.shell().dirty) await this.selection.save()
   }
 
   /**
@@ -337,6 +392,8 @@ export class WebSearchCardController {
    * @returns whether the Host reports a configured credential afterwards.
    */
   private async writeKey(value: string): Promise<boolean> {
+    if (this.isDisposed()) return false
+    this.credentialActive = true
     const ref = this.ref()
     let accepted = false
     try {
@@ -346,13 +403,35 @@ export class WebSearchCardController {
       // A failed transport cannot acknowledge replacement of an existing credential.
     }
     await this.readCredential()
-    return accepted && ref === this.ref() && this.credential.configured
+    return !this.isDisposed() && accepted && ref === this.ref() && this.credential.status === 'ready' && this.credential.configured
   }
 
-  /** Release configuration subscriptions. */
-  dispose(): void {
+  private async own(operation: () => Promise<void>): Promise<void> {
+    const completion = Promise.withResolvers<void>()
+    this.pending.add(completion.promise)
+    try {
+      await operation()
+    } finally {
+      this.pending.delete(completion.promise)
+      completion.resolve()
+    }
+  }
+
+  private isDisposed(): boolean {
+    return this.readLifetime.signal.aborted
+  }
+
+  /**
+   * Stop hint reads and subscriptions, and await every admitted read and save.
+   * Credential writes retain their acknowledgement path after disposal begins.
+   * @returns settlement after all owned operations finish.
+   */
+  async dispose(): Promise<void> {
+    this.readLifetime.abort()
+    ++this.credentialRead
     for (const off of this.unsubscribe) off()
     for (const form of [this.selection, this.messages, this.api]) form.dispose()
+    await Promise.allSettled(this.pending)
   }
 }
 

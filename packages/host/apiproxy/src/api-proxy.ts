@@ -35,7 +35,7 @@ import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-model-access'
 import type {} from '@deepseek-ai/dsh-model-provider-config'
-import { isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { foldRequestHeader, isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type {
   JsonValue,
@@ -60,6 +60,11 @@ import type {
   SessionPersistencePage,
   SessionPersistencePageRequest,
 } from '@deepseek-ai/dsh-session-persistence'
+import { isDeepStrictEqual } from 'node:util'
+import {
+  ColdSummaryCache, DEFAULT_COLD_SUMMARY_CACHE_MAX_BYTES, DEFAULT_COLD_SUMMARY_CACHE_MAX_ENTRIES,
+} from './cold-summary-cache.ts'
+import type { ColdSessionSummary } from './cold-summary-cache.ts'
 import { ensureSshRealm, sshRealmKey } from './ssh-execution.ts'
 // Type-only: resolves the optional permission-default owner notified after
 // the browser confirms and the Host verifies a Workspace blank reuse target.
@@ -87,7 +92,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import type {
   ApiProxy, ConfigurableProviderView, CredentialView, DiscoveredModelView, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   HostFrame,
-  ModelCatalogFailure, ModelProviderGroup,
+  ModelCatalogFailure, ModelProviderGroup, ModelSelectionProjectionState,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionAssistantStreamBaseline, SessionHistoryIndex,
   SessionListMetadata,
   SessionProjectionsBlock, SessionSearchItem,
@@ -284,6 +289,7 @@ export const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/syncInspectManifest',
   'agentPresets/list',
   'pluginManager/access',
+  'pluginManager/catalog',
   'pluginManager/listPlugins',
   'pluginManager/listBundles',
   'pluginManager/listVersionExemptions',
@@ -1211,7 +1217,7 @@ async function probeColdSessionMetadata(
   meta: SessionHeader,
   maxBytes: number,
   signal?: AbortSignal,
-): Promise<{ metadata: SessionListMetadata; events: readonly SessionEvent[] } | undefined> {
+): Promise<{ header: SessionHeader; metadata: SessionListMetadata; events: readonly SessionEvent[] } | undefined> {
   if (maxBytes === 0) return undefined
   signal?.throwIfAborted()
   const location = persistence.locate(meta)
@@ -1226,9 +1232,9 @@ async function probeColdSessionMetadata(
   }
   if (size > maxBytes) return undefined
   try {
-    const { events } = await persistence.readFrom(meta.id, SessionLogOffset(0), signal)
+    const { meta: header, events } = await persistence.readFrom(meta.id, SessionLogOffset(0), signal)
     signal?.throwIfAborted()
-    return { metadata: sessionListMetadata(events), events }
+    return { header, metadata: sessionListMetadata(events), events }
   } catch (error) {
     signal?.throwIfAborted()
     ctx.logger.warn(`session.list: blank probe for "${meta.id}" failed (serving it as visible): ${String(error)}`)
@@ -1244,12 +1250,12 @@ async function summarizeCold(
   metadata: SessionListMetadata | undefined,
   blankProbeMaxBytes: number,
   signal?: AbortSignal,
-): Promise<SessionSummary> {
+): Promise<{ summary: ColdSessionSummary; verifiedHeader: SessionHeader | undefined }> {
   const probed = metadata?.blank === false
     ? undefined
     : await probeColdSessionMetadata(ctx, persistence, meta, blankProbeMaxBytes, signal)
   const resolvedMetadata = probed?.metadata ?? metadata
-  return {
+  const summary: ColdSessionSummary = {
     sessionId: meta.id,
     updatedAt: sessionListUpdatedAt(meta, resolvedMetadata),
     running: false,
@@ -1268,6 +1274,7 @@ async function summarizeCold(
     // log for that switch would defeat the index read.
     ...sessionListFields(meta, probed?.events ?? []),
   }
+  return { summary, verifiedHeader: probed?.header }
 }
 
 /** Map a browse-primitive failure onto the wire error vocabulary (unknown throws stay internal). */
@@ -1311,6 +1318,10 @@ export interface ApiProxyDefaults {
   sessionExportCompressionLevel?: SessionLogCompressionLevel
   /** Maximum artifact size eligible for one cold blankness read. */
   coldBlankProbeMaxBytes?: number
+  /** Maximum verified cold summaries retained per ApiProxy; zero disables reuse. */
+  coldSummaryCacheMaxEntries?: number
+  /** Maximum encoded source-identity and summary bytes retained; zero disables reuse. */
+  coldSummaryCacheMaxBytes?: number
   /**
    * Whether handing a path to the native opener can work at all — the
    * `hasDocument` capability the preset roster reports, and the switch
@@ -1898,6 +1909,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL
   const coldBlankProbeMaxBytes = defaults.coldBlankProbeMaxBytes
     ?? DEFAULT_COLD_BLANK_PROBE_MAX_BYTES
+  const coldSummaryCacheMaxEntries = defaults.coldSummaryCacheMaxEntries ?? DEFAULT_COLD_SUMMARY_CACHE_MAX_ENTRIES
+  const coldSummaryCacheMaxBytes = defaults.coldSummaryCacheMaxBytes ?? DEFAULT_COLD_SUMMARY_CACHE_MAX_BYTES
+  const coldSummaries = new ColdSummaryCache(coldSummaryCacheMaxEntries, coldSummaryCacheMaxBytes)
+  ctx.effect(() => () => { coldSummaries.close() }, 'api-proxy: verified cold summaries')
   /** The seed model each create/resume declares; re-read so it never goes stale. */
   const agentOptions = (): AgentOptions => {
     const { provider, model } = defaults.defaultModelSelection()
@@ -2324,15 +2339,27 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return items.filter((workspaceId): workspaceId is WorkspaceId => workspaceId !== undefined)
   }
 
-  /** End a long-lived stream when its signed request principal expires. */
+  /** Enforce the current signed deadline, including verified connection renewals. */
   function principalSignal(
     signal: AbortSignal,
     authority: CollaborationAuthority | undefined,
   ): AbortSignal {
     if (authority === undefined) return signal
-    const remaining = authority.expiresAt - Date.now()
-    const expiry = remaining <= 0 ? AbortSignal.abort() : AbortSignal.timeout(remaining)
-    return AbortSignal.any([signal, authority.signal, expiry])
+    const expiry = new AbortController()
+    const combined = AbortSignal.any([signal, authority.signal, expiry.signal])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const check = (): void => {
+      if (combined.aborted) return
+      const remaining = authority.expiresAt - Date.now()
+      if (remaining <= 0) expiry.abort()
+      else {
+        timer = setTimeout(check, remaining)
+        timer.unref()
+      }
+    }
+    combined.addEventListener('abort', () => { clearTimeout(timer) }, { once: true })
+    check()
+    return combined
   }
 
   /** Serialize image admission with model selection for one agent. */
@@ -2415,6 +2442,38 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     installModelSelection(agent.ctx, selection)
     selections.set(agent, selection)
     return selection
+  }
+
+  /**
+   * Derive the same pending/header selection tiers as {@link selectionFor}
+   * from a durable log alone, so a cold or agent-less session's directory
+   * read does not resume an Agent to render the picker.
+   * @param events - the session's complete durable event log.
+   * @returns the effective selection, or undefined to use the default tier.
+   */
+  function detachedSelection(events: readonly SessionEvent[]): ModelSelection | undefined {
+    let state: ModelSelectionProjectionState = modelSelectionProjectionDefinition.init()
+    for (const event of events) state = modelSelectionProjectionDefinition.apply(state, event)
+    if (state.pending !== null) {
+      return {
+        provider: state.pending.provider,
+        model: state.pending.model,
+        ...state.pending.reasoningEffort === undefined
+          ? {}
+          : { reasoningEffort: ReasoningEffortId(state.pending.reasoningEffort) },
+      }
+    }
+    const header = foldRequestHeader(events)
+    if (header === undefined) return undefined
+    const logged = header.config
+    return {
+      provider: logged.provider,
+      model: logged.model,
+      // An effort the adapter defaulted is not a conversation choice: see selectionFor.
+      ...logged.reasoningEffort === undefined || header.adapterDefaults?.reasoningEffort === true
+        ? {}
+        : { reasoningEffort: logged.reasoningEffort },
+    }
   }
 
   /**
@@ -3617,7 +3676,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const attached = new Set(items.map(item => item.sessionId))
     const persistence = ctx.get('sessionPersistence')
     if (persistence !== undefined) {
-      const snapshots: Array<{ header: SessionHeader; content?: SessionListMetadata }> = typeof persistence.listSnapshots === 'function'
+      const snapshots: Array<{ header: SessionHeader; revision?: SessionPersistenceRevision; content?: SessionListMetadata }> = typeof persistence.listSnapshots === 'function'
         ? await persistence.listSnapshots(signal)
         : (await persistence.listHeaders(signal)).map(header => ({ header }))
       const cold = snapshots
@@ -3625,47 +3684,70 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           && snapshot.header.cwd !== undefined
           && (snapshot.header.draft !== true || snapshot.content?.blank !== true))
       signal?.throwIfAborted()
-      for (let offset = 0; offset < cold.length; offset += COLD_SUMMARY_BATCH_SIZE) {
-        signal?.throwIfAborted()
-        const batch = cold.slice(offset, offset + COLD_SUMMARY_BATCH_SIZE)
-        const settled = await Promise.allSettled(
-          batch.map(async (snapshot) => {
-            const meta = snapshot.header
-            // Projection hints remain optional. Blank verification may read
-            // this Session's artifact only when it passes the configured size check.
-            const projections = listProjectionsFor(ctx, meta, undefined)
-            const summary = await summarizeCold(
-              ctx,
-              persistence,
-              meta,
-              snapshot.content ?? projections?.values.sessionListMetadata,
-              coldBlankProbeMaxBytes,
-              signal,
-            )
-            const attachedSession = ctx.sessions.get(meta.id)
-            if (attachedSession !== undefined) return summarizeAttached(attachedSession)
-            if (meta.draft === true && summary.blank) return undefined
-            return {
-              ...summary,
-              ...projections === undefined ? {} : { projections },
+      const verified = new ColdSummaryCache(coldSummaries.enabled ? coldSummaryCacheMaxEntries : 0, coldSummaryCacheMaxBytes)
+      try {
+        for (let offset = 0; offset < cold.length; offset += COLD_SUMMARY_BATCH_SIZE) {
+          signal?.throwIfAborted()
+          const batch = cold.slice(offset, offset + COLD_SUMMARY_BATCH_SIZE)
+          const settled = await Promise.allSettled(
+            batch.map(async (snapshot) => {
+              const meta = snapshot.header
+              // Projection hints remain optional. Blank verification may read
+              // this Session's artifact only when it passes the configured size check.
+              const projections = listProjectionsFor(ctx, meta, undefined)
+              const metadata = snapshot.content ?? projections?.values.sessionListMetadata
+              let summary = metadata?.blank === false ? undefined : coldSummaries.get(snapshot)
+              if (summary === undefined) {
+                const resolved = await summarizeCold(ctx, persistence, meta, metadata, coldBlankProbeMaxBytes, signal)
+                summary = resolved.summary
+                if (verified.enabled && snapshot.revision !== undefined
+                  && resolved.verifiedHeader !== undefined && isDeepStrictEqual(resolved.verifiedHeader, meta)) {
+                  verified.set(snapshot, summary)
+                }
+              }
+              const attachedSession = ctx.sessions.get(meta.id)
+              if (attachedSession !== undefined) return summarizeAttached(attachedSession)
+              if (meta.draft === true && summary.blank) return undefined
+              return {
+                ...summary,
+                ...projections === undefined ? {} : { projections },
+              }
+            }),
+          )
+          const summaries: SessionSummary[] = []
+          let rejected = false
+          let failure: unknown
+          for (const result of settled) {
+            if (result.status === 'fulfilled') {
+              if (result.value !== undefined) summaries.push(result.value)
+            } else if (!rejected) {
+              rejected = true
+              failure = result.reason
             }
-          }),
-        )
-        const summaries: SessionSummary[] = []
-        let rejected = false
-        let failure: unknown
-        for (const result of settled) {
-          if (result.status === 'fulfilled') {
-            if (result.value !== undefined) summaries.push(result.value)
-          } else if (!rejected) {
-            rejected = true
-            failure = result.reason
+          }
+          if (rejected) throw failure
+          signal?.throwIfAborted()
+          items.push(...summaries)
+        }
+        if (verified.size > 0 && coldSummaries.enabled) {
+          let current: typeof snapshots | undefined
+          try { current = await persistence.listSnapshots(signal) }
+          catch (error: unknown) {
+            // Failed optional source verification skips retention; the already completed listing remains usable.
+            signal?.throwIfAborted()
+            ctx.logger.warn('Cold Session summary reuse skipped: source verification failed; using freshly read summaries.', error)
+          }
+          signal?.throwIfAborted()
+          for (const snapshot of current ?? []) {
+            const summary = verified.get(snapshot)
+            if (summary !== undefined) coldSummaries.set(snapshot, summary)
+          }
+          for (const [index, item] of items.entries()) {
+            const session = ctx.sessions.get(item.sessionId)
+            if (session !== undefined) items[index] = summarizeAttached(session)
           }
         }
-        if (rejected) throw failure
-        signal?.throwIfAborted()
-        items.push(...summaries)
-      }
+      } finally { verified.close() }
     }
     items.sort((a, b) => b.updatedAt - a.updatedAt)
     const collaboration = collaborationOf(ctx)
@@ -4562,6 +4644,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (signal?.aborted) {
           return err(request, { code: 'cancelled', message: 'history read was cancelled', details: {} })
         }
+        let detachedRevisionCheck: Promise<PromiseSettledResult<SessionPersistenceRevision | undefined>> | undefined
         try {
           signal?.throwIfAborted()
           if (toolCallId !== undefined) return ok(request, await callHistoryFor(sessionId, toolCallId, signal))
@@ -4615,8 +4698,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               return ok(request, cached)
             }
           }
-          const detachedRevisionAfterPromise = tailRequest && source.kind === 'detached'
-            ? detachedHistoryRevision(sessionId, signal)
+          // The parallel probe is observed immediately and joined even when another read fails.
+          detachedRevisionCheck = tailRequest && source.kind === 'detached'
+            ? detachedHistoryRevision(sessionId, signal).then(
+              value => ({ status: 'fulfilled' as const, value }),
+              (reason: unknown) => ({ status: 'rejected' as const, reason }),
+            )
             : undefined
           // Both awaits happen BEFORE the cut. Ensuring the recorded
           // composition's standing mount is what registers its projection
@@ -4644,7 +4731,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               // lifecycle events landed before the baseline fold could match
               // the window's last seq. Serve the resident log instead — the
               // detached revision pair captured above no longer applies.
-              void detachedRevisionAfterPromise?.then(() => undefined, () => undefined)
               source = { kind: 'attached', session: nowAttached }
               sourceSignature = historySourceSignature(source)
             }
@@ -4658,9 +4744,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           if (tailRequest
             && sourceSignature === historySourceSignature(source)
             && projectionRevision === projectionRevisionOf(ctx)) {
-            const detachedRevisionAfter = source.kind === 'detached'
-              ? await detachedRevisionAfterPromise
-              : undefined
+            const revisionCheck = source.kind === 'detached' ? await detachedRevisionCheck : undefined
+            if (revisionCheck?.status === 'rejected') throw revisionCheck.reason
+            const detachedRevisionAfter = revisionCheck?.value
             writeHistoryTailCache(
               sessionId, source.kind, sourceSignature, normalizedMaxMessages, projectionRevision,
               source.kind === 'detached'
@@ -4710,6 +4796,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             message: `history unavailable for session "${sessionId}"`,
             details: {},
           })
+        } finally {
+          if (detachedRevisionCheck !== undefined) await detachedRevisionCheck
         }
       },
 
@@ -4762,9 +4850,45 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const { sessionId } = request.payload
         const authorized = await authorizeSession(sessionId, 'read')
         if ('error' in authorized) return err(request, authorized.error)
-        const found = await agentFor(sessionId)
-        if ('error' in found) return err(request, found.error)
-        const current = selectionFor(found.agent).current
+        // The picker is a read: a session whose Agent is not live — and not
+        // already resuming for another reason — is served from its durable log
+        // instead of resuming one just to render the trigger label. The
+        // ownership fence mirrors agentFor's: generic reads never serve
+        // subagent-owned identities, live or cold.
+        const live = ctx.agents.get(sessionId)
+        const attached = ctx.sessions.get(sessionId)
+        if (attached !== undefined && hasSubagentOwner(attached, live)) {
+          return err(request, subagentOwnershipError(sessionId))
+        }
+        let current: ModelSelection
+        if (live !== undefined) {
+          current = selectionFor(live).current
+        } else if (pendingResume(sessionId) !== undefined) {
+          const found = await agentFor(sessionId)
+          if ('error' in found) return err(request, found.error)
+          current = selectionFor(found.agent).current
+        } else {
+          let events: readonly SessionEvent[]
+          if (attached !== undefined) {
+            // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+            events = attached.snapshotEvents()
+          } else {
+            let inspected: Awaited<ReturnType<typeof inspectServable>>
+            try {
+              inspected = await inspectServable(sessionId)
+            } catch (error: unknown) {
+              if (error instanceof SessionNotFound) {
+                return err(request, { code: 'session-not-found', message: error.message, details: { sessionId } })
+              }
+              throw error
+            }
+            if (hasApiRemoteSubagentOwner(ctx, { header: inspected.meta }, undefined)) {
+              return err(request, subagentOwnershipError(sessionId))
+            }
+            events = inspected.events
+          }
+          current = detachedSelection(events) ?? defaults.defaultModelSelection()
+        }
         const { groups, failures } = await buildModelCatalog(ctx)
         const routable = routeServed(current.provider)
           && modelRefusal(current.provider, current.model) === undefined
@@ -5180,6 +5304,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: {},
           })
         }
+      },
+
+      async activate(request) {
+        const { sessionId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        const archived = archivedInputError(sessionId)
+        if (archived !== undefined) return err(request, archived)
+        // Presentation is the open-intent boundary: a rendered conversation
+        // publishes the live Agent while ambient scope reads stay cold.
+        const found = await agentFor(sessionId)
+        if ('error' in found) return err(request, found.error)
+        return ok(request, { accepted: true as const })
       },
 
       async updateQueue(request) {
@@ -6321,9 +6458,27 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
           }
 
-          const subscribe = (session: Session, lastSeq?: number): void => {
+          const subscribe = (session: Session, lastSeq?: number, replayThrough?: number): void => {
             if (subscribed.has(session.id)) return
             subscribed.add(session.id)
+            const through = lastSeq ?? session.seq - 1
+            // Appends committed before this Session object's session/event
+            // emissions could reach a listener — the durable resume marker is
+            // the known case — never produce frames of their own. Stream them
+            // ahead of the baseline so a window ending at the restored prefix
+            // stitches them live instead of repairing the tail through a
+            // second history read. Post-construction events stay unframed only
+            // for the attach-race callers that pass their own bound; for
+            // initial and straggler subscriptions they were delivered to the
+            // earlier stream generation (or history covers them), so the
+            // replay stops at the constructor window instead of flooding the
+            // stream with the session's whole lifecycle.
+            const replayEnd = Math.min(through, replayThrough ?? session.firstLiveSeq)
+            // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+            for (const event of session.snapshotEvents(session.firstLifecycleSeq)) {
+              if (event.seq > replayEnd) break
+              publishEvent(session, event)
+            }
             const stream = assistantStreams.snapshot(session.id)
             streamBaseOrdinals.set(session.id, stream.ordinal)
             subscribeSession(queue, session, lastSeq, stream.baseline)
@@ -6360,8 +6515,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               })
             }),
             ctx.on('session/created', (session: Session) => {
-              const lastSeq = session.seq - 1
-              publishFor(session.id, () => { subscribe(session, lastSeq) })
+              publishFor(session.id, () => {
+                // The attach-time bound also covers events appended inside
+                // the enter window, which never reached a session/event
+                // observer either.
+                subscribe(session, session.seq - 1, session.seq - 1)
+              })
             }),
             ctx.on('session/disposed', (session: Session) => {
               openCalls.delete(session.id)

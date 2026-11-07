@@ -485,6 +485,7 @@ describe('WebSearchCardController', () => {
     const credentials = credentialsApi(true)
     const controller = new WebSearchCardController(webSearchScopes(host).scopes, credentials.api)
     const state = () => controller.inject().hooks.webSearchCard.getSnapshot()
+    await controller.ensureCredential()
     await vi.waitFor(() => { expect(credentials.describe).toHaveBeenCalled() })
 
     host.publish({ status: 'ready', writable: true, value: { baseURL: 'https://search.test/v1' }, user: {} })
@@ -549,6 +550,7 @@ describe('WebSearchCardController', () => {
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     const face = controller.inject()
+    await controller.ensureCredential()
     await vi.waitFor(() => { expect(face.hooks.webSearchCard.getSnapshot().apiKeyConfigured).toBe(true) })
     face.edit('apiKey', 'replacement-key')
     face.save()
@@ -566,6 +568,8 @@ describe('WebSearchCardController', () => {
     const older = Promise.withResolvers<Awaited<ReturnType<typeof credentials.describe>>>()
     credentials.describe.mockReturnValueOnce(older.promise)
     const controller = new WebSearchCardController(webSearchScopes(host).scopes, credentials.api)
+    void controller.ensureCredential()
+    await vi.waitFor(() => { expect(credentials.describe).toHaveBeenCalledOnce() })
     controller.refreshCredential('DEEPSEEK_API_KEY')
     const snapshot = () => controller.inject().hooks.webSearchCard.getSnapshot()
     await vi.waitFor(() => { expect(snapshot().apiKeyConfigured).toBe(true) })
@@ -579,6 +583,7 @@ describe('WebSearchCardController', () => {
     const credentials = credentialsApi(false)
     const controller = new WebSearchCardController(webSearchScopes(host).scopes, credentials.api)
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    await controller.ensureCredential()
     await vi.waitFor(() => { expect(credentials.describe).toHaveBeenCalled() })
     credentials.describe.mockClear()
 
@@ -633,6 +638,7 @@ describe('WebSearchCardController', () => {
     const set = vi.fn(() => Promise.reject(new Error('offline')))
     const controller = new WebSearchCardController(webSearchScopes(host).scopes, { credentials: { describe, set } } as never)
     const face = controller.inject()
+    await controller.ensureCredential()
     await vi.waitFor(() => { expect(describe).toHaveBeenCalled() })
 
     host.publish({ status: 'ready', writable: true, value: { baseURL: 'https://search.test/v1' }, user: {} })
@@ -654,6 +660,7 @@ describe('WebSearchCardController', () => {
       result: { ok: false as const, error: { code: 'credentials-unavailable', message: 'no provider' } },
     }))
     const controller = new WebSearchCardController(webSearchScopes(host).scopes, { credentials: { describe, set: vi.fn() } } as never)
+    await controller.ensureCredential()
     await vi.waitFor(() => { expect(describe).toHaveBeenCalled() })
 
     expect(controller.inject().hooks.webSearchCard.getSnapshot().apiKeyConfigured).toBe(false)
@@ -704,7 +711,7 @@ describe('WebSearchCardController', () => {
       await vi.waitFor(() => { expect(state().dirty).toBe(false) })
       expect(web.unset).toHaveBeenCalledWith('searchProvider')
       expect(web.unset).toHaveBeenCalledWith('fetchProvider')
-      controller.dispose()
+      await controller.dispose()
     })
 
     it('writes explicit Messages selections when the deployment composes the APIs', async () => {
@@ -733,7 +740,7 @@ describe('WebSearchCardController', () => {
       face.save()
       await vi.waitFor(() => { expect(state().dirty).toBe(false) })
       expect(web.unset).toHaveBeenCalledWith('searchProvider')
-      controller.dispose()
+      await controller.dispose()
     })
 
     it('saves the selected API section before the selection that starts using it', async () => {
@@ -752,7 +759,7 @@ describe('WebSearchCardController', () => {
       face.edit('baseURL', 'https://search-api.test/v1/tools')
       face.save()
       await vi.waitFor(() => { expect(order).toEqual(['api', 'web', 'web']) })
-      controller.dispose()
+      await controller.dispose()
     })
 
     it('keeps the selection staged when a provider section refuses its save', async () => {
@@ -771,7 +778,7 @@ describe('WebSearchCardController', () => {
       await vi.waitFor(() => { expect(state().failed).toBe(true) })
       expect(web.set).not.toHaveBeenCalled()
       expect(state()).toMatchObject({ useSearchApi: true, dirty: true, apiSwitchBlocked: true })
-      controller.dispose()
+      await controller.dispose()
     })
 
     it('locks the API switch while an invalid edit is staged', async () => {
@@ -789,7 +796,7 @@ describe('WebSearchCardController', () => {
       expect(host.set).not.toHaveBeenCalled()
       face.discard()
       expect(state().apiSwitchBlocked).toBe(false)
-      controller.dispose()
+      await controller.dispose()
     })
 
     it.each(['web', 'api'] as const)('hides the switch and shows Messages settings while %s is not served', async (missing) => {
@@ -811,7 +818,7 @@ describe('WebSearchCardController', () => {
       const state = () => controller.inject().hooks.webSearchCard.getSnapshot()
       await vi.waitFor(() => { expect(state().available).toBe(true) })
       expect(state()).toMatchObject({ apiSwitchAvailable: false, useSearchApi: false })
-      controller.dispose()
+      await controller.dispose()
     })
   })
 })

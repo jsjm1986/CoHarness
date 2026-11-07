@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-inspector-client-origin-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-inspector-client-origin-admission.md
+document:
+  en: b0e6193ff1345c9e3ef7efc80f6d7162e120fad5
+  zh: 26b40dc25afe7731b258cb532e16a5c89fb730f6
+/agent-note-admit-inspector-client-work-before-acquiring-browser-resources:
+  en: 6eb2e0426ce5a6fd
+  zh: 7709dba0ff7d5040
+/agent-note-admit-inspector-client-work-before-acquiring-browser-resources/problem:
+  en: cab8704ffd6c45c9
+  zh: 1d4bea56206c9d48
+/agent-note-admit-inspector-client-work-before-acquiring-browser-resources/decision:
+  en: 7b33c94f36d914bb
+  zh: 374ba805739ae37f
+/agent-note-admit-inspector-client-work-before-acquiring-browser-resources/alternatives-considered:
+  en: ed5c2a74fcd4f87d
+  zh: 6152a54d977f1f67
+/agent-note-admit-inspector-client-work-before-acquiring-browser-resources/verification:
+  en: 506f6c67cd7d1d57
+  zh: b39f4b3e9d6bf2fb
+/agent-note-admit-inspector-client-work-before-acquiring-browser-resources/consequences:
+  en: 32b4f19ff6f62eaa
+  zh: 4fbf3f29f0af8204

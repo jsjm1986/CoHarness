@@ -1,36 +1,20 @@
-// Web e2e scenario: startup auto-selection keeps the hero on screen.
-//
-// A page load with a workspace already registered runs
-// `WorkspaceRuntime.startInitialSelection`: it opens the most recent
-// workspace's history, falling back to its blank session when no history
-// exists. `openState` flips to `loading` the
-// moment `open()` lands; driving `data-phase=settling` on the conversation
-// root from that flip would hide the composer seat and the header
-// (`visibility:hidden`) for the whole `session.history` round-trip — the
-// center column blanks and repaints like a full-page refresh on every launch.
-//
-// The unit spec pins the phase condition over hand-built stores. What only the
-// assembled application can show is that the path a user actually takes
-// reaches it: the real selection service, the real client session opening over
-// the real /api transport, and a real browser deciding what is painted.
-// The initial Workspace pick also records the resident Hero/composer nodes and
-// proves that opening the first blank Session fallback fills the strict outlets
-// without replacing those nodes.
-//
-// The round-trip against a loopback host is far too fast to observe, so this
-// scenario HOLDS the `session.history` response open in the browser's network
-// handler and asserts the visible frame while it is in flight. That wait is
-// what makes the assertions non-vacuous: without the phase exemption, the held
-// window is exactly when `settling` would be painted and the composer hidden.
-//
-// Zero model calls: registering a workspace and opening its blank fallback are
-// Host operations with no model involvement. A stray stream would fail loud
-// with NO_ADAPTER.
+// Built web startup selection over independently held network responses.
+// Initial baselines and historical preparation show one loading status while
+// no Session is current. The resident Hero and composer nodes survive default
+// selection; a known-current blank retains its Hero during its own history read.
+// These Host-only scenarios make no model requests.
+import { join } from 'node:path'
+import type { Context } from '@deepseek-ai/cordis'
+import type { ClientModuleLoader, ClientModuleLoaderTarget } from '@deepseek-ai/dsh-client-modules/client'
+import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import { createUserMessage, createAssistantMessage } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-session-persistence'
+import type {} from '@deepseek-ai/dsh-workspace'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { acknowledgeReloadConnectionLoss, launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { acknowledgeReloadConnectionLoss, captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+import { connectFreshWorkspace, newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
 
 /** Wire path of the history round-trip the conversation root waits out (POST /api/session.history). */
 const HISTORY_ROUTE = /\/api\/session\.history(?:\?.*)?$/
@@ -44,6 +28,74 @@ const ROOT_PHASE = 'div[data-phase]'
 /** Every distinct `data-phase` the conversation root shows, in order, across one page load. */
 function recordedPhases(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as { __conversationPhases: string[] }).__conversationPhases)
+}
+
+const SAVED_ID = 'startup-saved-history'
+const SAVED_PROMPT = 'Show the saved conversation.'
+
+interface StartupModelObservation {
+  ctx?: Context
+  modules?: ClientModuleLoader
+}
+
+/** Read-only Client observations without importing its Cordis merges into the Host test face. */
+interface StartupSessionReadFace {
+  readonly list: {
+    getSnapshot(): { current?: string; byId: Readonly<Record<string, { origin?: string }>> }
+  }
+  scope(id: string): unknown
+  sessionOf(ctx: unknown): { getSnapshot(): { openState: string } } | undefined
+}
+
+/** Observe the real saved root's admission and lifetime while its history response is held. */
+async function readStartupModelAdmission(page: Page, sessionId: string) {
+  return page.evaluate((id) => {
+    const observation = Reflect.get(globalThis, '__startupModelObservation') as StartupModelObservation
+    const ctx = observation.ctx
+    const modules = observation.modules
+    if (ctx === undefined || modules === undefined) throw new Error('Real Client composition was not observed')
+    const runtime = modules.loadCache.get('@deepseek-ai/dsh-client-runtime')?.exports as {
+      clientSessionKey(target: { kind: 'personal' }, originalId: string): string
+    }
+    const key = runtime.clientSessionKey({ kind: 'personal' }, id)
+    const sessions = ctx.get('sessions') as unknown as StartupSessionReadFace
+    const connection = ctx.get('connection') as unknown as {
+      readonly state: { getSnapshot(): string | undefined }
+    }
+    const policy = ctx.get('projectUiPolicy') as unknown as {
+      getSnapshot(): { verifiedAccountId?: number }
+    }
+    const list = sessions.list.getSnapshot()
+    const scope = sessions.scope(key)
+    return {
+      currentMatchesSaved: list.current === key,
+      listed: Object.hasOwn(list.byId, key),
+      retainedScope: scope !== undefined,
+      connected: connection.state.getSnapshot() === 'connected',
+      accountVerified: policy.getSnapshot().verifiedAccountId === 1,
+      historyState: scope === undefined ? null : sessions.sessionOf(scope)?.getSnapshot().openState ?? null,
+    }
+  }, sessionId)
+}
+
+/** A closed synthetic conversation restored without an Agent or model request. */
+function savedHistory(): string {
+  const session = Session.create(SessionId(SAVED_ID))
+  session.append('turn/start', { turn: 1 })
+  session.append('step/start', { turn: 1, step: 1 })
+  session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: SAVED_PROMPT }], source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  session.append('assistant/message', {
+    turn: 1, step: 1, stream: [],
+    message: createAssistantMessage({ source: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      content: [{ type: 'text', text: 'The saved conversation is ready.' }],
+    }),
+  }, { surfaceOp: 'append' })
+  session.append('step/end', { turn: 1, step: 1 })
+  session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+  return [JSON.stringify({ type: 'session', version: SESSION_FORMAT_VERSION, id: '{{sessionId}}', createdAt: 1700000000000,
+    cwd: '{{cwd}}', isSeeded: false, delegationDepth: 0 }), ...session.snapshotEvents().map(event => JSON.stringify(event)), ''].join('\n')
 }
 
 describe('web e2e: startup auto-selection', () => {
@@ -115,18 +167,21 @@ describe('web e2e: startup auto-selection', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
 
-  it('keeps the hero and the composer on screen while the auto-selected blank session opens', async () => {
+  it('retains the composer nodes behind loading while an unselected blank fallback opens', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-startup-auto-selection'))
     // Runs before any page script on the reload below, so the first phase the
     // root ever renders is recorded, not just the ones after a listener attaches.
     await page.addInitScript(() => {
       const phases: string[] = []
       ;(window as unknown as { __conversationPhases: string[] }).__conversationPhases = phases
-      setInterval(() => {
+      const remember = (): void => {
         const phase = document.querySelector('div[data-phase]')?.getAttribute('data-phase')
         if (phase === null || phase === undefined) return
         if (phases[phases.length - 1] !== phase) phases.push(phase)
-      }, 8)
+      }
+      const observer = new MutationObserver(remember)
+      observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-phase'] })
+      window.addEventListener('pagehide', () => { observer.disconnect() }, { once: true })
     })
 
     let releaseHistory = (): void => {}
@@ -145,28 +200,528 @@ describe('web e2e: startup auto-selection', () => {
     })
 
     const warningsBefore = tripwire.warnings.length
+    await page.evaluate(() => { localStorage.removeItem('dsh.sessions.current') })
     await page.reload({ waitUntil: 'commit' })
     await historyInFlight
 
-    // The frame a user sees while the session is still opening: hero phase, the
-    // hero title, and a composer that is actually painted (`settling` hides the
-    // seat with `visibility:hidden`, which Playwright reports as not visible).
     await page.waitForSelector(ROOT_PHASE, { timeout: 15_000 })
-    expect(await page.locator(ROOT_PHASE).first().getAttribute('data-phase')).toBe('hero')
-    expect(await page.locator('[data-phase]').getByText('COHARNESS').isVisible()).toBe(true)
-    expect(await page.locator('textarea').first().isVisible()).toBe(true)
+    expect(await page.locator(ROOT_PHASE).first().getAttribute('data-phase')).toBe('settling')
+    expect(await page.getByRole('status', { name: 'Loading workspace', exact: true }).count()).toBe(1)
+    expect(await page.locator('textarea').first().isVisible()).toBe(false)
+    await page.evaluate(() => {
+      ;(window as unknown as { __pendingComposer: Element | null }).__pendingComposer = document.querySelector('textarea')
+    })
 
     releaseHistory()
-    // The auto-selected blank session parks the composer on its workspace
-    // prompt until a workspace is chosen; waiting for that stable state
-    // proves the composer resolved instead of hanging on the open.
-    await page.locator('textarea[placeholder="Choose a workspace to start"]')
+    await page.locator('textarea:enabled[placeholder="Describe what you want to build"]')
       .waitFor({ timeout: 15_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
 
-    // Settling is not merely absent from the frame sampled above: the root
-    // never entered it at any point of the load.
-    expect(await recordedPhases(page)).toEqual(['hero'])
+    await page.getByRole('status', { name: 'Loading workspace', exact: true }).waitFor({ state: 'hidden' })
+    expect(await page.locator('textarea').first().isVisible()).toBe(true)
+    expect(await page.evaluate(() => document.querySelector('textarea')
+      === (window as unknown as { __pendingComposer: Element | null }).__pendingComposer)).toBe(true)
+    expect(await recordedPhases(page)).toEqual(['settling', 'hero'])
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
+  it('ends the initial spinner on a failed Workspace baseline and shows it again during Retry', async () => {
+    const retryScaffold = await launchWebScaffold({})
+    let retryPage: Page | undefined
+    const failedBaseline = Promise.withResolvers<undefined>()
+    const retryBaseline = Promise.withResolvers<undefined>()
+    let listCalls = 0
+    let createCalls = 0
+    try {
+      retryPage = await newEnglishPage(browser)
+      const targetPage = retryPage
+      const logs = watchConsole(targetPage)
+      targetPage.on('request', (request) => {
+        if (new URL(request.url()).pathname === '/api/session.create') createCalls++
+      })
+      await targetPage.route(/\/api\/workspace\.list(?:\?.*)?$/, async (route) => {
+        const response = await route.fetch()
+        const call = ++listCalls
+        if (call === 1) {
+          await failedBaseline.promise
+          const body = await response.json() as { result: unknown }
+          body.result = { ok: false, error: { code: 'internal', message: 'Synthetic list failure', details: {} } }
+          await route.fulfill({ response, json: body })
+        } else {
+          if (call === 2) await retryBaseline.promise
+          await route.fulfill({ response })
+        }
+      })
+      await targetPage.goto(retryScaffold.authenticatedUrl, { waitUntil: 'load' })
+      const loading = targetPage.getByRole('status', { name: 'Loading workspace', exact: true })
+      await loading.waitFor()
+      failedBaseline.resolve(undefined)
+      const error = targetPage.getByRole('alert').filter({ hasText: 'Could not load the list' })
+      await error.waitFor()
+      await loading.waitFor({ state: 'hidden' })
+      await targetPage.getByRole('textbox', { name: 'Choose workspace', exact: true }).waitFor()
+      const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection/baseline-failed.expected.md')
+      await compareOrRefreshGolden(expected,
+        await captureStableAria(targetPage, '[data-row-key="list-feedback"]', retryScaffold.workspaceCwd), webSnapshotMode())
+      await error.getByRole('button', { name: 'Retry', exact: true }).click()
+      await loading.waitFor()
+      expect(await targetPage.getByRole('textbox', { name: 'Choose workspace', exact: true }).count()).toBe(0)
+      retryBaseline.resolve(undefined)
+      await loading.waitFor({ state: 'hidden' })
+      await targetPage.getByRole('textbox', { name: 'Choose workspace', exact: true }).waitFor()
+      expect(await targetPage.getByRole('alert').count()).toBe(0)
+      expect(listCalls).toBe(2)
+      expect(createCalls).toBe(0)
+      expect(logs.pageErrors).toEqual([])
+    } catch (error) {
+      if (retryPage !== undefined) await saveFailureShot(retryPage, 'web-e2e-startup-baseline-retry')
+      throw error
+    } finally {
+      failedBaseline.resolve(undefined)
+      retryBaseline.resolve(undefined)
+      try {
+        await retryPage?.unrouteAll({ behavior: 'wait' })
+        await retryPage?.close()
+      } finally { await retryScaffold.close() }
+    }
+  }, 120_000)
+
+  it('opens existing project history after cold identity and both baselines without a navigation click', async () => {
+    const projectScaffold = await launchWebScaffold({ workbench: true })
+    let projectPage: Page | undefined
+    const describeGate = Promise.withResolvers<undefined>()
+    const describeRequested = Promise.withResolvers<undefined>()
+    const workspaceGate = Promise.withResolvers<undefined>()
+    const workspaceRequested = Promise.withResolvers<undefined>()
+    const historyGate = Promise.withResolvers<undefined>()
+    const historyRequested = Promise.withResolvers<undefined>()
+    try {
+      const id = await seedSession(projectScaffold, savedHistory(), 'project-startup-history')
+      const workspace = await projectScaffold.ctx.workspaceRegistry.create(projectScaffold.workspaceCwd)
+      await workspace.attachSession(id)
+      projectPage = await newEnglishPage(browser)
+      const targetPage = projectPage
+      const targetTripwire = watchConsole(targetPage)
+      const calls: string[] = []
+      targetPage.on('request', (request) => { calls.push(new URL(request.url()).pathname) })
+      await targetPage.addInitScript(() => { localStorage.removeItem('dsh.sessions.current') })
+      // Gateway account/target declarations are external to this real Host composition.
+      await targetPage.route(/\/api\/host\.describe(?:\?.*)?$/, async (route) => {
+        const response = await route.fetch()
+        const body = await response.json() as {
+          result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'project'; projectId: number } } }
+            | { ok: false }
+        }
+        expect(body.result.ok).toBe(true)
+        if (body.result.ok) {
+          body.result.value.executionAuthorityRequired = true
+          body.result.value.runtimeTarget = { kind: 'project', projectId: 7 }
+        }
+        describeRequested.resolve(undefined)
+        await describeGate.promise
+        await route.fulfill({ response, json: body })
+      })
+      await targetPage.route(/\/account\/api\/context(?:\?.*)?$/, route => route.fulfill({ json: {
+        user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
+        scope: { kind: 'project', projectId: 7, projectName: 'Synthetic project', mode: 'rw' },
+        projects: [{ projectId: 7, name: 'Synthetic project', path: projectScaffold.workspaceCwd, mode: 'rw' }],
+      } }))
+      await targetPage.route(/\/account\/api\/workbench\/catalog(?:\?.*)?$/, route => route.fulfill({ json: {
+        personal: { id: 1, name: 'Fixture' }, personalComplete: true,
+        activeRuntime: { kind: 'project', projectId: 7 },
+        projects: [{ projectId: 7, name: 'Synthetic project', path: projectScaffold.workspaceCwd, mode: 'rw' }],
+        items: [{ sessionId: id, runtime: { kind: 'project', projectId: 7, projectName: 'Synthetic project' },
+          visibility: 'project', creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true }],
+      } }))
+      await targetPage.route(/\/api\/workspace\.list(?:\?.*)?$/, async (route) => {
+        const response = await route.fetch()
+        workspaceRequested.resolve(undefined)
+        await workspaceGate.promise
+        await route.fulfill({ response })
+      })
+      let heldHistory = false
+      await targetPage.route(HISTORY_ROUTE, async (route) => {
+        if (heldHistory) { await route.continue(); return }
+        heldHistory = true
+        const response = await route.fetch()
+        expect(response.status()).toBe(200)
+        historyRequested.resolve(undefined)
+        await historyGate.promise
+        await route.fulfill({ response })
+      })
+      await targetPage.goto(projectScaffold.authenticatedUrl, { waitUntil: 'load' })
+      await describeRequested.promise
+      expect(calls.filter(path => path === '/api/session.list' || path === '/api/workspace.list')).toEqual([])
+      const sessionBaseline = targetPage.waitForResponse(response => new URL(response.url()).pathname === '/api/session.list')
+      describeGate.resolve(undefined)
+      await Promise.all([workspaceRequested.promise, sessionBaseline])
+      expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      expect(calls.filter(path => path === '/api/session.history')).toEqual([])
+      // Account verification and both list baselines precede history; the account-pending case covers late viewport restoration.
+      await targetPage.getByRole('button', { name: 'Switch personal or project scope', exact: true })
+        .getByText('Synthetic project', { exact: true }).waitFor({ timeout: 30_000 })
+      expect(await targetPage.getByRole('status', { name: 'Loading workspace', exact: true }).count()).toBe(1)
+      expect(await targetPage.locator('textarea[placeholder="Choose a workspace to start"]').isVisible()).toBe(false)
+      const loadingExpected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection/initial-loading.expected.md')
+      await compareOrRefreshGolden(loadingExpected,
+        await captureStableAria(targetPage, '[data-conversation-region="chat"]', projectScaffold.workspaceCwd), webSnapshotMode())
+      workspaceGate.resolve(undefined)
+      await historyRequested.promise
+      expect(calls.filter(path => path === '/api/session.history')).toHaveLength(1)
+      expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      expect(await targetPage.getByRole('status', { name: 'Loading workspace', exact: true }).count()).toBe(1)
+      historyGate.resolve(undefined)
+      await targetPage.getByText(SAVED_PROMPT, { exact: true }).waitFor()
+      await targetPage.getByText('The saved conversation is ready.', { exact: true }).waitFor()
+      expect(calls.filter(path => path === '/api/session.create')).toEqual([])
+      expect(projectScaffold.ctx.agents.get(id)).toBeUndefined()
+      const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection/saved-history.expected.md')
+      await compareOrRefreshGolden(expected,
+        await captureStableAria(targetPage, '[data-conversation-scroll]', projectScaffold.workspaceCwd), webSnapshotMode())
+      expect(targetTripwire.pageErrors).toEqual([])
+    } catch (error) {
+      if (projectPage !== undefined) await saveFailureShot(projectPage, 'web-e2e-project-startup-selection')
+      throw error
+    } finally {
+      describeGate.resolve(undefined)
+      workspaceGate.resolve(undefined)
+      historyGate.resolve(undefined)
+      try {
+        await projectPage?.unrouteAll({ behavior: 'wait' })
+        await projectPage?.close()
+      } finally { await projectScaffold.close() }
+    }
+  }, 120_000)
+
+  it('prepares the saved current model directory while history is held and shares its first mounted read', async (test) => {
+    const modelScaffold = await launchWebScaffold({ workbench: true })
+    let modelPage: Page | undefined
+    const listGate = Promise.withResolvers<undefined>()
+    const listRequested = Promise.withResolvers<undefined>()
+    const historyGate = Promise.withResolvers<undefined>()
+    const historyRequested = Promise.withResolvers<undefined>()
+    const routeReads: Promise<void>[] = []
+    try {
+      const id = await seedSession(modelScaffold, savedHistory(), 'startup-model-current')
+      const otherId = await seedSession(modelScaffold, savedHistory(), 'startup-model-unselected')
+      const workspace = await modelScaffold.ctx.workspaceRegistry.create(modelScaffold.workspaceCwd)
+      await workspace.attachSession(id)
+      await workspace.attachSession(otherId)
+      modelPage = await newEnglishPage(browser)
+      const target = modelPage
+      const historyPrompt = target.locator('[data-conversation-scroll]').getByText(SAVED_PROMPT, { exact: true })
+      target.setDefaultTimeout(test.task.timeout)
+      const logs = watchConsole(target)
+      const origin = new URL(modelScaffold.authenticatedUrl).origin
+      const modelRequests: string[] = []
+      let creates = 0
+      target.on('request', (request) => {
+        const url = new URL(request.url())
+        if (url.origin !== origin) return
+        if (url.pathname === '/api/session.create') creates++
+        if (url.pathname !== '/api/session.models') return
+        const body = request.postDataJSON() as { payload: { sessionId: string } }
+        modelRequests.push(body.payload.sessionId)
+      })
+      await target.addInitScript((selectedId) => {
+        if (window !== window.top) return
+        Object.assign(globalThis, {
+          __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal' } },
+        })
+        localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId: selectedId }))
+        const observation: StartupModelObservation = {}
+        Reflect.set(globalThis, '__startupModelObservation', observation)
+        Object.defineProperty(globalThis, '__ModuleLoader__', {
+          configurable: true,
+          set(target: ClientModuleLoaderTarget) {
+            Object.defineProperty(globalThis, '__ModuleLoader__', { configurable: true, writable: true, value: target })
+            const create = target.create.bind(target)
+            target.create = function (options) {
+              const modules = create(options)
+              observation.modules = modules
+              const start = modules.entries.start.bind(modules.entries)
+              modules.entries.start = (loader, manifest) => {
+                observation.ctx = loader.ctx.root
+                return start(loader, manifest)
+              }
+              return modules
+            }
+          },
+        })
+      }, id)
+      // Gateway metadata is external; module boot, admission, history and model RPCs stay real.
+      await target.route(url => url.origin === origin && url.pathname === '/api/host.describe', async (route) => {
+        const response = await route.fetch()
+        const body = await response.json() as {
+          result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'personal' } } } | { ok: false }
+        }
+        expect(body.result.ok).toBe(true)
+        if (body.result.ok) {
+          body.result.value.executionAuthorityRequired = true
+          body.result.value.runtimeTarget = { kind: 'personal' }
+        }
+        await route.fulfill({ response, json: body })
+      })
+      await target.route(url => url.origin === origin && url.pathname === '/account/api/context', route => route.fulfill({ json: {
+        user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
+        scope: { kind: 'personal' }, projects: [],
+      } }))
+      await target.route(url => url.origin === origin && url.pathname === '/account/api/workbench/catalog', route => route.fulfill({ json: {
+        personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal' }, projects: [],
+        items: [id, otherId].map(sessionId => ({ sessionId, runtime: { kind: 'personal' }, visibility: 'personal',
+          creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true })),
+      } }))
+      await target.route(url => url.origin === origin && url.pathname === '/api/session.list', (route) => {
+        const read = (async () => {
+          const response = await route.fetch()
+          expect(response.status()).toBe(200)
+          listRequested.resolve(undefined)
+          await listGate.promise
+          await route.fulfill({ response })
+        })()
+        routeReads.push(read)
+        return read
+      })
+      await target.route(url => url.origin === origin && url.pathname === '/api/session.history', (route) => {
+        const body = route.request().postDataJSON() as { payload: { sessionId: string } }
+        if (body.payload.sessionId !== id) return route.continue()
+        const read = (async () => {
+          const response = await route.fetch()
+          expect(response.status()).toBe(200)
+          historyRequested.resolve(undefined)
+          await historyGate.promise
+          await route.fulfill({ response })
+        })()
+        routeReads.push(read)
+        return read
+      })
+      const workspaceBaseline = target.waitForResponse((response) => {
+        const url = new URL(response.url())
+        return url.origin === origin && url.pathname === '/api/workspace.list'
+      })
+      await target.goto(modelScaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' })
+      await Promise.all([listRequested.promise, historyRequested.promise])
+      expect(await (await workspaceBaseline).finished()).toBeNull()
+      await expect.poll(() => readStartupModelAdmission(target, id), { timeout: test.task.timeout }).toEqual({
+        currentMatchesSaved: false, listed: false, retainedScope: false, connected: true, accountVerified: true, historyState: null,
+      })
+      expect(modelRequests).toEqual([])
+      expect(modelScaffold.ctx.agents.get(id)).toBeUndefined()
+      expect(modelScaffold.ctx.agents.get(otherId)).toBeUndefined()
+      listGate.resolve(undefined)
+      await expect.poll(() => readStartupModelAdmission(target, id), { timeout: test.task.timeout }).toEqual({
+        currentMatchesSaved: true, listed: true, retainedScope: true, connected: true, accountVerified: true, historyState: 'loading',
+      })
+      expect(await historyPrompt.count()).toBe(0)
+      await expect.poll(() => modelRequests, {
+        timeout: test.task.timeout,
+        message: 'An admitted saved current root prepares its model directory before the held history response is released',
+      }).toEqual([id])
+      expect((await readStartupModelAdmission(target, id)).historyState).toBe('loading')
+      expect(await historyPrompt.count()).toBe(0)
+      expect(modelScaffold.ctx.agents.get(otherId)).toBeUndefined()
+      historyGate.resolve(undefined)
+      await historyPrompt.waitFor()
+      const model = target.getByRole('button', { name: 'Select model, current DeepSeek-V4-Flash', exact: true })
+      await model.waitFor()
+      await expect.poll(() => model.getAttribute('aria-busy'), { timeout: test.task.timeout }).not.toBe('true')
+      await compareOrRefreshGolden(
+        join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection/saved-history.expected.md'),
+        await captureStableAria(target, '[data-conversation-scroll]', modelScaffold.workspaceCwd), webSnapshotMode())
+      expect(modelRequests).toEqual([id])
+      expect(creates).toBe(0)
+      expect(modelScaffold.ctx.agents.get(otherId)).toBeUndefined()
+      expect(logs.pageErrors).toEqual([])
+      expect(logs.warnings).toEqual([])
+    } catch (error) {
+      if (modelPage !== undefined) await saveFailureShot(modelPage, 'web-e2e-startup-model-directory-preparation')
+      throw error
+    } finally {
+      listGate.resolve(undefined)
+      historyGate.resolve(undefined)
+      try {
+        await modelPage?.unrouteAll({ behavior: 'wait' })
+        await Promise.all(routeReads)
+        await modelPage?.close()
+      } finally { await modelScaffold.close() }
+    }
+  })
+
+  it.each(['local', 'account', 'account pending', 'account scoped'] as const)('reads the saved history while the real list response is held, then presents the same opening: %s', async (composition) => {
+    const accountScaffold = composition === 'local' ? undefined : await launchWebScaffold({ workbench: true })
+    let accountPage: Page | undefined
+    let targetPage = page
+    let holdContext = false
+    const accountContextGate = Promise.withResolvers<undefined>()
+    try {
+      const targetScaffold = accountScaffold ?? scaffold
+      if (accountScaffold !== undefined) targetPage = accountPage = await newEnglishPage(browser)
+      const targetTripwire = accountScaffold === undefined ? tripwire : watchConsole(targetPage)
+      if (accountScaffold !== undefined) {
+        if (composition === 'account scoped') {
+          await targetPage.addInitScript(() => {
+            Object.assign(globalThis, {
+              __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal' } },
+            })
+          })
+        }
+        // The Gateway owns account metadata; Host APIs, both WebSockets and the
+        // complete Workbench/authority/persistence consumers run unchanged.
+        await targetPage.route(/\/api\/host\.describe(?:\?.*)?$/, async (route) => {
+          const response = await route.fetch()
+          const body = await response.json() as {
+            result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'personal' } } } | { ok: false }
+          }
+          expect(body.result.ok).toBe(true)
+          if (body.result.ok) {
+            body.result.value.executionAuthorityRequired = true
+            body.result.value.runtimeTarget = { kind: 'personal' }
+          }
+          await route.fulfill({ response, json: body })
+        })
+        await targetPage.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
+          if (holdContext) await accountContextGate.promise
+          await route.fulfill({ json: {
+            user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
+            scope: { kind: 'personal' }, projects: [],
+          } })
+        })
+        await targetPage.route(/\/account\/api\/workbench\/catalog(?:\?.*)?$/, async (route) => {
+          await route.fulfill({ json: {
+            personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal' }, projects: [],
+            items: [{ sessionId: SAVED_ID, runtime: { kind: 'personal' }, visibility: 'personal', title: 'Saved fixture',
+              creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true }],
+          } })
+        })
+        await targetPage.goto(accountScaffold.authenticatedUrl, { waitUntil: 'load' })
+        await targetPage.waitForSelector('[class*="frame"]')
+      }
+      const id = await seedSession(targetScaffold, savedHistory(), SAVED_ID)
+      const workspace = await targetScaffold.ctx.workspaceRegistry.create(targetScaffold.workspaceCwd)
+      await workspace.attachSession(id)
+      await targetPage.evaluate(({ sessionId, scoped }) => {
+        localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId: scoped ? 'other-space' : sessionId }))
+        if (scoped) {
+          localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId }))
+          localStorage.setItem('dsh.sessions.current.v2.1.project-42', JSON.stringify({ sessionId: 'other-project' }))
+          localStorage.setItem('dsh.sessions.current.v2.2.personal', JSON.stringify({ sessionId: 'other-account' }))
+        }
+      }, { sessionId: id, scoped: composition === 'account scoped' })
+      const listGate = Promise.withResolvers<undefined>()
+      const listReady = Promise.withResolvers<undefined>()
+      let historyCalls = 0
+      let historyResponse: import('playwright').Response | undefined
+      const observeHistory = (response: import('playwright').Response): void => {
+        if (new URL(response.url()).pathname !== '/api/session.history'
+          || (response.request().postDataJSON() as { payload: { sessionId: string } }).payload.sessionId !== id) return
+        historyResponse = response
+      }
+      let indexCalls = 0
+      let terminalCalls = 0
+      const countHistory = (request: import('playwright').Request): void => {
+        const path = new URL(request.url()).pathname
+        if (path === '/api/session.history') {
+          historyCalls++
+          console.log(`[diag] history call #${String(historyCalls)} payload=${request.postData() ?? 'null'} nav=${targetPage.url()}`)
+        }
+        if (path === '/api/session.historyIndex') indexCalls++
+        if (path === '/api/terminal/list') terminalCalls++
+      }
+      targetPage.on('request', countHistory)
+      targetPage.on('response', observeHistory)
+      targetPage.on('framenavigated', (frame) => { if (frame === targetPage.mainFrame()) console.log(`[diag] navigated -> ${frame.url()}`) })
+      targetPage.on('console', (message) => {
+        const type = message.type()
+        if (type === 'error' || type === 'warning') console.log(`[diag] ${type}: ${message.text()}`)
+      })
+      targetPage.on('request', (request) => {
+        const path = new URL(request.url()).pathname
+        if (path === '/api/events.mux' || path === '/api/events.host' || path === '/api/host.describe') {
+          console.log(`[diag] request: ${path}`)
+        }
+      })
+      targetPage.on('requestfinished', (request) => {
+        const path = new URL(request.url()).pathname
+        if (path === '/api/events.mux' || path === '/api/events.host') console.log(`[diag] stream ended: ${path}`)
+      })
+      targetPage.on('pageerror', (error) => { console.log(`[diag] pageerror: ${String(error)}`) })
+      targetPage.on('requestfailed', (request) => { console.log(`[diag] requestfailed: ${new URL(request.url()).pathname} ${request.failure()?.errorText ?? ''}`) })
+      const listRoute = /\/api\/session\.list(?:\?.*)?$/
+      const listReads: Promise<void>[] = []
+      await targetPage.route(listRoute, (route) => {
+        const read = (async (): Promise<void> => {
+          const response = await route.fetch()
+          listReady.resolve(undefined)
+          await listGate.promise
+          await route.fulfill({ response })
+        })()
+        listReads.push(read)
+        return read
+      })
+      const warningsBefore = targetTripwire.warnings.length
+      try {
+        holdContext = composition === 'account pending'
+        await targetPage.reload({ waitUntil: 'commit' })
+        await listReady.promise
+        await expect.poll(() => historyCalls).toBe(1)
+        await expect.poll(() => historyResponse?.status()).toBe(200)
+        expect((await historyResponse!.json() as { result: { ok: boolean } }).result.ok).toBe(true)
+        expect(historyCalls).toBe(1)
+        expect(indexCalls).toBe(0)
+        expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+        expect(await targetPage.getByRole('status', { name: 'Loading workspace', exact: true }).count()).toBe(1)
+        expect(await targetPage.getByRole('textbox', { name: 'Choose workspace', exact: true }).count()).toBe(0)
+        expect(await targetPage.locator('textarea').first().isVisible()).toBe(false)
+        expect(targetScaffold.ctx.agents.get(id) === undefined).toBe(true)
+        listGate.resolve(undefined)
+        await targetPage.getByText(SAVED_PROMPT, { exact: true }).waitFor()
+        await targetPage.getByText('The saved conversation is ready.', { exact: true }).waitFor()
+        if (composition === 'account scoped') {
+          const selections = await targetPage.evaluate(() => Object.fromEntries([
+            'dsh.sessions.current', 'dsh.sessions.current.v2.1.personal',
+            'dsh.sessions.current.v2.1.project-42', 'dsh.sessions.current.v2.2.personal',
+          ].map(key => [key, (JSON.parse(localStorage.getItem(key) ?? '{}') as { sessionId?: string }).sessionId])))
+          expect(selections).toEqual({
+            'dsh.sessions.current': 'other-space', 'dsh.sessions.current.v2.1.personal': id,
+            'dsh.sessions.current.v2.1.project-42': 'other-project', 'dsh.sessions.current.v2.2.personal': 'other-account',
+          })
+        }
+        if (composition === 'account pending') {
+          const composer = await captureStableAria(targetPage, '[data-composer-seat]', targetScaffold.workspaceCwd)
+          expect(composer).not.toContain('Retry terminal recovery')
+          expect(terminalCalls).toBe(0)
+          accountContextGate.resolve(undefined)
+          await expect.poll(() => terminalCalls).toBe(1)
+          expect(await targetPage.getByRole('button', { name: 'Retry terminal recovery', exact: true }).count()).toBe(0)
+        }
+        // Late account verification can reinstall the persisted viewport and
+        // complete Agent-backed model reads after the opening is presented.
+        if (composition !== 'account pending') {
+          expect(historyCalls).toBe(1)
+          expect(targetScaffold.ctx.agents.get(id) === undefined).toBe(true)
+        }
+        const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection')
+        await compareOrRefreshGolden(join(expected, 'saved-history.expected.md'),
+          await captureStableAria(targetPage, '[data-conversation-scroll]', targetScaffold.workspaceCwd), webSnapshotMode())
+        acknowledgeReloadConnectionLoss(targetTripwire, warningsBefore)
+        expect(targetTripwire.pageErrors).toEqual([])
+      } finally {
+        listGate.resolve(undefined)
+        targetPage.off('request', countHistory)
+        targetPage.off('response', observeHistory)
+        await targetPage.unroute(listRoute)
+        await Promise.all(listReads)
+      }
+    } catch (error) {
+      await saveFailureShot(targetPage, `web-e2e-startup-saved-history-${composition}`)
+      throw error
+    } finally {
+      accountContextGate.resolve(undefined)
+      try {
+        await accountPage?.unrouteAll({ behavior: 'wait' })
+        await accountPage?.close()
+      }
+      finally { await accountScaffold?.close() }
+    }
+  }, 120_000)
+
 })

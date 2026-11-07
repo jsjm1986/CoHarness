@@ -47,6 +47,7 @@ type LayoutActions = {
   selectPanel: (draft: LayoutState, panelId: MainPanelId | null) => void
   retainMainPanels: (draft: LayoutState, panelIds: readonly string[]) => void
   focusRightbar: (draft: LayoutState, sessionId: SessionId) => void
+  releaseRightbar: (draft: LayoutState, sessionId: SessionId) => void
   openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
   closeRightbar: (draft: LayoutState) => void
   setSidebar: (draft: LayoutState, px: number) => void
@@ -79,6 +80,9 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         }
       },
       focusRightbar: (d, sessionId: SessionId) => { d.detailsSessionId = sessionId },
+      releaseRightbar: (d, sessionId: SessionId) => {
+        if (d.detailsSessionId === sessionId) delete d.detailsSessionId
+      },
       openRightbar: (d, track: boolean, fullscreen: boolean) => {
         // `details` stays null until the first drag: the frame resolves the
         // ratio default against the live viewport each render, so an

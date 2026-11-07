@@ -1,4 +1,6 @@
 import type { HostDescription, IApiClient, HostFrame, MuxFrame, RpcError, RpcRequest } from './api.ts'
+import { ApiTransportError } from './api.ts'
+import { StreamTermination } from './stream-termination.ts'
 import { DEFAULT_ENTRY_REQUEST_LIMIT } from '../browser-timing.ts'
 
 /** Reconnect/backoff tunables (deployment-varying — no hardcoded tunables; these become the
@@ -110,9 +112,32 @@ function waitForReadiness<T>(
  *  'reconnecting' the moment the generation fails (covers the whole backoff+retry span). */
 export type ConnectionState = 'connected' | 'reconnecting'
 
-/** Failure category preserved for consumers that must invalidate authorized data. */
-export type ConnectionFailure = { readonly kind: 'rpc'; readonly error: RpcError }
-  | { readonly kind: 'transport'; readonly error: unknown }
+/** Source, cause and timing of the first failure in one Client connection generation. */
+export interface ConnectionFailureDiagnostic {
+  /** Local Controller counter; this does not identify a Host process generation. */
+  readonly clientGeneration: number
+  readonly source: 'mux' | 'host' | 'describe' | 'readiness'
+  readonly cause: 'stream-eof' | 'queue-overflow' | 'rpc-error' | 'transport-rejection'
+  readonly phase: 'opening' | 'connected'
+  readonly elapsedMs: number
+  /** Constructor name of the failure value; the message stays on the error itself. */
+  readonly errorName?: string
+  /** Constructor name of the failure's `cause` when it is itself an Error. */
+  readonly causeName?: string
+  /** Constructor name of the deepest Error in the cause chain. */
+  readonly rootCauseName?: string
+  /** HTTP status of a nested ApiTransportError cause; 0 means no response arrived. */
+  readonly causeStatus?: number
+  readonly connectedForMs?: number
+  readonly closeCode?: number
+  readonly wasClean?: boolean
+}
+
+/** Original failure retained for authorization consumers; diagnostics exclude its message and details. */
+export type ConnectionFailure = ({ readonly kind: 'rpc'; readonly error: RpcError }
+  | { readonly kind: 'transport'; readonly error: unknown }) & {
+    readonly diagnostic?: ConnectionFailureDiagnostic
+  }
 
 class HandshakeRpcError extends Error {
   constructor(readonly error: RpcError) { super(`host.describe failed: ${error.code}: ${error.message}`) }
@@ -123,6 +148,12 @@ class HandshakeRpcError extends Error {
 export interface ConnectionSinks {
   onMuxEnvelope?: (envelope: RpcRequest<MuxFrame>) => void
   onHostEnvelope?: (envelope: RpcRequest<HostFrame>) => void
+  /** After each readiness handshake, including first connect, synchronously
+   * withdraw prior-generation state before connected state or the Host description
+   * is published. Buffered frames remain held until onConnected returns.
+   * @param description - validated description for the ready generation.
+   */
+  onBeforeConnected?: (description: HostDescription) => void
   /** After each connection generation is established (both streams open + describe succeeded),
    * first connect included; buffered frames are released after this callback returns. */
   onConnected?: (description: HostDescription) => void
@@ -208,8 +239,11 @@ export class ConnectionController {
   private async loop(token: number): Promise<void> {
     while (this.isRunning(token)) {
       const gen = ++this.generation
+      const startedAt = performance.now()
       const ac = new AbortController()
       this.current = ac
+      let connectedAt: number | undefined
+      let firstFailure: ConnectionFailureDiagnostic | undefined
 
       // Stream carriers can deliver a generation's replay before the unary
       // readiness handshake settles. Keep those frames out of the business
@@ -254,9 +288,32 @@ export class ConnectionController {
         new Promise<void>((resolve) => { hostOpened = resolve }),
       ])
 
-      const reportFailure = (failure: ConnectionFailure): void => {
-        if (!generationLive || !this.isGenerationActive(ac, token)) return
-        this.callSink(() => { this.sinks.onFailure?.(failure) })
+      const reportFailure = (failure: ConnectionFailure, source: ConnectionFailureDiagnostic['source']): void => {
+        if (firstFailure !== undefined || !generationLive || !this.isGenerationActive(ac, token)) return
+        const now = performance.now()
+        const termination = failure.kind === 'transport' && failure.error instanceof StreamTermination ? failure.error : undefined
+        const diagnostic: ConnectionFailureDiagnostic = {
+          clientGeneration: gen, source,
+          cause: failure.kind === 'rpc' ? 'rpc-error' : termination?.kind ?? 'transport-rejection',
+          phase: connectedAt === undefined ? 'opening' : 'connected',
+          elapsedMs: now - startedAt,
+          ...(connectedAt === undefined ? {} : { connectedForMs: now - connectedAt }),
+          ...(termination?.closure === undefined ? {} : {
+            closeCode: termination.closure.closeCode, wasClean: termination.closure.wasClean,
+          }),
+          ...(failure.kind === 'transport' && failure.error instanceof Error ? {
+            errorName: failure.error.name,
+            ...(failure.error.cause instanceof Error ? { causeName: failure.error.cause.name } : {}),
+            ...(failure.error.cause instanceof ApiTransportError ? { causeStatus: failure.error.cause.status } : {}),
+            rootCauseName: (() => {
+              let root = failure.error
+              for (let depth = 0; depth < 8 && root.cause instanceof Error; depth += 1) root = root.cause
+              return root.name
+            })(),
+          } : {}),
+        }
+        firstFailure = diagnostic
+        this.callSink(() => { this.sinks.onFailure?.({ ...failure, diagnostic }) })
       }
       const failed = new Promise<void>((resolve) => {
         const settle = (): void => {
@@ -265,18 +322,26 @@ export class ConnectionController {
           buffered.length = 0
           resolve()
         }
-        void this.pumpStream(this.api.events.mux({}, ac.signal, muxOpened), dispatchMux, settle, reportFailure)
-        void this.pumpStream(this.api.events.host({}, ac.signal, hostOpened), dispatchHost, settle, reportFailure)
+        void this.pumpStream(this.api.events.mux({}, ac.signal, muxOpened), ac.signal, dispatchMux, settle,
+          (failure) => { reportFailure(failure, 'mux') })
+        void this.pumpStream(this.api.events.host({}, ac.signal, hostOpened), ac.signal, dispatchHost, settle,
+          (failure) => { reportFailure(failure, 'host') })
       })
 
+      let readinessFailureSource: 'describe' | 'readiness' = 'describe'
       try {
         // Strict readiness handshake: describe proves unary reachability, onOpen
         // proves each physical stream is established before any frame —
         // only then may onConnected fire, so the resync it triggers cannot outrun the
         // subscribed baseline. The timeout guards against a carrier that never fires onOpen
         // (see ConnectionConfig.streamOpenTimeoutMs).
+        const describe = this.api.host.describe({}, ac.signal).catch((error: unknown) => {
+          readinessFailureSource = 'describe'
+          throw error
+        })
+        readinessFailureSource = 'readiness'
         const handshake = Promise.all([
-          this.api.host.describe({}, ac.signal),
+          describe,
           streamsOpen,
         ])
         void handshake.catch(() => {})
@@ -296,32 +361,37 @@ export class ConnectionController {
           throw new Error('Managed Host did not declare its runtime identity')
         }
         if (ac.signal.aborted) throw new Error('generation aborted during readiness handshake')
-        this.attempt = 0
-        this.emitState('connected')
-        // A state sink may synchronously stop this controller. Do not publish
-        // a description for a generation that no longer exists afterward.
+        this.callSink(() => { this.sinks.onBeforeConnected?.(descriptionResult.value) })
         if (this.isGenerationActive(ac, token)) {
-          // Open the live generation before invoking onConnected so its
-          // synchronous baseline pulls are not held behind the replay gate.
-          // `releasing` keeps any re-entrant stream delivery ordered until the
-          // callback has returned and the captured replay is flushed.
-          ready = true
-          releasing = true
-          this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
-          releasing = false
+          this.attempt = 0
+          connectedAt = performance.now()
+          this.emitState('connected')
+          // A state sink may synchronously stop this controller. Do not publish
+          // a description for a generation that no longer exists afterward.
           if (this.isGenerationActive(ac, token)) {
-            for (const item of buffered.splice(0)) {
-              if (!this.isGenerationActive(ac, token)) {
-                buffered.length = 0
-                break
+            // Open the live generation before invoking onConnected so its
+            // synchronous baseline pulls are not held behind the replay gate.
+            // `releasing` keeps any re-entrant stream delivery ordered until the
+            // callback has returned and the captured replay is flushed.
+            ready = true
+            releasing = true
+            this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
+            releasing = false
+            if (this.isGenerationActive(ac, token)) {
+              for (const item of buffered.splice(0)) {
+                if (!this.isGenerationActive(ac, token)) {
+                  buffered.length = 0
+                  break
+                }
+                if (item.kind === 'mux') dispatchMux(item.envelope)
+                else dispatchHost(item.envelope)
               }
-              if (item.kind === 'mux') dispatchMux(item.envelope)
-              else dispatchHost(item.envelope)
             }
           }
         }
       } catch (error: unknown) {
-        reportFailure(error instanceof HandshakeRpcError ? { kind: 'rpc', error: error.error } : { kind: 'transport', error })
+        reportFailure(error instanceof HandshakeRpcError ? { kind: 'rpc', error: error.error } : { kind: 'transport', error },
+          error instanceof HandshakeRpcError ? 'describe' : readinessFailureSource)
         // Every failure converges on the same generation cancellation and backoff.
         ac.abort()
         generationLive = false
@@ -337,7 +407,7 @@ export class ConnectionController {
       }
       this.emitState('reconnecting')
       this.attempt += 1
-      console.warn(`[web-runtime] connection lost, retry #${this.attempt}`)
+      console.warn(`[web-runtime] connection lost, retry #${this.attempt}${firstFailure === undefined ? '' : ` ${JSON.stringify(firstFailure)}`}`)
       const idle = new AbortController()
       this.backoff = idle
       await sleep(this.backoffDelay(this.attempt), idle.signal)
@@ -354,6 +424,7 @@ export class ConnectionController {
 
   private async pumpStream<F extends MuxFrame | HostFrame>(
     stream: AsyncIterable<RpcRequest<F>>,
+    signal: AbortSignal,
     sink: ((envelope: RpcRequest<F>) => void) | undefined,
     onEnd: () => void,
     reportFailure: (failure: ConnectionFailure) => void,
@@ -366,8 +437,9 @@ export class ConnectionController {
         }
         if (sink !== undefined) this.callSink(() => { sink(envelope) })
       }
+      if (!signal.aborted) reportFailure({ kind: 'transport', error: new StreamTermination('stream-eof') })
     } catch (error: unknown) {
-      reportFailure({ kind: 'transport', error })
+      if (!signal.aborted) reportFailure({ kind: 'transport', error })
     }
     onEnd()
   }

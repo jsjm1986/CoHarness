@@ -1,0 +1,10 @@
+/* The main bundle supplies parser loading content while the workbook's styles remain lazy. */
+.loading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 16px;
+  color: var(--dsw-alias-label-secondary);
+}

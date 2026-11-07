@@ -34,3 +34,5 @@ The [HTML preview component suite](../../../../packages/client/ui-workbench/test
 ## Consequences
 
 Markdown and HTML previews now behave like upstream's on the surfaces that matter — incremental text for Markdown, a fully packaged opaque iframe for HTML — while ACL, versioning, cancellation, and runtime targeting stay exactly those of the existing file tab. HTML dependency graphs pay bounded whole-file memory; unsupported traversals are documented in the package README rather than silently half-loaded. The [recorded browser scenario](../../../../apps/web/tests/workspace-files.e2e.ts) exercises Markdown rendering, the sandboxed packaged frame, and the shared change/reload path.
+
+Independent asset scheduling and byte reservations follow [bounded workspace preview preparation](../architecture/2026-10-23-bounded-preview-preparation.md).

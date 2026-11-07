@@ -18,6 +18,7 @@ import {
   writeClientBuildRecord,
 } from './client-build-environment.ts'
 import { clientBundle } from '../packages/client/tsdown.client.ts'
+import { stampClientArtifact } from '../packages/client/modules/src/artifact-revision.ts'
 
 const root = resolve(import.meta.dirname, '..')
 const PROBE_NAME = 'DSH_CLIENT_BUILD_TEST'
@@ -50,7 +51,7 @@ function buildFixture(environment: Record<string, string>): string {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'dsh-client-build-'))
   roots.push(fixtureRoot)
   write(join(fixtureRoot, 'apps/web/dist/index.html'), '<main></main>')
-  write(join(fixtureRoot, 'packages/client/example/lib/client.js'), 'module.exports = {}\n')
+  write(join(fixtureRoot, 'packages/client/example/lib/client.js'), stampClientArtifact('module.exports = {}\n', []))
   writeClientBuildRecord(fixtureRoot, environment)
   return fixtureRoot
 }
@@ -289,7 +290,22 @@ describe('client build environment', { timeout: 15_000 }, () => {
 
     const chunked = buildFixture(officialEnvironment)
     write(join(chunked, 'packages/client/example/lib/client.pdf.js'), 'module.exports = {}\n')
-    expect(() => { readClientBuildRecord(chunked) }).toThrow(/artifacts differ/)
+    expect(() => { readClientBuildRecord(chunked) }).toThrow(/chunks differ/)
+  })
+
+  it('rejects missing, malformed and stale executable content stamps before recording a build', () => {
+    const fixture = buildFixture({})
+    const path = join(fixture, 'packages/client/example/lib/client.js')
+    write(path, 'module.exports = {}\n')
+    expect(() => writeClientBuildRecord(fixture, {})).toThrow('missing content stamp')
+    write(path, 'module.exports = {}\n//# dsh-client-artifact=v2:bad\n')
+    expect(() => writeClientBuildRecord(fixture, {})).toThrow('invalid client artifact stamp')
+    write(path, stampClientArtifact('module.exports = {}\n', []))
+    write(join(fixture, 'packages/client/example/lib/client.lazy.js'), 'exports.value = 1\n')
+    expect(() => writeClientBuildRecord(fixture, {})).toThrow('executable chunks differ')
+    write(path, stampClientArtifact('module.exports = {}\n', [{ fileName: 'client.lazy.js', code: 'exports.value = 1\n' }]))
+    expect(() => writeClientBuildRecord(fixture, {})).not.toThrow()
+    expect(() => readClientBuildRecord(fixture)).not.toThrow()
   })
 
   it('keeps public client values out of workflow-wide environments', () => {

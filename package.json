@@ -228,6 +228,7 @@
   "devDependencies": {
     "@agentclientprotocol/sdk": "1.4.0",
     "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-browser-use": "workspace:*",
     "@deepseek-ai/dsh-computer-use": "workspace:*",
     "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp": "workspace:*",
@@ -243,6 +244,7 @@
     "@deepseek-ai/dsh-ssh-helper-runtime": "workspace:*",
     "@deepseek-ai/dsh-tool-session-query": "workspace:*",
     "@deepseek-ai/dsh-tool-userdoc": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-web-fetch-http": "workspace:*",
     "@deepseek-ai/libreoffice-kit": "0.1.1",
     "@stylistic/eslint-plugin": "^5.10.0",

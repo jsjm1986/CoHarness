@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-workbench-pane-grid-redesign.md
 document:
-  en: bec5fcc7a2f76350ee78925d0b5c3521999dbeb7
-  zh: 07c0068ade97a395548ff005bbf6ad35bb3a4109
+  en: ed0bb4d5d818e8dd5d9bad3f007bf08710e2a876
+  zh: d1b1fd5bffb89d351c90d995a646fdfb01fb4e37
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder:
   en: f483764b328d5518
   zh: 16f3488618c01649
@@ -12,14 +12,14 @@ document:
   en: efbeeeb033e8e99b
   zh: db68e29c197d06ec
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/decision:
-  en: 6d51c908ad4b92fb
-  zh: 330935ad4effafc4
+  en: 15aad0bd7035fddc
+  zh: f184ee85551eafc1
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/alternatives-considered:
-  en: 0cec3cfe44a15f85
-  zh: 9f1faeb41f09f908
+  en: 70fc10092f8f3d97
+  zh: d653f718cd68c1ee
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/consequences:
   en: 867145be74a023c0
   zh: 0eaab412b7b6307b
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/testing:
-  en: ebf708867603800e
-  zh: 97b236443978967f
+  en: 9ab07a8d55e1537c
+  zh: 005da3c81208bf65

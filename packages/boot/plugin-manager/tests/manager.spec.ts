@@ -18,6 +18,7 @@ import {
 import PluginManager, { type Config, type PluginChange, type PluginDesiredState, type PluginInstallFrame, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
+import type { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
 import Hmr from '@deepseek-ai/dsh-hmr'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -310,6 +311,17 @@ it('lists bundle versions and current-profile plugin targets', async () => {
   ])
 })
 
+it('lists current-profile targets independently of preset composition reads', async () => {
+  const { manager, ctx } = await fixture('startup')
+  const compositionInventory = vi.fn(async () => { throw new Error('preset composition unavailable') })
+  ctx.provide('agentPresets', { compositionInventory } as Partial<AgentPresetRegistry> as never)
+
+  await expect(manager.listPlugins()).resolves.toEqual(expect.arrayContaining([
+    expect.objectContaining({ entryId: 'include:managed', patchId: 'managed', enabled: true }),
+  ]))
+  expect(compositionInventory).not.toHaveBeenCalled()
+})
+
 it('describes a bundle by its manifest and patch: one-liner, rows without a live entry, and the built-in rows it changes', async () => {
   const { manager, dir, bundle } = await fixture()
   bundle('described', [{ id: 'described-row', name: './plugin.mjs' }])
@@ -366,6 +378,20 @@ it('names where each installed bundle comes from as a spec pnpm installs', async
     relative: `file:${resolve(dir, '../plugins/relative')}`, linked: `link:${resolve(dir, '/plugins/linked')}`,
     home: `file:${resolve(homedir(), 'plugins/home')}`, aliasLocal: `aliasLocal@file:${resolve(dir, '../plugins/original')}`, shadowed: undefined,
   })
+})
+
+it('lists current controls without reading entry metadata when it is omitted', async () => {
+  const { ctx, manager } = await fixture('startup')
+  await ctx.plugin(PluginPackages)
+  const metadata = vi.spyOn(ctx.pluginPackages, 'metaOf')
+  onTestFinished(() => { metadata.mockRestore() })
+  const controls = await manager.listPlugins(false)
+  expect(controls.length).toBeGreaterThan(0)
+  expect(controls.every(entry => !Object.hasOwn(entry, 'meta'))).toBe(true)
+  expect(metadata).not.toHaveBeenCalled()
+  const full = await manager.listPlugins()
+  expect(metadata).toHaveBeenCalled()
+  expect(full.map(({ meta: _meta, ...entry }) => entry)).toEqual(controls)
 })
 
 it.each(['native', 'runtime'] as const)('reads a disabled bundle and its independent exported plugins without running them with %s resolution', async (mode) => {

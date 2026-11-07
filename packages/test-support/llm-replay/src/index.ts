@@ -650,6 +650,44 @@ export function resolveScriptedEntry(entry: ReplayEntry, messages: GenerateOptio
   return substituteValue(entry, leaves.join('\n')) as ReplayEntry
 }
 
+/**
+ * Replace `{{cwd}}` tokens in a scripted entry with the live session's working
+ * directory, scraped from the `working-directory:current` runtime-context
+ * section already present in the live request messages. Recorded fixtures
+ * normalize the volatile per-run directory to `{{cwd}}`; replay must bind it
+ * back or tool calls receive a literal `{{cwd}}` relative path. Inside a JSON
+ * `arguments` string the substitution is the JSON-escaped inner form so the
+ * arg stays parseable (POSIX paths are unchanged); elsewhere the raw path is
+ * substituted verbatim. Throws when the entry needs the token but the request
+ * carries no working-directory section.
+ */
+function materializeCwdTokens(entry: ReplayEntry, messages: GenerateOptions['messages']): ReplayEntry {
+  if (!JSON.stringify(entry).includes('{{cwd}}')) return entry
+  const leaves: string[] = []
+  collectStrings(messages, leaves)
+  const encoded = /Current working directory: ("(?:[^"\\]|\\.)*")\./u.exec(leaves.join('\n'))?.[1]
+  if (encoded === undefined) {
+    throw new Error('llm-replay: a scripted entry needs {{cwd}} but the request carries no working-directory section')
+  }
+  const live = JSON.parse(encoded) as string
+  const escaped = JSON.stringify(live).slice(1, -1)
+  const replace = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      if (!value.includes('{{cwd}}')) return value
+      try {
+        JSON.parse(value)
+        return value.replaceAll('{{cwd}}', escaped)
+      } catch { return value.replaceAll('{{cwd}}', live) }
+    }
+    if (Array.isArray(value)) return value.map(replace)
+    if (value !== null && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replace(item)]))
+    }
+    return value
+  }
+  return replace(entry) as ReplayEntry
+}
+
 /** Replace typed recorded-session tokens with the live sessions bound at the same corpus indexes. */
 function materializeSessionTokens(entry: ReplayEntry, liveSessionIds: readonly (string | undefined)[]): ReplayEntry {
   if (!JSON.stringify(entry).includes('{{session:')) return entry
@@ -1178,7 +1216,10 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
         )
       }
       inferStartedSubagents(options.messages, liveSessionIds)
-      const resolved = resolveScriptedEntry(materializeSessionTokens(entry, liveSessionIds), options.messages)
+      const resolved = resolveScriptedEntry(
+        materializeSessionTokens(materializeCwdTokens(entry, options.messages), liveSessionIds),
+        options.messages,
+      )
       if (options.provider === 'deepseek-official' && providerAccepted(resolved)) {
         const extensions = ctx.get('deepseekLlmApiExtensions')
         if (extensions !== undefined) {

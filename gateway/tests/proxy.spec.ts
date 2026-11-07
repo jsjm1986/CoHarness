@@ -578,6 +578,41 @@ describe('proxy handlers', () => {
     expect(JSON.parse(first)).toEqual({ host: `127.0.0.1:${port}`, principal: null })
   })
 
+  it('caps the first event grant at the existing login deadline and closes it without renewal', async () => {
+    const { deps, base, cookie, signer, handlers, alice, db } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    const deadline = Date.now() + 5000
+    db.prepare('UPDATE auth_sessions SET expires_at=?,absolute_expires_at=?').run(deadline, deadline)
+    const ws = new WebSocket(`${base.replace('http', 'ws')}/api/events.mux`, { headers: { cookie, origin: base } })
+    cleanup.push(() => ws.terminate())
+    try {
+      const [message] = await once(ws, 'message', { signal: AbortSignal.timeout(5000) })
+      const grant = signer!.verify((JSON.parse(String(message)) as { principal: string }).principal)
+      expect(grant.expiresAt).toBe(deadline)
+      expect(handlers.streamPrincipals?.size).toBe(1)
+      const http = await fetch(`${base}/api/echo`, { headers: { cookie } })
+      const httpGrant = signer!.verify(((await http.json()) as { principal: string }).principal)
+      expect(httpGrant.expiresAt).toBeGreaterThan(deadline)
+      const closed = once(ws, 'close', { signal: AbortSignal.timeout(5000) })
+      await vi.advanceTimersByTimeAsync(5001)
+      await closed
+      expect(handlers.streamPrincipals?.size).toBe(0)
+    } finally { ws.terminate(); vi.useRealTimers() }
+  })
+
+  it('refuses an event upgrade whose login loses eligibility after ordinary validation', async () => {
+    const { deps, base, cookie, handlers, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const qualification = vi.spyOn(deps.auth, 'qualifyForStream').mockResolvedValueOnce(null)
+    cleanup.push(() => qualification.mockRestore())
+    const ws = new WebSocket(`${base.replace('http', 'ws')}/api/events.host`, { headers: { cookie, origin: base } })
+    cleanup.push(() => ws.terminate())
+    await once(ws, 'error', { signal: AbortSignal.timeout(5000) })
+    expect(qualification).toHaveBeenCalledOnce()
+    expect(handlers.streamPrincipals?.size).toBe(0)
+  })
+
   it('replaces forged principal headers on HTTP and WebSocket requests', async () => {
     const { deps, base, cookie, signer } = await setup(true)
     await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-gateway-startup-resilience.md
 document:
-  en: f7769c6642a26f1060ba50daafeb9ea31e0aefc1
-  zh: 93280fedcca698da793260ee18fcb94a15be309c
+  en: 7adb724aa6f63aecebbff4528c64f4e90e86e376
+  zh: ccfa7047244c9275646499dd25a5884210fea7d7
 /agent-note-gateway-startup-resilience:
   en: 7fe4934b5cbbf270
   zh: 2cfbfe51339c416b
@@ -12,14 +12,14 @@ document:
   en: 1f8c362c46881089
   zh: 8e54cfe798ff5c70
 /agent-note-gateway-startup-resilience/decision:
-  en: 9507742f131a4c95
-  zh: 6c113aabdd075f5a
+  en: 3566d535ac999962
+  zh: ad2d7cb6367b2803
 /agent-note-gateway-startup-resilience/verification:
-  en: 1c7027d414951611
-  zh: 70fdd103546f93cb
+  en: 7b294c305cdb10eb
+  zh: 975e142e43902e6d
 /agent-note-gateway-startup-resilience/alternatives-considered:
-  en: 6106b4047b0f601b
-  zh: 7f38902f834baf99
+  en: 3dc48a74dc0a56f6
+  zh: eb8196ef886fb6dd
 /agent-note-gateway-startup-resilience/consequences:
   en: 4eab3a655f0fd6e7
   zh: 7a759f0810002bd1

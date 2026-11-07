@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md
 document:
-  en: 9a4837afbec7968016e391889f540165483087e1
-  zh: 3a3b830de695b16ec7ad92c99d7c91f1e3e772eb
+  en: 0d01562980c90ef776ed04f2f6865ae03afc9723
+  zh: ac5eb85d498daa8f081ea2413595d054b6b32c22
 /agent-note-document-index-pagination-and-recoverable-trash:
   en: 1db4b68735aaf621
   zh: b813714a5cc49fd7
@@ -12,8 +12,8 @@ document:
   en: 7403c36610537e71
   zh: f77cebba8c384016
 /agent-note-document-index-pagination-and-recoverable-trash/decision:
-  en: a824a977154cb6b8
-  zh: 1fa155e7c73d6364
+  en: 2216011d79db1d3e
+  zh: da6fc45282db3d5e
 /agent-note-document-index-pagination-and-recoverable-trash/alternatives-considered:
   en: 30dbbb6e22373232
   zh: b0c0f0778cd318d2

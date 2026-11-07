@@ -23,7 +23,7 @@ describe('computer-use provider registration', () => {
       expect(computerUseUnavailableReason(ctx)).toBe('disabled')
       await disabled()
       expect(computerUseUnavailableReason(ctx)).toBe('headless')
-      await environment()
+      environment()
       expect(computerUseUnavailableReason(ctx)).toBeUndefined()
     } finally { await ctx.fiber.dispose() }
   })

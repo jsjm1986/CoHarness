@@ -18,9 +18,17 @@ it('retains a pending New Session and its origin draft across transport renewal'
   try {
     await page.goto(fixture.url, { waitUntil: 'networkidle' })
     const office = page.getByRole('region', { name: 'Office computer', exact: true })
-    await office.getByRole('button', { name: 'Office computer', exact: true }).click()
-    await office.getByText('Office work', { exact: true }).click()
-    await office.getByText('Office conversation', { exact: true }).click()
+    const heading = office.getByRole('button', { name: 'Office computer', exact: true })
+    const firstRow = office.locator('[data-row-key^="session:"]').first()
+    const workspaceRow = office.getByText('Office work', { exact: true })
+    await expect.poll(async () => {
+      // The collapsed default tracks the active computer and remounts drop
+      // explicit expansion, so re-arm the click inside the poll.
+      if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+      return (await firstRow.isVisible()) || (await workspaceRow.isVisible())
+    }, { timeout: 60_000 }).toBe(true)
+    if (!await firstRow.isVisible()) await workspaceRow.click()
+    await firstRow.click()
     const input = page.locator('textarea').first()
     await page.locator('[data-conversation-intent]').waitFor({ state: 'hidden' })
     await input.fill('Keep the original draft across transport renewal')
@@ -203,8 +211,13 @@ it('browses twenty cold computers and keeps personal conversations, drafts and t
     const openOffice = async (owner: typeof page): Promise<void> => {
       const section = owner.getByRole('region', { name: 'Office computer', exact: true })
       const heading = section.getByRole('button', { name: 'Office computer', exact: true })
-      if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
-      if (!await section.locator('[data-row-key^="session:"]').first().isVisible()) await section.getByText('Office work', { exact: true }).click()
+      const firstRow = section.locator('[data-row-key^="session:"]').first()
+      const workspaceRow = section.getByText('Office work', { exact: true })
+      await expect.poll(async () => {
+        if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+        return (await firstRow.isVisible()) || (await workspaceRow.isVisible())
+      }, { timeout: 60_000 }).toBe(true)
+      if (!await firstRow.isVisible()) await workspaceRow.click()
       await section.locator('[data-row-key^="session:"]').first().click()
     }
     await openOffice(page)
@@ -255,7 +268,7 @@ it('browses twenty cold computers and keeps personal conversations, drafts and t
       type: 'jpeg', quality: 85, animations: 'disabled' })
     await page.emulateMedia({ colorScheme: 'dark' })
     await page.getByRole('button', { name: 'Switch personal or project scope', exact: true }).click()
-    const spaces = page.getByRole('group', { name: 'Switch personal or project scope', exact: true })
+    const spaces = page.getByRole('dialog', { name: 'Switch personal or project scope', exact: true })
     expect(await spaces.getByRole('button', { name: /^Personal/ }).count()).toBe(1)
     expect(await spaces.getByText('Office computer', { exact: true }).count()).toBe(0)
     expect(await spaces.getByText('Compute computer', { exact: true }).count()).toBe(0)

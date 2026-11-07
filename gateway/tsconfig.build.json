@@ -63,6 +63,12 @@
       ],
       "@deepseek-ai/dsh-resource-budget/wire": [
         "../packages/context/resource-budget/lib/types/wire.d.ts"
+      ],
+      "@deepseek-ai/dsh-native-command": [
+        "../packages/util/native-command/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-typert-protocol": [
+        "../packages/typert/protocol/lib/types/index.d.ts"
       ]
     }
   },

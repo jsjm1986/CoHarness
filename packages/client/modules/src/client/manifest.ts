@@ -56,6 +56,8 @@ export interface WebBootEntry {
   url: string
   /** Opaque plugin-artifact revision used for HMR cache busting. */
   rev: string
+  /** Executable revisions of published package-local chunks; absent on legacy Hosts. */
+  chunks?: Record<string, string>
   /** Package-name dependency edges used for factory arrival and plugin composition. */
   inject?: string[]
   /** Stage-one prefetch mark: load the script for factory registration during module-face boot. */
@@ -113,6 +115,8 @@ export interface BootModuleRow {
   initialUrl: string
   /** Opaque plugin-artifact revision used after HMR invalidation. */
   rev: string
+  /** Executable chunk revisions for this owner revision; absence selects owner-revision URLs. */
+  chunks?: Record<string, string>
   /** Injected package rows whose factories arrive before this row materializes. */
   inject: string[]
   /** Module specifiers this row requests from the module table ([] when the wire omits them). */
@@ -156,6 +160,27 @@ export function optionalStringArray(subject: string, field: string, value: unkno
     throw new Error(`client-modules: ${subject} ${field} must be a string array`)
   }
   return value as string[]
+}
+
+/**
+ * Validate executable chunk revisions from the boot wire or compiler footer.
+ * @param subject - diagnostic prefix identifying the owner or artifact.
+ * @param value - required chunk filename to SHA-256 revision table.
+ * @returns a copied table.
+ * @throws {Error} when a filename or revision is malformed.
+ */
+export function parseChunkRevisions(subject: string, value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`client-modules: ${subject} chunks must be a filename/revision table`)
+  }
+  const entries = Object.entries(value)
+  for (const [fileName, revision] of entries) {
+    if (!/^client\.[A-Za-z0-9][A-Za-z0-9._-]*\.js$/u.test(fileName)
+      || typeof revision !== 'string' || !/^[a-f\d]{64}$/u.test(revision)) {
+      throw new Error(`client-modules: ${subject} chunks must contain published filenames and SHA-256 revisions`)
+    }
+  }
+  return Object.fromEntries(entries)
 }
 
 /**
@@ -258,6 +283,7 @@ export function parseBootManifest(wire: unknown): BootManifest {
     const subject = `boot manifest entry ${where}`
     const inject = optionalStringArray(subject, 'inject', row.inject)
     const external = optionalStringArray(subject, 'external', row.external)
+    const chunks = row.chunks === undefined ? undefined : parseChunkRevisions(subject, row.chunks)
     if (row.immediately !== undefined && typeof row.immediately !== 'boolean') {
       throw new Error(`client-modules: boot manifest entry ${where} immediately must be a boolean`)
     }
@@ -265,6 +291,7 @@ export function parseBootManifest(wire: unknown): BootManifest {
       id: row.id,
       url: row.url,
       rev: row.rev,
+      ...(chunks === undefined ? {} : { chunks }),
       inject: inject === undefined ? [] : [...inject],
       external: external === undefined ? [] : [...external],
     })

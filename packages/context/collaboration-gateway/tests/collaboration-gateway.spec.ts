@@ -57,6 +57,49 @@ describe('GatewayCollaboration', () => {
     expect(request).toHaveBeenCalledTimes(1)
   })
 
+  it('reads verified replacement signatures from one retained handle without changing participant permissions', async () => {
+    let current = PRINCIPAL
+    const socket = new AbortController()
+    const principal: GatewayRequestPrincipal = {
+      get assertion() { return current.assertion }, get claims() { return current.claims }, signal: socket.signal,
+    }
+    const request = vi.fn(async (_path: string, init: { principal?: GatewayRequestPrincipal }) => {
+      expect(init.principal?.assertion).toBe(current.assertion)
+      return new Response(JSON.stringify({ sessionIds: ['session-1'] }), { headers: { 'content-type': 'application/json' } })
+    })
+    const ctx = new Context()
+    ctx.provide('gatewayRuntime', { requireCurrent: () => principal, request, sessionCreation: () => undefined })
+    const fiber = ctx.plugin(GatewayCollaboration)
+    await fiber.await()
+    try {
+      const authority = ctx.collaboration.capture()
+      current = { assertion: 'verified-replacement', claims: { ...PRINCIPAL.claims, expiresAt: 20, nonce: 'replacement' } }
+      expect(authority.expiresAt).toBe(20)
+      expect(authority.participant.role).toBe('user')
+      await expect(authority.readableSessionIds([SessionId('session-1')])).resolves.toEqual(new Set(['session-1']))
+      socket.abort()
+      await expect(authority.readableSessionIds([SessionId('session-1')])).rejects.toMatchObject({ code: 'gateway-unavailable' })
+      expect(request).toHaveBeenCalledTimes(1)
+    } finally { await fiber.dispose() }
+  })
+
+  it('refuses personal fast paths after their retained event socket closes', async () => {
+    const socket = new AbortController()
+    const principal: GatewayRequestPrincipal = { ...PRINCIPAL, claims: { ...PRINCIPAL.claims, scope: { kind: 'personal' } }, signal: socket.signal }
+    const request = vi.fn()
+    const ctx = new Context()
+    ctx.provide('gatewayRuntime', { requireCurrent: () => principal, request, sessionCreation: () => undefined })
+    const fiber = ctx.plugin(GatewayCollaboration)
+    await fiber.await()
+    try {
+      const authority = ctx.collaboration.capture()
+      socket.abort()
+      await expect(authority.readableSessionIds([])).rejects.toMatchObject({ code: 'gateway-unavailable' })
+      await expect(authority.claimInteraction(SessionId('session-1'), 'approval', 'request-1', {})).rejects.toMatchObject({ code: 'gateway-unavailable' })
+      expect(request).not.toHaveBeenCalled()
+    } finally { await fiber.dispose() }
+  })
+
   it('forwards pending creation authorizations for blank-session ACL checks', async () => {
     const request = vi.fn((path: string, init?: RequestInit) => {
       if (typeof init?.body !== 'string') throw new Error('expected a JSON request body')

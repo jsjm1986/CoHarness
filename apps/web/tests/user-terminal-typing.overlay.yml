@@ -1,0 +1,7 @@
+# A portable interactive shell keeps typed-input replies independent of login profiles.
+- id: terminal-controller
+  config:
+    shell:
+      path: /bin/sh
+      name: sh
+      args: [-i]

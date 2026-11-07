@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/resource-budget/README.md
 document:
-  en: bcfc39f8ac2ead6a87522b5b0cc9497505637050
-  zh: 381fe35b6b659154ece7a74543338fdd44f80f00
+  en: d3a6175bdc5c4dc22d26dd1c0c54f9db0e38ae19
+  zh: 85d143536774fc79c6e1b5dede4bf9bd00a2aeb2
 /:
   en: 7c0e9906b97c762d
   zh: ebd42c9ff4da819d
@@ -24,20 +24,11 @@ document:
   en: 27705df1c5be4869
   zh: 306ef61f89650e08
 /deepseek-ai-dsh-resource-budget/model-experience:
-  en: 215e7ba838619b7b
-  zh: a311da3843709f90
-/deepseek-ai-dsh-resource-budget/model-experience/resource-permits:
-  en: 16690254f1cbb492
-  zh: 3360acc99b12bf03
-/deepseek-ai-dsh-resource-budget/model-experience/resource-permits/what-the-model-sees:
-  en: a6de5361f19232d1
-  zh: 2534a86938c28ee1
-/deepseek-ai-dsh-resource-budget/model-experience/resource-permits/token-effect:
-  en: a30afbed1d0a3013
-  zh: 6ac7dde8d5b9c7d3
-/deepseek-ai-dsh-resource-budget/model-experience/resource-permits/kv-cache-effect:
-  en: fb7364fa54d4fb0c
-  zh: 047ae065acdc21a1
+  en: bda5b07d2bf8c5e8
+  zh: 2e2413a1f852bd08
+/deepseek-ai-dsh-resource-budget/model-experience/kv-cache-effect:
+  en: b8867f5995faf993
+  zh: e5e1b741778518d7
 /deepseek-ai-dsh-resource-budget/known-limitations-and-deferred-work:
   en: 19640258dcde43db
   zh: de8e6858f970e767

@@ -1313,13 +1313,38 @@ describe('PythonPtcRuntime — programs and bindings', () => {
     // arbitrary pipe boundaries inside one native write. Stray capture holds a
     // per-stream residual and admits only on a real `\n`, so a 200 KiB blast
     // with no newline reads back as exactly one entry with no interior breaks.
-    const { runtime } = await setup({ maxLogBytes: 300_000 })
+    // The settlement drain shares graceMs with the exit wait; under an
+    // instrumented coverage partition the event loop can starve pipe reads for
+    // more than the 3s default while the finished 200 KiB write is still queued
+    // in the kernel buffer, so this run takes a wider cleanup bound.
+    const { runtime } = await setup({ maxLogBytes: 300_000, graceMs: 30_000 })
     const size = 200_000
     const result = await runtime.run(runtime.resolve({
-      program: ['import os', `os.write(1, b"A" * ${size})`, 'return None'].join('\n'),
+      // `os.write` returns a SHORT count on a non-blocking fd — libuv marks
+      // the child's stdio ends non-blocking, so under a starved reader the
+      // write accepts only what fits the kernel buffer (CI observed 146176
+      // of 200000) and Python silently drops the rest. Loop until the full
+      // payload is written; EAGAIN arrives as BlockingIOError, retried after
+      // `select` reports the pipe writable again.
+      program: [
+        'import os, select',
+        `view = memoryview(b"A" * ${size})`,
+        'while len(view) > 0:',
+        '    try:',
+        '        written = os.write(1, view)',
+        '    except BlockingIOError:',
+        '        select.select([], [1], [])',
+        '        continue',
+        '    view = view[written:]',
+        'return None',
+      ].join('\n'),
       bindings: [],
     }))
     expect(result.error).toBeUndefined()
+    // Length first: the string diff of a 200 KiB entry is display-truncated,
+    // so a mismatch under CI only shows identical 'A' prefixes. The count and
+    // byte lengths expose whether an entry was truncated, split, or doubled.
+    expect(result.logs.map(entry => entry.length)).toEqual([size])
     expect(result.logs).toEqual(['A'.repeat(size)])
   })
 
@@ -5083,30 +5108,42 @@ describe('PythonPtcRuntime — hostile peer', () => {
     // `sendReply` checks `settled`, but only after the resolution has been walked
     // and copied by `snapshotJsonValue`. Binding resolution carries no seam-level
     // byte cap, so a binding that resolves a wide value AFTER the run already
-    // settled (here on `maxWallMs`) spent host heap building a frame that is then
-    // discarded. The check now runs before the snapshot.
+    // settled (here on an explicit abort) spent host heap building a frame that
+    // is then discarded. The check now runs before the snapshot.
     //
-    // The binding resolves well after the 1s wall clock with a 2M-element array;
-    // the run must still report `timeout`, and the late value must not appear.
+    // The binding resolves well after the run settles with a 2M-element array;
+    // the run must still report its settle cause, and the late value must not
+    // appear. Settling by explicit abort (not maxWallMs) is deterministic: a
+    // wall clock only keeps the late path late when the child's first `call`
+    // frame beats the deadline, which instrumented coverage partitions cannot
+    // promise — aborting after the binding is provably in-flight does.
     let resolvedLate = false
-    const { runtime } = await setup({ maxWallMs: 1_000 })
-    const result = await runtime.run(runtime.resolve({
+    let invoked!: () => void
+    const bindingCall = new Promise<void>((accept) => { invoked = accept })
+    const controller = new AbortController()
+    const { runtime } = await setup()
+    const run = runtime.run(runtime.resolve({
       program: 'return await tools.slow({})',
       bindings: [{
         global: 'tools',
         functions: {
           slow: async () => {
+            invoked()
             await new Promise(resolve => setTimeout(resolve, 2_500))
             resolvedLate = true
             return Array.from({ length: 2_000_000 }, () => 0)
           },
         },
       }],
+      signal: controller.signal,
     }))
-    expect(result.error?.kind).toBe('timeout')
+    await bindingCall
+    controller.abort(new Error('settle now'))
+    const result = await run
+    expect(result.error?.kind).toBe('abort')
     expect(result.value).toBeUndefined()
     // Pin that the late path actually ran, so the assertion above is not vacuous.
-    await new Promise(resolve => setTimeout(resolve, 2_000))
+    await vi.waitUntil(() => resolvedLate, { timeout: 30_000 })
     expect(resolvedLate).toBe(true)
   }, 90_000)
 

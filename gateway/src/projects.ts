@@ -72,6 +72,10 @@ export interface ProjectDetail extends ProjectRow {
   invitations?: ProjectInvitation[]
 }
 
+/** Owner, origin and theme fields for an already-authorized project scope. */
+export type ProjectScopeMetadata = Pick<ProjectRow, 'id' | 'origin'>
+  & Required<Pick<ProjectRow, 'owner' | 'uiThemePolicy'>>
+
 /** One stored project membership row as seen from the member's account side. */
 export interface UserProjectMembership {
   projectId: number

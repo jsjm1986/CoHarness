@@ -64,7 +64,7 @@ None; the package never assembles or sends provider requests.
 
 - **No authentication of its own** — the route inherits Connection's reachability and same-origin policy; deployments that expose the Web server beyond loopback must provide authentication at the gateway.
 - **The legacy current-runtime listing is not indexed** — the provider may scan the root for a complete response; scoped Gateway listings use bounded pages for large workspaces.
-- **Downloads default to attachment disposition** — the `inline=1` option is limited to images, PDFs, and text media and carries a restrictive content policy for the preview viewer.
+- **Downloads default to attachment disposition** — `inline=1` is limited to images, PDFs, and text media. Only inline `application/pdf` responses admit same-origin frame ancestors; other inline types retain `frame-ancestors 'none'`. All inline responses retain `default-src 'none'`, the existing image policy and bare CSP `sandbox`, with `nosniff` and private non-cacheable streaming. A media type derived from the stored filename does not verify PDF structure: the browser's PDF reader parses those bytes. The [PDF framing decision](../../../.agents/notes/implemented/bug-fix/2026-10-23-native-document-pdf-framing.md) owns the rationale and browser verification.
 - **Temporary upload sessions are bounded, not published documents** — session records expire according to the local provider policy; the published document remains until deleted.
 
 <a id="dev-note"></a>

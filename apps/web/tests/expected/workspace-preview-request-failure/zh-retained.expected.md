@@ -1,0 +1,4 @@
+- button "重新加载"
+- alert: 未能更新预览，仍显示上次内容；请检查连接后重新加载
+- heading "Previous document" [level=1]
+- paragraph: Authorized preview.

@@ -41,6 +41,7 @@
     "@deepseek-ai/dsh-client-connection": "workspace:*",
     "@deepseek-ai/dsh-execution-authority": "workspace:*",
     "@deepseek-ai/dsh-host-apiproxy": "workspace:*",
+    "@deepseek-ai/dsh-host-webserver": "workspace:*",
     "@deepseek-ai/dsh-model-access": "workspace:*",
     "@deepseek-ai/dsh-resource-budget": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",

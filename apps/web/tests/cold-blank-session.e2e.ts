@@ -47,7 +47,12 @@ describe('web e2e: cold blank Session visibility', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    const settled = await Promise.allSettled([
+      page.waitForResponse(response => response.url().includes('/api/session.list')
+        && response.request().method() === 'POST' && response.status() === 200),
+      page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' }),
+    ])
+    for (const result of settled) if (result.status === 'rejected') throw result.reason
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -58,11 +63,22 @@ describe('web e2e: cold blank Session visibility', () => {
 
   it('keeps verified blank and empty-turn Sessions out of the sidebar', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-cold-blank-session'))
-    const tree = page.getByRole('tree', { name: 'Sessions' })
-    await tree.waitFor({ timeout: 30_000 })
-    expect(await tree.getByText(WORKSPACE_NAME, { exact: true }).count()).toBe(0)
-    const sidebar = await captureStableAria(page, '[role="tree"][aria-label="Sessions"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(SIDEBAR_EXPECTED, sidebar, MODE)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        const settled = await Promise.allSettled([
+          page.waitForResponse(response => response.url().includes('/api/session.list')
+            && response.request().method() === 'POST' && response.status() === 200),
+          page.reload({ waitUntil: 'load' }),
+        ])
+        for (const result of settled) if (result.status === 'rejected') throw result.reason
+      }
+      const tree = page.getByRole('tree', { name: 'Sessions' })
+      await tree.waitFor({ timeout: 30_000 })
+      await tree.getByText('No sessions yet', { exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
+      expect(await tree.getByText(WORKSPACE_NAME, { exact: true }).count()).toBe(0)
+      const sidebar = await captureStableAria(page, '[role="tree"][aria-label="Sessions"]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(SIDEBAR_EXPECTED, sidebar, MODE)
+    }
     expect(tripwire.pageErrors).toEqual([])
   })
 })

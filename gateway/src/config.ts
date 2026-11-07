@@ -4,7 +4,7 @@ import type { RuntimeCapacityConfig } from './runtime-capacity.ts'
 import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { basename, join, posix, resolve, sep, win32 } from 'node:path'
+import { basename, isAbsolute, join, posix, resolve, sep, win32 } from 'node:path'
 
 /** Path grammar matching the hosting OS; deployment paths were validated POSIX-only before Windows hosts joined. */
 const hostPath = process.platform === 'win32' ? win32 : posix
@@ -51,6 +51,8 @@ export interface GatewayConfig {
   principalKeyDir: string
   /** Lifetime of one browser-request principal assertion. */
   principalAssertionTtlMs: number
+  /** Private renewal of registered event WebSockets; disabled leaves fixed assertion expiry. */
+  streamPrincipalRenewal: { enabled: boolean; intervalMs: number; requestTimeoutMs: number; maxBatchSize: number }
   /** Maximum time an HTTP/WebSocket proxy waits on one runtime upstream operation. */
   upstreamTimeoutMs: number
   /** Loopback resource-accounting request deadline for managed Runtime plugins. */
@@ -175,6 +177,8 @@ export interface GatewayConfig {
   secureCookies: boolean
   /** Instance launch backend: `local` child process (dev) or `systemd` (Linux prod). */
   launcher: 'local' | 'systemd'
+  /** Derived font metadata shared by local runtimes; undefined retains each runtime's kit cache. */
+  officeFontMetadataCacheDirectory?: string
   /** systemd MemoryMax per instance (systemd launcher only). */
   memoryMax: string
   /** systemd CPUQuota per instance (systemd launcher only). */
@@ -520,6 +524,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const cloudflaredBin = env.HGW_CLOUDFLARED === undefined || env.HGW_CLOUDFLARED === ''
     ? undefined : normalizedAbsolutePath(env.HGW_CLOUDFLARED)
   const launcher = env.HGW_LAUNCHER === 'systemd' ? 'systemd' : 'local'
+  const configuredFontMetadataCache = env.HGW_OFFICE_FONT_METADATA_CACHE_DIR
+  if (launcher !== 'local' && configuredFontMetadataCache !== undefined && configuredFontMetadataCache !== 'off') {
+    throw new Error('HGW_OFFICE_FONT_METADATA_CACHE_DIR requires HGW_LAUNCHER=local')
+  }
+  const officeFontMetadataCacheDirectory = launcher === 'local' && configuredFontMetadataCache !== 'off'
+    ? configuredFontMetadataCache ?? resolve(stateRoot, 'cache', 'office-font-metadata')
+    : undefined
+  if (officeFontMetadataCacheDirectory !== undefined
+    && (!isAbsolute(officeFontMetadataCacheDirectory) || officeFontMetadataCacheDirectory.includes('\0'))) {
+    throw new Error('HGW_OFFICE_FONT_METADATA_CACHE_DIR must be an absolute path or off')
+  }
   const configuredProjectPathRoots = projectPathRoots(env.HGW_PROJECT_PATH_ROOTS)
   if (launcher === 'systemd' && configuredProjectPathRoots.length === 0) {
     throw new Error('HGW_PROJECT_PATH_ROOTS is required when HGW_LAUNCHER=systemd')
@@ -667,6 +682,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     30_000,
     'HGW_PRINCIPAL_ASSERTION_TTL_MS',
   )
+  const streamRenewalEnabled = env.HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED ?? 'true'
+  if (streamRenewalEnabled !== 'true' && streamRenewalEnabled !== 'false') throw new Error('HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED must be true or false')
+  const streamPrincipalRenewal = {
+    enabled: streamRenewalEnabled === 'true',
+    intervalMs: timerDelay(env.HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS, 10_000, 'HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS'),
+    requestTimeoutMs: timerDelay(env.HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS, 5_000, 'HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS'),
+    maxBatchSize: positiveSafeInteger(env.HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH, 64, 'HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH'),
+  }
+  if (streamPrincipalRenewal.maxBatchSize > 1024) throw new Error('HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH must not exceed 1024')
   const upstreamTimeoutMs = timerDelay(
     env.HGW_UPSTREAM_TIMEOUT_MS,
     DEFAULT_UPSTREAM_TIMEOUT_MS,
@@ -882,6 +906,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     projectRuntimeUser,
     principalKeyDir,
     principalAssertionTtlMs,
+    streamPrincipalRenewal,
     upstreamTimeoutMs,
     runtimeRequestTimeoutMs,
     documentOverviewDeadlineMs,
@@ -952,6 +977,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     sessionAbsoluteTtlMs,
     secureCookies: publicOrigins.some(o => o.startsWith('https://')),
     launcher,
+    ...(officeFontMetadataCacheDirectory === undefined ? {} : {
+      officeFontMetadataCacheDirectory: normalizedAbsolutePath(officeFontMetadataCacheDirectory),
+    }),
     memoryMax,
     cpuQuota,
     gatewayDir,

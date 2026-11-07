@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const [mode] = process.argv.slice(2)
 assert.ok(mode === 'src' || mode === 'lib')
@@ -47,7 +47,7 @@ try {
   const lsp = await import(entry('lsp/lsp-stdio'))
   const mounted = ctx.plugin(lsp, { servers: { fixture: {
     command: process.execPath,
-    args: ['--import', import.meta.resolve('tsx/esm'), '--import', preload,
+    args: ['--import', import.meta.resolve('tsx/esm'), '--import', pathToFileURL(preload).href,
       fileURLToPath(new URL('../fixture-server.ts', import.meta.url))],
     env: { LSP_NATIVE_PID_FILE: pidFile, LSP_FAKE_HOVER: JSON.stringify({ contents: 'recovered' }) },
     extensionToLanguage: { '.ts': 'typescript' }, shutdownTimeoutMs: 30, killGraceMs: 30,

@@ -1,7 +1,7 @@
 /** Multiple personal allocations must never share a browser Session identity. */
 import { expect, it } from 'vitest'
 import { clientSessionKey, parseClientSessionKey, runtimeTargetKey, type ClientRuntimeId } from '../src/api/client-session.ts'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 
 const a = '10000000-0000-4000-8000-000000000001' as ClientRuntimeId
 const b = '10000000-0000-4000-8000-000000000002' as ClientRuntimeId

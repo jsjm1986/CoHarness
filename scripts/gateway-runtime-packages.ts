@@ -82,3 +82,9 @@ export function gatewayRuntimePackageLinksValid(root: string): boolean {
     }
   })
 }
+
+if (import.meta.main) {
+  const root = resolve(import.meta.dirname, '..')
+  ensureGatewayRuntimePackages(root)
+  console.log(`gateway-runtime-packages: linked ${GATEWAY_RUNTIME_PACKAGES.length} runtime package(s) into gateway/node_modules.`)
+}

@@ -47,6 +47,7 @@ const API_METHODS = {
     attachment: 'session.attachment',
     updateQueue: 'session.updateQueue',
     cancel: 'session.cancel',
+    activate: 'session.activate',
   },
   subagents: { history: 'subagent.history' },
   jobs: { output: 'jobs.output', kill: 'jobs.kill' },

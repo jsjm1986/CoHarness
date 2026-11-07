@@ -172,9 +172,12 @@
 .emptyHints { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; color: var(--dsw-alias-label-caption); font-size: 12px; }
 .emptyIcon { display: grid; width: 36px; height: 36px; place-items: center; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: 50%; corner-shape: round; color: var(--dsw-alias-state-business-primary); }
 
-/* Tabbed mode keeps one row: the pane strip is a flex item that scrolls
-   sideways rather than wrapping into a second band. */
-.toolbar[data-tabbed] { min-height: 40px; }
+/* Tab navigation owns a full row; the title and primary actions share the row above it. */
+.toolbar[data-tabbed] { display: grid; grid-template-columns: minmax(0, 1fr) auto; row-gap: 0; min-height: 40px; }
+.toolbar[data-tabbed] .toolbarTitle { grid-column: 1; grid-row: 1; }
+.toolbar[data-tabbed] .toolbarActions { grid-column: 2; grid-row: 1; }
+.toolbar[data-tabbed] .tabs { grid-column: 1 / -1; grid-row: 2; }
+.toolbar[data-tabbed] > .notice { grid-column: 1 / -1; }
 /* Horizontal edge fades stand in for the hidden scrollbar: a clipped tab
    reads as continuing past the edge instead of ending on a hard clip. The
    8px bands stay inside a tab button's own 10px side padding, so end tabs
@@ -250,6 +253,10 @@
 }
 
 .filePreviewActions { display: flex; gap: 8px; padding: 8px; flex-wrap: wrap; flex: none; }
+.previewReloadLabels { display: grid; grid-template-columns: max-content; white-space: nowrap; }
+.previewReloadLabels > span { grid-area: 1 / 1; }
+.previewReloadSize { visibility: hidden; }
+.previewReload[data-workspace-preview-reconnecting], .previewReload[data-workspace-preview-request-failed] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
 
 .filePreviewText {
   max-height: 65vh;

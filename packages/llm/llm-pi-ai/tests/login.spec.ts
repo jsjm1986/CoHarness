@@ -180,11 +180,11 @@ describe('pi-ai login flows', () => {
     })
 
     expect(ui.prompts).toEqual([
-      { kind: 'text', message: 'Your workspace', placeholder: 'acme' },
-      { kind: 'secret', message: 'Paste the key' },
-      { kind: 'secret', message: 'Paste the token', placeholder: 'sk-…' },
-      { kind: 'select', message: 'Which account?', options: [{ id: 'a', label: 'Work' }] },
-      { kind: 'text', message: 'Paste the code', signal: withdraw.signal },
+      { kind: 'text', message: 'Your workspace', placeholder: 'acme', signal: expect.any(AbortSignal) as AbortSignal },
+      { kind: 'secret', message: 'Paste the key', signal: expect.any(AbortSignal) as AbortSignal },
+      { kind: 'secret', message: 'Paste the token', placeholder: 'sk-…', signal: expect.any(AbortSignal) as AbortSignal },
+      { kind: 'select', message: 'Which account?', options: [{ id: 'a', label: 'Work' }], signal: expect.any(AbortSignal) as AbortSignal },
+      { kind: 'text', message: 'Paste the code', signal: expect.any(AbortSignal) as AbortSignal },
     ])
   })
 

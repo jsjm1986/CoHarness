@@ -5,6 +5,7 @@ import { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { UserDocDirectoryId, UserDocId, UserDocIncarnationId, UserDocTrashId } from '@deepseek-ai/dsh-userdoc'
 import type { UserDocLimits } from '@deepseek-ai/dsh-userdoc'
+import { resolve } from 'node:path'
 import { expect, it, vi } from 'vitest'
 import { DocumentTransport } from '../src/client.ts'
 import { documentFrame, DocumentStreamCleanupError, readDocumentFrame } from '../src/frame.ts'
@@ -34,7 +35,8 @@ it('carries exact file and trash selections through every managed mutation', asy
   const docId = UserDocId('a.txt'), incarnationId = UserDocIncarnationId('incarnation-a')
   const active = { docId, incarnationId, revision: 1 }, trash = { ...active, revision: 2, trashId: UserDocTrashId('trash-a') }
   const folder = { ...active, docId: UserDocId('folder/a.txt') }, operations: DocumentStoreOperation[] = []
-  const ref = { docId, path: '/documents/a.txt', name: 'a.txt', bytes: 1, mediaType: 'text/plain', modifiedAt: 1 }
+  const root = resolve('/documents')
+  const ref = { docId, path: resolve(root, 'a.txt'), name: 'a.txt', bytes: 1, mediaType: 'text/plain', modifiedAt: 1 }
   const { ctx, transport } = fixture(async (_path, options) => {
     if (!(options?.body instanceof ReadableStream)) throw new Error('The provider did not send its framed request stream.')
     const opened = await readDocumentFrame(options.body, 4096)
@@ -45,12 +47,12 @@ it('carries exact file and trash selections through every managed mutation', asy
     const result = kind === 'trash' ? { docId, name: ref.name, bytes: ref.bytes, mediaType: ref.mediaType,
       modifiedAt: ref.modifiedAt, directoryId: '', trashedAt: 1, purgeAfter: 2, trashId: trash.trashId }
       : kind === 'restore' || kind === 'move' ? ref
-        : kind === 'renameDirectory' ? { directoryId: 'renamed', path: '/documents/renamed', name: 'renamed', modifiedAt: 1 }
+        : kind === 'renameDirectory' ? { directoryId: 'renamed', path: resolve(root, 'renamed'), name: 'renamed', modifiedAt: 1 }
           : null
     return new Response(documentFrame({ version: 1, kind: 'success', operation: kind, result }, 4096))
   })
-  transport.bindRoot('/documents', '/documents')
-  const store = new GatewayUserDocStore(ctx, transport, { root: '/documents', limits })
+  transport.bindRoot(root, root)
+  const store = new GatewayUserDocStore(ctx, transport, { root, limits })
   try {
     await store.trash(docId, undefined, active)
     await store.restore(docId, undefined, undefined, undefined, trash)

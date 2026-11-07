@@ -54,6 +54,12 @@ async function mountPlugin() {
   const openTabIn = vi.fn()
   const tabsIn = vi.fn(() => [] as { id: string; kind: string }[])
   const openTabs = createSnapshotStore<readonly SidebarRightOpenTab[]>([])
+  const sessionList = createSnapshotStore<{ byId: Readonly<Record<string, unknown>> }>({ byId: { session: {}, 'other-session': {} } })
+  const hostDescription = createSnapshotStore<{ executionAuthorityRequired: boolean } | undefined>({ executionAuthorityRequired: false })
+  const projectPolicy = createSnapshotStore<{ verifiedAccountId?: number }>({})
+  ctx.provide('sessions', { list: sessionList, runtimeIdentityFor: () => ({ kind: 'personal' }) } as never)
+  ctx.provide('connection', { hostDescription } as never)
+  ctx.provide('projectUiPolicy', projectPolicy as never)
   ctx.provide('webTerminals', terminals as never)
   ctx.provide('sidebarRight', {
     tabDomain: { occurrence }, openTabIn, tabsIn, openTabs,
@@ -72,6 +78,7 @@ async function mountPlugin() {
   const fiber = await ctx.plugin({ inject, apply })
   return {
     tabs, entries, dictionaries, terminals, model, occurrence, openTabIn, tabsIn, openTabs, theme,
+    sessionList, hostDescription, projectPolicy,
     emitTheme() { ctx.emit('theme/change', theme) },
     get closeHandler() { return closeHandler },
     setParams(next: typeof params) { params = next },
@@ -161,11 +168,11 @@ it('restores terminal occurrences before listing unrepresented Host terminals an
   const sessionId = 'session' as SessionId
   const recovery = h.entries[3]!.inject(sessionId) as TerminalRecoveryInjected
   const remounted = h.entries[3]!.inject(sessionId) as TerminalRecoveryInjected
-  const completion = recovery.restore()
+  const completion = recovery.restore(new AbortController().signal)
   expect(h.terminals.view).toHaveBeenCalledWith(sessionId, 'collapsed-terminal', 'sidebar://terminal/content', undefined, undefined)
   expect(h.terminals.view).toHaveBeenCalledOnce()
   try {
-    expect(remounted.restore()).toBe(completion)
+    expect(remounted.restore(new AbortController().signal)).toBe(completion)
     expect(h.terminals.recover).toHaveBeenCalledExactlyOnceWith(sessionId)
     expect(h.openTabIn).not.toHaveBeenCalled()
     pending.resolve([terminalInfo('build'), terminalInfo('tests')])
@@ -174,11 +181,11 @@ it('restores terminal occurrences before listing unrepresented Host terminals an
       [sessionId, 'terminal', { params: { terminalId: 'build' } }],
       [sessionId, 'terminal', { params: { terminalId: 'tests' } }],
     ])
-    await remounted.restore()
+    await remounted.restore(new AbortController().signal)
     expect(h.terminals.recover).toHaveBeenCalledTimes(2)
     expect(h.openTabIn).toHaveBeenCalledTimes(2)
     const otherSession = 'other-session' as SessionId
-    await (h.entries[3]!.inject(otherSession) as TerminalRecoveryInjected).restore()
+    await (h.entries[3]!.inject(otherSession) as TerminalRecoveryInjected).restore(new AbortController().signal)
     expect(h.terminals.recover).toHaveBeenLastCalledWith(otherSession)
     expect(h.terminals.recover).toHaveBeenCalledTimes(3)
     expect(h.openTabIn).toHaveBeenCalledTimes(2)
@@ -196,13 +203,113 @@ it('allows a failed Host lookup to be retried without marking the Session recove
   const sessionId = 'session' as SessionId
   const recovery = h.entries[3]!.inject(sessionId) as TerminalRecoveryInjected
   try {
-    await expect(recovery.restore()).rejects.toBe(unavailable)
+    await expect(recovery.restore(new AbortController().signal)).rejects.toBe(unavailable)
     expect(h.openTabIn).not.toHaveBeenCalled()
-    await recovery.restore()
-    await recovery.restore()
+    await recovery.restore(new AbortController().signal)
+    await recovery.restore(new AbortController().signal)
     expect(h.terminals.recover).toHaveBeenCalledTimes(3)
   } finally {
     await h.dispose()
+  }
+})
+
+it('waits for the canonical account key before touching saved terminal views or Host recovery', async () => {
+  const h = await mountPlugin()
+  h.hostDescription.set({ executionAuthorityRequired: true })
+  h.tabsIn.mockReturnValue([{ id: 'saved', kind: 'terminal' }])
+  const recovery = h.entries[3]!.inject('session' as SessionId) as TerminalRecoveryInjected
+  const changed = vi.fn()
+  const stop = recovery.hooks.ownership.subscribe(changed)
+  try {
+    expect(recovery.hooks.ownership.getSnapshot()).toBeUndefined()
+    await recovery.restore(new AbortController().signal)
+    expect(h.terminals.view).not.toHaveBeenCalled()
+    expect(h.terminals.recover).not.toHaveBeenCalled()
+    h.projectPolicy.set({ verifiedAccountId: 1 })
+    expect(changed).toHaveBeenCalledOnce()
+    expect(recovery.hooks.ownership.getSnapshot()).toBe(JSON.stringify(['account:1', ['personal'], 'session']))
+    await recovery.restore(new AbortController().signal)
+    expect(h.terminals.view).toHaveBeenCalledOnce()
+    expect(h.terminals.recover).toHaveBeenCalledOnce()
+    h.sessionList.set({ byId: {} })
+    expect(recovery.hooks.ownership.getSnapshot()).toBeUndefined()
+    await recovery.restore(new AbortController().signal)
+    expect(h.terminals.view).toHaveBeenCalledOnce()
+    expect(h.terminals.recover).toHaveBeenCalledOnce()
+  } finally { stop(); await h.dispose() }
+  const calls = changed.mock.calls.length
+  h.hostDescription.set(undefined)
+  h.projectPolicy.set({ verifiedAccountId: 2 })
+  h.sessionList.set({ byId: { session: {}, 'other-session': {} } })
+  expect(changed).toHaveBeenCalledTimes(calls)
+})
+
+it('contains a synchronous saved-view failure in the retryable restoration promise', async () => {
+  const h = await mountPlugin()
+  h.tabsIn.mockReturnValue([{ id: 'saved', kind: 'terminal' }])
+  h.terminals.view.mockImplementationOnce(() => { throw new Error('Saved terminal unavailable') })
+  const recovery = h.entries[3]!.inject('session' as SessionId) as TerminalRecoveryInjected
+  try {
+    await expect(recovery.restore(new AbortController().signal)).rejects.toThrow('Saved terminal unavailable')
+    expect(h.terminals.recover).not.toHaveBeenCalled()
+    await recovery.restore(new AbortController().signal)
+    expect(h.terminals.recover).toHaveBeenCalledOnce()
+  } finally { await h.dispose() }
+})
+
+it.each(['one', 'all'] as const)('opens recovered tabs only for a live composer consumer after %s consumers unmount', async (unmounted) => {
+  const h = await mountPlugin()
+  const listed = Promise.withResolvers<WebTerminalInfo[]>()
+  h.terminals.recover.mockReturnValueOnce(listed.promise)
+  const recovery = h.entries[3]!.inject('session' as SessionId) as TerminalRecoveryInjected
+  const first = new AbortController(), second = new AbortController()
+  const completion = recovery.restore(first.signal)
+  try {
+    expect(recovery.restore(second.signal)).toBe(completion)
+    first.abort()
+    if (unmounted === 'all') second.abort()
+    listed.resolve([terminalInfo('shared')])
+    await completion
+    expect(h.terminals.recover).toHaveBeenCalledOnce()
+    if (unmounted === 'one') expect(h.openTabIn).toHaveBeenCalledExactlyOnceWith('session', 'terminal', { params: { terminalId: 'shared' } })
+    else expect(h.openTabIn).not.toHaveBeenCalled()
+  } finally { listed.resolve([]); await completion; await h.dispose() }
+})
+
+it.each(['account change', 'withdrawal and regrant', 'all consumers unmounted'].flatMap(cause =>
+  ['success', 'failure'].map(outcome => [cause, outcome] as const),
+))('ignores the old %s lookup and preserves its replacement after a late %s', async (cause, outcome) => {
+  const h = await mountPlugin()
+  h.hostDescription.set({ executionAuthorityRequired: true })
+  h.projectPolicy.set({ verifiedAccountId: 1 })
+  const previous = Promise.withResolvers<WebTerminalInfo[]>(), next = Promise.withResolvers<WebTerminalInfo[]>()
+  h.terminals.recover.mockReturnValueOnce(previous.promise).mockReturnValueOnce(next.promise)
+  const recovery = h.entries[3]!.inject('session' as SessionId) as TerminalRecoveryInjected
+  const stop = recovery.hooks.ownership.subscribe(() => {})
+  const first = new AbortController(), second = new AbortController()
+  const oldOpening = recovery.restore(first.signal)
+  let newOpening: Promise<void> | undefined
+  try {
+    if (cause === 'all consumers unmounted') first.abort()
+    else {
+      h.projectPolicy.set({})
+      h.projectPolicy.set({ verifiedAccountId: cause === 'account change' ? 2 : 1 })
+    }
+    newOpening = recovery.restore(second.signal)
+    expect(newOpening).not.toBe(oldOpening)
+    expect(h.terminals.recover).toHaveBeenCalledTimes(2)
+    if (outcome === 'success') previous.resolve([terminalInfo('previous')])
+    else previous.reject(new Error('Previous lookup unavailable'))
+    await oldOpening
+    expect(h.openTabIn).not.toHaveBeenCalled()
+    expect(recovery.restore(second.signal)).toBe(newOpening)
+    next.resolve([terminalInfo('current')])
+    await newOpening
+    expect(h.openTabIn).toHaveBeenCalledExactlyOnceWith('session', 'terminal', { params: { terminalId: 'current' } })
+  } finally {
+    previous.resolve([]); next.resolve([])
+    await Promise.allSettled([oldOpening, newOpening])
+    stop(); await h.dispose()
   }
 })
 
@@ -211,10 +318,12 @@ it('does not open retained terminals when their lookup completes after plugin un
   const pending = Promise.withResolvers<WebTerminalInfo[]>()
   h.terminals.recover.mockImplementationOnce(() => pending.promise)
   const recovery = h.entries[3]!.inject('session' as SessionId) as TerminalRecoveryInjected
-  const completion = recovery.restore()
+  const completion = recovery.restore(new AbortController().signal)
   try {
     expect(h.terminals.recover).toHaveBeenCalledOnce()
     await h.dispose()
+    await recovery.restore(new AbortController().signal)
+    expect(h.terminals.recover).toHaveBeenCalledOnce()
     pending.resolve([terminalInfo('build')])
     await completion
     expect(h.openTabIn).not.toHaveBeenCalled()

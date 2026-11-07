@@ -878,10 +878,24 @@
   padding-top: 0;
 }
 
-/* Settling (session replaying, hero/docked unknown): keep the composer seat
-   mounted but invisible so no wrong layout flashes before the phase lands. */
+/* Initial navigation and unread history retain the mounted composer until its layout is known. */
 .root[data-phase='settling'] .composerSeat {
   visibility: hidden;
+}
+
+.initialLoading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--dsw-alias-label-tertiary);
+  pointer-events: none;
+}
+
+.initialLoadingIcon { animation: initial-loading-spin 0.8s linear infinite; }
+@keyframes initial-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .initialLoadingIcon { animation: none; }
 }
 
 .workbenchRoot {

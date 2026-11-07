@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-28-project-scoped-settings-management.md
 document:
-  en: f1aa55655cb0fd56dfcb06e457a840d41a7385fd
-  zh: 56852dfe959d266c86a26d9ef8a20740b4890c42
+  en: 6fdae54d0bd1be0c6baa06f17405c28d1d8500c9
+  zh: 04ce4fb80a2b82247a2e4905efe4bcd3b381c1a3
 /agent-note-project-scoped-settings-management:
   en: 48b56d365c9a05da
   zh: e775a6556527e69b
@@ -12,8 +12,8 @@ document:
   en: 09704289179e6942
   zh: d3ef1cd1bf0598e1
 /agent-note-project-scoped-settings-management/decision:
-  en: df68f4e3577c2e37
-  zh: bac56459e49d92a0
+  en: 8e5b0b790e8b1752
+  zh: e063e43d956654f3
 /agent-note-project-scoped-settings-management/alternatives-considered:
   en: 96c6131cbb144064
   zh: 0df798f1015e840f

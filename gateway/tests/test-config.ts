@@ -32,6 +32,7 @@ export function testEnvironment(root: string, overrides: NodeJS.ProcessEnv = {})
     tunnelCredentialKeyFile: cfg.tunnelCredentialKeyFile,
     webhookSecretKeyFile: cfg.webhookSecretKeyFile, bootstrapAdminPasswordFile: cfg.bootstrapAdminPasswordFile,
     backupDir: cfg.backupDir, nodeConfigFile: cfg.nodeConfigFile,
+    officeFontMetadataCacheDirectory: cfg.officeFontMetadataCacheDirectory,
     databaseUrlFile: cfg.databaseUrlFile, managedDataApprovalFile: cfg.managedDataApprovalFile,
   }
   for (const [name, path] of Object.entries(writable)) {

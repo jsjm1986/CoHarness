@@ -61,7 +61,7 @@ export function parseClientSessionKey(key: string): ClientSessionAddress | undef
   if (!Array.isArray(value) || value.length !== (exact ? 3 : 2)
     || (value[0] !== null && (typeof value[0] !== 'number' || !Number.isSafeInteger(value[0]) || value[0] <= 0))) return undefined
   if (exact && (typeof value[1] !== 'string' || !UUID.test(value[1]))) return undefined
-  const original = value[exact ? 2 : 1]
+  const original: unknown = value[exact ? 2 : 1]
   if (typeof original !== 'string' || original === '') return undefined
   const location = exact ? { runtimeId: value[1] as ClientRuntimeId } : {}
   const runtime: ClientRuntimeTarget = value[0] === null ? { kind: 'personal', ...location } : { kind: 'project', projectId: value[0] as number, ...location }

@@ -84,7 +84,7 @@
       "sovereignty": "tracked"
     },
     "bundle/web-app": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "client/connection": {
       "sovereignty": "adapted",
@@ -387,7 +387,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "compaction/command-compact": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "compaction/compaction": {
       "sovereignty": "adapted"
@@ -396,7 +396,7 @@
       "sovereignty": "tracked"
     },
     "compaction/compaction-image-offload": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "compaction/compaction-tool-result-pruner": {
       "sovereignty": "tracked"
@@ -405,7 +405,7 @@
       "sovereignty": "adapted"
     },
     "context/agent-instructions": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/bug-fix/2026-10-12-session-reliability-fixes.md"
     },
     "context/archive-gateway": {
@@ -533,10 +533,10 @@
       "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
     },
     "experimental/browser-use-chrome-devtools-mcp": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/browser-use-playwright-mcp": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/browser-use-runtime": {
       "sovereignty": "adapted",
@@ -738,7 +738,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "interaction/commands": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "interaction/permission-presets": {
       "sovereignty": "adapted"
@@ -747,7 +747,7 @@
       "sovereignty": "adapted"
     },
     "interaction/user-approval": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "interaction/user-questions": {
       "sovereignty": "adapted",
@@ -826,7 +826,7 @@
       "note": ".agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md"
     },
     "preset/agent-preset": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "packages/preset/agent-preset/skills/cordis-composition-reference/references/packages.md"
     },
     "preset/agent-preset-registry": {
@@ -837,7 +837,7 @@
       "sovereignty": "tracked"
     },
     "ptc-runtime/ptc-runtime": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "ptc-runtime/ptc-runtime-node": {
       "sovereignty": "adapted",
@@ -856,7 +856,7 @@
       "sovereignty": "tracked"
     },
     "sandbox/sandbox-local": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "sandbox/sandbox-policy": {
       "sovereignty": "tracked"
@@ -895,7 +895,7 @@
       "sovereignty": "owned"
     },
     "session/session-checkpoint-policy": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "session/session-format": {
       "sovereignty": "adapted"
@@ -1133,7 +1133,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "test-support/llm-mock-server": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "test-support/llm-replay": {
       "sovereignty": "adapted"
@@ -1154,13 +1154,13 @@
       "sovereignty": "adapted"
     },
     "typert/loader": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "typert/protocol": {
       "sovereignty": "adapted"
     },
     "typert/registry": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/atomic-write": {
       "sovereignty": "adapted"
@@ -1187,7 +1187,7 @@
       "sovereignty": "tracked"
     },
     "util/launch-environment": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/lazy-require": {
       "sovereignty": "tracked"
@@ -1257,13 +1257,16 @@
       "sovereignty": "adapted"
     },
     "workflow/workflow": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "workflow/workflow-ptc": {
       "sovereignty": "adapted"
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
+    },
+    "attachment/userdoc-gateway": {
+      "sovereignty": "owned"
     }
   },
   "upstreamOnly": [

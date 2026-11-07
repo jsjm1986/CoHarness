@@ -547,6 +547,36 @@ class JsonlSessionPersistence extends SessionPersistence {
   }
 
   /**
+   * Read the requested artifact's validated header without listing other sessions.
+   * @param id - session to observe, including an unmaterialized local creation.
+   * @param signal - optional cancellation for discovery and header reads.
+   * @returns the selected generation's logical header, or undefined when absent.
+   */
+  override async readHeader(id: SessionId, signal?: AbortSignal): Promise<SessionHeader | undefined> {
+    return (await this.stat(id, signal === undefined ? undefined : { signal }))?.header
+  }
+
+  /**
+   * Read one artifact's source-qualified identity through targeted discovery.
+   * @param id - session to observe, including an unmaterialized local creation.
+   * @param signal - optional cancellation for discovery and identity reads.
+   * @returns the selected generation's revision, or undefined when absent.
+   */
+  override async revision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
+    return (await this.stat(id, signal === undefined ? undefined : { signal }))?.revision
+  }
+
+  /**
+   * Read the same targeted identity exposed by revision().
+   * @param id - session to observe, including an unmaterialized local creation.
+   * @param signal - optional cancellation for discovery and identity reads.
+   * @returns the selected generation's revision, or undefined when absent.
+   */
+  override async readRevision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
+    return this.revision(id, signal)
+  }
+
+  /**
    * List every stored session visible to this process: materialized artifacts
    * plus this process's created-but-unmaterialized sessions.
    * @param options - optional cancellation.

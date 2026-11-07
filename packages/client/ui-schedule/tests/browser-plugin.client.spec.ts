@@ -111,6 +111,7 @@ async function baseContext(
     archivedById: {},
     current: undefined,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {},
     jobsBySession: {},
     observedJobs: {},

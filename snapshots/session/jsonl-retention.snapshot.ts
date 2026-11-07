@@ -1,6 +1,6 @@
 /** Capacity refusal and prefix recovery through the shipped headless profile. */
 
-import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,6 +32,12 @@ it('refuses a full JSONL provider without accepting the new event and resumes it
   }
   const args = ['--profile', 'headless', ...[...patches, capacity].flatMap(file => ['--patch', file]), '--json']
   try {
+    // The replay provider is test-only and not carried by the shipped headless
+    // profile; stage it as a profile-local package so plain-Node launches can
+    // resolve the patch-declared name from the materialized profile directory.
+    const profileModules = join(cwd, '.dsh', 'profiles', 'headless', 'node_modules', '@deepseek-ai')
+    await mkdir(profileModules, { recursive: true })
+    await symlink(join(repository, 'packages/test-support/llm-replay'), join(profileModules, 'dsh-llm-replay'), 'dir')
     const patch = (events: number) => [
       '- id: session-persistence-jsonl', "  name: '@deepseek-ai/dsh-session-persistence-jsonl'",
       '  config:', "    root: !!js dshHomePath('sessions')", '    compression: none',

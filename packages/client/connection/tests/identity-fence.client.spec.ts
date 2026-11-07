@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import { BrowserIdentityChanged, createBrowserIdentityFence } from '../src/client/identity-fence.ts'
+import { ApiTransportError } from '../src/client/api.ts'
 
 const ORIGIN = 'https://gateway.example'
 
@@ -35,7 +36,7 @@ it('rejects a handshake for another Runtime before exposing account-owned state'
   const runtime = '10000000-0000-4000-8000-000000000001'
   const fence = createBrowserIdentityFence(vi.fn(), ORIGIN, vi.fn(), `?dshRuntime=${runtime}`)
   try {
-    expect(() =>{  fence.setRuntimeTarget({ kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000002' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']> }) })
+    expect(() => { fence.setRuntimeTarget({ kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000002' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']> }) })
       .toThrow(BrowserIdentityChanged)
   } finally { fence.dispose() }
 })
@@ -46,6 +47,45 @@ function requestedUrl(input: RequestInfo | URL | undefined): URL {
 }
 
 describe('browser account identity fence', () => {
+  it('identifies a native request failure without treating an unreadable response or external error as a network outage', async () => {
+    const cause = new TypeError('Native fetch failed')
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(cause)
+      .mockResolvedValueOnce(new Response('invalid JSON'))
+      .mockRejectedValueOnce(cause)
+    const reload = vi.fn()
+    const fence = createBrowserIdentityFence(fetcher, ORIGIN, reload)
+    fence.setRuntimeTarget(undefined)
+    fence.confirm(7)
+    try {
+      await expect(fence.fetch(`${ORIGIN}/api/workspaceFiles.stat`)).rejects.toMatchObject({
+        name: 'ApiTransportError', status: 0, code: 'request-unavailable', cause,
+      })
+      const response = await fence.fetch(`${ORIGIN}/api/workspaceFiles.read`)
+      await expect(response.json()).rejects.toBeInstanceOf(SyntaxError)
+      await expect(fence.fetch('https://other.example/api/data')).rejects.toBe(cause)
+      expect(reload).not.toHaveBeenCalled()
+      expect(new ApiTransportError(403, '/api/workspaceFiles.stat').code).toBe('access-revoked')
+      expect(new ApiTransportError(503, '/api/workspaceFiles.stat').code).toBeUndefined()
+    } finally { fence.dispose() }
+  })
+
+  it('preserves a request abort reason when native fetch rejects during cancellation', async () => {
+    const stopped = new AbortController()
+    const pending = Promise.withResolvers<Response>()
+    const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
+    const fence = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn())
+    fence.setRuntimeTarget(undefined)
+    try {
+      const request = fence.fetch(`${ORIGIN}/api/workspaceFiles.stat`, { signal: stopped.signal })
+      const reason = new Error('Preview closed')
+      const observed = expect(request).rejects.toBe(reason)
+      await vi.waitFor(() => { expect(fetcher).toHaveBeenCalledOnce() })
+      stopped.abort(reason)
+      pending.reject(new TypeError('Native fetch aborted'))
+      await observed
+    } finally { fence.dispose(); pending.resolve(new Response('{}')) }
+  })
+
   it('withdraws an explicitly revoked document once even when its principal has not changed', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}'))
     const reload = vi.fn()

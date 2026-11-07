@@ -38,13 +38,21 @@ kind: "package-reference"
 
 `apply()` 等待 `conversationViewport`，通过 `ctx.slots.inject()` 注册工作台控件。侧栏面板列出已暂存的面板并提供聚焦与关闭操作，Add 与等宽操作绑定同一个选择器 store 和 viewport 能力，可退出回单会话模式，并声明由 ui-conversation 以紧凑显示偏好行填充的 `conversation.workbench.display` 孔位。提供方拥有有界 Session stage 集合；卸载工作台会释放额外历史窗口，保留普通当前会话视图。Gateway 返回经过 ACL 过滤的账户级目录，选中的项目运行时使用独立的目标传输和 principal assertion。在云端 Web 中，`workspace/resource-open` 请求预览消费方接收明确绑定 runtime 的文件。工具栏按目录读取 Workspace 文件，并在统一右侧栏中打开文件，绑定发起操作的 Session 和 runtime。标签经注入的 `keyedHooks.workspaceResource` 源订阅资源元数据；各预览接收普通的 `WorkspacePreviewResource` face——不可变 `{status, value, error, accessDenied}` 元数据加绑定的 `reload`/`revoke` 回调——从不持有 registry。读取通过带版本保护的 `workspaceFiles.read` 分页；二进制内容使用有界 Base64 窗口，该回退界面在所属基础 loopback 连接声明原生打开能力时，还会经 `host.openPath` 提供默认应用打开操作。隐藏标签不持有订阅或内容读取器；关闭标签释放对应实例。文件变化需要重新加载，临时重连保留内容，权限拒绝则隐藏内容。Session JSONL、持久化格式和 Collaboration 授权语义保持不变。
 
+已加载的预览在元数据重载或非权限失败期间保留上次成功内容。元数据重载失败时不发起正文请求；成功后只授权一次带版本保护的新读取。新版本读取失败时，在旧内容旁保留文件变化提示。流恢复与 HTTP 请求失败使用不同的本地化重新加载标签，不移动文档；该操作保留完整可访问告警。HTTP 失败本身不安排重试，也不声称正在自动重连。访问被拒绝时清空正文，隐藏或关闭标签释放内容。重新加载始终使用资源所属 runtime。 PDF 和表格预览在授权重读返回相同字节时复用已解码的只读缓冲区，保留文档模型和画布；字节变化时才替换。HTML 重载仍重新打包相对依赖。
+
 Markdown 文件链接在现有鉴权文件标签中打开，并从请求的首行开始显示。再次打开同一文件的不同行号只更新导航，不创建第二个资源。链接目标不会改变文件系统权限。
+
+完整的最后一个文本页保留可见内容并禁用“下一页”，包括恰好达到 Host 行数上限的情况。
 
 文件标签按扩展名选择预览正文。Markdown 文件（`md`、`markdown`）累计同样的带版本保护分页，经 `MarkdownText` 渲染且不自动换行。文档开头的 YAML frontmatter（首行 `---` 开始，以 `---` 或 `...` 结束）通过包内 `client.frontmatter-fields.js` 分块在正文上方显示为键值列表；字符串值显示解析后的文本，其他标量、集合与别名保留原始 YAML 写法，无效 YAML 或非映射文档原样显示整个块，空块不显示，未闭合的块仍按 Markdown 渲染。HTML 文件（`html`、`htm`）经 [`preview-readers.ts`](src/client/preview-readers.ts) 的 `readFileBytes` 以 Base64 读取完整源——带版本保护的 `workspaceFiles.readBytes` 窗口按调用方完整文件上限约束——由 [`contract/html/read-relative.ts`](src/client/contract/html/read-relative.ts) 的 `workspaceFileBytes` 解码后打包，收集通过同一授权 Session 和 runtime 目标读取的直接声明相对 `.js` classic 脚本、`.css` 样式表与可识别图片文件。依赖读取限定在 Session 工作区内解析，[`contract/html/pack.ts`](src/client/contract/html/pack.ts) 实施单资源 4 MiB、总量 32 MiB、最多 64 个资源的边界；外部、根相对、module 及 CSS 遍历得到的引用一律不读取。打包后的文档在仅有 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行；替换或卸载预览即吊销 Blob URL。非法 UTF-8、读取失败或超出限制使预览失败，而不会发布残缺包。PDF 与其余 Office 文件保留各自的文档正文，其余文件继续使用文本或有界 Base64 窗口。
 
 表格文件（`xlsx`、`xls`、`csv`、`tsv`）经同一条有界 `readFileBytes` 路径读取完整授权 Base64——以配置的 `excelMaxBytes` 为上限——并交由懒加载的工作簿查看器只读渲染，而不再请求转换。一次性 Worker 在配置的字节数、单元格面积与超时限制下解析工作簿，公式连同缓存结果一并保留且不重算；图表、图片、形状与条件格式按不支持的预览特性报告。解析限制来自插件 `Config`（`excelMaxBytes`、`excelMaxCells`、`excelTimeoutMs`）。单元格焦点保持不可编辑，键入不会在网格或无障碍树中生成未提交文字。源版本、重新加载、撤权与隐藏标签的生命周期与其他文件预览一致：迟到或过期的读取被丢弃，权限拒绝立即清空内容。
 
 其余 Office 文件通过同一文件标签请求授权转换；PDF.js 在独立 Worker 中按可见页面渲染，提供可选择文本及缺失字体提示。隐藏正文释放内容与 Worker，标签保留页码偏好。源变化要求重新加载，撤权立即清空内容。普通 PDF 读取仍受 Workspace 单窗口字节限制；Office 输入和输出由转换器限制。引擎及适配规则见[文档转换](../../../docs/subsystems/office-to-pdf.zh.md)。
+
+打开文档或表格预览时，所选查看器的导入与元数据加载同时启动。Office 预览还会在初始元数据等待期间准备一次由服务端授权的转换；普通正文读取器仅在实时元数据报告相同源版本时接纳该结果。版本不符时执行带版本保护的读取。元数据失败、读取替换、关闭或拒权均丢弃准备结果，重新加载仍使用明确版本。普通 PDF 与表格读取等待实时元数据。查看器导入不挂载内容或 Worker；它们须等待通过元数据准入的授权字节。关闭或撤权后，迟到的结果不会挂载正文。
+
+PDF 核心保留 Worker 与许可证声明。嵌入的 PDF 与表格许可证逐行标记为压缩时保留。同版本的 CMap、标准字体和图片解码器完整保存在三个仅含数据的懒加载 chunk（`client.cmaps.js`、`client.fonts.js`、`client.wasm.js`）中；PDF.js 发起资源请求时，才通过现有模块加载器读取所需资源组。同一文档按组共享等待中的读取，每次返回独立可转移的字节。关闭文档立即拒绝等待中的资源读取；迟到的代码导入不能发布字节或重新启动 Worker。缺失资源直接失败，不回退到外部网络。
 
 PDF、转换后的 Office 预览以及位图或 SVG 图片预览共用同一浮动缩放控件，提供**适应宽度**、25%、50%、100%、150% 和 200% 选项，并在 25%–400% 固定范围内按 25% 逐级缩放。适应宽度是默认模式并跟随面板尺寸变化，但不会放大小于面板的内容；100% 表示 PDF 的 96 DPI 页面尺寸或图片的固有 CSS 像素尺寸。在精细指针设备上，控件初始隐藏；指针进入底部 72 个 CSS 像素时向上滑入，离开 420 ms 后向下退出；控件悬停、键盘焦点、菜单展开和手势进行期间保持显示，无 hover 的设备则始终显示。Chromium 将 macOS 触控板捏合映射到与 Ctrl+滚轮相同的实时指针锚定路径，静止后的偏好保留在标签自己的 view 中，正文重新挂载后继续生效，直至标签关闭。缩放视口拥有自己的滚动区，固定缩放可在预览内产生横向和纵向滚动，而文本与二进制面板保留原有滚动器。缩放静止后，可见 PDF 页面按设备像素比乘以缩放比例重绘，旧位图保留到新渲染完成；图片始终在单个 `<img>` 内按固有纵横比显示，SVG 继续使用浏览器的矢量渲染路径。文本、Markdown、HTML 与表格预览不提供缩放控件。
 

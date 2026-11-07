@@ -9,6 +9,8 @@ import type { RpcMessage, SessionId } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
 import { FixtureApiClient } from '../src/client/fixture.ts'
 import { WebApiClient } from '../src/client/web-api-client.ts'
+import { ConnectionController, type ConnectionFailure } from '../src/client/connection.ts'
+import { deferred } from './fake-api.client.ts'
 
 type Win = { location?: { hostname: string; search: string; origin?: string } }
 type WebSocketGlobal = { WebSocket?: typeof WebSocket }
@@ -17,6 +19,7 @@ const originalWebSocket = globalThis.WebSocket
 const sockets: FakeWebSocket[] = []
 
 class FakeWebSocket extends EventTarget {
+  static autoOpen = true
   static readonly CONNECTING = 0
   static readonly OPEN = 1
   static readonly CLOSING = 2
@@ -24,22 +27,30 @@ class FakeWebSocket extends EventTarget {
 
   readonly url: string
   readyState = FakeWebSocket.CONNECTING
+  holdClose = false
+  closeCalls = 0
 
   constructor(url: string | URL) {
     super()
     this.url = String(url)
     sockets.push(this)
     queueMicrotask(() => {
-      if (this.readyState !== FakeWebSocket.CONNECTING) return
+      if (!FakeWebSocket.autoOpen || this.readyState !== FakeWebSocket.CONNECTING) return
       this.readyState = FakeWebSocket.OPEN
       this.dispatchEvent(new Event('open'))
     })
   }
 
   close(): void {
+    this.closeCalls++
     if (this.readyState === FakeWebSocket.CLOSED) return
+    if (this.holdClose) { this.readyState = FakeWebSocket.CLOSING; return }
+    this.remoteClose(1000, true)
+  }
+
+  remoteClose(code: number, wasClean: boolean, reason = ''): void {
     this.readyState = FakeWebSocket.CLOSED
-    this.dispatchEvent(new Event('close'))
+    this.dispatchEvent(Object.assign(new Event('close'), { code, wasClean, reason }))
   }
 
   receive(data: unknown): void {
@@ -52,8 +63,157 @@ afterEach(async () => {
   for (const ctx of mountedContexts.splice(0).reverse()) await ctx.fiber.dispose()
   delete (globalThis as Win).location
   sockets.length = 0
+  FakeWebSocket.autoOpen = true
   if (originalWebSocket === undefined) delete (globalThis as WebSocketGlobal).WebSocket
   else globalThis.WebSocket = originalWebSocket
+})
+
+describe('connection termination diagnostics', () => {
+  const privateText = 'private-session/private?token=do-not-record'
+  const config = { backoffBaseMs: 10_000, backoffMaxMs: 10_000 }
+
+  function response(init?: RequestInit): Response {
+    const request = JSON.parse(init?.body as string) as { rpcId: string }
+    return Response.json({ type: 'server-response', rpcId: request.rpcId, result: { ok: true, value: {
+      version: 'test', cwd: '/private', home: '/private', attachedSessions: 0, canOpenPath: false,
+    } } })
+  }
+
+  it.each([
+    { source: 'mux', code: 1012, wasClean: true },
+    { source: 'host', code: 1006, wasClean: false },
+  ] as const)('reports only the first $source close and excludes the companion abort', async ({ source, code, wasClean }) => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '', origin: 'http://localhost:3080' }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    let clock = 100
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => { clock = Math.max(clock, 120); return response(init) })
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const connected = deferred<undefined>()
+    const nextConnected = deferred<undefined>()
+    let connections = 0
+    const reconnecting = deferred<undefined>()
+    const failure = vi.fn<(value: ConnectionFailure) => void>()
+    const controller = new ConnectionController(new WebApiClient(), {
+      onConnected: () => { if (++connections === 1) connected.resolve(undefined); else nextConnected.resolve(undefined) },
+      onStateChange: (state) => { if (state === 'reconnecting') reconnecting.resolve(undefined) },
+      onFailure: failure,
+    }, config)
+    controller.start()
+    try {
+      await connected.promise
+      const first = sockets.find(socket => new URL(socket.url).pathname === `/api/events.${source}`)!
+      const companion = sockets.find(socket => socket !== first)!
+      companion.holdClose = true
+      clock = 165
+      first.remoteClose(code, wasClean, privateText)
+      await reconnecting.promise
+      expect(failure).toHaveBeenCalledOnce()
+      expect(failure.mock.calls[0]![0]).toMatchObject({ kind: 'transport', diagnostic: {
+        clientGeneration: 1, source, cause: 'stream-eof', phase: 'connected',
+        elapsedMs: 65, connectedForMs: 45, closeCode: code, wasClean,
+      } })
+      expect(companion.readyState).toBe(FakeWebSocket.CLOSING)
+      expect(companion.closeCalls).toBe(1)
+      await vi.advanceTimersByTimeAsync(10_000)
+      await nextConnected.promise
+      companion.remoteClose(1000, true, privateText)
+      controller.stop()
+      await vi.runAllTimersAsync()
+      expect(failure).toHaveBeenCalledOnce()
+      expect(warning).toHaveBeenCalledOnce()
+      const text = warning.mock.calls.flat().join('\n')
+      expect(text).toContain(`"source":"${source}"`)
+      expect(text).toContain(`"closeCode":${String(code)}`)
+      expect(text).not.toContain(privateText)
+      expect(text).not.toContain('localhost')
+      expect(text).not.toContain('/private')
+      expect(JSON.parse(text.slice(text.indexOf('{')))).toEqual(failure.mock.calls[0]![0].diagnostic)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      controller.stop()
+      for (const socket of sockets) if (socket.readyState !== FakeWebSocket.CLOSED) socket.remoteClose(1000, true)
+      await vi.runAllTimersAsync()
+      warning.mockRestore(); fetch.mockRestore(); now.mockRestore()
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('attributes a rejected describe to opening and preserves its error without logging its text', async () => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '', origin: 'http://localhost:3080' }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.autoOpen = false
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const error = new TypeError(privateText)
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(error)
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const reconnecting = deferred<undefined>()
+    const failure = vi.fn<(value: ConnectionFailure) => void>()
+    const controller = new ConnectionController(new WebApiClient(), {
+      onFailure: failure,
+      onStateChange: (state) => { if (state === 'reconnecting') reconnecting.resolve(undefined) },
+    }, config)
+    controller.start()
+    try {
+      await reconnecting.promise
+      controller.stop()
+      await vi.runAllTimersAsync()
+      expect(failure).toHaveBeenCalledOnce()
+      expect(failure.mock.calls[0]![0].error).toBe(error)
+      expect(failure.mock.calls[0]![0].diagnostic).toMatchObject({
+        clientGeneration: 1, source: 'describe', cause: 'transport-rejection', phase: 'opening',
+      })
+      expect(failure.mock.calls[0]![0].diagnostic).not.toHaveProperty('connectedForMs')
+      expect(failure.mock.calls[0]![0].diagnostic).not.toHaveProperty('closeCode')
+      expect(sockets).toHaveLength(2)
+      expect(sockets.every(socket => socket.readyState === FakeWebSocket.CLOSED)).toBe(true)
+      expect(warning).toHaveBeenCalledOnce()
+      expect(warning.mock.calls.flat().join('\n')).not.toContain(privateText)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      controller.stop()
+      await vi.runAllTimersAsync()
+      warning.mockRestore(); fetch.mockRestore()
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each([false, true])('treats stop as client cancellation without a failure or retry (ready=%s)', async (ready) => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '', origin: 'http://localhost:3080' }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const reply = deferred<Response>()
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => ready ? response(init) : reply.promise)
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const connected = deferred<undefined>()
+    const failure = vi.fn()
+    const controller = new ConnectionController(new WebApiClient(), {
+      onFailure: failure, onConnected: () => { connected.resolve(undefined) },
+    }, config)
+    controller.start()
+    try {
+      if (ready) await connected.promise
+      else await Promise.resolve()
+      expect(sockets).toHaveLength(2)
+      controller.stop()
+      reply.resolve(Response.json({}))
+      await vi.runAllTimersAsync()
+      expect(failure).not.toHaveBeenCalled()
+      expect(warning).not.toHaveBeenCalled()
+      expect(fetch).toHaveBeenCalledOnce()
+      expect(sockets.every(socket => socket.readyState === FakeWebSocket.CLOSED)).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      controller.stop(); reply.resolve(Response.json({}))
+      await vi.runAllTimersAsync()
+      warning.mockRestore(); fetch.mockRestore()
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 async function mount(): Promise<ConnectionHandle> {
@@ -66,6 +226,148 @@ async function mount(): Promise<ConnectionHandle> {
 }
 
 describe('connection client apply', () => {
+  it('rejects malformed browser document input before replacing fetch or providing a connection', () => {
+    const ctx = new Context()
+    mountedContexts.push(ctx)
+    const original = globalThis.fetch
+    expect(() => {
+      installConnection(ctx, {
+        location: { hostname: 'harness.example', origin: 'https://harness.example' },
+        documentIdentity: { version: 2 },
+      })
+    }).toThrow(/Connection document identity/)
+    expect(globalThis.fetch).toBe(original)
+    expect(ctx.get('connection')).toBeUndefined()
+  })
+
+  it('leaves document identity to an explicit carrier', () => {
+    const ctx = new Context()
+    mountedContexts.push(ctx)
+    const api = new FixtureApiClient()
+    const original = globalThis.fetch
+    installConnection(ctx, {
+      location: { hostname: 'harness.example', origin: 'https://harness.example' },
+      documentIdentity: { version: 2 },
+      transport: { createApiClient: () => api },
+    })
+    expect((ctx.get('connection') as ConnectionHandle).api).toBe(api)
+    expect(globalThis.fetch).toBe(original)
+  })
+
+  it.each(['account', 'runtime'] as const)('retires early sockets when the first response changes the document %s', async (changed) => {
+    const reloaded = deferred<undefined>()
+    vi.stubGlobal('location', {
+      hostname: 'harness.example', search: '', origin: 'https://harness.example',
+      reload: () => { reloaded.resolve(undefined) },
+    })
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.stubGlobal('__DSH_DOCUMENT_IDENTITY__', { version: 1, principalId: 7, runtimeTarget: { kind: 'project', projectId: 42 } })
+    const held = deferred<Response>()
+    const requested = deferred<RequestInit | undefined>()
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      requested.resolve(init)
+      return held.promise
+    })
+    let loop: ReturnType<ConnectionHandle['start']> | undefined
+    try {
+      const handle = await mount()
+      expect(handle.documentIdentity).toEqual({ principalId: 7, runtimeTarget: { kind: 'project', projectId: 42 } })
+      expect(handle.forTarget?.({ kind: 'personal' }).documentIdentity).toBe(handle.documentIdentity)
+      const connected = vi.fn()
+      loop = handle.start({ onConnected: connected })
+      const init = await requested.promise
+      await vi.waitFor(() => { expect(sockets).toHaveLength(2) })
+      held.resolve(Response.json({
+        type: 'server-response', rpcId: (JSON.parse(init?.body as string) as { rpcId: string }).rpcId,
+        result: { ok: true, value: {
+          version: 'test', cwd: '/fixture', home: '/fixture', attachedSessions: 0, canOpenPath: false,
+          executionAuthorityRequired: true, runtimeTarget: { kind: 'project', projectId: changed === 'runtime' ? 43 : 42 },
+        } },
+      }, { headers: { 'x-dsh-principal-id': changed === 'account' ? '8' : '7' } }))
+      await reloaded.promise
+      expect(connected).not.toHaveBeenCalled()
+      expect(handle.hostDescription.getSnapshot()).toBeUndefined()
+      expect(sockets.every(socket => socket.readyState === FakeWebSocket.CLOSED)).toBe(true)
+    } finally {
+      loop?.stop()
+      held.resolve(new Response('{}'))
+      await mountedContexts.at(-1)?.fiber.dispose()
+      fetch.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('ignores document input for a fixture carrier', async () => {
+    vi.stubGlobal('location', { hostname: 'localhost', search: '?fixture', origin: 'http://localhost:3080' })
+    vi.stubGlobal('__DSH_DOCUMENT_IDENTITY__', { version: 'invalid-for-HTTP' })
+    try {
+      expect((await mount()).api).toBeInstanceOf(FixtureApiClient)
+    } finally {
+      await mountedContexts.at(-1)?.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each([
+    { kind: 'personal' as const },
+    { kind: 'project' as const, projectId: 42 },
+  ])('opens pinned startup sockets before describe without publishing early for $kind', async (runtimeTarget) => {
+    vi.stubGlobal('location', { hostname: 'harness.example', search: '', origin: 'https://harness.example' })
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.stubGlobal('__DSH_DOCUMENT_IDENTITY__', { version: 1, principalId: 7, runtimeTarget })
+    FakeWebSocket.autoOpen = false
+    const held = deferred<Response>()
+    const requested = deferred<RequestInit | undefined>()
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      requested.resolve(init)
+      return held.promise
+    })
+    let loop: ReturnType<ConnectionHandle['start']> | undefined
+    try {
+      const handle = await mount()
+      const order: string[] = []
+      const connected = deferred<undefined>()
+      loop = handle.start({
+        onConnected: () => { order.push('connected'); connected.resolve(undefined) },
+        onHostEnvelope: () => { order.push('host-frame') },
+      })
+      const init = await requested.promise
+      await vi.waitFor(() => { expect(sockets).toHaveLength(2) })
+      const pinned = runtimeTarget.kind === 'personal' ? 'personal' : 'project:42'
+      for (const socket of sockets) {
+        const url = new URL(socket.url)
+        expect(url.searchParams.get('dshTarget')).toBe(pinned)
+        expect(url.searchParams.get('dshPrincipal')).toBe('7')
+        socket.readyState = FakeWebSocket.OPEN
+        socket.dispatchEvent(new Event('open'))
+      }
+      expect(new Headers(init?.headers).get('x-dsh-expected-principal-id')).toBe('7')
+      const input = fetch.mock.calls[0]![0]
+      const descriptionUrl = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+      expect(descriptionUrl.searchParams.get('dshTarget')).toBe(pinned)
+      sockets.find(socket => new URL(socket.url).pathname.endsWith('events.host'))!.receive(JSON.stringify({
+        type: 'server-request', rpcId: 'early-host', method: 'host/remote-event',
+        payload: { type: 'host/remote-event', event: 'commands/change', args: [] },
+      }))
+      expect(handle.hostDescription.getSnapshot()).toBeUndefined()
+      expect(order).toEqual([])
+      held.resolve(Response.json({
+        type: 'server-response', rpcId: (JSON.parse(init?.body as string) as { rpcId: string }).rpcId,
+        result: { ok: true, value: {
+          version: 'test', cwd: '/fixture', home: '/fixture', attachedSessions: 0, canOpenPath: false,
+          executionAuthorityRequired: true, runtimeTarget,
+        } },
+      }, { headers: { 'x-dsh-principal-id': '7' } }))
+      await connected.promise
+      await vi.waitFor(() => { expect(order).toEqual(['connected', 'host-frame']) })
+    } finally {
+      loop?.stop()
+      held.resolve(new Response('{}'))
+      await mountedContexts.at(-1)?.fiber.dispose()
+      fetch.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
   it('advertises document identity cleanup only when the browser account fence owns the connection', async () => {
     ;(globalThis as Win).location = { hostname: 'gateway.example', search: '', origin: 'https://gateway.example' }
     expect((await mount()).onPrincipalChange).toBeTypeOf('function')
@@ -185,12 +487,21 @@ describe('connection client apply', () => {
     const handle = await mount()
     const descriptions: Array<boolean | undefined> = []
     const reconnectSnapshots: Array<boolean | undefined> = []
+    const preparationSnapshots: unknown[] = []
+    const order: string[] = []
     const stopDescription = handle.hostDescription.subscribe(() => {
       descriptions.push(handle.hostDescription.getSnapshot()?.canOpenPath)
+      order.push(`description:${String(handle.hostDescription.getSnapshot()?.canOpenPath)}`)
     })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const loop = handle.start({
+      onBeforeConnected: () => {
+        preparationSnapshots.push([handle.state.getSnapshot(), handle.hostDescription.getSnapshot()])
+        order.push('before-connected')
+      },
+      onConnected: () => { order.push('connected') },
       onStateChange: (state) => {
+        order.push(`state:${state}`)
         if (state === 'reconnecting') {
           reconnectSnapshots.push(handle.hostDescription.getSnapshot()?.canOpenPath)
         }
@@ -209,6 +520,12 @@ describe('connection client apply', () => {
       await vi.waitFor(() => { expect(reconnectSnapshots).toEqual([undefined]) })
       await vi.waitFor(() => { expect(descriptions).toEqual([true, undefined, true]) })
       expect(handle.hostDescription.getSnapshot()?.canOpenPath).toBe(true)
+      expect(preparationSnapshots).toEqual([[undefined, undefined], ['reconnecting', undefined]])
+      expect(order).toEqual([
+        'before-connected', 'state:connected', 'description:true', 'connected',
+        'description:undefined', 'state:reconnecting',
+        'before-connected', 'state:connected', 'description:true', 'connected',
+      ])
     } finally {
       stopDescription()
       loop.stop()
@@ -350,15 +667,7 @@ describe('connection client apply', () => {
     sockets[0]!.receive(frame)
     await expect(first).resolves.toMatchObject({ value: { payload: { type: 'session/subscribed' } } })
     for (let index = 0; index < 1_100; index += 1) sockets[0]!.receive(frame)
-    let ended = false
-    for (let index = 0; index < 1_100; index += 1) {
-      const next = await iterator.next()
-      if (next.done) {
-        ended = true
-        break
-      }
-    }
-    expect(ended).toBe(true)
+    await expect(iterator.next()).rejects.toMatchObject({ kind: 'queue-overflow' })
     expect(sockets[0]?.readyState).toBe(FakeWebSocket.CLOSED)
     expect(errors).toHaveBeenCalledWith(expect.stringContaining('downlink queue exceeded'))
     abort.abort()

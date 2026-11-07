@@ -8,6 +8,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
+import type { WebSearchCardFace } from '../src/client/web-search-card-controller.ts'
 import { SubagentModelSelectionCardController } from '../src/client/subagent-model-selection-card-controller.ts'
 import type { PluginsSettingsSectionInjected } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
@@ -138,10 +139,33 @@ describe('ui-settings-plugins apply', () => {
     }
   })
 
+  it('keeps credential reads inactive until the detailed web-search page is opened', async () => {
+    const { ctx, slots, describeCredentials } = await bench(['web', 'web-search-deepseek', 'web-deepseek-api'])
+    try {
+      declarePluginsItem(slots)
+      await ctx.plugin({ inject: [...inject], apply }).await()
+      expect(describeCredentials).not.toHaveBeenCalled()
+      const card = slots.entries('plugins.item').find(entry => entry.options.id === 'web-search-deepseek')!
+      const face = card.inject!() as Pick<WebSearchCardFace, 'ensureCredential'>
+      ctx.remote.$dispatch('credentials/reference-updated', ['DEEPSEEK_API_KEY'])
+      ctx.emit('connection/reset')
+      expect(describeCredentials).not.toHaveBeenCalled()
+      face.ensureCredential()
+      await vi.waitFor(() => { expect(describeCredentials).toHaveBeenCalledOnce() })
+      ctx.emit('connection/reset')
+      await vi.waitFor(() => { expect(describeCredentials).toHaveBeenCalledTimes(2) })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('re-reads the credential when the Host reports the watched reference changed', async () => {
     const { ctx, slots, describeCredentials } = await bench()
     declarePluginsItem(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
+    const card = slots.entries('plugins.item').find(entry => entry.options.id === 'web-search-deepseek')!
+    const face = card.inject!() as Pick<WebSearchCardFace, 'ensureCredential'>
+    face.ensureCredential()
     await vi.waitFor(() => { expect(describeCredentials).toHaveBeenCalled() })
     describeCredentials.mockClear()
 
@@ -156,6 +180,9 @@ describe('ui-settings-plugins apply', () => {
     const { ctx, slots, describeCredentials } = await bench()
     declarePluginsItem(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
+    const card = slots.entries('plugins.item').find(entry => entry.options.id === 'web-search-deepseek')!
+    const face = card.inject!() as Pick<WebSearchCardFace, 'ensureCredential'>
+    face.ensureCredential()
     await vi.waitFor(() => { expect(describeCredentials).toHaveBeenCalled() })
     describeCredentials.mockClear()
 

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-26-local-runtime-office-font-metadata.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-26-local-runtime-office-font-metadata.md
+document:
+  en: a6231b40f277e4ab1a56a632445c7485af0d9ceb
+  zh: 483e6c303ddfb329bf04eb31c13883fd9c0c6306
+/agent-note-office-font-metadata-across-local-runtimes:
+  en: 540f88a9ac1eee75
+  zh: 432fbc2c6966fc7c
+/agent-note-office-font-metadata-across-local-runtimes/problem:
+  en: 77b013b3f9ff13e3
+  zh: e36ea90639015d78
+/agent-note-office-font-metadata-across-local-runtimes/decision:
+  en: 1816e718c89e478a
+  zh: f80be10222f67296
+/agent-note-office-font-metadata-across-local-runtimes/alternatives-considered:
+  en: 8b13cabc2b69ed9c
+  zh: 0c63b724e93e14c1
+/agent-note-office-font-metadata-across-local-runtimes/consequences:
+  en: 5bab1c9b11fcac9d
+  zh: 3ddd1ffc8567542c

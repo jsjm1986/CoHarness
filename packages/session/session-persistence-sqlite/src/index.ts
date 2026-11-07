@@ -32,6 +32,7 @@ import type { JournalMode } from './schema.ts'
 import { SqliteStore } from './store.ts'
 
 export { SCHEMA_VERSION } from './schema.ts'
+export { loadNodeSqlite } from './store.ts'
 
 /** Default wait for another SQLite connection's write reservation. */
 export const DEFAULT_BUSY_TIMEOUT_MS = 5_000

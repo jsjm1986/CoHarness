@@ -206,6 +206,7 @@ async function readBootstrap(dir: string): Promise<BootstrapState | undefined> {
   try {
     text = await readFile(join(dir, BOOTSTRAP_FILE), 'utf8')
   } catch (error) {
+    /* v8 ignore next -- a non-ENOENT read refusal needs POSIX permissions; its suite gates off win32. */
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     return undefined
   }

@@ -1,5 +1,6 @@
 /** Node-half composition diagnostics for package metadata and built client bundles. */
 
+import { Hash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SourceMap } from 'node:module'
@@ -12,7 +13,8 @@ import { Context, FiberState, type Fiber } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderIndexInjections, type WebServer, type WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import * as modulesClient from '../src/client/index.ts'
-import { ClientModuleRegistry, bootInjections, orderByModuleGraph } from '../src/index.ts'
+import { ClientModuleRegistry, bootInjections, orderByModuleGraph, type Config } from '../src/index.ts'
+import { clientChunkRevision, stampClientArtifact } from '../src/artifact-revision.ts'
 import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '../src/client/index.ts'
 
 const MODULES_ID = '@deepseek-ai/dsh-client-modules'
@@ -110,10 +112,11 @@ function writePackage(
 }
 
 /** Create a built package with the supplied client declaration. */
-function writeBuiltPackage(packageName: string, client: Record<string, unknown>): void {
+function writeBuiltPackage(packageName: string, client: Record<string, unknown> = {}): string {
   const clientPath = writePackage(packageName, { dsh: { client: { platform: 'web', ...client } } })
   mkdirSync(dirname(clientPath), { recursive: true })
   writeFileSync(clientPath, 'module.exports = {}\n')
+  return clientPath
 }
 
 /** Construct the node-half service and capture its plugin-bundle route. */
@@ -123,6 +126,7 @@ function constructWithRoute(
     contextBaseUrl?: string
     entryBaseUrl?: string
     internal?: NonNullable<Context['loader']['internal']>
+    config?: Config
   } = {},
 ): { context: Context; service: ClientModuleRegistry; route: Promise<WebRoute> } {
   const ctx = new Context()
@@ -152,7 +156,7 @@ function constructWithRoute(
     tapIndex: () => () => {},
   }
   ctx.provide('webServer', webServer as WebServer)
-  const service = new ClientModuleRegistry(ctx)
+  const service = new ClientModuleRegistry(ctx, options.config)
   owned.ready = route.promise
   return { context: ctx, service, route: route.promise }
 }
@@ -714,6 +718,63 @@ describe('client bundle activation', () => {
     expect(service.artifactBaseline('@fixture/unknown')).toBeUndefined()
   })
 
+  it('keeps content-marked revisions stable across filesystem generations', () => {
+    const packageName = '@fixture/content-marked-revision'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    const bundle = stampClientArtifact('module.exports = {}\n', [])
+    writeFileSync(clientPath, bundle)
+    const initialTime = new Date(1_700_000_000_000)
+    utimesSync(clientPath, initialTime, initialTime)
+    const first = construct([packageName]).graph()
+
+    writeFileSync(clientPath, bundle)
+    const copiedTime = new Date(initialTime.getTime() + 10_000)
+    utimesSync(clientPath, copiedTime, copiedTime)
+    const copied = construct([packageName]).graph()
+    expect(copied.entries[0]!.rev).toBe(first.entries[0]!.rev)
+    expect(copied.batches).toEqual(first.batches)
+  })
+
+  it('keeps graph, subscriptions and response bytes when a marked entry is copied or touched', async () => {
+    const packageName = '@fixture/content-marked-rebuild'
+    const clientPath = writeBuiltPackage(packageName)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', []))
+    const service = construct([packageName])
+    const before = service.graph()
+    const changed = vi.fn()
+    const rebuilt = vi.fn()
+    service.onGraphChanged(changed)
+    service.onRebuilt(rebuilt)
+    const url = 'https://fixture.invalid/' + before.entries[0]!.url
+    const response = await service.fetchBundle(new Request(url))
+    const body = await response.text()
+    const original = statSync(clientPath)
+    utimesSync(clientPath, original.atime, new Date(original.mtimeMs + 10_000))
+    expect(service.rebuilt(packageName)).toBe(before.entries[0]!.rev)
+    expect(service.graph()).toBe(before)
+    expect(changed).not.toHaveBeenCalled()
+    expect(rebuilt).not.toHaveBeenCalled()
+    expect(await (await service.fetchBundle(new Request(url))).text()).toBe(body)
+    expect(service.artifactBaseline(packageName)!.mtimeMs).toBe(statSync(clientPath).mtimeMs)
+  })
+
+  it('invalidates marked entries for changed lazy content and agrees with a fresh registry', () => {
+    const packageName = '@fixture/content-marked-lazy-rebuild'
+    const clientPath = writeBuiltPackage(packageName)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName: 'client.lazy.js', code: 'exports.value = 1\n' }]))
+    const service = construct([packageName])
+    const before = service.graph()
+    const changed = vi.fn()
+    service.onGraphChanged(changed)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName: 'client.lazy.js', code: 'exports.value = 2\n' }]))
+    const original = statSync(clientPath)
+    utimesSync(clientPath, original.atime, new Date(original.mtimeMs + 10_000))
+    expect(service.rebuilt(packageName)).not.toBe(before.entries[0]!.rev)
+    expect(changed).toHaveBeenCalledOnce()
+    expect(service.graph()).toEqual(construct([packageName]).graph())
+  })
+
   it('keeps the initial graph and subscribers unchanged when a rebuild has identical artifacts', () => {
     const packageName = '@fixture/unchanged-rebuild'
     writeBuiltPackage(packageName, {})
@@ -730,42 +791,37 @@ describe('client bundle activation', () => {
     expect(onGraphChanged).not.toHaveBeenCalled()
   })
 
-  it('derives artifact revisions from bytes so identical artifacts share URLs', () => {
-    const firstName = '@fixture/byte-revision-first'
-    const secondName = '@fixture/byte-revision-second'
-    const firstPath = writePackage(firstName)
-    const secondPath = writePackage(secondName)
-    mkdirSync(dirname(firstPath), { recursive: true })
-    mkdirSync(dirname(secondPath), { recursive: true })
-    writeFileSync(firstPath, 'module.exports = { shared: true }\n')
-    writeFileSync(secondPath, 'module.exports = { shared: true }\n')
-    // Distinct filesystem generations of the same bytes must not split the revision.
-    utimesSync(firstPath, new Date(1_600_000_000_000), new Date(1_600_000_000_000))
-    utimesSync(secondPath, new Date(1_700_000_000_000), new Date(1_700_000_000_000))
-    const first = construct([firstName]).graph().entries[0]!
-    const second = construct([secondName]).graph().entries[0]!
-    expect(second.rev).toBe(first.rev)
-    expect(second.url).toBe(first.url.replace(firstName, secondName))
-
-    writeFileSync(secondPath, 'module.exports = { shared: false }\n')
-    const changed = construct([secondName]).graph().entries[0]!
-    expect(changed.rev).not.toBe(first.rev)
+  it('hashes only metadata when publishing legacy initial and rebuilt artifact revisions', () => {
+    const packageName = '@fixture/metadata-revision'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    const bundle = `module.exports = ${JSON.stringify('x'.repeat(64 * 1024))}\n`
+    writeFileSync(clientPath, bundle)
+    const update = vi.spyOn(Hash.prototype, 'update')
+    try {
+      const service = construct([packageName])
+      writeFileSync(clientPath, `module.exports = ${JSON.stringify('y'.repeat(64 * 1024))}\n`)
+      service.rebuilt(packageName)
+      const inputBytes = update.mock.calls.map(([input]) => Buffer.byteLength(input))
+      expect(inputBytes.length).toBeGreaterThan(0)
+      expect(inputBytes.reduce((total, bytes) => total + bytes, 0)).toBeLessThan(4 * 1024)
+    } finally {
+      update.mockRestore()
+    }
   })
 
-  it('folds package-local chunk bytes into the revision so a chunk-only edit moves URLs', () => {
+  it('keeps the filesystem metadata policy for unmarked artifacts beside sibling chunks', () => {
     const packageName = '@fixture/chunk-revision'
     const clientPath = writePackage(packageName)
     mkdirSync(dirname(clientPath), { recursive: true })
     writeFileSync(clientPath, 'module.exports = {}\n')
+    const timestamp = new Date(1_700_000_000_000)
+    utimesSync(clientPath, timestamp, timestamp)
     writeFileSync(join(dirname(clientPath), 'client.extra.js'), 'module.exports = { chunk: 1 }\n')
     const first = construct([packageName]).graph().entries[0]!
     writeFileSync(join(dirname(clientPath), 'client.extra.js'), 'module.exports = { chunk: 2 }\n')
     const changed = construct([packageName]).graph().entries[0]!
-    expect(changed.rev).not.toBe(first.rev)
-    // A chunk file disappearing is likewise a different artifact generation.
-    rmSync(join(dirname(clientPath), 'client.extra.js'))
-    const removed = construct([packageName]).graph().entries[0]!
-    expect(removed.rev).not.toBe(changed.rev)
+    expect(changed.rev).toBe(first.rev)
   })
 
   it('serves Brotli, gzip, or identity for one immutable response by Accept-Encoding', async () => {
@@ -797,10 +853,7 @@ describe('client bundle activation', () => {
     expect(unsupported.body).toEqual(plain)
   })
 
-  it.each([
-    ['bytes', true],
-    ['build stamp', false],
-  ])('agrees with a fresh registry after rebuilding changed %s', (change, moved) => {
+  it.each(['bytes', 'build stamp'])('agrees with a fresh registry after rebuilding changed %s', (change) => {
     const packageName = '@fixture/changed-rebuild'
     const clientPath = writePackage(packageName)
     mkdirSync(dirname(clientPath), { recursive: true })
@@ -818,8 +871,7 @@ describe('client bundle activation', () => {
     }
 
     const rev = service.rebuilt(packageName)
-    if (moved) expect(rev).not.toBe(before.entries[0]!.rev)
-    else expect(rev).toBe(before.entries[0]!.rev)
+    expect(rev).not.toBe(before.entries[0]!.rev)
     expect(construct([packageName]).graph()).toEqual(service.graph())
   })
 
@@ -843,7 +895,77 @@ describe('client bundle activation', () => {
     expect(construct([packageName]).graph()).toEqual(service.graph())
   })
 
-  it('splits startup combos before the map-form URL exceeds 3 KiB', async () => {
+  it('reuses shared application responses when an optional transport group is present', async () => {
+    const shared = ['@fixture/shared-before', '@fixture/shared-after']
+    const optional = '@fixture/optional-panel'
+    for (const id of [...shared, optional]) writeBuiltPackage(id)
+    const config = { applicationBatchGroups: [[optional]] }
+    const withoutOptional = constructWithRoute(shared, { config })
+    const withOptional = constructWithRoute([shared[0]!, optional, shared[1]!], { config })
+    const baseline = withoutOptional.service.graph()
+    const added = withOptional.service.graph()
+
+    expect(added.entries.map(row => row.id)).toEqual([shared[0], optional, shared[1]])
+    const sharedBatch = added.batches.find(batch => batch.entries.includes(shared[0]!))!
+    expect(sharedBatch.url).toBe(baseline.batches[0]!.url)
+    expect(sharedBatch.entries).toEqual(shared)
+    expect(added.batches.map(batch => batch.entries)).toEqual([shared, [optional]])
+    expect((await routeRequest(withOptional.route, sharedBatch.url)).body)
+      .toEqual((await routeRequest(withoutOptional.route, baseline.batches[0]!.url)).body)
+  })
+
+  it.each([
+    { groups: [[]], message: 'must name at least one package' },
+    { groups: [['@fixture/panel/client']], message: 'bare package name' },
+    { groups: [['not a package']], message: 'bare package name' },
+    { groups: [[MODULES_ID]], message: 'bootstrap package' },
+    { groups: [['@deepseek-ai/dsh-client-runtime']], message: 'bootstrap package' },
+    { groups: [['@fixture/panel', '@fixture/panel']], message: 'repeated application batch package' },
+    { groups: [['@fixture/panel'], ['@fixture/panel']], message: 'repeated application batch package' },
+  ])('rejects an invalid application transport group: $groups', ({ groups, message }) => {
+    expect(() => ClientModuleRegistry.Config({ applicationBatchGroups: groups })).toThrow(message)
+  })
+
+  it('keeps inactive transport groups out of the response table', () => {
+    const id = '@fixture/shared-only'
+    writeBuiltPackage(id)
+    const baseline = constructWithRoute([id])
+    const configured = constructWithRoute([id], { config: { applicationBatchGroups: [['@fixture/inactive']] } })
+    expect(ClientModuleRegistry.Config({})).toEqual({ applicationBatchGroups: [] })
+    expect(configured.service.graph()).toEqual(baseline.service.graph())
+  })
+
+  it('orders transport groups by configuration while preserving graph and within-group order', () => {
+    const ids = ['@fixture/group-b', '@fixture/shared', '@fixture/group-a-last', '@fixture/group-a-first']
+    for (const id of ids) writeBuiltPackage(id)
+    const { service } = constructWithRoute(ids, { config: { applicationBatchGroups: [
+      [ids[3]!, ids[2]!], [ids[0]!],
+    ] } })
+    expect(service.graph().entries.map(row => row.id)).toEqual(ids)
+    expect(service.graph().batches.map(batch => batch.entries)).toEqual([[ids[1]], [ids[2], ids[3]], [ids[0]]])
+  })
+
+  it('rebuilds an optional transport group without invalidating shared responses', async () => {
+    const common = '@fixture/shared-rebuild'
+    const optional = '@fixture/optional-rebuild'
+    writeBuiltPackage(common)
+    const path = writeBuiltPackage(optional)
+    const { service, route } = constructWithRoute([common, optional], {
+      config: { applicationBatchGroups: [[optional]] },
+    })
+    const before = service.graph()
+    const commonBefore = before.batches.find(batch => batch.entries.includes(common))!
+    const optionalBefore = before.batches.find(batch => batch.entries.includes(optional))!
+    const retained = await routeRequest(route, optionalBefore.url)
+    writeFileSync(path, 'module.exports = { generation: 2 }\n')
+    service.rebuilt(optional)
+    const after = service.graph()
+    expect(after.batches.find(batch => batch.entries.includes(common))!.url).toBe(commonBefore.url)
+    expect(after.batches.find(batch => batch.entries.includes(optional))!.url).not.toBe(optionalBefore.url)
+    expect((await routeRequest(route, optionalBefore.url)).body).toEqual(retained.body)
+  })
+
+  it.each([false, true])('splits startup combos before the map-form URL exceeds 3 KiB when grouped=%s', async (grouped) => {
     const packageNames = Array.from({ length: 48 }, (_, index) => (
       `@fixture/combo-url-${String(index).padStart(3, '0')}-${'x'.repeat(40)}`
     ))
@@ -860,7 +982,8 @@ describe('client bundle activation', () => {
       writeFileSync(`${clientPath}.map`, sourceMap)
     }
 
-    const { service, route } = constructWithRoute(packageNames)
+    const { service, route } = constructWithRoute(packageNames,
+      grouped ? { config: { applicationBatchGroups: [packageNames] } } : {})
     const batches = service.graph().batches.filter(batch => batch.phase === 'application')
     expect(batches.length).toBeGreaterThan(1)
     expect(batches.flatMap(batch => batch.entries)).toEqual(packageNames)
@@ -1007,6 +1130,179 @@ describe('client bundle activation', () => {
     expect(chunk.body.toString('utf8')).toContain(`sourceMappingURL=client.terminal.js.map?rev=${row.rev}`)
     expect((await routeRequest(route, url.replace('.js?', '.js.map?'))).status).toBe(200)
     expect((await routeRequest(route, url.replace(`rev=${row.rev}`, 'rev=stale'))).status).toBe(404)
+  })
+
+  it('publishes chunk identities without reading siblings or maps before their own GET', async () => {
+    const packageName = '@fixture/published-lazy-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const code = 'module.exports = { marker: "preview" }\n//# sourceMappingURL=client.preview.js.map\n'
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName, code }]))
+    const { service, route, context } = constructWithRoute([packageName])
+    const row = service.graph().entries[0]!
+    expect(row.chunks).toEqual({ [fileName]: clientChunkRevision(code) })
+    const url = chunkUrl(packageName, fileName, row.chunks![fileName]!)
+    expect((await routeRequest(route, url)).status).toBe(404)
+    writeFileSync(chunkPath, code)
+    mkdirSync(`${chunkPath}.map`)
+    const warn = vi.spyOn(context.logger, 'warn')
+    try {
+      expect((await routeRequest(route, url, 'HEAD')).body).toHaveLength(0)
+      const script = await routeRequest(route, url)
+      expect(script.status).toBe(200)
+      expect(script.body.toString('utf8')).toContain(`sourceMappingURL=${fileName}.map?rev=${row.chunks![fileName]}`)
+      expect(warn).not.toHaveBeenCalled()
+      rmSync(`${chunkPath}.map`, { recursive: true })
+      writeFileSync(`${chunkPath}.map`, JSON.stringify({ version: 3, names: [], mappings: 'AAAA', sources: ['src/preview.ts'] }))
+      expect(JSON.parse((await routeRequest(route, url.replace('.js?', '.js.map?'))).body.toString('utf8'))).toMatchObject({
+        sections: [{ map: { sources: [`/plugins/${packageName}/src/preview.ts`] } }],
+      })
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('retains identical chunk URLs and response bytes across an owner-only rebuild', async () => {
+    const packageName = '@fixture/chunk-content-revision'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const code = 'module.exports = { marker: "stable preview" }\n'
+    const siblings = [{ fileName, code }]
+    writeFileSync(chunkPath, code)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = { ui: 1 }\n', siblings))
+    const { service, route } = constructWithRoute([packageName])
+    const before = service.graph().entries[0]!
+    const url = chunkUrl(packageName, fileName, before.chunks![fileName]!)
+    const original = await routeRequest(route, url)
+    expect((await routeRequest(route, chunkUrl(packageName, fileName, before.rev))).body).toEqual(original.body)
+
+    writeFileSync(clientPath, stampClientArtifact('module.exports = { ui: 2 }\n', siblings))
+    const stat = statSync(clientPath)
+    utimesSync(clientPath, stat.atime, new Date(stat.mtimeMs + 1_000))
+    const revision = service.rebuilt(packageName)!
+    expect(revision).not.toBe(before.rev)
+    expect(service.graph().entries[0]!.chunks).toEqual(before.chunks)
+    expect((await routeRequest(route, url)).body).toEqual(original.body)
+    expect((await routeRequest(route, chunkUrl(packageName, fileName, revision))).body).toEqual(original.body)
+    expect((await routeRequest(route, chunkUrl(packageName, fileName, before.rev))).status).toBe(404)
+    expect((await routeRequest(route, url)).headers).toEqual(original.headers)
+  })
+
+  it.each([
+    ['inline', false], ['inline', true], ['multiline', false], ['multiline', true],
+  ] as const)('serves %s debug-directive strings with a real map trailer: %s', async (literalKind, withMap) => {
+    const packageName = '@fixture/inline-debug-directive'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const executable = literalKind === 'inline'
+      ? 'const comment = `//# sourceURL=` + "template.js"; module.exports = { comment };\n'
+      : 'const comment = `first\n//# sourceURL=template.js`; module.exports = { comment };\n'
+    const code = executable + (withMap ? '//# sourceMappingURL=client.preview.js.map\n' : '')
+    writeFileSync(join(dirname(clientPath), fileName), code)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName, code }]))
+    const { service, route } = constructWithRoute([packageName])
+    const row = service.graph().entries[0]!
+    const response = await routeRequest(route, chunkUrl(packageName, fileName, row.chunks![fileName]!))
+    expect(response.status).toBe(200)
+    expect(response.body.toString('utf8')).toContain(executable)
+    const module = { exports: {} }
+    runInNewContext(response.body.toString('utf8'), { module })
+    expect(module.exports).toEqual({ comment: (literalKind === 'inline' ? '' : 'first\n') + '//# sourceURL=template.js' })
+    const mapUrl = chunkUrl(packageName, fileName, row.chunks![fileName]!).replace('.js?', '.js.map?')
+    const map = JSON.parse((await routeRequest(route, mapUrl)).body.toString('utf8')) as {
+      sections: { map: { sources: string[] } }[]
+    }
+    expect(map.sections[0]!.map.sources).toEqual([`/plugins/${packageName}/${fileName}`])
+  })
+
+  it('rejects old, unknown and extra-parameter chunk URLs after a completed lazy-code rebuild', async () => {
+    const packageName = '@fixture/changed-published-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const entry = 'module.exports = {}\n'
+    const first = 'module.exports = { marker: "first" }\n'
+    writeFileSync(chunkPath, first)
+    writeFileSync(clientPath, stampClientArtifact(entry, [{ fileName, code: first }]))
+    const { service, route } = constructWithRoute([packageName])
+    const original = service.graph().entries[0]!
+    const oldUrl = chunkUrl(packageName, fileName, original.chunks![fileName]!)
+    expect((await routeRequest(route, oldUrl)).status).toBe(200)
+
+    const next = 'module.exports = { marker: "next" }\n'
+    writeFileSync(chunkPath, next)
+    writeFileSync(clientPath, stampClientArtifact(entry, [{ fileName, code: next }]))
+    const stat = statSync(clientPath)
+    utimesSync(clientPath, stat.atime, new Date(stat.mtimeMs + 1_000))
+    service.rebuilt(packageName)
+    const current = service.graph().entries[0]!
+    const url = chunkUrl(packageName, fileName, current.chunks![fileName]!)
+    expect(url).not.toBe(oldUrl)
+    expect((await routeRequest(route, url)).body.toString('utf8')).toContain('"next"')
+    for (const invalid of [
+      oldUrl, url + '&extra=1', url + '&rev=other', url.replace(/\?rev=.*/u, ''),
+      chunkUrl(packageName, 'client.unpublished.js', current.rev),
+      chunkUrl(packageName, 'client.unpublished.js', current.chunks![fileName]!),
+    ]) expect((await routeRequest(route, invalid)).status).toBe(404)
+    expect((await routeRequest(route, chunkUrl(packageName, fileName, current.rev))).status).toBe(200)
+  })
+
+  it('refuses changed on-disk chunk bytes under an already published immutable URL', async () => {
+    const packageName = '@fixture/torn-published-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const code = 'module.exports = { marker: "published" }\n'
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName, code }]))
+    writeFileSync(join(dirname(clientPath), fileName), 'module.exports = { marker: "unpublished" }\n')
+    const { service, route } = constructWithRoute([packageName])
+    const row = service.graph().entries[0]!
+    const url = chunkUrl(packageName, fileName, row.chunks![fileName]!)
+    await expect(routeRequest(route, url)).rejects.toThrow('does not match its published chunk revision')
+  })
+
+  it('serves restored chunk bytes on the next explicit GET after a failed immutable response', async () => {
+    const packageName = '@fixture/restored-published-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const code = 'module.exports = { marker: "published" }\n'
+    const siblings = [{ fileName, code }]
+    writeFileSync(clientPath, stampClientArtifact('module.exports = { ui: 1 }\n', siblings))
+    writeFileSync(chunkPath, 'module.exports = { marker: "unpublished" }\n')
+    const { service, route } = constructWithRoute([packageName])
+    const before = service.graph().entries[0]!
+    const url = chunkUrl(packageName, fileName, before.chunks![fileName]!)
+    await expect(routeRequest(route, url)).rejects.toThrow('does not match its published chunk revision')
+
+    writeFileSync(chunkPath, code)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = { ui: 2 }\n', siblings))
+    const stat = statSync(clientPath)
+    utimesSync(clientPath, stat.atime, new Date(stat.mtimeMs + 1_000))
+    expect(service.rebuilt(packageName)).not.toBe(before.rev)
+    expect(service.graph().entries[0]!.chunks).toEqual(before.chunks)
+    const restored = await routeRequest(route, url)
+    expect(restored.status).toBe(200)
+    expect(restored.body.toString('utf8')).toContain('"published"')
+    expect(restored.body.toString('utf8')).not.toContain('"unpublished"')
+  })
+
+  it('keeps executable revisions independent of authored debug map changes', async () => {
+    const packageName = '@fixture/map-independent-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const code = 'module.exports = {}\n'
+    writeFileSync(chunkPath, code)
+    const bundle = stampClientArtifact('module.exports = {}\n', [{ fileName, code }])
+    writeFileSync(clientPath, bundle)
+    const { service } = constructWithRoute([packageName])
+    const original = service.graph()
+    writeFileSync(`${chunkPath}.map`, '{"version":3,"names":[],"sources":["src/changed.ts"],"mappings":"AAAA"}')
+    expect(service.rebuilt(packageName)).toBe(original.entries[0]!.rev)
+    expect(service.graph()).toBe(original)
+    expect(construct([packageName]).graph()).toEqual(original)
   })
 
   it('publishes a new chunk revision when a completed build rewrites only the entry timestamp', async () => {

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-25-workbench-html-markdown-previews.md
 document:
-  en: 56619c8f6026793075f558de25d7adb7a900a46e
-  zh: ecfe76ce3ab201919fa5784a37c662103afd15e4
+  en: 5b53d7031c8d9ad3d1983ec4d088103ccb6b3a42
+  zh: eaa8df218f953c830b056f66e2ee3f97e3788270
 /agent-note-workbench-file-previews-render-markdown-and-html-on-the-shared-workspace-resource-owner:
   en: 9c40a5471cc7aa8c
   zh: 0e6a92714445b89b
@@ -21,5 +21,5 @@ document:
   en: 62cbca1ee5b82aec
   zh: 19a04127229bd698
 /agent-note-workbench-file-previews-render-markdown-and-html-on-the-shared-workspace-resource-owner/consequences:
-  en: e1f355a4fc969204
-  zh: c37e4fee8247383f
+  en: 0dd9d86dfd0b85bd
+  zh: 2eb06c28a60bd62f

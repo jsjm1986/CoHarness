@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
 import { ExecutionIdentityError, GatewayExecutionIdentity, watchExecutionAccess } from './execution-identity.ts'
 import type { GatewayAccessMonitor } from './access-invalidation.ts'
+import { StreamPrincipalRequestError, type StreamPrincipalRenewals, type StreamLeaseRuntime } from './stream-principal-leases.ts'
 import { createRuntimeDocumentStoreStream, type RuntimeDocumentStoreHandler } from './runtime-document-store.ts'
 import type { GatewayRuntimeHandler } from './server.ts'
 import { DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_UPSTREAM_TIMEOUT_MS } from './config.ts'
@@ -101,6 +102,8 @@ const EVENT_ENVELOPE_KEYS = new Set([
 ])
 
 interface RuntimeApiDependencies {
+  /** Renew only socket registrations owned by this Gateway; absent disables private renewal. */
+  renewStreamPrincipals?: (runtime: StreamLeaseRuntime, value: unknown, runtimeCurrent: () => Promise<boolean>) => Promise<StreamPrincipalRenewals>
   /** Initialized organization invalidations; required for documentStore and streamed as hints to managed runtimes. */
   accessMonitor?: GatewayAccessMonitor
   /** Configured liveness interval for execution-watch connections. */
@@ -757,6 +760,17 @@ export function createRuntimeApiHandler(
           execution, budget: deps.resourceBudget }, subject, req, res, pathname, body)
       }
       const url = new URL(req.url ?? '/', 'http://runtime')
+      if (pathname === '/internal/runtime/stream-principals/renew' && req.method === 'POST') {
+        if (deps.renewStreamPrincipals === undefined) { send(res, 503, { error: 'stream-principal-renewal-unavailable' }); return true }
+        res.setHeader('cache-control', 'no-store')
+        send(res, 200, await deps.renewStreamPrincipals(subject, JSON.parse(body), async () => {
+          const current = await authenticate(req, false)
+          return current !== null && current.organizationId === subject.organizationId
+            && current.target.kind === subject.target.kind && current.target.id === subject.target.id
+            && current.generation === subject.generation
+        }))
+        return true
+      }
       if (pathname === '/internal/runtime/execution/watch' && req.method === 'GET') {
         if (deps.accessMonitor === undefined) { send(res, 503, { error: 'execution-watch-unavailable' }); return true }
         watchExecutionAccess(deps.accessMonitor, res, deps.executionWatchHeartbeatMs ?? DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS,
@@ -1811,6 +1825,10 @@ export function createRuntimeApiHandler(
     } catch (error) {
       if (error instanceof NodeContentUnavailable) {
         send(res, error.status, { error: error.code, message: error.message })
+        return true
+      }
+      if (error instanceof StreamPrincipalRequestError) {
+        send(res, 400, { error: error.code })
         return true
       }
       if (error instanceof ExecutionIdentityError) {

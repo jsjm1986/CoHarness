@@ -28,6 +28,7 @@ interface Actions {
   readCatalog?: (signal: AbortSignal, visible?: { scope?: string; q?: string; cursor?: string }) => Promise<WorkbenchCatalog>
   listWorkbenches?: () => readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
   currentWorkbench?: () => { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number } | undefined
+  needsCatalogRestore?: () => boolean
   createWorkbench?: (name: string) => string
   renameWorkbench?: (id: string, name: string) => void
   duplicateWorkbench?: (id: string, name: string) => string
@@ -66,9 +67,10 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
  * @returns the toolbar and its controlled picker dialog.
  */
 export function WorkbenchToolbar({
-  viewport, tabbed, inline = false, layout, onSelectLayout, toolsHostId, useStore, actions, useSessions, useWorkspaces, useDeployment,
-  chooseSession, focusSession, createSession, hydrateCatalog, readCatalog, readProjectDisplay, moreComputers, catalogAuthority, catalogUnavailable, setMode,
-  listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
+  viewport, tabbed, inline = false, layout, onSelectLayout, toolsHostId, useStore, actions, useSessions,
+  useWorkspaces, useDeployment, chooseSession, focusSession, createSession, hydrateCatalog, readCatalog,
+  readProjectDisplay, moreComputers, catalogAuthority, catalogUnavailable, setMode, listWorkbenches,
+  currentWorkbench, needsCatalogRestore, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
   listWorkspaceDirectory, openWorkspaceResource, filesAvailable, openFiles, t,
 }: Props) {
@@ -124,10 +126,13 @@ export function WorkbenchToolbar({
   const remoteScope = paged ? workspace : ''
   const remoteQuery = paged ? query : ''
   const remotePage = paged ? continuation : undefined
+  const restoreDemand = needsCatalogRestore?.() === true
   useEffect(() => {
+    // Chooser opens pull the directory each time; a saved layout awaiting
+    // catalog reconciliation pulls once so the restore evaluation has candidates.
     const closing = wasOpen.current && !pickerOpen
     wasOpen.current = pickerOpen
-    if (closing) return
+    if (closing || (!pickerOpen && !restoreDemand)) return
     const abort = new AbortController()
     setCatalogPhase('loading')
     const token = pickerOpen && revision === receivedRevision && remotePage?.scope === remoteScope && remotePage.query === remoteQuery
@@ -159,7 +164,7 @@ export function WorkbenchToolbar({
       catalogUnavailable?.()
     })
     return () => { abort.abort() }
-  }, [pickerOpen, catalogAttempt, deployment.context?.revision, remoteScope, remoteQuery, remotePage, revision])
+  }, [pickerOpen, catalogAttempt, restoreDemand, deployment.context?.revision, remoteScope, remoteQuery, remotePage, revision])
   useEffect(() => () => {
     const request = pendingOperation.current
     pendingOperation.current = undefined

@@ -16,6 +16,7 @@ import open from 'open'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Inspector from '../src/index.ts'
 import { INSPECTOR_BOOTSTRAP_PATH } from '../src/shared/web.ts'
+import { parseInspectorClientBootstrap } from '../src/shared/bridge/control-codec.ts'
 
 vi.mock('open', () => ({ default: vi.fn(async () => undefined), apps: { chrome: 'chrome' } }))
 
@@ -74,7 +75,9 @@ describe('experimental Inspector through a real Loader composition', () => {
       name: 'cordis:include',
       config: {
         path: pathToFileURL(configPath).href,
-        patches: [{ insert: [inspector] }, { id: 'experimental-inspector', config: { port: 0, captureFetch: false } }],
+        patches: [{ insert: [inspector] }, { id: 'experimental-inspector', config: {
+          port: 0, captureFetch: false, clientOrigins: ['https://inspector.local.example'],
+        } }],
       },
     })
     await context.loader.await()
@@ -92,7 +95,9 @@ describe('experimental Inspector through a real Loader composition', () => {
       expect((await context!.inspector.cordis.getTree()).host?.source.kind).toBe('host')
     })
     const bootstrap = await httpFetch(connection, new Request(`http://localhost${INSPECTOR_BOOTSTRAP_PATH}`))
-    expect(await bootstrap.json()).toHaveProperty('endpoint', expect.stringContaining('/ingest'))
+    const parameters = parseInspectorClientBootstrap(await bootstrap.json())
+    expect(parameters.endpoint).toContain('/ingest')
+    expect(parameters.clientOrigins).toEqual(['https://inspector.local.example'])
 
     await inspectorEntry!.fiber!.dispose()
     expect(context.get('inspector')).toBeUndefined()

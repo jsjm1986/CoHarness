@@ -11,6 +11,8 @@ kind: "package-reference"
 
 client entry 还持有 slot outlet、会话 provider 以及 observable 到 uSES 绑定的 React 实现。业务插件通过带类型的 slot `hooks` 传递裸 observable source；渲染器在 outlet 处完成绑定。`SessionProvider` 未传 id 时跟随当前选择，也可以为多 pane surface 绑定一个明确的已列出 Session。插件在 `slots`、`sessions` 和 `connection` 就绪后激活，投影当前会话标题，并执行全程序唯一一次上下文级 `renderSlot('root')` 调用。React、React DOM、Cordis、ui-slots 和 ui-primitives 通过 web 外壳的静态模块表保持同一浏览器身份；本包则以动态客户端 bundle 到达。
 
+显式 Session 绑定在所持代次或提供方 roster 变化时更新，即使当前选择未变也如此。迟到的绑定无需聚焦即可替换空分支；退役后撤下正文。未变 bundle 保持身份，因此另一个窗格的生命周期不会替换当前 bundle。
+
 认证账号变化时，Connection 重载页面之前立即卸载全部自有应用根节点。组件清理失败仍会清空私有 DOM 内容，不能在释放期间继续显示另一个账号的页面。
 
 ## 概述

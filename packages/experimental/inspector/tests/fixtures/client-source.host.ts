@@ -2,6 +2,7 @@
 
 import { Worker } from 'node:worker_threads'
 import type { InspectorClientBootstrap } from '../../src/shared/bridge/messages/control.ts'
+import type { InspectorSourceId } from '../../src/shared/bridge/ids.ts'
 import type { CordisRuntimeTree } from '../../src/shared/cordis/model.ts'
 import type { InspectorJsonValue } from '../../src/shared/json.ts'
 
@@ -16,6 +17,7 @@ interface ClientFixtureSourceCatalog {
 /** Options for one isolated Client fixture. */
 export interface ClientFixtureOptions {
   readonly label?: string
+  readonly sourceId?: InspectorSourceId
   readonly sourceCatalog?: ClientFixtureSourceCatalog
 }
 
@@ -51,6 +53,7 @@ export class InspectorClientFixture {
       workerData: {
         bootstrap,
         label: options.label ?? 'Test Client',
+        ...(options.sourceId === undefined ? {} : { sourceId: options.sourceId }),
         ...(options.sourceCatalog === undefined ? {} : { sourceCatalog: options.sourceCatalog }),
       },
     })

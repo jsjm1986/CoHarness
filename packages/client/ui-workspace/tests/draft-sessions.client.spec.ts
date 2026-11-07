@@ -10,6 +10,7 @@ function fixture() {
     ids: [a, b, ordinary], byId: Object.fromEntries([a, b, ordinary].map(key => [key, {
       id: key, displayTitle: '', blank: key !== ordinary, running: false, updatedAt: 0,
     }])), archivedById: {}, phase: 'ready', current: ordinary, currentAddress: undefined,
+    state: 'idle', error: null,
     subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
   })
   const counts = new Map([a, b].map(key => [key, createSnapshotStore<SessionRetainInfo>({ referenceCount: 0, retainedBy: {} })]))

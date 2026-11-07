@@ -109,8 +109,9 @@ async function loadComposition(): Promise<{ ctx: Context; grantsFile: string; en
 describe('remote-desktop-vnc real composition', () => {
   it('reloads removed endpoints when atomic replacement preserves the modification timestamp', async () => {
     root = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-composition-'))
+    const upstream = await fakeVnc()
     const endpointsFile = join(root, 'endpoints.json'), timestamp = new Date('2020-01-01T00:00:00Z')
-    await writeFileAtomic(endpointsFile, JSON.stringify({ endpoints: [{ nodeId: 'n1', host: '127.0.0.1', port: 5900 }] }), { mode: 0o600 })
+    await writeFileAtomic(endpointsFile, JSON.stringify({ endpoints: [{ nodeId: 'n1', host: '127.0.0.1', port: upstream.port }] }), { mode: 0o600 })
     await utimes(endpointsFile, timestamp, timestamp)
     await writeFile(join(root, 'cordis.yml'), [
       '- id: remote-desktop-vnc', "  name: '@deepseek-ai/dsh-remote-desktop-vnc'", '  config:',

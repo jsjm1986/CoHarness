@@ -20,6 +20,8 @@ Status: implemented
 
 ## 备选方案
 
+**由当前 Session 监听器选择 Sidebar 前台。** 未采用：框架可以为已打开的文档固定另一个 Session。第二个选择写入方可能在固定目标未变时隐藏文档并折叠框架轨道。`RightbarRoot` 根据解析后的框架目标持有前台选择；View 集合负责引用保留和释放。
+
 **逐字采用上游的 `session-view.ts` 保留机制。** 否决：它写在本分叉不携带的 controller `SessionReferenceSourceMap` 上；`SidebarSessionViews` 在 runtime 对象层上保留了相同的保留语义。
 
 **在 preparing 分支旁保留 `StateDot` 状态指示。** 否决：上游修复让每种状态都保留工具字形、经错误摘要传达失败，因此指示符在两处元素里重复了同一事实。

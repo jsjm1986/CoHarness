@@ -214,7 +214,7 @@ describe('ScopeControl', () => {
     ], nextCursor: null } })
     render(<ScopeControl {...scopeProps(state, { switchScope })} />)
     fireEvent.click(screen.getByRole('button', { name: t('scope.aria') }))
-    fireEvent.click(within(screen.getByRole('group', { name: t('scope.aria') })).getByRole('button', { name: '个人空间' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: t('scope.aria') })).getByRole('button', { name: '个人空间' }))
     expect(switchScope).toHaveBeenCalledExactlyOnceWith({ kind: 'personal', runtimeId: available })
   })
   it('keeps one personal entry and exact fixed-computer project destinations', () => {
@@ -233,7 +233,7 @@ describe('ScopeControl', () => {
     render(<ScopeControl {...scopeProps(state, { switchScope, loadEnvironments })} />)
     const trigger = screen.getByRole('button', { name: t('scope.aria') })
     fireEvent.click(trigger)
-    const page = () => within(screen.getByRole('group', { name: t('scope.aria') }))
+    const page = () => within(screen.getByRole('dialog', { name: t('scope.aria') }))
     expect(page().queryByRole('button', { name: /审计平台/ })).toBeNull()
     expect(page().getAllByRole('button', { name: '个人空间' })).toHaveLength(1)
     expect(page().queryByRole('button', { name: /个人空间.*Computer/ })).toBeNull()
@@ -290,10 +290,10 @@ describe('ScopeControl', () => {
     fireEvent.click(trigger)
     // Visibility staging lives one level down; the root row shows the value.
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
-    fireEvent.click(screen.getByRole('button', { name: /仅自己/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /仅自己/ }))
     expect(stageVisibility).toHaveBeenCalledWith('private')
     // Staging keeps the picker open; Escape pops back to the root view.
-    expect(screen.getByRole('button', { name: /项目公开/ })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /项目公开/ })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
 
@@ -353,7 +353,7 @@ describe('ScopeControl', () => {
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
 
     // The wide surface is the push page, not the rail's floating menu.
-    const page = screen.getByRole('group', { name: '切换个人或项目空间' })
+    const page = screen.getByRole('dialog', { name: '切换个人或项目空间' })
     expect(page.className.split(/\s+/)).toContain(css.scopePage)
     const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索空间或电脑' })
     expect(search.placeholder).toBe('搜索空间或电脑')
@@ -371,7 +371,7 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: '项目 1' })).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('group', { name: '切换个人或项目空间' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '切换个人或项目空间' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
     expect(screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索空间或电脑' }).value).toBe('')
     view.unmount()
@@ -482,7 +482,7 @@ describe('ScopeControl', () => {
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
     expect(screen.getByText('只有创建者可以查看')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '新建项目空间' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    fireEvent.click(screen.getByRole('button', { name: '返回空间管理' }))
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
     // Tapping a scope row selects it and dismisses the page.
     fireEvent.click(screen.getByRole('button', { name: /审计平台/ }))

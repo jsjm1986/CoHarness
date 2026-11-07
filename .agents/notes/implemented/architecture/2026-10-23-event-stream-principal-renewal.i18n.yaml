@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-event-stream-principal-renewal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-event-stream-principal-renewal.md
+document:
+  en: a7f2aadac969f9744bc4d75c88d24f3eea63ea46
+  zh: 76116a35ca36714545940004006d206da88ac3a1
+/agent-note-socket-owned-renewal-of-short-gateway-principals:
+  en: 2f26bf03107f487d
+  zh: fe823c2425d34dc8
+/agent-note-socket-owned-renewal-of-short-gateway-principals/problem:
+  en: d5f8c5920e026031
+  zh: 596a13aaacd929d1
+/agent-note-socket-owned-renewal-of-short-gateway-principals/decision:
+  en: b1cdd202546cbb9e
+  zh: 2916278dc6681cf7
+/agent-note-socket-owned-renewal-of-short-gateway-principals/alternatives-considered:
+  en: a770fdc09e7e0ab7
+  zh: 8c81969c82f1ee1f
+/agent-note-socket-owned-renewal-of-short-gateway-principals/consequences:
+  en: c9da05348402cfdc
+  zh: 52bfc9fabe56cefe
+/agent-note-socket-owned-renewal-of-short-gateway-principals/verification:
+  en: e557f66d56044ff6
+  zh: b976b2df0eab1627

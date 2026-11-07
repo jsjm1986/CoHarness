@@ -520,9 +520,10 @@ it('reports failed Worker termination during canceled request cleanup', async ()
   try {
     await entered
     controller.abort(new Error('Cancel active call'))
+    const cleanup = expect(runtime.close()).rejects.toThrow('Worker shutdown refused')
     worker.postMessage({ method: 'fixture-release' })
     await canceled
-    await expect(runtime.close()).rejects.toThrow('Worker shutdown refused')
+    await cleanup
   } finally {
     refused.mockRestore()
     await terminate()

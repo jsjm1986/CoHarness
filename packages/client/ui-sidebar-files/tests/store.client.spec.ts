@@ -60,6 +60,53 @@ describe('createFilesStore', () => {
     expect(store.getSnapshot().byTab[TAB]!.levels[ROOT]).toEqual({ kind: 'ready', level: LEVEL })
   })
 
+  it('keeps unchanged refreshes out of the published tree while retaining entry freshness', () => {
+    const store = createFilesStore().create()
+    store.actions.start(TAB, ROOT)
+    store.actions.loaded(TAB, ROOT, LEVEL)
+    const before = store.getSnapshot()
+    let publications = 0
+    const stop = store.subscribe(() => { publications++ })
+    try {
+      for (let update = 0; update < 20; update++) {
+        store.actions.loaded(TAB, ROOT, { entries: LEVEL.entries.map(entry => ({ ...entry })), truncated: false })
+      }
+      expect(store.getSnapshot()).toBe(before)
+      expect(publications).toBe(0)
+      store.actions.loaded(TAB, ROOT, {
+        entries: LEVEL.entries.map(entry => entry.type === 'file' ? { ...entry, version: 'v2' } : { ...entry }),
+        truncated: false,
+      })
+      expect(store.getSnapshot()).not.toBe(before)
+      expect(publications).toBe(1)
+      expect(store.getSnapshot().byTab[TAB]!.levels[ROOT]).toMatchObject({ level: {
+        entries: [LEVEL.entries[0], { ...LEVEL.entries[1], version: 'v2' }],
+      } })
+    } finally { stop() }
+  })
+
+  it.each(['name', 'path', 'type', 'bytes', 'version', 'truncated', 'order', 'removed'] as const)(
+    'publishes a refreshed directory when %s changes', (field) => {
+      const store = createFilesStore().create()
+      store.actions.start(TAB, ROOT)
+      store.actions.loaded(TAB, ROOT, LEVEL)
+      const before = store.getSnapshot()
+      const entries = LEVEL.entries.map(entry => ({ ...entry }))
+      if (field === 'order') entries.reverse()
+      else if (field === 'removed') entries.pop()
+      else if (field !== 'truncated') {
+        const entry = entries[1]!
+        if (field === 'type') entry.type = 'directory'
+        else if (field === 'bytes') entry.bytes = 24
+        else entry[field] = 'changed'
+      }
+      const level = { entries, truncated: field === 'truncated' }
+      store.actions.loaded(TAB, ROOT, level)
+      expect(store.getSnapshot()).not.toBe(before)
+      expect(store.getSnapshot().byTab[TAB]!.levels[ROOT]).toEqual({ kind: 'ready', level })
+    },
+  )
+
   it('toggles a directory in and out of the expanded set without touching its level', () => {
     const store = createFilesStore().create()
     const { actions } = store
