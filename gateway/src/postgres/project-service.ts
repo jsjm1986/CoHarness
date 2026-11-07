@@ -292,8 +292,20 @@ export class PostgresProjectService {
    * path that already exists on this node.
    */
   async ensureSteward(input: { name: string; path: string; createdBy?: number }): Promise<ProjectRow> {
+    const canonical = resolveProjectDirectory(input.path)
     const existing = await this.stewardProject()
     if (existing !== null) {
+      // The reserved mount follows configuration: a workspace path changed
+      // since seeding reconciles here the same way recoverSteward reconciles
+      // a lost mount. A path another project already claims surfaces as a
+      // conflict rather than being stolen.
+      if (existing.path !== canonical)
+        await this.context.pool.query(
+          `UPDATE harness.project_mounts pm SET local_path=$4,canonical_path=$4
+           FROM harness.projects p WHERE p.organization_id=$1 AND p.public_id=$2 AND p.kind='steward'
+           AND pm.organization_id=p.organization_id AND pm.project_id=p.id AND pm.node_id=$3 AND pm.status='active'`,
+          [this.context.organizationId, existing.id, this.context.nodeId, canonical],
+        )
       const detail = await this.getById(existing.id)
       if (detail !== null) return detail
     }
@@ -302,7 +314,6 @@ export class PostgresProjectService {
     // bound through steward_node_id. The node name keeps the reserved name
     // unique across nodes.
     const name = normalizeProjectName(`${input.name}·${this.context.nodeName}`)
-    const canonical = resolveProjectDirectory(input.path)
     const seed = (seedName: string) => this.insert({
       name: seedName,
       resolveDirectory: () => canonical,

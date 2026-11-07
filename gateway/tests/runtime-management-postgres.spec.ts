@@ -157,6 +157,22 @@ describePg('personal Runtime management across computers', () => {
       [f.organizationId, 'steward'])).rows[0]!.count).toBe(2)
   })
 
+  it('reconverges the bound steward mount when the configured workspace path moves', async () => {
+    const f = await fixture(), pathA = join(f.root, 'steward-a'), moved = join(f.root, 'steward-moved')
+    await mkdir(pathA); await mkdir(moved)
+    const serviceA = new PostgresProjectService(f.a, f.cfgA)
+    const seeded = await serviceA.ensureSteward({ name: 'Reserved maintenance', path: pathA })
+    // A workspace path that changed since seeding must update the live mount,
+    // not leave the Runtime pointed at the retired directory.
+    const converged = await serviceA.ensureSteward({ name: 'Reserved maintenance', path: moved })
+    expect(converged.id).toBe(seeded.id)
+    const mount = await pool.query<{ local_path: string; canonical_path: string }>(`SELECT pm.local_path,pm.canonical_path
+      FROM harness.project_mounts pm JOIN harness.projects p ON p.id=pm.project_id AND p.organization_id=pm.organization_id
+      WHERE pm.organization_id=$1 AND p.kind='steward' AND pm.node_id=$2 AND pm.status='active'`, [f.organizationId, f.a.nodeId])
+    expect(await Promise.all(mount.rows.map(row => realpath(row.local_path)))).toEqual([await realpath(moved)])
+    expect(await Promise.all(mount.rows.map(row => realpath(row.canonical_path)))).toEqual([await realpath(moved)])
+  })
+
   it('retains override revisions through inheritance and refuses stale editors and administrators', async () => {
     const f = await fixture()
     expect(await f.serviceA.policy(f.admin)).toMatchObject({ revision: '1', maxTotal: 8, maxPerNode: 4, source: 'organization' })
