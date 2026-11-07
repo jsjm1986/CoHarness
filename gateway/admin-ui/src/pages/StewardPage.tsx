@@ -81,14 +81,22 @@ export function StewardPage() {
     setNotice('')
     try {
       await setStewardPolicy({ kind: 'user', id: entry.userId, enabled: grant, revision: entry.revision })
-      await reload()
-      setNotice(grant ? t('noticeGranted', { name: entry.username }) : t('noticeRevoked', { name: entry.username }))
-      setPending(null)
     } catch (cause) {
       setError(t('grantRejected', { error: cause instanceof Error ? cause.message : t('operationFailed') }))
-    } finally {
       setSaving(false)
+      return
     }
+    try {
+      await reload()
+    } catch (cause) {
+      // The write already landed; only the follow-up read failed.
+      setError(t('errorReread', { error: cause instanceof Error ? cause.message : t('operationFailed') }))
+      setSaving(false)
+      return
+    }
+    setNotice(grant ? t('noticeGranted', { name: entry.username }) : t('noticeRevoked', { name: entry.username }))
+    setPending(null)
+    setSaving(false)
   }
 
   const members = overview?.members ?? []

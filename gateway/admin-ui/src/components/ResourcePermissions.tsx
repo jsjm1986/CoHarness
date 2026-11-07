@@ -66,7 +66,8 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
 
   useEffect(() => {
     const owner = owners.find(item => keyOf(item) === selected)
-    if (owner === undefined) return
+    // A vanished owner must not leave its stale policy editable.
+    if (owner === undefined) { setPolicy(null); return }
     const attempt = ++generation.current
     const controller = new AbortController()
     setLoading(true)

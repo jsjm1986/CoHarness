@@ -63,6 +63,20 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
   // moment the tab is both live and on screen. An operator who backs out of
   // fullscreen is not re-pulled until the body remounts.
   const fullscreenAsked = useRef(false)
+
+  // A retargeted tab (the guide opens targets with replaceTab) must not carry
+  // the previous target's picks, fullscreen memory, or rendered status: drop
+  // them synchronously so no render ever mixes two targets.
+  const targetKey = target === undefined ? undefined : `${target.nodeId}/${target.desktop ?? ''}`
+  const [shownKey, setShownKey] = useState(targetKey)
+  if (shownKey !== targetKey) {
+    setShownKey(targetKey)
+    setPhase({ kind: 'loading' })
+    picks.current = { zoom: 'fit', quality: 'balanced' }
+    fullscreenAsked.current = false
+  }
+  const sameTarget = (status: RemoteDesktopStatusView): boolean =>
+    target !== undefined && status.target.nodeId === target.nodeId && status.target.desktop === target.desktop
   useEffect(() => {
     if (phase.kind !== 'live' || !tab.visible || fullscreenAsked.current || sidebar.fullscreen) return
     fullscreenAsked.current = true
@@ -82,7 +96,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
 
   const attachNow = async (current: RemoteDesktopStatusView): Promise<void> => {
     const controller = gate.current
-    if (target === undefined || controller === undefined) return
+    if (target === undefined || controller === undefined || !sameTarget(current)) return
     setPhase({ kind: 'attaching', status: current })
     try {
       const attachment = await attach(target, current.level, controller.signal)
@@ -95,7 +109,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
 
   const consentNow = async (current: RemoteDesktopStatusView): Promise<void> => {
     const controller = gate.current
-    if (target === undefined || controller === undefined) return
+    if (target === undefined || controller === undefined || !sameTarget(current)) return
     setPhase({ kind: 'attaching', status: current })
     try {
       await confirm(target, current.level, controller.signal)
@@ -193,6 +207,8 @@ function RfbSurface({ openScreen, url, spec, t, fullscreen, onPanelMode, onRecon
       onCredentialsRequired: (types) => { setChallenge(types) },
       onDisconnected: () => { setClosed(true) },
     })
+    setUsername('')
+    setPassword('')
     screen.current = next
     next.setZoom(picks.current.zoom)
     next.setQuality(picks.current.quality)
