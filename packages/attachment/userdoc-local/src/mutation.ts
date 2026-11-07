@@ -100,13 +100,21 @@ export class DocumentMutationExecutor {
         await admitDocumentWrite(this.admit, async () => {
           try {
             await this.storage.bindDomain(this.store.rootId)
-          } catch {
-            await this.storage.recoverDomainMount(this.store.rootId)
+          } catch (conflict) {
+            try {
+              await this.storage.recoverDomainMount(this.store.rootId)
+            } catch {
+              throw conflict
+            }
           }
           try {
             this.store.bindStorage(this.storage.binding)
-          } catch {
-            this.store.recoverMount(this.storage.binding)
+          } catch (conflict) {
+            try {
+              this.store.recoverMount(this.storage.binding)
+            } catch {
+              throw conflict
+            }
           }
           await ensureIdentityDirectory(this.storage, 'anchors')
         })
@@ -114,8 +122,12 @@ export class DocumentMutationExecutor {
       } else {
         try {
           await this.storage.bindDomain(this.store.rootId, false)
-        } catch {
-          await this.storage.recoverDomainMount(this.store.rootId)
+        } catch (conflict) {
+          try {
+            await this.storage.recoverDomainMount(this.store.rootId)
+          } catch {
+            throw conflict
+          }
         }
       }
       return operation()

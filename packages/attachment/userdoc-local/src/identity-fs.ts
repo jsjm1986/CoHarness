@@ -124,8 +124,12 @@ export class DocumentIdentityFs {
           }
           try {
             await storage.bindDomain(legacy.rootId)
-          } catch {
-            await storage.recoverDomainMount(legacy.rootId)
+          } catch (conflict) {
+            try {
+              await storage.recoverDomainMount(legacy.rootId)
+            } catch {
+              throw conflict
+            }
           }
         }
         const store = new DocumentIdentityStore(root, database)
