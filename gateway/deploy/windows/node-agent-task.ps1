@@ -30,15 +30,59 @@ param(
   [Parameter(ParameterSetName = 'Install')][Parameter(ParameterSetName = 'Watchdog')][string]$AlsoWatch = ''
 )
 $ErrorActionPreference = 'Stop'
+# True only when the task hosts the agent itself: the watchdog's registered
+# action also names this script, so matching the -Run invocation keeps a
+# watchdog (or ad-hoc restart) task restart from sweeping a live agent.
+function Test-HostsAgent([object[]]$Actions) {
+  foreach ($action in $Actions) {
+    if ("$($action.Execute) $($action.Arguments)" -match 'node-agent-task\.ps1.*?-Run\b') { return $true }
+  }
+  return $false
+}
+# Kill processes still running this install's agent entry. No executable-name
+# filter: -NodeExe may name a pinned binary, and a surviving cmd.exe shim holds
+# the same command line. The GatewayDir scope keeps a co-hosted second install
+# or a manual dev run alive.
+function Sweep-AgentOrphans([object[]]$Actions) {
+  $gatewayDir = $null
+  foreach ($action in $Actions) {
+    if ($action.Arguments -match '-GatewayDir\s+"([^"]+)"') { $gatewayDir = $Matches[1] }
+  }
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match 'node-agent-main\.js' -and ($null -eq $gatewayDir -or $_.CommandLine -like ('*' + [WildcardPattern]::Escape($gatewayDir) + '*')) } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
 if ($Install -or $Uninstall -or $Restart) {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
   if (-not [Security.Principal.WindowsPrincipal]::new($identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'registering, removing, or restarting the agent task requires an elevated shell'
   }
 }
+if ($TaskName -match '[<>"|]') { throw 'TaskName must not contain any of <>"|' }
+# Every path and executable name lands inside cmd /c quoting or the registered
+# argument string; a literal " breaks quoting and %FOO% is env-expanded by cmd.
+foreach ($p in @($GatewayDir, $StateRoot, $LogFile, $ConnectionFile, $EnvFile, $NodeExe)) {
+  if ($p -match '["%]') { throw 'paths and executable names must not contain " or %' }
+}
 if ($Uninstall) {
+  # Unregistering never terminates a running instance: the watchdog goes first
+  # so it cannot relaunch the agent, then the agent task is ended and swept, or
+  # the orphaned node.exe keeps heartbeating on its channel lease indefinitely.
   if (Get-ScheduledTask -TaskName "$TaskName-watchdog" -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName "$TaskName-watchdog" -Confirm:$false }
-  if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false }
+  $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $TaskName }
+  if ($task) {
+    $actions = $task.Actions
+    if (Test-HostsAgent $actions) {
+      & cmd.exe /c "schtasks /end /tn `"$TaskName`" >nul 2>nul" | Out-Null
+      $deadline = (Get-Date).AddSeconds(30)
+      do {
+        Start-Sleep -Milliseconds 500
+        $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $TaskName }
+      } until ($task.State -ne 'Running' -or (Get-Date) -gt $deadline)
+      Sweep-AgentOrphans $actions
+    }
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+  }
   Write-Output "removed tasks $TaskName and $TaskName-watchdog"
   return
 }
@@ -49,6 +93,12 @@ if ($Install) {
   $StateRoot = [IO.Path]::GetFullPath($StateRoot)
   if (-not $LogFile) { $LogFile = Join-Path $StateRoot 'node-agent.log' } else { $LogFile = [IO.Path]::GetFullPath($LogFile) }
   if ($ConnectionFile) { $ConnectionFile = [IO.Path]::GetFullPath($ConnectionFile) }
+  # The first launch appends to the agent log with cmd >> — it fails silently
+  # when its parent directory does not exist yet, leaving no diagnostics.
+  New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
+  $logDir = Split-Path -Parent $LogFile
+  if ($logDir) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+  if ($ConnectionFile) { $connectionDir = Split-Path -Parent $ConnectionFile; if ($connectionDir) { New-Item -ItemType Directory -Path $connectionDir -Force | Out-Null } }
   $runArgs = ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -Run' -f $PSCommandPath)
   $runArgs += (' -GatewayDir "{0}" -StateRoot "{1}"' -f $GatewayDir, $StateRoot)
   if ($ConnectionFile) { $runArgs += (' -ConnectionFile "{0}"' -f $ConnectionFile) }
@@ -90,6 +140,10 @@ if ($Watchdog) {
     if ($LogFile) {
       $logDir = Split-Path -Parent $LogFile
       if ($logDir -and -not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+      # A sustained crash loop appends one line per pass forever; roll at 1MB.
+      if ((Test-Path -LiteralPath $LogFile) -and (Get-Item -LiteralPath $LogFile).Length -gt 1MB) {
+        Move-Item -LiteralPath $LogFile -Destination "$LogFile.1" -Force
+      }
       Add-Content -LiteralPath $LogFile -Value ('{0} watchdog: restarted {1} (state was {2})' -f (Get-Date -Format 'o'), $name, $task.State)
     }
   }
@@ -109,15 +163,8 @@ if ($Restart) {
   # before the next start or the second agent loops on already-connected while
   # the orphan holds the channel lease — but only when the task being restarted
   # is the agent host itself, or a sibling task restart would kill a live agent.
-  $hostsAgent = $false
-  foreach ($action in $current.Actions) {
-    if ("$($action.Execute) $($action.Arguments)" -match 'node-agent-task\.ps1') { $hostsAgent = $true }
-  }
-  if ($hostsAgent) {
-    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-      Where-Object { $_.CommandLine -match 'node-agent-main\.js' } |
-      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-  }
+  $hostsAgent = Test-HostsAgent $current.Actions
+  if ($hostsAgent) { Sweep-AgentOrphans $current.Actions }
   $deadline = (Get-Date).AddSeconds(30)
   $stoppedSeen = $false
   do {
@@ -129,10 +176,15 @@ if ($Restart) {
   # A still-Running state means /end never landed (access denied, scheduler
   # stall); starting now would be dropped by IgnoreNew while reporting success.
   if (-not $stoppedSeen -and $state -eq 'Running') { throw "task $TaskName did not stop within 30 seconds" }
+  # A mid-launch cmd.exe shim can spawn the agent between the first sweep and
+  # the confirmed stop; sweep again while the task is down. Skip when the state
+  # is Running: that agent is the watchdog's legitimate relaunch, not an orphan.
+  if ($hostsAgent -and $stoppedSeen -and $state -ne 'Running') { Sweep-AgentOrphans $current.Actions }
   # Running again after a real stop means the watchdog beat us to it — that is
   # the restart we wanted, not a failure.
   if ($state -ne 'Running') {
     schtasks /run /tn "$TaskName" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "task $TaskName failed to start (schtasks exit $LASTEXITCODE)" }
     $deadline = (Get-Date).AddSeconds(30)
     do { Start-Sleep -Milliseconds 500; $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $TaskName }; $state = if ($task) { $task.State } else { '' } } until ($state -eq 'Running' -or (Get-Date) -gt $deadline)
     if ($state -ne 'Running') { throw "task $TaskName did not reach Running after restart" }
@@ -146,7 +198,14 @@ if ($Run) {
   # applied before the unit's own assignments, matching systemd precedence
   # (Environment= overrides EnvironmentFile=).
   if ($EnvFile -and (Test-Path -LiteralPath $EnvFile)) {
-    foreach ($line in Get-Content -LiteralPath $EnvFile -Encoding UTF8) {
+    $lines = @(Get-Content -LiteralPath $EnvFile -Encoding UTF8)
+    # A UTF-16 file (what PowerShell 5.1 '>' redirect writes) decodes as
+    # mojibake under UTF8 so every KEY= line silently fails; re-read with BOM
+    # auto-detection when nothing parsed.
+    if (-not ($lines | Where-Object { $_ -match '^\s*[A-Za-z_][A-Za-z0-9_]*=' } | Select-Object -First 1)) {
+      $lines = @(Get-Content -LiteralPath $EnvFile)
+    }
+    foreach ($line in $lines) {
       if ($line -match '^\s*#' -or $line -notmatch '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { continue }
       $value = $Matches[2].Trim()
       # systemd EnvironmentFile strips one pair of surrounding quotes; match it.

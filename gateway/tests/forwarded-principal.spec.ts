@@ -1,8 +1,8 @@
-import { generateKeyPairSync, createPublicKey, sign } from 'node:crypto'
+import { createHash, generateKeyPairSync, createPublicKey, sign } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
 import { GatewayPrincipalSigner } from '../src/principal.ts'
-import { forwardIssuerOf, verifyGatewayForward } from '../src/forwarded-principal.ts'
+import { forwardIssuerOf, forwardRequestMatches, verifyGatewayForward } from '../src/forwarded-principal.ts'
 import type { RuntimeNodeId } from '../src/runtime-catalog.ts'
 
 const USER: UserRow = {
@@ -105,5 +105,32 @@ describe('forwarded principal assertions', () => {
     expect(verifyGatewayForward(forge(now, now + 0.5), publicKey, input)).toBeNull()
     // A sane window still verifies.
     expect(verifyGatewayForward(forge(now, now + 100), publicKey, input)).not.toBeNull()
+  })
+
+  it('binds verified claims to the exact request and forwarded session', () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+    const now = 100_000
+    const signer = new GatewayPrincipalSigner(privateKey, 'acme', 1000)
+    const sessionHash = createHash('sha256').update('session-token').digest('hex')
+    const assertion = signer.issueForward({
+      issuerNode: NODE_A, audienceNode: NODE_B, user: USER, now,
+      request: { method: 'POST', path: '/account/api/scope', sessionHash },
+    })
+    const claims = verifyGatewayForward(assertion, publicKey, {
+      audienceNode: NODE_B, organization: 'acme', now,
+    })
+    expect(claims).not.toBeNull()
+    // The issued request line and session cookie match.
+    expect(forwardRequestMatches(claims!, { method: 'POST', path: '/account/api/scope', sessionToken: 'session-token' })).toBe(true)
+    // A rewritten path or method — or reuse without the session — is refused.
+    expect(forwardRequestMatches(claims!, { method: 'GET', path: '/account/api/scope', sessionToken: 'session-token' })).toBe(false)
+    expect(forwardRequestMatches(claims!, { method: 'POST', path: '/account/password', sessionToken: 'session-token' })).toBe(false)
+    expect(forwardRequestMatches(claims!, { method: 'POST', path: '/account/api/scope', sessionToken: 'other-token' })).toBe(false)
+    expect(forwardRequestMatches(claims!, { method: 'POST', path: '/account/api/scope', sessionToken: undefined })).toBe(false)
+    // Assertions minted before request binding stay fail-closed to the caller.
+    const legacy = signer.issueForward({ issuerNode: NODE_A, audienceNode: NODE_B, user: USER, now })
+    const legacyClaims = verifyGatewayForward(legacy, publicKey, { audienceNode: NODE_B, organization: 'acme', now })
+    expect(legacyClaims).not.toBeNull()
+    expect(forwardRequestMatches(legacyClaims!, { method: 'POST', path: '/x', sessionToken: 'session-token' })).toBe(false)
   })
 })

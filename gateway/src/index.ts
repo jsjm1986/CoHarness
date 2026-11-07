@@ -435,7 +435,7 @@ const nodeServiceProxy = new GatewayNodeServiceProxy({
   authorizeAdministratorNode: (actor, id) => nodeAccess.authorizeAdministratorNode(actor, id),
   authorizeAccountNode: (actor, id) => computerAccess.authorize(actor.id, id),
 }, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor,
-async (target, user) => {
+async (target, user, request) => {
   // Attach the placement this Gateway already authorized so the destination
   // can adopt it as a checked placement; scope and runtime storage are
   // node-local data the destination resolves itself.
@@ -445,6 +445,7 @@ async (target, user) => {
     selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
     ...(environment === undefined || target.resolvedTarget === undefined
       ? {} : { context: { environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name } } }),
+    request,
   })
 })
 const runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter({ collaboration, instances }), {
@@ -490,7 +491,12 @@ const deps: GatewayDeps = {
       const now = Date.now()
       for (const [nonce, expiry] of forwardNonceLedger) if (expiry <= now) forwardNonceLedger.delete(nonce)
       if (forwardNonceLedger.has(claims.nonce)) return null
-      forwardNonceLedger.set(claims.nonce, claims.expiresAt)
+      // Clamp retained expiry to the issued lifetime and bound the map: a
+      // hostile issuer could mint far-future expiresAt claims and grow the
+      // ledger unboundedly. Clearing under pressure only widens the replay
+      // window for assertions still inside their TTL.
+      if (forwardNonceLedger.size >= 4096) forwardNonceLedger.clear()
+      forwardNonceLedger.set(claims.nonce, Math.min(claims.expiresAt, now + cfg.principalAssertionTtlMs))
       return claims
     } catch {
       return null

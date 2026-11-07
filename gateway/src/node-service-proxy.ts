@@ -1,4 +1,5 @@
 import { operationPhase, timeOperation } from './operation-timing.ts'
+import { createHash } from 'node:crypto'
 /** Forward existing authenticated Gateway operations to their owning computer. */
 import { Agent, request, STATUS_CODES, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
@@ -8,7 +9,7 @@ import type { UserRow } from './auth.ts'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import type { RuntimePlacement, RuntimeSelection } from './runtime-router.ts'
-import { parseCookies, SCOPE_COOKIE } from './server.ts'
+import { parseCookies, SCOPE_COOKIE, SESSION_COOKIE } from './server.ts'
 import { RuntimeCatalogError } from './runtime-catalog.ts'
 import { nodeUuidSchema } from './node-access.ts'
 import { NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
@@ -38,6 +39,19 @@ interface Target { nodeId: RuntimeNodeId; runtimeId?: RuntimeId; projectId?: num
   /** Authorized environment and verified scope target, when resolution already ran. */
   environment?: RuntimeCatalogEntry; resolvedTarget?: 'personal' | `project:${number}` }
 interface Active extends Target { userId: number; abort(): void }
+
+/** The request binding an issuer signs into a forwarded assertion. */
+interface ForwardRequest { method: string; path: string; sessionHash: string }
+
+/** Bind the assertion to this exact request line and the session cookie being forwarded. */
+function forwardRequestOf(req: IncomingMessage): ForwardRequest {
+  const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE) ?? ''
+  return {
+    method: req.method ?? 'GET',
+    path: new URL(req.url ?? '/', 'http://gateway').pathname,
+    sessionHash: createHash('sha256').update(token).digest('hex'),
+  }
+}
 
 const HOP_HEADERS = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade'])
 
@@ -91,7 +105,7 @@ export class GatewayNodeServiceProxy {
     private readonly timeoutMs: number,
     config: NodeServiceConfig,
     private readonly monitor?: GatewayAccessMonitor,
-    private readonly forwardIssuer?: (target: Target, user: UserRow) => Promise<string>) {
+    private readonly forwardIssuer?: (target: Target, user: UserRow, request: ForwardRequest) => Promise<string>) {
     if (directory.resolvePlacement !== undefined && directory.resetScopeCookie === undefined) {
       throw new Error('Node service owner routing requires the Gateway scope-cookie formatter')
     }
@@ -264,7 +278,7 @@ export class GatewayNodeServiceProxy {
       signal.throwIfAborted()
       let complete = false
       const assertion = typeof actor === 'number' || this.forwardIssuer === undefined
-        ? undefined : await this.forwardIssuer(target, actor)
+        ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req))
       const operation = this.outgoing(req, target, lease.agent, false, body, assertion)
       dispose = () => {
         if (complete) lease.release()
@@ -338,7 +352,7 @@ export class GatewayNodeServiceProxy {
       dispose = () => { stream.destroy() }
       signal.throwIfAborted()
       const operation = this.outgoing(req, target, stream, true, undefined,
-        this.forwardIssuer === undefined ? undefined : await this.forwardIssuer(target, actor))
+        this.forwardIssuer === undefined ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req)))
       dispose = operation.dispose
       const { outgoing } = operation
       const cancel = () => { outgoing.destroy(new NodeServiceError(409, 'node-service/cancelled')) }

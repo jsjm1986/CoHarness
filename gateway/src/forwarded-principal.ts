@@ -1,4 +1,4 @@
-import { createPublicKey, type KeyObject } from 'node:crypto'
+import { createHash, createPublicKey, type KeyObject } from 'node:crypto'
 import type { UserRow } from './auth.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import { nodeUuidSchema } from './node-access.ts'
@@ -35,6 +35,14 @@ export interface GatewayForwardClaims {
   context?: {
     environment: { id: RuntimeId; nodeId: RuntimeNodeId; nodeName?: string }
   }
+  /**
+   * The exact request this assertion was issued for. Without it the assertion
+   * is a bearer credential: any holder could reuse it on any gateway-local
+   * path within its TTL. The destination accepts the claims only when the
+   * arrived method, pathname and session token hash all match, so a captured
+   * or replayed assertion is worthless without the forwarded session.
+   */
+  request?: { method: string; path: string; sessionHash: string }
   issuedAt: number
   expiresAt: number
   nonce: string
@@ -83,6 +91,13 @@ function forwardClaims(value: unknown): GatewayForwardClaims {
       throw new Error('invalid forwarded principal claims')
     }
   }
+  if (claims.request !== undefined) {
+    const request = record(claims.request)
+    if (request === undefined || typeof request.method !== 'string'
+      || typeof request.path !== 'string' || typeof request.sessionHash !== 'string') {
+      throw new Error('invalid forwarded principal claims')
+    }
+  }
   return value as GatewayForwardClaims
 }
 
@@ -126,4 +141,24 @@ export function verifyGatewayForward(assertion: string, issuerKey: KeyObject | s
   } catch {
     return null
   }
+}
+
+/**
+ * Bind verified claims to the arriving request. The assertion was issued for
+ * exactly one method+pathname and one validated session: any in-flight rewrite
+ * of the request line, or reuse without the forwarded session cookie, makes
+ * the match fail and the caller falls back to ordinary session validation.
+ * @param claims - verified assertions from verifyGatewayForward.
+ * @param input - arrived request line and session cookie token (undefined when absent).
+ * @returns whether the claims may stand in for session validation on this request.
+ */
+export function forwardRequestMatches(claims: GatewayForwardClaims, input: {
+  method: string | undefined
+  path: string
+  sessionToken: string | undefined
+}): boolean {
+  const request = claims.request
+  if (input.sessionToken === undefined || request === undefined) return false
+  return request.method === input.method && request.path === input.path
+    && createHash('sha256').update(input.sessionToken).digest('hex') === request.sessionHash
 }

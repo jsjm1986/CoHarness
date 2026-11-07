@@ -185,7 +185,7 @@ export class GatewayNodeConnection {
         // dropped by IgnoreNew or reports an error without touching the process.
         // The task script's -Restart mode performs the atomic stop+start this
         // button means, entirely on the node and outside the agent's tree.
-        : process.platform === 'win32' ? ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+        : process.platform === 'win32' ? ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
           fileURLToPath(new URL('../deploy/windows/node-agent-task.ps1', import.meta.url)), '-Restart', '-TaskName', this.service] : undefined
       if (command === undefined) throw new NodeConfigurationError(409, 'node-connection-platform-unsupported')
       try { await runGatewayChildCommand(command[0]!, command.slice(1), this.cfg.systemdCommandTimeoutMs, signal, 8192) }

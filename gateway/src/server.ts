@@ -16,6 +16,7 @@ import type { GatewayConfig } from './config.ts'
 import type { WriteGateVerdict } from './postgres/maintenance-service.ts'
 import { RuntimeStartBlockedError, type ProjectRuntime, type RuntimeSubject } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
+import { forwardRequestMatches } from './forwarded-principal.ts'
 import type { GatewayPushService, PushProvider } from './push-notifications.ts'
 import { gateCopy, gateLanguage, loginPage, passwordPage, environmentsPage, runtimeStartFailurePage, type RuntimeStartFailureReason, type RuntimeStartRetry } from './html.ts'
 import { browserReturnPath } from './browser-return.ts'
@@ -785,7 +786,21 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     if (typeof forward === 'string' && arrivedForThisNode && deps.forwardedPrincipal !== undefined) {
       const claims = await deps.forwardedPrincipal(forward)
-      if (claims !== null) return { token: token ?? '', user: claims.user, forward: claims }
+      // The assertion is bound to one request line and the forwarded session:
+      // without a cookie, or with a rewritten method/path, the claims are not
+      // a stand-in for session validation and the ordinary path runs instead.
+      const path = new URL(req.url ?? '/', 'http://gateway').pathname
+      if (claims !== null && forwardRequestMatches(claims, { method: req.method, path, sessionToken: token })) {
+        // /api traffic revalidates the session downstream; gateway-local
+        // mutations would otherwise be forensically identical to the user's.
+        if (!path.startsWith('/api/')) {
+          void Promise.resolve(audit.write({ userId: claims.user.id, action: 'auth.forwarded',
+            methodPath: `${req.method ?? ''} ${path}`, ip: clientIp(req),
+            detail: JSON.stringify({ issuerNode: claims.issuerNode, nonce: claims.nonce }) }))
+            .catch((error: unknown) => { console.error('[gateway] audit write failed:', error) })
+        }
+        return { token: token ?? '', user: claims.user, forward: claims }
+      }
     }
     if (token === undefined) return null
     const user = await timeOperation('authorize',async()=>auth.validate(token))

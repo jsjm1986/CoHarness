@@ -14,7 +14,7 @@ export function isExplicitSessionRequest(method: string | undefined, pathname: s
 
 /** @param method - original HTTP method. @param url - original request coordinates. @returns whether a scope change explicitly prepares an allocation. */
 export function isExplicitScopeRequest(method: string | undefined, url: URL): boolean {
-  return method === 'POST' && url.pathname === '/account/api/scope' && url.searchParams.has('dshRuntime')
+  return method === 'POST' && (url.pathname === '/account/api/scope' || url.pathname === '/account/runtime/start') && url.searchParams.has('dshRuntime')
 }
 
 /**

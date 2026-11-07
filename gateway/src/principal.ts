@@ -205,6 +205,8 @@ export class GatewayPrincipalSigner {
     user: UserRow
     selection?: { runtimeId: string | null; target: string | null }
     context?: unknown
+    /** Exact request binding; without it the assertion is a bearer credential. */
+    request?: { method: string; path: string; sessionHash: string }
     now?: number
   }): string {
     const now = input.now ?? Date.now()
@@ -215,6 +217,7 @@ export class GatewayPrincipalSigner {
       organization: this.organization, user: input.user,
       ...(input.selection === undefined ? {} : { selection: input.selection }),
       ...(input.context === undefined ? {} : { context: input.context }),
+      ...(input.request === undefined ? {} : { request: input.request }),
       issuedAt, expiresAt: now + this.ttlMs, nonce: randomUUID(),
     }
     return signedPayload(claims, this.privateKey)

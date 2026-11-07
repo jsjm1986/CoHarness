@@ -61,6 +61,7 @@ validate_release() {
     gateway/node_modules/pg/package.json \
     gateway/node_modules/argon2/package.json \
     gateway/node_modules/better-sqlite3/package.json \
+    gateway/deploy/windows/node-agent-task.ps1 \
     plugins/dsh-directory-guard/lib/index.js \
     plugins/dsh-directory-guard/cordis.patch.yml \
     plugins/dsh-model-governance/lib/index.js \
