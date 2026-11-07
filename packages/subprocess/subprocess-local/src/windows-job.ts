@@ -90,16 +90,22 @@ class WindowsJobOwner implements BoundProcessOwner {
       this.cancellationReason = cancellationReason
       this.cancellationReasonSet = true
     }
-    if (this.terminationSent || !this.runner.connected) return
+    if (this.terminationSent) return
     this.terminationSent = true
-    // A connected runner whose event loop is wedged would accept the IPC write
-    // and never process it; the Job still needs its owner gone, so bound the
-    // wait and kill the runner — Job close sweeps the tree on handle release.
+    // A runner that accepts the IPC write but never processes it — or whose
+    // channel is already gone — still owns its Job; bound the wait and let
+    // Job close sweep the tree when the deadline path kills the owner.
     const deadline = setTimeout(() => {
-      this.failAndKill(new Error('Windows Job runner did not process its terminate request'))
+      this.failAndKill(new Error('Windows Job runner did not process its terminate request'), true)
     }, RUNNER_TERMINATE_TIMEOUT_MS)
     deadline.unref()
     void this.exited.then(() => clearTimeout(deadline), () => clearTimeout(deadline))
+    if (!this.runner.connected) {
+      // No result can ever arrive over a dead channel; fail fast while the
+      // armed deadline still covers a wedged process holding its Job.
+      this.failAndKill(new Error('Windows Job runner lost its IPC channel before its terminate request'))
+      return
+    }
     try {
       this.runner.send?.({ type: 'terminate' }, (error) => {
         if (error === null) return
@@ -110,8 +116,17 @@ class WindowsJobOwner implements BoundProcessOwner {
     }
   }
 
-  private failAndKill(error: unknown): void {
-    if (this.infrastructureFailed || this.directResultType() !== undefined) return
+  private failAndKill(error: unknown, wedged = false): void {
+    // A latched direct result must not be rewritten by an infrastructure
+    // failure, and a mere delivery failure needs no kill — the runner is
+    // already on its own exit path. A wedge (deadline or dead channel) is
+    // different: the runner still owns the Job handle, so kill it and let
+    // the exit path settle the managed range.
+    if (this.directResultType() !== undefined) {
+      if (wedged) this.terminateForHostExit()
+      return
+    }
+    if (this.infrastructureFailed) return
     this.infrastructureFailed = true
     this.failInfrastructure(error)
     this.terminateForHostExit()

@@ -351,6 +351,38 @@ describe('Windows parent runner contract', () => {
     }
   })
 
+  it('kills a runner that wedged after delivering its direct result', async () => {
+    vi.useFakeTimers()
+    try {
+      const spawned = launch()
+      spawned.child.deferSendCallbacks = true
+      spawned.child.emit('message', { type: 'target-exit', exitCode: 7 })
+      await expect(spawned.result.direct).resolves.toEqual({ exitCode: 7, signal: null })
+      spawned.result.owner.signal('SIGTERM')
+      expect(spawned.child.sent.at(-1)).toEqual({ type: 'terminate' })
+      expect(spawned.child.killed).toEqual([])
+      const range = expect(spawned.result.owner.waitForExit()).rejects.toThrow('signal SIGKILL')
+      vi.advanceTimersByTime(5_000)
+      expect(spawned.child.killed).toEqual(['SIGKILL'])
+      spawned.child.connected = false
+      spawned.child.exit(null, 'SIGKILL')
+      await range
+      await expect(spawned.result.direct).resolves.toEqual({ exitCode: 7, signal: null })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('fails and kills a runner whose IPC channel is already down', async () => {
+    const spawned = launch()
+    spawned.child.connected = false
+    spawned.result.owner.signal('SIGTERM')
+    expect(spawned.child.killed).toEqual(['SIGKILL'])
+    await expect(spawned.result.direct).rejects.toThrow('lost its IPC channel')
+    await expect(spawned.result.owner.waitForExit()).rejects.toThrow('lost its IPC channel')
+    spawned.child.exit(127, null)
+  })
+
   it('does not kill a runner that settled after its direct result', async () => {
     vi.useFakeTimers()
     try {

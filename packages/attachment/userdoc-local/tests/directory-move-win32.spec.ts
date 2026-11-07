@@ -9,7 +9,6 @@ const native = vi.hoisted(() => ({
   calls: [] as string[], unloads: 0, next: 100, code: 0,
   fail: '' as string, nativeCode: 183, failOpen: 2, badAttributes: false, badIdentity: false,
   closeFailure: false, unloadFailure: false, bindingFailure: false, callbackFailure: undefined as Error | string | undefined,
-  gate: undefined as { entered: () => void; release: Promise<void> } | undefined,
 }))
 
 vi.mock('node:fs/promises', () => ({ lstat: async (path: string) => {
@@ -27,12 +26,8 @@ vi.mock('koffi', () => ({ default: { load: () => ({
       return 1
     }
     if (name === 'GetLastError') return () => native.code
-    const invoke = async (args: unknown[]): Promise<number> => {
+    return (...args: unknown[]): number => {
       native.calls.push(name)
-      if (native.gate !== undefined) {
-        const gate = native.gate; native.gate = undefined
-        gate.entered(); await gate.release
-      }
       if (native.callbackFailure !== undefined) throw native.callbackFailure
       if (name === 'CreateFileW') {
         if (native.fail === name && native.opened.size + 1 === native.failOpen) { native.code = native.nativeCode; return -1 }
@@ -52,12 +47,6 @@ vi.mock('koffi', () => ({ default: { load: () => ({
       if (name === 'MoveFileExW') { native.moveFlags.push(Number(args[2])); return 1 }
       throw new Error(`Unexpected native function ${name}`)
     }
-    return { async: (...args: unknown[]) => {
-      const callback = args.pop()
-      if (typeof callback !== 'function') throw new Error('The native operation must have an awaited callback.')
-      const complete = callback as (error: unknown, result: number) => void
-      void invoke(args).then((result) => { complete(null, result) }, (error: unknown) => { complete(error, 0) })
-    } }
   },
   unload: () => { native.unloads += 1; if (native.unloadFailure) throw new Error('Owned native unload failure') },
 }) } }))
@@ -66,7 +55,7 @@ beforeEach(() => {
   native.opened.clear(); native.closed.length = 0; native.shares.length = 0; native.calls.length = 0; native.moveFlags.length = 0
   native.unloads = 0; native.next = 100; native.code = 0; native.fail = ''; native.nativeCode = 183; native.failOpen = 2
   native.badAttributes = false; native.badIdentity = false; native.closeFailure = false; native.unloadFailure = false
-  native.bindingFailure = false; native.callbackFailure = undefined; native.gate = undefined
+  native.bindingFailure = false; native.callbackFailure = undefined
 })
 
 function move<T>(operation: Parameters<typeof withWindowsDirectoryMove<T>>[3], expectedRoot?: { device: string; inode: string }) {
@@ -105,7 +94,7 @@ it.each([false, true])('pins an independent private root and validates its ident
 })
 
 it.each([[183, 'EEXIST'], [32, 'EBUSY'], [17, 'EXDEV'], [999, 'EIO']] as const)(
-  'transfers native error %s from a failed asynchronous rename as %s', async (code, expected) => {
+  'transfers native error %s from a failed synchronous rename as %s', async (code, expected) => {
     native.fail = 'MoveFileExW'; native.nativeCode = code
     await move(async (scope) => {
       await expect(scope.rename()).rejects.toHaveProperty('code', expected)
@@ -151,13 +140,13 @@ it('unloads a library when symbol binding fails before handles open', async () =
   expectClosed()
 })
 
-it('normalizes an FFI callback failure without leaving a native owner behind', async () => {
+it('propagates an FFI call failure without leaving a native owner behind', async () => {
   native.callbackFailure = 'owned invalid native callback'
-  await expect(move(scope => scope.rename())).rejects.toMatchObject({ cause: native.callbackFailure })
+  await expect(move(scope => scope.rename())).rejects.toBe(native.callbackFailure)
   expectClosed()
 })
 
-it('retains a native callback Error and reports cleanup failure after a successful rename', async () => {
+it('retains a native call Error and reports cleanup failure after a successful rename', async () => {
   const failure = new Error('Owned native callback Error')
   native.callbackFailure = failure
   await expect(move(scope => scope.rename())).rejects.toBe(failure)
@@ -169,14 +158,17 @@ it('retains a native callback Error and reports cleanup failure after a successf
   expectClosed()
 })
 
-it('keeps the library loaded until an accepted asynchronous native call completes', async () => {
+it('keeps handles and the library open for the operation duration', async () => {
   const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
-  native.gate = { entered: () => { entered.resolve(undefined) }, release: release.promise }
-  const operation = move(scope => scope.rename())
+  const operation = move(async () => {
+    entered.resolve(undefined)
+    await release.promise
+  })
   try {
     await entered.promise
     expect(native.unloads).toBe(0)
     expect(native.closed).toEqual([])
+    expect(native.opened.size).toBeGreaterThan(0)
   } finally { release.resolve(undefined); await operation }
   expectClosed()
 })
