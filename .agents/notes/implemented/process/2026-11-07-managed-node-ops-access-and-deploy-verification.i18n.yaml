@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-11-07-managed-node-ops-access-and-deploy-verification.md
 document:
-  en: 489450665163233cde8ea7f54850820559a3e479
-  zh: ce9fbd7a58eb1b59f761bf218e2a9a88a7ed3cac
+  en: 6f68a75739a004c0290b681e73f53840f4fff551
+  zh: d650c0133381f3fc784255a803b31410d760b996
 /agent-note-managed-node-operations-access-and-deployment-verification:
   en: 325ff78e4d7cf58c
   zh: 671a5c5e313bed56
@@ -12,8 +12,8 @@ document:
   en: a4c57b08b2992c4b
   zh: 2c184921bbaef794
 /agent-note-managed-node-operations-access-and-deployment-verification/decision:
-  en: 46e536f265cbf2a3
-  zh: cbddeeabc43757ab
+  en: e8efe24254a64452
+  zh: 36c6c5ff46ad852d
 /agent-note-managed-node-operations-access-and-deployment-verification/verification:
   en: b8150f2910be218f
   zh: ad09d6b919c5d787

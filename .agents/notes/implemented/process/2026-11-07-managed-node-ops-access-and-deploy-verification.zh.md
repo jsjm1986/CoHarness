@@ -14,6 +14,7 @@
 
 - **访问 key 按用途分离。** 每节点隧道 key `~/.config/harness-gateway/<node>-db-tunnel/id_ed25519` 仅服务于 launchd 管理的反向隧道；用它发起任何交互命令都会通过认证后阻塞在强制的 `sleep` 中。管理操作使用 `~/.ssh/id_ed25519` 连接 `ubuntu@101.36.115.219`，使用 `~/.ssh/dsh-win-vps-test` 连接 `administrator@47.108.174.138`。隧道 key 的限制本身是特性——正确的做法是选对 key，绝不能放松 `authorized_keys`。
 - **网关代码部署是一条有序序列，不是一次拷贝。** 先在 `gateway/` 运行 `npm run build`（测试通过 tsx 跑 `src/`，测试绿不能证明 `lib/` 新鲜）；将 `gateway/lib/` 整个目录 `rsync -a --delete` 同步到每个节点的发布 lib——逐文件拷贝会让编译产物的间接依赖漂移；随后重启各网关（macOS 用 `launchctl kickstart -k gui/<uid>/com.maycran.harness-gateway`,Ubuntu 用 `sudo systemctl restart harness-gateway`,Windows 先 `/end` 再 `schtasks /run /tn HarnessNodeGateway`)；最后验证内容而非一致性——在部署文件上 `grep -c <新符号>` 才能证明改动存在，跨节点校验和只能证明所有节点同样陈旧。随后以 `harness.compute_nodes` 新鲜心跳与 `status='active'` 确认进程健康。
+- **Ubuntu 的网关从 `src/` 经 `tsx` 直接运行，不读 `lib/`。** `harness-gateway.service` 在 `/srv/harness/gateway` 内执行 `node --import tsx/esm src/index.ts`，因此该节点的部署必须 rsync `gateway/src/` 与 `deploy/postgres/migrations/`——`lib/` 从不被读取。由于工作区化的 `src/` 携带裸 `@deepseek-ai/*` 导入，`/srv/harness/node_modules/@deepseek-ai/` 维护指向 `/srv/harness/packages/**` 的符号链接场（`node-addon-system` 指向 `../../native/system/packages/*`，其 `linux-x64/bin/glibc/system.node` 二进制随发布树分发）；registry 依赖统一安装进 `/srv/harness-deps/node_modules` 再链入 `/srv/harness/node_modules`。只拷 `src/` 会让服务单元以 `ERR_MODULE_NOT_FOUND` 崩溃——诊断走 `journalctl -u harness-gateway`，不要先假定网络故障。
 
 ## 验证
 
