@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-07-independent-review-hardening.md
 document:
-  en: 29df6e12f6dcbe9ac1c322d3b81ec1445c32e2c3
-  zh: 3b59dc11a4b915b360cde15a54534b81889ce781
+  en: 1f2f2671a69db227b9ab07b454eb227998426e0d
+  zh: 198eb2c011767b1cb1bbcfee05d90821cf4e426c
 /agent-note-independent-review-hardening-across-node-deployment-and-admin-surfaces:
   en: edc71216ecf73beb
   zh: 2f803fc47d2a428a
@@ -12,8 +12,8 @@ document:
   en: 6cf05167e8628264
   zh: dc5fed7b284116f3
 /agent-note-independent-review-hardening-across-node-deployment-and-admin-surfaces/decision:
-  en: 2cc3a14adaf6bd82
-  zh: 38d09203915bdc56
+  en: e733adce77408178
+  zh: b5b070e806cb1cf9
 /agent-note-independent-review-hardening-across-node-deployment-and-admin-surfaces/alternatives-considered:
   en: 4032f448beb62312
   zh: 79bfe4816787a6e6
