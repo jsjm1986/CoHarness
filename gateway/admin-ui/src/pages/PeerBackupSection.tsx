@@ -675,6 +675,7 @@ function PeerRecoveryActions({
     'target-ready': t('replacementVerified'),
     'retire-approved': t('waitingForSourceToConfirmItHasStopped'),
     retiring: t('fencingSourceWriter'),
+    retreat: t('resolvingSourceFence'),
     'old-fenced': t('sourceWriterFenced'),
     switching: t('switchingOwnership'),
     published: current?.targetActivatedAt
@@ -776,7 +777,7 @@ function PeerRecoveryActions({
           </Button>
         </div>
       )}
-      {current && ['prepared', 'target-ready', 'retire-approved'].includes(current.phase) && (
+      {current && ['prepared', 'target-ready', 'retire-approved', 'retiring'].includes(current.phase) && (
         <Button disabled={busy} onClick={() => void run(() => Promise.resolve(operate('cancel')))}>
           {t('cancelTakeover')}
         </Button>

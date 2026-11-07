@@ -435,7 +435,7 @@ export class PeerBackupGateway {
             const body = z.object({
               confirm: z.uuid(),
               policyRevision: z.number().int().positive(),
-              phase: z.enum(['prepared', 'target-ready', 'retire-approved', 'retiring', 'old-fenced', 'published']),
+              phase: z.enum(['prepared', 'target-ready', 'retire-approved', 'retiring', 'retreat', 'old-fenced', 'published']),
             }).strict().parse(input)
             if (id !== body.confirm) throw new PeerBackupError(409, 'peer-backup/recovery-approval-changed')
             await this.recovery.reapprove(actor, id, body.policyRevision, body.phase)

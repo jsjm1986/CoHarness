@@ -243,7 +243,7 @@ export class PeerProjectRecovery {
       const current = await tx.query(`SELECT FROM harness.peer_backup_policies p JOIN harness.project_recovery_operations r ON r.policy_id=p.id
         JOIN harness.peer_backup_points q ON q.id=r.point_id AND q.policy_id=p.id AND q.organization_id=r.organization_id
         WHERE r.organization_id=$1 AND r.id=$2 AND p.organization_id=r.organization_id AND p.enabled AND p.revision=$3 AND r.phase=$4
-        AND r.phase IN('prepared','target-ready','retire-approved','retiring','old-fenced','published') AND r.target_activated_at IS NULL
+        AND r.phase IN('prepared','target-ready','retire-approved','retiring','retreat','old-fenced','published') AND r.target_activated_at IS NULL
         AND p.source_node_id=r.source_node_id AND p.target_node_id=r.target_node_id AND p.scope_id=r.project_id AND p.scope_kind='project'
         AND q.gap_count=0 AND q.manifest_digest=r.manifest_digest AND q.writer_epoch=r.source_epoch AND q.watermark=r.point_revision
         FOR SHARE OF p FOR UPDATE OF r`,[op.organizationId,id,revision,phase])
