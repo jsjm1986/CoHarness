@@ -291,6 +291,7 @@ describePg('PostgreSQL baseline', () => {
       organization_id,username,display_name,home_path
     ) VALUES($1,'alice','Alice','/tmp/alice') RETURNING id`, [organizationId])
     userId = user.rows[0]!.id
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [userId])
     baselineNodeId = (await pool.query<{ id: string }>(`INSERT INTO harness.compute_nodes(organization_id,name)
       VALUES($1,'baseline-storage') RETURNING id`, [organizationId])).rows[0]!.id
     baselineRuntimeId = (await pool.query<{ runtime_id: RuntimeId }>(`INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port)
@@ -1462,6 +1463,8 @@ describePg('PostgreSQL baseline', () => {
       VALUES($1,$2,'member'),($1,$3,'member'),($1,$4,'member'),($1,$5,'admin')
       ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,status='active'`,
     [organizationId, userId, memberId, readerId, administratorId])
+    await pool.query(`INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password)
+      SELECT id,'fixture',false FROM harness.users WHERE id=ANY($1::uuid[])`, [[memberId, readerId, administratorId]])
     const node = await pool.query<{ id: string }>(`INSERT INTO harness.compute_nodes(
       organization_id,name
     ) VALUES($1,$2) RETURNING id`, [organizationId, `collaboration-${suffix}`])

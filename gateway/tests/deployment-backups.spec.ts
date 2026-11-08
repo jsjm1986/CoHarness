@@ -97,6 +97,7 @@ describePg('deployment backup completeness', () => {
     const user = (await pool.query<{ id: string; public_id: string }>(
       "INSERT INTO harness.users(organization_id,username,display_name,home_path) VALUES($1,'alice','Alice',$2) RETURNING id,public_id",
       [organization, home])).rows[0]!
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [user.id])
     await pool.query(`INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port,generation)
       VALUES($1,$2,$3,49101,1)`, [organization, user.id, context.nodeId])
     await writeFile(cfg.managedDataApprovalFile!, '', { mode: 0o600 })

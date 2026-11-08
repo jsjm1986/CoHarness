@@ -66,6 +66,7 @@ export async function createExecutionFixture(pool: Pool, options: {
       [organizationId, row.id, role === 'admin' ? 'admin' : 'member'])
     await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)',
       [organizationId, context.nodeId, row.id])
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [row.id])
     return { uuid: row.id, id: Number(row.public_id), username: name, displayName: name,
       homePath: `/tmp/${slug}/${name}`, role, status: 'active', mustChangePassword: false, autoReviewEligible: auto }
   }
