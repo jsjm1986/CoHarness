@@ -9,7 +9,7 @@ const native = vi.hoisted(() => ({
   calls: [] as string[], unloads: 0, next: 100, code: 0,
   fail: '' as string, nativeCode: 183, failOpen: 2, badAttributes: false, badIdentity: false,
   closeFailure: false, unloadFailure: false, bindingFailure: false, callbackFailure: undefined as Error | string | undefined,
-  asyncError: undefined as unknown, asyncMoveResult: undefined as number | undefined,
+  asyncError: undefined as Error | string | undefined, asyncMoveResult: undefined as number | undefined,
 }))
 
 vi.mock('node:fs/promises', () => ({ lstat: async (path: string) => {

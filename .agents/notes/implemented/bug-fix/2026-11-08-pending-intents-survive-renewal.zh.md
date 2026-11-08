@@ -21,3 +21,11 @@ Status: implemented
 **恢复合并前的 `documentIdentityOwned` 门**（fence 存在时跳过 `setVerifiedAccountId(undefined)`）。否决：`371a539a490` 刻意移除它以保证未验证窗口不拥有私有作用域，且 `plugin.client.spec.ts` 已断言续约期间吊销。
 
 **保留目录 `prewarm`。** 否决并回退（`8e493aac7e4`）：为每台已授权计算机预热行分页违反冷计算机契约——未使用的 runtime 必须收到零请求，被动读也不例外。
+
+## 后果
+
+只要文档仍属同一账号，挂起的 intent 与已输入草稿就能挺过任意次数的传输续约；只有当另一个已验证账号到达、或 fence 销毁整棵 fiber 时才消失。单节点部署上的选择器只读本地 session 存储，`/account/api` 缺失不再会让它永久为空；已验证的多机部署仍以远端目录为准。
+
+## 验证
+
+`personal-computers` 传输续约场景在 `renewEventStreams` 期间保持会话打开，并断言挂起的 intent 及其草稿仍可编辑。`ui-conversation` 的 NodeDraft 定向套件以逐文件 100% 覆盖率验证归属类别、挂起重放与 legacy-copy 迁移。

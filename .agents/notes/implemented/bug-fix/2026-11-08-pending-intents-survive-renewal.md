@@ -21,3 +21,11 @@ The related catalog fix: the remote workbench directory is authoritative only in
 **Restore the pre-merge `documentIdentityOwned` gate** (skip `setVerifiedAccountId(undefined)` while a fence exists). Rejected: `371a539a490` deliberately removed it so the unverified interval owns no private scope, and `plugin.client.spec.ts` asserts revocation during renewal.
 
 **Keep directory `prewarm`.** Rejected and reverted (`8e493aac7e4`): warming every granted computer's row page violates the cold-computer contract — unused runtimes must receive zero requests, passive reads included.
+
+## Consequences
+
+A pending intent or typed draft survives any number of transport renewals while the document still belongs to the same account, and disappears exactly when a different verified account arrives or the fence tears the fiber down. The picker on a single-node deployment reads only the local session store, so `/account/api` absence can no longer strand it empty; verified multi-computer deployments keep the remote directory as their source of truth.
+
+## Verification
+
+The `personal-computers` transport-renewal scenario holds a conversation open through `renewEventStreams` and asserts the pending intent and its draft remain editable. The scoped NodeDraft suite in `ui-conversation` covers owner categories, suspension replay, and legacy-copy migration at per-file 100% coverage.

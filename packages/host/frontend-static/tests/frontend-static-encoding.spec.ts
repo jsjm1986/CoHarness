@@ -2,7 +2,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import { ServerResponse, type IncomingMessage } from 'node:http'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { apply } from '../src/index.ts'
@@ -45,8 +45,11 @@ it('reports failed background encodings through the plugin logger', async () => 
   apply(ctx, { distIndex })
   if (fallback === undefined) throw new Error('frontend-static did not claim the fallback seat')
 
-  const res = { writeHead: () => res, end: vi.fn() } as unknown as ServerResponse
-  await fallback({ method: 'GET', url: '/assets/app-12345678.js', headers: { 'accept-encoding': 'br' } } as IncomingMessage, res)
+  const req = { method: 'GET', url: '/assets/app-12345678.js', headers: { 'accept-encoding': 'br' } } as IncomingMessage
+  const res = new ServerResponse(req)
+  vi.spyOn(res, 'writeHead').mockImplementation(() => res)
+  vi.spyOn(res, 'end').mockImplementation(() => res)
+  await fallback(req, res)
 
   expect(warnings).toHaveLength(2)
   expect(warnings[0]).toBeInstanceOf(Error)
