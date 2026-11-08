@@ -261,7 +261,11 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
   }
   const identity = (): void => {
     const next = ctx.projectUiPolicy.getSnapshot().verifiedAccountId
-    if (account !== next) {
+    // A bare revocation is the unverified renewal interval, not an account
+    // change: keep the last verified identity so pending restores and their
+    // conversation intents survive it. Only a different verified account
+    // forfeits this document's account-scoped work.
+    if (next !== undefined && next !== account) {
       account = next; pending?.abort(); pending = undefined; work = undefined
       accountLifetime.abort(); accountLifetime = new AbortController()
       selection = undefined; restoredDirectory = undefined; recovery = undefined; initialNavigation = undefined

@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-08-pending-intents-survive-renewal.md
 document:
-  en: b821567573fd929aa0a7e231c772ced09834105c
-  zh: 94971623b0731f50369f080cc6a4933b24eb8bda
+  en: 9eaf94e7c3ce67b8781689ce299dd7a68d669990
+  zh: 5ed9056c0bb45b1013cc86419d8e275d49b38ed9
 /agent-note-pending-conversation-intents-survive-same-account-renewal:
   en: 1ee1518e424eccef
   zh: ee3cccf4df96e63f
 /agent-note-pending-conversation-intents-survive-same-account-renewal/problem:
-  en: 473cc388a14adeac
-  zh: 95652893c194bfe9
+  en: cba2b9637f556b3e
+  zh: 6cdedc628d4a86f5
 /agent-note-pending-conversation-intents-survive-same-account-renewal/decision:
-  en: 6fc22bb68967adca
-  zh: bce3bff02ca30104
+  en: 0b87a905fbba6ab8
+  zh: 71391e2d1325af73
 /agent-note-pending-conversation-intents-survive-same-account-renewal/alternatives-considered:
   en: 07a37d607a25930b
   zh: 5cc1910abb0c87fc

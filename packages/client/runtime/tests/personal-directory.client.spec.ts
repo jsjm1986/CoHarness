@@ -210,6 +210,10 @@ it('rejects an active Runtime mismatch before publishing new directory metadata 
     expect(f.forTarget).not.toHaveBeenCalled()
     expect(report).toHaveBeenCalledOnce()
     policy.setVerifiedAccountId(undefined)
+    expect(directory.getSnapshot()).toBe(before)
+    policy.setAccountPermissions('full')
+    expect(directory.getSnapshot()).toBe(before)
+    policy.setVerifiedAccountId(8)
     expect(directory.getSnapshot()).toEqual([])
   } finally { await f.ctx.fiber.dispose(); report.mockRestore() }
 })
