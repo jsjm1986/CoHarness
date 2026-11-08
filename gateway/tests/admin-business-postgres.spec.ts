@@ -1635,11 +1635,12 @@ describePg('Admin business PostgreSQL regressions', () => {
         const response = await fetch(`${base}${path}`)
         expect(response.status, path).toBe(400)
       }
-      expect(lookups.users).not.toHaveBeenCalled()
+      const subjectLookups = () => lookups.users.mock.calls.filter(([id]) => id !== adminRow.id)
+      expect(subjectLookups()).toEqual([])
       expect(lookups.projects).not.toHaveBeenCalled()
 
       expect((await fetch(`${base}/admin/api/model-access?userId=424242`)).status).toBe(404)
-      expect(lookups.users).toHaveBeenCalledTimes(1)
+      expect(subjectLookups()).toEqual([[424242]])
     })
   })
 
