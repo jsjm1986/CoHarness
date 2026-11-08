@@ -160,8 +160,10 @@ export class ConversationViewportController implements ConversationViewport {
     if (this.disposed || principal === this.persistenceScope) return
     // Supersede stale view intents, but never an intent holding an input
     // block: that hold belongs to an in-flight user operation whose commit
-    // must still land when the Host settles it.
-    if (this.persistenceScope !== undefined
+    // must still land when the Host settles it. A bare revocation
+    // (principal === undefined) is the unverified renewal interval — the
+    // pending intent still belongs to the same account, not a stale one.
+    if (principal !== undefined && this.persistenceScope !== undefined
       && this.sessions.list.getSnapshot().navigationBlockedSessionId === undefined) this.sessions.beginNavigation()
     this.persistenceScope = principal
     this.unavailablePanes.clear()

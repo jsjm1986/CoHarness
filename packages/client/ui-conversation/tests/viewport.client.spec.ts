@@ -56,6 +56,20 @@ describe('ConversationViewportController', () => {
     } finally { viewport.dispose() }
   })
 
+  it('does not supersede pending navigation on a bare revocation, still does on account change', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('account:7')
+    const pending = h.sessions.beginNavigation()
+    viewport.setPersistenceScope(undefined)
+    expect(pending.aborted).toBe(false)
+    viewport.setPersistenceScope('account:7')
+    expect(pending.aborted).toBe(false)
+    viewport.setPersistenceScope('account:8')
+    expect(pending.aborted).toBe(true)
+    viewport.dispose()
+  })
+
   it('bounds panes, focuses duplicates, and stages only workbench panes', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
@@ -423,6 +437,10 @@ describe('ConversationViewportController', () => {
     viewport.setPersistenceScope('local')
     expect(navigation.aborted).toBe(false)
     viewport.setPersistenceScope(undefined)
+    expect(navigation.aborted).toBe(false)
+    viewport.setPersistenceScope('local')
+    expect(navigation.aborted).toBe(false)
+    viewport.setPersistenceScope('account:9')
     expect(navigation.aborted).toBe(true)
     viewport.dispose()
     viewport.setPersistenceScope('local')
