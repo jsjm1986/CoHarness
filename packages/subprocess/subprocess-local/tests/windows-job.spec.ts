@@ -383,6 +383,27 @@ describe('Windows parent runner contract', () => {
     spawned.child.exit(127, null)
   })
 
+  it('ignores a second infrastructure failure after the first settle', async () => {
+    vi.useFakeTimers()
+    try {
+      const spawned = launch()
+      spawned.child.deferSendCallbacks = true
+      spawned.result.owner.signal('SIGTERM')
+      expect(spawned.child.sent.at(-1)).toEqual({ type: 'terminate' })
+      spawned.child.deliverNextSend(new Error('IPC write refused'))
+      expect(spawned.child.killed).toEqual(['SIGKILL'])
+      const direct = expect(spawned.result.direct).rejects.toThrow('IPC write refused')
+      vi.advanceTimersByTime(5_000)
+      expect(spawned.child.killed).toEqual(['SIGKILL'])
+      await direct
+      spawned.child.connected = false
+      spawned.child.exit(null, 'SIGKILL')
+      await expect(spawned.result.owner.waitForExit()).rejects.toThrow('IPC write refused')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not kill a runner that settled after its direct result', async () => {
     vi.useFakeTimers()
     try {
