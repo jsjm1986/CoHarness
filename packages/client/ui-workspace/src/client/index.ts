@@ -202,7 +202,10 @@ export function apply(ctx: ClientContext): void {
       intents.begin({ target, label: [summary?.displayTitle, target.nodeName].filter(Boolean).join(' · '),
         ...(pane?.mode === 'workbench' && pane.activePaneId ? { paneId: pane.activePaneId } : {}) },
       async (intent, editing, transferred) => {
-        const current = AbortSignal.any([editing, ctx.sessions.beginNavigation(), lifetime.signal])
+        // The intent's own `editing` signal carries its death (hide/clear);
+        // ambient navigation supersession — including the session re-open a
+        // transport renewal replays — must not kill an in-flight prepare.
+        const current = AbortSignal.any([editing, lifetime.signal])
         const perform = async (active: AbortSignal): Promise<void> => {
           if (!ctx.sessions.preparedOperationsAvailable?.(target)) throw new Error('The original managed Runtime is unavailable')
           if (!await ensure(target, address.sessionId, active)) throw new Error('Session is unavailable')
@@ -302,7 +305,10 @@ export function apply(ctx: ClientContext): void {
       intents.begin({ target, ...(workspaceId === undefined ? {} : { workspaceId }),
         ...(pane?.mode === 'workbench' && pane.activePaneId !== undefined ? { paneId: pane.activePaneId } : {}),
         label: [workspace?.title, target.nodeName].filter(Boolean).join(' · ') }, async (intent, editing, transferred) => {
-        const navigation = AbortSignal.any([ctx.sessions.beginNavigation(),
+        // `editing` owns intent death; a view navigation supersede (renewal
+        // re-open included) must not abort the pending create — commitOpen's
+        // transfer check decides whether the intent still owns the landing.
+        const navigation = AbortSignal.any([
           editing, lifetime.signal, ...(signal === undefined ? [] : [signal])])
         const perform = async (active: AbortSignal): Promise<void> => {
           const id = await create(target, workspaceId, active, intent)

@@ -150,6 +150,7 @@ async function bench() {
     binding,
     subagentAddress: vi.fn(() => undefined),
     fork,
+    preparedOperationsAvailable: vi.fn(() => true),
   } as never)
   const viewportState = { mode: 'single' as 'single' | 'workbench' }
   const replaceActive = vi.fn<(_id: SessionId) => AddPaneResult>(() => ({ ok: true }))
@@ -176,7 +177,7 @@ async function bench() {
   ctx.provide('locale', locale)
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, startSession, createRuntimeSession, refreshPersonalDirectory, usingRuntime, rename,
-    insertSessionBefore, open, selectPanel, search, renameSession, binding, retain, using, fork,
+    insertSessionBefore, open, selectPanel, search, renameSession, binding, retain, using, fork, beginNavigation,
     archiveSession, unarchiveSession, pinSession, unpinSession, workspacesSubscribe,
     refreshSessions, refreshWorkspaces,
     viewportState, replaceActive,
@@ -272,6 +273,37 @@ describe('ui-workspace apply', () => {
       expect(b.usingRuntime).toHaveBeenCalledOnce()
     } finally {
       complete()
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it('a pending intent prepare survives ambient navigation supersession', async () => {
+    const b = await bench()
+    declare(b.slots, 'sidebar.workspaces')
+    let perform: ((intent: never, editing: AbortSignal, transferred: () => void) => Promise<void>) | undefined
+    b.ctx.provide('conversationIntents', {
+      begin: (_target: unknown, prepare: typeof perform) => { perform = prepare; return 'intent-1' },
+      snapshot: { getSnapshot: () => ({}) },
+    } as never)
+    b.createRuntimeSession.mockImplementation(() => new Promise(() => {}))
+    try {
+      await b.ctx.plugin({ inject: [...inject], apply }).await()
+      const browser = faceOf(b.slots.entries('sidebar.workspaces')[0]!) as WorkspaceBrowserInjected
+      const target = { kind: 'personal' as const, runtimeId: 'computer-b' as never }
+      await browser.startRuntimeSession!(target)
+      const editing = new AbortController()
+      const running = perform!(undefined as never, editing.signal, () => {})
+      running.catch(() => {})
+      await Promise.resolve()
+      expect(b.createRuntimeSession).toHaveBeenCalledOnce()
+      const active = (b.createRuntimeSession.mock.calls[0] as unknown[])[2] as AbortSignal
+      // A new view navigation (renewal-driven session re-open uses the same
+      // supersede) must not abort the in-flight create.
+      b.beginNavigation()
+      expect(active.aborted).toBe(false)
+      editing.abort()
+      expect(active.aborted).toBe(true)
+    } finally {
       await b.ctx.fiber.dispose()
     }
   })
