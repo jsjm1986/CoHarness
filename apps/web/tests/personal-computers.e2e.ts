@@ -48,6 +48,8 @@ it('retains a pending New Session and its origin draft across transport renewal'
     expect(fixture.receipts.filter(item => item.path === '/api/admit/v1/session.prompt')).toEqual([])
     await editor.fill('Text on the intended new conversation')
     const warningStart = warnings.warnings.length
+    page.on('console', (m) => { process.stdout.write(`[PG] ${m.text().slice(0, 400)}\n`) })
+    page.on('pageerror', (e) => { process.stdout.write(`[PGERR] ${String(e).slice(0, 400)}\n`) })
     const refreshed = page.waitForResponse(response => new URL(response.url()).pathname === '/account/api/context')
     fixture.renewEventStreams(personalTargets[0]!.runtimeId)
     await (await refreshed).finished()
