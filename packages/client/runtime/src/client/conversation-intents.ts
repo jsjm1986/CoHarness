@@ -89,7 +89,6 @@ export class ConversationIntents {
       this.active = undefined
       this.publish()
     }).catch((error: unknown) => {
-      console.warn(`conversation intent prepare failed: ${error instanceof Error ? error.name : 'unknown'} editingAborted=${String(controller.signal.aborted)}`)
       if (entry.controller !== controller || controller.signal.aborted) return
       const refusal = error instanceof Error && ('status' in error && (error.status === 401 || error.status === 403)
         || 'code' in error && error.code === 'access-revoked' || error.name === 'ProjectReadOnlyError')
@@ -105,7 +104,6 @@ export class ConversationIntents {
 
   /** Leave the editor while preserving any input for this intent. */
   hide(): void {
-    console.warn('[intents] hide() called')
     if (this.active === undefined) return
     const entry = this.entries.get(this.active)
     if (entry !== undefined) {
@@ -125,7 +123,6 @@ export class ConversationIntents {
 
   /** Forget all content after a verified account change or document disposal. */
   clear(): void {
-    console.warn('[intents] clear() called')
     for (const entry of this.entries.values()) entry.controller?.abort()
     this.entries.clear()
     this.active = undefined

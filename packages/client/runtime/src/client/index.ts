@@ -409,13 +409,20 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     let account = principal()
     const stopAccount = ctx.projectUiPolicy.subscribe(() => {
-      if (account === principal()) return
-      account = principal(); entryRequests.invalidate()
+      const next = principal()
+      // A bare revocation is the unverified renewal interval, not an account
+      // change: in-flight entry requests — including a pending session.create
+      // — keep their authorization under the same identity that returns.
+      if (next === undefined || next === account) return
+      account = next; entryRequests.invalidate()
     })
     let revision = deploymentContext.getSnapshot().context?.revision
     const stopPolicy = deploymentContext.subscribe(() => {
       const next = deploymentContext.getSnapshot().context?.revision
-      if (next !== revision) { revision = next; entryRequests.invalidate() }
+      // While the context is unverified there is no deployment revision to
+      // supersede; withdrawing in-flight work then is a renewal artifact.
+      if (next === undefined || next === revision) return
+      revision = next; entryRequests.invalidate()
     })
     return async () => { stopAccount(); stopPolicy(); await entryRequests.dispose() }
   }, 'runtime: document entry requests')

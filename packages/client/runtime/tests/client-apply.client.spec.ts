@@ -460,6 +460,23 @@ describe('runtime client apply', () => {
   })
 })
 
+it('keeps in-flight entry requests through a bare verification revocation', async () => {
+  const b = await mount({ documentIdentity: { principalId: 7, runtimeTarget: { kind: 'personal' } } })
+  const policy = b.ctx.projectUiPolicy
+  const requests = b.ctx.get('gatewayEntryRequests')!
+  const spy = vi.spyOn(requests, 'invalidate')
+  try {
+    policy.setVerifiedAccountId(7)
+    spy.mockClear()
+    // The unverified renewal interval withdraws nothing: the same verified
+    // identity returns, so in-flight creates and reads stay authorized.
+    policy.setVerifiedAccountId(undefined)
+    expect(spy).not.toHaveBeenCalled()
+    policy.setVerifiedAccountId(7)
+    expect(spy).not.toHaveBeenCalled()
+  } finally { spy.mockRestore(); await b.ctx.fiber.dispose() }
+})
+
 it('disposes every retained Client generation before reloading for a different confirmed account', async () => {
   const { createBrowserIdentityFence } = await import('@deepseek-ai/dsh-client-connection/src/client/identity-fence.ts')
   const reload = vi.fn()
