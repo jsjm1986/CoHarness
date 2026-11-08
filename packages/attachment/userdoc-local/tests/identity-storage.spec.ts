@@ -12,7 +12,6 @@ const faults = vi.hoisted(() => ({
   objects: new Map<string, { dev?: bigint; ino?: bigint; uid?: bigint }>(),
   readLimit: 0, shortSizePath: '', changedHandlePath: '',
   failedLookup: '', failedMkdir: '',
-  opened: [] as string[], statPatched: 0,
 }))
 
 vi.mock('node:fs/promises', async (original) => {
@@ -37,14 +36,12 @@ vi.mock('node:fs/promises', async (original) => {
     },
     open: async (...args: Parameters<typeof actual.open>) => {
       const handle = await actual.open(...args), path = String(args[0])
-      faults.opened.push(path)
       return new Proxy(handle, { get(target, key) {
         if (key === 'read' && faults.readLimit > 0) {
           return (buffer: Uint8Array, offset: number, length: number, position: number) =>
             target.read(buffer, offset, Math.min(length, faults.readLimit), position)
         }
         if (key === 'stat' && (path === faults.shortSizePath || path === faults.changedHandlePath)) {
-          faults.statPatched += 1
           return async () => {
             const info = await target.stat()
             return new Proxy(info, { get(value, property, receiver) {
@@ -65,7 +62,7 @@ vi.mock('node:fs/promises', async (original) => {
 
 afterEach(() => {
   faults.objects.clear(); faults.readLimit = 0; faults.shortSizePath = ''; faults.changedHandlePath = ''
-  faults.failedLookup = ''; faults.failedMkdir = ''; faults.opened.length = 0; faults.statPatched = 0
+  faults.failedLookup = ''; faults.failedMkdir = ''
 })
 
 async function fixture() {
@@ -208,8 +205,6 @@ it('refuses a marker changed between directory lookup and descriptor acquisition
   const f = await fixture()
   await f.storage.bindDomain(f.rootId)
   faults.changedHandlePath = f.marker
-  const outcome = await f.storage.bindDomain(f.rootId).then(() => 'resolved', (error: unknown) => error)
-  console.log('diag-binddomain', JSON.stringify({ outcome: outcome instanceof Error ? outcome.message : outcome, marker: f.marker, opened: faults.opened, statPatched: faults.statPatched }))
   await expect(f.storage.bindDomain(f.rootId)).rejects.toThrow('changed while opening')
 })
 

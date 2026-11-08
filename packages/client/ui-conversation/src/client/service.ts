@@ -848,6 +848,7 @@ function beforeImageEncoding(signal?: AbortSignal): Promise<void> {
   if (doc.hidden) return Promise.resolve()
   if (typeof requestAnimationFrame !== 'function') return new Promise((resolve) => { setTimeout(resolve, 0) })
   return new Promise((resolve) => {
+    let frame = 0
     const finish = () => {
       globalThis.cancelAnimationFrame(frame)
       doc.removeEventListener('visibilitychange', visibility)
@@ -857,6 +858,6 @@ function beforeImageEncoding(signal?: AbortSignal): Promise<void> {
     const visibility = () => { if (doc.hidden) finish() }
     doc.addEventListener('visibilitychange', visibility)
     signal?.addEventListener('abort', finish, { once: true })
-    const frame = requestAnimationFrame(finish)
+    frame = requestAnimationFrame(finish)
   })
 }

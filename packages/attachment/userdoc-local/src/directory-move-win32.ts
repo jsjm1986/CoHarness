@@ -104,8 +104,21 @@ export async function withWindowsDirectoryMove<T>(
       sync: () => verify(),
       rename: async () => {
         await verify()
-        native(rename, [toNamespacedPath(source), toNamespacedPath(target), MOVEFILE_WRITE_THROUGH],
-          'MoveFileExW', source, result => result === 0)
+        const sourcePath = toNamespacedPath(source), targetPath = toNamespacedPath(target)
+        await new Promise<void>((accept, reject) => {
+          // Write-through completion is real I/O and stays off the JS thread, but
+          // its callback cannot read the worker's GetLastError: a failed result
+          // re-runs the atomic rename synchronously to classify the refusal. A
+          // retry that succeeds means the destination only then became free.
+          rename.async(sourcePath, targetPath, MOVEFILE_WRITE_THROUGH, (error: unknown, result: number) => {
+            if (error !== null) {
+              reject(error instanceof Error ? error : new Error('Windows directory rename failed.', { cause: error }))
+            } else if (result !== 0) accept()
+            else if (rename(sourcePath, targetPath, MOVEFILE_WRITE_THROUGH) === 0) {
+              reject(windowsError('MoveFileExW', lastError(), source))
+            } else accept()
+          })
+        })
         renamed = true
       },
     })

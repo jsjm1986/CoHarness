@@ -68,6 +68,7 @@ function release(root: string, name: string): string {
     'gateway/node_modules/pg/package.json',
     'gateway/node_modules/argon2/package.json',
     'gateway/node_modules/better-sqlite3/package.json',
+    'gateway/deploy/windows/node-agent-task.ps1',
     ...['@deepseek-ai/cordis', '@deepseek-ai/schemastery', '@deepseek-ai/dsh-managed-data', '@deepseek-ai/dsh-atomic-write', '@deepseek-ai/dsh-native-command',
       '@deepseek-ai/dsh-llm', '@deepseek-ai/dsh-session-format', '@deepseek-ai/dsh-session-format-catalog',
       '@deepseek-ai/dsh-home-paths', '@deepseek-ai/dsh-userdoc', '@deepseek-ai/dsh-userdoc-local',
@@ -412,7 +413,7 @@ printf '%s\n' "$*" > "$CAPTURE"
 
   it.each([null, 'prior-material-receipts', 'prior-request-sessions', 'gateway/lib/gateway-model-budget.js', 'gateway/lib/postgres/progress-usage.js',
     'gateway/lib/postgres/progress-service.js',
-    'native/system/packages/entry/lib/flock.js', 'gateway/node_modules/@deepseek-ai/node-addon-system/package.json',
+    'gateway/node_modules/@deepseek-ai/node-addon-system/package.json',
     'gateway/deploy/postgres/migrations/065_gateway_model_ownership.sql',
     'gateway/deploy/postgres/migrations/066_project_journal_generation.sql',
     'gateway/deploy/postgres/migrations/067_project_journal_requests.sql',

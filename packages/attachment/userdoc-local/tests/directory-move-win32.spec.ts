@@ -26,7 +26,7 @@ vi.mock('koffi', () => ({ default: { load: () => ({
       return 1
     }
     if (name === 'GetLastError') return () => native.code
-    return (...args: unknown[]): number => {
+    const invoke = (args: unknown[]): number => {
       native.calls.push(name)
       if (native.callbackFailure !== undefined) throw native.callbackFailure
       if (name === 'CreateFileW') {
@@ -47,6 +47,17 @@ vi.mock('koffi', () => ({ default: { load: () => ({
       if (name === 'MoveFileExW') { native.moveFlags.push(Number(args[2])); return 1 }
       throw new Error(`Unexpected native function ${name}`)
     }
+    return Object.assign((...args: unknown[]): number => invoke(args), {
+      async: (...args: unknown[]) => {
+        const callback = args.pop()
+        if (typeof callback !== 'function') throw new Error('The native operation must have an awaited callback.')
+        const complete = callback as (error: unknown, result: number) => void
+        void Promise.resolve().then(() => invoke(args)).then(
+          (result) => { complete(null, result) },
+          (error: unknown) => { complete(error, -1) },
+        )
+      },
+    })
   },
   unload: () => { native.unloads += 1; if (native.unloadFailure) throw new Error('Owned native unload failure') },
 }) } }))
@@ -94,7 +105,7 @@ it.each([false, true])('pins an independent private root and validates its ident
 })
 
 it.each([[183, 'EEXIST'], [32, 'EBUSY'], [17, 'EXDEV'], [999, 'EIO']] as const)(
-  'transfers native error %s from a failed synchronous rename as %s', async (code, expected) => {
+  'transfers native error %s from a failed asynchronous rename as %s', async (code, expected) => {
     native.fail = 'MoveFileExW'; native.nativeCode = code
     await move(async (scope) => {
       await expect(scope.rename()).rejects.toHaveProperty('code', expected)
