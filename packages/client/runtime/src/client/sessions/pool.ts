@@ -603,6 +603,9 @@ export class SessionRuntimePool implements ISessions {
 
   async usingRuntime<T>(target: SessionRuntimeTarget, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const active = AbortSignal.any([signal, this.lifetime.signal])
+    active.addEventListener('abort', () => {
+      console.warn('[pool] usingRuntime aborted: callerSignal=', signal.aborted, 'poolLifetime=', this.lifetime.signal.aborted)
+    }, { once: true })
     active.throwIfAborted()
     const key = targetKey(target)
     const owner = this.runtimeOperations.get(key) ?? { references: 0 }

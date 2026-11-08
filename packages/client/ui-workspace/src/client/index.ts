@@ -310,6 +310,10 @@ export function apply(ctx: ClientContext): void {
         // transfer check decides whether the intent still owns the landing.
         const navigation = AbortSignal.any([
           editing, lifetime.signal, ...(signal === undefined ? [] : [signal])])
+        const tagAbort = (s: AbortSignal | undefined, name: string): void => {
+          s?.addEventListener('abort', () => console.warn('[ws] prepare input aborted:', name, s.reason), { once: true })
+        }
+        tagAbort(editing, 'editing'); tagAbort(lifetime.signal, 'lifetime'); tagAbort(signal, 'caller')
         const perform = async (active: AbortSignal): Promise<void> => {
           const id = await create(target, workspaceId, active, intent)
           active.throwIfAborted()
