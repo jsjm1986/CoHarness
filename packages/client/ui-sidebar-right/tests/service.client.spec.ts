@@ -656,6 +656,16 @@ describe('SidebarRightController — a tab\'s own actions', () => {
     expect(() => { controller.setExpandedIn(OTHER, true) }).toThrow('no adopted surface')
     release()
   })
+
+  it('sets the panel mode through the adopted store and ignores sessions without one', () => {
+    const { controller, unadopt, layout } = harness()
+    controller.setPanelModeIn(SESSION, 'fullscreen')
+    expect(layout().mode).toBe('fullscreen')
+    unadopt()
+    controller.setPanelModeIn(SESSION, 'push')
+    controller.setPanelModeIn(OTHER, 'fullscreen')
+    expect(layout().mode).toBe('fullscreen')
+  })
 })
 
 describe('SidebarRightController — the readable slice', () => {

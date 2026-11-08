@@ -2,13 +2,14 @@
 import { join, toNamespacedPath } from 'node:path'
 import { tmpdir } from 'node:os'
 import { beforeEach, expect, it, vi } from 'vitest'
-import { withWindowsDirectoryMove } from '../src/directory-move-win32.ts'
+import { replaceRecoveredFileWindows, withWindowsDirectoryMove } from '../src/directory-move-win32.ts'
 
 const native = vi.hoisted(() => ({
   opened: new Map<number, string>(), closed: [] as number[], shares: [] as number[], moveFlags: [] as number[],
   calls: [] as string[], unloads: 0, next: 100, code: 0,
   fail: '' as string, nativeCode: 183, failOpen: 2, badAttributes: false, badIdentity: false,
   closeFailure: false, unloadFailure: false, bindingFailure: false, callbackFailure: undefined as Error | string | undefined,
+  asyncError: undefined as unknown, asyncMoveResult: undefined as number | undefined,
 }))
 
 vi.mock('node:fs/promises', () => ({ lstat: async (path: string) => {
@@ -52,8 +53,12 @@ vi.mock('koffi', () => ({ default: { load: () => ({
         const callback = args.pop()
         if (typeof callback !== 'function') throw new Error('The native operation must have an awaited callback.')
         const complete = callback as (error: unknown, result: number) => void
+        if (name === 'MoveFileExW' && native.asyncError !== undefined) { complete(native.asyncError, -1); return }
         void Promise.resolve().then(() => invoke(args)).then(
-          (result) => { complete(null, result) },
+          (result) => {
+            if (name === 'MoveFileExW' && native.asyncMoveResult !== undefined) result = native.asyncMoveResult
+            complete(null, result)
+          },
           (error: unknown) => { complete(error, -1) },
         )
       },
@@ -67,6 +72,7 @@ beforeEach(() => {
   native.unloads = 0; native.next = 100; native.code = 0; native.fail = ''; native.nativeCode = 183; native.failOpen = 2
   native.badAttributes = false; native.badIdentity = false; native.closeFailure = false; native.unloadFailure = false
   native.bindingFailure = false; native.callbackFailure = undefined
+  native.asyncError = undefined; native.asyncMoveResult = undefined
 })
 
 function move<T>(operation: Parameters<typeof withWindowsDirectoryMove<T>>[3], expectedRoot?: { device: string; inode: string }) {
@@ -167,6 +173,37 @@ it('retains a native call Error and reports cleanup failure after a successful r
   await expect(move(scope => scope.rename())).rejects.toMatchObject({ errors: [expect.objectContaining({ code: 'EACCES' })] })
   expect(native.moveFlags).toEqual([8])
   expectClosed()
+})
+
+it('completes the rename when the synchronous retry finds the destination free', async () => {
+  native.asyncMoveResult = 0
+  await expect(move(async (scope) => {
+    await scope.rename()
+    expect(scope.renamed).toBe(true)
+    return 'moved'
+  })).resolves.toBe('moved')
+  expect(native.moveFlags).toEqual([8, 8])
+  expectClosed()
+})
+
+it.each([new Error('owned transport failure'), 'opaque ffi failure'])(
+  'rejects a failed asynchronous rename with its delivered error: %p', async (asyncError) => {
+    native.asyncError = asyncError
+    await move(async (scope) => {
+      if (asyncError instanceof Error) await expect(scope.rename()).rejects.toBe(asyncError)
+      else await expect(scope.rename()).rejects.toMatchObject({ cause: asyncError })
+      expect(scope.renamed).toBe(false)
+    })
+    expectClosed()
+  },
+)
+
+it('transfers the native error from a refused recovered-file replacement', async () => {
+  const root = join(tmpdir(), 'virtual-windows-document-root')
+  await expect(replaceRecoveredFileWindows(join(root, 'stage'), join(root, 'body'))).resolves.toBeUndefined()
+  native.fail = 'MoveFileExW'; native.nativeCode = 80
+  await expect(replaceRecoveredFileWindows(join(root, 'stage'), join(root, 'body'))).rejects.toMatchObject({ code: 'EEXIST' })
+  expect(native.unloads).toBe(2)
 })
 
 it('keeps handles and the library open for the operation duration', async () => {

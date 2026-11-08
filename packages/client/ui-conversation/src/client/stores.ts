@@ -40,8 +40,7 @@ function initialState(): ChatStoreState {
   return { selection: null, draft: '', view: null, inspect: null }
 }
 
-function readState(key: string | undefined, readDraft: ChatStorePersistence['readDraft']): ChatStoreState {
-  if (key === undefined) return initialState()
+function readState(key: string, readDraft: ChatStorePersistence['readDraft']): ChatStoreState {
   let raw: string | null
   try { raw = globalThis.sessionStorage.getItem(`${key}.tab.v1`) }
   catch { raw = null /* Tab storage can be unavailable; durable recovery remains independent. */ }

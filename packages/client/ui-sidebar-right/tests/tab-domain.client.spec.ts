@@ -191,6 +191,8 @@ describe('TabDomain — a tab\'s own actions', () => {
     const { tabActions } = domain.occurrence(SESSION, recordOf(current(), tabId))
     tabActions.openTab('files', { replaceTab: true })
     expect(navigator.openTabIn).toHaveBeenLastCalledWith(SESSION, 'files', { replaceTab: tabId })
+    tabActions.setPanelMode('fullscreen')
+    expect(navigator.setPanelModeIn).toHaveBeenLastCalledWith(SESSION, 'fullscreen')
     tabActions.close()
     expect(navigator.closeIn).toHaveBeenCalledWith(SESSION, tabId)
   })
