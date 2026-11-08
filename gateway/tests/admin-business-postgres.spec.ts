@@ -1099,7 +1099,7 @@ describePg('Admin business PostgreSQL regressions', () => {
         const f = await fixture(), steward = await f.user('admin')
         const actor = await f.user(eligibility === 'unqualified-administrator' ? 'admin' : 'member')
         const project = await f.project()
-        await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [project.uuid])
+        await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [project.uuid, f.context.nodeId])
         await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision,node_id)
           VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))`, [f.organizationId, steward.uuid])
         if (eligibility === 'qualified-member') await pool.query(`INSERT INTO harness.steward_access_policies(
@@ -1128,7 +1128,7 @@ describePg('Admin business PostgreSQL regressions', () => {
 
     it('admits a qualified Steward administrator without a project membership', async () => {
       const f = await fixture(), actor = await f.user('admin'), project = await f.project()
-      await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [project.uuid])
+      await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [project.uuid, f.context.nodeId])
       await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision,node_id)
         VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))`, [f.organizationId, actor.uuid])
       const service = catalog(f.context), scope = { kind: 'project' as const, projectId: project.publicId }
@@ -1143,7 +1143,7 @@ describePg('Admin business PostgreSQL regressions', () => {
 
     it.for(['sync', 'delete', 'batch-delete', 'purge'] as const)('rechecks Steward qualification after a %s row wait', async kind => {
       const f = await fixture(), actor = await f.user('admin'), project = await f.project()
-      await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [project.uuid])
+      await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [project.uuid, f.context.nodeId])
       await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision,node_id)
         VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))`, [f.organizationId, actor.uuid])
       const service = catalog(f.context), scope = { kind: 'project' as const, projectId: project.publicId }
@@ -1194,7 +1194,7 @@ describePg('Admin business PostgreSQL regressions', () => {
       const f = await createExecutionFixture(pool)
       cleanup.push(f.dispose); fixtureOrganizations.add(f.organizationId)
       await pool.query('DELETE FROM harness.project_members WHERE organization_id=$1 AND project_id=$2', [f.organizationId, f.project.uuid])
-      await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [f.project.uuid])
+      await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [f.project.uuid, f.context.nodeId])
       await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision,node_id)
         VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1)),($1,$3,false,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))`, [f.organizationId, f.admin.uuid, f.peer.uuid])
       const service = catalog(f.context)
@@ -1580,6 +1580,9 @@ describePg('Admin business PostgreSQL regressions', () => {
       const db = openDb(join(root, 'gateway.sqlite'))
       cleanup.push(() => { db.close() })
       const cfg = testConfig(root)
+      const now = Date.now()
+      db.prepare(`INSERT INTO users(id,username,password_hash,display_name,role,home_path,must_change_password,created_at,updated_at)
+        VALUES(?,'admin-boss','unused-password-hash','Boss','admin',?,0,?,?)`).run(adminRow.id, root, now, now)
       const deps: GatewayDeps = {
         cfg,
         auth: new AuthService(db, cfg),
