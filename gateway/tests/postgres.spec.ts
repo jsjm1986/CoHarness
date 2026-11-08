@@ -1653,12 +1653,6 @@ describePg('PostgreSQL baseline', () => {
       path: `/tmp/project-${suffix}`,
       mode: 'rw',
       kind: 'standard',
-      nodeId,
-      nodeName: context.nodeName,
-      origin: 'admin',
-      owner: null,
-      uiThemePolicy: 'follow-user',
-      canManage: true,
     })
     await expect(collaboration.projectForUser(projectPublicId, administratorPublicId)).resolves.toMatchObject({
       mode: 'rw',

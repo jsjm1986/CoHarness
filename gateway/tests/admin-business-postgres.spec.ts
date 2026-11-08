@@ -579,6 +579,9 @@ describePg('Admin business PostgreSQL regressions', () => {
       const db = openDb(join(root, 'gateway.sqlite'))
       cleanup.push(() => { db.close() })
       const cfg = testConfig(root)
+      const now = Date.now()
+      db.prepare(`INSERT INTO users(id,username,password_hash,display_name,role,home_path,must_change_password,created_at,updated_at)
+        VALUES(?,'document-admin','unused-password-hash','Admin','admin',?,0,?,?)`).run(actorId, root, now, now)
       const instances = new InstanceManager(db, cfg)
       cleanup.push(() => instances.stopAll())
       const handler = createAdminApiHandler({
