@@ -80,7 +80,7 @@ it('reads project names only from the chosen computer in the authorized space pi
   try {
     await page.goto(fixture.url, { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Switch personal or project scope', exact: true }).click()
-    const selector = page.getByRole('group', { name: 'Switch personal or project scope', exact: true })
+    const selector = page.getByRole('dialog', { name: 'Switch personal or project scope', exact: true })
     const choose = selector.getByRole('combobox', { name: 'Load project names' })
     await choose.waitFor()
     expect(fixture.projectReads).toEqual([])
@@ -89,7 +89,7 @@ it('reads project names only from the chosen computer in the authorized space pi
     await selector.getByText('Compute project', { exact: true }).waitFor()
     expect(fixture.projectReads).toEqual([[18]])
     await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/owner-projects.expected.md', import.meta.url)),
-      await captureStableAria(page, '[role="group"][aria-label="Switch personal or project scope"]', fixture.worlds[0]!.workspaceCwd), webSnapshotMode())
+      await captureStableAria(page, '[role="dialog"][aria-label="Switch personal or project scope"]', fixture.worlds[0]!.workspaceCwd), webSnapshotMode())
     expect(await selector.getByText('Office project', { exact: true }).count()).toBe(0)
     expect(fixture.preparations.size).toBe(0)
     expect(fixture.calls.get(personalTargets[1]!.runtimeId) ?? 0).toBe(0)
@@ -249,6 +249,11 @@ it('browses twenty cold computers and keeps personal conversations, drafts and t
     await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/groups.expected.md', import.meta.url)),
       await captureStableAria(page, 'section[aria-label="Compute computer"]', fixture.worlds[1]!.workspaceCwd), webSnapshotMode())
     const warningStart = warnings.warnings.length
+    // Recovery needs the Compute receipt and both acknowledged pointers in this
+    // tab's storage before navigation; polling only the composer value leaves a
+    // real gap where reload can precede the write-through.
+    await expect.poll(() => fixture.draftReceipts.some(row => row.node === 1 && row.method === 'PUT' && row.status === 200 && row.hasText === true), { timeout: 10_000 }).toBe(true)
+    await expect.poll(() => page.evaluate(() => Object.keys(sessionStorage).filter(key => key.endsWith('.node-draft.v1')).length), { timeout: 10_000 }).toBe(2)
     const beforeReload = await page.evaluate(() => Object.keys(sessionStorage).filter(key => key.endsWith('.node-draft.v1')).length)
     await page.reload({ waitUntil: 'networkidle' })
     acknowledgeReloadConnectionLoss(warnings, warningStart)

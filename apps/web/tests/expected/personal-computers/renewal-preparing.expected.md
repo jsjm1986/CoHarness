@@ -1,4 +1,4 @@
-- text: Office work · Office computer
 - textbox "Message COHARNESS": Text on the intended new conversation
 - status: Preparing the conversation. You can start writing.
 - button "Back"
+- paragraph: Office work · Office computer

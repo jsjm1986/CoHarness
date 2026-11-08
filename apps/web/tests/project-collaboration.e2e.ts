@@ -143,6 +143,48 @@ async function mockGateway(page: Page | BrowserContext, mode: ProjectMode, optio
     await route.fulfill({ json: options.runtimeDirectory ? { ...context, scope: target.kind === 'project' ? { ...target, mode } : target,
       environment: { id: target.runtimeId, nodeId: target.nodeId, nodeName: target.nodeName } } : context })
   })
+  // Prepared/admitted Session operations run over the gateway's versioned
+  // route prefix; the real Host serves them natively, but only the gateway
+  // stamps the answering runtime's identity — reproduce that header.
+  await page.route(/\/api\/(?:prepare|admit)\/v1\//, async (route) => {
+    const response = await route.fetch()
+    await route.fulfill({ response, headers: { ...response.headers(), 'x-dsh-runtime-id': navigationTarget(route).runtimeId } })
+  })
+  // Tab drafts live on the owning Runtime's node draft store: a revisioned
+  // read/write surface answered by the gateway, emulated here with the same
+  // pinned-read and compare-and-save semantics as gateway/src/node-drafts.ts.
+  const drafts = new Map<string, { revision: number; text: string; previous: Map<number, string> }>()
+  await page.route(/\/account\/api\/drafts\/[^/?]+(?:\?.*)?$/, async (route) => {
+    const url = new URL(route.request().url())
+    const id = url.pathname.slice('/account/api/drafts/'.length)
+    const current = drafts.get(id) ?? { revision: 0, text: '', previous: new Map<number, string>() }
+    const respond = (status: number, value?: unknown): Promise<void> => route.fulfill({
+      status, ...(value === undefined ? {} : { json: value }),
+      headers: { 'x-dsh-runtime-id': navigationTarget(route).runtimeId },
+    })
+    const method = route.request().method()
+    if (method === 'GET') {
+      const pinned = url.searchParams.get('revision')
+      const revision = pinned === null ? undefined : Number(pinned)
+      if (revision === undefined) return respond(200, { revision: current.revision, text: current.text })
+      if (revision > current.revision) return respond(410)
+      const text = revision === current.revision ? current.text : current.previous.get(revision)
+      if (text === undefined) return respond(410)
+      return respond(200, { revision, text, currentRevision: current.revision })
+    }
+    const body = JSON.parse(route.request().postData() ?? '{}') as { revision?: number; text?: string }
+    const revision = body.revision ?? 0
+    const text = method === 'DELETE' ? '' : body.text ?? ''
+    if (revision === current.revision) {
+      current.previous.set(current.revision, current.text)
+      drafts.set(id, { ...current, revision: revision + 1, text })
+      return respond(200, { revision: revision + 1, text })
+    }
+    if (revision === current.revision - 1 && text === current.text) {
+      return respond(200, { revision: current.revision, text: current.text })
+    }
+    return respond(409)
+  })
   if (options.runtimeDirectory) await page.route(/\/account\/api\/runtimes(?:\?.*)?$/, async (route) => {
     await route.fulfill({ json: { items: [NAV_RUNTIME_A, NAV_RUNTIME_B, NAV_RUNTIME_PROJECT].map((id) => {
       const target = navigationRuntime(id)
@@ -209,7 +251,7 @@ async function openSeededSession(page: Page, scaffold: WebScaffold, runtimeId?: 
   await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
-  await page.getByRole('textbox', { name: 'Search sessions…', exact: true }).fill(SEEDED_PROMPT)
+  await page.getByRole('textbox', { name: /Search (?:sessions|computers, workspaces or conversations)…/u }).fill(SEEDED_PROMPT)
   const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
   await results.click()

@@ -53,19 +53,19 @@ async function setup() {
     providers: [], models: { groups: [], failures: [] },
   })
   const governance = Object.assign({} as GatewayModelGovernanceService, {
-    policyForProject: vi.fn(async () => ({ version: 1, defaultAllowed: false, models: [], providers: [] })),
+    policyForProject: vi.fn(async () => ({ version: 1, defaultAllowed: false as const, models: [], providers: [] })),
     issueIntakeToken: vi.fn(async () => 'token'),
     subjectForIntakeToken: vi.fn(async () => ({ kind: 'project' as const, id: project.id })),
-    authorizeProjectModelRead: vi.fn(async (projectId: number, userId: number) => {
-      const current = await authority(projectId, userId)
-      if (current === null) throw new CollaborationDeniedError('forbidden')
-      return current.canManage
-    }),
     describeProjectModelSettings: vi.fn(async () => view()),
     mutateProjectModelSettings: vi.fn(async () => view()),
     describeProjectCredentials: vi.fn(async (_id: number, refs: string[]) => Object.fromEntries(refs.map(ref => [ref, { configured: false, source: 'project' as const, writable: true as const }]))),
     setProjectCredential: vi.fn(async () => {}), unsetProjectCredential: vi.fn(async () => {}),
     discoverProjectModels: vi.fn(async () => []),
+  })
+  governance.authorizeProjectModelRead = vi.fn(async (projectId: number, userId: number) => {
+    const current = await authority(projectId, userId)
+    if (current === null) throw new CollaborationDeniedError('forbidden')
+    return current.canManage
   })
   const deps: GatewayDeps = {
     cfg, auth: new AuthService(db, cfg), users, projects, collaboration,

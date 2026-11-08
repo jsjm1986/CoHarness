@@ -287,7 +287,11 @@ export function WorkbenchToolbar({
     }]
   })
   const browserKey = (item: WorkbenchConversation): SessionId => clientSessionKey(item.runtime, item.sessionId)
-  const catalogItems = catalog === undefined ? readCatalog ? [] : fallbackCandidates : [...new Map([
+  // The remote directory is authoritative only once the deployment context
+  // verifies multi-computer mode: a single-node runtime has no `/account/api`
+  // surface at all, so its own session store remains the complete catalog.
+  const remoteDirectory = readCatalog !== undefined && deployment.context?.mode === 'multi'
+  const catalogItems = catalog === undefined ? remoteDirectory ? [] : fallbackCandidates : [...new Map([
     ...catalog.items.map(item => [browserKey(item), item] as const),
     ...(!catalog.paged && !catalog.personalComplete ? fallbackCandidates.filter(item => item.runtime.kind === 'personal'
       && catalog.personalRuntimes?.some(target => target.runtimeId === item.runtime.runtimeId) === true)

@@ -375,8 +375,12 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     let account = principal()
     const stop = ctx.projectUiPolicy.subscribe(() => {
-      if (account === principal()) return
-      account = principal()
+      // A bare revocation is the unverified renewal interval, not an account
+      // change: only a different verified identity forfeits this document's
+      // pending input. The fence's principal change disposes the whole fiber.
+      const next = principal()
+      if (next === undefined || next === account) return
+      account = next
       intents.clear()
     })
     const beforeUnload = (event: BeforeUnloadEvent): void => {
