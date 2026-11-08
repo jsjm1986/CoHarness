@@ -71,7 +71,6 @@ export class EntryDirectory {
   private personal: { id: number; name: string } | undefined
   private active: SessionRuntimeTarget | undefined
   private more: string | null = null
-  private prewarmed = false
 
   /** @param read - account-fenced, bounded and coalesced metadata reader. */
   constructor(private readonly read: Read) {}
@@ -303,24 +302,6 @@ export class EntryDirectory {
       }) }
   }
 
-  /** Warm each granted computer's service stream and first Workspace page in the background.
-   * Interactive expansion then meets a pooled stream instead of a cold transport open; failures leave the entry's lazy path untouched.
-   * The bootstrap computer is already warm from this document's own requests and is skipped. Runs once per directory generation.
-   */
-  prewarm(): void {
-    if (this.prewarmed) return
-    this.prewarmed = true
-    const nodes = new Set<string>()
-    for (const row of this.entries.values()) {
-      if (row.target.kind !== 'personal' || row.target.runtimeId === undefined) continue
-      if (row.target.nodeId !== undefined && row.target.nodeId === this.active?.nodeId) continue
-      if (row.target.nodeId !== undefined && nodes.has(row.target.nodeId)) continue
-      if (row.target.nodeId !== undefined) nodes.add(row.target.nodeId)
-      if (runtimeTargetKey(row.target) === (this.active && runtimeTargetKey(this.active))) continue
-      void this.rows(row.target, { kind: 'workspaces', includeConversations: true }).catch(() => {})
-    }
-  }
-
   /** Revoke cached grants, private rows and any reads from this generation. */
   clear(): void {
     this.epoch++
@@ -330,7 +311,6 @@ export class EntryDirectory {
     this.active = undefined
     this.personal = undefined
     this.more = null
-    this.prewarmed = false
     for (const notify of this.revoked) notify()
   }
 
