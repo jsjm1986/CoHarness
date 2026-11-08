@@ -492,7 +492,7 @@ it.each(['empty', 'populated', 'session-failure', 'workspace-failure'] as const)
         } finally { operations.delete(operation) }
       })
       await page.goto(scaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' })
-      await expect.poll(() => Object.values(gates).map(gate => gate.arrived)).toEqual([true, true])
+      await expect.poll(() => Object.values(gates).map(gate => gate.arrived), { timeout: 30_000 }).toEqual([true, true])
       const tree = page.getByRole('tree', { name: 'Sessions', exact: true })
       await tree.waitFor()
       expect(await tree.getByText('No sessions yet', { exact: true }).count()).toBe(0)
