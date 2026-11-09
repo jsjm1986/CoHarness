@@ -121,7 +121,12 @@ try {
           const response = await fetch(`${origin}/inspector/devtools/devtools_app.html`)
           status = response.status; await response.body?.cancel()
         }
-        await mounted?.fiber?.dispose()
+        const disposing = mounted?.fiber?.dispose()
+        const disposalWatch = setTimeout(() => {
+          mark(`${id} dispose slow: workers=${JSON.stringify(workers.slice(before).map(w => w.exited))}`)
+        }, 20_000)
+        await disposing
+        clearTimeout(disposalWatch)
         mark(`${id} fiber disposed`)
         socket?.terminate(); socket = undefined
         await Promise.all(workers.slice(before).map(worker => worker.completion))
