@@ -15,7 +15,6 @@ import type { CordisRuntimeTreeReader } from '../../shared/cordis/reader.ts'
 import type { InspectorQueryRouter } from '../inspection/query-router.ts'
 import type { InspectorRealmRegistry } from '../inspection/realm-store.ts'
 import type { InspectorSourceRegistry, SourceConnection } from './hub.ts'
-import { diag } from '../../shared/diag.ts'
 
 /** Bound endpoint information returned to the Host controller. */
 export interface InspectorEndpointInfo {
@@ -76,7 +75,6 @@ export class InspectorEndpoint {
 
   /** Stop admission, dispose CDP sessions, terminate sockets, and await server close. */
   async close(): Promise<void> {
-    diag('worker endpoint: close entered')
     const server = this.requireServer()
     for (const [socket, session] of this.cdpSessions) {
       session.close()
@@ -88,7 +86,6 @@ export class InspectorEndpoint {
       socket.terminate()
     }
     this.ingestConnections.clear()
-    diag('worker endpoint: connections terminated')
     await Promise.all([
       closeWebSocketServer(this.cdpServer),
       closeWebSocketServer(this.ingestServer),
@@ -97,7 +94,6 @@ export class InspectorEndpoint {
         server.closeAllConnections()
       }),
     ])
-    diag('worker endpoint: server closed')
   }
 
   private handleHttp(request: IncomingMessage, response: import('node:http').ServerResponse): void {

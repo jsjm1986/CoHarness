@@ -11,7 +11,6 @@ import { HostInspectorSource } from './transport.ts'
 import { InspectorWorkerLifecycle } from './lifecycle.ts'
 import type ResourceBudget from '@deepseek-ai/dsh-resource-budget'
 import { disposeInspectorResources } from '../../shared/dispose.ts'
-import { diag } from '../../shared/diag.ts'
 
 /** Node accountant and caller cancellation for one infrastructure Worker startup. */
 export interface InspectorAdmission {
@@ -381,7 +380,6 @@ function sourceWorkerEnv(): NodeJS.ProcessEnv {
     env.TEMP = tmpdir()
   }
   if (process.env.TSX_TSCONFIG_PATH !== undefined) env.TSX_TSCONFIG_PATH = process.env.TSX_TSCONFIG_PATH
-  if (process.env.DSH_INSPECTOR_DIAG !== undefined) env.DSH_INSPECTOR_DIAG = process.env.DSH_INSPECTOR_DIAG
   return env
 }
 
@@ -394,20 +392,16 @@ async function closeInspector(
   const failures: unknown[] = []
   try {
     await fetchObserver?.stop()
-    diag('closeInspector: fetch observer stopped')
   } catch (error) {
     failures.push(error)
   }
   try {
     source.close()
-    diag('closeInspector: source closed')
   } catch (error) {
     failures.push(error)
   }
   try {
-    diag('closeInspector: lifecycle.stop')
     await lifecycle.stop(timeoutMs)
-    diag('closeInspector: lifecycle stopped')
   } catch (error) {
     failures.push(error)
   }

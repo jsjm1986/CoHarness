@@ -23,7 +23,6 @@ it('refuses managed Inspector startup and closes live debugging through the real
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_MANAGED_DATA_MANIFEST: undefined,
       DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), DSH_TELEMETRY_DISABLED: '1', TMPDIR: root,
       TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
-      DSH_INSPECTOR_DIAG: '1',
     } }).catch((error: unknown) => {
       const detail = error as { stdout?: string; stderr?: string; message: string }
       detail.message += `\nstdout:\n${detail.stdout}\nstderr:\n${detail.stderr}`

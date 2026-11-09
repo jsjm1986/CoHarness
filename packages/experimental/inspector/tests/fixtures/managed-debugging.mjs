@@ -21,11 +21,19 @@ const OriginalWorker = threads.Worker, workers = []
 threads.Worker = class extends OriginalWorker {
   constructor(...args) {
     super(...args)
-    const record = { exited: false }
+    const target = args[0] instanceof URL ? args[0].href : String(args[0])
+    const stack = (new Error().stack ?? '').split('\n').slice(2, 5).join(' | ')
+    const record = { exited: false, tid: this.threadId, target: target.slice(0, 90), stack,
+      // The tracked assertions belong to the Inspector's own Worker; pool
+      // Workers spawned lazily inside a combo window (tsx's esbuild service
+      // is the observed case) never exit and must not join the wait set.
+      inspector: /[\\/]inspector[\\/]/.test(stack) }
     record.completion = new Promise(ready => this.once('exit', () => { record.exited = true; ready() }))
     workers.push(record)
+    mark(`worker spawned tid=${String(this.threadId)} inspector=${String(record.inspector)} target=${record.target}`)
   }
 }
+const inspectorWorkers = from => workers.slice(from).filter(worker => worker.inspector)
 syncBuiltinESMExports()
 const print = console.log
 console.log = (...args) => {
@@ -117,35 +125,40 @@ try {
         if (outcome.ready) { status = await fetchBootstrap(); mark(`${id} bootstrap ${status}`); evaluated = await evaluate(); mark(`${id} evaluated=${evaluated}`) }
         if (timing === 'running') {
           policy = await install()
-          await Promise.all(workers.slice(before).map(worker => worker.completion))
-          closedByPolicy = workers.slice(before).every(worker => worker.exited)
+          await Promise.all(inspectorWorkers(before).map(worker => worker.completion))
+          closedByPolicy = inspectorWorkers(before).every(worker => worker.exited)
           const response = await fetch(`${origin}/inspector/devtools/devtools_app.html`)
           status = response.status; await response.body?.cancel()
         }
         const disposing = mounted?.fiber?.dispose()
         const disposalWatch = setTimeout(() => {
-          mark(`${id} dispose slow: workers=${JSON.stringify(workers.slice(before).map(w => w.exited))}`)
+          mark(`${id} dispose slow: workers=${JSON.stringify(inspectorWorkers(before).map(w => w.exited))}`)
         }, 20_000)
         await disposing
         clearTimeout(disposalWatch)
         mark(`${id} fiber disposed`)
         socket?.terminate(); socket = undefined
-        await Promise.all(workers.slice(before).map(worker => worker.completion))
+        mark(`${id} socket terminated`)
+        const settleWatch = setTimeout(() => {
+          mark(`${id} workers wait: ${JSON.stringify(workers.slice(before).map(w => ({ exited: w.exited, tid: w.tid, target: w.target, stack: w.stack })))}`)
+        }, 15_000)
+        await Promise.all(inspectorWorkers(before).map(worker => worker.completion))
+        clearTimeout(settleWatch)
         mark(`${id} workers settled`)
         console.log(JSON.stringify({ control, isolated, timing, ...outcome, evaluated,
           ...status === undefined ? {} : { status }, closedByPolicy,
           published: ctx.get('inspector') !== undefined,
-          workers: workers.length - before, exited: workers.slice(before).every(worker => worker.exited),
+          workers: inspectorWorkers(before).length, exited: inspectorWorkers(before).every(worker => worker.exited),
           admissions, releases, uncertainties }))
         if (control === 'independent' || timing === 'running') {
           assert.equal(outcome.ready, true)
           assert.equal(evaluated, true)
-          assert.equal(workers.length - before, 1)
+          assert.equal(inspectorWorkers(before).length, 1)
           if (timing === 'running') { assert.equal(closedByPolicy, true); assert.equal(status, 404) }
           else assert.equal(status, 200)
         } else {
           assert.deepEqual(outcome, { ready: false, forbidden: true })
-          assert.equal(workers.length - before, 0)
+          assert.equal(inspectorWorkers(before).length, 0)
           assert.equal(evaluated, false)
         }
         assert.equal(ctx.get('inspector'), undefined)
