@@ -292,6 +292,36 @@ it.each(['recover', 'clear', 'relocated', 'unqualified'] as const)('keeps the of
   } finally { log.mockRestore(); await f.ctx.fiber.dispose() }
 })
 
+it('queues a restore retry that arrives while the previous open is still in flight', async () => {
+  const raw = 'retry-on-b' as SessionId, saved = clientSessionKey(target(2), raw)
+  const key = `dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`
+  const storage = new Map([[key, JSON.stringify({ sessionId: saved })]])
+  vi.stubGlobal('sessionStorage', { getItem: (k: string) => storage.get(k) ?? null,
+    setItem: (k: string, v: string) => { storage.set(k, v) } })
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : Response.json({ activeRuntime: target(1), personalWorkspaces: [group(1), group(2)], paged: true,
+      items: [{ sessionId: raw, runtime: target(2), title: 'Saved on B', updatedAt: 1, blank: false }] })))
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: raw, updatedAt: 1, running: false, blank: false }] })
+  const gate = deferred<boolean>()
+  const check = vi.spyOn(f.sessions, 'ensureSession').mockImplementationOnce(async () => gate.promise)
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0,
+      home: '/home/test', canOpenPath: true, executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    await vi.waitFor(() => { expect(check).toHaveBeenCalledTimes(1) })
+    await f.workspaces.refreshPersonalDirectory()
+    gate.resolve(false)
+    await vi.waitFor(() => { expect(check).toHaveBeenCalledTimes(2) })
+    await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(saved) })
+  } finally { gate.resolve(false); log.mockRestore(); await f.ctx.fiber.dispose() }
+})
+
 it('lets a new navigation supersede the saved target while the initial directory is loading', async () => {
   const saved = clientSessionKey(target(2), 'previous' as SessionId)
   const key = `dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`

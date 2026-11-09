@@ -77,6 +77,7 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
   } | undefined
   let restoredDirectory: { runtimeId: string; rows: readonly SessionSummary[]; paged: boolean } | undefined
   let restoreWork: Promise<void> | undefined
+  let retryQueued = false
   const restoreSelection = (retry = false): void => {
     const bootstrap = sessions.bootstrapRuntimeTarget().runtimeId
     if (initialNavigation === undefined && account !== undefined && bootstrap !== undefined
@@ -97,7 +98,10 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
         signal: AbortSignal.any([initialNavigation, lifetime.signal, accountLifetime.signal]) }
     } else if (!retry) return
     const attempt = recovery
-    if (attempt === undefined || attempt.signal.aborted || restoreWork !== undefined) return
+    if (attempt === undefined || attempt.signal.aborted) return
+    // An in-flight open was issued against the world as it was when it started;
+    // a retry arriving now must run once after it settles, not be dropped.
+    if (restoreWork !== undefined) { if (retry) retryQueued = true; return }
     const { saved, address } = attempt
     const catalogTarget = (): SessionRuntimeTarget | undefined =>
       directory.getSnapshot().find(group => group.runtime.runtimeId === address.runtime.runtimeId)?.runtime
@@ -129,7 +133,8 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
           sessions.open(saved)
           transfer?.()
         })
-      }).finally(() => { if (restoreWork === flight) restoreWork = undefined })
+      }).finally(() => { if (restoreWork === flight) { restoreWork = undefined
+        if (retryQueued) { retryQueued = false; restoreSelection(true) } } })
       restoreWork = flight
       return flight
     }
@@ -284,15 +289,21 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
   })
   const stopHost = connection.hostDescription.subscribe(() => { void refresh(true) })
   let revisit: Promise<void> | undefined
+  let revisitQueued = false
   const focus = (): void => {
-    if (disposed || revisit !== undefined) return
+    if (disposed) return
+    // Coalesce attention events into one deferred pass: a revisit already in
+    // flight predates this event's state change, so dropping it loses the
+    // retry the event exists to trigger.
+    if (revisit !== undefined) { revisitQueued = true; return }
     const previous = work, owner = accountLifetime
     const flight = (async () => {
       if (previous !== undefined) await previous
       if (lifetime.signal.aborted || owner.signal.aborted) return
       ctx.get('gatewayEntryRequests')?.refreshDirectory()
       await refresh(true)
-    })().finally(() => { if (revisit === flight) revisit = undefined })
+    })().finally(() => { if (revisit === flight) revisit = undefined
+      if (revisitQueued) { revisitQueued = false; focus() } })
     revisit = flight
   }
   browser.addEventListener?.('focus', focus)
