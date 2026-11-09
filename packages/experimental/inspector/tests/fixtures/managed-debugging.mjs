@@ -8,6 +8,9 @@ import WebSocket from 'ws'
 
 const [mode, artifactRoot] = process.argv.slice(2)
 assert.ok(mode === 'src' || mode === 'lib')
+const t0 = Date.now()
+const mark = step => process.stderr.write(`[fixture] ${step} +${Date.now() - t0}ms\n`)
+mark('argv parsed')
 const root = new URL('../../../../../', import.meta.url)
 const entry = path => path === 'experimental/inspector' && artifactRoot !== undefined
   ? pathToFileURL(join(artifactRoot, mode === 'src' ? 'src/index.ts' : 'lib/index.js')).href
@@ -29,7 +32,9 @@ console.log = (...args) => {
   Reflect.apply(print, console, args)
 }
 const { boot } = await import(entry('boot/app-boot'))
+mark('app-boot imported')
 const { default: ExecutionAuthority } = await import(entry('context/execution-authority'))
+mark('execution-authority imported')
 class FixtureAuthority extends ExecutionAuthority {
   stamp() { throw new Error('Fixture does not stamp messages') }
   answer() { throw new Error('Fixture does not answer questions') }
@@ -52,8 +57,11 @@ try {
     { name: entry('host/webserver'), config: { host: '127.0.0.1', port: 0 } },
     { name: entry('client/connection') },
   ]))
+  mark('config written')
   ctx = await boot('inspector-managed-debugging', config)
+  mark('boot settled')
   const origin = ctx.webServer.getOrigin()
+  mark('origin acquired')
   const fetchBootstrap = async () => {
     const response = await fetch(ctx.connection.authenticatedUrl(`${origin}/api/experimental-inspector/bootstrap`))
     await response.body?.cancel()
@@ -93,6 +101,7 @@ try {
             uncertain: async () => { uncertainties++ } }
         } }))
         const id = `debug-${control}-${String(isolated)}-${timing}`
+        mark(`${id} loader.create`)
         const pending = ctx.loader.create({ id, name: entry('experimental/inspector'),
           ...isolated ? { isolate: { executionAuthority: true, executionAuthorityRequired: true } } : {}, config: { port: 0, captureFetch: false } })
           .then(async () => {
@@ -103,7 +112,8 @@ try {
           }).catch(error => ({ ready: false, forbidden: error.message.includes('Inspector requires an independent local runtime') }))
         if (timing === 'queued') { await entered.promise; policy = await install(); grant.resolve() }
         const outcome = await pending
-        if (outcome.ready) { status = await fetchBootstrap(); evaluated = await evaluate() }
+        mark(`${id} loader settled ready=${outcome.ready}`)
+        if (outcome.ready) { status = await fetchBootstrap(); mark(`${id} bootstrap ${status}`); evaluated = await evaluate(); mark(`${id} evaluated=${evaluated}`) }
         if (timing === 'running') {
           policy = await install()
           await Promise.all(workers.slice(before).map(worker => worker.completion))
@@ -114,6 +124,7 @@ try {
         await mounted?.fiber?.dispose()
         socket?.terminate(); socket = undefined
         await Promise.all(workers.slice(before).map(worker => worker.completion))
+        mark(`${id} workers settled`)
         console.log(JSON.stringify({ control, isolated, timing, ...outcome, evaluated,
           ...status === undefined ? {} : { status }, closedByPolicy,
           published: ctx.get('inspector') !== undefined,
