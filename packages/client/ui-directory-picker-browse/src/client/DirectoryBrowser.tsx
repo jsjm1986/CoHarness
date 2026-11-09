@@ -794,12 +794,6 @@ export function DirectoryBrowser({ open, listDirectory, createDirectory, onOpen,
         onBlur={(event) => {
           if (pathDraft === null) return
           if (!document.hasFocus()) return
-          // The edit-zone button only exists outside editing: its blur while
-          // the editor is open is the toggle's own DOM teardown (the button
-          // unmounts focused in the same commit that mounts the input), not
-          // user escape. Cancelling on it would close the editor in the very
-          // frame it opens.
-          if (event.target === (editZoneRef.current as Node | null)) return
           const card = event.currentTarget.closest('[role="dialog"]')
           /* v8 ignore next -- narrowing guard: this scope always renders inside the Modal card. */
           if (card === null) return

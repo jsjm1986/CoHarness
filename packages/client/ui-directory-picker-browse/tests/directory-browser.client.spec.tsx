@@ -246,18 +246,6 @@ describe('DirectoryBrowser', () => {
     expect(columns()).toHaveLength(1)
   })
 
-  it('keeps the path editor open when the toggling button blurs out on its own unmount', async () => {
-    mount()
-    await waitFor(() => { expect(screen.getByRole('listitem')).toBeTruthy() })
-    const button = screen.getByRole('button', { name: 'browser.editPath' })
-    fireEvent.click(button)
-    expect(screen.getByLabelText('browser.editPath', { selector: 'input' })).toBeTruthy()
-    // Chromium fires focusout on the unmounted button in the toggle commit;
-    // that teardown blur must not read as user escape.
-    fireEvent.blur(button, { relatedTarget: null })
-    expect(screen.getByLabelText('browser.editPath', { selector: 'input' })).toBeTruthy()
-  })
-
   it('cancels the path editor when focus genuinely leaves the dialog card', async () => {
     mount()
     await waitFor(() => { expect(screen.getByRole('listitem')).toBeTruthy() })
