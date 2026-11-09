@@ -17,6 +17,7 @@ import {
   INSPECTOR_BOOTSTRAP_PATH, INSPECTOR_CLIENT_QUERY, INSPECTOR_SOURCE_SCOPE_QUERY, readInspectorClientSelection,
 } from '../shared/web.ts'
 import { disposeInspectorResources } from '../shared/dispose.ts'
+import { diag } from '../shared/diag.ts'
 import { ResourceAdmissionError, resourceBudgetOf, type ResourceBudget } from '@deepseek-ai/dsh-resource-budget'
 import { InspectorStartupCleanupError } from './bridge/controller.ts'
 
@@ -76,7 +77,11 @@ export async function apply(ctx: Context, config: HostPluginConfig): Promise<voi
     let worker: InspectorHandle | undefined
     let blocked = false, closing: Promise<void> | undefined
     const dispose = (): Promise<void> => closing ??= disposeInspectorResources(
-      disposers, () => worker?.close(), 'experimental-inspector: disposal failed',
+      disposers.map((step, index) => async () => {
+        diag(`dispose: step ${String(index)}/${String(disposers.length)}`)
+        await step()
+      }),
+      () => worker?.close(), 'experimental-inspector: disposal failed',
     ).catch((error: unknown) => { closing = undefined; throw error })
     const assertIndependent = (): void => {
       if (blocked || managedDebugging(ctx)) throw new Error(MANAGED_DEBUGGING_ERROR)

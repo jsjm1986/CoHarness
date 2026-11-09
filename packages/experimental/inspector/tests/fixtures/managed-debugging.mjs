@@ -1,6 +1,7 @@
 /** Real Loader/Web composition keeps unrestricted debugging out of managed execution. */
 import assert from 'node:assert/strict'
 import { createRequire, syncBuiltinESMExports } from 'node:module'
+import { writeSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -9,7 +10,7 @@ import WebSocket from 'ws'
 const [mode, artifactRoot] = process.argv.slice(2)
 assert.ok(mode === 'src' || mode === 'lib')
 const t0 = Date.now()
-const mark = step => process.stderr.write(`[fixture] ${step} +${Date.now() - t0}ms\n`)
+const mark = step => writeSync(2, `[fixture] ${step} +${Date.now() - t0}ms\n`)
 mark('argv parsed')
 const root = new URL('../../../../../', import.meta.url)
 const entry = path => path === 'experimental/inspector' && artifactRoot !== undefined

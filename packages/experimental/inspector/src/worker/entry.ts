@@ -4,6 +4,7 @@ import { MessagePort, parentPort, workerData } from 'node:worker_threads'
 import type { InspectorWorkerBoot, InspectorWorkerControl } from '../shared/bridge/messages/control.ts'
 import { parseInspectorHostControl, parseInspectorWorkerConfig } from '../shared/bridge/control-codec.ts'
 import { isPlainObject } from '../shared/json.ts'
+import { diag } from '../shared/diag.ts'
 import { startInspectorWorker } from './server.ts'
 
 if (parentPort === null) throw new Error('experimental inspector: Worker entry loaded on the main thread')
@@ -24,9 +25,12 @@ let stopping: Promise<void> | undefined
 
 const stop = (): Promise<void> => {
   stopping ??= (async () => {
+    diag('worker: stop entered')
     await runtime?.close()
+    diag('worker: runtime closed')
     controlPort.postMessage({ type: 'stopped' } satisfies InspectorWorkerControl)
     controlPort.close()
+    diag('worker: control port closed')
   })()
   return stopping
 }

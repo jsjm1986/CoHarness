@@ -4,6 +4,7 @@ import type { Worker } from 'node:worker_threads'
 import type { ResourceLease } from '@deepseek-ai/dsh-resource-budget'
 import type { InspectorHostControl, InspectorWorkerControl } from '../../shared/bridge/messages/control.ts'
 import { parseInspectorWorkerControl } from '../../shared/bridge/control-codec.ts'
+import { diag } from '../../shared/diag.ts'
 
 /** Tracks Worker termination without removing the listener that contains runtime errors. */
 export class InspectorWorkerLifecycle {
@@ -96,13 +97,16 @@ export class InspectorWorkerLifecycle {
   async terminate(): Promise<void> {
     this.expectExit()
     if (this.exitCodeValue === undefined) {
+      diag('lifecycle: terminate()')
       try { await this.worker.terminate() } catch (error) {
+        diag('lifecycle: terminate() rejected')
         try { await this.lease?.uncertain() } catch (reportError) {
           throw new AggregateError([error, reportError], 'inspector: Worker termination and uncertainty report failed')
         }
         throw error
       }
     }
+    diag('lifecycle: terminate() settled')
     await this.complete()
   }
 
@@ -114,6 +118,7 @@ export class InspectorWorkerLifecycle {
     this.expectExit()
     if (this.exitCodeValue !== undefined) return this.complete()
     this.worker.postMessage({ type: 'shutdown' } satisfies InspectorHostControl)
+    diag('lifecycle: shutdown posted')
     let timer: NodeJS.Timeout | undefined
     const timeout = new Promise<'timeout'>((resolve) => {
       timer = setTimeout(() => { resolve('timeout') }, timeoutMs)
@@ -123,6 +128,7 @@ export class InspectorWorkerLifecycle {
       timeout,
     ])
     clearTimeout(timer)
+    diag(`lifecycle: stop outcome=${outcome}`)
     if (outcome === 'exited') return this.complete()
     await this.terminate()
     throw new Error(`inspector Worker did not stop within ${String(timeoutMs)}ms and was terminated`)
