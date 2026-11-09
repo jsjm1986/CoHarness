@@ -797,3 +797,17 @@ describe.skipIf(!hasPwsh)('process lifecycle ownership (the subprocess service, 
     expect(['killed', 'completed']).toContain(running.status)
   })
 })
+
+// ConstrainedLanguage can be entered from FullLanguage on any platform, so a
+// real pwsh regression covers the confined-mode branch without a Windows host.
+describe.skipIf(!hasPwsh)('ENCODING_PREAMBLE under ConstrainedLanguage', () => {
+  it('runs clean under ConstrainedLanguage where type member writes are denied', () => {
+    const result = spawnSync(resolvePwshPath(), [
+      '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+      `$ExecutionContext.SessionState.LanguageMode = 'ConstrainedLanguage'; ${ENCODING_PREAMBLE}Write-Output ok`,
+    ], { encoding: 'utf8' })
+    expect(result.status).toBe(0)
+    expect(result.stderr).toBe('')
+    expect(lf(result.stdout).trim()).toBe('ok')
+  })
+})

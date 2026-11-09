@@ -8,7 +8,7 @@ description: "节点接入、凭证恢复和现有 Gateway 服务的出站连接
 
 ## 概述
 
-登记 macOS/Linux x64 或 arm64 电脑，通过出站代理连接其现有 Gateway 服务。代理进程无需 PostgreSQL 凭据或入站监听。接入报告 `executionReady: false`，不授予运行时权限。电脑使用权和能力资格分别按电脑配置。组织的[部署模式](../deployment-topology/README.zh.md)控制聚合；用户端与 Admin 流程明确保留电脑和 Runtime 身份。每个协作项目归属于选定电脑。
+登记 macOS、Linux 和 Windows x64 或 arm64 电脑，通过出站代理连接其现有 Gateway 服务。代理进程无需 PostgreSQL 凭据或入站监听。接入报告 `executionReady: false`，不授予运行时权限。电脑使用权和能力资格分别按电脑配置。组织的[部署模式](../deployment-topology/README.zh.md)控制聚合；用户端与 Admin 流程明确保留电脑和 Runtime 身份。每个协作项目归属于选定电脑。
 
 ## 目录
 
@@ -81,7 +81,7 @@ Admin 部署页提供独立的电脑接入区域，包含登记、显式重发�
 
 主入口启用多电脑模式、代理配置 `HGW_NODE_LOCAL_GATEWAY_URL` 后，携带获授权 `dshRuntime` 的 API 请求选择该环境所在电脑。管理员 API 可显式选择 `dshNode=<节点 UUID>`，并重新核验当前管理员权限。目标 Gateway 继续检查现有浏览器会话、源站、账号及业务权限，处理请求前校验目标节点请求头。浏览器始终使用中心源站。
 
-现有个人／项目选择及空间 Cookie 也从中心元数据解析所在电脑。根 HTML、资源、账号 API 与运行时 HTTP／WebSocket 流量使用所选电脑。切换空间先解析有界请求体，再转发到精确 Runtime。属主选择存在歧义时返回409并要求 `dshRuntime`，不会选择第一个环境。组合了目录服务时，账号上下文和工作台目录响应包含 `environment: { id, nodeId }`。Admin 专用 API 不要求管理员在所选电脑拥有个人 Runtime。
+现有个人／项目选择及空间 Cookie 也从中心元数据解析所在电脑。根 HTML、资源、账号 API 与运行时 HTTP／WebSocket 流量使用所选电脑。字节确定性的浏览器 URL——`/plugins` 下的 `??` combo 或带 `rev` 的 `client.*.js` chunk 及 source map、带内容哈希的 `/assets/*` 路径——在来源页选定的 Runtime 下完成授权后就地转发，而不是用 `dshRuntime` 重定向应答，因此未钉选的 URL 能在各电脑间共享同一份缓存；授权总是先于转发执行。Runtime 专属或未带 revision 的路径——`/plugins/events`、无 revision 的插件或资源 URL——保持重定向钉选。切换空间先解析有界请求体，再转发到精确 Runtime。属主选择存在歧义时返回409并要求 `dshRuntime`，不会选择第一个环境。组合了目录服务时，账号上下文和工作台目录响应包含 `environment: { id, nodeId }`。Admin 专用 API 不要求管理员在所选电脑拥有个人 Runtime。
 
 账号偏好、推送设备登记及 `GET /account/api/projects` 使用共享账号存储，不选择或连接 Runtime。工作台目录使用已授权的归属元数据，所选分配在另一台电脑时也不要求本机存储。项目创建保留显式选择的目标电脑。浏览器 SVG 图标沿用来源标签页中已验证的 Runtime 选择。
 
@@ -100,6 +100,8 @@ HTTP 服务连接按电脑使用有界空闲池，每条连接同一时刻承载
 <a id="runtime-isolation"></a>
 
 ## 运行时隔离
+
+在 Windows 上，Gateway 签名时将有效期起点提前一个系统时钟节拍（16 毫秒），到期时刻仍由实际签发时刻和配置的生命周期决定。接收端 Runtime 校验签名、确切身份、进程代次和有效期两端。
 
 生命周期队列、私有凭据、签名请求凭证、资源登记及 Session 执行记录保留所分配 Runtime 的 UUID。凭据与请求凭证的 UUID、属主及进程代次必须一致。PostgreSQL 在实例分配退役后仍保留属主／节点的代次计数器；代次单调递增且允许跳号。确认停止后的清理只回收该 Runtime 的登记。精确节点连接失效后，排队工作失去准入；活动或不确定占用继续保留，直到所属清理得到确认。
 
@@ -163,16 +165,20 @@ Webhook 配置绑定精确 Runtime 及电脑。除非提交其他明确 Runtime�
 | 节点变量 | 默认 | 含义 |
 |---|---|---|
 | `HGW_NODE_CENTER_URL` | 必需 | HTTPS 源站；本地可使用回环 HTTP |
-| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | 由节点操作系统账号拥有、权限为 0600 的凭证文件 |
+| `HGW_NODE_CENTER_DIAL_URLS` | `HGW_NODE_CENTER_URL` | 逗号分隔的有序源站列表，节点依次改经这些地址拨号；每项遵循 center URL 规则 |
+| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | 仅文件属主账号可访问的凭证文件（macOS/Linux 为 0600 权限，Windows 为限定于属主、SYSTEM 与 Administrators 的 ACL） |
 | `HGW_NODE_ENROLLMENT_TOKEN` | 新状态文件必需 | 管理员令牌；已接入记录使用保存的凭证 |
 | `HGW_NODE_AGENT_REQUEST_TIMEOUT_MS` | 10000 | 网络请求和退出释放的超时 |
 | `HGW_NODE_AGENT_RETRY_MS` | 3000 | 幂等控制操作重试之间的间隔 |
+| `HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS` | 60000 | 发生拨号回退后，首个晚于该时长的全新尝试重新探测首选拨号源站 |
 | `HGW_NODE_AGENT_CHANNEL_ENABLED` | `1` | `0` 关闭控制 Socket；不能与本机服务转发同时配置 |
 | `HGW_NODE_AGENT_CHANNEL_MAX_INFLIGHT` | 4 | 同时处理的只读探测数 |
 | `HGW_NODE_AGENT_CHANNEL_MAX_FRAME_BYTES` | 16384 | 完整收发控制消息的字节上限 |
 | `HGW_NODE_AGENT_CHANNEL_MAX_BUFFERED_BYTES` | 65536 | 出站控制缓冲预算 |
 | `HGW_NODE_LOCAL_GATEWAY_URL` | 未设置 | 现有 Gateway 固定的 `http://127.0.0.1:<port>` 或 IPv6 回环源站 |
 | `HGW_NODE_AGENT_SERVICE_MAX_CONNECTIONS` | 16 | 与探测分别计数的本机 Gateway 并发转发数 |
+
+`HGW_NODE_CENTER_DIAL_URLS` 命名的是传输路径，从来不是身份。每个列出的源站都必须到达同一个 center：凭证文件仍绑定 `HGW_NODE_CENTER_URL`，enrollment、身份与状态检查不随之移动。该列表覆盖公网源站不是节点最佳路由的部署——到回环的 SSH 反向隧道（`http://127.0.0.1:<port>`）、LAN 地址、mesh 覆盖网络，最后是公网源站。未获得 HTTP 响应的尝试——连接被拒、超时、在 `open` 之前断开的 socket——把拨号推进到下一项；任何 HTTP 响应（包括拒绝）都视为已到达 center，绝不触发回退。进行中的尝试从不向另一源站重放；只有下一次全新尝试才看到变化。
 
 <a id="recovery"></a>
 
@@ -190,7 +196,7 @@ Webhook 配置绑定精确 Runtime 及电脑。除非提交其他明确 Runtime�
 
 ## 验证
 
-当 `HGW_TEST_DATABASE_URL` 指向可丢弃测试数据库时，`npm run test:postgres` 包含已认证 Gateway 记录和两个独立源码节点进程。`npm run test:built-node-agent` 构建后在普通 Node 下重跑进程场景。这些场景覆盖同时连接、独立停止、凭证撤销、真实 Admin 客户端的签发／重发／撤销流程，以及零运行时启动。回环验证不代表已验收公网入口、跨电脑或 Windows。
+当 `HGW_TEST_DATABASE_URL` 指向可丢弃测试数据库时，`npm run test:postgres` 包含已认证 Gateway 记录和两个独立源码节点进程。`npm run test:built-node-agent` 构建后在普通 Node 下重跑进程场景。这些场景覆盖同时连接、独立停止、凭证撤销、真实 Admin 客户端的签发／重发／撤销流程，以及零运行时启动。回环验证不代表已验收公网入口、跨电脑或 Windows 运行时。
 
 `npm run test:built-node-service` 使用两个独立编译 Gateway 进程、一个编译节点代理进程、PostgreSQL 和项目提供的 Web Profile。记录验证中心一次登录、现有远端 Admin API、在选定电脑启动运行时、运行时 WebSocket 上的真实工作区事件，以及节点不可用时拒绝请求且不在中心启动替代进程。它要求已构建工作区产物，并使用同一可丢弃数据库设置。包测试另外覆盖有界二进制传输、分块 HTTP 送达、节点身份不匹配、独立控制容量、撤权和取消获取时的清理。
 

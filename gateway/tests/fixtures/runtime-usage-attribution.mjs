@@ -35,6 +35,7 @@ try {
   const cfgA = configuration('computer-a'), cfgB = configuration('computer-b')
   const users = new PostgresUserService(a, cfgA)
   const administrator = await users.create({ username: 'administrator', password: 'pw-12345678', role: 'admin' })
+  await users.changeOwnPassword(administrator.id, 'pw-12345678')
   const user = await users.create({ username: 'executor', password: 'pw-12345678' })
   const userUuid = (await pool.query('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2', [organizationId, user.id])).rows[0].id
   const repositoryA = new PostgresInstanceRepository(a, cfgA.instancePortBase), repositoryB = new PostgresInstanceRepository(b, cfgB.instancePortBase)

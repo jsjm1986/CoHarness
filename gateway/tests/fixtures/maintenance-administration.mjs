@@ -32,7 +32,7 @@ async function removeOrganization(id) {
 }
 
 try {
-  await runMigrations(pool, process.env.DSH_AUDIT_MAINTENANCE_MIGRATIONS ?? fileURLToPath(new URL('../../deploy/postgres/migrations', import.meta.url)))
+  const { current: schemaVersion } = await runMigrations(pool, process.env.DSH_AUDIT_MAINTENANCE_MIGRATIONS ?? fileURLToPath(new URL('../../deploy/postgres/migrations', import.meta.url)))
   for (const operation of ['read', 'enter', 'exit', 'node-status', 'restore']) {
     for (const change of ['role', 'disabled-account', 'deleted-account', 'disabled-membership', 'missing-membership', 'disabled-organization', 'current', ...(operation === 'restore' ? ['unverified-backup'] : [])]) {
       const root = await mkdtemp(join(tmpdir(), 'maintenance-http-')), organizations = []
@@ -58,7 +58,7 @@ try {
         if (operation === 'exit') await maintenance.enterMaintenance(null, 'existing window')
         let backup
         if (operation === 'restore') {
-          backup = await backups.record({ path: join(root, 'accepted.dump'), migrationVersion: 95, writeEpoch: 1n,
+          backup = await backups.record({ path: join(root, 'accepted.dump'), migrationVersion: schemaVersion, writeEpoch: 1n,
             sizeBytes: 128, sha256: 'a'.repeat(64), managedSnapshot: { version: 1, roots: [], directories: [], absent: [], files: [] }, actor: actor.id })
           await backups.setVerified(backup.id, true)
         }

@@ -61,6 +61,7 @@ validate_release() {
     gateway/node_modules/pg/package.json \
     gateway/node_modules/argon2/package.json \
     gateway/node_modules/better-sqlite3/package.json \
+    gateway/deploy/windows/node-agent-task.ps1 \
     plugins/dsh-directory-guard/lib/index.js \
     plugins/dsh-directory-guard/cordis.patch.yml \
     plugins/dsh-model-governance/lib/index.js \
@@ -115,6 +116,7 @@ validate_release() {
       dsh-userdoc-local
       dsh-host-userdoc-http
     )
+    if [[ -f "$release/gateway/lib/peer-backup-takeover-schedule.js" ]]; then runtime_links+=(dsh-schedule); fi
     for required in "${runtime_links[@]}"; do
       [[ -s "$release/gateway/node_modules/@deepseek-ai/$required/package.json" ]] \
         || fail "release Gateway runtime link is missing or broken: $release/gateway/node_modules/@deepseek-ai/$required"

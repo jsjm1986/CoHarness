@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-07-node-lease-control-functions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-07-node-lease-control-functions.md
+document:
+  en: 87fb25258401ef3fcc608753593459a0abea6bc5
+  zh: a2af0b736b1d7bfee8cb6c221d33630061c4fe83
+/agent-note-node-lease-and-control-channel-authorization-collapsed-to-single-sql-functions:
+  en: 669ecb6e15d81641
+  zh: 44f135c678d3b074
+/agent-note-node-lease-and-control-channel-authorization-collapsed-to-single-sql-functions/problem:
+  en: ec3b7246a5d43e82
+  zh: 7fe202989dab69cc
+/agent-note-node-lease-and-control-channel-authorization-collapsed-to-single-sql-functions/decision:
+  en: 9f4e05f67c363969
+  zh: 90f3b923fdca36a5
+/agent-note-node-lease-and-control-channel-authorization-collapsed-to-single-sql-functions/alternatives-considered:
+  en: 18fffae6806a1e40
+  zh: df388ee8bdd2aee1
+/agent-note-node-lease-and-control-channel-authorization-collapsed-to-single-sql-functions/consequences:
+  en: 30fda05fc732fa4e
+  zh: bdbf130653018adb
+/agent-note-node-lease-and-control-channel-authorization-collapsed-to-single-sql-functions/verification:
+  en: 07e939ccbb3080f2
+  zh: 9199389550795dca

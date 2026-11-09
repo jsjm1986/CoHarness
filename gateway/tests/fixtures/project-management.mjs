@@ -6,12 +6,15 @@ import { createServer } from 'node:http'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { removeFixtureOrganization } from './postgres-fixture-cleanup.mjs'
 
-const mode = process.argv[2]
+const [mode, artifactRoot] = process.argv.slice(2)
 if (mode !== 'src' && mode !== 'lib') throw new Error('Project management replay requires src or lib.')
-const entry = mode, extension = mode === 'src' ? 'ts' : 'js'
-const load = name => import(new URL(`../../${entry}/${name}.${extension}`, import.meta.url))
+assert.ok(artifactRoot === undefined || mode === 'lib')
+const base = artifactRoot === undefined ? new URL(`../../${mode}/`, import.meta.url) : pathToFileURL(`${resolve(artifactRoot)}/`)
+const extension = mode === 'src' ? 'ts' : 'js'
+const load = name => import(new URL(`${name}.${extension}`, base))
 const { createPostgresPool, runMigrations } = await load('postgres/database')
 const { resolvePostgresRuntimeContext } = await load('postgres/runtime-context')
 const { PostgresUserService } = await load('postgres/user-service')
@@ -39,8 +42,10 @@ const close = async server => {
 }
 const failures = []
 try {
-  await runMigrations(pool, resolve(import.meta.dirname, '../../deploy/postgres/migrations'))
-  for (const operation of ['name', 'theme', 'models', 'credential-set', 'credential-unset', 'discover']) {
+  await runMigrations(pool, process.env.DSH_AUDIT_PROJECT_MIGRATIONS ?? resolve(import.meta.dirname, '../../deploy/postgres/migrations'))
+  const scenarios = ['name', 'theme', 'models', 'credential-set', 'credential-unset', 'discover'].flatMap(operation =>
+    ['ownership', 'password-reset'].map(change => ({ operation, change })))
+  for (const { operation, change } of scenarios) {
     const root = await mkdtemp(join(tmpdir(), 'project-manager-replay-')), slug = `manager-${randomUUID()}`
     let server, probe, instances, pending, release, organizationId
     try {
@@ -91,7 +96,7 @@ try {
         assert(cookie !== undefined); return cookie
       }
       const ownerCookie = await login(owner), adminCookie = await login(administrator)
-      if (operation === 'name') {
+      if (operation === 'name' && change === 'ownership') {
         const viewer = await users.create({ username: 'viewer', password: 'pw-12345678' })
         await users.changeOwnPassword(viewer.id, 'pw-12345678')
         await projects.setMember(project.id, viewer.id, 'ro', administrator.id)
@@ -166,9 +171,10 @@ try {
       }
       pending = send(ownerCookie)
       await observed.promise
-      await pool.query(`UPDATE harness.projects SET owner_user_id=(SELECT id FROM harness.users
+      if (change === 'ownership') await pool.query(`UPDATE harness.projects SET owner_user_id=(SELECT id FROM harness.users
         WHERE organization_id=$1 AND public_id=$3) WHERE organization_id=$1 AND public_id=$2`,
       [organizationId, project.id, administrator.id])
+      else await users.resetPassword(owner.id, 'pw-replacement', administrator.id)
       release()
       const denied = await pending, preserved = isDeepStrictEqual(before, await state()), dispatchedBeforeAdmission = discoveries
       const audit = await pool.query("SELECT 1 FROM harness.audit_events WHERE organization_id=$1 AND action LIKE 'projects.%'", [organizationId])
@@ -176,9 +182,9 @@ try {
       const allowed = await send(adminCookie), changed = operation === 'discover' ? discoveries > dispatchedBeforeAdmission
         : !isDeepStrictEqual(before, await state())
       const expectedAllowed = ['name', 'credential-set', 'credential-unset'].includes(operation) ? 204 : 200
-      const event = { operation, formerOwnerStatus: denied.status, originalStatePreserved: preserved,
+      const event = { operation, change, deniedStatus: denied.status, originalStatePreserved: preserved,
         successfulMutationAuditAfterDenial: audit.rowCount !== 0, unauthorizedDiscoveryCalls: dispatchedBeforeAdmission,
-        currentOwnerStatus: allowed.status, currentOwnerActionApplied: changed }
+        currentManagerStatus: allowed.status, currentManagerActionApplied: changed }
       process.stdout.write(`${JSON.stringify(event)}\n`)
       if (denied.status !== 403 || !preserved || audit.rowCount !== 0 || dispatchedBeforeAdmission !== 0
         || allowed.status !== expectedAllowed || !changed) failures.push(operation)

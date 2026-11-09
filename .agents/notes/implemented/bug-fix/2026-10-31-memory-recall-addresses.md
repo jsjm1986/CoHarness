@@ -28,4 +28,4 @@ Compaction can reclaim recall bytes without making an already recorded address e
 
 ## Verification
 
-Focused cases cover partial frames followed by another turn, repeated selections, same-named personal and workspace entries, and three- and four-byte character cuts. A real Loader, Agent, JSON domain and model-admission provider exercise three turns and compare the complete durable recall text and addresses while confirming every model admission is released. Controlled private variants restore incorrect source attribution or last-scope resolution without modifying shared production files.
+Focused cases cover partial frames followed by another turn, repeated selections, same-named personal and workspace entries, and three- and four-byte character cuts. A real Loader, Agent, JSON domain and model-admission provider exercise three turns and compare the complete durable recall text and addresses while confirming every model admission is released. Controlled private variants restore mismatched recorded source addresses or resolution limited to the latest scope without modifying shared production files.

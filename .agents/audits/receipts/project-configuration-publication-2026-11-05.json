@@ -1,0 +1,110 @@
+{
+  "id": "B518",
+  "title": "Project configuration reads retain revoked browser authority, stale ownership and capabilities after metadata preparation",
+  "status": "fixed_current_configuration_read_authority_and_reserved_capabilities_verified_remaining_business_review_open",
+  "sourceFixed": true,
+  "at": "2026-11-05T01:12:32.131309+00:00",
+  "paths": [
+    "gateway/src/server.ts",
+    "gateway/src/project-configuration.ts"
+  ],
+  "receipt": "receipts/project-configuration-publication-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z",
+  "counterproof": {
+    "realPostgresHttp": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-negative.jsonl",
+      "result": "The new directory/detail controls pass while18configuration cases publish revoked member/account/computer or Steward data, stale owner and management flags, or an earlier theme. The negative replay exits1 after69completed cases."
+    },
+    "reservedMembership": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-reserved-negative.jsonl",
+      "result": "A separate real Gateway case advertises Steward members=true while the corresponding recipient directory returns403 steward-reserved. It exits1 with only that case failing."
+    }
+  },
+  "correction": "Configuration GET performs final browser-only control-SQL admission after metadata preparation and requires its prepared computer identifiers to match. Ownership, theme and all capabilities use current authority. Steward spaces always advertise members=false. Initial write routing uses the management flag returned by project authority; owning write transactions and already-admitted mutation responses retain their behavior.",
+  "checks": {
+    "distinctNamedCases": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-acceptance-union.json",
+      "passed": 227,
+      "skipped": 0,
+      "repeatedRunsNotDoubleCounted": true,
+      "breakdown": {
+        "server": 91,
+        "registry": 3,
+        "projectService": 131,
+        "publicProjectReads": 1,
+        "publicManagementWrites": 1
+      }
+    },
+    "publicHttpReplay": {
+      "spec": "gateway/tests/project-configuration-read-postgres.spec.ts",
+      "expected": "gateway/tests/expected/projects/directory-read.jsonl",
+      "scenarios": 69,
+      "qualification": "Actual login, real single-connection PostgreSQL and Gateway. The original44rows remain byte-identical;23configuration cases and two directory/detail theme changes are added. Steward member capability is compared with the actual403response. Existing management13scenario write replay also passes. No Runtime or model provider starts."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 69,
+      "typescriptLoader": false,
+      "gatewayProductionJs": 262,
+      "artifactFiles": 403,
+      "qualification": "Unchanged ordinary production emit and public MJS fixture; macOS only."
+    },
+    "changedMethodMeasurements": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-changed-path-v8.json",
+      "qualification": "The capability evaluator executes for current managers, readers and reserved Steward spaces in both ordinary Node versions. Optional provider/SSH availability paths are not all executed by these PostgreSQL golden scenarios; no whole-file100percent claim."
+    },
+    "fullGatewayTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-typecheck.log",
+    "ordinaryGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-production-build.log",
+    "focusedLint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-lint.json",
+      "actualFiles": 4,
+      "selectedFiles": 5,
+      "diagnostics": 0,
+      "qualification": "The MJS fixture is ignored by the existing lint configuration and separately passes Node24syntax checking."
+    },
+    "docs": {
+      "pairing": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-pairing-check.log",
+      "pairs": 4,
+      "markdownLinks": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-markdown-links.json",
+      "sources": 8,
+      "guideStructure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-upgrade-guide-structure.json",
+      "guideWords": 436,
+      "documentBudgets": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-doc-budgets.log",
+      "globalQuickPassClaimed": false,
+      "retainedGlobalFailures": [
+        "Historical Session format catalog is stale",
+        "Existing concrete terminology findings in retained code and audit records"
+      ]
+    },
+    "ownedClusters": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/native-postgres-lifecycle-summary.json",
+    "whitespace": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-owned-whitespace.log"
+  },
+  "earlierAuthorityArchiveAndSqlReadSourcesUnchanged": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/prior-frozen-sources-check.json",
+  "stableSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/project-configuration-stable-sources.json",
+  "frozenDelivery": {
+    "at": "2026-11-05T01:11:48.487863+00:00",
+    "finding": "B518",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/B518-project-configuration-publication",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/B518-project-configuration-publication.delta.tar.gz",
+    "archiveSha256": "c8b81b68167783278f6b1661a25e0aea486a8f0d42a7e0f2b015d40032606418",
+    "manifestSha256": "fa45252889b486e9fc0a756d573d6c0d764f91da38f15efd0cfafa195f60a8ed",
+    "ownedPaths": 18,
+    "readOnlyPrerequisites": 11,
+    "gatewayProductionJs": 262,
+    "artifactFiles": 403,
+    "wholeProjectComplete": false
+  },
+  "limits": [
+    "All12business domains remain in progress; configuration acceptance is not whole-file review.",
+    "Remaining invitation publication, archive/business flows, allocation ownership, peer capabilities and native platform acceptance remain open.",
+    "Earlier E516complete repository build8steps remains retained evidence; current checks cover the full Gateway typecheck and ordinary emit.",
+    "Real paid Responses validation remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

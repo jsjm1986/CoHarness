@@ -67,6 +67,40 @@ function transport(overrides: Partial<CollaborationTransport> = {}): Collaborati
 }
 
 describe('response parsing', () => {
+  it('reveals only selected owner names, redacts rejected reads, and drops results after grants change', async () => {
+    const node = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' as NonNullable<SessionRuntimeTarget['nodeId']>
+    const elsewhere = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' as NonNullable<SessionRuntimeTarget['nodeId']>
+    const context = parseCollaborationContext({ ...projectContext, projects: projectContext.projects.map((row, i) => ({
+      ...row, nodeId: i ? elsewhere : node, metadataOnNode: true,
+    })) })
+    expect(context.scope).toMatchObject({ projectName: '#9' })
+    expect(context.projects.map(row => [row.name, row.path])).toEqual([['#9', ''], ['#10', '']])
+    const item = { nodeId: node, projectId: 9, runtimeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as NonNullable<SessionRuntimeTarget['runtimeId']>,
+      name: 'From owner', rootPath: '/owner/path' }
+    const pending = deferred<typeof item[]>()
+    const read = vi.fn<NonNullable<CollaborationTransport['loadProjectMetadata']>>().mockResolvedValue([item])
+    const client = new CollaborationClient(transport({ loadContext: vi.fn().mockResolvedValue(context), loadProjectMetadata: read }))
+    await client.load()
+    const signal = new AbortController().signal
+    await expect(client.loadProjectNames(node, [9, 10], signal)).rejects.toThrow('selected computer')
+    expect(read).not.toHaveBeenCalled()
+    await client.loadProjectNames(node, [9], signal)
+    expect(read).toHaveBeenCalledWith(node, [{ projectId: 9 }], expect.any(AbortSignal))
+    expect(client.getSnapshot().context?.projects[0]).toMatchObject({ name: 'From owner', path: '/owner/path' })
+    expect(client.getSnapshot().context?.scope).toMatchObject({ projectName: 'From owner' })
+    read.mockRejectedValueOnce(new Error('Access revoked'))
+    await expect(client.loadProjectNames(node, [9], signal)).rejects.toThrow('revoked')
+    expect(client.getSnapshot().context?.projects[0]).toMatchObject({ name: '#9', path: '' })
+    read.mockReturnValueOnce(pending.promise)
+    const late = client.loadProjectNames(node, [9], signal)
+    client.invalidateContext()
+    await client.load()
+    pending.resolve([item])
+    await expect(late).rejects.toThrow('membership changed')
+    expect(client.getSnapshot().context?.scope).toMatchObject({ projectName: '#9' })
+    client.dispose()
+  })
+
   it('retains fixed computer metadata for an empty project and rejects invalid computer identities', () => {
     const project = { ...projectContext.projects[0], nodeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nodeName: 'Ubuntu' }
     expect(parseCollaborationContext({ ...projectContext, projects: [project] }).projects[0]).toMatchObject({

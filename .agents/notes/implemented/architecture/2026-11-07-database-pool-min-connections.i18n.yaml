@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-07-database-pool-min-connections.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-07-database-pool-min-connections.md
+document:
+  en: cc28ab16999ba2367417c71b191b280886c9c4b3
+  zh: c766a702cea4a53e49243a82aeb59879ca7df88a
+/agent-note-configurable-minimum-postgresql-pool-connections-for-high-rtt-nodes:
+  en: 79cde26d4fe6edb2
+  zh: 7b202ff8816817fd
+/agent-note-configurable-minimum-postgresql-pool-connections-for-high-rtt-nodes/problem:
+  en: c0deb7bc7911da1a
+  zh: 83010f9699561b4a
+/agent-note-configurable-minimum-postgresql-pool-connections-for-high-rtt-nodes/decision:
+  en: d302323d82b72317
+  zh: aa739ce0928097b3
+/agent-note-configurable-minimum-postgresql-pool-connections-for-high-rtt-nodes/alternatives-considered:
+  en: a407442a3b560a64
+  zh: c097058550814e9b
+/agent-note-configurable-minimum-postgresql-pool-connections-for-high-rtt-nodes/consequences:
+  en: daadf59f871ad528
+  zh: 37abdb1b0f8e99bc

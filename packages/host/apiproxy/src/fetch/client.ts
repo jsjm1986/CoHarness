@@ -27,12 +27,12 @@ import {
   sessionActivateValueSchema,
   sessionAttachmentValueSchema,
   sessionCancelValueSchema,
-  sessionCreateValueSchema,
+  sessionCreateResultSchema,
   sessionForkValueSchema,
   sessionHistoryIndexValueSchema,
   sessionListValueSchema,
   sessionModelsValueSchema,
-  sessionPromptValueSchema,
+  sessionPromptValueSchema, sessionPromptStatusValueSchema,
   sessionRenameValueSchema,
   sessionSearchValueSchema,
   sessionSelectModelValueSchema,
@@ -96,6 +96,7 @@ export interface IApiClient {
     selectModel(payload: RequestPayload<'session.selectModel'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.selectModel'>>>
     rename(payload: RequestPayload<'session.rename'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.rename'>>>
     fork(payload: RequestPayload<'session.fork'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.fork'>>>
+    promptStatus(payload: RequestPayload<'session.promptStatus'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.promptStatus'>>>
     prompt(payload: RequestPayload<'session.prompt'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.prompt'>>>
     attachment(payload: RequestPayload<'session.attachment'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.attachment'>>>
     updateQueue(payload: RequestPayload<'session.updateQueue'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.updateQueue'>>>
@@ -130,7 +131,8 @@ export interface IApiClient {
     unpinSession(payload: RequestPayload<'workspace.unpinSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.unpinSession'>>>
   }
   desktop: {
-    status(payload: RequestPayload<'desktop.status'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'desktop.status'>>>
+    /** Closed desktop indicators may yield browser connections to an explicit user operation. */
+    status(payload: RequestPayload<'desktop.status'>, signal?: AbortSignal, priority?: 'low'): Promise<RpcResponse<ResponseValue<'desktop.status'>>>
     confirm(payload: RequestPayload<'desktop.confirm'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'desktop.confirm'>>>
   }
   workspaceChanges: {
@@ -191,7 +193,7 @@ export interface IApiClient {
 const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseValue<K>>> } = {
   'session.list': sessionListValueSchema,
   'session.search': sessionSearchValueSchema,
-  'session.create': sessionCreateValueSchema,
+  'session.create': sessionCreateResultSchema(historyWireValueSchema),
   'session.history': historyWireValueSchema,
   'session.historyIndex': sessionHistoryIndexValueSchema,
   'session.models': sessionModelsValueSchema,
@@ -199,6 +201,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.rename': sessionRenameValueSchema,
   'session.fork': sessionForkValueSchema,
   'session.prompt': sessionPromptValueSchema,
+  'session.promptStatus': sessionPromptStatusValueSchema,
   'session.attachment': sessionAttachmentValueSchema,
   'session.updateQueue': sessionUpdateQueueValueSchema,
   'session.cancel': sessionCancelValueSchema,
@@ -538,6 +541,29 @@ export function readApiResponseText(
   return readBoundedText(response, limit, signal)
 }
 
+/** A prepared operation's correlation header can contain only its intent UUID or the new RPC UUID. */
+function preparedOperationId(path: string, body: ClientRequest | ClientResponse): string | undefined {
+  if (body.type !== 'client-request') return undefined
+  const payload = body.payload
+  let stable: unknown
+  switch (path) {
+    case '/api/prepare/v1/session.create':
+      if (payload && typeof payload === 'object' && 'draftId' in payload && typeof payload.draftId === 'string') {
+        if (payload.draftId.startsWith('draft-')) stable = payload.draftId.slice('draft-'.length)
+      }
+      break
+    case '/api/admit/v1/session.prompt':
+    case '/api/admit/v1/session.status':
+      if (payload && typeof payload === 'object' && 'requestId' in payload) stable = payload.requestId
+      break
+    case '/api/prepare/v1/session.history': break
+    default: return undefined
+  }
+  const uuid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/iu
+  if (typeof stable === 'string' && uuid.test(stable)) return stable
+  return uuid.test(body.rpcId) ? body.rpcId : undefined
+}
+
 /** Request body release without delaying the primary HTTP or callback failure. */
 function cancelRejectedResponseBody(body: Response['body']): void {
   void body?.cancel().catch(() => {
@@ -650,16 +676,20 @@ export abstract class AbstractApiClient implements IApiClient {
     body: ClientRequest | ClientResponse,
     signal: AbortSignal | undefined,
     timeoutPolicy: UnaryTimeoutPolicy = 'default',
+    priority?: 'low',
   ): Promise<{ response: Response; signal: AbortSignal | undefined; dispose: () => void }> {
     const lease = requestSignalLease(signal, timeoutPolicy, this.timeoutMs)
     try {
       lease.signal?.throwIfAborted()
       const encodedBody = JSON.stringify(body)
       lease.signal?.throwIfAborted()
-      const response = await this.doFetch(this.resolveUrl(path), {
+      const url = this.resolveUrl(path)
+      const operation = preparedOperationId(url.pathname, body)
+      const response = await this.doFetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...(operation === undefined ? {} : { 'x-dsh-operation-id': operation }) },
         body: encodedBody,
+        ...(priority === undefined ? {} : { priority }),
         ...lease.signal === undefined ? {} : { signal: lease.signal },
       })
       if (!response.ok) {
@@ -683,10 +713,11 @@ export abstract class AbstractApiClient implements IApiClient {
     payload: RequestPayload<K>,
     signal?: AbortSignal,
     timeoutPolicy: UnaryTimeoutPolicy = 'default',
+    priority?: 'low',
   ): Promise<RpcResponse<ResponseValue<K>>> {
     const message: ClientRequest = { type: 'client-request', rpcId: this.mintRpcId(), method, payload }
     this.onEnvelope(message)
-    const posted = await this.postJson(`/api/${method}`, message, signal, timeoutPolicy)
+    const posted = await this.postJson(`/api/${method}`, message, signal, timeoutPolicy, priority)
     try {
       const full = serverResponseSchema.parse(await readBoundedJson(
         posted.response,
@@ -795,6 +826,7 @@ export abstract class AbstractApiClient implements IApiClient {
     rename: (payload, signal) => this.callUnary('session.rename', payload, signal),
     fork: (payload, signal) => this.callUnary('session.fork', payload, signal),
     prompt: (payload, signal) => this.callUnary('session.prompt', payload, signal),
+    promptStatus: (payload, signal) => this.callUnary('session.promptStatus', payload, signal),
     attachment: (payload, signal) => this.callUnary('session.attachment', payload, signal),
     updateQueue: (payload, signal) => this.callUnary('session.updateQueue', payload, signal),
     cancel: (payload, signal) => this.callUnary('session.cancel', payload, signal),
@@ -837,7 +869,7 @@ export abstract class AbstractApiClient implements IApiClient {
   }
 
   readonly desktop: IApiClient['desktop'] = {
-    status: (payload, signal) => this.callUnary('desktop.status', payload, signal),
+    status: (payload, signal, priority) => this.callUnary('desktop.status', payload, signal, 'default', priority),
     confirm: (payload, signal) => this.callUnary('desktop.confirm', payload, signal),
   }
 

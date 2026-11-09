@@ -56,6 +56,8 @@ describePg('PostgreSQL personal Runtime policy', () => {
         await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [organizationId, row.id])
         await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)',
           [organizationId, context.nodeId, row.id])
+        await pool.query('INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,$2,false)',
+          [row.id, 'fixture-password-hash'])
         users.push({ uuid: row.id, user: { id: Number(row.public_id), username, homePath, displayName: username,
           role: 'admin', status: 'active', mustChangePassword: false, autoReviewEligible: false } })
       }
@@ -84,7 +86,7 @@ describePg('PostgreSQL personal Runtime policy', () => {
 
   for (const action of ['start', 'stop', 'policy'] as const) {
     it.each(['role', 'disabled-account', 'deleted-account', 'disabled-membership', 'missing-membership',
-      'disabled-organization', 'current', 'owner-role'] as const)(`retains current administrator admission for ${action} after an organization wait: %s`, async change => {
+      'disabled-organization', 'password-required', 'missing-credential', 'current', 'owner-role'] as const)(`retains current administrator admission for ${action} after an organization wait: %s`, async change => {
       const f = await fixture()
       const applicationName = `runtime-administrator-${randomUUID()}`
       const reader = createPostgresPool(databaseUrl!, { max: 1, application_name: applicationName })
@@ -111,6 +113,8 @@ describePg('PostgreSQL personal Runtime policy', () => {
         else if (change === 'disabled-membership') await blocker.query("UPDATE harness.memberships SET status='disabled' WHERE user_id=$1", [f.holder.uuid])
         else if (change === 'missing-membership') await blocker.query('DELETE FROM harness.memberships WHERE user_id=$1', [f.holder.uuid])
         else if (change === 'disabled-organization') await blocker.query("UPDATE harness.organizations SET status='disabled' WHERE id=$1", [f.context.organizationId])
+        else if (change === 'password-required') await blocker.query('UPDATE harness.password_credentials SET must_change_password=true WHERE user_id=$1', [f.holder.uuid])
+        else if (change === 'missing-credential') await blocker.query('DELETE FROM harness.password_credentials WHERE user_id=$1', [f.holder.uuid])
         await blocker.query('COMMIT')
         const result = await pending
         if (change === 'current' || change === 'owner-role') {
@@ -133,7 +137,7 @@ describePg('PostgreSQL personal Runtime policy', () => {
     const f = await fixture()
     try {
       const project = (await pool.query<{ id: string; public_id: string }>(
-        "INSERT INTO harness.projects(organization_id,name,kind) VALUES($1,'Reserved control','steward') RETURNING id,public_id", [f.context.organizationId],
+        "INSERT INTO harness.projects(organization_id,name,kind,steward_node_id) VALUES($1,'Reserved control','steward',$2) RETURNING id,public_id", [f.context.organizationId, f.context.nodeId],
       )).rows[0]!
       await pool.query('INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path) VALUES($1,$2,$3,$4,$4)',
         [f.context.organizationId, project.id, f.context.nodeId, f.root])
@@ -148,7 +152,7 @@ describePg('PostgreSQL personal Runtime policy', () => {
     } finally { await f.close() }
   })
 
-  it('refuses an administrator revoked while node-pressure admission waits', async () => {
+  it.each(['role', 'password-required'] as const)('refuses an administrator after %s while node-pressure admission waits', async (change) => {
     const f = await fixture()
     let manager: InstanceManager | undefined, pending: Promise<unknown> | undefined
     try {
@@ -167,7 +171,8 @@ describePg('PostgreSQL personal Runtime policy', () => {
       await expect.poll(async () => (await pool.query<{ allocation_state: string }>(
         'SELECT allocation_state FROM harness.instances WHERE user_id=$1', [f.waiting.uuid],
       )).rows[0]!.allocation_state).toBe('waiting')
-      await pool.query("UPDATE harness.memberships SET role='member' WHERE user_id=$1", [f.holder.uuid])
+      if (change === 'role') await pool.query("UPDATE harness.memberships SET role='member' WHERE user_id=$1", [f.holder.uuid])
+      else await pool.query('UPDATE harness.password_credentials SET must_change_password=true WHERE user_id=$1', [f.holder.uuid])
       await budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 1 })
       expect(await pending).toMatchObject({ code: 'forbidden' })
       expect(allocations).toBe(0)

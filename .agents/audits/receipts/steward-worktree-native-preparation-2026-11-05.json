@@ -1,0 +1,94 @@
+{
+  "id": "B506",
+  "title": "Steward Git blocks serving Gateway requests, inherits credentials, and leaves ordinary hooks after cancellation",
+  "status": "fixed_named_posix_gateway_and_managed_hook_cases_verified_other_platforms_open",
+  "sourceFixed": true,
+  "paths": [
+    "gateway/src/index.ts",
+    "gateway/src/config.ts",
+    "gateway/src/steward-worktree.ts",
+    "gateway/tsconfig.build.json",
+    "gateway/tsconfig.run.json",
+    "scripts/gateway-runtime-packages.ts"
+  ],
+  "receipt": "receipts/steward-worktree-native-preparation-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-startup-git-before-v2.json",
+  "observations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-startup-git-original-observations.json",
+  "evidence": "Actual Gateway entry and owned PostgreSQL initially return health200. Reopening maintenance triggers a Git worktree checkout in an owned repository whose post-checkout hook reaches a file barrier. While it waits, the same health endpoint times out and the hook confirms receipt of a synthetic HGW secret. The fixture only substitutes listener allocation with loopback port0; no auth or Git result is mocked, no real model key is supplied and no production state is changed.",
+  "at": "2026-11-04T19:00:42.936151+00:00",
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "correction": "Asynchronous Git preparation owns a fresh local subprocess provider until every command and managed range is joined. Validated total preparation and termination grace settings cancel checkout on deadline or Gateway shutdown. The explicit environment removes ambient Gateway/Runtime/credential variables. Existing branches and workspace edits survive; only a retained branch selects detached checkout, other Git failures retain their cause and partial files.",
+  "intermediateCounterproof": {
+    "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/git-hook-cancellation-before-range.json",
+    "observation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/git-hook-cancellation-before-range-observations.json",
+    "result": "Killing only the asynchronous native Git leader leaves an ordinary hook alive with inherited pipes, and preparation remains pending after caller cancellation."
+  },
+  "checks": {
+    "managedHookRecheck": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/git-hook-cancellation-managed-range.json",
+      "passed": 1,
+      "skipped": 0
+    },
+    "helperAndConfig": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-managed-helper-config-cases.json",
+      "passed": 49,
+      "skipped": 0
+    },
+    "realGateway": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-managed-public-gateway-cases.json",
+      "passed": 1,
+      "skipped": 0,
+      "transcript": "gateway/tests/expected/steward-worktree.jsonl",
+      "observed": "Real Git hook barrier with live HTTP200, synthetic secret excluded, graceful exit0, ordinary TERM-trapping hook absent, zero steward projects after cancellation."
+    },
+    "normalNodeArtifact": {
+      "matrix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "passed": 2,
+      "typescriptLoader": false,
+      "fixtureInstrumentation": "A Node preload allocates the two serving sockets at loopback port0 and records actual listening addresses; source behavior, Git and authentication are not mocked."
+    },
+    "runtimeAssemblyPackages": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-runtime-package-cases.json",
+      "passed": 4
+    },
+    "coverage": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-managed-coverage/coverage-summary.json",
+      "scope": "entire new steward-worktree.ts measured with10real helper cases; no exclusions or thresholds changed",
+      "lines": 100,
+      "statements": 97.77,
+      "functions": 100,
+      "branches": 95
+    },
+    "typecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-managed-final-typecheck.log",
+    "ordinaryFullGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-managed-gateway-build.log",
+    "focusedLint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-managed-lint.log",
+    "threeBilingualPairs": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-translation-pairing-check.log",
+    "sixMarkdownSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/steward-markdown-links.log"
+  },
+  "limits": [
+    "Actual POSIX Git hooks were verified on macOS; native Windows and Linux platform-specific containment are not accepted by these runs.",
+    "Escaped descendants follow the existing subprocess provider platform limitations; B25 remains open.",
+    "Git partial writes intentionally remain for inspection; no reset or rollback promise.",
+    "Global documentation debts and whole-project business review remain open."
+  ],
+  "frozenDelivery": {
+    "at": "2026-11-04T19:01:52.047328+00:00",
+    "finding": "B506",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/B506-steward-worktree-preparation",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T181302Z/B506-steward-worktree-preparation.delta.tar.gz",
+    "archiveSha256": "e959cdcf61b8291d9c846714d88297d37a9a0ea3bf34f368f5ee0aa9225bb0ea",
+    "manifestSha256": "e2d4c72137306b54b9e2e0831d3f0ad1ae05103892044d099d112e5d3d61508c",
+    "ownedPaths": 20,
+    "readOnlyPrerequisites": 6,
+    "compiledGatewayFiles": 256,
+    "migrationAndArtifactFiles": 375,
+    "wholeProjectComplete": false
+  }
+}

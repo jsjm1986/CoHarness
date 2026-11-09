@@ -15,6 +15,11 @@ import type {
 export type RemoteDesktopRemote = Pick<ClientRemote['remoteDesktop'],
   'status' | 'confirm' | 'attach' | 'listGrants' | 'grant' | 'setLevel' | 'revoke' | 'audit'>
 
+interface DesktopConnection {
+  readonly privateResourceUrl?: (value: string) => string
+  readonly forSession?: (sessionId: SessionId) => DesktopConnection
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Human remote-desktop status, consent, attach, grant administration, and audit. */
@@ -41,13 +46,13 @@ export class ClientRemoteDesktops extends Service {
    * @param ctx - Client root Context.
    * @param remote - generated `remoteDesktop` namespace.
    * @param privateResourceUrl - binds private URLs to the verified document
-   *   identity and runtime target (Gateway `dshTarget`/`dshPrincipal`); the
+   *   identity and addressed Session's Runtime (Gateway `dshTarget`/`dshPrincipal`); the
    *   stream upgrade resolves its runtime from them, not from the scope cookie.
    */
   constructor(
     ctx: Context,
     private readonly remote: RemoteDesktopRemote,
-    private readonly privateResourceUrl?: (value: string) => string,
+    private readonly privateResourceUrl?: (value: string, sessionId: SessionId) => string,
   ) {
     super(ctx, 'remoteDesktops')
   }
@@ -98,7 +103,7 @@ export class ClientRemoteDesktops extends Service {
     // Identity pinning must run on the http(s) URL: the fence matches the page
     // origin, so a ws(s) URL would fall out of its scope check unpinned.
     const path = `${result.value.stream.path}?token=${encodeURIComponent(result.value.stream.token)}`
-    const url = new URL(this.privateResourceUrl?.(path) ?? path, location.href)
+    const url = new URL(this.privateResourceUrl?.(path, sessionId) ?? path, location.href)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     return { id: result.value.id, spec: result.value.spec, url: url.href }
   }
@@ -201,10 +206,10 @@ export async function apply(ctx: Context): Promise<void> {
     const { default: remoteDesktopRemote } = await import('@deepseek-ai/dsh-api-remote-desktop-controller/remote')
     await ctx.remote.$mount(remoteDesktopRemote)
   }
-  const connection = ctx.get('connection') as { privateResourceUrl?: (value: string) => string } | undefined
+  const connection = ctx.get('connection') as DesktopConnection | undefined
   new ClientRemoteDesktops(
     ctx,
     ctx.get('remote.remoteDesktop') as RemoteDesktopRemote,
-    connection?.privateResourceUrl,
+    (value, sessionId) => (connection?.forSession?.(sessionId) ?? connection)?.privateResourceUrl?.(value) ?? value,
   )
 }

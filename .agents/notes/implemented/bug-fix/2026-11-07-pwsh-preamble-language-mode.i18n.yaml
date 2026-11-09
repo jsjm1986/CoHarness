@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-07-pwsh-preamble-language-mode.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-07-pwsh-preamble-language-mode.md
+document:
+  en: a3941f156be017f932f93d4af691e66f6b40f837
+  zh: db5813080d75b45941ab0836869b747db83d3750
+/agent-note-encoding-preamble-is-gated-on-fulllanguage:
+  en: 7494adf83b0f4c9e
+  zh: f68141e83422cf45
+/agent-note-encoding-preamble-is-gated-on-fulllanguage/problem:
+  en: 6ab96382f97daf64
+  zh: 566c53b04b13c7eb
+/agent-note-encoding-preamble-is-gated-on-fulllanguage/decision:
+  en: 4101dbb4c69a8821
+  zh: de7aabf0a3d05fdf
+/agent-note-encoding-preamble-is-gated-on-fulllanguage/alternatives-considered:
+  en: 69c90e5f0ec55250
+  zh: 72cc9d50f80e53e0
+/agent-note-encoding-preamble-is-gated-on-fulllanguage/consequences:
+  en: 8853a35f438bd995
+  zh: a49159669258b438

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-10-steward-admin-layered-admission.md
 document:
-  en: 820b7e6e72d798f6162904efb304bb089223677d
-  zh: 4b66cf9bacae5063b0d834596d7f6672795dc378
+  en: 73095895e70acdce5b9c563dfdee0ee8cf2da8d9
+  zh: ff33942b1c5c19a8fec69e55954839b0191b28ff
 /agent-note-steward-admission-layers-the-grant-on-administrator-membership:
   en: 264defdc641aac18
   zh: 8d6bee435c436243
@@ -12,11 +12,11 @@ document:
   en: 6c0a5d658877a380
   zh: ac127af59828cdd0
 /agent-note-steward-admission-layers-the-grant-on-administrator-membership/decision:
-  en: 358e0267b0d962a7
-  zh: 0ded185b626aa5a7
+  en: 3c851352c8e27225
+  zh: b6752a6f89c87cb2
 /agent-note-steward-admission-layers-the-grant-on-administrator-membership/alternatives-considered:
   en: 9ec0f47c56b90267
   zh: a4f2e60b967b5487
 /agent-note-steward-admission-layers-the-grant-on-administrator-membership/consequences:
-  en: 1e6f310634f7ef61
-  zh: b14651db429603ee
+  en: 86edf29b445b5ba8
+  zh: 0a24ef4033bdf37a

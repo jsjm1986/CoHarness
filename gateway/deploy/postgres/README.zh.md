@@ -89,6 +89,30 @@ npm run pg:restore-check -- "$HOME/harness-postgres-backups/harness-YYYYMMDD-HHM
 
 Named volume 与宿主机备份目录仍在同一台机器上，只能防逻辑误操作和容器损坏，不能防整机或磁盘损坏。在把它当作企业备份前，必须把成功的 dump 同步到第二台机器或 NAS。
 
+<a id="private-maintenance-connections"></a>
+
+## 私密维护连接
+
+Gateway 维护操作和 `pg:deploy` 通过管道传递部署连接。原生 `pg_dump` 和 `psql` 的参数只含解析后的非密码选项，所选密码通过 `PGPASSWORD` 传递。Gateway 清理后的子进程环境仍保留明确允许的 PostgreSQL 凭据输入。这避免数据库密码出现在普通命令参数检查中；操作系统管理员及获准检查其他进程环境的进程仍可读取密码。
+
+在维护执行主机上安装 C 编译器、PostgreSQL 客户端工具、libpq 头文件及开发库。Gateway 工作区依赖构建完成后，针对客户端使用的同一套 libpq 安装执行构建：
+
+```bash
+npm run build:pg-client -- --pg-config /path/to/postgres/bin/pg_config
+```
+
+适配器生成在 `gateway/lib/native/hgw-pg-client`，Windows 文件名带 `.exe`。`HGW_PG_CONNECTION_COMMAND` 可指定其他本机解析器命令。`HGW_PG_CONNECTION_TIMEOUT_MS` 限制本机解析与包装命令就绪等待，默认 `30000`，接受不超过 `2147483647` 的正整数。获准执行后的导出或 SQL 事务继续沿用原有取消生命周期，不受这个就绪期限限制。缺少适配器或包装命令不兼容时，维护操作失败，不发布备份，也不提交恢复 SQL。普通 Gateway 与节点代理构建仍不依赖 libpq 开发工具。
+
+解析得到的 TLS 密钥密码、OAuth 客户端秘密和 SCRAM 密钥需要额外的私密凭据通道。内置适配器在暴露客户端参数前拒绝这些非空字段，不会丢弃它们或尝试更弱的认证。
+
+部署连接指定数据库、账户与连接设置。连接目标应写入该值，不应依赖固定客户端参数覆盖未填写的字段。Libpq 解析 URI 与关键字语法、重复值、服务文件选择、环境默认值及密码文件回退。显式选定的密码保留包括换行在内的完整字节。解析会在实际客户端启动前发起并关闭一个非阻塞辅助连接；就绪期限也限制解析器启动与 DNS 工作。
+
+自定义包装命令必须在 PostgreSQL 客户端的实际执行环境中运行 `hgw-pg-client`，并保持 stdin 和 stdout 为二进制。例如，将 `HGW_PGDUMP_COMMAND` 设置为 `docker compose exec -T postgres /usr/local/bin/hgw-pg-client pg_dump`，将 `HGW_PGRESTORE_COMMAND` 设置为同一前缀并以 `pg_restore` 结尾。在该容器内针对其自身 libpq 安装适配器。SSH 使用相应远端前缀，并禁用伪终端。`HGW_PSQL_COMMAND` 可显式指定 SQL 执行器，否则会将 `pg_restore` 配对为 `psql`。PostgreSQL 凭据环境转发及引用文件必须在执行主机上可用；Gateway 本机路径不足以让容器或远端电脑读取文件。POSIX 包装模式通过 `exec` 保持原生客户端的进程身份。Windows 维护使用本机解析器，再直接启动原生客户端。
+
+数据库调用会添加 `--hgw-connection-stdin-v1=<32 个小写十六进制字符>`。Stdin 先包含四字节无符号大端 UTF-8 字节长度，再包含该长度的连接字节；连接最多一 MiB，禁止 NUL。适配器解析连接后，先输出精确的 `hgw-pg-client/1 <nonce>\n`，再输出原生客户端数据。Gateway 从导出文件中去掉该前缀，并在匹配成功前保留后续恢复 SQL。离线 `pg_restore` 检查和渲染不携带标记或连接帧。本机解析模式 `--resolve-stdin-v1 <nonce>` 通过私密 stdout 管道返回带版本和 nonce 的头部，以及有长度上限、由 NUL 分隔的 libpq 关键字／值；这些内容不会进入操作员输出。
+
+取消会等待本机命令实际退出，并移除未完成的备份文件。Docker 或 SSH 载体可能与远端连接分离；事务恢复仍保留独立的数据库锁，并在修改与提交前检查确切的协调 lease。取消载体不证明远端 SQL 事务已经停止。参见[维护决策](../../../.agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.zh.md)。
+
 ## 测试
 
 只有显式设置 `HGW_TEST_DATABASE_URL` 才会启用集成测试：

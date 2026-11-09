@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write gateway/deploy/node-content/README.md
+document:
+  en: a035f61c34e33c451383b9ce25a69c78357cde79
+  zh: 3ed2fd5fd7c7bdf43ab031b117140acfdf27a0d0
+/postgresql-storage-for-one-project-computer:
+  en: 3bc3cbdb3cd88dc1
+  zh: ce4b4edb374d5c0c
+/postgresql-storage-for-one-project-computer/provision-a-volume:
+  en: b75b6dac633ad236
+  zh: a95926e52858804d
+/postgresql-storage-for-one-project-computer/project-placement-and-migration:
+  en: a27d343cbb0deb07
+  zh: 2ec64108285c50f8
+/postgresql-storage-for-one-project-computer/protect-live-project-files-on-linux:
+  en: 2f0b8de26223b576
+  zh: 743736d682c3b63c
+/postgresql-storage-for-one-project-computer/protect-live-project-files-on-windows:
+  en: 4fe4f548e33cb714
+  zh: 82454ed54fb23764
+/postgresql-storage-for-one-project-computer/check-a-mac-project-volume:
+  en: 6353fc1e7f291500
+  zh: c8a0373b9530d9a3
+/postgresql-storage-for-one-project-computer/verify-the-isolated-database-path:
+  en: 823bcd194016d5e7
+  zh: e25960f72b91e159
+/postgresql-storage-for-one-project-computer/organization-wide-project-names:
+  en: 819f29504ee1b072
+  zh: a185eaca81aa99e2
+/postgresql-storage-for-one-project-computer/move-an-existing-project:
+  en: 8d7e260c3b28aee2
+  zh: 184f4aa064fac76e
+/postgresql-storage-for-one-project-computer/review-a-project-plugin:
+  en: 205a0e7d7212f5a2
+  zh: 78816db7b19e1669
+/postgresql-storage-for-one-project-computer/retire-a-historical-source:
+  en: a350f62f3e635e49
+  zh: 34c286b31cde8324

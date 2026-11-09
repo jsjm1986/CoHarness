@@ -1,16 +1,27 @@
+import { defaultDraftHistoryLimits, type DraftHistoryLimits } from './draft-history.ts'
 import type { NodeResourceBudgetConfig } from './node-resource-budget.ts'
 import type { RuntimeCapacityConfig } from './runtime-capacity.ts'
 import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { basename, isAbsolute, join, posix, resolve } from 'node:path'
+import { basename, isAbsolute, join, posix, resolve, sep, win32 } from 'node:path'
+
+/** Path grammar matching the hosting OS; deployment paths were validated POSIX-only before Windows hosts joined. */
+const hostPath = process.platform === 'win32' ? win32 : posix
 import { DEFAULT_DESKTOP_COORDINATOR_CONFIG, type DesktopCoordinatorConfig } from './desktop-coordinator.ts'
 import { DEFAULT_PROGRESS_CONFIG, type ProgressConfig } from './postgres/progress-service.ts'
 import { DEFAULT_RUNTIME_LOG_CAP_BYTES } from './runtime-log.ts'
 import { loadNodeChannelConfig } from './node-channel-protocol.ts'
 import { loadNodeServiceConfig } from './node-service.ts'
+import { defaultPgConnectionCommand } from './pg-client-protocol.ts'
 
 export interface GatewayConfig {
+  /** Primary-only organization project-name key ring file. */
+  projectNameKeyFile?: string
+
+  /** Operator-enrolled, locally attested PostgreSQL content volume. */
+  nodeContent?: { databaseUrlFile: string; dataDirectory: string; volumeId: string }
+
   /** Canonical immutable release directory for managed deployments. */
   releaseRoot?: string
   /** Public release identifier derived from the immutable directory name. */
@@ -46,6 +57,8 @@ export interface GatewayConfig {
   upstreamTimeoutMs: number
   /** Loopback resource-accounting request deadline for managed Runtime plugins. */
   runtimeRequestTimeoutMs: number
+  /** Foreground wait shared by all node sources in one document overview. */
+  documentOverviewDeadlineMs: number
   /** Resource-accounting cleanup deadline, longer than one Runtime request. */
   runtimeCleanupTimeoutMs: number
   /** Managed browser readiness deadline, including its Host description and event streams. */
@@ -58,6 +71,8 @@ export interface GatewayConfig {
   keepAliveTimeoutMs: number
   /** Maximum interval between durable access-revocation reads and listener reconnects. */
   accessInvalidationPollMs: number
+  /** Memoization window for runtime-credential resolution; access invalidations flush early. */
+  runtimeTokenCacheMs: number
   /** Heartbeat interval for a managed runtime's execution revocation stream. */
   executionWatchHeartbeatMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
@@ -104,12 +119,16 @@ export interface GatewayConfig {
   configurationRevision: number
   /** Node-owned JSONL approvals for custom provider data roots, qualified by runtime identity. */
   managedDataApprovalFile?: string
-  /** pg_dump command prefix (e.g. `pg_dump` or `docker compose exec -T postgres pg_dump`); the database URL is appended. */
+  /** Direct pg_dump command or wrapper implementing the private connection-input protocol. */
   pgDumpCommand: string[]
   /** pg_restore command prefix used for dump verification and restores. */
   pgRestoreCommand: string[]
   /** Optional SQL command wrapper; otherwise use the pg_restore command's psql sibling. */
   psqlCommand?: string[]
+  /** Native local libpq resolver; built separately against the maintenance client's installation. */
+  pgConnectionCommand: string[]
+  /** Maximum time for local resolution or a wrapper's private-input acknowledgement. */
+  pgConnectionTimeoutMs: number
   /** Interval at which this node publishes its maintenance acknowledgement heartbeat. */
   nodeHeartbeatMs: number
   /** Heartbeat age at which a node stops counting as a live writer for quiesce checks. */
@@ -126,6 +145,7 @@ export interface GatewayConfig {
   /** Node-wide managed Runtime cold-start and residency admission. */
   runtimeCapacity: RuntimeCapacityConfig
   /** Row and complete-response limits for environment-directory reads. */
+  draftHistory: DraftHistoryLimits
   runtimeCatalog: import('./runtime-catalog.ts').RuntimeCatalogLimits
   /** Outbound node enrollment and control leases; connectivity does not grant execution. */
   nodeAccess: import('./node-access.ts').NodeAccessConfig
@@ -138,6 +158,8 @@ export interface GatewayConfig {
   resourceBudget: NodeResourceBudgetConfig
   /** Enable bounded Gateway performance observations. */
   performanceEnabled: boolean
+  /** Maximum completed versioned Session operations retained in memory on one Gateway. */
+  performanceOperationSamples: number
   /** Event-loop histogram sampling interval, in milliseconds. */
   performanceEventLoopResolutionMs: number
   /** Maximum PostgreSQL connections owned by this Gateway, including dedicated listeners. */
@@ -146,6 +168,8 @@ export interface GatewayConfig {
   databaseMaxCheckoutQueue: number
   /** PostgreSQL connection checkout deadline, in milliseconds. */
   databaseConnectionTimeoutMs: number
+  /** Connections kept open between bursts; remote nodes avoid a multi-RTT handshake per new client. */
+  databaseMinConnections: number
   idleTimeoutMs: number
   readinessTimeoutMs: number
   sessionTtlMs: number
@@ -234,11 +258,15 @@ export interface StewardSpaceConfig {
   /** Steward workspace directory — the resident runtime's cwd (HGW_STEWARD_WORKSPACE). */
   workspacePath: string
   /**
-   * Git repository the workspace forks from as a detached worktree
+   * Git repository used for the separate steward worktree
    * (HGW_STEWARD_SOURCE). Empty keeps a plain directory: the agent still has
    * shell and file tools, just no repository checkout.
    */
   sourcePath: string
+  /** Total Git workspace preparation deadline (HGW_STEWARD_PREPARE_TIMEOUT_MS). */
+  prepareTimeoutMs: number
+  /** Managed Git process termination grace (HGW_STEWARD_PREPARE_KILL_GRACE_MS). */
+  prepareKillGraceMs: number
   /** Steward-tools policy package directory materialized into the steward profile (HGW_STEWARD_TOOLS_PACKAGE). */
   toolsPackage: string
   /**
@@ -272,37 +300,35 @@ export const MAX_TIMER_DELAY_MS = 2_147_483_647
 function projectPathRoots(value: string | undefined): string[] {
   if (value === undefined) return []
   const roots = value.split(',').map(path => path.trim()).filter(Boolean).map((path) => {
-    if (!posix.isAbsolute(path)) throw new Error(`HGW_PROJECT_PATH_ROOTS must contain absolute Linux paths: ${path}`)
-    return posix.normalize(path)
+    if (!hostPath.isAbsolute(path)) throw new Error(`HGW_PROJECT_PATH_ROOTS must contain absolute paths: ${path}`)
+    return hostPath.normalize(path)
   })
   for (const [index, root] of roots.entries()) {
-    if (root === '/') throw new Error('HGW_PROJECT_PATH_ROOTS must not include the filesystem root')
+    if (root === hostPath.parse(root).root) throw new Error('HGW_PROJECT_PATH_ROOTS must not include the filesystem root')
     for (const prior of roots.slice(0, index)) {
-      const nested = root === prior || posix.relative(prior, root).split('/')[0] !== '..'
-        || posix.relative(root, prior).split('/')[0] !== '..'
-      if (nested) throw new Error(`HGW_PROJECT_PATH_ROOTS contains overlapping roots: ${prior}, ${root}`)
+      if (pathsOverlap(prior, root)) throw new Error(`HGW_PROJECT_PATH_ROOTS contains overlapping roots: ${prior}, ${root}`)
     }
   }
   return roots
 }
 
 function strictlyNestedPath(root: string, path: string): boolean {
-  const normalizedRoot = posix.normalize(root)
-  const normalizedPath = posix.normalize(path)
-  return normalizedPath !== normalizedRoot
-    && posix.relative(normalizedRoot, normalizedPath).split('/')[0] !== '..'
-    && !posix.isAbsolute(posix.relative(normalizedRoot, normalizedPath))
+  const normalizedRoot = hostPath.normalize(root)
+  const normalizedPath = hostPath.normalize(path)
+  const relative = hostPath.relative(normalizedRoot, normalizedPath)
+  return relative !== '' && relative.split(/[\\/]/u)[0] !== '..' && !hostPath.isAbsolute(relative)
 }
 
 function normalizedAbsolutePath(path: string): string {
-  const normalized = posix.normalize(path)
-  return normalized.length > 1 ? normalized.replace(/\/+$/, '') : normalized
+  const normalized = hostPath.normalize(path)
+  return normalized.length > 1 ? normalized.replace(/[\\/]+$/u, '') : normalized
 }
 
 function pathsOverlap(left: string, right: string): boolean {
   const nested = (root: string, candidate: string): boolean => {
-    const relative = posix.relative(posix.normalize(root), posix.normalize(candidate))
-    return relative === '' || (!relative.startsWith('../') && relative !== '..' && !posix.isAbsolute(relative))
+    const relative = hostPath.relative(hostPath.normalize(root), hostPath.normalize(candidate))
+    return relative === '' || (!relative.startsWith(`..${sep}`) && !relative.startsWith('../')
+      && relative !== '..' && !hostPath.isAbsolute(relative))
   }
   return nested(left, right) || nested(right, left)
 }
@@ -429,7 +455,7 @@ function parseStewardReadRoots(value: string): string[] {
     throw new Error('HGW_STEWARD_READ_ROOTS must be a JSON array of absolute paths')
   }
   if (!Array.isArray(parsed) || parsed.length > 64
-    || parsed.some(path => typeof path !== 'string' || !posix.isAbsolute(path) || /[\u0000-\u001f\u007f]/u.test(path))) {
+    || parsed.some(path => typeof path !== 'string' || !hostPath.isAbsolute(path) || /[\u0000-\u001f\u007f]/u.test(path))) {
     throw new Error('HGW_STEWARD_READ_ROOTS must be a JSON array of at most 64 absolute paths without control characters')
   }
   return parsed as string[]
@@ -459,11 +485,24 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     requireReleasePath(env.HGW_DSH_REPO_ROOT, releaseRoot, 'HGW_DSH_REPO_ROOT')
   }
   const usersRoot = env.HGW_USERS_ROOT ?? join(homedir(), 'harness-users')
+  const projectNameKeyFile = env.HGW_PROJECT_NAME_KEY_FILE?.trim()
+  if (projectNameKeyFile !== undefined && !hostPath.isAbsolute(projectNameKeyFile)) throw new Error('HGW_PROJECT_NAME_KEY_FILE requires an absolute path')
+  const contentFile = env.HGW_NODE_CONTENT_DATABASE_URL_FILE?.trim()
+  const contentData = env.HGW_NODE_CONTENT_PGDATA?.trim()
+  const contentVolume = env.HGW_NODE_CONTENT_VOLUME_ID?.trim()
+  let nodeContent: GatewayConfig['nodeContent']
+  if (contentFile !== undefined || contentData !== undefined || contentVolume !== undefined) {
+    if (!contentFile || !hostPath.isAbsolute(contentFile) || !contentData || !hostPath.isAbsolute(contentData)
+      || !contentVolume || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(contentVolume)) {
+      throw new Error('Node content storage requires absolute HGW_NODE_CONTENT_DATABASE_URL_FILE and HGW_NODE_CONTENT_PGDATA paths and a valid HGW_NODE_CONTENT_VOLUME_ID')
+    }
+    nodeContent = { databaseUrlFile: contentFile, dataDirectory: contentData, volumeId: contentVolume }
+  }
   const stateRoot = resolve(env.HGW_STATE_ROOT ?? join(homedir(), '.harness-gateway'))
   const bootstrapAdminPasswordFile = normalizedAbsolutePath(resolve(
     env.HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE ?? join(stateRoot, 'bootstrap-admin-password'),
   ))
-  if (!posix.isAbsolute(bootstrapAdminPasswordFile) || bootstrapAdminPasswordFile === '/') {
+  if (!hostPath.isAbsolute(bootstrapAdminPasswordFile) || bootstrapAdminPasswordFile === '/') {
     throw new Error('HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE must be an absolute path')
   }
   const principalKeyDir = resolve(env.HGW_PRINCIPAL_KEY_DIR ?? join(stateRoot, 'principal-keys'))
@@ -502,7 +541,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const userProjectsRoot = normalizedAbsolutePath(env.HGW_USER_PROJECTS_ROOT
     ?? join(configuredProjectPathRoots[0] ?? stateRoot, 'user-projects'))
-  if (!posix.isAbsolute(userProjectsRoot) || userProjectsRoot === '/') {
+  if (!hostPath.isAbsolute(userProjectsRoot) || userProjectsRoot === '/') {
     throw new Error('HGW_USER_PROJECTS_ROOT must be an absolute path')
   }
   if (launcher === 'systemd' && !configuredProjectPathRoots.some(root => strictlyNestedPath(root, userProjectsRoot))) {
@@ -510,7 +549,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const projectsRoot = normalizedAbsolutePath(env.HGW_PROJECTS_ROOT
     ?? join(configuredProjectPathRoots[0] ?? homedir(), 'harness-projects'))
-  if (!posix.isAbsolute(projectsRoot) || projectsRoot === '/') {
+  if (!hostPath.isAbsolute(projectsRoot) || projectsRoot === '/') {
     throw new Error('HGW_PROJECTS_ROOT must be an absolute path')
   }
   if (launcher === 'systemd' && !configuredProjectPathRoots.some(root => strictlyNestedPath(root, projectsRoot))) {
@@ -518,6 +557,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const projectRuntimesRoot = env.HGW_PROJECT_RUNTIMES_ROOT ?? join(homedir(), 'harness-project-runtimes')
   const gatewayDir = releaseRoot === undefined ? env.HGW_GATEWAY_DIR ?? gatewayRoot : join(releaseRoot, 'gateway')
+  const workspaceRoots = [usersRoot, projectRuntimesRoot, userProjectsRoot, projectsRoot, ...configuredProjectPathRoots]
+  if (projectNameKeyFile !== undefined && [...workspaceRoots, gatewayDir, principalKeyDir, runtimeCredentialDir,
+    bootstrapAdminPasswordFile, organizationModelCredentialKeyFile, webhookSecretKeyFile, tunnelCredentialKeyFile].some(path => pathsOverlap(path, projectNameKeyFile))) {
+    throw new Error('HGW_PROJECT_NAME_KEY_FILE overlaps a workspace, Gateway or credential path')
+  }
+  if (nodeContent && (workspaceRoots.some(path => pathsOverlap(path, nodeContent.databaseUrlFile) || pathsOverlap(path, nodeContent.dataDirectory))
+    || pathsOverlap(nodeContent.databaseUrlFile,nodeContent.dataDirectory)
+    || projectNameKeyFile !== undefined && (pathsOverlap(nodeContent.databaseUrlFile,projectNameKeyFile) || pathsOverlap(nodeContent.dataDirectory,projectNameKeyFile)))) {
+    throw new Error('Node content credentials and PGDATA must be separate from workspace and organization key paths')
+  }
   if (releaseRoot !== undefined && env.HGW_GATEWAY_DIR !== undefined) {
     requireReleasePath(env.HGW_GATEWAY_DIR, gatewayDir, 'HGW_GATEWAY_DIR')
   }
@@ -653,6 +702,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     'HGW_KEEPALIVE_TIMEOUT_MS',
   )
   const runtimeRequestTimeoutMs = timerDelay(env.HGW_RUNTIME_REQUEST_TIMEOUT_MS, 5000, 'HGW_RUNTIME_REQUEST_TIMEOUT_MS')
+  const documentOverviewDeadlineMs = timerDelay(env.HGW_DOCUMENT_OVERVIEW_DEADLINE_MS, 1200, 'HGW_DOCUMENT_OVERVIEW_DEADLINE_MS')
   const runtimeCleanupTimeoutMs = timerDelay(env.HGW_RUNTIME_CLEANUP_TIMEOUT_MS, 30000, 'HGW_RUNTIME_CLEANUP_TIMEOUT_MS')
   if (runtimeCleanupTimeoutMs <= runtimeRequestTimeoutMs) throw new Error('HGW_RUNTIME_CLEANUP_TIMEOUT_MS must exceed HGW_RUNTIME_REQUEST_TIMEOUT_MS')
   const runtimeBrowserReadyTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS, 15000, 'HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS')
@@ -671,6 +721,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const performanceFlag = env.HGW_PERFORMANCE_ENABLED ?? 'true'
   if (performanceFlag !== 'true' && performanceFlag !== 'false') throw new Error('HGW_PERFORMANCE_ENABLED must be true or false')
   const performanceEnabled = performanceFlag === 'true'
+  const performanceOperationSamples = positiveSafeInteger(env.HGW_PERFORMANCE_OPERATION_SAMPLES,256,'HGW_PERFORMANCE_OPERATION_SAMPLES')
+  if (performanceOperationSamples>4096) throw new Error('HGW_PERFORMANCE_OPERATION_SAMPLES must not exceed 4096')
   const runtimeCapacity: RuntimeCapacityConfig = {
     maxStarting: positiveSafeInteger(env.HGW_RUNTIME_MAX_STARTING, 2, 'HGW_RUNTIME_MAX_STARTING'),
     maxResident: env.HGW_RUNTIME_MAX_RESIDENT === undefined || env.HGW_RUNTIME_MAX_RESIDENT === '0' ? 0 : positiveSafeInteger(env.HGW_RUNTIME_MAX_RESIDENT, 1, 'HGW_RUNTIME_MAX_RESIDENT'),
@@ -708,6 +760,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (resourceBudget.maxQueuedPerUser > resourceBudget.maxQueued || resourceBudget.maxQueuedPerProject > resourceBudget.maxQueued) {
     throw new Error('HGW_RESOURCE_MAX_QUEUED_PER_USER and HGW_RESOURCE_MAX_QUEUED_PER_PROJECT must not exceed HGW_RESOURCE_MAX_QUEUED')
   }
+  const databaseMinConnections = (() => {
+    const resolved = Number(env.HGW_DATABASE_MIN_CONNECTIONS ?? 0)
+    if (!Number.isSafeInteger(resolved) || resolved < 0) throw new Error('HGW_DATABASE_MIN_CONNECTIONS must be a non-negative safe integer')
+    return resolved
+  })()
+  const databaseMaxConnections = positiveSafeInteger(env.HGW_DATABASE_MAX_CONNECTIONS, 10, 'HGW_DATABASE_MAX_CONNECTIONS')
+  if (databaseMinConnections > databaseMaxConnections) throw new Error('HGW_DATABASE_MIN_CONNECTIONS must not exceed HGW_DATABASE_MAX_CONNECTIONS')
   const idleTimeoutMs = positiveSafeInteger(env.HGW_IDLE_TIMEOUT_MS, 30 * 60 * 1000, 'HGW_IDLE_TIMEOUT_MS')
   const readinessTimeoutMs = timerDelay(env.HGW_READINESS_TIMEOUT_MS, 30 * 1000, 'HGW_READINESS_TIMEOUT_MS')
   const systemdCommandTimeoutMs = timerDelay(env.HGW_SYSTEMD_COMMAND_TIMEOUT_MS, 120_000, 'HGW_SYSTEMD_COMMAND_TIMEOUT_MS')
@@ -743,7 +802,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const desktopDriverPackage = releaseDesktopDriverPackage
     ?? normalizedAbsolutePath(env.HGW_DESKTOP_DRIVER_PACKAGE
       ?? join(dshRepoRoot, 'packages/experimental/computer-use-cua-driver-mcp'))
-  if (!posix.isAbsolute(desktopDriverPackage)) {
+  if (!hostPath.isAbsolute(desktopDriverPackage)) {
     throw new Error('HGW_DESKTOP_DRIVER_PACKAGE must be an absolute path')
   }
   const desktopDriverCommand = env.HGW_DESKTOP_DRIVER_COMMAND?.trim()
@@ -763,7 +822,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const stewardRuntimeUser = env.HGW_STEWARD_RUNTIME_USER ?? projectRuntimeUser
   if (stewardEnabled) {
-    if (!posix.isAbsolute(stewardRoot) || stewardRoot === '/') {
+    if (!hostPath.isAbsolute(stewardRoot) || stewardRoot === '/') {
       throw new Error('HGW_STEWARD_ROOT must be an absolute path')
     }
     if (!strictlyNestedPath(stewardRoot, stewardWorkspacePath)) {
@@ -777,6 +836,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     }
     if (!SYSTEMD_ACCOUNT_RE.test(stewardRuntimeUser) || stewardRuntimeUser === 'root') {
       throw new Error('HGW_STEWARD_RUNTIME_USER is not a valid systemd account')
+    }
+    // ensureSteward seeds `name·nodeName` through normalizeProjectName; a
+    // combination that can never normalize must fail here, not at first boot.
+    const seedName = `${env.HGW_STEWARD_PROJECT_NAME ?? '维护中枢'}·${env.HGW_COMPUTE_NODE_NAME ?? 'local'}`.trim()
+    if (seedName === '' || seedName === '.' || seedName === '..' || seedName.length > 120
+      || /[\\/\u0000-\u001f\u007f]/u.test(seedName)) {
+      throw new Error('HGW_STEWARD_PROJECT_NAME and HGW_COMPUTE_NODE_NAME must combine into one valid project name')
     }
   }
   const memoryMax = systemdMemoryValue(env.HGW_MEMORY_MAX ?? '1G', 'HGW_MEMORY_MAX')
@@ -822,6 +888,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     releaseRoot,
     releaseId: releaseRoot === undefined ? undefined : basename(releaseRoot),
     port,
+    ...(projectNameKeyFile === undefined ? {} : { projectNameKeyFile }),
+    ...(nodeContent === undefined ? {} : { nodeContent }),
     organizationSlug: env.HGW_ORGANIZATION_SLUG ?? 'default',
     computeNodeName: env.HGW_COMPUTE_NODE_NAME ?? 'local',
     intakePort,
@@ -841,6 +909,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     streamPrincipalRenewal,
     upstreamTimeoutMs,
     runtimeRequestTimeoutMs,
+    documentOverviewDeadlineMs,
     runtimeCleanupTimeoutMs,
     runtimeBrowserReadyTimeoutMs,
     runtimeBrowserStreamTimeoutMs,
@@ -853,6 +922,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     databaseStartupRetryInitialMs,
     databaseStartupRetryMaxMs,
     accessInvalidationPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_POLL_MS, 1_000, 'HGW_ACCESS_INVALIDATION_POLL_MS'),
+    runtimeTokenCacheMs: timerDelay(env.HGW_RUNTIME_TOKEN_CACHE_MS, 2_000, 'HGW_RUNTIME_TOKEN_CACHE_MS'),
     executionWatchHeartbeatMs: timerDelay(env.HGW_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, 'HGW_EXECUTION_WATCH_HEARTBEAT_MS'),
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,
@@ -873,6 +943,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     pgDumpCommand: env.HGW_PGDUMP_COMMAND === undefined ? ['pg_dump'] : parseCommandLine(env.HGW_PGDUMP_COMMAND, 'HGW_PGDUMP_COMMAND'),
     pgRestoreCommand: env.HGW_PGRESTORE_COMMAND === undefined ? ['pg_restore'] : parseCommandLine(env.HGW_PGRESTORE_COMMAND, 'HGW_PGRESTORE_COMMAND'),
     ...(env.HGW_PSQL_COMMAND === undefined ? {} : { psqlCommand: parseCommandLine(env.HGW_PSQL_COMMAND, 'HGW_PSQL_COMMAND') }),
+    pgConnectionCommand: env.HGW_PG_CONNECTION_COMMAND === undefined ? defaultPgConnectionCommand()
+      : parseCommandLine(env.HGW_PG_CONNECTION_COMMAND, 'HGW_PG_CONNECTION_COMMAND'),
+    pgConnectionTimeoutMs: timerDelay(env.HGW_PG_CONNECTION_TIMEOUT_MS, 30_000, 'HGW_PG_CONNECTION_TIMEOUT_MS'),
     nodeHeartbeatMs: timerDelay(env.HGW_NODE_HEARTBEAT_MS, 5_000, 'HGW_NODE_HEARTBEAT_MS'),
     nodeStaleMs: timerDelay(env.HGW_NODE_STALE_MS, 30_000, 'HGW_NODE_STALE_MS'),
     deployMigrationsDir: env.HGW_DEPLOY_MIGRATIONS_DIR ?? join(gatewayRoot, 'deploy/postgres/migrations'),
@@ -882,17 +955,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     dshRepoRoot,
     instancePortBase,
     runtimeCapacity,
+    draftHistory: {
+      revisions: positiveSafeInteger(env.HGW_DRAFT_HISTORY_REVISIONS,defaultDraftHistoryLimits.revisions,'HGW_DRAFT_HISTORY_REVISIONS'),
+      bytes: positiveSafeInteger(env.HGW_DRAFT_HISTORY_BYTES,defaultDraftHistoryLimits.bytes,'HGW_DRAFT_HISTORY_BYTES'),
+    },
     runtimeCatalog,
     nodeAccess,
     nodeChannel: loadNodeChannelConfig(env),
     nodeService: loadNodeServiceConfig(env),
     deploymentContextRefreshMs: timerDelay(env.HGW_DEPLOYMENT_CONTEXT_REFRESH_MS, 30_000, 'HGW_DEPLOYMENT_CONTEXT_REFRESH_MS'),
     resourceBudget,
-    performanceEnabled,
+    performanceEnabled, performanceOperationSamples,
     performanceEventLoopResolutionMs: timerDelay(env.HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS, 20, 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS'),
-    databaseMaxConnections: positiveSafeInteger(env.HGW_DATABASE_MAX_CONNECTIONS, 10, 'HGW_DATABASE_MAX_CONNECTIONS'),
+    databaseMaxConnections,
     databaseMaxCheckoutQueue: positiveSafeInteger(env.HGW_DATABASE_MAX_CHECKOUT_QUEUE, 256, 'HGW_DATABASE_MAX_CHECKOUT_QUEUE'),
     databaseConnectionTimeoutMs: timerDelay(env.HGW_DATABASE_CONNECTION_TIMEOUT_MS, 5_000, 'HGW_DATABASE_CONNECTION_TIMEOUT_MS'),
+    databaseMinConnections,
     idleTimeoutMs,
     readinessTimeoutMs,
     sessionTtlMs,
@@ -929,6 +1007,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       root: stewardRoot,
       workspacePath: stewardWorkspacePath,
       sourcePath: stewardSourcePath,
+      prepareTimeoutMs: timerDelay(env.HGW_STEWARD_PREPARE_TIMEOUT_MS, 60_000, 'HGW_STEWARD_PREPARE_TIMEOUT_MS'),
+      prepareKillGraceMs: timerDelay(env.HGW_STEWARD_PREPARE_KILL_GRACE_MS, 1000, 'HGW_STEWARD_PREPARE_KILL_GRACE_MS'),
       toolsPackage: releaseStewardToolsPackage
         ?? env.HGW_STEWARD_TOOLS_PACKAGE
         ?? join(dshRepoRoot, 'plugins/dsh-steward-tools'),

@@ -7,7 +7,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ClientRemoteDesktops } from '../src/client/index.ts'
+import { apply, ClientRemoteDesktops } from '../src/client/index.ts'
 import type { RemoteDesktopRemote } from '../src/client/index.ts'
 
 const roots: Context[] = []
@@ -37,6 +37,24 @@ function fixture(privateResourceUrl?: (value: string) => string): ClientRemoteDe
 }
 
 describe('ClientRemoteDesktops.attach stream URL', () => {
+  it('uses the addressed Session connection when the bootstrap Runtime belongs to another computer', async () => {
+    vi.stubGlobal('location', { href: 'https://app.example/' })
+    const ctx = new Context()
+    roots.push(ctx)
+    const sessionId = 'remote-session' as SessionId
+    const rootPin = vi.fn((path: string) => path + '&dshRuntime=base')
+    const ownerPin = vi.fn((path: string) => path + '&dshRuntime=remote&dshPrincipal=7')
+    const forSession = vi.fn(() => ({ privateResourceUrl: ownerPin }))
+    ctx.provide('remote.remoteDesktop', remote() as never)
+    ctx.provide('connection', { privateResourceUrl: rootPin, forSession } as never)
+    await apply(ctx)
+    const attachment = await ctx.remoteDesktops.attach(sessionId, { nodeId: 'node-1' }, 'view', signal())
+    expect(new URL(attachment.url).searchParams.get('dshRuntime')).toBe('remote')
+    expect(forSession).toHaveBeenCalledWith(sessionId)
+    expect(ownerPin).toHaveBeenCalledOnce()
+    expect(rootPin).not.toHaveBeenCalled()
+  })
+
   it('pins the runtime target and principal on the stream URL', async () => {
     vi.stubGlobal('location', { href: 'https://app.example/' })
     // Stand-in for the identity fence: appends the runtime and principal

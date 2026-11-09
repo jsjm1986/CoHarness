@@ -4,6 +4,7 @@ import { constants } from 'node:fs'
 import { chmod, chown, lstat, mkdir, open, readdir, realpath, rename, rm, rmdir, unlink } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { ManagedDataPath } from '@deepseek-ai/dsh-managed-data'
+import { syncStateDirectory } from './node-private-file.ts'
 
 interface FileMetadata {
   mode: number
@@ -65,10 +66,11 @@ async function canonicalRoot(path: string): Promise<string> {
 /**
  * Resolve and deduplicate configured roots without following links inside their contents.
  * @param paths - storage ownership already checked against the deployment's permitted locations.
+ * @param verifiedVssPath - optional resolver for paths inspected on a live, volatile Windows shadow device.
  * @returns canonical roots; directory ownership subsumes narrower claims.
  */
-export async function normalizeManagedRoots(paths: readonly ManagedDataPath[]): Promise<ManagedDataPath[]> {
-  const rows = await Promise.all(paths.map(async row => ({ ...row, path: await canonicalRoot(row.path) })))
+export async function normalizeManagedRoots(paths: readonly ManagedDataPath[],verifiedVssPath?:(path:string)=>string): Promise<ManagedDataPath[]> {
+  const rows = await Promise.all(paths.map(async row => ({ ...row, path: verifiedVssPath?verifiedVssPath(row.path):await canonicalRoot(row.path) })))
   rows.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
   const result: ManagedDataPath[] = []
   for (const row of rows) {
@@ -149,17 +151,29 @@ export async function copyVerifiedFile(source: string, destination: string, sign
  * @param paths - explicitly owned roots; callers must hold the writer exclusion lease.
  * @param filesDir - new private snapshot directory, or absent for a read-only comparison.
  * @param signal - aborts between reads, partial writes and entries, and after synchronization.
+ * @param budget - optional source-side byte and entry limits for an immutable online snapshot.
  * @returns a complete sorted membership and content manifest.
  */
-export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], filesDir?: string, signal?: AbortSignal): Promise<ManagedSnapshot> {
-  const roots = await normalizeManagedRoots(paths)
+export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], filesDir?: string, signal?: AbortSignal,
+  budget?:{maxBytes:number;maxEntries:number;rejectNestedBtrfs?:boolean;btrfsDevices?:{sourceDevice:string;snapshotDevice:string};verifiedVssPath?:(path:string)=>string}): Promise<ManagedSnapshot> {
+  const roots = await normalizeManagedRoots(paths,budget?.verifiedVssPath)
   const destination = filesDir === undefined ? undefined : await canonicalRoot(resolve(filesDir))
   if (destination !== undefined && roots.some(root => beneath(root.path, destination))) {
     throw new Error('Backup directory must be outside managed data roots')
   }
   const snapshot: ManagedSnapshot = { version: 1, roots, directories: [], absent: [], files: [] }
+  function originalObject(value:{device:string;inode:string}){
+    const devices=budget?.btrfsDevices
+    if(!devices)return value
+    // Btrfs preserves inode numbers in a snapshot but exposes the new subvolume under its own device number.
+    if(value.device!==devices.snapshotDevice)throw new Error('A captured object is outside the witnessed Btrfs snapshot.')
+    return {device:devices.sourceDevice,inode:value.inode}
+  }
+  let entries=0,bytes=0
   async function visit(path: string, root: boolean, declaredKind?: ManagedDataPath['kind']): Promise<void> {
     signal?.throwIfAborted()
+    budget?.verifiedVssPath?.(path)
+    if(budget && ++entries>budget.maxEntries) throw new Error('Managed snapshot entry limit exceeded')
     const info = await lstat(path, { bigint: true }).catch((error: unknown) => {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
       throw error
@@ -172,11 +186,13 @@ export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], fi
     } else if (declaredKind !== undefined && (info.isDirectory() ? 'directory' : 'file') !== declaredKind) {
       throw new Error(`Managed data root has the wrong kind: ${path}`)
     } else if (info.isDirectory()) {
+      if(budget?.rejectNestedBtrfs && info.ino===2n) throw new Error('A nested Btrfs subvolume was not captured.')
       const transient = (name: string): boolean => roots.some(row => row.owner.startsWith('gateway-documents/')
         && (row.owner.endsWith('/metadata') && row.path === path && name === 'mutation.lock'
           || row.owner.endsWith('/files') && row.path === path && name === 'domain.lock'))
       const names = (await readdir(path)).filter(name => !transient(name)).sort()
-      snapshot.directories.push({ path, ...metadata(info) })
+      const attributes=metadata(info)
+      snapshot.directories.push({ path, ...attributes, object:originalObject(attributes.object!) })
       for (const name of names) await visit(join(path, name), false)
       const after = await lstat(path, { bigint: true })
       const ignoresLocks = transient('mutation.lock') || transient('domain.lock')
@@ -186,9 +202,14 @@ export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], fi
         throw new Error(`Managed directory changed during backup: ${path}`)
       }
     } else {
+      if(budget) {
+        bytes+=Number(info.size)
+        if(!Number.isSafeInteger(bytes)||bytes>budget.maxBytes) throw new Error('Managed snapshot byte limit exceeded')
+      }
       const member = `${snapshot.files.length.toString().padStart(8, '0')}.data`
       const digest = await fingerprint(path, filesDir === undefined ? undefined : join(filesDir, member), signal)
-      snapshot.files.push({ member, sourcePath: path, ...metadata(info), ...digest })
+      if(digest.object.device!==String(info.dev) || digest.object.inode!==String(info.ino))throw new Error('Managed file changed identity before capture')
+      snapshot.files.push({ member, sourcePath: path, ...metadata(info), ...digest, object:originalObject(digest.object) })
     }
   }
   for (const root of roots) await visit(root.path, true, root.kind)
@@ -279,12 +300,14 @@ export function parseManagedSnapshot(value: unknown): ManagedSnapshot {
  * @param filesDir - backup-owned files directory.
  * @param snapshot - previously parsed metadata.
  * @param signal - operation lifetime.
+ * @param authenticatedRootMap - separately verified logical root mapping in a peer project checkpoint.
  * @returns after every stored byte matches its manifest.
  */
-export async function verifyStoredFiles(filesDir: string, snapshot: ManagedSnapshot, signal?: AbortSignal): Promise<void> {
+export async function verifyStoredFiles(filesDir: string, snapshot: ManagedSnapshot, signal?: AbortSignal,
+  authenticatedRootMap?: 'roots.json'): Promise<void> {
   const directory = await lstat(filesDir)
   if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error('Backup member directory must be a real directory')
-  const expected = [...snapshot.files.map(file => file.member), 'manifest.json'].sort()
+  const expected = [...snapshot.files.map(file => file.member), 'manifest.json', ...(authenticatedRootMap ? [authenticatedRootMap] : [])].sort()
   if (JSON.stringify((await readdir(filesDir)).sort()) !== JSON.stringify(expected)) throw new Error('Backup member set differs from its manifest')
   for (const entry of snapshot.files) {
     const actual = await fingerprint(join(filesDir, entry.member), undefined, signal)
@@ -419,8 +442,7 @@ export async function restoreManagedSnapshot(filesDir: string, selected: Managed
       const member = selected.files.find(file => file.sourcePath === entry.sourcePath)!
       const actual = await fingerprint(join(filesDir, member.member), temporary, signal)
       if (actual.sha256 !== entry.sha256 || actual.sizeBytes !== entry.sizeBytes) throw new Error('Backup changed during restoration')
-      await chown(temporary, entry.uid, entry.gid)
-      await chmod(temporary, entry.mode)
+      if (process.platform !== 'win32') { await chown(temporary, entry.uid, entry.gid); await chmod(temporary, entry.mode) }
       const handle = await open(temporary, constants.O_RDONLY | constants.O_NOFOLLOW)
       try { await handle.sync() } finally { await handle.close() }
       signal?.throwIfAborted()
@@ -428,15 +450,13 @@ export async function restoreManagedSnapshot(filesDir: string, selected: Managed
     } finally { await rm(temporary, { force: true }) }
   }
   for (const dir of [...snapshot.directories].sort((a, b) => b.path.length - a.path.length)) {
-    await chown(dir.path, dir.uid, dir.gid)
-    await chmod(dir.path, dir.mode)
+    if (process.platform !== 'win32') { await chown(dir.path, dir.uid, dir.gid); await chmod(dir.path, dir.mode) }
   }
   for (const directory of new Set([...snapshot.directories.map(dir => dir.path),
     ...authorized.map(root => dirname(root.path)), ...live.directories.map(dir => dirname(dir.path))])) {
     signal?.throwIfAborted()
     if (await infoOrAbsent(directory) === undefined) continue
-    const handle = await open(directory, 'r')
-    try { await handle.sync() } finally { await handle.close() }
+    await syncStateDirectory(directory)
   }
   return snapshot
 }

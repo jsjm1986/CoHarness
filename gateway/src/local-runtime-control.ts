@@ -2,6 +2,7 @@
 import { request } from 'node:http'
 import { performance } from 'node:perf_hooks'
 import type { InstanceProc } from './launcher.ts'
+import { runGatewayChildCommand } from './child-command.ts'
 import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerLease, type LocalRuntimeOwnerRecord } from './local-runtime-owner.ts'
 import { localKernelBootId } from './local-runtime-protocol.ts'
 import { localLinuxRuntimeEmpty, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
@@ -76,6 +77,10 @@ export class LocalRuntimeControl implements InstanceProc {
           if (!isDeadlineKilledCommand(error)) throw error
         }
       }
+      if (process.platform === 'win32' && record.bootId === bootId && record.groupPid !== undefined
+        && performance.now() >= forceAfter) {
+        await runGatewayChildCommand('taskkill.exe', ['/PID', String(record.groupPid), '/T', '/F'], this.timeoutMs).catch(() => {})
+      }
       await new Promise(resolve => setTimeout(resolve, Math.min(POLL_MS, Math.max(1, deadline - performance.now()))))
     }
   }
@@ -83,7 +88,7 @@ export class LocalRuntimeControl implements InstanceProc {
   private async confirmStopped(bootId: string): Promise<boolean> {
     let lease: LocalRuntimeOwnerLease
     try { lease = await this.store.acquireExisting(bootId) } catch (error) {
-      if (['EAGAIN', 'EWOULDBLOCK'].includes((error as NodeJS.ErrnoException).code ?? '')) return false
+      if (['EAGAIN', 'EWOULDBLOCK', 'EADDRINUSE'].includes((error as NodeJS.ErrnoException).code ?? '')) return false
       throw error
     }
     try {
@@ -95,6 +100,11 @@ export class LocalRuntimeControl implements InstanceProc {
         return true
       }
       if (current.groupPid !== undefined && this.groupExists(current.groupPid)) return false
+      if (process.platform === 'win32' && current.groupPid !== undefined) {
+        // A dead supervisor leaves no process-group handle; sweep its orphaned
+        // descendants by parent link before the generation may fence.
+        await this.sweepOrphans(current.groupPid)
+      }
       if (current.nativeRange === 'linux-slice') {
         try {
           if (!await localLinuxRuntimeEmpty(current, this.timeoutMs)) return false
@@ -116,8 +126,21 @@ export class LocalRuntimeControl implements InstanceProc {
     } finally { await lease.close() }
   }
 
+  /** Kill every descendant tree rooted at a dead supervisor's children. */
+  private async sweepOrphans(parentPid: number): Promise<void> {
+    const { stdout } = await runGatewayChildCommand('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      `& { (Get-CimInstance Win32_Process -Filter "ParentProcessId=${String(parentPid)}").ProcessId -join "," }`,
+    ], this.timeoutMs, undefined, 4096)
+    for (const pid of stdout.trim().split(',').map(Number).filter(pid => Number.isSafeInteger(pid) && pid > 0)) {
+      await runGatewayChildCommand('taskkill.exe', ['/PID', String(pid), '/T', '/F'], this.timeoutMs).catch(() => {})
+    }
+  }
+
   private groupExists(pid: number): boolean {
-    try { process.kill(-pid, 0); return true } catch (error) {
+    // Windows has no process-group probe: groupPid is the supervisor itself.
+    const target = process.platform === 'win32' ? pid : -pid
+    try { process.kill(target, 0); return true } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
       if (code === 'ESRCH') return false
       if (code === 'EPERM') return true

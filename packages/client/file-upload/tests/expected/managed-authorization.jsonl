@@ -1,3 +1,4 @@
+{"scenario":"runtime-qualified-browser","addressed":2,"originalSessionVerified":true,"distinctBootstrapRetained":true,"bytesVerified":true,"signedManagedHost":true}
 {"restriction":"private","independentPermissionDenied":true,"ownerUploadAccepted":true,"ownerBytesVerified":true,"peerUploadAccepted":false,"refusal":"collaboration-forbidden"}
 {"restriction":"read-only","independentPermissionDenied":true,"ownerUploadAccepted":true,"ownerBytesVerified":true,"peerUploadAccepted":false,"refusal":"collaboration-forbidden"}
 {"scenario":"streamed","phase":"streaming","idleDisposal":false}

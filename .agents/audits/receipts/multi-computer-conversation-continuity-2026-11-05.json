@@ -1,0 +1,232 @@
+{
+  "date": "2026-11-05T05:29:54+08:00",
+  "release": "candidate verified separately from production R50",
+  "mac": {
+    "topology": "native Chrome, two real isolated Web Hosts, fixture account router, 500ms added latency",
+    "samplesPerAction": 50,
+    "editableSamples": 100,
+    "failures": 0,
+    "timeouts": 0,
+    "before": {
+      "drafts": {
+        "p50Ms": 4.2,
+        "p95Ms": 6.3
+      },
+      "opens": {
+        "p50Ms": 583.2,
+        "p95Ms": 619.6
+      },
+      "creates": {
+        "p50Ms": 1003.8,
+        "p95Ms": 1041.3
+      },
+      "accepted": {
+        "p50Ms": 981.2,
+        "p95Ms": 1001.1
+      },
+      "sends": {
+        "p50Ms": 1074.3,
+        "p95Ms": 1113.7
+      }
+    },
+    "after": {
+      "drafts": {
+        "p50Ms": 4.6,
+        "p95Ms": 8
+      },
+      "opens": {
+        "p50Ms": 586.2,
+        "p95Ms": 637.2
+      },
+      "creates": {
+        "p50Ms": 1004.9,
+        "p95Ms": 1099.9
+      },
+      "accepted": {
+        "p50Ms": 980.3,
+        "p95Ms": 1068.8
+      },
+      "sends": {
+        "p50Ms": 1074.4,
+        "p95Ms": 1316.7
+      }
+    },
+    "coldPageSingleSampleMs": [
+      866.4,
+      690.9
+    ],
+    "methodCounts": {
+      "workbenchCreate": 1,
+      "workbenchCreateExtraHistory": 0
+    },
+    "medianPromptQueueMs": 451.5,
+    "medianPromptFirstByteMs": 518.5
+  },
+  "focus": {
+    "computers": 20,
+    "before": {
+      "computers": 20,
+      "requests": 24,
+      "targetCount": 12,
+      "perComputer": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "preparations": 0
+    },
+    "candidateRepeats": [
+      {
+        "computers": 20,
+        "requests": 4,
+        "targetCount": 4,
+        "perComputer": [
+          1,
+          1,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "preparations": 0
+      },
+      {
+        "computers": 20,
+        "requests": 4,
+        "targetCount": 4,
+        "perComputer": [
+          1,
+          1,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "preparations": 0
+      },
+      {
+        "computers": 20,
+        "requests": 4,
+        "targetCount": 4,
+        "perComputer": [
+          1,
+          1,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "preparations": 0
+      }
+    ]
+  },
+  "ubuntu": {
+    "lastHeartbeatLocal": "2026-11-05 02:27:29 UTC+08",
+    "verification": "waiting for SSH and node lease",
+    "followup": "Automatic recovery checks cancelled at user request. Resume Ubuntu validation after the user reports recovery.",
+    "followupUpdatedAt": "2026-11-05T05:35:42+08:00"
+  },
+  "rollout": "not deployed",
+  "releaseGatesOpen": [
+    "native Windows browser comparison",
+    "Ubuntu real regression",
+    "physical isolation and backup coverage"
+  ],
+  "isolationAndBackup": {
+    "tracker": ".artifacts/multi-node-audit-20261105/isolation-backup-acceptance.zh.md",
+    "verified": [
+      "personal-draft-owner-and-revisions",
+      "source-and-receiver-scratch-recovery-previous-checkpoints"
+    ],
+    "releaseStillRequires": [
+      "personal-body-files-document-and-plugin-coverage",
+      "Mac-live-project-file-snapshot",
+      "sealed-writer-unreachable-source-recovery",
+      "scheduled-delivery-failover-and-RPO"
+    ]
+  },
+  "productionInstanceFingerprintUnchanged": true,
+  "windows": {
+    "deployedR50RealPromptAndReply": true,
+    "deployedR50IndependentBrowserRead": true,
+    "nativeCandidateReplayAndWorkspace": true,
+    "nativeEdgePairedSamples": 0
+  },
+  "validation": [
+    "apps/web/tests/managed-prompt-reload.e2e.ts",
+    "apps/web/tests/node-draft-clone.e2e.ts",
+    "apps/web/tests/personal-navigation-resume.e2e.ts",
+    "apps/web/tests/workbench-continuity.e2e.ts",
+    "apps/web/tests/personal-runtime-latency.e2e.ts",
+    "gateway/tests/workbench-computer-permissions-transcript.spec.ts",
+    "gateway/tests/node-content-postgres.spec.ts"
+  ],
+  "rawReceipts": {
+    "before-mac-browser.json": "2e24e4425eb9a8a1381851935a117237ea88e1b2f163a76bdd02cc9f29d93e72",
+    "candidate-confirmed-mac.json": "c6d2dc601c2bdc36c57b7a7822724414e912c1dbd1d374dd0bd23361c732dbc7",
+    "before-focus-matched.json": "e6baf4108d5e725f9646546e82bb9330e17b1fdc5889fda1de00cb47556a8c53",
+    "final-focus-3.json": "a699defecb982693cc9b4c658e18f0ab2f7a4f145c68a34d1a024b4b144e7ce7",
+    "windows-target-resumed.json": "6623c095ce5bffa350cd2245e2ab95d799208891fc7c8b27ef5ae48a84bf4f12",
+    "windows-target-independent-history.json": "869b09cbfae9c78a78b0e09ecc8d29de33d19154ad04a0a60c06585d92eb5365",
+    "native-workflow-r2.json": "914527106cb48869349d164ae7f681cd6626236ad20303a9ccedff43ef18e0f1"
+  }
+}

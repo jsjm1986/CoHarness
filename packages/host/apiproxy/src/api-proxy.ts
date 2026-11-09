@@ -173,6 +173,9 @@ import type {} from '@deepseek-ai/dsh-goal'
 // Type-only: resolves `ctx.get('workingDirectory')` — optional in host compositions.
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
+import { promptInputJson, promptProofJson } from './api/prompt-wire.ts'
+import type { ResponseValue } from './api/rpc-map.ts'
+import { admittedPrompts, promptFingerprint, promptReceiptKey, promptReceiptProjection } from './prompt-receipts.ts'
 import { inboxProjectionDefinition } from './inbox-projection.ts'
 import { modelSelectionProjectionDefinition } from './model-selection-projection.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
@@ -1871,12 +1874,12 @@ function workspaceNotFound<T>(request: RpcRequest<unknown>, workspaceId: string)
 }
 
 /** Wire projection of one workspace entity (the workspace.* value row). */
-function workspaceView(workspace: Workspace): WorkspaceView {
+function workspaceView(workspace: Workspace, sessionIds: readonly SessionId[] = workspace.sessionIds): WorkspaceView {
   return {
     workspaceId: workspace.id,
     path: workspace.path,
     title: workspace.title,
-    sessionIds: [...workspace.sessionIds],
+    sessionIds: [...sessionIds],
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
   }
@@ -2188,6 +2191,23 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   function projectParticipant(authority: CollaborationAuthority | undefined): CollaborationParticipant | undefined {
     return authority?.participant.scope.kind === 'project' ? authority.participant : undefined
   }
+
+  /** Verify the committed inbox insertion while later events may still be appending to the same log. */
+  async function confirmPromptReceipt(session: Session, key: string, signal?: AbortSignal): Promise<boolean> {
+    const marker = ctx.get('sessionProjections')?.stateOf(session, 'acceptedPromptReceipts')?.[key]
+    const persistence = ctx.get('sessionPersistence')
+    if (marker === undefined || persistence === undefined || !await ctx.sessions.flush(session)) return false
+    const options = signal === undefined ? undefined : { signal }
+    const reader = await persistence.open(session.id, 'read', options)
+    try {
+      if (reader.id !== session.id || reader.header.id !== session.id) return false
+      const { events } = await reader.read(marker.seq, 1, options)
+      const [event] = events
+      return events.length === 1 && event?.seq === marker.seq
+        && admittedPrompts(event).some(item => item.key === key && item.digest === marker.digest)
+    } finally { await reader.close() }
+  }
+
 
   /** Resolve a possibly new absolute path through its nearest existing ancestor. */
   async function canonicalPath(path: string): Promise<string> {
@@ -2725,6 +2745,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   })
 
   ctx.inject(['sessionProjections'], (projectionCtx) => {
+    projectionCtx.effect(() => projectionCtx.sessionProjections.register(promptReceiptProjection), 'apiproxy.promptReceiptProjection()')
     projectionCtx.effect(() => projectionCtx.sessionProjections.register(inboxProjectionDefinition), 'apiproxy.inboxProjection()')
   })
 
@@ -4223,7 +4244,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const captured = captureCollaboration('read')
         if ('error' in captured) return err(request, captured.error)
         try {
-          return ok(request, { items: await listVisibleSessionSummaries(undefined, captured.authority) })
+          const { authority } = captured
+          let items = await listVisibleSessionSummaries(undefined, authority)
+          if (authority !== undefined && items.length > 0) {
+            const readable = await authority.readableSessionIds(items.map(item => item.sessionId))
+            items = items.filter(item => readable.has(item.sessionId))
+          }
+          return ok(request, { items })
         } catch (error: unknown) {
           if (error instanceof CollaborationError) {
             return err(request, collaborationRefusal(error, 'read'))
@@ -4254,13 +4281,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           if (isAborted(signal)) return cancelled()
           if (visible.length === 0) return ok(request, { items: [], hasMore: false })
           const visibleIds = new Set(visible.map(item => item.sessionId))
-          const authorized: SessionSearchItem[] = []
+          let candidates: SessionSearchItem[] = []
           const acceptedIds = new Set<SessionId>()
           const seenCursors = new Set<SessionSearchCursor>()
           let cursor: SessionSearchCursor | undefined
           let providerCallCount = 0
           let providerPageLimit = SESSION_SEARCH_RESULT_LIMIT
-          while (authorized.length <= SESSION_SEARCH_RESULT_LIMIT) {
+          for (;;) {
             if (isAborted(signal)) return cancelled()
             if (providerCallCount >= SESSION_SEARCH_PROVIDER_CALL_LIMIT) {
               throw new Error(
@@ -4297,7 +4324,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 && error instanceof SessionQueryError
                 && error.code === 'SESSION_QUERY_STALE_CURSOR'
               ) {
-                authorized.length = 0
+                candidates.length = 0
                 acceptedIds.clear()
                 seenCursors.clear()
                 cursor = undefined
@@ -4312,13 +4339,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 `session search provider returned ${providerItemCount} items; maximum is ${requestedPageLimit}`,
               )
             }
-            // Host visibility is the authorization boundary. Consume the
-            // provider's globally ranked results rather than binding every
-            // visible id into one SQLite statement, then require each hit to
-            // name a visible session and a current message from that same
-            // session before emitting its snippet.
             for (const hit of page.items) {
-              if (authorized.length > SESSION_SEARCH_RESULT_LIMIT) continue
               if (
                 !visibleIds.has(hit.header.id)
                 || hit.bestMatch.sessionId !== hit.header.id
@@ -4331,7 +4352,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
               )
               acceptedIds.add(hit.header.id)
-              authorized.push({
+              candidates.push({
                 sessionId: hit.header.id,
                 snippet,
               })
@@ -4343,23 +4364,33 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               }
               seenCursors.add(nextCursor)
             }
-            if (authorized.length > SESSION_SEARCH_RESULT_LIMIT || nextCursor === undefined) break
+            if (candidates.length > SESSION_SEARCH_RESULT_LIMIT || nextCursor === undefined) {
+              if (captured.authority !== undefined && candidates.length > 0) {
+                // Refill from this page or the next if access was withdrawn while the index searched.
+                const readable = await captured.authority.readableSessionIds(candidates.map(item => item.sessionId))
+                if (isAborted(signal)) return cancelled()
+                candidates = candidates.filter(item => readable.has(item.sessionId))
+              }
+              if (candidates.length > SESSION_SEARCH_RESULT_LIMIT || nextCursor === undefined) break
+            }
             cursor = nextCursor
           }
           return ok(request, {
-            items: authorized.slice(0, SESSION_SEARCH_RESULT_LIMIT),
-            hasMore: authorized.length > SESSION_SEARCH_RESULT_LIMIT,
+            items: candidates.slice(0, SESSION_SEARCH_RESULT_LIMIT),
+            hasMore: candidates.length > SESSION_SEARCH_RESULT_LIMIT,
           })
         } catch (error: unknown) {
-          if (error instanceof CollaborationError) {
-            return err(request, collaborationRefusal(error, 'read'))
-          }
           if (
             isAborted(signal)
             || (error instanceof SessionQueryError && error.code === 'SESSION_QUERY_ABORTED')
           ) return cancelled()
-          // XXX: Redact provider details before exposing this gateway beyond
-          // its current single-user local deployment.
+          if (error instanceof CollaborationError) {
+            return err(request, collaborationRefusal(error, 'read'))
+          }
+          if (captured.authority !== undefined) {
+            ctx.logger.warn(`session.search: ${String(error)}`)
+            return err(request, { code: 'internal', message: 'session search failed', details: {} })
+          }
           return err(request, {
             code: 'internal',
             message: `session search failed: ${String(error)}`,
@@ -4388,6 +4419,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           cwd = await resolveProjectPath(cwd, scope.authority)
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'write', sessionId))
+        }
+        if (request.payload.defaultWorkspace === true) {
+          try {
+            workspace = (await ensureWorkspace(cwd)).workspace
+          } catch (error: unknown) {
+            return err(request, { code: 'workspace-invalid-path', message: String(error), details: { path: cwd } })
+          }
         }
         const requestedPreset = request.payload.agentPreset
         const requestedSshTarget = request.payload.sshTarget
@@ -4586,6 +4624,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           ...createdPreset === undefined ? {} : { agentPreset: createdPreset },
           ...createdSshTarget === undefined ? {} : { sshTarget: createdSshTarget },
           ...(draftRequested ? { draft: true as const } : {}),
+          ...(workspace !== undefined && (request.payload.defaultWorkspace === true || request.payload.includeWorkspace === true)
+            ? { workspace: workspaceView(workspace, workspace.sessionIds.includes(sessionId) ? [sessionId] : []) }
+            : {}),
         })
       },
 
@@ -4596,6 +4637,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         const authorized = await authorizeSession(sessionId, 'read')
         if ('error' in authorized) return err(request, authorized.error)
+        if (request.payload.onlyActive === true) {
+          const archived = archivedInputError(sessionId)
+          if (archived !== undefined) return err(request, archived)
+        }
         if (signal?.aborted) {
           return err(request, { code: 'cancelled', message: 'history read was cancelled', details: {} })
         }
@@ -5081,14 +5126,38 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const agent = resolved.agent
         // Request identity and optional browser zone ride the exact durable user message.
         const participant = projectParticipant(authorized.authority)
+        const receipt = request.payload.durable === true && requestId !== undefined
+          ? {
+            key: promptReceiptKey(sessionId, participant?.userId, requestId),
+            digest: promptFingerprint(promptInputJson(mode, canonicalTimeZone ?? null, content)),
+          }
+          : undefined
+        const unavailable = () => err<{ accepted: true }>(request, { code: 'prompt-durability-unavailable',
+          message: 'The input receipt could not be verified on this Runtime.', details: { sessionId } })
+        const confirm = async (): Promise<RpcResponse<{ accepted: true }>> => {
+          try {
+            if (receipt !== undefined && await confirmPromptReceipt(agent.session, receipt.key)) {
+              return ok(request, { accepted: true as const })
+            }
+          } catch { /* The caller queries the same receipt after a write failure. */ }
+          return unavailable()
+        }
         const source = {
           kind: 'user',
           rpcId: requestId ?? request.rpcId,
+          ...(receipt === undefined ? {} : { admission: receipt }),
           ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
           ...(participant === undefined ? {} : { participant }),
         } satisfies MessageSource
         const hasImage = content.some(part => part.type === 'image')
         const admit = async (): Promise<RpcResponse<{ accepted: true }>> => {
+          if (receipt !== undefined) {
+            const state = ctx.get('sessionProjections')?.stateOf(agent.session, 'acceptedPromptReceipts')
+            if (state === undefined || ctx.get('sessionPersistence') === undefined) return unavailable()
+            const previous = state[receipt.key]
+            if (previous !== undefined) return previous.digest === receipt.digest ? confirm()
+              : err(request, { code: 'bad-request', message: 'This request ID already belongs to different input.', details: { issues: [] } })
+          }
           try {
             if (hasImage) {
               const current = selectionFor(agent).current
@@ -5135,9 +5204,55 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               details: { reason: String(error) },
             })
           }
-          return ok(request, { accepted: true as const })
+          return receipt === undefined ? ok(request, { accepted: true as const }) : confirm()
         }
-        return hasImage ? serializeImageAdmission(agent, admit) : admit()
+        return hasImage || receipt !== undefined ? serializeImageAdmission(agent, admit) : admit()
+      },
+
+      async promptStatus(request, signal): Promise<RpcResponse<ResponseValue<'session.promptStatus'>>> {
+        const { sessionId, requestId, confirmInput } = request.payload
+        const authorized = await authorizeSession(sessionId, 'read')
+        if ('error' in authorized) return err(request, authorized.error)
+        const key = promptReceiptKey(sessionId, projectParticipant(authorized.authority)?.userId, requestId)
+        const accepted = async (digest: string): Promise<RpcResponse<ResponseValue<'session.promptStatus'>>> => {
+          if (!confirmInput) return ok(request, { state: 'accepted' as const })
+          signal?.throwIfAborted()
+          const current = await authorizeSession(sessionId, 'read')
+          if ('error' in current) return err(request, current.error)
+          const actor = projectParticipant(current.authority)?.userId
+          if (promptReceiptKey(sessionId, actor, requestId) !== key) return unavailable()
+          return ok(request, { state: 'accepted' as const, inputProof: promptFingerprint(promptProofJson(requestId, digest)) })
+        }
+        const unavailable = () => err<{ state: 'accepted' | 'unknown' }>(request, { code: 'prompt-durability-unavailable',
+          message: 'The input receipt could not be read on this Runtime.', details: { sessionId } })
+        try {
+          const attached = ctx.sessions.get(sessionId)
+          if (attached !== undefined) {
+            const state = ctx.get('sessionProjections')?.stateOf(attached, 'acceptedPromptReceipts')
+            if (state === undefined) return unavailable()
+            const marker = state[key]
+            if (marker === undefined) return ok(request, { state: 'unknown' as const })
+            if (!await confirmPromptReceipt(attached, key, signal)) return unavailable()
+            return await accepted(marker.digest)
+          }
+          const persistence = ctx.get('sessionPersistence')
+          if (persistence === undefined) return unavailable()
+          let cursor: import('@deepseek-ai/dsh-session-persistence').SessionPersistenceReadCursor | undefined
+          do {
+            signal?.throwIfAborted()
+            const page = await persistence.readPage(sessionId, { direction: 'older', ...(cursor === undefined ? {} : { cursor }) }, signal)
+            for (const event of page.events) {
+              const marker = admittedPrompts(event).find(item => item.key === key)
+              if (marker) return await accepted(marker.digest)
+            }
+            if (page.hasMore && (page.nextCursor === undefined || page.nextCursor === cursor)) return unavailable()
+            cursor = page.hasMore ? page.nextCursor : undefined
+          } while (cursor !== undefined)
+          return ok(request, { state: 'unknown' as const })
+        } catch {
+          if (signal?.aborted) return err(request, { code: 'cancelled', message: 'Receipt lookup was cancelled.', details: {} })
+          return unavailable()
+        }
       },
 
       async attachment(request) {

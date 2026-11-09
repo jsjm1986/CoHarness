@@ -5,6 +5,7 @@ import { apply } from '../src/client/index.ts'
 import { fileUploadWorker, FileUploadRuntime } from '../src/client/runtime.ts'
 import type { FileUploadBody } from '../src/client/contract.ts'
 import type { ClientFileUploadHooks } from '../src/types.ts'
+import { clientSessionKey } from '@deepseek-ai/dsh-client-connection/client'
 
 interface UploadGlobal {
   __DSH_FILE_UPLOAD__?: ClientFileUploadHooks
@@ -444,6 +445,40 @@ describe('Session-addressed file upload', () => {
       [SESSION_ID, { data: 'AQ==' }, undefined],
     ])
     await fiber.dispose()
+  })
+
+  it('keeps streamed bodies on the encoded Runtime and passes only the original Session ID to its Host', async () => {
+    const fetch = vi.fn(async (_path: string | URL, _init?: RequestInit) => Response.json({ ok: true, value: {
+      receiptId: 'receipt', file: { attachmentId: 'file', name: 'scoped.bin', bytes: 1 },
+    } }))
+    ;(globalThis as UploadGlobal).__DSH_FILE_UPLOAD__ = { fetch }
+    const { fiber, service } = await scopedService()
+    const runtimeId = '10000000-0000-4000-8000-000000000002' as NonNullable<import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget['runtimeId']>
+    try {
+      for (const body of [new Blob(['x']), new ReadableStream<Uint8Array>({ start(c) { c.close() } })]) {
+        await service.upload(clientSessionKey({ kind: 'project', projectId: 7, runtimeId }, SESSION_ID), body, 'scoped.bin')
+        const path = new URL(fetch.mock.calls.at(-1)![0], 'https://app.example/mount/')
+        expect(path.pathname).toBe('/mount/api/session/uploadFileBinary')
+        expect(path.searchParams.get('sessionId')).toBe(SESSION_ID)
+        expect(path.searchParams.get('dshTarget')).toBe('project:7')
+        expect(path.searchParams.get('dshRuntime')).toBe(runtimeId)
+      }
+    } finally { await fiber.dispose() }
+  })
+
+  it('retains the document-relative upload route when the owning connection pins an absolute private URL', async () => {
+    const fetch = vi.fn(async (_path: string | URL, _init?: RequestInit) => Response.json({ ok: true, value: {
+      receiptId: 'receipt', file: { attachmentId: 'file', name: 'scoped.bin', bytes: 1 },
+    } }))
+    ;(globalThis as UploadGlobal).__DSH_FILE_UPLOAD__ = { fetch }
+    const { ctx, fiber, service } = await scopedService()
+    ctx.provide('connection', { privateResourceUrl: (path: string) => 'https://app.example/' + path + '&dshPrincipal=7' } as never)
+    try {
+      await service.upload(SESSION_ID, new Blob(['x']))
+      const path = new URL(fetch.mock.calls.at(-1)![0], 'https://app.example/mount/')
+      expect(path.pathname).toBe('/mount/api/session/uploadFileBinary')
+      expect(path.searchParams.get('dshPrincipal')).toBe('7')
+    } finally { await fiber.dispose() }
   })
 
   it('rejects malformed background results', async () => {

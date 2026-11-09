@@ -13,6 +13,8 @@
     "src/types.ts"
   ],
   "references": [
+    { "path": "../connection/tsconfig.client.json" },
+    { "path": "../../host/apiproxy" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../util/brand" },
     { "path": "../../util/crypto" },

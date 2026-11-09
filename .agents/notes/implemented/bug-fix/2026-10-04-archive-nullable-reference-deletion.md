@@ -14,6 +14,8 @@ Monotonic migration `050` re-adds the same five foreign keys with unchanged colu
 
 This does not promise transcript survival after project deletion. Production user removal remains logical rather than physical.
 
+Creator filters resolve retained control-database account identities without requiring the creator to remain login-eligible. Shared and node-volume archives apply the same historical identity rule. The authenticated administrator still requires current qualification; historical creator lookup grants no access to that creator.
+
 Organization and `publicId` rules remain owned by the independent [PostgreSQL baseline and runtime cutover architecture](../architecture/2026-08-14-postgresql-jsonb-gateway-baseline.md).
 
 ## Alternatives considered

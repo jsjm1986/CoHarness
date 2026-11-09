@@ -127,6 +127,7 @@ async function fixture(): Promise<Fixture> {
       [organizationId, row.id, role])
     await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)',
       [organizationId, context.nodeId, row.id])
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [row.id])
     await new PostgresInstanceRepository(context, 48_000).initialize()
     return { uuid: row.id, publicId: Number(row.public_id) }
   }
@@ -578,6 +579,9 @@ describePg('Admin business PostgreSQL regressions', () => {
       const db = openDb(join(root, 'gateway.sqlite'))
       cleanup.push(() => { db.close() })
       const cfg = testConfig(root)
+      const now = Date.now()
+      db.prepare(`INSERT INTO users(id,username,password_hash,display_name,role,home_path,must_change_password,created_at,updated_at)
+        VALUES(?,'document-admin','unused-password-hash','Admin','admin',?,0,?,?)`).run(actorId, root, now, now)
       const instances = new InstanceManager(db, cfg)
       cleanup.push(() => instances.stopAll())
       const handler = createAdminApiHandler({
@@ -1095,7 +1099,7 @@ describePg('Admin business PostgreSQL regressions', () => {
         const f = await fixture(), steward = await f.user('admin')
         const actor = await f.user(eligibility === 'unqualified-administrator' ? 'admin' : 'member')
         const project = await f.project()
-        await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [project.uuid])
+        await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [project.uuid, f.context.nodeId])
         await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision,node_id)
           VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))`, [f.organizationId, steward.uuid])
         if (eligibility === 'qualified-member') await pool.query(`INSERT INTO harness.steward_access_policies(
@@ -1124,7 +1128,7 @@ describePg('Admin business PostgreSQL regressions', () => {
 
     it('admits a qualified Steward administrator without a project membership', async () => {
       const f = await fixture(), actor = await f.user('admin'), project = await f.project()
-      await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [project.uuid])
+      await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [project.uuid, f.context.nodeId])
       await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision,node_id)
         VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))`, [f.organizationId, actor.uuid])
       const service = catalog(f.context), scope = { kind: 'project' as const, projectId: project.publicId }
@@ -1139,7 +1143,7 @@ describePg('Admin business PostgreSQL regressions', () => {
 
     it.for(['sync', 'delete', 'batch-delete', 'purge'] as const)('rechecks Steward qualification after a %s row wait', async kind => {
       const f = await fixture(), actor = await f.user('admin'), project = await f.project()
-      await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [project.uuid])
+      await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [project.uuid, f.context.nodeId])
       await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision,node_id)
         VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))`, [f.organizationId, actor.uuid])
       const service = catalog(f.context), scope = { kind: 'project' as const, projectId: project.publicId }
@@ -1190,7 +1194,7 @@ describePg('Admin business PostgreSQL regressions', () => {
       const f = await createExecutionFixture(pool)
       cleanup.push(f.dispose); fixtureOrganizations.add(f.organizationId)
       await pool.query('DELETE FROM harness.project_members WHERE organization_id=$1 AND project_id=$2', [f.organizationId, f.project.uuid])
-      await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [f.project.uuid])
+      await pool.query("UPDATE harness.projects SET kind='steward',steward_node_id=$2 WHERE id=$1", [f.project.uuid, f.context.nodeId])
       await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision,node_id)
         VALUES($1,$2,true,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1)),($1,$3,false,1,(SELECT id FROM harness.compute_nodes WHERE organization_id=$1))`, [f.organizationId, f.admin.uuid, f.peer.uuid])
       const service = catalog(f.context)
@@ -1576,6 +1580,9 @@ describePg('Admin business PostgreSQL regressions', () => {
       const db = openDb(join(root, 'gateway.sqlite'))
       cleanup.push(() => { db.close() })
       const cfg = testConfig(root)
+      const now = Date.now()
+      db.prepare(`INSERT INTO users(id,username,password_hash,display_name,role,home_path,must_change_password,created_at,updated_at)
+        VALUES(?,'admin-boss','unused-password-hash','Boss','admin',?,0,?,?)`).run(adminRow.id, root, now, now)
       const deps: GatewayDeps = {
         cfg,
         auth: new AuthService(db, cfg),
@@ -1628,11 +1635,12 @@ describePg('Admin business PostgreSQL regressions', () => {
         const response = await fetch(`${base}${path}`)
         expect(response.status, path).toBe(400)
       }
-      expect(lookups.users).not.toHaveBeenCalled()
+      const subjectLookups = () => lookups.users.mock.calls.filter(([id]) => id !== adminRow.id)
+      expect(subjectLookups()).toEqual([])
       expect(lookups.projects).not.toHaveBeenCalled()
 
       expect((await fetch(`${base}/admin/api/model-access?userId=424242`)).status).toBe(404)
-      expect(lookups.users).toHaveBeenCalledTimes(1)
+      expect(subjectLookups()).toEqual([[424242]])
     })
   })
 

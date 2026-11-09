@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-09-personal-directory-revisit-coalescing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-09-personal-directory-revisit-coalescing.md
+document:
+  en: fbd35c8876e2e1a15f0b504676de8abea3e159f5
+  zh: c40e699049ef6cbbf168d7099138293cefd4eaba
+/agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them:
+  en: add008bc62784a9b
+  zh: 1418ee5bdd17f001
+/agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them/problem:
+  en: 8a82aba8123b8af7
+  zh: 24e95892208310a0
+/agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them/decision:
+  en: d54912496948783f
+  zh: 3a794cf8811fd3be
+/agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them/alternatives-considered:
+  en: 7d43c593c3f70ffa
+  zh: f84edfad7a972ea5
+/agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them/consequences:
+  en: 6308853415f1f6b2
+  zh: b6c7dede0536879f
+/agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them/verification:
+  en: a5c1f09726512eb4
+  zh: f468361011f9719c

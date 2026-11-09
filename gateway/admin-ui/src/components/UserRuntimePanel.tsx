@@ -8,6 +8,7 @@ import { adminComputerTarget } from '../computer-target.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { ComputerBadge } from '../model-settings-primitives.ts'
 import { zh, en } from '../runtime.copy.ts'
+import { PersonalDataPublication } from './PersonalDataPublication.tsx'
 import { InstanceState } from './users.tsx'
 import { RuntimeAllocationPolicyEditor } from './RuntimeAllocationPolicyEditor.tsx'
 import { Button, ConfirmDialog, EmptyState, ErrorBanner, LoadingState, Section } from './ui.tsx'
@@ -27,6 +28,7 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
   const [needsRefresh, setNeedsRefresh] = useState(false)
   usePendingEdits(busy)
   const [confirm, setConfirm] = useState<{ runtime: RuntimeCatalogEntry; action: 'start' | 'stop' | 'restart' | 'retire' } | null>(null)
+  const [publication,setPublication]=useState<RuntimeCatalogEntry|null>(null)
   const allocation = useRef<{ nodeId: RuntimeNodeId; requestId: string } | undefined>(undefined)
   const items = page?.items.filter(runtime => localNode === undefined || runtime.node.id === localNode) ?? []
   const allocationUnavailable = localNode !== undefined && (allocation.current?.nodeId ?? nodeId) !== undefined
@@ -64,7 +66,7 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
   }
   const controls = (runtime: RuntimeCatalogEntry) => <div className="formActions runtimeActions">{(['start', 'stop', 'restart', 'retire'] as const).map(action => <Button key={action} variant={action === 'retire' ? 'danger' : 'secondary'}
     disabled={busy || loading || needsRefresh || runtime.provisioning === 'preparing' || action === 'start' && ['ready', 'starting', 'stopping'].includes(runtime.observedState)}
-    onClick={() => { setError(''); setConfirm({ runtime, action }) }}>{t(action)}</Button>)}</div>
+    onClick={() => { setError(''); setConfirm({ runtime, action }) }}>{t(action)}</Button>)}<Button variant="secondary" disabled={busy||loading||needsRefresh} onClick={()=>setPublication(runtime)}>{adminLanguage()==='en'?'Local history':'本机历史数据'}</Button></div>
   return <Section title={t(showComputer ? 'title' : 'localTitle')}>
     <p className="muted">{t(showComputer ? 'description' : 'localDescription')}</p><ErrorBanner message={confirm === null ? error : ''} />
     {loading && page === null ? <LoadingState label={t('refresh')} /> : null}
@@ -90,6 +92,9 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
       {cursor === undefined ? null : <Button disabled={busy || loading} onClick={() => setCursor(undefined)}>{t('first')}</Button>}</div>
     {notice === '' ? null : <p role="status">{notice}</p>}
     <details className="runtimePolicyDetails"><summary>{t('limitsTitle')}</summary><RuntimeAllocationPolicyEditor userId={userId} /></details>
+    {publication && <PersonalDataPublication key={userId+':'+publication.id} userId={userId} runtime={publication}
+      available={items.some(item=>item.id===publication.id && item.node.id===publication.node.id)} showComputer={showComputer}
+      onClose={()=>setPublication(null)} />}
     <ConfirmDialog open={confirm !== null} title={t('confirm', { action: confirm === null ? '' : t(confirm.action) })}
       description={confirm === null ? '' : `${t(showComputer ? 'confirmDetail' : 'localConfirm', { computer: confirm.runtime.node.name, runtime: confirm.runtime.id, generation: String(confirm.runtime.generation) })}${confirm.action === 'retire' ? ` · ${t(showComputer ? 'retiredDetail' : 'localRetired')}` : ''}`}
       pending={busy} error={confirmationUnavailable ? t('selectionUnavailable') : error} confirmDisabled={needsRefresh || confirmationUnavailable} confirmLabel={confirm === null ? '' : t(confirm.action)} onClose={() => { if (!busy) setConfirm(null) }}

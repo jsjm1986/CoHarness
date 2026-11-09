@@ -164,6 +164,18 @@ async function fixture(bundles = ['addon', 'other'], before?: (home: string, dir
   return { ready: () => commit?.(), ctx, home, dir, trace, reconcile, select, editPatch, profile }
 }
 
+it('leaves the running plugin untouched when deployment refuses the changed profile', async () => {
+  const f = await fixture()
+  f.trace.length = 0
+  const dispose = f.ctx.on('hmr/authorize-reload', () => { throw new Error('unverified project storage') })
+  addon(f.dir, '2')
+  await expect(f.reconcile()).rejects.toMatchObject({ errors:[expect.objectContaining({ message:'unverified project storage' })] })
+  expect(f.trace).toEqual([])
+  dispose()
+  await f.reconcile()
+  expect(f.trace).toContain('stop:1')
+})
+
 it('leaves plugins running when no loaded file changed', async () => {
   const f = await fixture()
   expect(f.trace.toSorted()).toEqual(['start:1:1:-', 'start:other'])

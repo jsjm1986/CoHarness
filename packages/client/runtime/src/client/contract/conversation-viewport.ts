@@ -10,6 +10,8 @@ export interface ConversationViewportSnapshot {
   mode: ConversationViewportMode
   /** Present while a legacy raw-ID layout awaits a complete catalog; layout edits are refused. */
   pendingIdentity?: true
+  /** Restoring panes whose Runtime has not yet confirmed this Session's current access. */
+  paneVerification?: Readonly<Partial<Record<SessionId, 'checking' | 'unavailable'>>>
   paneIds: readonly SessionId[]
   activePaneId?: SessionId
   paneRatios: readonly number[]
@@ -90,6 +92,10 @@ export interface ConversationViewport {
    * @param unavailable - identities awaiting runtime or directory verification; these retain metadata without granting access.
    */
   markCatalogReady(unavailable?: ReadonlySet<SessionId>): void
+  /** Publish the remaining independent pane checks for the current restored layout.
+   * @param states - exact Session addresses still checking or temporarily unavailable.
+   */
+  setPaneVerification?(states: NonNullable<ConversationViewportSnapshot['paneVerification']>): void
   /** List user-owned named workbench layouts. */
   listWorkbenches?(): readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
   /** Return the active named workbench. */

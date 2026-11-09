@@ -6,6 +6,9 @@
  * The koffi bindings load lazily so
  * non-Windows processes never touch Win32 libraries; all decision logic takes
  * an injectable internals boundary so suites can pin it on any host.
+ * Known limit: identity check and taskkill are separate calls, so a process
+ * that exits and has its pid recycled between them could be hit by the kill;
+ * the window is milliseconds and the Job-owner path never reaches this code.
  * @module dsh-subprocess-local/windows-inspector
  */
 
@@ -290,6 +293,11 @@ function allocNative(type: Parameters<Koffi['alloc']>[0], count: number): Native
   return value as NativePtr
 }
 
+/** Free a koffi allocation; ownership pairs with {@link allocNative}. */
+function freeNative(pointer: NativePtr | undefined): void {
+  if (pointer !== undefined) requireKoffi().free(pointer)
+}
+
 /** Enumerate the current process table through Toolhelp32. */
 function snapshotWindowsProcesses(bindings: Win32Bindings): ProcessEntry[] {
   const koffi = requireKoffi()
@@ -297,8 +305,9 @@ function snapshotWindowsProcesses(bindings: Win32Bindings): ProcessEntry[] {
   const snapshot = bindings.createToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
   if (isInvalidHandle(snapshot)) throw new Win32Error('CreateToolhelp32Snapshot', bindings.getLastError())
   const entries: ProcessEntry[] = []
+  let entry: NativePtr | undefined
   try {
-    const entry = allocNative(PROCESSENTRY32W, 1)
+    entry = allocNative(PROCESSENTRY32W, 1)
     koffi.encode(entry, 'uint32', PROCESSENTRY32W.size)
     let ok = bindings.process32FirstW(snapshot, entry)
     if (ok === 0) {
@@ -318,6 +327,7 @@ function snapshotWindowsProcesses(bindings: Win32Bindings): ProcessEntry[] {
       }
     }
   } finally {
+    freeNative(entry)
     bindings.closeHandle(snapshot)
   }
   return entries
@@ -333,11 +343,15 @@ function windowsProcessState(bindings: Win32Bindings, pid: number): WindowsProce
     if (error === ERROR_INVALID_PARAMETER) return undefined
     throw new Win32Error('OpenProcess', error)
   }
+  let creation: NativePtr | undefined
+  let exit: NativePtr | undefined
+  let kernel: NativePtr | undefined
+  let user: NativePtr | undefined
   try {
-    const creation = allocNative(FILETIME, 1)
-    const exit = allocNative(FILETIME, 1)
-    const kernel = allocNative(FILETIME, 1)
-    const user = allocNative(FILETIME, 1)
+    creation = allocNative(FILETIME, 1)
+    exit = allocNative(FILETIME, 1)
+    kernel = allocNative(FILETIME, 1)
+    user = allocNative(FILETIME, 1)
     if (bindings.getProcessTimes(handle, creation, exit, kernel, user) === 0) {
       throw new Win32Error('GetProcessTimes', bindings.getLastError())
     }
@@ -351,6 +365,10 @@ function windowsProcessState(bindings: Win32Bindings, pid: number): WindowsProce
       active: wait === WAIT_TIMEOUT,
     }
   } finally {
+    freeNative(creation)
+    freeNative(exit)
+    freeNative(kernel)
+    freeNative(user)
     bindings.closeHandle(handle)
   }
 }

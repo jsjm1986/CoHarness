@@ -4,12 +4,14 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import { Button, IconLoadingOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import { parseClientSessionKey, SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
+import { parseClientSessionKey, SessionCreateError, type ConversationIntent, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationContentProps, ConversationSlotProps, ConversationViewsProps, InputZone, WorkbenchLayoutPreset,
 } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { CHAT_CONTENT_WIDTH_RANGE } from '../../submission-settings.ts'
+import inputCss from './InputBar.module.css'
+import statsCss from '../chat/StatsPills.module.css'
 import css from './ConversationRoot.module.css'
 
 function invokePointerCapture(target: HTMLElement, method: 'setPointerCapture' | 'releasePointerCapture', pointerId: number): void {
@@ -174,11 +176,57 @@ function ConversationSessionView({ renderSlot, compact = false }: ConversationVi
   return <>{renderSlot('conversation.session', { compact })}</>
 }
 
+/** Composer-seat draft editor for a live preparation intent. The card mirrors
+ * the InputBar surface (same radius, elevation, and text metrics) so the real
+ * composer lands in the same seat without a layout step on transfer; it owns
+ * no send action because submission requires the acquired Session. The wrapper
+ * clones the bar's `.root` two-child skeleton — card plus the strip slot the
+ * stats pills occupy when the Session lands — so the swap shifts no metric at
+ * any user font size or content width. */
+function PendingIntentComposer({ intent, t, onInput, onRetry, onHide, onFocusChange, solo = false }: {
+  intent: ConversationIntent
+  t: ConversationContentOwnProps['t']
+  onInput?: ((id: string, text: string) => void) | undefined
+  onRetry?: ((id: string) => void) | undefined
+  onHide?: (() => void) | undefined
+  /** Reports the draft textarea's focus so the real composer can inherit it. */
+  onFocusChange?: ((focused: boolean) => void) | undefined
+  /** Standalone surface (workbench pane body) without the composer-stack column. */
+  solo?: boolean
+}) {
+  const phase = intent.phase === 'preparing' ? 'preparing' : intent.denied ? 'denied' : 'unavailable'
+  return <div className={clsx(inputCss.root, css.pendingRoot, solo && css.pendingSolo)} data-conversation-intent={intent.id}
+    data-intent-runtime={intent.target.runtimeId}>
+    <div className={clsx(inputCss.card, css.pendingCard)}>
+      <div className={inputCss.scroll}>
+        <textarea autoFocus value={intent.text} className={clsx(inputCss.input, css.pendingTextarea)}
+          aria-label={t('placeholder.default')}
+          placeholder={t('placeholder.default')} onChange={(event) => { onInput?.(intent.id, event.currentTarget.value) }}
+          onFocus={() => { onFocusChange?.(true) }} onBlur={() => { onFocusChange?.(false) }} />
+      </div>
+      <div className={clsx(inputCss.row, css.pendingRow)}>
+        <small role="status" className={css.pendingStatus} data-intent-phase={phase}>
+          {phase === 'preparing' && <span className={css.pendingSpinner} aria-hidden="true" />}
+          {t(phase === 'preparing' ? 'draft.preparing' : phase === 'denied' ? 'draft.denied' : 'draft.unavailable')}
+        </small>
+        {phase === 'unavailable' &&
+          <Button size="sm" onClick={() => { onRetry?.(intent.id) }}>{t('draft.retry')}</Button>}
+        <Button size="sm" onClick={() => { onHide?.() }}>{t('draft.back')}</Button>
+      </div>
+    </div>
+    {/* The strip the session stats pills take over: it rides their .root
+        class, so the handoff is a content swap at an identical seat and
+        metrics, not a layout event. */}
+    <p className={clsx(statsCss.root, css.pendingCaption)}>{intent.label}</p>
+  </div>
+}
+
 /** Render one Session's complete conversation surface. */
 export function ConversationContent({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
   useDisplaySettings, useProjectPolicy, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace,
   t, useFactorySlot, variant = 'main', compact = false, active = true, workbench = false, headerLeading, toolsHostId, toolsActive = active,
+  pendingIntent, onIntentInput, onIntentRetry, onIntentHide,
 }: ConversationContentOwnProps) {
   const Views = useFactorySlot('views', ConversationSessionView)
   const openState = useSession(s => s.openState)
@@ -233,6 +281,13 @@ export function ConversationContent({
     })
     seatObserver.current.observe(seat)
   }, [])
+
+  // Focus handoff: typing already started in the preparation draft, so the
+  // swap must not strand the caret — when the intent resolves while its
+  // textarea held focus, the incoming composer gets focus back at the draft
+  // tail.
+  const pendingDraftFocused = useRef(false)
+  const wasPreparing = useRef(false)
 
   const sessionWorkspace = sessionId === undefined
     ? undefined
@@ -307,15 +362,30 @@ export function ConversationContent({
   // The exemption is deliberately open-state-wide, not loading-only: a
   // summary-blank session is the hero before its open starts (`cold`) and
   // after one fails (`error`) for the same reason — there is no history.
+  // A live intent borrows this resident frame only: the provisional id is not
+  // a Session, and an ambient committed Session must not leak its header,
+  // transcript, or takeover chain into the preparing surface.
+  const preparing = pendingIntent !== undefined
+  useEffect(() => {
+    if (wasPreparing.current && !preparing && pendingDraftFocused.current) {
+      pendingDraftFocused.current = false
+      const textarea = rootRef.current?.querySelector<HTMLTextAreaElement>('[data-composer-seat] textarea')
+      if (textarea) {
+        textarea.focus()
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+      }
+    }
+    wasPreparing.current = preparing
+  }, [preparing])
   // Initial navigation and unread history retain the mounted composer until its layout is known.
   // A current summary-proven blank Session keeps its Hero while history opens.
   const initialSelectionPending = sessionId === undefined && workspaces.initialSelectionPending === true
-  const settling = initialSelectionPending || (sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
-    && summaryBlank !== true)
-  const hero = sessionId === undefined
-    || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))
+  const settling = !preparing && (initialSelectionPending || (sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
+    && summaryBlank !== true))
+  const hero = !preparing && (sessionId === undefined
+    || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true)))
   const zone: InputZone | undefined =
-    session === undefined || inputState === undefined ? undefined : { session, input: inputState }
+    preparing || session === undefined || inputState === undefined ? undefined : { session, input: inputState }
 
   // The chip is a selector; label resolution walks the flow top-down:
   //   1. a just-picked workspace (pending) → its title;
@@ -366,35 +436,39 @@ export function ConversationContent({
   // one disabled textarea, never a second tree. The no-workspace state wins
   // when both hold — picking a workspace is the earlier prerequisite.
   const blocked = !inert && composerBlock !== undefined
-  const inputBar = renderSlot('conversation.composer.bar', {
-    variant: hero ? 'hero' : 'composer',
-    active,
-    compact,
-    ...(inert
-      ? {
-        disabled: true,
-        placeholder: t('placeholder.workspace'),
-        workspacePickerOpen: pickerOpen,
-        onRequestWorkspace: () => { setPickerOpen(true) },
-      }
-      : blocked
-        // `blocked`, not `disabled`: the bar refuses input either way, but a
-        // block keeps the model seat live because choosing a model is how the
-        // user clears it.
-        ? { blocked: composerBlock, placeholder: composerBlock.reason }
-        // The steward maintenance space speaks to a runtime that operates
-        // on the deployment itself; its composer hints at that contract
-        // instead of the generic agent prompt, in the hero and the docked
-        // bar alike.
-        : stewardScope ? { placeholder: t('placeholder.steward') }
-          : hero ? { placeholder: t('placeholder.hero') } : {}),
-    overlay: renderSlot('conversation.input.overlay', {}),
-    leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
-    rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
-    // Stats band under the card, inside the bar's width column so both
-    // share one constraint (composer.dock = session-stats pill family).
-    footer: !hero && zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
-  })
+  const inputBar = preparing
+    ? <PendingIntentComposer intent={pendingIntent}
+      t={t} onInput={onIntentInput} onRetry={onIntentRetry} onHide={onIntentHide}
+      onFocusChange={(focused) => { pendingDraftFocused.current = focused }} />
+    : renderSlot('conversation.composer.bar', {
+      variant: hero ? 'hero' : 'composer',
+      active,
+      compact,
+      ...(inert
+        ? {
+          disabled: true,
+          placeholder: t('placeholder.workspace'),
+          workspacePickerOpen: pickerOpen,
+          onRequestWorkspace: () => { setPickerOpen(true) },
+        }
+        : blocked
+          // `blocked`, not `disabled`: the bar refuses input either way, but a
+          // block keeps the model seat live because choosing a model is how the
+          // user clears it.
+          ? { blocked: composerBlock, placeholder: composerBlock.reason }
+          // The steward maintenance space speaks to a runtime that operates
+          // on the deployment itself; its composer hints at that contract
+          // instead of the generic agent prompt, in the hero and the docked
+          // bar alike.
+          : stewardScope ? { placeholder: t('placeholder.steward') }
+            : hero ? { placeholder: t('placeholder.hero') } : {}),
+      overlay: renderSlot('conversation.input.overlay', {}),
+      leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
+      rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
+      // Stats band under the card, inside the bar's width column so both
+      // share one constraint (composer.dock = session-stats pill family).
+      footer: !hero && zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
+    })
 
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
@@ -421,7 +495,7 @@ export function ConversationContent({
   const composerSeat = (
     <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer"
       aria-hidden={initialSelectionPending || undefined}>
-      {composer}
+      {preparing ? composerBar : composer}
     </div>
   )
 
@@ -515,13 +589,13 @@ export function ConversationContent({
       {initialSelectionPending && headerLeading !== undefined && (
         <header className={css.header}><div className={css.titleRow}>{headerLeading}</div></header>
       )}
-      {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading, toolsHostId, toolsActive })}
-      <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
+      {variant === 'embedded' || preparing ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading, toolsHostId, toolsActive })}
+      <div className={css.scrollRegion} data-conversation-session={preparing ? undefined : sessionId} data-conversation-region="chat">
         {initialSelectionPending && <div className={css.initialLoading} role="status" aria-label={t('hero.loadingWorkspace')}>
           <span aria-hidden="true"><IconLoadingOutline16 size={24} className={css.initialLoadingIcon} /></span>
         </div>}
         <div className={css.scrollBody} data-conversation-scroll="" aria-busy={initialSelectionPending || undefined}>
-          {sessionId === undefined ? null : <Views compact={compact} />}
+          {sessionId === undefined || preparing ? null : <Views compact={compact} />}
           {composerSeat}
         </div>
         {/* Width handles only while a transcript is on screen; the hero has no
@@ -571,6 +645,9 @@ export function ConversationRoot(props: ConversationRootProps) {
   const toolsId = useId()
   const viewport = props.useStore(snapshot => snapshot)
   const available = props.useViewportAvailable(value => value)
+  const intents = props.useConversationIntents(value => value)
+  const pending = intents.active
+  const draftFailures = props.useDraftFailures(value => value)
   const [maximizedId, setMaximizedId] = useState<SessionId | undefined>()
   const [width, setWidth] = useState<number | undefined>()
   /** Single-pane tab presentation chosen from the layout preset menu. */
@@ -692,13 +769,35 @@ export function ConversationRoot(props: ConversationRootProps) {
     setDraggingPaneId(undefined)
     setDropTarget(null)
   }
+  const editor = pending === undefined ? null : <PendingIntentComposer intent={pending} t={props.t}
+    onInput={props.onIntentInput} onRetry={props.onIntentRetry} onHide={props.onIntentHide} solo />
+  const retryStorage = draftFailures.length ? <div role="status" className={css.resumeDraft}>
+    {props.t(draftFailures.some(row => row.versionUnavailable) ? 'draft.versionUnavailable' : 'draft.storageUnavailable')} <button type="button"
+      onClick={() => { for (const row of draftFailures) props.onRetryNodeDraft(row.sessionId) }}>{props.t('draft.retry')}</button>
+  </div> : null
+  const saved = intents.saved.map(draft => <button type="button" className={css.resumeDraft} key={draft.id}
+    onClick={() => { props.onIntentRetry(draft.id) }}>{props.t('draft.resume')} · {draft.label || draft.text.slice(0, 32)}</button>)
+  // A live intent outside the Workbench still mounts the resident content
+  // frame: the full page chrome is real, only the transcript and session-only
+  // regions stay empty until the Session lands, and the composer seat edits
+  // the intent draft directly.
+  if (!workbench && pending !== undefined) return (
+    <div className={css.workbenchRoot}>
+      {retryStorage}{saved}
+      {props.renderFactorySlot('conversation.content', { variant: 'main', compact, workbench: false,
+        pendingIntent: pending, onIntentInput: props.onIntentInput, onIntentRetry: props.onIntentRetry, onIntentHide: props.onIntentHide })}
+    </div>
+  )
   if (!workbench) return available ? (
     <div className={css.workbenchRoot}>
+      {retryStorage}{saved}
       {props.renderFactorySlot('conversation.content', { variant: 'main', compact, workbench: false, headerLeading: props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed: false, inline: true }) })}
     </div>
   ) : props.renderFactorySlot('conversation.content', { variant: 'main', compact })
   return (
     <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
+      {retryStorage}{saved}
+      {pending !== undefined && (pending.paneId === undefined || !paneIds.includes(pending.paneId)) && editor}
       {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed, layout: layoutPreset, onSelectLayout: applyLayout, toolsHostId })}
       {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', { viewport }) : (
         <div
@@ -742,7 +841,9 @@ export function ConversationRoot(props: ConversationRootProps) {
                       onDrop={(event) => { onPaneDrop(event, id) }}
                       onDragEnd={onPaneDragEnd}
                     >
-                      <props.SessionProvider sessionId={id} empty={() => <p className={css.workbenchUnavailable} role="status">{props.t('viewport.unavailable')}</p>}>
+                      {pending?.paneId === id ? editor : viewport.paneVerification?.[id] !== undefined ? <p className={css.workbenchUnavailable} role="status"
+                        aria-busy={viewport.paneVerification[id] === 'checking'}>{props.t(viewport.paneVerification[id] === 'checking'
+                          ? 'viewport.checking' : 'viewport.unavailable')}</p> : <props.SessionProvider sessionId={id} empty={() => <p className={css.workbenchUnavailable} role="status">{props.t('viewport.unavailable')}</p>}>
                         {() => (
                           <>
                             {props.renderSlot('conversation.workbench.pane.header', {
@@ -768,7 +869,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                             </div>
                           </>
                         )}
-                      </props.SessionProvider>
+                      </props.SessionProvider>}
                       {nextId !== undefined && !isCollapsed && !collapsed.has(nextId) && (
                         <div
                           className={css.paneSeparator}

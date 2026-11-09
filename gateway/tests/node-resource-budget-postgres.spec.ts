@@ -184,27 +184,24 @@ describePg('durable node resource budget', () => {
     }
   })
 
-  /** Real server latency follows clock capture; each fault belongs to one private connection pool. */
-  async function clockFault(f: Awaited<ReturnType<typeof fixture>>) {
-    const schema = `pressure_fault_${randomUUID().replaceAll('-', '')}`
-    await pool.query(`CREATE SCHEMA ${schema}`)
-    cleanups.push(async () => { await pool.query(`DROP SCHEMA ${schema} CASCADE`) })
-    const prefix = 'SELECT clock_timestamp()::text observed_at'
-    await pool.query(`CREATE TABLE ${schema}.calls(applied boolean);
-      CREATE FUNCTION ${schema}.clock_timestamp() RETURNS timestamptz LANGUAGE plpgsql VOLATILE AS $$
-      DECLARE captured timestamptz:=pg_catalog.clock_timestamp();
-      BEGIN
-        IF starts_with(pg_catalog.current_query(),'${prefix}') THEN
-          INSERT INTO ${schema}.calls VALUES(true);
-          PERFORM pg_catalog.pg_sleep(0.15);
-        END IF;
-        RETURN captured;
-      END; $$;`)
-    const observerPool = createPostgresPool(databaseUrl!, { max: 1,
-      options: `-c search_path=${schema},pg_catalog -c audit.organization=${f.context.organizationId} -c audit.node=${f.context.nodeId}` })
+  /** Slow observation delivery belongs to one private connection pool; each delay counts once. */
+  async function slowDispatch(f: Awaited<ReturnType<typeof fixture>>) {
+    const observerPool = createPostgresPool(databaseUrl!, { max: 1 })
     cleanups.push(() => observerPool.end())
-    return { budget: new NodeResourceBudget(observerPool, f.context.organizationId, f.context.nodeId, f.config),
-      calls: async () => Number((await pool.query<{ count: string }>(`SELECT count(*)::text count FROM ${schema}.calls`)).rows[0]!.count) }
+    let calls = 0
+    const instrumented = new Proxy(observerPool, { get(actualPool, key) {
+      if (key === 'query') return async (sql: string, values?: readonly unknown[]) => {
+        if (sql === 'SELECT harness.observe_node_resources($1,$2,$3::jsonb,$4,$5::jsonb)') {
+          calls++
+          await new Promise(resolve => setTimeout(resolve, 150))
+        }
+        return actualPool.query(sql, values === undefined ? undefined : [...values])
+      }
+      const value: unknown = Reflect.get(actualPool, key, actualPool)
+      return typeof value === 'function' ? value.bind(actualPool) : value
+    } })
+    return { budget: new NodeResourceBudget(instrumented, f.context.organizationId, f.context.nodeId, f.config),
+      calls: () => calls }
   }
 
   /** Expiry commits on the owned client before the server-local scheduling call. */
@@ -476,24 +473,22 @@ describePg('durable node resource budget', () => {
   })
 
   it('does not renew pressure observations that expire while waiting for the node lock', async () => {
-    const f = await fixture({ sampleMs: 10 })
+    const f = await fixture({ sampleMs: 10, staleMs: 50 })
     const applicationName = `pressure-lock-${randomUUID()}`
     const observerPool = createPostgresPool(databaseUrl!, { max: 1, application_name: applicationName })
     const observer = new NodeResourceBudget(observerPool, f.context.organizationId, f.context.nodeId, f.config)
     const blocker = await pool.connect()
-    let now = 10_000
-    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
     let observing: Promise<unknown> | undefined
     try {
       await blocker.query('BEGIN')
       await blocker.query('SELECT 1 FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2 FOR UPDATE',
         [f.context.organizationId, f.context.nodeId])
-      const sample = { capturedAt: now, cpu: 0, memory: 'normal' as const, eventLoopMs: 0, parallelism: 1 }
+      const sample = { capturedAt: performance.now(), cpu: 0, memory: 'normal' as const, eventLoopMs: 0, parallelism: 1 }
       observing = observer.observe(sample).then(() => undefined, (error: unknown) => error)
       await expect.poll(async () => (await pool.query<{ waiting: boolean }>(
         "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock') waiting", [applicationName],
       )).rows[0]!.waiting).toBe(true)
-      now += f.config.staleMs + 1
+      await new Promise(resolve => setTimeout(resolve, 120))
       await blocker.query('COMMIT')
       await expect(observing).resolves.toBeUndefined()
       expect((await pool.query<{ credits: number }>(
@@ -505,7 +500,6 @@ describePg('durable node resource budget', () => {
       blocker.release()
       await observing
       await observerPool.end()
-      clock.mockRestore()
     }
   })
 
@@ -534,12 +528,12 @@ describePg('durable node resource budget', () => {
     )).rows[0]).toEqual({ credits: 0, pressure: { memory: 'warning' } })
   })
 
-  it('preserves a newer warning when an older healthy capture follows a delayed clock reply', async () => {
+  it('preserves a newer warning when an older healthy capture follows a delayed observation delivery', async () => {
     const f = await fixture({ sampleMs: 10, staleMs: 10_000 })
-    const delayed = await clockFault(f)
+    const delayed = await slowDispatch(f)
     const older = { capturedAt: performance.now(), cpu: 0, memory: 'normal' as const, eventLoopMs: 0, parallelism: 1 }
     await delayed.budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'warning', eventLoopMs: 0, parallelism: 1 })
-    expect(await delayed.calls()).toBeGreaterThan(0)
+    expect(delayed.calls()).toBeGreaterThan(0)
     await f.budget.observe(older)
     expect((await pool.query<{ credits: number; pressure: { memory: string } }>(
       'SELECT credits,pressure FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2',

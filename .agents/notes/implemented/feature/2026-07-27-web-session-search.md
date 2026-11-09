@@ -22,7 +22,7 @@ Content matching inherits the SQLite backend's normalized literal token/phrase s
 
 ## Failure and visibility contract
 
-Search never widens session visibility: cold sessions without a servable cwd are absent for the same reason they are absent from `session.list`, and only provider hits whose ids occur in that baseline can leave the Host. Shadowed and log-only events, tool events outside message content, errors, todos, and other trace records do not produce UI hits.
+Search never widens session visibility: cold sessions without a servable cwd are absent for the same reason they are absent from `session.list`, and provider hits must occur in that baseline. The Host uses the captured caller to check access again before publishing list rows, ranked hits and the search lookahead. When a withdrawal leaves space, search continues with later ranked candidates. A managed caller receives a generic error if the search provider fails. Shadowed and log-only events, tool events outside message content, errors, todos, and other trace records do not produce UI hits.
 
 While the first or a later content request is pending, the UI keeps immediate metadata matches and shows a history-search status. If the backend fails, the same rows remain and a warning explains that content search is unavailable. Zero merged rows produce an explicit empty state. More than 20 candidate rows produce a refine-query hint.
 

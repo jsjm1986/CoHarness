@@ -8,6 +8,7 @@ import type {
   ConversationAccess,
   ConversationCollaborationView,
   ProjectAuthorityView,
+  ProjectReadAuthorityView,
   ProjectScopeView,
 } from './collaboration.ts'
 import type { InstanceManager } from './instances.ts'
@@ -134,17 +135,18 @@ export interface GatewayProjectService {
    * @param input - name, optional import path and creator; supplied actorUserId must match that authenticated creator. Omitting path allocates below the configured administrator project root.
    * @returns the registered administrator project; imported host bytes remain caller-owned.
    */
-  create(input: { name: string; path?: string; createdBy: number; actorUserId?: number }): Awaitable<ProjectRow>
+  reindexNames?(actorUserId: number, names: import('./node-content-project-names.ts').ProjectNameMacAuthority, after?: number, limit?: number): Awaitable<{ indexed: number; next: number | null }>
+  create(input: { name: string; path?: string; createdBy: number; actorUserId?: number }, names?: import('./node-content-project-names.ts').ProjectNameMacAuthority): Awaitable<ProjectRow>
   /**
    * Allocate below HGW_USER_PROJECTS_ROOT with current actor authority; omission permits trusted internal maintenance.
    * @param input - name and owner/creator; when actorUserId is supplied, both identities must match that authenticated actor.
    * @returns the registered project with its allocated directory.
    */
-  createManaged?(input: { name: string; ownerUserId: number; createdBy?: number; actorUserId?: number }): Awaitable<ProjectRow>
-  list(): Awaitable<ProjectRow[]>
-  getById(id: number): Awaitable<ProjectDetail | null>
+  createManaged?(input: { name: string; ownerUserId: number; createdBy?: number; actorUserId?: number }, names?: import('./node-content-project-names.ts').ProjectNameMacAuthority): Awaitable<ProjectRow>
+  list(display?: 'directory'): Awaitable<ProjectRow[]>
+  getById(id: number, display?: 'directory'): Awaitable<ProjectDetail | null>
   /** Batch detail lookup used by account catalog pages to avoid N+1 queries. */
-  getByIds?(ids: readonly number[]): Awaitable<ProjectDetail[]>
+  getByIds?(ids: readonly number[], display?: 'directory'): Awaitable<ProjectDetail[]>
   /**
    * Read active node-local scope metadata without member lists or counts.
    * @param ids - public project ids already authorized by the caller.
@@ -162,7 +164,7 @@ export interface GatewayProjectService {
   /** Reserved kind of a project by internal row id, or null when unknown. */
   kindOfInternal?(internalId: string): Awaitable<import('./projects.ts').ProjectKind | null>
   /** Rename with current manager authority when actorUserId is supplied; omission is trusted internal maintenance. */
-  rename(id: number, name: string, actorUserId?: number): Awaitable<void>
+  rename(id: number, name: string, actorUserId?: number, names?: import('./node-content-project-names.ts').ProjectNameMacAuthority): Awaitable<void>
   /** Remove with current administrator authority when actorUserId is supplied; omission permits trusted maintenance. Return every removed member id for grant refresh and preserve host files. */
   remove(id: number, actorUserId?: number): Awaitable<number[]>
   /** Override membership with current administrator authority; actor omission permits trusted internal maintenance. */
@@ -207,6 +209,13 @@ export interface GatewayProjectService {
 /** Project membership and shared-conversation authorization operations. */
 export interface GatewayCollaborationService {
   projectsForUser(userId: number): Awaitable<ProjectScopeView[]>
+  /**
+   * Admit prepared browser project metadata using one current account and project authority read without node I/O.
+   * @param userId - server-authenticated account identifier.
+   * @param projectId - optional exact project; omission selects the account's current directory.
+   * @returns current ownership and management facts with directory computer identifiers; an unqualified account yields no projects.
+   */
+  projectReadAuthorities?(userId: number, projectId?: number): Awaitable<ProjectReadAuthorityView[]>
   /**
    * Read one mounted project's current membership, management authority and theme policy.
    * @param projectId - project identifier.
@@ -281,7 +290,7 @@ export interface GatewayAuditService {
 export type GatewayDocumentCatalogService = Pick<
   PostgresDocumentCatalogService,
   'adminList' | 'adminMetrics' | 'detail' | 'transferOwnership' | 'adminDelete'
-> & Partial<Pick<PostgresDocumentCatalogService, 'adminListPage' | 'target' | 'adminTrash' | 'adminRestore' | 'adminPurge' | 'purgeDue'>>
+> & Partial<Pick<PostgresDocumentCatalogService, 'personalHistory' | 'adminListPage' | 'target' | 'adminTrash' | 'adminRestore' | 'adminPurge' | 'purgeDue'>>
 
 /**
  * Model authorization, pricing, quota, and usage operations consumed by the Gateway.
@@ -381,7 +390,14 @@ export interface GatewayModelGovernanceService {
     api?: string
     apiKey?: string
   }): Awaitable<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>>
-  /** Project-scoped Provider settings used by the user-facing project UI. */
+  /**
+   * Qualify a prepared project model read against current account, project and computer permissions.
+   * @param projectId - selected public project identifier on this Gateway's computer.
+   * @param actorUserId - server-authenticated browser account, never a request-body actor.
+   * @returns whether the currently authorized reader can manage the settings; throws when reading is forbidden.
+   */
+  authorizeProjectModelRead?(projectId: number, actorUserId: number): Awaitable<boolean>
+  /** Project-scoped Provider settings; browser publication also requires authorizeProjectModelRead. */
   describeProjectModelSettings?(projectId: number): Awaitable<ProjectModelSettingsView>
   /** Mutate with current manager authority; an omitted actor permits trusted internal maintenance. */
   mutateProjectModelSettings?(

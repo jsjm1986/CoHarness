@@ -24,6 +24,8 @@ import { renderIndexInjections, type IndexInjection } from './injections.ts'
 
 export { renderIndexInjections } from './injections.ts'
 export type { IndexInjection, IndexInjectionPlacement } from './injections.ts'
+export { acceptableEncodings, precompressBody, selectVariant } from './precompressed.ts'
+export type { PrecompressedBody, PrecompressedCoding } from './precompressed.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {

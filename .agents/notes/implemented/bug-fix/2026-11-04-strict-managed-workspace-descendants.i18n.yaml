@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-04-strict-managed-workspace-descendants.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-04-strict-managed-workspace-descendants.md
+document:
+  en: 25dcef8bbb9344e51f611e92861da5b327b35d04
+  zh: 88609821c2c5229eb75fa93ab52071fc0b978ce7
+/agent-note-strict-managed-workspace-descendants:
+  en: bef96133c0ece6f9
+  zh: f20efdfb874796f3
+/agent-note-strict-managed-workspace-descendants/problem:
+  en: 02a5c281b1ebf877
+  zh: ad6cc47d5782b1ee
+/agent-note-strict-managed-workspace-descendants/decision:
+  en: 540701680a7ecd65
+  zh: 8b292c288d9ab02c
+/agent-note-strict-managed-workspace-descendants/alternatives-considered:
+  en: 628d672627b5c80d
+  zh: d59a2d572e0346a2
+/agent-note-strict-managed-workspace-descendants/consequences:
+  en: e728888998d532bb
+  zh: fcea72446d5cd567

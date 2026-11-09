@@ -31,6 +31,7 @@ describePg('PostgreSQL webhook admission', () => {
         const row = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
           VALUES($1,$2::text,$2::text,'/unused') RETURNING id,public_id`, [organizationId, name])).rows[0]!
         await pool.query('INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,$3)', [organizationId, row.id, name === 'administrator' ? 'admin' : 'member'])
+        await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [row.id])
         accounts.push({ id: row.id, publicId: Number(row.public_id) })
       }
       const admin = accounts[0]!, executor = accounts[1]!, cipher = new WebhookSecretCipher(Buffer.alloc(32, 9))

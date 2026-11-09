@@ -7,6 +7,7 @@ import {
   deleteProject,
   getProjectModelAccess,
   getProject,
+  getOwnerProjectDisplays,
   listUsageContributors,
   getProjectUsage,
   listModelProviders,
@@ -75,6 +76,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
   const [pending, setPending] = useState('')
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const renameInitial = useRef('')
   const [projectName, setProjectName] = useState('')
   const [removeTarget, setRemoveTarget] = useState<AdminUser | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -101,25 +103,45 @@ function ProjectDetail({ projectId }: { projectId: number }) {
   const [modelPending, setModelPending] = useState('')
   const [runtimeAction, setRuntimeAction] = useState<'start' | 'stop' | 'restart' | null>(null)
   const [runtimeError, setRuntimeError] = useState('')
-  usePendingEdits(pending !== '' || quotaOpen || quotaSaving || renameOpen && project !== null && projectName !== project.name)
+  usePendingEdits(pending !== '' || quotaOpen || quotaSaving || renameOpen && projectName !== renameInitial.current)
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
 
+  const projectRequest = useRef<AbortController | undefined>(undefined)
   const reload = useCallback(async (showLoading = false) => {
+    projectRequest.current?.abort()
+    const controller = new AbortController()
+    projectRequest.current = controller
     if (showLoading) setLoading(true)
     try {
-      const [nextProject, nextUsers] = await Promise.all([getProject(projectId), listUsers()])
+      const [nextProject, nextUsers] = await Promise.all([getProject(projectId, 'members', controller.signal), listUsers()])
+      if (controller.signal.aborted) return
       setProject(nextProject)
-      setProjectName(nextProject.name)
       setUsers(nextUsers)
       setError('')
+      setLoading(false)
+      if (nextProject.metadataOnNode) {
+        try {
+          const displays = await getOwnerProjectDisplays([nextProject], controller.signal)
+          if (!controller.signal.aborted) setProject({ ...nextProject, ...displays.get(projectId), ownerDisplayLoaded: true })
+        } catch (cause) {
+          if (controller.signal.aborted) return
+          if (cause && typeof cause === 'object' && 'status' in cause && (cause.status === 401 || cause.status === 403)) setProject(null)
+          setError(t('ownerUnavailable'))
+        }
+      }
     } catch (cause) {
+      if (controller.signal.aborted) return
+      setProject(null)
       setError(messageFrom(cause))
     } finally {
-      if (showLoading) setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
   }, [projectId, t])
 
-  useEffect(() => { void reload(true) }, [reload])
+  useEffect(() => {
+    void reload(true)
+    return () => { projectRequest.current?.abort() }
+  }, [reload])
 
   const monthRef = useRef('')
   const usageGeneration = useRef(0)
@@ -264,6 +286,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
 
   async function onRename(event: FormEvent) {
     event.preventDefault()
+    if (project === null) return
     setPending('rename')
     setRenameError('')
     try {
@@ -352,7 +375,9 @@ function ProjectDetail({ projectId }: { projectId: number }) {
         title={project?.name ?? t('pageTitle')}
         description={project?.path}
         meta={project === null ? undefined : t('membersCount', { count: String(project.memberCount) })}
-        actions={project === null ? undefined : <Button icon={Pencil} onClick={() => { setRenameError(''); setProjectName(project.name); setRenameOpen(true) }}>{t('rename')}</Button>}
+        actions={project === null ? undefined : <Button icon={Pencil} disabled={project.metadataOnNode && !project.ownerDisplayLoaded} onClick={() => {
+          setRenameError(''); renameInitial.current = project.name; setProjectName(project.name); setRenameOpen(true)
+        }}>{t('rename')}</Button>}
       />
       <ErrorBanner message={error} />
       {loading ? <Section><LoadingState label={t('loadingProject')} /></Section> : project === null ? (
@@ -669,7 +694,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
         footer={(
           <>
             <Button type="button" disabled={pending === 'rename'} onClick={() => setRenameOpen(false)}>{t('cancel')}</Button>
-            <Button type="submit" form="rename-project-form" variant="primary" loading={pending === 'rename'}>{t('saveName')}</Button>
+            <Button type="submit" form="rename-project-form" variant="primary" disabled={project === null} loading={pending === 'rename'}>{t('saveName')}</Button>
           </>
         )}
       >

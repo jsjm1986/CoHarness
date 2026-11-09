@@ -1,11 +1,12 @@
-/** PostgreSQL command pipes settle when a catalog reader exits before consuming the dump. */
+/** Offline PostgreSQL readers settle their pipes and owned processes before returning. */
 import { execFile } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createDeploymentCommands } from '../src/deployment-commands.ts'
+import { createDeploymentCommands, inspectDumpMigrations } from '../src/deployment-commands.ts'
+import { PG_METADATA_BYTES } from '../src/pg-client-protocol.ts'
 
 const execute = promisify(execFile)
 const roots: string[] = []
@@ -51,7 +52,7 @@ it('rejects a missing input file without leaving the command waiting for input',
   })
 })
 
-it('waits for the reader process to exit after the operation loses its lease', async () => {
+it.each(['catalog', 'migration metadata'] as const)('waits for the %s reader to exit after losing its lease', async mode => {
   const root = await mkdtemp(join(tmpdir(), 'gateway-restore-cancel-'))
   roots.push(root)
   const dump = join(root, 'fixture.dump'), reader = join(root, 'reader.mjs'), pidFile = join(root, 'pid')
@@ -62,13 +63,38 @@ it('waits for the reader process to exit after the operation loses its lease', a
     setInterval(() => {}, 1000)
   `)
   const controller = new AbortController(), command = [process.execPath, reader]
-  const reading = createDeploymentCommands(command, command).verifyDump(dump, controller.signal)
+  const reading = mode === 'catalog' ? createDeploymentCommands(command, command).verifyDump(dump, controller.signal)
+    : inspectDumpMigrations(command, dump, controller.signal)
   const rejected = expect(reading).rejects.toThrow()
   try {
     let pid = 0
     await vi.waitFor(async () => { pid = Number(await readFile(pidFile, 'utf8')); expect(pid).toBeGreaterThan(0) })
     controller.abort(new Error('fixture lease lost'))
     await rejected
+    expect(() => process.kill(pid, 0)).toThrow()
+  } finally {
+    controller.abort()
+    await Promise.allSettled([reading])
+  }
+})
+
+it('refuses excessive migration output and joins the terminated reader before reporting failure', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gateway-migration-output-'))
+  roots.push(root)
+  const dump = join(root, 'fixture.dump'), reader = join(root, 'reader.mjs'), pidFile = join(root, 'pid')
+  await writeFile(dump, 'fixture')
+  await writeFile(reader, `import { writeFileSync } from 'node:fs'
+    writeFileSync(${JSON.stringify(pidFile)}, String(process.pid))
+    process.stdin.resume()
+    process.stdout.write(Buffer.alloc(${String(PG_METADATA_BYTES + 1)}, 'x'))
+    setInterval(() => {}, 1000)
+  `)
+  const controller = new AbortController()
+  const reading = inspectDumpMigrations([process.execPath, reader], dump, controller.signal)
+  try {
+    await expect(reading).rejects.toThrow('metadata exceeds its limit')
+    const pid = Number(await readFile(pidFile, 'utf8'))
+    expect(pid).toBeGreaterThan(0)
     expect(() => process.kill(pid, 0)).toThrow()
   } finally {
     controller.abort()

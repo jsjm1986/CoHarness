@@ -197,6 +197,8 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   settingsSchema: 'client-side schema introspection service — packages/client/ui-settings/README.md owns the API',
   settingsScope: 'client-side settings-namespace transport service — packages/client/ui-settings/README.md owns the API',
   deploymentContext: 'entry-owned deployment policy observable — packages/client/runtime/README.md owns the API',
+  gatewayEntryRequests: 'client-side per-document request sharing and cancellation — packages/client/runtime/README.md owns the API',
+  conversationIntents: 'client-side input and preparation for a captured Runtime — packages/client/runtime/README.md owns the API',
   runtimeEnvironments: 'client-side Runtime management directory observable — packages/client/runtime/README.md owns the API',
   projectUiPolicy: 'client-side project UI policy snapshot service — packages/client/runtime/README.md owns the API',
   chatFileMentions: 'client-side slot-contract accessor (ChatFileMentions) — packages/client/ui-conversation/README.md owns the API',
@@ -299,6 +301,9 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
   'sessions/confirm-blank-reuse': 'client-face blank-session compatibility waterfall — packages/client/runtime/README.md owns the API',
   'conversation/document-admission': 'client-face captured document attachment eligibility — packages/client/ui-conversation/README.md owns the API',
   'conversation/draft-initialize': 'client-face composer draft initialization — packages/client/ui-conversation/README.md owns the API',
+  'conversation/prepare-input': 'client-face saved draft admission — packages/client/runtime/README.md owns the API',
+  'conversation/append-input': 'client-face unsent input adoption — packages/client/runtime/README.md owns the API',
+  'workspaces/start-prepared': 'client-face new conversation navigation — packages/client/runtime/README.md owns the API',
   'theme/change': 'client-face theme switch signal — packages/client/ui-theme/README.md owns the API',
 }
 

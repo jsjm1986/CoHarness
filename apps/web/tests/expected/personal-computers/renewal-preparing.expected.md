@@ -1,1 +1,4 @@
-- textbox "Opening the new conversation…" [disabled]: Keep the original draft across transport renewal
+- textbox "Message COHARNESS": Text on the intended new conversation
+- status: Preparing the conversation. You can start writing.
+- button "Back"
+- paragraph: Office work · Office computer

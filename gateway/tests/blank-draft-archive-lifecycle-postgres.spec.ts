@@ -26,6 +26,7 @@ describePg('blank-draft archive lifecycle', () => {
     await pool.query("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'local')", [organizationId]); context = await resolvePostgresRuntimeContext(pool, slug, 'local')
     const user = (await pool.query<{ id: string; public_id: string }>("INSERT INTO harness.users(organization_id,username,display_name,home_path) VALUES($1,'owner','Owner','/unused-lifecycle') RETURNING id,public_id", [organizationId])).rows[0]!
     userId = user.id; actorId = Number(user.public_id)
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [userId])
     await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [organizationId, userId])
     await pool.query("INSERT INTO harness.node_user_accounts(organization_id,node_id,user_id,home_path) VALUES($1,$2,$3,'/unused-lifecycle')", [organizationId, context.nodeId, userId])
     await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)', [organizationId, context.nodeId, userId])

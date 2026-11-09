@@ -19,7 +19,7 @@ const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
 const operations = ['create', 'patch', 'status', 'role', 'name', 'remove', 'password'] as const
 type Mutation = typeof operations[number]
-const revocations = ['role', 'disabled-account', 'deleted-account', 'disabled-membership', 'missing-membership', 'disabled-organization'] as const
+const revocations = ['role', 'disabled-account', 'deleted-account', 'disabled-membership', 'missing-membership', 'disabled-organization', 'password-required', 'missing-credential'] as const
 
 describePg('PostgreSQL current account administrator authority', () => {
   let pool: Pool
@@ -42,6 +42,7 @@ describePg('PostgreSQL current account administrator authority', () => {
     const context = await resolvePostgresRuntimeContext(limited, slug, 'local'), cfg = testConfig(root)
     const users = new PostgresUserService(context, cfg)
     const actor = await users.create({ username: 'actor', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await users.create({ username: 'keeper', password: 'pw-123456', role: 'admin' })
     const target = await users.create({ username: 'target', password: 'pw-123456', displayName: 'Retained target' })
     const actorId = (await pool.query<{ id: string }>('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2',
@@ -72,6 +73,8 @@ describePg('PostgreSQL current account administrator authority', () => {
         case 'disabled-membership': await pool.query("UPDATE harness.memberships SET status='disabled' WHERE user_id=$1", [actorId]); break
         case 'missing-membership': await pool.query('DELETE FROM harness.memberships WHERE user_id=$1', [actorId]); break
         case 'disabled-organization': await pool.query("UPDATE harness.organizations SET status='disabled' WHERE id=$1", [organizationId]); break
+        case 'password-required': await pool.query('UPDATE harness.password_credentials SET must_change_password=true WHERE user_id=$1', [actorId]); break
+        case 'missing-credential': await pool.query('DELETE FROM harness.password_credentials WHERE user_id=$1', [actorId]); break
         default: assertNever(kind)
       }
     }

@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto'
+import { checkDocumentAttachmentTarget } from './node-content-documents-target.ts'
+import { NodeContentUnavailable } from './node-content-store.ts'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { createServer, STATUS_CODES } from 'node:http'
 import type { Duplex } from 'node:stream'
@@ -8,11 +11,12 @@ import {
   AccountPreferencesUnavailableError,
   normalizeAccountPreferenceMutation,
 } from './account-preferences.ts'
-import { CollaborationDeniedError } from './collaboration.ts'
+import { CollaborationDeniedError, type ProjectReadAuthorityView } from './collaboration.ts'
 import type { GatewayConfig } from './config.ts'
 import type { WriteGateVerdict } from './postgres/maintenance-service.ts'
 import { RuntimeStartBlockedError, type ProjectRuntime, type RuntimeSubject } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
+import { forwardRequestMatches } from './forwarded-principal.ts'
 import type { GatewayPushService, PushProvider } from './push-notifications.ts'
 import { gateCopy, gateLanguage, loginPage, passwordPage, environmentsPage, runtimeStartFailurePage, type RuntimeStartFailureReason, type RuntimeStartRetry } from './html.ts'
 import { browserReturnPath } from './browser-return.ts'
@@ -46,21 +50,22 @@ import { isAdminPath, serveAdmin } from './static.ts'
 import { ResponseBodyTooLargeError } from './response-budget.ts'
 import { removeBootstrapAdminPassword } from './bootstrap-admin.ts'
 import type { ProjectConfigurationView } from './project-configuration.ts'
-import type { ProjectThemePolicy } from './projects.ts'
+import type { ProjectInvitation, ProjectKind, ProjectThemePolicy } from './projects.ts'
 import { applyModelGovernanceToProject, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
 import { ProjectModelSettingsConflictError, type ModelSettingsPathOp } from './model-governance.ts'
 import type { GatewayWorkbenchCatalogHandler } from './workbench.ts'
+import { OperationTimings, timeOperation } from './operation-timing.ts'
 import { GatewayPerformanceObserver } from './performance-observer.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
 import { RuntimeCatalogError } from './runtime-catalog.ts'
-import { pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { isExplicitScopeRequest, isExplicitSessionRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
 import { DocumentCatalogError, parseDocumentOverviewOptions } from './document-catalog.ts'
 import { ComputerAccessError, type GatewayComputerAccess } from './computer-access.ts'
 import { computerAccessApi } from './computer-access-api.ts'
 import { DeploymentTopologyError } from './deployment-topology.ts'
 import { isCentralRuntimeManagementRequest } from './runtime-management-api.ts'
-import { GatewayRuntimeRouter, InvalidRuntimeTargetError, LocalRuntimeAdapter } from './runtime-router.ts'
+import { GatewayRuntimeRouter, InvalidRuntimeTargetError, LocalRuntimeAdapter, type RuntimePlacement } from './runtime-router.ts'
 import { NodeAccessError, nodeUuidSchema } from './node-access.ts'
 import { NODE_CHANNEL_PATH, NodeChannelError } from './node-channel-protocol.ts'
 import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_STREAM_PATH, NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
@@ -68,6 +73,20 @@ import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
 import { PostgresCheckoutQueueFullError, type PostgresPoolAdmissionSnapshot } from './postgres/database.ts'
 
 export interface GatewayDeps {
+  /** Verify the originating database and independently held historical copies after project cutover. */
+  sourceRetirement?: Pick<import('./node-content-source-retirement.ts').NodeContentSourceRetirement,'report'|'open'|'finalize'>
+  contentMigrations?: Pick<import('./node-content-migration-admin.ts').NodeContentMigrationAdmin,'choices'|'preflight'|'prepare'|'publish'>
+  /** Primary-only blind equality identifiers for organization-wide project naming. */
+  projectNames?: Pick<import('./primary-project-names.ts').PrimaryProjectNames, 'forRequest' | 'redeem' | 'status' | 'prepare' | 'activate'>
+  projectMetadata?: Pick<import('./node-content-projects.ts').NodeProjectMetadata, 'authorizedMetadata'>
+
+  /** One-way migration of an exact personal allocation to its owner index. */
+  personalDirectory?: Pick<import('./workspace-catalog.ts').PostgresWorkspaceCatalog, 'promotePersonal'> &
+    Partial<Pick<import('./workspace-catalog.ts').PostgresWorkspaceCatalog,'previewPersonal'>>
+
+  /** On-demand, node-local content volume health; no Runtime is started by this check. */
+  nodeContent?: Pick<import('./node-content-connection.ts').NodeContentConnection, 'health'>
+
   /** Organization policy belongs to this browser ingress, independently of selected Runtime placement. */
   topology?: Pick<import('./deployment-topology.ts').PostgresDeploymentTopology, 'read' | 'adminRead' | 'save' | 'preflight' | 'assertNode' | 'candidates'>
   /** Private setup and installed-service actions owned by the handling computer. */
@@ -75,8 +94,11 @@ export interface GatewayDeps {
   /** Shared, bounded document-root metadata; reads require no personal Runtime. */
   documentLocations?: Pick<import('./postgres/document-locations.ts').PostgresDocumentLocations, 'page' | 'resolve'>
   documentOverview?: Pick<import('./postgres/document-catalog-service.ts').PostgresDocumentCatalogService, 'overview'>
+    & Partial<Pick<import('./postgres/document-catalog-service.ts').PostgresDocumentCatalogService, 'localOverview'>>
   cfg: GatewayConfig
   auth: GatewayAuthService
+  /** Current browser session and local computer permission after acquiring a Runtime. */
+  revalidateOnComputer?(token:string): Promise<UserRow|null>
   users: GatewayUserService
   projects: GatewayProjectService
   audit: GatewayAuditService
@@ -116,6 +138,8 @@ export interface GatewayDeps {
   }
   /** Durable revocations shared by Gateways using the same organization. */
   accessMonitor?: import('./access-invalidation.ts').GatewayAccessMonitor
+  /** Peer-signed forwarded-request assertion verifier; null falls back to session validation. */
+  forwardedPrincipal?: (assertion: string) => Promise<import('./forwarded-principal.ts').GatewayForwardClaims | null>
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
   /** Optional human-facing project progress journal; absent without PostgreSQL. */
@@ -185,6 +209,15 @@ export interface GatewayDeps {
    */
   writerSpan?: () => (() => void)
   readiness?: (signal?: AbortSignal) => Awaitable<void>
+  /**
+   * Optional center-local server for the release's built web frontend dist.
+   * When present, byte-deterministic `/assets/*` and `/favicon.svg` requests
+   * are answered from the center's own release files — identical bytes to
+   * what any same-release Runtime would serve — instead of pinning a Runtime
+   * and proxying the owning node. Absent keeps Referer-pinned forwarding for
+   * every asset path.
+   */
+  releaseAssets?: Pick<import('./release-assets.ts').ReleaseAssets, 'serve'>
 }
 
 /** Backup execution wiring shared by the admin backup routes. */
@@ -199,6 +232,15 @@ function browserPrincipalMatches(req: IncomingMessage, user: UserRow): boolean {
   const query = new URL(req.url ?? '/', 'http://x').searchParams.getAll('dshPrincipal')
   const current = String(user.id)
   return (expected === undefined || expected === current) && (query.length === 0 || query.length === 1 && query[0] === current)
+}
+
+function assertPlacementComputer(placement: RuntimePlacement, selected: string | null,
+  forwarded: IncomingMessage['headers'][string], localNode: string | undefined): void {
+  const owner = placement.environment?.node.id
+  if (selected !== null && selected !== owner) throw new NodeServiceError(400, 'node-service/invalid-target')
+  if (forwarded !== undefined && forwarded !== owner || localNode !== undefined && placement.local && localNode !== owner) {
+    throw new NodeServiceError(409, 'node-service/mismatch')
+  }
 }
 
 export function parseCookies(header: string | undefined): Map<string, string> {
@@ -484,6 +526,31 @@ function sendAdminGate(res: ServerResponse, pathname: string, error: string): vo
   send(res, 403, error, 'text/plain')
 }
 
+// Byte-deterministic paths: the URL alone names the same bytes on every
+// Runtime. Keep the asset regex aligned with IMMUTABLE_ASSET_PATH in
+// packages/host/frontend-static; the chunk form mirrors the modules package's
+// CLIENT_CHUNK route contract.
+const SHARED_ASSET_PATH = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/u
+const SHARED_PLUGIN_CHUNK_PATH = /^\/plugins\/.+\/client\.[A-Za-z0-9][A-Za-z0-9._-]*\.js(?:\.map)?$/u
+
+/**
+ * Whether one Referer-selected path is byte-deterministic across Runtimes and
+ * can be forwarded without a visible runtime pin.
+ * @param pathname - decoded request pathname.
+ * @param url - the full request URL (query identifies the content revision).
+ * @returns true for content-hashed `/assets/*` and `/plugins/*` URLs carrying
+ * a content-addressed revision; runtime-specific or unrevisioned paths stay on
+ * the pin redirect.
+ */
+function shareableImmutableRequest(pathname: string, url: URL): boolean {
+  if (SHARED_ASSET_PATH.test(pathname)) return true
+  // `/plugins/events`, `/favicon.svg`, and revision-less plugin URLs are not
+  // byte-deterministic; the combo `??` marker and `rev` parameter name bytes.
+  if (pathname === '/plugins/combo.js') return url.search.startsWith('??') && url.searchParams.has('rev')
+  if (SHARED_PLUGIN_CHUNK_PATH.test(pathname)) return url.searchParams.has('rev')
+  return false
+}
+
 function redirect(res: ServerResponse, location: string, cookies: string[] = []): void {
   res.writeHead(302, { location, ...(cookies.length > 0 ? { 'set-cookie': cookies } : {}) })
   res.end()
@@ -529,7 +596,21 @@ function projectSettingsOps(value: unknown): ModelSettingsPathOp[] | undefined {
   return result
 }
 
+class ReadPublicationUnavailableError extends Error {
+  constructor(kind: 'project' | 'invitation' | 'usage', cause: unknown) { super(`${kind}-read-authority-unavailable`, { cause }) }
+}
+
+/** Authority lookup failures withhold prepared records and database diagnostics. */
+async function readPublicationAuthority<T>(kind: 'project' | 'invitation' | 'usage', read: () => Awaitable<T>): Promise<T> {
+  try { return await read() }
+  catch (cause) {
+    if (cause instanceof CollaborationDeniedError) throw cause
+    throw new ReadPublicationUnavailableError(kind, cause)
+  }
+}
+
 function accountProjectError(error: unknown): { status: number; error: string } {
+  if (error instanceof ReadPublicationUnavailableError) return { status: 503, error: error.message }
   if (error instanceof BodyTooLargeError) {
     return { status: 413, error: 'request-too-large' }
   }
@@ -600,6 +681,13 @@ export interface GatewayRuntimeHandler {
 }
 
 export interface GatewayHandlers {
+  /** Authorized policies and opaque peer repositories for this ingress. */
+  peerBackups?: Pick<import('./peer-backup-gateway.ts').PeerBackupGateway, 'admin' | 'internal'>
+  /** Runtime-qualified node index. */
+  workbenchRows?: ReturnType<typeof import('./workbench-rows.ts').workbenchRows>
+  /** Drafts on the exact serving node, independent of Runtime process liveness. */
+  nodeDrafts?: import('./node-drafts.ts').NodeDraftStorage
+
   /** Runtime-independent document plans, copy and directory operations through the center. */
   browserDocuments?: ReturnType<typeof import('./browser-documents.ts').createBrowserDocumentHandler>
 
@@ -686,17 +774,65 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     return probe
   }
 
-  const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow } | null> => {
+  const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow;
+      forward?: import('./forwarded-principal.ts').GatewayForwardClaims } | null> => {
+    // A peer-signed assertion proves the forwarding Gateway already validated
+    // this session. The target header is only a routing marker — clients can
+    // set it — so assertion acceptance rests on signature verification and the
+    // nonce ledger in deps.forwardedPrincipal, not on the header itself.
+    const forward = req.headers['x-dsh-gateway-forward']
+    const arrivedForThisNode = req.headers[NODE_SERVICE_TARGET_HEADER] !== undefined
+      && req.headers[NODE_SERVICE_TARGET_HEADER] === deps.nodeServiceIdentity?.nodeId
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
+    if (typeof forward === 'string' && arrivedForThisNode && deps.forwardedPrincipal !== undefined) {
+      const claims = await deps.forwardedPrincipal(forward)
+      // The assertion is bound to one request line and the forwarded session:
+      // without a cookie, or with a rewritten method/path, the claims are not
+      // a stand-in for session validation and the ordinary path runs instead.
+      const path = new URL(req.url ?? '/', 'http://gateway').pathname
+      if (claims !== null && forwardRequestMatches(claims, { method: req.method, path, sessionToken: token })) {
+        // Acceptance requires the bound session cookie itself; gateway-local
+        // (non-/api) mutations journal their own row because no downstream
+        // revalidation distinguishes them from the user's own traffic.
+        if (!path.startsWith('/api/')) {
+          void Promise.resolve(audit.write({ userId: claims.user.id, action: 'auth.forwarded',
+            methodPath: `${req.method ?? ''} ${path}`, ip: clientIp(req),
+            detail: JSON.stringify({ issuerNode: claims.issuerNode, nonce: claims.nonce }) }))
+            .catch((error: unknown) => { console.error('[gateway] audit write failed:', error) })
+        }
+        return { token: token ?? '', user: claims.user, forward: claims }
+      }
+    }
     if (token === undefined) return null
-    const user = await auth.validate(token)
+    const user = await timeOperation('authorize',async()=>auth.validate(token))
     return user === null ? null : { token, user }
   }
 
-  const requestContext = (req: IncomingMessage, user: UserRow) => {
+  /** Parse the selector target exactly as the destination router would; no query. */
+  const parsedTarget = (raw: string | null | undefined): 'personal' | `project:${number}` =>
+    raw !== undefined && raw !== null && /^project:[1-9][0-9]*$/u.test(raw) ? raw as `project:${number}` : 'personal'
+
+  const requestContext = (req: IncomingMessage, user: UserRow, checked?:RuntimePlacement,
+    forward?: import('./forwarded-principal.ts').GatewayForwardClaims) => {
     const query = new URL(req.url ?? '/', 'http://x').searchParams
-    return runtimeRouter.resolve(user, { runtimeId: query.get('dshRuntime'), target: query.get('dshTarget'),
-      scopeCookie: parseCookies(req.headers.cookie).get(SCOPE_COOKIE) })
+    const runtimeId = query.get('dshRuntime'), target = query.get('dshTarget')
+    const scopeCookie = parseCookies(req.headers.cookie).get(SCOPE_COOKIE)
+    // A bound assertion supplies the placement the issuer already authorized;
+    // it is adopted only when this request's parsed selectors equal the signed
+    // selectors exactly and the claimed environment lands on this node. The
+    // destination still resolves scope and node-local runtime storage itself.
+    const claimed = forward?.context, effectiveTarget = target ?? parsedTarget(scopeCookie)
+    if (claimed !== undefined && forward?.selection !== undefined
+      && (forward.selection.runtimeId ?? null) === runtimeId
+      && (forward.selection.target ?? null) === effectiveTarget
+      && claimed.environment.nodeId === deps.nodeServiceIdentity?.nodeId) {
+      const claimedTarget = forward.selection.target as 'personal' | `project:${number}`
+      return runtimeRouter.resolve(user, { runtimeId, target: claimedTarget, scopeCookie },
+        { target: claimedTarget, local: true, resetScope: false,
+          environment: { id: claimed.environment.id,
+            node: { id: claimed.environment.nodeId, name: claimed.environment.nodeName } } as RuntimePlacement['environment'] })
+    }
+    return runtimeRouter.resolve(user, { runtimeId, target, scopeCookie },checked)
   }
 
   const conversationRuntime = (context: GatewayRequestContext): import('./runtime-catalog.ts').RuntimeId => {
@@ -710,6 +846,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     enabled: cfg.performanceEnabled,
     eventLoopResolutionMs: cfg.performanceEventLoopResolutionMs,
   })
+  const operationTimings=new OperationTimings(cfg.performanceEnabled?cfg.performanceOperationSamples:0)
   const server = createServer((req, res) => {
     // Baseline response headers for every route. `writeHead` on relayed
     // responses can still override them when the upstream supplied its own.
@@ -721,7 +858,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     res.setHeader('content-security-policy-report-only',
       "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'")
     performanceObserver.observeResponse(res, (req.url ?? '').startsWith('/internal/runtime/') ? 'internal' : 'http')
-    void handle(req, res).catch((error: unknown) => {
+    void operationTimings.run(req,res,()=>handle(req,res)).catch((error: unknown) => {
       if (!res.writableEnded && res.headersSent) {
         res.destroy()
       } else if (!res.writableEnded && !res.destroyed) {
@@ -755,6 +892,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           send(res, error.code === 'INSTANCE_STOPPED' ? 409 : 503, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
         } else if (error instanceof InvalidRuntimeTargetError) {
           send(res, 400, JSON.stringify({ error: error.message }), 'application/json')
+        } else if (error instanceof DocumentTransferError) {
+          send(res,error.status,JSON.stringify({error:error.code}), 'application/json')
+        } else if (error instanceof NodeContentUnavailable) {
+          send(res, error.status, JSON.stringify({ error: error.code }), 'application/json')
         } else if (error instanceof CollaborationDeniedError) {
           send(res, error.code === 'conversation-not-found' ? 404 : 403,
             JSON.stringify({ error: error.code }), 'application/json')
@@ -862,6 +1003,13 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 200, JSON.stringify({ protocolVersion: 1, organizationId: lease.organizationId,
           nodeId: lease.nodeId, release: cfg.releaseId ?? null }), 'application/json')
       } finally { nodeControlsInFlight -= 1 }
+      return
+    }
+
+    if (pathname.startsWith('/internal/peer-backups/')) {
+      if (handlers.peerBackups !== undefined && await handlers.peerBackups.internal(req, res)) return
+      req.resume()
+      send(res, 404, '{"error":"peer-backup/not-found"}', 'application/json')
       return
     }
 
@@ -995,9 +1143,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
     }
     const nodeAccessWrite = req.method === 'POST' && (pathname === '/admin/api/deployment/nodes/enrollments'
-      || pathname.startsWith('/admin/api/deployment/nodes/access/'))
+      || pathname.startsWith('/admin/api/deployment/nodes/access/') || pathname.startsWith('/admin/api/deployment/project-names/')
+      || pathname.startsWith('/admin/api/deployment/project-content-migrations/'))
     if (!await writesOpen(req, res, pathname, nodeAccessWrite)) return
-    const { token, user } = session
+    const { token, user, forward } = session
 
     if (pathname === '/logout' && req.method === 'POST') {
       await auth.revoke(token)
@@ -1010,6 +1159,17 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (user.mustChangePassword && pathname !== '/account/password') {
       if (wantsHtml(req)) { const returnTo = browserReturnPath(req.url); redirect(res, returnTo === '/' ? '/account/password' : `/account/password?returnTo=${encodeURIComponent(returnTo)}`); return }
       send(res, 403, '{"error":"password-change-required"}', 'application/json')
+      return
+    }
+
+    if (pathname === '/account/api/project-name-proof') {
+      res.setHeader('cache-control', 'no-store')
+      if (req.method !== 'POST' || deps.projectNames === undefined) { send(res, 404, '', 'application/json'); return }
+      const raw = await readBody(req, 4096)
+      let parsed: unknown
+      try { parsed = JSON.parse(raw) } catch { send(res, 400, '{"error":"invalid-name-request"}', 'application/json'); return }
+      const proof = await deps.projectNames.redeem(parsed,user)
+      send(res, 200, JSON.stringify(proof), 'application/json')
       return
     }
 
@@ -1061,12 +1221,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const read = pathname.endsWith('/overview') || operation === 'capabilities'
         if (req.method !== (read ? 'GET' : 'POST')) { send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return }
         if (pathname.endsWith('/overview')) {
-          if (deps.documentOverview === undefined) { send(res, 501, '{"error":"documents-unavailable"}', 'application/json'); return }
           const query = new URL(req.url ?? '/', 'http://gateway').searchParams
           const options = parseDocumentOverviewOptions({ query: query.get('q') ?? undefined, type: query.get('type') ?? undefined,
             sort: query.get('sort') ?? undefined, cursor: query.get('cursor') ?? undefined,
             limit: query.has('limit') ? Number(query.get('limit')) : undefined })
-          send(res, 200, JSON.stringify(await deps.documentOverview.overview(user.id, options, true)), 'application/json')
+          let result: unknown
+          if (handlers.browserDocuments !== undefined) result = await handlers.browserDocuments(req,user,'overview',options,abort.signal)
+          else if (deps.documentOverview !== undefined) result = await deps.documentOverview.overview(user.id, options, true)
+          else { send(res, 501, '{"error":"documents-unavailable"}', 'application/json'); return }
+          if (!abort.signal.aborted) send(res, 200, JSON.stringify(result), 'application/json')
         } else {
           if (handlers.browserDocuments === undefined) { send(res, 501, '{"error":"documents-unavailable"}', 'application/json'); return }
           let payload: unknown
@@ -1094,8 +1257,12 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
       if (deps.runtimeCatalog === undefined) { send(res, 503, '{"error":"runtime-catalog/unavailable"}', 'application/json'); return }
       const query = new URL(req.url ?? pathname, 'http://gateway').searchParams
-      const cursor = query.get('cursor'), limit = query.get('limit'), ids = query.get('ids')
-      const options = { ...(cursor === null ? {} : { cursor }), ...(limit === null ? {} : { limit }), ...(ids === null ? {} : { ids }) }
+      const cursor = query.get('cursor'), limit = query.get('limit'), ids = query.get('ids'), projectId = query.get('projectId')
+      if (projectId !== null && (pathname !== '/account/api/runtimes' || query.getAll('projectId').length !== 1)) {
+        throw new RuntimeCatalogError(400, 'runtime-catalog/invalid-id')
+      }
+      const options = { ...(cursor === null ? {} : { cursor }), ...(limit === null ? {} : { limit }),
+        ...(ids === null ? {} : { ids }), ...(projectId === null ? {} : { projectId }) }
       const result = pathname === '/account/api/runtimes'
         ? await deps.runtimeCatalog.pageForAccount(user, options)
         : await deps.runtimeCatalog.pageForAdministrator(user, options)
@@ -1110,15 +1277,34 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       await handlers.admin(req, res, user, pathname, body)
       return
     }
-    const selectedUrl = new URL(req.url ?? '/', 'http://gateway')
-    const selection = selectedUrl.searchParams
+    // Release-bundled files are identical on every computer running this
+    // release: answer them from the center's own dist without selecting a
+    // Runtime, so unpinned asset URLs share one browser cache entry and never
+    // traverse a remote node hop. `/plugins/*` stays runtime-owned: combo and
+    // chunk bodies are synthesized per Runtime composition, `/plugins/events`
+    // is a live channel, and the Referer block below still pins any asset
+    // path this release's dist does not hold.
+    if (deps.releaseAssets !== undefined && (pathname.startsWith('/assets/') || pathname === '/favicon.svg')
+      && await deps.releaseAssets.serve(req, res, pathname)) return
+    let selectedUrl = new URL(req.url ?? '/', 'http://gateway')
+    let selection = selectedUrl.searchParams
     if ((pathname.startsWith('/assets/') || pathname.startsWith('/plugins/') || pathname === '/favicon.svg') && deps.runtimeCatalog !== undefined && !selection.has('dshRuntime') && req.headers.referer !== undefined) {
       const referer = new URL(req.headers.referer, 'http://gateway')
       const id = referer.searchParams.get('dshRuntime')
       if (id !== null && (cfg.publicOrigins.includes(referer.origin) || referer.host === req.headers.host)) {
         await deps.runtimeCatalog?.resolveForAccount(user, id)
-        redirect(res, pinRuntimeRequestPath(req.url ?? '/', id as import('./runtime-catalog.ts').RuntimeId))
-        return
+        if ((req.method === 'GET' || req.method === 'HEAD') && shareableImmutableRequest(pathname, selectedUrl)) {
+          // The URL names the same bytes on every Runtime: forward under the
+          // Referer's runtime and keep the browser-visible URL unpinned, so
+          // browser and CDN caches share it across runtimes. The normal
+          // selected-runtime pipeline below forwards remote or serves local.
+          req.url = pinRuntimeRequestPath(req.url ?? '/', id as import('./runtime-catalog.ts').RuntimeId)
+          selectedUrl = new URL(req.url, 'http://gateway')
+          selection = selectedUrl.searchParams
+        } else {
+          redirect(res, pinRuntimeRequestPath(req.url ?? '/', id as import('./runtime-catalog.ts').RuntimeId))
+          return
+        }
       }
     }
     if (pathname === '/' && req.method === 'GET' && deps.runtimeCatalog !== undefined && !selection.has('dshRuntime')) {
@@ -1144,25 +1330,53 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
     }
+    const explicitSession = isExplicitSessionRequest(req.method, pathname)
+    const explicitScope = isExplicitScopeRequest(req.method, selectedUrl)
+    if (explicitSession) {
+      const targets = selection.getAll('dshTarget'), runtimes = selection.getAll('dshRuntime')
+      const target = targets[0] ?? '', project = /^project:([1-9][0-9]*)$/u.exec(target)
+      if (runtimes.length !== 1 || !nodeUuidSchema.safeParse(runtimes[0]).success || targets.length !== 1
+        || target !== 'personal' && (!project || !Number.isSafeInteger(Number(project[1])))) {
+        send(res, 400, '{"error":"invalid-prepare-target"}', 'application/json')
+        return
+      }
+    }
     const selectedNode = selection.get('dshNode')
     if (selectedNode !== null) {
       const nodeProjectCreation = pathname === '/account/api/projects' && req.method === 'POST'
+      const nodeMetadata = (pathname === '/account/api/project-metadata' || pathname === '/account/api/node-document-overview') && req.method === 'GET'
+      if (selection.getAll('dshNode').length !== 1 || (nodeMetadata && (selection.has('dshRuntime') || selection.has('dshTarget')))) throw new NodeServiceError(400, 'node-service/invalid-target')
       if (!nodeUuidSchema.safeParse(selectedNode).success) throw new NodeServiceError(400, 'node-service/invalid-target')
       await deps.topology?.assertNode(selectedNode)
-      if (!selection.has('dshRuntime') && !pathname.startsWith('/api/documents') && !nodeProjectCreation
+      if (!selection.has('dshRuntime') && !pathname.startsWith('/api/documents') && !nodeProjectCreation && !nodeMetadata
         && (!pathname.startsWith('/admin/api/') || user.role !== 'admin')) throw new NodeServiceError(403, 'node-service/invalid-target')
-      if (selectedNode !== deps.nodeServiceIdentity?.nodeId && deps.nodeServiceProxy === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
-      if ((pathname.startsWith('/api/documents') || nodeProjectCreation) && selectedNode === deps.nodeServiceIdentity?.nodeId) {
+      if (!explicitSession && !explicitScope && selectedNode !== deps.nodeServiceIdentity?.nodeId && deps.nodeServiceProxy === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
+      if ((pathname.startsWith('/api/documents') || nodeProjectCreation || nodeMetadata) && selectedNode === deps.nodeServiceIdentity?.nodeId) {
         await deps.computerAccess?.authorize(user.id)
       }
     }
-    if (deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.http(req, res, user)) return
+    let admittedPlacement:RuntimePlacement|undefined
+    const remember = explicitSession ? (placement:RuntimePlacement)=>{admittedPlacement=placement} : undefined
+    if (deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.http(req, res, user,undefined,remember)) return
     if (deps.nodeServiceProxy === undefined && selection.has('dshRuntime') && !pathname.startsWith('/admin/api/')) {
       const placement = await runtimeRouter.placement(user, { runtimeId: selection.get('dshRuntime'), target: selection.get('dshTarget'),
         scopeCookie: parseCookies(req.headers.cookie).get(SCOPE_COOKIE) })
+      if (explicitSession || explicitScope) {
+        assertPlacementComputer(placement, selectedNode, requestedNode, deps.nodeServiceIdentity?.nodeId)
+      }
       if (!placement.local) throw new RuntimeCatalogError(503, 'runtime-catalog/remote-unavailable')
+      remember?.(placement)
     }
 
+    if (pathname === '/admin/api/performance/operations') {
+      if (user.role!=='admin') { sendAdminGate(res,pathname,'forbidden');return }
+      res.setHeader('cache-control','no-store')
+      if (req.method!=='GET') {send(res,405,'{"error":"method-not-allowed"}','application/json');return}
+      const id=selection.get('id')
+      if (id!==null && !nodeUuidSchema.safeParse(id).success) {send(res,400,'{"error":"invalid-operation-id"}','application/json');return}
+      send(res,200,JSON.stringify({operations:operationTimings.samples(id??undefined)}),'application/json')
+      return
+    }
     if (pathname === '/admin/api/performance') {
       if (user.role !== 'admin') { sendAdminGate(res, pathname, 'forbidden'); return }
       res.setHeader('cache-control', 'no-store')
@@ -1179,14 +1393,36 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
 
     if (pathname === '/account/api/usage' && req.method === 'GET') {
+      res.setHeader('cache-control', 'no-store')
       if (deps.governance === undefined) { send(res, 503, '{"error":"usage-unavailable"}', 'application/json'); return }
-      const month = new URL(req.url ?? '/', 'http://x').searchParams.get('month') ?? undefined
-      const resolvedUsage = await requestContext(req, user)
+      const month = selection.get('month') ?? undefined
+      if (month !== undefined && !/^\d{4}-(?:0[1-9]|1[0-2])$/u.test(month)) {
+        send(res, 400, '{"error":"invalid-month"}', 'application/json'); return
+      }
+      const resolvedUsage = await requestContext(req, user, undefined, forward)
       if (resolvedUsage.resetScope) res.setHeader('set-cookie', scopeCookie('personal', cfg))
-      const subject = resolvedUsage.context.scope.kind === 'project'
-        ? { kind: 'project' as const, id: resolvedUsage.context.scope.projectId }
+      const projectId = resolvedUsage.context.scope.kind === 'project' ? resolvedUsage.context.scope.projectId : undefined
+      const selectedNodeId = resolvedUsage.context.environment?.nodeId
+      const subject = projectId !== undefined
+        ? { kind: 'project' as const, id: projectId }
         : { kind: 'user' as const, id: user.id }
-      send(res, 200, JSON.stringify(await deps.governance.summary(subject, month)), 'application/json')
+      try {
+        const summary = await readPublicationAuthority('usage', () => deps.governance!.summary(subject, month))
+        if (projectId !== undefined) {
+          if (deps.collaboration?.projectReadAuthorities === undefined) {
+            send(res, 501, '{"error":"usage-read-authority-unavailable"}', 'application/json'); return
+          }
+          const authorities = await readPublicationAuthority('usage', () => deps.collaboration!.projectReadAuthorities!(user.id, projectId))
+          if (!authorities.some(authority => authority.projectId === projectId
+            && (selectedNodeId === undefined || authority.nodeId === selectedNodeId))) throw new CollaborationDeniedError('forbidden')
+        }
+        const current = await readPublicationAuthority('usage', () => auth.validate(token))
+        if (current === null || current.id !== user.id || current.mustChangePassword) throw new CollaborationDeniedError('forbidden')
+        send(res, 200, JSON.stringify(summary), 'application/json')
+      } catch (error) {
+        const mapped = accountProjectError(error)
+        send(res, mapped.status, JSON.stringify({ error: mapped.error }), 'application/json')
+      }
       return
     }
 
@@ -1312,6 +1548,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const placement = await runtimeRouter.placement(user, {
         runtimeId: scopeQuery.get('dshRuntime'), target: requestedTarget, scopeCookie: undefined,
       })
+      if (explicitScope) assertPlacementComputer(placement, selectedNode, requestedNode, deps.nodeServiceIdentity?.nodeId)
       if (!placement.local) {
         if (deps.nodeServiceProxy === undefined || placement.environment === undefined) throw new RuntimeCatalogError(503, 'runtime-catalog/remote-unavailable')
         if (!await deps.nodeServiceProxy.http(req, res, user, { body, runtimeId: placement.environment.id })) {
@@ -1344,10 +1581,72 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
 
     let contextFlight: ReturnType<typeof requestContext> | undefined
-    const selectedContext = () => contextFlight ??= requestContext(req, user).then(resolved => {
+    const selectedContext = () => contextFlight ??= requestContext(req, user,admittedPlacement, forward).then(resolved => {
       if (resolved.resetScope) res.setHeader('set-cookie', scopeCookie('personal', cfg))
       return resolved
     })
+
+    if (pathname.startsWith('/account/api/drafts/')) {
+      res.setHeader('cache-control', 'no-store')
+      const draftId = pathname.slice('/account/api/drafts/'.length)
+      const requestedRuntime = selection.get('dshRuntime')
+      const target = selection.get('dshTarget')
+      const sessionId = selection.get('sessionId') ?? ''
+      if (!nodeUuidSchema.safeParse(draftId).success || selection.getAll('dshRuntime').length !== 1
+        || !nodeUuidSchema.safeParse(requestedRuntime).success || selection.getAll('dshTarget').length !== 1 || target === null
+        || selection.getAll('sessionId').length > 1 || (selection.has('sessionId') && sessionId === '')
+        || sessionId.length > 512 || sessionId.includes('\0')) {
+        send(res, 400, '{"error":"invalid-draft-target"}', 'application/json'); return
+      }
+      if (!handlers.nodeDrafts || !deps.nodeServiceIdentity) { send(res, 503, '{"error":"drafts-unavailable"}', 'application/json'); return }
+      let operation: import('./node-drafts.ts').NodeDraftOperation = { kind: 'read' }
+      if (selection.has('revision')) {
+        const value = selection.get('revision')!
+        if (req.method !== 'GET' || selection.getAll('revision').length !== 1 || !/^(?:0|[1-9]\d*)$/u.test(value) || !Number.isSafeInteger(Number(value))) {
+          send(res, 400, '{"error":"invalid-draft-revision"}', 'application/json'); return
+        }
+        operation = { kind: 'read', revision: Number(value) }
+      }
+      if (req.method === 'PUT' || req.method === 'DELETE') {
+        const raw = await readBody(req)
+        let body: unknown
+        try { body = JSON.parse(raw) } catch { body = null }
+        const draftText = req.method === 'DELETE' ? '' : typeof body === 'object' && body !== null && 'text' in body ? body.text : undefined
+        if (typeof body !== 'object' || body === null || !('revision' in body) || typeof body.revision !== 'number'
+          || !Number.isSafeInteger(body.revision) || body.revision < 0 || body.revision >= Number.MAX_SAFE_INTEGER
+          || typeof draftText !== 'string') {
+          send(res, 400, '{"error":"invalid-draft"}', 'application/json'); return
+        }
+        operation = { kind: 'save', value: { revision: body.revision, text: draftText } }
+      } else if (req.method !== 'GET') { res.setHeader('allow', 'GET, PUT, DELETE'); send(res, 405, '', 'application/json'); return }
+      const identity=deps.nodeServiceIdentity
+      const authorize=async()=>{
+        const fresh=forward!==undefined?user:await auth.validate(token)
+        if (!fresh || fresh.id!==user.id || fresh.mustChangePassword) throw new CollaborationDeniedError('forbidden')
+        const resolved=(await requestContext(req,fresh,undefined,forward)).context
+        const environment=resolved.environment,scope=resolved.scope
+        if (!environment || environment.id!==requestedRuntime || environment.nodeId!==identity.nodeId ||
+          target!==(scope.kind==='personal'?'personal':`project:${scope.projectId}`)) throw new RuntimeCatalogError(400,'runtime-catalog/target-mismatch')
+        if(scope.kind==='project') {
+          if(operation.kind==='save' && scope.mode!=='rw') throw new CollaborationDeniedError('forbidden')
+          if(sessionId) {
+            if(!deps.collaboration) throw new CollaborationDeniedError('forbidden')
+            await deps.collaboration.access(fresh.id,environment.id,sessionId,operation.kind==='read'?'read':'write')
+          }
+        }
+        return environment
+      }
+      await deps.accessMonitor?.synchronize()
+      const environment=await authorize()
+      const key={organizationId:identity.organizationId,nodeId:environment.nodeId,userId:user.id,runtimeId:environment.id,target,sessionId,draftId}
+      const result=handlers.nodeDrafts.applyAuthenticated
+        ? await handlers.nodeDrafts.applyAuthenticated(key,operation,createHash('sha256').update(token).digest())
+        : await handlers.nodeDrafts.apply(key,operation)
+      if(!handlers.nodeDrafts.applyAuthenticated&&operation.kind==='read') await authorize()
+      res.setHeader('x-dsh-runtime-id', environment.id)
+      send(res, result.status, JSON.stringify(result.status === 200 ? result.value : { error: result.status === 410 ? 'draft-version-unavailable' : 'draft-revision-conflict' }), 'application/json')
+      return
+    }
 
     const scopedUploadRequest = pathname === DOCUMENT_TRANSFER_UPLOADS_PATH
       || pathname.startsWith(`${DOCUMENT_TRANSFER_UPLOADS_PATH}/`)
@@ -1610,6 +1909,51 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       return
     }
 
+    if (pathname === '/account/api/node-document-overview') {
+      res.setHeader('cache-control', 'no-store')
+      if (req.method !== 'GET') { send(res,405,'{"error":"method-not-allowed"}','application/json'); return }
+      if (selectedNode === null || selectedNode !== deps.nodeServiceIdentity?.nodeId) throw new NodeServiceError(400,'node-service/invalid-target')
+      if (!deps.documentOverview?.localOverview) { send(res,503,'{"error":"node-content/unavailable"}','application/json'); return }
+      try {
+        const options = parseDocumentOverviewOptions({ query: selection.get('q') ?? undefined, type: selection.get('type') ?? undefined,
+          sort: selection.get('sort') ?? undefined })
+        const offset = selection.get('offset'), limit = selection.get('limit')
+        if (!/^(?:0|[1-9][0-9]*)$/u.test(offset ?? '') || !/^[1-9][0-9]*$/u.test(limit ?? '')) {
+          throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA',400,'Invalid document page.')
+        }
+        const page = await deps.documentOverview.localOverview(user.id,options,Number(offset),Number(limit))
+        send(res,200,JSON.stringify(page),'application/json')
+      } catch (error) {
+        if (!(error instanceof DocumentCatalogError)) throw error
+        send(res,error.status,JSON.stringify({error:{code:error.code,message:error.message}}),'application/json')
+      }
+      return
+    }
+    if ((pathname === '/account/api/project-metadata' || pathname === '/admin/api/project-metadata') && req.method === 'GET') {
+      res.setHeader('cache-control','no-store')
+      const adminView = pathname.startsWith('/admin/')
+      if (adminView && user.role !== 'admin') { sendAdminGate(res,pathname,'forbidden'); return }
+      const ids = (selection.get('ids') ?? '').split(',')
+      if (selection.getAll('dshNode').length !== 1 || selection.get('dshNode') !== deps.nodeServiceIdentity?.nodeId
+        || ids.length > 32 || !ids.every(value => /^[1-9][0-9]*$/u.test(value) && Number.isSafeInteger(Number(value)))) {
+        send(res,400,'{"error":"invalid-project-selection"}','application/json'); return
+      }
+      if (deps.projectMetadata === undefined) { send(res,503,'{"error":"node-content/unavailable"}','application/json'); return }
+      send(res,200,JSON.stringify({ items: await deps.projectMetadata.authorizedMetadata(user.id, adminView ? 'admin' : 'account', ids.map(Number)) }), 'application/json')
+      return
+    }
+    if (pathname === '/account/api/workbench/rows' && req.method === 'GET') {
+      res.setHeader('cache-control', 'no-store')
+      if (handlers.workbenchRows === undefined) { send(res, 503, '{"error":"workbench-rows-unavailable"}', 'application/json'); return }
+      const owner = (await selectedContext()).context
+      const page = selection.has('documentSession')
+        ? await checkDocumentAttachmentTarget(handlers.workbenchRows,owner,selection)
+        : await handlers.workbenchRows(owner,selection)
+      res.setHeader('x-dsh-runtime-id', page.runtimeId)
+      send(res, 200, JSON.stringify(page), 'application/json')
+      return
+    }
+
     if (pathname === '/account/api/workbench/catalog' && req.method === 'GET') {
       const placement = await runtimeRouter.placement(user, { runtimeId: selection.get('dshRuntime'), target: selection.get('dshTarget'),
         scopeCookie: parseCookies(req.headers.cookie).get(SCOPE_COOKIE) })
@@ -1724,34 +2068,42 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 403, JSON.stringify({ error: 'not-member' }), 'application/json')
         return
       }
+      const selectedNodeId = authority.nodeId
       const project = await deps.projects.getById(projectId)
       if (project === null) {
         send(res, 404, JSON.stringify({ error: 'project-not-found' }), 'application/json')
         return
       }
-      const canManage = user.role === 'admin' || project.owner?.id === user.id
-        || authority.administrator
-      const capabilities: ProjectConfigurationView['capabilities'] = {
-        themePolicy: deps.projects.setThemePolicy !== undefined && canManage,
-        runtimeSettings: canManage,
-        projectModels: canManage && deps.governance?.describeProjectModelSettings !== undefined
+      const metadataNodeId = project.nodeId
+      const canManage = authority.canManage
+      const capabilities = (managed: boolean, kind: ProjectKind | undefined): ProjectConfigurationView['capabilities'] => ({
+        themePolicy: deps.projects.setThemePolicy !== undefined && managed,
+        runtimeSettings: managed,
+        projectModels: managed && deps.governance?.describeProjectModelSettings !== undefined
           && deps.governance.mutateProjectModelSettings !== undefined,
-        members: canManage,
-        sshTargets: canManage && deps.sshTargets?.listForProject !== undefined,
+        members: managed && kind !== 'steward',
+        sshTargets: managed && deps.sshTargets?.listForProject !== undefined,
         filesystem: false,
-      }
+      })
       try {
         if (req.method === 'GET') {
+          if (deps.collaboration.projectReadAuthorities === undefined) {
+            send(res, 501, '{"error":"project-read-authority-unavailable"}', 'application/json'); return
+          }
+          const current = (await readPublicationAuthority('project', () => deps.collaboration!.projectReadAuthorities!(user.id, projectId)))
+            .find(current => current.nodeId === selectedNodeId
+              && (metadataNodeId === undefined || current.nodeId === metadataNodeId))
+          if (current === undefined) throw new CollaborationDeniedError('forbidden')
           const value: ProjectConfigurationView = {
             project: {
               id: project.id,
               name: project.name,
               ...(project.origin === undefined ? {} : { origin: project.origin }),
-              ...(project.owner === undefined ? {} : { owner: project.owner }),
-              themePolicy: project.uiThemePolicy ?? 'follow-user',
+              owner: current.owner,
+              themePolicy: current.uiThemePolicy,
             },
-            canManage,
-            capabilities,
+            canManage: current.canManage,
+            capabilities: capabilities(current.canManage, current.kind),
           }
           res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
           res.end(JSON.stringify(value))
@@ -1790,7 +2142,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
               themePolicy: next.uiThemePolicy ?? policy as ProjectThemePolicy,
             },
             canManage,
-            capabilities,
+            capabilities: capabilities(canManage, next.kind),
           }
           res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
           res.end(JSON.stringify(value))
@@ -1871,7 +2223,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 503, JSON.stringify({ error: 'project-model-settings-unavailable' }), 'application/json')
         return
       }
-      if (deps.governance === undefined) {
+      if (deps.governance === undefined || deps.governance.authorizeProjectModelRead === undefined) {
         send(res, 501, JSON.stringify({ error: 'project-model-settings-unsupported' }), 'application/json')
         return
       }
@@ -1905,6 +2257,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             ...stringField(input?.api) === undefined ? {} : { api: stringField(input?.api) },
             ...stringField(input?.apiKey) === undefined ? {} : { apiKey: stringField(input?.apiKey) },
           })
+          if (!await deps.governance.authorizeProjectModelRead(projectId, user.id)) {
+            throw new CollaborationDeniedError('forbidden')
+          }
           send(res, 200, JSON.stringify({ models }), 'application/json')
           return
         }
@@ -1917,9 +2272,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
               return
             }
             const described = await deps.governance.describeProjectCredentials(projectId, [...new Set(refs)])
+            const currentCanManage = await deps.governance.authorizeProjectModelRead(projectId, user.id)
             send(res, 200, JSON.stringify({
               credentials: Object.fromEntries(Object.entries(described).map(([ref, value]) => [
-                ref, { ...value, writable: canManage && value.writable },
+                ref, { ...value, writable: currentCanManage && value.writable },
               ])),
             }), 'application/json')
             return
@@ -1970,7 +2326,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             return
           }
           const view = await deps.governance.describeProjectModelSettings(projectId)
-          if (canManage) {
+          const currentCanManage = await deps.governance.authorizeProjectModelRead(projectId, user.id)
+          if (currentCanManage) {
             send(res, 200, JSON.stringify(view), 'application/json')
           } else {
             send(res, 200, JSON.stringify({
@@ -2053,14 +2410,35 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname === '/account/api/projects') {
       try {
         if (req.method === 'GET') {
-          const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
+          const collaboration = deps.collaboration
+          if (collaboration === undefined) { send(res, 200, '[]', 'application/json'); return }
+          if (collaboration.projectReadAuthorities === undefined) {
+            send(res, 501, '{"error":"project-read-authority-unavailable"}', 'application/json'); return
+          }
+          const scopes = await collaboration.projectsForUser(user.id)
+          const selectedNodes = new Map(scopes.map(scope => [scope.projectId, scope.nodeId]))
           const details = deps.projects.getByIds === undefined
             ? await Promise.all(scopes.map(scope => deps.projects.getById(scope.projectId)))
-            : await deps.projects.getByIds(scopes.map(scope => scope.projectId))
-          send(res, 200, JSON.stringify(details.filter((project): project is NonNullable<typeof project> => project !== null).map(project => ({
-            ...project,
-            canManage: user.role === 'admin' || project.owner?.id === user.id,
-          }))), 'application/json')
+            : await deps.projects.getByIds(scopes.map(scope => scope.projectId), 'directory')
+          const prepared = details.map(project => project === null ? null : { project, nodeId: project.nodeId })
+          const authorities = await readPublicationAuthority('project', () => collaboration.projectReadAuthorities!(user.id))
+          if (authorities.length === 0) {
+            const fresh = await readPublicationAuthority('project', () => auth.validate(token))
+            if (fresh === null || fresh.id !== user.id || fresh.mustChangePassword) throw new CollaborationDeniedError('forbidden')
+          }
+          const current = new Map(authorities.map(authority => [authority.projectId, authority]))
+          send(res, 200, JSON.stringify(prepared.flatMap(item => {
+            if (item === null) return []
+            const { project, nodeId } = item
+            const authority = current.get(project.id)
+            return authority === undefined || authority.nodeId !== selectedNodes.get(project.id)
+              || nodeId !== undefined && nodeId !== authority.nodeId ? [] : [{
+              ...project,
+              owner: authority.owner,
+              uiThemePolicy: authority.uiThemePolicy,
+              canManage: authority.canManage,
+            }]
+          })), 'application/json')
           return
         }
         if (req.method === 'POST') {
@@ -2070,7 +2448,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           if (deps.projects.createManaged === undefined) {
             send(res, 503, '{"error":"managed-projects-unavailable"}', 'application/json'); return
           }
-          const project = await deps.projects.createManaged({ name, ownerUserId: user.id, actorUserId: user.id })
+          const project = await deps.projects.createManaged({ name, ownerUserId: user.id, actorUserId: user.id }, deps.projectNames?.forRequest(req,user))
           await audit.write({ userId: user.id, action: 'projects.create', detail: JSON.stringify({ id: project.id, origin: 'user' }), ip: clientIp(req) })
           send(res, 201, JSON.stringify(project), 'application/json')
           return
@@ -2083,19 +2461,34 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       return
     }
 
-    if (pathname === '/account/api/invitations/count' && req.method === 'GET') {
-      if (deps.projects.countPendingInvitations === undefined) {
+    if ((pathname === '/account/api/invitations' || pathname === '/account/api/invitations/count') && req.method === 'GET') {
+      res.setHeader('cache-control', 'no-store')
+      const count = pathname.endsWith('/count')
+      if (count ? deps.projects.countPendingInvitations === undefined : deps.projects.listInvitations === undefined) {
         send(res, 503, '{"error":"invitations-unavailable"}', 'application/json'); return
       }
-      send(res, 200, JSON.stringify({ pending: await deps.projects.countPendingInvitations(user.id) }), 'application/json')
-      return
-    }
-
-    if (pathname === '/account/api/invitations' && req.method === 'GET') {
-      if (deps.projects.listInvitations === undefined) {
-        send(res, 503, '{"error":"invitations-unavailable"}', 'application/json'); return
+      try {
+        const prepared = await readPublicationAuthority('invitation', async () => count
+          ? { kind: 'count' as const, pending: await deps.projects.countPendingInvitations!(user.id) }
+          : { kind: 'list' as const, items: await deps.projects.listInvitations!(user.id) })
+        const participant = (invitation: ProjectInvitation): boolean => invitation.invitee.id === user.id || invitation.inviter.id === user.id
+        let authorities: ProjectReadAuthorityView[] = []
+        if (prepared.kind === 'list' && prepared.items.some(invitation => !participant(invitation))) {
+          if (deps.collaboration?.projectReadAuthorities === undefined) {
+            send(res, 501, '{"error":"invitation-read-authority-unavailable"}', 'application/json'); return
+          }
+          authorities = await readPublicationAuthority('invitation', () => deps.collaboration!.projectReadAuthorities!(user.id))
+        }
+        const current = await readPublicationAuthority('invitation', () => auth.validate(token))
+        if (current === null || current.id !== user.id || current.mustChangePassword) throw new CollaborationDeniedError('forbidden')
+        const managed = new Set(authorities.filter(authority => authority.canManage
+          && (!authority.administrator || current.role === 'admin' || authority.owner?.id === user.id)).map(authority => authority.projectId))
+        send(res, 200, JSON.stringify(prepared.kind === 'count' ? { pending: prepared.pending }
+          : prepared.items.filter(invitation => participant(invitation) || managed.has(invitation.projectId))), 'application/json')
+      } catch (error) {
+        const mapped = accountProjectError(error)
+        send(res, mapped.status, JSON.stringify({ error: mapped.error }), 'application/json')
       }
-      send(res, 200, JSON.stringify(await deps.projects.listInvitations(user.id)), 'application/json')
       return
     }
 
@@ -2126,9 +2519,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       try {
         const project = await deps.projects.getById(projectId)
         if (project === null) { send(res, 404, '{"error":"project-not-found"}', 'application/json'); return }
+        const metadataNodeId = project.nodeId
         const authority = await deps.collaboration?.projectForUser(projectId, user.id)
         if (authority === null || authority === undefined) { send(res, 403, '{"error":"not-member"}', 'application/json'); return }
-        const canManage = user.role === 'admin' || authority.administrator || project.owner?.id === user.id
+        const selectedNodeId = metadataNodeId ?? authority.nodeId
+        const canManage = authority.canManage
         if (accountProjectPath[2] === 'invitable-users') {
           if (req.method !== 'GET') { send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return }
           if (!canManage) { send(res, 403, '{"error":"forbidden"}', 'application/json'); return }
@@ -2141,7 +2536,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         if (isInvitationPath) {
           if (req.method === 'GET') {
             if (deps.projects.listInvitations === undefined) { send(res, 503, '{"error":"invitations-unavailable"}', 'application/json'); return }
-            send(res, 200, JSON.stringify(await deps.projects.listInvitations(user.id, projectId)), 'application/json'); return
+            const invitations = await deps.projects.listInvitations(user.id, projectId)
+            if (deps.collaboration?.projectReadAuthorities === undefined) {
+              send(res, 501, '{"error":"project-read-authority-unavailable"}', 'application/json'); return
+            }
+            const current = (await readPublicationAuthority('project', () => deps.collaboration!.projectReadAuthorities!(user.id, projectId)))
+              .find(current => current.nodeId === selectedNodeId)
+            if (current === undefined) throw new CollaborationDeniedError('forbidden')
+            send(res, 200, JSON.stringify(current.canManage ? invitations : invitations.filter(invitation =>
+              invitation.invitee.id === user.id || invitation.inviter.id === user.id)), 'application/json'); return
           }
           if (req.method === 'POST') {
             if (!canManage || deps.projects.createInvitation === undefined) { send(res, 403, '{"error":"forbidden"}', 'application/json'); return }
@@ -2159,14 +2562,23 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return
         }
         if (req.method === 'GET') {
-          send(res, 200, JSON.stringify({ ...project, canManage }), 'application/json'); return
+          if (deps.collaboration?.projectReadAuthorities === undefined) {
+            send(res, 501, '{"error":"project-read-authority-unavailable"}', 'application/json'); return
+          }
+          const current = (await readPublicationAuthority('project', () => deps.collaboration!.projectReadAuthorities!(user.id, projectId)))
+            .find(current => current.nodeId === selectedNodeId)
+          if (current === undefined) throw new CollaborationDeniedError('forbidden')
+          send(res, 200, JSON.stringify({ ...project,
+            owner: current.owner,
+            uiThemePolicy: current.uiThemePolicy, canManage: current.canManage,
+          }), 'application/json'); return
         }
         if (req.method === 'PATCH') {
           if (!canManage) { send(res, 403, '{"error":"forbidden"}', 'application/json'); return }
           const name = stringField(jsonObject(await readBody(req))?.name)
           if (name === undefined) { send(res, 400, '{"error":"name required"}', 'application/json'); return }
-          await deps.projects.rename(projectId, name, user.id)
-          await audit.write({ userId: user.id, action: 'projects.rename', detail: JSON.stringify({ projectId, name }), ip: clientIp(req) })
+          await deps.projects.rename(projectId, name, user.id, deps.projectNames?.forRequest(req,user))
+          await audit.write({ userId: user.id, action: 'projects.rename', detail: JSON.stringify({ projectId }), ip: clientIp(req) })
           res.writeHead(204); res.end(); return
         }
         send(res, 405, '{"error":"method-not-allowed"}', 'application/json')
@@ -2315,6 +2727,12 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
     if (isAdminPath(pathname)) {
       if (user.role !== 'admin') { sendAdminGate(res, pathname, 'forbidden'); return }
+      if (pathname.startsWith('/admin/api/peer-backups')) {
+        if (handlers.peerBackups !== undefined && await handlers.peerBackups.admin(req, res, user.id)) return
+        req.resume()
+        send(res, 404, '{"error":"peer-backup/not-found"}', 'application/json')
+        return
+      }
       const projectSettingsRedirect = /^\/admin\/projects\/(\d+)\/settings$/.exec(pathname)
       if (projectSettingsRedirect !== null && req.method === 'GET') {
         const projectId = Number(projectSettingsRedirect[1])
@@ -2333,7 +2751,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           return
         }
         await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward',
-          ...(placement?.environment === undefined ? {} : { runtimeId: placement.environment.id }) })
+          ...(placement?.environment === undefined ? {} : { runtimeId: placement.environment.id }) }, 'passive', user.id)
         if (placement?.environment === undefined) redirect(res, '/', [scopeCookie(`project:${project.id}`, cfg)])
         else redirect(res, `/?dshRuntime=${encodeURIComponent(placement.environment.id)}`)
         return
@@ -2388,7 +2806,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.upgrade(req, socket, head, session.user)) {
         upgradeStatus = 101; return
       }
-      const resolved = await requestContext(req, session.user)
+      const resolved = await requestContext(req, session.user, undefined, session.forward)
       upgradeStatus = 101
       await handlers.upgrade(req, socket, head, resolved.context)
     }

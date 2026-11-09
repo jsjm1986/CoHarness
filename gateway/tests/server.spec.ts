@@ -12,6 +12,7 @@ import { openDb } from '../src/db.ts'
 import { InstanceManager, RuntimeStartBlockedError } from '../src/instances.ts'
 import type { ModelUsageSubject, UsageSummary } from '../src/model-governance.ts'
 import { ProjectService } from '../src/projects.ts'
+import { CollaborationDeniedError } from '../src/collaboration.ts'
 import type { GatewayCollaborationService } from '../src/services.ts'
 import { createGatewayServer, type GatewayDeps, type GatewayHandlers, type GatewayRuntimeHandler } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
@@ -89,11 +90,13 @@ function installProjectCollaboration(deps: GatewayDeps): void {
     const [project, user] = await Promise.all([deps.projects.getById(projectId), deps.users.getById(userId)])
     if (project === null || user === null || user.status !== 'active') return null
     if (user.role === 'admin') return {
-      projectId, name: project.name, path: project.path, mode: 'rw' as const, administrator: true, canManage: true, uiThemePolicy: 'follow-user' as const,
+      projectId, name: project.name, path: project.path, mode: 'rw' as const, administrator: true, canManage: true,
+      uiThemePolicy: 'follow-user' as const, owner: project.owner ?? null,
     }
     const member = project.members.find(candidate => candidate.userId === userId)
     return member === undefined ? null : {
-      projectId, name: project.name, path: project.path, mode: member.mode, administrator: false, canManage: project.owner?.id === userId, uiThemePolicy: 'follow-user' as const,
+      projectId, name: project.name, path: project.path, mode: member.mode, administrator: false, canManage: project.owner?.id === userId,
+      uiThemePolicy: 'follow-user' as const, owner: project.owner ?? null,
     }
   }
   deps.collaboration = {
@@ -107,6 +110,12 @@ function installProjectCollaboration(deps: GatewayDeps): void {
       return scopes
     },
     projectForUser: authority,
+    projectReadAuthorities: async (userId, projectId) => {
+      const user = await deps.users.getById(userId)
+      if (user === null || user.status !== 'active' || user.mustChangePassword) return []
+      const ids = projectId === undefined ? (await deps.projects.list()).map(project => project.id) : [projectId]
+      return (await Promise.all(ids.map(id => authority(id, userId)))).filter(value => value !== null)
+    },
     access: () => { throw new Error('not implemented in route test') },
     listConversations: () => [],
     readableSessionIds: () => [],
@@ -160,6 +169,21 @@ const emptyUsageSummary: UsageSummary = {
   tokenLimit: null,
   companyCostMicrosLimit: null,
   alerts: [],
+}
+
+async function usageSetup(scope: 'personal' | 'project', selectedComputer = false) {
+  const environment = selectedComputer ? { ...conversationEnvironment, owner: { kind: 'project' as const, id: 1, name: 'Usage project' } } : undefined
+  const fixture = await setup({}, {}, undefined, environment)
+  const { deps, base } = fixture
+  let projectId: number | undefined
+  if (scope === 'project') {
+    projectId = (await deps.projects.createManaged!({ name: 'Usage project', ownerUserId: 1 })).id
+    installProjectCollaboration(deps)
+  }
+  deps.governance = { summary: (_subject: ModelUsageSubject) => emptyUsageSummary } as NonNullable<GatewayDeps['governance']>
+  const cookie = await login(base, 'root-admin', 'pw-12345678')
+  return { ...fixture, cookie, projectId,
+    url: `${base}/account/api/usage?dshTarget=${scope === 'personal' ? 'personal' : `project:${projectId}`}` }
 }
 
 describe('gateway server', () => {
@@ -234,6 +258,44 @@ describe('gateway server', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(Number(response.headers.get('retry-after'))).toBeGreaterThan(0)
     expect(await response.json()).toMatchObject({ error: { code: 'INSTANCE_CAPACITY' } })
+  })
+
+  it('reads and saves node-local drafts only for the pinned allocation, without starting its Runtime', async () => {
+    const environment: RuntimeCatalogEntry = { ...conversationEnvironment, owner: { kind: 'personal', id: 1, name: 'root-admin' } }
+    const apply = vi.fn<import('../src/node-drafts.ts').NodeDraftStorage['apply']>()
+    apply.mockReturnValue({ status: 200, value: { revision: 1, text: 'unsent' } })
+    const { deps, base } = await setup({}, { nodeDrafts: { apply } }, undefined, environment)
+    deps.nodeServiceIdentity = { nodeId: environment.node.id, organizationId: 'org', authorize: async () => { throw new Error('Unexpected node handoff') } }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const start = vi.spyOn(deps.instances, 'ensureRunning')
+    const path = base + '/account/api/drafts/eb2f0fbf-7c38-4d58-b80c-fec1772de27c'
+    const url = `${path}?dshTarget=personal&dshRuntime=${environment.id}`
+    const init = { method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ revision: 0, text: 'unsent' }) }
+    const response = await fetch(url, init)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('x-dsh-runtime-id')).toBe(environment.id)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(apply).toHaveBeenCalledWith(expect.objectContaining({ userId: 1, nodeId: environment.node.id, runtimeId: environment.id, target: 'personal' }),
+      { kind: 'save', value: { revision: 0, text: 'unsent' } })
+    for (const target of [path, url + '&dshTarget=personal', url.replace('dshTarget=personal','dshTarget=project:7')]) {
+      expect((await fetch(target, init)).status).toBe(400)
+    }
+    expect((await fetch(url, { ...init, body: '{"revision":-2,"text":"bad"}' })).status).toBe(400)
+    expect((await fetch(url, { ...init, headers: { origin: base } })).status).toBe(401)
+    expect(apply).toHaveBeenCalledTimes(1)
+    const get = { headers: init.headers }
+    expect((await fetch(url + '&revision=1', get)).status).toBe(200)
+    expect(apply).toHaveBeenLastCalledWith(expect.objectContaining({userId:1,runtimeId:environment.id}),{kind:'read',revision:1})
+    for(const bad of ['-1','1.2','01','1&revision=1','9007199254740992']){
+      expect((await fetch(url+'&revision='+bad,get)).status).toBe(400)
+    }
+    expect((await fetch(url+'&revision=1',init)).status).toBe(400)
+    apply.mockReturnValueOnce({status:410})
+    const expired=await fetch(url+'&revision=1',get)
+    expect(expired.status).toBe(410)
+    expect(await expired.json()).toEqual({error:'draft-version-unavailable'})
+    expect(start).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -1074,10 +1136,13 @@ describe('gateway server', () => {
         return { ...emptyUsageSummary, month: month ?? emptyUsageSummary.month }
       },
     } as NonNullable<GatewayDeps['governance']>
+    const authority = { projectId: 42, name: 'Shared project', path: '/shared', mode: 'rw' as const,
+      administrator: true, canManage: true, uiThemePolicy: 'follow-user' as const, owner: null }
     deps.collaboration = {
       projectForUser: (projectId, userId) => projectId === 42 && userId === 1
-        ? { projectId, name: 'Shared project', path: '/shared', mode: 'rw', administrator: true, canManage: true }
+        ? authority
         : null,
+      projectReadAuthorities: (userId, projectId) => projectId === 42 && userId === 1 ? [authority] : [],
     } as NonNullable<GatewayDeps['collaboration']>
     const cookie = await login(base, 'root-admin', 'pw-12345678')
 
@@ -1092,6 +1157,87 @@ describe('gateway server', () => {
       { subject: { kind: 'user', id: 1 }, month: '2026-07' },
       { subject: { kind: 'project', id: 42 }, month: '2026-06' },
     ])
+  })
+
+  it('repairs an inaccessible legacy project cookie before selecting personal usage', async () => {
+    const { deps, base, cookie } = await usageSetup('personal')
+    const summary = vi.spyOn(deps.governance!, 'summary')
+    const response = await fetch(`${base}/account/api/usage`, { headers: { cookie: `${cookie}; hgw_scope=project:999` } })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('hgw_scope=personal')
+    expect(await response.json()).toEqual(emptyUsageSummary)
+    expect(summary).toHaveBeenCalledExactlyOnceWith({ kind: 'user', id: 1 }, undefined)
+  })
+
+  it.each(['', '2026-00', '2026-13', '2026-1', 'November', '2026-11\n', '12345-01'])(
+    'refuses invalid usage month %j before reading usage', async month => {
+      const { deps, url, cookie } = await usageSetup('personal')
+      const summary = vi.spyOn(deps.governance!, 'summary')
+      const response = await fetch(`${url}&month=${encodeURIComponent(month)}`, { headers: { cookie } })
+      expect(response.status).toBe(400)
+      expect(response.headers.get('cache-control')).toBe('no-store')
+      expect(await response.json()).toEqual({ error: 'invalid-month' })
+      expect(summary).not.toHaveBeenCalled()
+    })
+
+  it('reports an unavailable usage service without preparing an owner', async () => {
+    const { deps, url, cookie } = await usageSetup('personal')
+    delete deps.governance
+    const response = await fetch(url, { headers: { cookie } })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'usage-unavailable' })
+  })
+
+  it.each((['personal', 'project'] as const).flatMap(scope =>
+    (['missing', 'changed', 'password-required', 'failed'] as const).map(state => ({ scope, state }))))(
+    'withholds $scope usage when final browser qualification is $state', async ({ scope, state }) => {
+      const { deps, url, cookie } = await usageSetup(scope), validate = deps.auth.validate.bind(deps.auth)
+      let calls = 0
+      deps.auth.validate = async token => {
+        const value = await validate(token)
+        if (++calls !== 2 || value === null) return value
+        if (state === 'failed') throw new Error('Synthetic private browser database diagnostic')
+        return state === 'missing' ? null : state === 'changed' ? { ...value, id: value.id + 1 } : { ...value, mustChangePassword: true }
+      }
+      const response = await fetch(url, { headers: { cookie } })
+      expect(calls).toBe(2)
+      expect(response.status).toBe(state === 'failed' ? 503 : 403)
+      expect(await response.json()).toEqual({ error: state === 'failed' ? 'usage-read-authority-unavailable' : 'forbidden' })
+    })
+
+  it.each(['personal', 'project'] as const)('withholds %s usage when summary preparation fails', async scope => {
+    const { deps, url, cookie } = await usageSetup(scope)
+    deps.governance!.summary = () => { throw new Error('Synthetic private usage query diagnostic') }
+    const response = await fetch(url, { headers: { cookie } })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'usage-read-authority-unavailable' })
+  })
+
+  it.each(['missing', 'failed', 'denied', 'withdrawn', 'different-project', 'different-computer'] as const)(
+    'withholds prepared project usage when current authority is %s', async state => {
+      const { deps, url, cookie } = await usageSetup('project', true)
+      const read = deps.collaboration!.projectReadAuthorities!.bind(deps.collaboration)
+      if (state === 'missing') delete deps.collaboration!.projectReadAuthorities
+      else deps.collaboration!.projectReadAuthorities = async (...args) => {
+        if (state === 'failed') throw new Error('Synthetic private project authority diagnostic')
+        if (state === 'denied') throw new CollaborationDeniedError('forbidden')
+        const values = await read(...args)
+        if (state === 'withdrawn') return []
+        return values.map(value => state === 'different-project' ? { ...value, projectId: value.projectId + 1 }
+          : { ...value, nodeId: '74111111-1111-4111-8111-111111111111' as RuntimeNodeId })
+      }
+      const response = await fetch(url, { headers: { cookie } })
+      expect(response.status).toBe(state === 'missing' ? 501 : state === 'failed' ? 503 : 403)
+      expect(await response.json()).toEqual({ error: state === 'missing' || state === 'failed' ? 'usage-read-authority-unavailable' : 'forbidden' })
+    })
+
+  it('publishes project usage from the selected current computer', async () => {
+    const { deps, url, cookie } = await usageSetup('project', true)
+    const read = deps.collaboration!.projectReadAuthorities!.bind(deps.collaboration)
+    deps.collaboration!.projectReadAuthorities = async (...args) => (await read(...args)).map(value => ({ ...value, nodeId: conversationEnvironment.node.id }))
+    const response = await fetch(url, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(emptyUsageSummary)
   })
 
   it.each(['personal', 'cookie-project', 'target-project'] as const)('builds %s account context from one scope resolution and one project catalog read', async (selection) => {
@@ -1200,6 +1346,7 @@ describe('gateway server', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ projects: [{ projectId: 991, nodeName: 'Ubuntu', canManage: true,
       owner: { id: 1, username: 'root-admin' }, origin: 'user' }] })
+    expect(deps.projects.getByIds).toHaveBeenCalledWith([991])
     expect(details).not.toHaveBeenCalled()
   })
 
@@ -1299,6 +1446,112 @@ describe('gateway server', () => {
     }
   })
 
+  it.each(['list', 'detail', 'configuration', 'invitations'] as const)('refuses %s publication without a current project read authority provider', async operation => {
+    const { deps, base } = await setup()
+    installProjectCollaboration(deps)
+    const project = await deps.projects.create({ name: 'read-provider', createdBy: 1 })
+    deps.collaboration!.projectReadAuthorities = undefined
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/projects${operation === 'list' ? '' : `/${project.id}${operation === 'configuration' || operation === 'invitations' ? `/${operation}` : ''}`}`, { headers: { cookie } })
+    expect(response.status).toBe(501)
+    expect(await response.json()).toEqual({ error: 'project-read-authority-unavailable' })
+  })
+
+  it.each(['list', 'detail', 'configuration', 'invitations'] as const)('withholds prepared %s data when current project authority cannot be read', async operation => {
+    const { deps, base } = await setup()
+    installProjectCollaboration(deps)
+    const project = await deps.projects.create({ name: 'private-read-result', createdBy: 1 })
+    deps.collaboration!.projectReadAuthorities = () => { throw new Error('Synthetic private database details') }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/projects${operation === 'list' ? '' : `/${project.id}${operation === 'configuration' || operation === 'invitations' ? `/${operation}` : ''}`}`, { headers: { cookie } })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'project-read-authority-unavailable' })
+  })
+
+  it.each(['list', 'detail', 'configuration', 'invitations'] as const)('preserves a current authority denial for prepared %s data', async operation => {
+    const { deps, base } = await setup()
+    installProjectCollaboration(deps)
+    const project = await deps.projects.create({ name: 'read-denied', createdBy: 1 })
+    deps.collaboration!.projectReadAuthorities = () => { throw new CollaborationDeniedError('forbidden') }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/projects${operation === 'list' ? '' : `/${project.id}${operation === 'configuration' || operation === 'invitations' ? `/${operation}` : ''}`}`, { headers: { cookie } })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'forbidden' })
+  })
+
+  it.each(['list', 'detail', 'configuration', 'invitations'] as const)('withholds prepared %s metadata when the project moves to another computer', async operation => {
+    const { deps, base } = await setup()
+    installProjectCollaboration(deps)
+    const project = await deps.projects.create({ name: 'read-computer', createdBy: 1 })
+    const first = '10000000-0000-4000-8000-000000000001' as RuntimeNodeId
+    const next = '10000000-0000-4000-8000-000000000002' as RuntimeNodeId
+    const collaboration = deps.collaboration!
+    const prepared: Array<{ nodeId?: RuntimeNodeId }> = []
+    const list = collaboration.projectsForUser.bind(collaboration), detail = collaboration.projectForUser.bind(collaboration)
+    const read = collaboration.projectReadAuthorities!.bind(collaboration)
+    collaboration.projectsForUser = async userId => (await list(userId)).map(scope => {
+      const row = { ...scope, nodeId: first }; prepared.push(row); return row
+    })
+    collaboration.projectForUser = async (projectId, userId) => {
+      const scope = await detail(projectId, userId)
+      if (scope === null) return null
+      const row = { ...scope, nodeId: first }; prepared.push(row); return row
+    }
+    collaboration.projectReadAuthorities = async (...args) => {
+      const current = await read(...args)
+      for (const scope of prepared) scope.nodeId = next
+      return current.map(scope => ({ ...scope, nodeId: next }))
+    }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/projects${operation === 'list' ? '' : `/${project.id}${operation === 'configuration' || operation === 'invitations' ? `/${operation}` : ''}`}`, { headers: { cookie } })
+    expect(response.status).toBe(operation === 'list' ? 200 : 403)
+    expect(await response.json()).toEqual(operation === 'list' ? [] : { error: 'forbidden' })
+  })
+
+  it.each(['list', 'detail', 'configuration', 'invitations'] as const)('keeps the prepared metadata computer when %s authority has already moved', async operation => {
+    const { deps, base } = await setup()
+    installProjectCollaboration(deps)
+    const project = await deps.projects.create({ name: 'prepared-computer', createdBy: 1 })
+    const first = '10000000-0000-4000-8000-000000000001' as RuntimeNodeId
+    const next = '10000000-0000-4000-8000-000000000002' as RuntimeNodeId
+    const get = deps.projects.getById.bind(deps.projects)
+    deps.projects.getById = async id => {
+      const value = await get(id)
+      return value === null ? null : { ...value, nodeId: first }
+    }
+    deps.projects.getByIds = async ids => (await Promise.all(ids.map(id => deps.projects.getById(id)))).filter(value => value !== null)
+    const collaboration = deps.collaboration!
+    const list = collaboration.projectsForUser.bind(collaboration), detail = collaboration.projectForUser.bind(collaboration)
+    const read = collaboration.projectReadAuthorities!.bind(collaboration)
+    collaboration.projectsForUser = async userId => (await list(userId)).map(scope => ({ ...scope, nodeId: next }))
+    collaboration.projectForUser = async (projectId, userId) => {
+      const value = await detail(projectId, userId)
+      return value === null ? null : { ...value, nodeId: next }
+    }
+    collaboration.projectReadAuthorities = async (...args) => (await read(...args)).map(scope => ({ ...scope, nodeId: next }))
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/projects${operation === 'list' ? '' : `/${project.id}${operation === 'configuration' || operation === 'invitations' ? `/${operation}` : ''}`}`, { headers: { cookie } })
+    expect(response.status).toBe(operation === 'list' ? 200 : 403)
+    expect(await response.json()).toEqual(operation === 'list' ? [] : { error: 'forbidden' })
+  })
+
+  it('withholds an empty project directory when its final account lookup fails', async () => {
+    const { deps, base } = await setup()
+    installProjectCollaboration(deps)
+    deps.collaboration!.projectReadAuthorities = () => []
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const validate = deps.auth.validate.bind(deps.auth)
+    let reads = 0
+    deps.auth.validate = token => {
+      if (++reads === 2) throw new Error('Synthetic private account lookup details')
+      return validate(token)
+    }
+    const response = await fetch(`${base}/account/api/projects`, { headers: { cookie } })
+    expect(reads).toBe(2)
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'project-read-authority-unavailable' })
+  })
+
   it('lets a user own a managed project, invite a member, and exposes one admin project view', async () => {
     const { deps, base } = await setup()
     const alice = await deps.users.create({ username: 'alice', password: 'pw-12345678', displayName: 'Alice' })
@@ -1394,6 +1647,99 @@ describe('gateway server', () => {
     expect(await adminProjects.json()).toEqual([expect.objectContaining({ id: adminProject.id, origin: 'admin' })])
   })
 
+  it.each(['list', 'count'] as const)('withholds the prepared invitation %s when the final browser lookup fails', async operation => {
+    const { deps, base } = await setup()
+    const cookie = await login(base, 'root-admin', 'pw-12345678'), validate = deps.auth.validate.bind(deps.auth)
+    let calls = 0
+    deps.auth.validate = async token => {
+      if (++calls === 2) throw new Error('Synthetic private database diagnostic')
+      return validate(token)
+    }
+    const response = await fetch(`${base}/account/api/invitations${operation === 'count' ? '/count' : ''}`, { headers: { cookie } })
+    expect(calls).toBe(2)
+    expect(response.status).toBe(503)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(await response.json()).toEqual({ error: 'invitation-read-authority-unavailable' })
+  })
+
+  it.each((['list', 'count'] as const).flatMap(operation =>
+    (['missing', 'changed', 'password-required'] as const).map(state => ({ operation, state }))))(
+    'withholds prepared invitation $operation data when browser qualification is $state', async ({ operation, state }) => {
+    const { deps, base } = await setup()
+    const cookie = await login(base, 'root-admin', 'pw-12345678'), validate = deps.auth.validate.bind(deps.auth)
+    let calls = 0
+    deps.auth.validate = async token => {
+      const value = await validate(token)
+      if (++calls !== 2 || value === null) return value
+      return state === 'missing' ? null : state === 'changed' ? { ...value, id: value.id + 1 } : { ...value, mustChangePassword: true }
+    }
+    const response = await fetch(`${base}/account/api/invitations${operation === 'count' ? '/count' : ''}`, { headers: { cookie } })
+    expect(calls).toBe(2)
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'forbidden' })
+  })
+
+  it.each(['list', 'count'] as const)('reports a missing invitation %s provider without publishing data', async operation => {
+    const { deps, base } = await setup()
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    Object.defineProperty(deps.projects, operation === 'list' ? 'listInvitations' : 'countPendingInvitations', { value: undefined })
+    const response = await fetch(`${base}/account/api/invitations${operation === 'count' ? '/count' : ''}`, { headers: { cookie } })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'invitations-unavailable' })
+  })
+
+  it.each(['list', 'count'] as const)('withholds the invitation %s when its data provider fails', async operation => {
+    const { deps, base } = await setup()
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const unavailable = (): never => { throw new Error('Synthetic private invitation database diagnostic') }
+    if (operation === 'list') deps.projects.listInvitations = unavailable
+    else deps.projects.countPendingInvitations = unavailable
+    const response = await fetch(`${base}/account/api/invitations${operation === 'count' ? '/count' : ''}`, { headers: { cookie } })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'invitation-read-authority-unavailable' })
+  })
+
+  it.each(['missing', 'failed', 'denied'] as const)('withholds invitations between other accounts when current project authority is %s', async state => {
+    const { deps, base } = await setup()
+    const owner = await deps.users.create({ username: 'invitation-owner', password: 'pw-12345678' })
+    const recipient = await deps.users.create({ username: 'invitation-recipient', password: 'pw-12345678' })
+    await deps.users.changeOwnPassword(owner.id, 'pw-12345678')
+    const project = await deps.projects.createManaged!({ name: 'Private invitation list', ownerUserId: owner.id })
+    await deps.projects.createInvitation!({ projectId: project.id, inviterUserId: owner.id, inviteeUserId: recipient.id, mode: 'ro' })
+    installProjectCollaboration(deps)
+    if (state === 'missing') delete deps.collaboration!.projectReadAuthorities
+    else deps.collaboration!.projectReadAuthorities = () => {
+      if (state === 'denied') throw new CollaborationDeniedError('forbidden')
+      throw new Error('Synthetic private project authority diagnostic')
+    }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/invitations`, { headers: { cookie } })
+    expect(response.status).toBe(state === 'missing' ? 501 : state === 'denied' ? 403 : 503)
+    expect(await response.json()).toEqual({ error: state === 'denied' ? 'forbidden' : 'invitation-read-authority-unavailable' })
+  })
+
+  it.each(['actor', 'other', 'none'] as const)('retains current management after a role change following authority preparation with %s project ownership', async owner => {
+    const { deps, base } = await setup()
+    const actor = (await deps.users.getByUsername('root-admin'))!
+    const keeper = await deps.users.create({ username: 'keeper-admin', password: 'pw-12345678', role: 'admin' })
+    const recipient = await deps.users.create({ username: 'invitation-recipient', password: 'pw-12345678' })
+    await deps.users.changeOwnPassword(keeper.id, 'pw-12345678')
+    const project = owner === 'none' ? await deps.projects.create({ name: 'Current invitation manager', createdBy: keeper.id })
+      : await deps.projects.createManaged!({ name: 'Current invitation manager', ownerUserId: owner === 'actor' ? actor.id : keeper.id })
+    const invitation = await deps.projects.createInvitation!({ projectId: project.id, inviterUserId: keeper.id, inviteeUserId: recipient.id, mode: 'ro' })
+    installProjectCollaboration(deps)
+    const read = deps.collaboration!.projectReadAuthorities!.bind(deps.collaboration)
+    deps.collaboration!.projectReadAuthorities = async (...args) => {
+      const values = await read(...args)
+      await deps.users.setRole(actor.id, 'user', keeper.id)
+      return values
+    }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/invitations`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(owner === 'actor' ? [invitation] : [])
+  })
+
   it('lists active users for the member picker and counts pending invitations', async () => {
     const { deps, base } = await setup()
     const alice = await deps.users.create({ username: 'alice', password: 'pw-12345678', displayName: 'Alice' })
@@ -1487,4 +1833,46 @@ it('checks the explicit project before returning or modifying a conversation wit
   expect((await fetch(`${conversation}&projectId=07`, { headers })).status).toBe(400)
   expect((await fetch(`${conversation}&projectId=7`, { method: 'PATCH', headers, body: '{"visibility":"private"}' })).status).toBe(204)
   expect(setVisibility).toHaveBeenCalledOnce()
+})
+
+it('refuses implicit or ambiguous versioned conversation targets before consulting the computer forwarder', async () => {
+  const { deps, base } = await setup()
+  const cookie = await login(base, 'root-admin', 'pw-12345678')
+  const forward = vi.fn<NonNullable<GatewayDeps['nodeServiceProxy']>['http']>(async (_req, res) => {
+    res.writeHead(204)
+    res.end()
+    return true
+  })
+  deps.nodeServiceProxy = { http: forward, upgrade: async () => false }
+  const runtime = conversationEnvironment.id
+  const post = (route: string, query: string) =>
+    fetch(base + route + '?' + query, { method: 'POST', headers: { cookie, origin: base } })
+  for (const route of [
+    '/api/prepare/v1/session.create',
+    '/api/prepare/v1/session.history',
+    '/api/admit/v1/session.prompt',
+    '/api/admit/v1/session.status',
+  ]) {
+    for (const query of [
+      'dshTarget=personal',
+      'dshTarget=personal&dshNode=' + conversationEnvironment.node.id,
+      'dshRuntime=' + runtime,
+      'dshRuntime=&dshTarget=personal',
+      'dshRuntime=invalid&dshTarget=personal',
+      'dshRuntime=' + runtime + '&dshTarget=',
+      'dshRuntime=' + runtime + '&dshTarget=project:0',
+      'dshRuntime=' + runtime + '&dshRuntime=' + runtime + '&dshTarget=personal',
+      'dshRuntime=' + runtime + '&dshTarget=personal&dshTarget=project:7',
+    ]) {
+      const response = await post(route, query)
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'invalid-prepare-target' })
+    }
+  }
+  expect(forward).not.toHaveBeenCalled()
+  expect((await post('/api/prepare/v1/session.create', 'dshRuntime=' + runtime + '&dshTarget=project:7')).status).toBe(
+    204,
+  )
+  expect((await post('/api/session.history', 'dshTarget=personal')).status).toBe(204)
+  expect(forward).toHaveBeenCalledTimes(2)
 })

@@ -1,0 +1,138 @@
+{
+  "id": "B510",
+  "title": "Backup creation verification and POST configuration preview outlive initiating administrator qualification",
+  "status": "fixed_real_native_backup_and_post_read_authority_verified_remaining_review_open",
+  "sourceFixed": true,
+  "at": "2026-11-04T20:50:29.287638+00:00",
+  "paths": [
+    "gateway/src/admin-api.ts",
+    "gateway/src/admin-response.ts",
+    "gateway/src/postgres/backup-service.ts",
+    "gateway/src/postgres/deployment-backups.ts",
+    "gateway/src/postgres/maintenance-service.ts"
+  ],
+  "receipt": "receipts/backup-work-administrator-authority-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-work-before.json",
+  "originalObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-work-negative-observations.json",
+  "originalResult": "Actual browser authentication, current PostgreSQL schema, a complete physical pg_dump backup and native pg_restore verification. Commit administrator demotion before entering each backup service. Creation returns200 and performs another dump plus registry insertion; verification returns200 and invokes native verification; configuration preview returns200 with the applied settings. Verify and preview omit their initiating actor.",
+  "correction": "Admin forwards authenticated actor identity to verification and preview. Operation admission, backup registration and verification updates retain current organization/account/membership authority on one transaction checkout. Administrator transactions finish before filesystem/native waits; the independent deployment data lease retains its own checkout. Current authority is rechecked before command dispatch. Authority refusal cannot mark an existing valid backup failed. Explicit POST read publication withholds preview data even after admitted verification committed.",
+  "checks": {
+    "responseUnit": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-response-unit-cases.json",
+      "passed": 88,
+      "helperCoverage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/admin-response-coverage/coverage-summary.json",
+      "helperAllFourMetrics": 100
+    },
+    "backupAndMaintenanceRegression": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-service-final-cases.json",
+      "passed": 33,
+      "skipped": 0,
+      "wholeFileCoverage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-service-final-coverage/coverage-summary.json",
+      "metrics": {
+        "backup-service.ts": {
+          "lines": 100,
+          "statements": 97.05,
+          "functions": 100,
+          "branches": 96.15
+        },
+        "deployment-backups.ts": {
+          "lines": 100,
+          "statements": 96.42,
+          "functions": 100,
+          "branches": 84.61
+        },
+        "maintenance-service.ts": {
+          "lines": 66.18,
+          "statements": 62.19,
+          "functions": 74.35,
+          "branches": 56.41
+        }
+      },
+      "qualification": "Full deployment-backups owning file24cases and maintenance administration9cases; foreign actors, one available registry checkout and actual authority-lock retention included."
+    },
+    "assembledGateway": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-and-read-public-current-cases.json",
+      "passed": 2,
+      "newNativeScenarios": 27,
+      "priorReadPublicationScenarios": 161,
+      "expectedTranscript": "gateway/tests/expected/administrator-backup-work.jsonl",
+      "qualification": "27new backup scenarios plus the earlier161prepared Admin read cases repeated after the shared responder changed; repetitions are not additional distinct coverage."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 27,
+      "typescriptLoader": false,
+      "nativePostgresClients": true,
+      "qualification": "Unchanged ordinary full Gateway build; two ESM test-support files are emitted separately. This is named backup assembly acceptance, not acceptance of concurrent peer catalog changes."
+    },
+    "typecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-work-delivery-typecheck.log",
+    "ordinaryFullGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-work-production-build.log",
+    "lint": {
+      "productionAndInitialTests": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-work-lint-cases.json",
+      "finalNativeTests": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-work-native-tests-final-lint.json",
+      "uniqueFiles": 10,
+      "diagnostics": 0
+    },
+    "fiveBilingualPairs": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-work-pairing-check.log",
+    "tenMarkdownSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/backup-work-markdown-links.log",
+    "nativePostgresOwnership": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/native-postgres-lifecycle-summary.json"
+  },
+  "coverageQualification": {
+    "fullFileMetrics": {
+      "backup-service.ts": {
+        "lines": 100,
+        "statements": 97.05,
+        "functions": 100,
+        "branches": 96.15
+      },
+      "deployment-backups.ts": {
+        "lines": 100,
+        "statements": 96.42,
+        "functions": 100,
+        "branches": 84.61
+      },
+      "maintenance-service.ts": {
+        "lines": 66.18,
+        "statements": 62.19,
+        "functions": 74.35,
+        "branches": 56.41
+      }
+    },
+    "newReadResponderAllMetrics100": true,
+    "thresholdsOrExclusionsChanged": false,
+    "wholeProject100PercentClaimed": false
+  },
+  "intermediateCorrections": [
+    "The fixture compares durable PostgreSQL row revisions instead of Date reference identity or clock-dependent timestamp changes.",
+    "Two added unit scenarios initially omitted the required provider inventory; the unchanged production guard refused them. Correctly owned inventories were supplied and the33-case regression passes.",
+    "A concurrent peer draft-history configuration edit temporarily omitted two NodeSettingValues mappings. One concrete coordination message was sent; the peer completed its mapping, and final current-source Gateway typecheck passes."
+  ],
+  "limits": [
+    "Native database and command acceptance ran on macOS using an owned PostgreSQL18.4 x86_64-apple-darwin server and libpq18.6 clients. Linux and native Windows still need their own platform acceptance.",
+    "Existing admitted verification updates may survive a later preview refusal; accepted capture files remain for operator cleanup after refused registration. No state rollback is falsely promised.",
+    "An already admitted operation may finish bookkeeping after withdrawal; row authority is never held across native waits.",
+    "Global documentation quick-pass debt remains from the earlier run. Only affected pairs, links and whitespace are accepted here.",
+    "All12audit domains remain in progress. Real paid Responses API verification remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "frozenDelivery": {
+    "at": "2026-11-04T20:49:13.219492+00:00",
+    "finding": "B510",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/B510-backup-work-administrator",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T202247Z/B510-backup-work-administrator.delta.tar.gz",
+    "archiveSha256": "fa5f8d41afb5e11e543b24a25ca4f89e83f670725e023e1e1548dc5056d71912",
+    "manifestSha256": "0311fd011c014aa13f6ca5c7a5b455517355e52b662d57f3ab4c70d2c2b6608d",
+    "ownedPaths": 27,
+    "readOnlyPrerequisites": 8,
+    "compiledProductionJs": 257,
+    "artifactFiles": 381,
+    "wholeProjectComplete": false
+  }
+}

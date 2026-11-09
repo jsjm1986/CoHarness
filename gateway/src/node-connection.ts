@@ -4,12 +4,14 @@ import { constants } from 'node:fs'
 import { mkdir, open, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { z } from 'zod'
 import { loadNodeAgentConfig, type NodeAgentConfig } from './node-agent.ts'
 import { nodeEnrollmentTokenSchema, nodeIdentitySchema } from './node-access.ts'
 import { NodeConfigurationError, type NodeConfigurationMutationAuthority } from './node-config-store.ts'
 import { runGatewayChildCommand } from './child-command.ts'
+import { privateFileState, syncStateDirectory, tightenPrivateFileAcl } from './node-private-file.ts'
 import type { GatewayConfig } from './config.ts'
 import type { UserRow } from './auth.ts'
 import type { Queryable } from './postgres/database.ts'
@@ -37,7 +39,7 @@ async function read(file: string): Promise<Record | undefined> {
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error }
   try {
     const info = await handle.stat()
-    if (!info.isFile() || info.size > 8192 || (info.mode & 0o077) !== 0 || info.uid !== process.getuid?.()) {
+    if ((await privateFileState(file, info, 8192)) !== 'private') {
       throw new NodeConfigurationError(409, 'node-connection-file-not-private')
     }
     const bytes = Buffer.alloc(8193)
@@ -63,8 +65,8 @@ async function write(file: string, record: Record, signal?: AbortSignal): Promis
     try { await handle.writeFile(bytes); await handle.sync() } finally { await handle.close() }
     signal?.throwIfAborted()
     await rename(temporary, file)
-    const directory = await open(dirname(file), 'r')
-    try { await directory.sync() } finally { await directory.close() }
+    await tightenPrivateFileAcl(file)
+    await syncStateDirectory(dirname(file))
   } finally { await rm(temporary, { force: true }) }
 }
 
@@ -98,7 +100,7 @@ export class GatewayNodeConnection {
     this.file = cfg.nodeConnectionFile
     this.service = process.platform === 'darwin'
       ? `${environment.HGW_LAUNCHD_DOMAIN ?? `gui/${process.getuid?.() ?? 0}`}/${environment.HGW_NODE_AGENT_LABEL ?? 'com.maycran.harness-node-agent'}`
-      : environment.HGW_NODE_AGENT_SERVICE ?? 'harness-node-agent.service'
+      : environment.HGW_NODE_AGENT_SERVICE ?? (process.platform === 'win32' ? 'HarnessNodeAgent' : 'harness-node-agent.service')
     if (/[\s\u0000-\u001f]/u.test(this.service)) throw new NodeConfigurationError(400, 'invalid-node-agent-service')
   }
 
@@ -178,7 +180,13 @@ export class GatewayNodeConnection {
         }, { waitMs: 0 })
       }
       const command = process.platform === 'darwin' ? ['launchctl', 'kickstart', '-k', this.service]
-        : process.platform === 'linux' ? ['systemctl', '--no-ask-password', '--no-pager', 'restart', this.service] : undefined
+        : process.platform === 'linux' ? ['systemctl', '--no-ask-password', '--no-pager', 'restart', this.service]
+        // schtasks /Run is start-only: on a wedged-but-Running task it is either
+        // dropped by IgnoreNew or reports an error without touching the process.
+        // The task script's -Restart mode performs the atomic stop+start this
+        // button means, entirely on the node and outside the agent's tree.
+        : process.platform === 'win32' ? ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+          fileURLToPath(new URL('../deploy/windows/node-agent-task.ps1', import.meta.url)), '-Restart', '-TaskName', this.service] : undefined
       if (command === undefined) throw new NodeConfigurationError(409, 'node-connection-platform-unsupported')
       try { await runGatewayChildCommand(command[0]!, command.slice(1), this.cfg.systemdCommandTimeoutMs, signal, 8192) }
       catch (error) { throw new NodeConfigurationError(409, 'node-connection-service-start-failed', { cause: error }) }

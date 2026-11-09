@@ -61,13 +61,18 @@ async function eligibleActor(deps: Dependencies, subject: RuntimeCredentialSubje
   const eligible = await deps.pool.query<{ role: string }>(`SELECT m.role FROM harness.users u
         JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
         JOIN harness.organizations o ON o.id=u.organization_id
+        LEFT JOIN harness.runtime_environments environment ON environment.organization_id=u.organization_id AND environment.id=$5
         WHERE u.organization_id=$1 AND u.public_id=$2 AND u.status='active' AND u.deleted_at IS NULL
           AND m.status='active' AND o.status='active'
-          AND ($4::boolean OR EXISTS(SELECT 1 FROM harness.runtime_environments environment
-            WHERE environment.organization_id=u.organization_id AND environment.id=$5
-              AND harness.computer_use_allowed(u.organization_id,u.id,environment.node_id)))
-          AND ($3::uuid IS NULL OR m.role='admin' OR EXISTS(SELECT 1 FROM harness.project_members pm
-            WHERE pm.organization_id=u.organization_id AND pm.project_id=$3::uuid AND pm.user_id=u.id))`,
+          AND ($4::boolean OR harness.computer_use_allowed(u.organization_id,u.id,environment.node_id))
+          AND ($3::uuid IS NULL OR EXISTS (
+            SELECT 1 FROM harness.projects p WHERE p.organization_id=u.organization_id AND p.id=$3 AND p.status='active'
+              AND (p.kind='standard' AND (m.role='admin' OR EXISTS (
+                SELECT 1 FROM harness.project_members pm
+                WHERE pm.organization_id=p.organization_id AND pm.project_id=p.id AND pm.user_id=u.id))
+              OR p.kind='steward' AND m.role='admin' AND EXISTS (
+                SELECT 1 FROM harness.steward_access_policies sp
+                WHERE sp.organization_id=p.organization_id AND sp.user_id=u.id AND sp.node_id=environment.node_id AND sp.enabled))))`,
   [subject.organizationId, actorId, subject.projectInternalId ?? null, administrative, subject.target.runtimeId ?? null])
   if (eligible.rows.length !== 1 || (administrative && eligible.rows[0]?.role !== 'admin')) {
     throw new ExecutionIdentityError(403, 'resource principal is no longer eligible')

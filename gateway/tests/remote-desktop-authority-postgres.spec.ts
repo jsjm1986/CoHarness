@@ -35,6 +35,7 @@ describePg('PostgreSQL remote desktop administrator authority', () => {
       const actor = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
         VALUES($1,'administrator','Administrator','/unused') RETURNING id,public_id`, [organizationId])).rows[0]!
       await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [organizationId, actor.id])
+      await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [actor.id])
       const actorId = Number(actor.public_id), administration = remoteDesktopAdministration(context), service = new RemoteDesktopService(dir, administration)
       await service.saveEndpoints(endpoints, actorId)
       return { context, actor, actorId, dir, service, administration,

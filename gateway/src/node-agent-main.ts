@@ -19,6 +19,7 @@ try {
       shutdown.abort()
     })
     const diagnostic = event.status === 'degraded' ? { ...event, message: nodeAgentFailureMessage(event.reason) }
+      : event.status === 'dial-origin' ? { ...event, message: `The agent now dials the center through ${event.origin} (${event.reason}).` }
       : event.status === 'channel-degraded' ? { ...event, message: 'The node control channel is unavailable. Heartbeat supervision continues; check the network and center release before using node services.' }
       : event.status === 'stopped-lease-uncertain' ? { ...event, message: 'The center has not confirmed connection release. Check the center directory; its lease will expire without further heartbeats.' }
         : event

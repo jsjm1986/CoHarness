@@ -129,3 +129,20 @@ it('persists node admission limits and upgrades missing additive settings from t
   expect(() => parseNodeSettingValues({ ...initial.desired, HGW_RUNTIME_MAX_STARTING: '9', HGW_RUNTIME_MAX_RESIDENT: '8' }, f.env))
     .toThrow('HGW_RUNTIME_MAX_STARTING')
 })
+
+it('shows the effective node draft window, keeps saved changes pending, and upgrades settings without those two keys', async () => {
+  const f = await fixture()
+  const initial = await f.store.view(1)
+  expect(initial.effective).toMatchObject({ HGW_DRAFT_HISTORY_REVISIONS: '16', HGW_DRAFT_HISTORY_BYTES: '262144' })
+  const next = { ...initial.desired, HGW_DRAFT_HISTORY_REVISIONS: '4', HGW_DRAFT_HISTORY_BYTES: '8192' }
+  await f.store.save(f.identity, 0, next, 1)
+  const saved = await readNodeConfiguration(f.cfg.nodeConfigFile, f.env)
+  expect(saved?.desired).toMatchObject({ HGW_DRAFT_HISTORY_REVISIONS: '4', HGW_DRAFT_HISTORY_BYTES: '8192' })
+  expect((await f.store.view(1)).effective).toMatchObject({ HGW_DRAFT_HISTORY_REVISIONS: '16', HGW_DRAFT_HISTORY_BYTES: '262144' })
+  const legacy: Record<string, string> = { ...initial.desired }
+  delete legacy.HGW_DRAFT_HISTORY_REVISIONS
+  delete legacy.HGW_DRAFT_HISTORY_BYTES
+  expect(parseNodeSettingValues(legacy, { ...f.env, HGW_DRAFT_HISTORY_REVISIONS: '3' }))
+    .toMatchObject({ HGW_DRAFT_HISTORY_REVISIONS: '3', HGW_DRAFT_HISTORY_BYTES: '262144' })
+  expect(() => parseNodeSettingValues({ ...initial.desired, HGW_DRAFT_HISTORY_BYTES: '-1' }, f.env)).toThrow('HGW_DRAFT_HISTORY_BYTES')
+})

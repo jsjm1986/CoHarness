@@ -295,7 +295,7 @@
     "action": "extended the existing retained-collaboration note, owning README and existing conversation-writer upgrade guide; regenerated three control descriptions and their bilingual subsystem reference",
     "newNotes": 0,
     "archivedNotesChanged": false,
-    "generatedBeforeimageProvenance": "subsystem reference and metadata imported from frozen B453; generated differences checked to contain only the three control descriptions"
+    "generatedBeforeimageSource": "subsystem reference and metadata imported from frozen B453; generated differences checked to contain only the three control descriptions"
   },
   "remaining": [
     "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress.",

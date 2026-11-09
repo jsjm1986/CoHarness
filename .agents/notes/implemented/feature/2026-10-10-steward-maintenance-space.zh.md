@@ -12,6 +12,8 @@ Status: implemented
 
 保留的 steward 空间复用现有项目空间机制，而不是新增第三种运行时目标类别。`projects.kind`（`standard`/`steward`，迁移 051）为每个组织标记一个保留项目；准入、生命周期、工具面和审计叠加其上。
 
+工作区在项目播种或 Runtime 启动前通过[有期限的 Git 辅助程序](../../../../gateway/src/steward-worktree.ts)准备。配置期限与 Gateway 退出信号会取消并等待本地子进程提供者管理的 Git 进程组结束，包括普通仓库钩子和终止升级。每次准备持有独立提供者，在已接收工作结束后销毁；经工具环境过滤后，钩子不会收到 Gateway 秘密。检出等待期间 Gateway 仍可响应。已有供给分支会选择分离检出，不重置其提交。其他 Git 失败保留原始原因及部分文件，不授予第二次检出的资格。
+
 - **准入是叠加在管理员身份上的授权。** `steward_access_policies`（按用户、启用标记、版本栅栏的管理写入）持有第二道闸：持启用行的活跃组织管理员以 `rw` 进入，无授权的管理员和持有授权行的普通成员同样被拒。对非管理员的启用写入在授权事务内失败；每条准入路径都在读时复核角色，因此降级立即终止准入（授权行可以留在原地），迁移 052 删除历史死授权行。成员/邀请行按契约保持为空——对 steward 行的项目变更直接拒绝。叠加依据见[管理员叠加准入 note](2026-10-10-steward-admin-layered-admission.zh.md)。
 - **运行时常驻且不能重启自己。** 启动播种项目并调用一次 `ensureRunning`；steward 目标的 systemd 单元渲染 `Restart=always`，空闲回收排除 steward 项目，管理员显式停止则保持停止直到下次启动或显式拉起。插件状态与插件管理写入拒绝 steward owner，因此固定组装（`dsh-steward-tools` 经 profile 补丁）永远不可能从空间内部改变。
 - **身份来自数据库而非请求。** steward 特权——特权单元渲染、回收豁免、查询端点准入——一律读取经实例仓储解析的 `projects.kind`，调用方传入的标记无法把普通项目提升为 steward。
@@ -27,6 +29,8 @@ steward 工具为读取结果和 dry-run 计划标明截断；`row_limit` 同时
 
 ## 考虑过但未采用
 
+**把每次 Git 失败都重试为分离检出。** 分离检出解决的是分支名称已存在，不是取消、权限或检出钩子失败。检出前解析引用可保留分支历史，同时保留其他失败。
+
 **`kind='maintenance'` 运行时目标。** 放弃：它要把目标判别联合扩展贯穿实例、插件状态、会话、审计、代理和会话键编码——用 schema 与 wire 扩张去重新推导项目空间已经提供的东西（独立 cwd、组装、会话、治理）。
 
 **在 `admin-ui` 里做对话。** 放弃：管理端 SPA 没有会话与流式栈；steward 空间以零客户端运行时成本复用现有会话面。
@@ -39,4 +43,4 @@ steward 工具为读取结果和 dry-run 计划标明截断；`row_limit` 同时
 
 ## 影响
 
-该空间无法在对话之外操作自身：组装被锁死，worktree 改动仍走普通 PR 与发版流水线；v1 刻意不带通用运行时调用代理与发版激活自动化——两者都在 Gateway README 中记录为延后项。本地 launcher 下的常驻仅覆盖 gateway 进程存活期，只有 systemd 提供监督重启。仅 PostgreSQL：SQLite 目录不建模 `kind`，`HGW_STEWARD=on` 只在实现了 `ensureSteward` 的后端上有意义。
+该空间无法在对话之外操作自身：组装被锁死，worktree 改动仍走普通 PR 与发版流水线；v1 刻意不带通用运行时调用代理与发版激活自动化——两者都在 Gateway README 中记录为延后项。本地监督在 Gateway 失效后保留活跃 Runtime，但不重启崩溃的 Runtime；正常本地退出会停止持有的 Runtime。只有 systemd 提供监督下的自动重启。仅 PostgreSQL：SQLite 目录不建模 `kind`，`HGW_STEWARD=on` 只在实现了 `ensureSteward` 的后端上有意义。

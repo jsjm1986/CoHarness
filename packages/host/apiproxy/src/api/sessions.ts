@@ -15,7 +15,7 @@ export type { SessionDraftId } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { RpcId, RpcRequest, RpcResponse } from './rpc.ts'
 import type { QueuedInboxItem, ToolEventView } from './events.ts'
-import type { WorkspaceId } from './workspace.ts'
+import type { WorkspaceId, WorkspaceView } from './workspace.ts'
 import type { UserDocIdType, UserDocPromptAttachment } from '@deepseek-ai/dsh-userdoc'
 
 /** Durable attribution for one authenticated human prompt in a shared project. */
@@ -31,6 +31,8 @@ export interface AuthenticatedParticipant {
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
+    /** Session-bound human input fingerprints indexed by actor and operation. */
+    acceptedPromptReceipts: Record<string, { digest: string; seq: number }>
     sessionListMetadata: SessionListMetadata
     imageLimits: null
     queuedInbox: {
@@ -98,6 +100,8 @@ declare module '@deepseek-ai/dsh-llm' {
       kind: 'user'
       rpcId: RpcId
       clientTimeZone?: string
+      /** Digests of the submitter-scoped operation and input used to verify durable admission. */
+      admission?: { key: string; digest: string }
       /** Authenticated project participant permanently attributed to this prompt. */
       participant?: AuthenticatedParticipant
       /** Host-admitted snapshots; never accepted from a client as paths or text. */
@@ -123,6 +127,14 @@ export type HistoryDetail = 'conversation' | 'full'
 export interface HistoryOmittedSpan {
   startSeq: number
   endSeq: number
+}
+
+/** A read-authorized conversation page and its matching projection and omission cursors. */
+export interface SessionHistoryPage {
+  events: HistoryEntry[]
+  hasMore: boolean
+  projections?: SessionProjectionsBlock
+  omittedSpans?: readonly HistoryOmittedSpan[]
 }
 
 /** One bounded turn marker used by the conversation navigation rail. */
@@ -395,10 +407,22 @@ export interface SessionsApi {
     agentPreset?: string
     sshTarget?: number
     visibility?: 'project' | 'private'
+    /** Register the Host's default directory as the workspace for this create. */
+    defaultWorkspace?: true
+    /** Return the workspace location and only this session's membership. */
+    includeWorkspace?: true
+    /** Request a bounded, read-authorized tail with a versioned prepared create. */
+    includeInitialHistory?: true
     reuseWorkspaceBlank?: true
     draftId?: SessionDraftId
-  }>):
-  Promise<RpcResponse<{ sessionId: SessionId; agentPreset?: string; sshTarget?: number; draft?: true }>>
+  }>): Promise<RpcResponse<{
+    sessionId: SessionId
+    agentPreset?: string
+    sshTarget?: number
+    draft?: true
+    workspace?: WorkspaceView
+    initialHistory?: SessionHistoryPage
+  }>>
 
   /**
    * Reads a window of history events; page boundaries align to append-origin message
@@ -433,17 +457,14 @@ export interface SessionsApi {
    */
   history(request: RpcRequest<{
     sessionId: SessionId
+    /** Require a currently openable conversation when preparing a pane. */
+    onlyActive?: true
     toolCallId?: ToolCallId
     beforeSeq?: number
     maxMessages?: number
     detail?: HistoryDetail
   }>, signal?: AbortSignal):
-  Promise<RpcResponse<{
-    events: HistoryEntry[]
-    hasMore: boolean
-    projections?: SessionProjectionsBlock
-    omittedSpans?: readonly HistoryOmittedSpan[]
-  }>>
+  Promise<RpcResponse<SessionHistoryPage>>
 
   /**
    * Reads bounded navigation metadata without loading event or chunk payloads.
@@ -523,8 +544,14 @@ export interface SessionsApi {
     clientTimeZone?: string
     /** Optional browser-owned identity used to reconcile an optimistic submission echo. */
     requestId?: RpcId
+    /** Require a recoverable, durably flushed admission receipt. */
+    durable?: true
   }>):
   Promise<RpcResponse<{ accepted: true }>>
+
+  /** Read an original submitter's committed acceptance. With confirmInput, return the salted proof for this exact request. */
+  promptStatus(request: RpcRequest<{ sessionId: SessionId; requestId: RpcId; confirmInput?: true }>, signal?: AbortSignal):
+  Promise<RpcResponse<{ state: 'accepted' | 'unknown'; inputProof?: string }>>
 
   /** Reads one durable image after proving that this session's log references its id. */
   attachment(request: RpcRequest<{ sessionId: SessionId; attachmentId: AttachmentIdType }>):

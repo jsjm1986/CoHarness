@@ -56,7 +56,7 @@ export function prepareUserData(cfg: GatewayConfig, username: string, storage: P
   registerManagedDataPath({ owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: documents }, inventory)
   if (!inventoryExists) {
     const owner = lstatSync(dsh)
-    chownSync(inventory, owner.uid, owner.gid)
+    if (process.platform !== 'win32') chownSync(inventory, owner.uid, owner.gid)
   }
   directory(documents)
 }

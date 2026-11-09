@@ -28,6 +28,11 @@ declare module '@deepseek-ai/cordis' {
   }
 
   interface Events {
+    /** Check prospective configuration or module replacement before the live tree changes.
+     * @mode parallel
+     * @param source - the kind of reload the supervisor is about to apply.
+     */
+    'hmr/authorize-reload'(source: 'profile' | 'configuration' | 'modules'): void | Promise<void>
     /** A watched file has no module or configuration handler.
      * @mode emit
      * @param url Canonical file URL.
@@ -297,7 +302,10 @@ class Hmr extends Service {
 
   private runReload(operation: () => Promise<void>): Promise<void> {
     return this.runExclusive(async () => {
-      if (await this.applicationReady) await operation()
+      if (await this.applicationReady) {
+        await this.ownerContext.parallel('hmr/authorize-reload','configuration')
+        await operation()
+      }
     })
   }
 
@@ -485,6 +493,7 @@ class Hmr extends Service {
           else this.ctx.emit('hmr/change', url)
         }
         if (!fullReload && includes.size === 0 && this.stashed.size === 0) return
+        await this.ownerContext.parallel('hmr/authorize-reload','modules')
         if (fullReload) {
           loader.exit()
           return
@@ -946,6 +955,7 @@ class Hmr extends Service {
     if (this.executing.getStore() !== true) throw new Error('HMR profile reconciliation must run inside runExclusive')
     const profile = this.ownerContext.get('profileContext')
     if (profile === undefined) throw new Error('HMR profile reconciliation requires profileContext')
+    await this.ownerContext.parallel('hmr/authorize-reload','profile')
     // Entries this recomposition stops start again, and fail it when they cannot.
     const running = [...this.ctx.loader.entries()].filter(entry => entry.fiber?.state === FiberState.ACTIVE)
     // Read while the packages are still on disk, so a removed link's target is known in its real spellings.

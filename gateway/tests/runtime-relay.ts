@@ -15,9 +15,10 @@ export const RUNTIME_PORT_PUBLISHER = `(function(portFile, port) {
  * Hold the Gateway endpoint while real fixture children bind ephemeral listeners.
  * @param portFile - private file in which the current child publishes its assigned port.
  * @param registerCleanup - fixture owner that awaits socket closure and receives malformed-publication failures.
+ * @param format - child's plain port or JSON readiness publication.
  * @returns the atomically allocated Gateway-side loopback port.
  */
-export async function runtimeRelay(portFile: string, registerCleanup: (dispose: () => Promise<void>) => void): Promise<number> {
+export async function runtimeRelay(portFile: string, registerCleanup: (dispose: () => Promise<void>) => void, format: 'text' | 'json' = 'text'): Promise<number> {
   const sockets = new Set<Socket>()
   let failed = false, failure: unknown, closing = false, disposal: Promise<void> | undefined
   const rememberFailure = (error: unknown): void => { if (!failed) { failed = true; failure = error } }
@@ -28,7 +29,10 @@ export async function runtimeRelay(portFile: string, registerCleanup: (dispose: 
     downstream.on('close', () => sockets.delete(downstream))
     // The manager retries signed readiness while the child publishes its listener.
     let port: number
-    try { port = Number(readFileSync(portFile, 'utf8')) } catch (error) {
+    try {
+      const value = readFileSync(portFile, 'utf8')
+      port = format === 'json' ? (JSON.parse(value) as { port: number }).port : Number(value)
+    } catch (error) {
       downstream.destroy()
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') rememberFailure(error)
       return

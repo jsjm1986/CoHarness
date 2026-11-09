@@ -249,6 +249,20 @@ describe('workbench navigation lifecycle', () => {
       await expect(h.actions.createSession(target, false)).resolves.toEqual({ ok: true })
       expect(createRuntimeSession).toHaveBeenCalledWith(target, undefined, expect.any(AbortSignal))
       expect(h.sessions.createSession).not.toHaveBeenCalled()
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(h.viewport.add).toHaveBeenCalledWith(clientSessionKey(target, A))
+      await h.actions.chooseSession({ ...item, runtime: target }, false)
+      expect(h.sessions.ensureSession).toHaveBeenCalledWith(target, A, expect.any(AbortSignal))
+    } finally { await h.ctx.fiber.dispose() }
+  })
+  it('refuses a creation receipt for another Runtime without adding a pane', async () => {
+    const selected = { kind: 'personal', runtimeId: '11111111-1111-4111-8111-111111111111' } as SessionRuntimeTarget
+    const other = { kind: 'personal', runtimeId: '22222222-2222-4222-8222-222222222222' } as SessionRuntimeTarget
+    const h = await harness({ workspaces: { createRuntimeSession: async () => clientSessionKey(other, A) } })
+    try {
+      await expect(h.actions.createSession(selected, false)).resolves.toEqual({ ok: false, reason: 'unknown' })
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
     } finally { await h.ctx.fiber.dispose() }
   })
   it('rejects missing viewport configuration at application', () => {
@@ -314,6 +328,25 @@ describe('workbench navigation lifecycle', () => {
         : h.sessions.createSession.mock.calls[0]?.[1]
       expect((signal as AbortSignal).aborted).toBe(true)
     } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('releases a verified pane while another computer is still verifying its Session', async () => {
+    const h = await harness()
+    const slow = Promise.withResolvers<boolean>()
+    const foreign: WorkbenchConversation = { ...item, runtime: { kind: 'project', projectId: 7 } }
+    const fastKey = clientSessionKey(item.runtime, A), slowKey = clientSessionKey(foreign.runtime, A)
+    const received: Record<string, string>[] = []
+    Object.assign(h.viewport, { sessionKeyVersion: () => 3, needsCatalogRestore: () => true,
+      setPaneVerification: (states: Record<string, string>) => { received.push({ ...states }) } })
+    Object.assign(h.sessions, { keyFor: (id: SessionId, target: SessionRuntimeTarget) => clientSessionKey(target, id) })
+    h.snapshot.set({ mode: 'workbench', paneIds: [fastKey, slowKey], paneRatios: [0.5, 0.5], collapsedIds: [] })
+    h.sessions.ensureSession.mockImplementation(async target => target.kind === 'project' ? slow.promise : true)
+    const restoring = h.actions.hydrateCatalog({ ...catalog, items: [item, foreign] }, [fastKey, slowKey])
+    try {
+      await vi.waitFor(() => { expect(received).toContainEqual({ [slowKey]: 'checking' }) })
+      expect(h.viewport.markCatalogReady).not.toHaveBeenCalled()
+    } finally { slow.resolve(true); await restoring; await h.ctx.fiber.dispose() }
+    expect(received.at(-1)).toEqual({})
   })
 
   it('reports unavailable sessions and hydrates only catalogued pane targets', async () => {

@@ -239,6 +239,7 @@ export class SessionManager {
     restoredSelection?: SessionId,
     restoredAddress?: SubagentAddress,
     private readonly conversation?: ConversationRuntime,
+    private readonly admission?: (forRecovery?: boolean) => import('../prepare-runtime.ts').PreparedSessionApi | undefined,
   ) {
     this.selected = restoredSelection
     if (restoredAddress !== undefined) this.addresses.set(restoredAddress.childSessionId, restoredAddress)
@@ -454,6 +455,7 @@ export class SessionManager {
   private createSession(sessionId: SessionId): Session {
     const address = this.addresses.get(sessionId)
     return new Session(sessionId, this.api, this.remote, {
+      ...(this.admission === undefined ? {} : { admission: this.admission }),
       ...(address === undefined ? {} : {
         address,
         parentAvailable: this.catalogs.get(address.parentSessionId)?.parentAvailable ?? false,
@@ -783,6 +785,20 @@ export class SessionManager {
     } catch (error) {
       return transportError(error)
     }
+  }
+
+  /** Add the exact Session whose creation or authorized history the target just confirmed.
+   * @param sessionId - original Host identity.
+   * @param blank - whether creation reserved an empty draft.
+   * @param options - optional returned Workspace and preset metadata.
+   */
+  acceptPrepared(sessionId: SessionId, blank: boolean, options: SessionCreateOptions): void {
+    if (blank && options.workspaceId !== undefined) this.draftWorkspaceIds.set(sessionId, options.workspaceId)
+    this.mergeSummary({ sessionId, updatedAt: Date.now(), running: false, blank,
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      ...(options.workspaceId === undefined ? {} : { workspaceId: options.workspaceId }),
+      ...(options.agentPreset === undefined ? {} : { agentPreset: options.agentPreset }),
+      ...(options.sshTarget === undefined ? {} : { sshTarget: options.sshTarget }) })
   }
 
   /**
@@ -1164,7 +1180,7 @@ export class SessionManager {
         }
         const operation = (async (): Promise<void> => {
           try {
-            await session.resync()
+            await session.resync(generation === 1)
           } catch (error: unknown) {
             if (!(error instanceof Error && error.name === 'AbortError')) {
               console.error(`[web-runtime] session resync failed for ${session.sessionId}:`, error)

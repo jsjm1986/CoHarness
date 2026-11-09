@@ -606,6 +606,11 @@
 .root[data-phase='active'] .composerSeat {
   position: sticky;
   bottom: 0;
+  /* Free space belongs below the transcript; with no session surface at all
+     (a preparing intent) it is what docks the seat at the floor instead of
+     leaving it at the column top. With a view filling the box this resolves
+     to zero, so real sessions are untouched. */
+  margin-top: auto;
   /* Above markdown CodeBlock sticky banners (z-index 6) so the footer never
      paints under a sticking code header while scrolling. */
   z-index: 7;
@@ -988,3 +993,87 @@
 :global([data-viewport='compact']) .workbenchContent .header .tabs,
 :global([data-viewport='compact']) .workbenchContent .header .tabs button { min-height: 44px; }
 :global([data-viewport='compact']) .workbenchContent .header .tabs::before { bottom: 0; }
+
+/* Preparation-intent draft editor: rides the live composer classes —
+   InputBar's .root/.card/.scroll/.row for the card skeleton and StatsPills'
+   .root for the under-card strip — so radius, padding, gap, row seat, strip
+   metrics and the width/clearance/font variables track the ready composer by
+   construction at every user font size and width setting. Local classes
+   cover only what has no ready-state counterpart. */
+.pendingRoot { align-self: stretch; }
+
+/* Standalone surface (workbench pane body): no composer-stack column exists,
+   so the card centers itself inside the pane. Two-class selectors keep these
+   overrides winning over the borrowed .card metrics regardless of sheet
+   order. */
+.pendingSolo { margin: auto auto var(--dsw-space-4); }
+.pendingSolo .pendingCard { max-width: min(46rem, 100%); }
+
+/* The draft textarea is its own glyph layer: .input supplies every shared
+   metric (padding, font and line-height inheritance, wrapping rules, caret
+   color, the no-resize no-chrome reset); these overrides only undo what makes
+   the real input a transparent absolute overlay on its mirror stack. The
+   descendant selector keeps the wins order-independent against .input. */
+.pendingCard textarea {
+  display: block;
+  position: static;
+  width: 100%;
+  height: auto;
+  min-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  -webkit-text-fill-color: var(--dsw-alias-label-primary);
+  /* Grows with the draft like the real composer's mirror does; the .scroll
+     wrapper caps and scrolls it past the shared text height variable. */
+  field-sizing: content;
+}
+
+/* The 28px sm buttons stand in for the row's 32px controls. .row resolves
+   content-box, so this min-height sizes the content area: 32 + the row's own
+   2px top padding reproduces the real row's measured 34px — the card's own
+   metrics never move on transfer, only the row's contents. */
+.pendingRow { min-height: 32px; }
+.pendingStatus {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pendingStatus[data-intent-phase='unavailable'], .pendingStatus[data-intent-phase='denied'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+.pendingSpinner {
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--dsw-alias-state-business-primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  corner-shape: round;
+  animation: pendingSpin 0.8s linear infinite;
+}
+@keyframes pendingSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pendingSpinner { animation: none; } }
+.pendingStatus[data-intent-phase='preparing'] { color: var(--dsw-alias-label-secondary); }
+
+/* Caption text treatment only: the strip's metrics come from the borrowed
+   StatsPills .root (where pills carry color/clip on their children, the
+   caption needs them on itself). Ellipsis needs a block box, so display/text
+   alignment drop the flex mode here — the nested selector wins over .root
+   regardless of sheet order. The bottom pad mirrors the .pill pair of 1px
+   boxes so the caption lands on the same 24px strip seat the pills occupy
+   at every user font size (root pad 4 + text 18 + 2). */
+.pendingRoot .pendingCaption {
+  display: block;
+  padding-bottom: 2px;
+  text-align: center;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resumeDraft { font: inherit; color: inherit; cursor: pointer; }
+.resumeDraft { align-self: start; }

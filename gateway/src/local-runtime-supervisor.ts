@@ -1,9 +1,10 @@
-/** Independent POSIX group owner; private IPC bootstraps authenticated loopback recovery. */
+/** Independent process-group owner; private IPC bootstraps authenticated loopback recovery. */
 import { spawn, type ChildProcess } from 'node:child_process'
 import { timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import type { Writable } from 'node:stream'
+import { runGatewayChildCommand } from './child-command.ts'
 import { LocalRuntimeOwnerLease, LocalRuntimeOwnerStore } from './local-runtime-owner.ts'
 import { LOCAL_BOOTSTRAP_BYTES, localBootstrapSchema, localKernelBootId } from './local-runtime-protocol.ts'
 import { RuntimeLog } from './runtime-log.ts'
@@ -30,7 +31,11 @@ async function supervise(input: unknown): Promise<void> {
   if (Buffer.byteLength(JSON.stringify(input)) > LOCAL_BOOTSTRAP_BYTES) throw new Error('Local runtime bootstrap exceeds its byte limit')
   const spec = localBootstrapSchema.parse(input)
   const store = new LocalRuntimeOwnerStore(spec.directory, spec.identity)
-  const lease = await LocalRuntimeOwnerLease.inherit(store, 4, spec.record)
+  // Windows has no descriptor inheritance: the supervisor claims the
+  // generation's named-pipe lease itself, waiting out the launcher's release.
+  const lease = process.platform === 'win32'
+    ? await LocalRuntimeOwnerLease.adopt(store, spec.record, bootstrapTimeoutMs)
+    : await LocalRuntimeOwnerLease.inherit(store, 4, spec.record)
   let record = (await store.read())!
   if (record.bootId !== await localKernelBootId()) throw new Error('Local runtime reservation belongs to another kernel boot')
   if ((record.nativeRange === 'linux-slice') !== (spec.linuxScopeMode !== undefined)) {
@@ -53,6 +58,13 @@ async function supervise(input: unknown): Promise<void> {
   function killOwnedGroup(): void {
     forceWork ??= (async () => {
       if (record.nativeRange === 'linux-slice') await stopLocalLinuxRuntime(record, spec.controlTimeoutMs)
+      if (process.platform === 'win32') {
+        // Windows has no process-group signal; taskkill /T ends the runtime tree.
+        if (child?.pid !== undefined) {
+          await runGatewayChildCommand('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], spec.controlTimeoutMs).catch(() => {})
+        }
+        process.exit(0)
+      }
       // This process is the live group leader, so this PID cannot refer to a reused group.
       process.kill(-process.pid, 'SIGKILL')
       throw new Error('Local runtime group kill returned')
@@ -68,6 +80,12 @@ async function supervise(input: unknown): Promise<void> {
       record = (await store.read())!
       if (record.phase === 'starting' || record.phase === 'running' || record.phase === 'uncertain') {
         record = await lease.publish({ ...record, phase: 'stopping' })
+      }
+      if (process.platform === 'win32') {
+        // No graceful signal exists on Windows; honour the grace window, then force.
+        if (child === undefined || child.exitCode !== null || child.signalCode !== null) { await log.close(); killOwnedGroup() }
+        else setTimeout(killOwnedGroup, graceMs)
+        return
       }
       process.kill(-process.pid, 'SIGTERM')
       setTimeout(killOwnedGroup, graceMs)
@@ -117,7 +135,9 @@ async function supervise(input: unknown): Promise<void> {
     const command = spec.linuxScopeMode === undefined ? spec.command : localLinuxRuntimeCommand(record, spec.linuxScopeMode, spec.command)
     child = spawn(command[0]!, command.slice(1), {
       cwd: spec.cwd, env: spec.env, detached: false,
-      stdio: ['ignore', 'pipe', 'pipe', 'pipe', lease.fd],
+      stdio: process.platform === 'win32'
+        ? ['ignore', 'pipe', 'pipe', 'pipe']
+        : ['ignore', 'pipe', 'pipe', 'pipe', lease.fd],
     })
     child.stdout!.pipe(log, { end: false }); child.stderr!.pipe(log, { end: false })
     child.once('exit', () => { runtimeAlive = false; stop(0) })

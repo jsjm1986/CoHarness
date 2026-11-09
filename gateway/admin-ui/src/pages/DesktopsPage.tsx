@@ -1,7 +1,7 @@
 import { DesktopPermissions } from '../components/DesktopPermissions.tsx'
 import { DesktopEnvironmentNotice } from '../components/DesktopEnvironmentNotice.tsx'
 import { Ban, Monitor, RefreshCw, ShieldOff } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyDesktopAction,
   desktopHolderOf,
@@ -57,17 +57,22 @@ export function DesktopsPage() {
     }
   }, [])
 
+  const detailSeq = useRef(0)
   const openDetail = useCallback(async (resource: AdminDesktopResource) => {
+    const attempt = ++detailSeq.current
     setSelected(resource)
     setDetailLoading(true)
     try {
-      setDetail(await getDesktopDetail(resource.node, resource.desktop))
+      const value = await getDesktopDetail(resource.node, resource.desktop)
+      if (attempt !== detailSeq.current) return
+      setDetail(value)
       setError('')
     } catch (cause) {
+      if (attempt !== detailSeq.current) return
       setDetail(null)
       setError(messageFrom(cause))
     } finally {
-      setDetailLoading(false)
+      if (attempt === detailSeq.current) setDetailLoading(false)
     }
   }, [])
 

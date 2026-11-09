@@ -16,6 +16,7 @@
     <key>HGW_NODE_CONNECTION_FILE</key><string>/Users/ACCOUNT/.harness-gateway/node-connection.json</string>
     <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>
+  <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>ThrottleInterval</key><integer>5</integer>
   <key>Umask</key><integer>63</integer>

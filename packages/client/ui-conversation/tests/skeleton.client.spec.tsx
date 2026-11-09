@@ -10,7 +10,8 @@ import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, SessionCreateError,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationSnapshot, ProjectUiPolicySnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
+  ConversationIntent, ConversationSnapshot, ProjectUiPolicySnapshot, SessionId, SessionListState, WorkspaceId,
+  WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationContentOwnProps as ConversationPaneProps,
@@ -1025,5 +1026,63 @@ describe('SessionInputShell publication stability', () => {
     shell.setDraft('ab')
     expect(seen).toHaveLength(2)
     shell.dispose()
+  })
+})
+
+describe('ConversationContent pending intent', () => {
+  const intent = (overrides: Partial<ConversationIntent> = {}): ConversationIntent => ({
+    id: 'intent-1',
+    sessionId: sid('session-intent-1'),
+    draftId: 'draft-intent-1' as ConversationIntent['draftId'],
+    target: { kind: 'personal', runtimeId: 'rt-1' as NonNullable<ConversationIntent['target']['runtimeId']> },
+    label: 'windows-vps-47',
+    text: 'keep this draft',
+    phase: 'preparing',
+    ...overrides,
+  })
+
+  it('mounts the draft composer inside the resident frame without any session surface', () => {
+    const b = mount(conversationSnapshot())
+    const before = b.slotCalls.length
+    const onInput = vi.fn()
+    const onRetry = vi.fn()
+    const onHide = vi.fn()
+    b.rerender({
+      pendingIntent: intent(), onIntentInput: onInput, onIntentRetry: onRetry, onIntentHide: onHide,
+    })
+    const root = b.view.container.querySelector('[data-phase]')
+    expect(root?.getAttribute('data-phase')).toBe('active')
+    // The ambient session's chrome must not leak: no session header, no
+    // transcript, no session-scoped composer or takeover chain.
+    expect(root?.querySelector('[data-conversation-region="chat"]')?.getAttribute('data-conversation-session')).toBeNull()
+    const calls = b.slotCalls.slice(before)
+    expect(calls).not.toContain('conversation.session')
+    expect(calls).not.toContain('conversation.session.header')
+    expect(calls).not.toContain('conversation.composer.bar')
+    const card = b.view.container.querySelector('[data-conversation-intent="intent-1"]')
+    expect(card).not.toBeNull()
+    const textarea = card?.querySelector('textarea')
+    expect(textarea?.value).toBe('keep this draft')
+    expect(b.view.getByText('正在准备对话，可以先写消息')).toBeTruthy()
+    expect(b.view.queryByText('重试')).toBeNull()
+    fireEvent.change(textarea as HTMLTextAreaElement, { target: { value: 'more text' } })
+    expect(onInput).toHaveBeenCalledWith('intent-1', 'more text')
+  })
+
+  it('offers retry only while unavailable, reports denial, and always offers back', () => {
+    const b = mount(conversationSnapshot())
+    const onRetry = vi.fn()
+    const onHide = vi.fn()
+    b.rerender({
+      pendingIntent: intent({ phase: 'unavailable' }),
+      onIntentInput: vi.fn(), onIntentRetry: onRetry, onIntentHide: onHide,
+    })
+    expect(b.view.getByText('暂时无法打开对话，草稿保留在此标签页')).toBeTruthy()
+    b.view.getByText('重试').click()
+    expect(onRetry).toHaveBeenCalledWith('intent-1')
+    b.view.getByText('返回').click()
+    expect(onHide).toHaveBeenCalledOnce()
+    b.rerender({ pendingIntent: intent({ phase: 'unavailable', denied: true }) })
+    expect(b.view.getByText('当前账号没有操作此对话的权限，草稿保留在此标签页')).toBeTruthy()
   })
 })

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-07-managed-node-ops-access-and-deploy-verification.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-11-07-managed-node-ops-access-and-deploy-verification.md
+document:
+  en: 662cb31e3a7b658453e3152073063c61ec1eb737
+  zh: 14d8175332fa88f7f02ada1124a12ca23265c55f
+/agent-note-managed-node-operations-access-and-deployment-verification:
+  en: 325ff78e4d7cf58c
+  zh: 671a5c5e313bed56
+/agent-note-managed-node-operations-access-and-deployment-verification/problem:
+  en: a4c57b08b2992c4b
+  zh: 2c184921bbaef794
+/agent-note-managed-node-operations-access-and-deployment-verification/decision:
+  en: 7137543fa036f8ce
+  zh: 40c64c21c1cd209c
+/agent-note-managed-node-operations-access-and-deployment-verification/verification:
+  en: b8150f2910be218f
+  zh: ad09d6b919c5d787
+/agent-note-managed-node-operations-access-and-deployment-verification/alternatives-considered:
+  en: 06f4979652726ef1
+  zh: 345ab7a12bd24f43
+/agent-note-managed-node-operations-access-and-deployment-verification/consequences:
+  en: b4fedf617684ee4c
+  zh: a5bd229f35c5f315

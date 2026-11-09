@@ -246,6 +246,21 @@ describe('DirectoryBrowser', () => {
     expect(columns()).toHaveLength(1)
   })
 
+  it('cancels the path editor when focus genuinely leaves the dialog card', async () => {
+    mount()
+    await waitFor(() => { expect(screen.getByRole('listitem')).toBeTruthy() })
+    fireEvent.click(screen.getByRole('button', { name: 'browser.editPath' }))
+    const input = screen.getByLabelText<HTMLInputElement>('browser.editPath')
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      fireEvent.blur(input, { relatedTarget: outside })
+      expect(screen.queryByLabelText('browser.editPath', { selector: 'input' })).toBeNull()
+    } finally {
+      outside.remove()
+    }
+  })
+
   it('lands the target single-pane at the wait bound, aborts a superseded parent leg on the wire, and drops its late resolution', async () => {
     vi.useFakeTimers()
     try {

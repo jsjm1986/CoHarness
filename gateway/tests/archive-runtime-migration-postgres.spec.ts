@@ -1,6 +1,6 @@
 /** Archive identities preserve assigned and unassigned history across the Runtime namespace migration. @module */
 import { randomUUID } from 'node:crypto'
-import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Pool } from 'pg'

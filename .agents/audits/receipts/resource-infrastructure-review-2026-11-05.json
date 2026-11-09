@@ -1,0 +1,103 @@
+{
+  "at": "2026-11-05T01:53:37.236746+00:00",
+  "parentFinding": "B04",
+  "status": "named_current_infrastructure_and_post_wait_resource_qualification_verified_remaining_review_open",
+  "receipt": "receipts/resource-infrastructure-review-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z",
+  "productionSourceChanged": false,
+  "newConfirmedBugs": 0,
+  "wholeProjectComplete": false,
+  "review": {
+    "sourceInventory": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/current-allocation-scan.json",
+      "productionSourceFiles": 2998,
+      "rawAllocationSites": 44,
+      "unmatchedHistoricalOwnerKeys": 16,
+      "qualification": "Syntactic source inventory only; unmatched historical keys are not defects or complete dynamic allocation discovery."
+    },
+    "allocationClassification": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/current-allocation-review.json",
+    "immediateReservationHypothesis": {
+      "result": "Not a production defect: an initial active registration is accounting only. The concrete provider performs a separate fresh authorization before delivering a lease.",
+      "newCases": 7,
+      "qualification": "Real PostgreSQL node-row lock waits, original signed interactive identity or immutable execution scope, committed account/project/membership/computer/admin-role withdrawal, no process marker, exact unused occupancy cleanup and real Node execution after restoration."
+    }
+  },
+  "checks": {
+    "distinctNamedCases": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/resource-infrastructure-acceptance-union.json",
+      "passed": 125,
+      "notExecuted": 2,
+      "breakdown": {
+        "resourceApiProviderAndCoordinator": 113,
+        "privateFilePluginProofAndPersonalProjection": 11,
+        "repository": 1
+      },
+      "qualification": "Two explicit skips: Linux-only mount rejection on macOS, and real restic integration without a configured local executable. Initial two new execution cases used the legacy enter fixture; corrected to an explicit immutable scope before final113case acceptance. No production fix was inferred from those fixture failures."
+    },
+    "ordinaryNodeFileOwnership": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/infrastructure-file-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 2,
+      "typescriptLoader": false,
+      "qualification": "Original public built fixtures, unchanged ordinary Gateway JavaScript. Zero idle process/IPC, one selected file process, link and sidecar refusal, crash replay and physical reaping after refused first use."
+    },
+    "ordinaryNodeProofTimeout": {
+      "logs": [
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/proof-timeout-node22.log",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/proof-timeout-node24.log"
+      ],
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "uncooperativePureVerifier": true,
+      "observedDeadlineMs": 500,
+      "ownedVerifierProcessesAfterSettlement": 0,
+      "qualification": "Looping WASM module through the real reviewed-profile verifier. Observed641/675ms include preparation and scheduling;500ms is the configured child deadline, not a strict wall-clock completion promise."
+    },
+    "projectReadConsumers": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/browser-project-consumer-node-service.json",
+      "passed": 49,
+      "qualification": "Separate node-service browser/account routing regressions pass; not included in the125resource-case union. Other adapters only use their existing Runtime/model/document methods and do not require the new browser metadata provider."
+    },
+    "typecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/resource-lock-withdrawal-typecheck.log",
+    "lint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/resource-lock-withdrawal-lint.json",
+      "actualFiles": 1,
+      "diagnostics": 0
+    },
+    "docs": {
+      "pairing": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/resource-lock-withdrawal-pairing-check.log",
+      "pairs": 2,
+      "markdownLinks": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/resource-lock-withdrawal-markdown-links.json",
+      "sources": 4,
+      "budgets": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/resource-lock-withdrawal-doc-budgets.log",
+      "globalQuickPassClaimed": false
+    },
+    "ownedClusters": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/native-postgres-lifecycle-summary.json",
+    "priorSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/prior-frozen-sources-check.json"
+  },
+  "delivery": {
+    "at": "2026-11-05T01:51:48.244292+00:00",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/resource-infrastructure-review.delta.tar.gz",
+    "archiveSha256": "262569a44b693638cf2791a84130e2b77450d2668b1bf7b575de3da2fe198501",
+    "manifestSha256": "5b283763bf5271f608785a8e821395d2bf6e47e34b6d231d3b69563bd9150fb0",
+    "ownedPaths": 7,
+    "readOnlySources": 26,
+    "productionSourceChanged": false,
+    "wholeProjectComplete": false
+  },
+  "limits": [
+    "All12business domains remain in progress. No full-file100percent or whole resource inventory completion is claimed.",
+    "Fresh Linux/Windows native snapshot, escaped descendant and platform containment acceptance remain open.",
+    "Source inspection does not independently accept the complete peer backup/restic feature; prior peer reports retain their separate attribution.",
+    "Global invitation/history publication and all remaining business flows remain to review.",
+    "Two existing global documentation quick-check failures remain until their current source is diagnosed.",
+    "Real paid Responses validation remains explicitly deferred."
+  ],
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

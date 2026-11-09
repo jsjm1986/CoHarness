@@ -151,7 +151,10 @@ export class LocalLauncher implements Launcher {
         cwd: runtime.homePath, dshHome: runtime.dshHome, credential: runtime.gatewayCredential,
         logCapBytes: this.cfg.runtimeLogCapBytes, controlTimeoutMs: this.cfg.upstreamTimeoutMs,
         env: {
+          // os.homedir() reads USERPROFILE on Windows and HOME elsewhere; both
+          // are set so `~/documents` and friends resolve to the runtime owner.
           ...scrubbedGatewayChildEnv(), HOME: runtime.homePath, DSH_HOME: runtime.dshHome,
+          ...(process.platform === 'win32' ? { USERPROFILE: runtime.homePath } : {}),
           DSH_DIRECTORY_GRANTS: join(runtime.dshHome, 'directory-grants.json'),
           DSH_MANAGED_DATA_MANIFEST: join(runtime.dshHome, 'managed-data.jsonl'), DSH_GATEWAY_CREDENTIAL_FD: '3',
           TSX_TSCONFIG_PATH: join(this.cfg.dshRepoRoot, 'tsconfig.base.json'),
@@ -163,8 +166,13 @@ export class LocalLauncher implements Launcher {
       await runtime.beforeAllocation?.()
       if (await control.store.cancelled() || runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
       allocationAttempted = true
+      // Windows cannot inherit the lease descriptor: the supervisor claims the
+      // named-pipe lease itself, so no fd slot is passed and the launcher
+      // releases its pipe as soon as the bootstrap is delivered.
+      const stdio: ('ignore' | 'ipc' | number)[] = ['ignore', 'ignore', 'ignore', 'ipc']
+      if (process.platform !== 'win32') stdio.push(lease.fd)
       const child = supervisor = spawn(process.execPath, [...(source ? ['--import', import.meta.resolve('tsx/esm')] : []), entry, String(this.cfg.readinessTimeoutMs)], {
-        cwd: this.cfg.dshRepoRoot, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc', lease.fd],
+        cwd: this.cfg.dshRepoRoot, detached: true, stdio,
         env: { ...scrubbedGatewayChildEnv(), TSX_TSCONFIG_PATH: fileURLToPath(new URL('../tsconfig.run.json', import.meta.url)) },
       })
       const exited = new Promise<void>(resolve => child.once('exit', () => resolve()))
@@ -181,7 +189,10 @@ export class LocalLauncher implements Launcher {
         })
         runtime.signal?.addEventListener('abort', aborted, { once: true })
         if (runtime.signal?.aborted) aborted()
-        else child.send(spec, error => { if (error !== null) failed(error) })
+        else child.send(spec, error => {
+          if (error !== null) failed(error)
+          else if (process.platform === 'win32') void lease.close()
+        })
       })
       if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
       child.unref()

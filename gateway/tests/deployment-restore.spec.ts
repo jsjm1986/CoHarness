@@ -11,6 +11,7 @@ import type { Pool } from 'pg'
 import { testConfig, testEnvironment } from './test-config.ts'
 import { NodeConfigurationStore, readNodeConfiguration, writeNodeConfiguration } from '../src/node-config-store.ts'
 import { createDeploymentCommands } from '../src/deployment-commands.ts'
+import { defaultPgConnectionCommand, nativePgClient } from '../src/pg-client-protocol.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresMaintenanceService } from '../src/postgres/maintenance-service.ts'
 import { PostgresBackupService } from '../src/postgres/backup-service.ts'
@@ -115,6 +116,7 @@ describePg('transactional PostgreSQL backup restore', () => {
     const cfg = testConfig(join(directory, 'issuer-history'))
     const users = new PostgresUserService(context, cfg)
     const original = await users.create({ username: 'original-admin', password: 'test-password', role: 'admin' })
+    await users.changeOwnPassword(original.id, 'test-password')
     const topology = new PostgresDeploymentTopology(context, { legacyForwarding: false, refreshAfterMs: 30000,
       pageSize: 10, maxBytes: 65536, allowedOrigins: ['https://issuer.example.test'] })
     await topology.save(original, { revision: '0', enabled: true, primaryOrigin: 'https://issuer.example.test' })
@@ -127,6 +129,7 @@ describePg('transactional PostgreSQL backup restore', () => {
     const incompatible = await commands.backup(join(directory, 'issuer-backups'), databaseUrl!, [])
     await pool.query('ALTER TABLE harness.node_agent_enrollments DROP CONSTRAINT node_agent_enrollments_created_by_organization_id_fkey')
     const later = await users.create({ username: 'later-admin', password: 'test-password', role: 'admin' })
+    await users.changeOwnPassword(later.id, 'test-password')
     const nodes = new PostgresNodeAccessService(context, cfg.nodeAccess, cfg.runtimeCatalog)
     const worker = (await pool.query<{ id: string }>("SELECT id FROM harness.compute_nodes WHERE organization_id=$1 AND name='prepared-worker'", [organization])).rows[0]!.id
     const ticket = await nodes.issue(later, { requestId: randomUUID(), nodeId: worker })
@@ -264,18 +267,26 @@ describePg('transactional PostgreSQL backup restore', () => {
     await maintenance.beginRestore(null)
     const proxy = join(directory, 'detached-psql-proxy.mjs'), pidFile = join(directory, 'detached-psql.pid')
     await writeFile(proxy, `import { spawn } from 'node:child_process'; import { writeFileSync } from 'node:fs'
-      const chunks = []; for await (const chunk of process.stdin) chunks.push(chunk)
-      const script = Buffer.concat(chunks).toString('utf8')
-      const point = '-- Verify the same coordinating lease before committing.'
-      if (!script.includes(point)) throw new Error('SQL barrier insertion point is absent')
-      const argv = ${JSON.stringify(psql)}
+      const argv = ${JSON.stringify(nativePgClient(psql) ? [...defaultPgConnectionCommand(), ...psql] : psql)}
       const child = spawn(argv[0], [...argv.slice(1), ...process.argv.slice(2)], { stdio: ['pipe', 'pipe', 'pipe'] })
+      const exited = new Promise((resolve, reject) => { child.once('error', reject); child.once('close', code => resolve(code ?? 1)) })
       writeFileSync(${JSON.stringify(pidFile)}, String(child.pid))
       child.stdout.pipe(process.stdout); child.stderr.pipe(process.stderr)
       child.stdin.on('error', () => {})
+      const chunks = []; let prefix = Buffer.alloc(0), framed = false
+      for await (const chunk of process.stdin) {
+        if (framed) { chunks.push(chunk); continue }
+        prefix = Buffer.concat([prefix, chunk])
+        if (prefix.length < 4 || prefix.length < 4 + prefix.readUInt32BE()) continue
+        const size = 4 + prefix.readUInt32BE()
+        child.stdin.write(prefix.subarray(0, size)); chunks.push(prefix.subarray(size)); framed = true
+      }
+      const script = Buffer.concat(chunks).toString('utf8')
+      const point = '-- Verify the same coordinating lease before committing.'
+      if (!script.includes(point)) throw new Error('SQL barrier insertion point is absent')
       child.stdin.end(${JSON.stringify(`SET application_name='${marker}';\n`)} + script.replace(point,
         ${JSON.stringify(`SELECT pg_advisory_xact_lock(hashtext('${barrier}'));\n`)} + point))
-      process.exitCode = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', code => resolve(code ?? 1)) })
+      process.exitCode = await exited
     `)
     const blocker = await pool.connect()
     await blocker.query('SELECT pg_advisory_lock(hashtext($1))', [barrier])

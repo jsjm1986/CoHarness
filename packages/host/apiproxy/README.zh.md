@@ -9,6 +9,8 @@ kind: "package-reference"
 
 所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, coldSummaryCacheMaxEntries?, coldSummaryCacheMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
 
+版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。
+
 `workspaceFiles.*` 在 Session 授权、canonical containment、符号链接检查和已组合的 `workspace-files/authorize` 目录策略通过后，读取 Session 相对文件。冷读取只加载 header。Host 在返回相对元数据、UTF-8 文本页或 Base64 窗口前复核文件身份与权限；可选版本保护拒绝混合版本分页。`host.describe.workspaceFiles` 声明支持情况与配置上限：默认每页／窗口 2 MiB、5,000 行、2,000 个目录项和 512 条 Client 元数据记录。Agent 工具继续拥有写入、CAS 与审计语义。
 
 文本页的偏移量和上限均按行计数。最后一页即使恰好达到行数上限，也会报告 `eof: true`。行窗口填满后检查已缓冲文本，或推进提供方迭代器，直到遇到下一个非空分块或结束；分页循环既不追加也不扫描下一行。所选页超过字节上限时仍会拒绝，而不是截断。
@@ -24,6 +26,8 @@ kind: "package-reference"
 `workspaceChanges.summary` 与 `workspaceChanges.diff` 通过相同的 Session 和目录授权读取已记录的轮次差异。读取完成后重新核验权限，通过已加载或持久 Session 的通知定位不可变记录。内容缺失时返回 null；存储损坏仍作为错误返回。已删除的文件仍可审阅，不用当前内容替代历史证据，也不公开私有存储路径或 Git 对象标识。
 
 `desktop.status` 和 `desktop.confirm` 使用会话写入授权及部署的交互确认控制器，不启动模型回合。未配置控制器且没有已知的提供方或环境限制时，状态返回 null，写入被拒绝；确认绑定页面显示的根会话、节点和桌面。Host 在异步操作完成后复核访问权限，取消或卸载后不能返回迟到的成功响应。
+
+版本化的准备与受理请求在 `x-dsh-operation-id` 中发送 UUID。新建会话使用草稿意图的 UUID，提交提示与查询受理状态共用提交 UUID。其余版本化请求使用 RPC UUID。普通 RPC 省略该请求头。 预留会话的版本化创建请求可通过 `includeInitialHistory` 同时读取首屏对话。Host 核验会话和工作区后，使用同一账号和 Runtime 代次读取活动会话的尾页。尾页放不进历史响应的大小限制时，客户端仍使用同一会话单独读取。
 
 Host 为 `hostSessionLifecycle` 保存创建、恢复与 fork 句柄。永久清理只释放这些确切的空闲所有者，并将标识预留保持到存储删除和 Gateway 回执完成。忙碌或所有权不明时，在删除前拒绝。
 
@@ -104,7 +108,9 @@ Workspace 列表与 Session 列表是相互独立的重连基线。`workspace.cr
 
 归档响应在异步 Collaboration ACL 过滤前，一并捕获 id 集合及其 `archiveRevision`。`session.prompt` 和 `session.updateQueue` 的 edit/steer 操作以 `session-archived` 拒绝已归档的目标；执行器在内容转换或执行身份标记完成后的最后一个同步准入点再次检查，因此请求处理期间提交的归档会阻止输入插入。队列移除与取消仍然可用。未组合 `workspaceRegistry` 的运行时没有归档集合。[池化会话归档一致性决策](../../../.agents/notes/implemented/bug-fix/2026-10-04-pooled-session-archive-consistency.zh.md) 记录了客户端投影与执行器的设计理由。
 
-`session.search` 是以 `session.list` 所列会话为范围的有界内容搜索投影。网关向可选的 `ctx.sessionQuery` 服务请求全局排序后的当前内容视图中的 user、assistant 和 steering 匹配项，并持续消费该结果流，直到获得至多 20 个可见会话／snippet 对及一个前瞻项；返回前仍会依据从列表推导的授权集合重新校验每个命中。提供方分页初始请求 20 个命中；如果第一页请求因这一上限被拒绝，网关会依次探测 10、5、2、1，并在续传和陈旧世代重启中沿用探测所得的页面大小。返回的 snippet 最多包含 240 个 Unicode 码点，响应 schema 则会在每个客户端边界独立强制执行该上限。将授权集合保留在宿主内存中，可在不削弱可见性或排序的前提下避开有效大型语料库的 SQLite 变量上限。
+`session.search` 是以 `session.list` 所列会话为范围的有界内容搜索投影。网关向可选的 `ctx.sessionQuery` 服务请求全局排序后的当前内容视图中的用户和助手消息匹配项。对于托管调用者，Host 在发布列表摘要或检索结果前复核当前访问权限。检索会按顺序用后续命中补足撤权留下的空位，仅在另有可读命中时设置 `hasMore`。提供方分页初始请求 20 个命中；如果第一页请求因这一上限被拒绝，网关会依次探测 10、5、2、1，并在续传和陈旧世代重启中沿用探测所得的页面大小。返回的 snippet 最多包含 240 个 Unicode 码点，响应 schema 则会在每个客户端边界独立强制执行该上限。将授权集合保留在宿主内存中，可在不削弱可见性或排序的前提下避开有效大型语料库的 SQLite 变量上限。
+
+托管检索失败时向调用者返回通用错误。提供方的诊断保留在 Host 日志中。
 
 陈旧的续传会丢弃该提供方尝试中的所有部分结果、去重条目和游标，然后依据最初从列表推导的可见性快照从第一页重新开始，但不会丢弃探测所得的提供方页面大小。上限探测与陈旧重试共用最多 100 次提供方调用的限制（因此最多检查 2,000 个命中）；如果某页命中数超过其请求的上限、续传游标重复，或用尽该调用预算后结果流仍未耗尽，都会直接返回 `internal` 业务错误，不返回部分结果。载体请求信号可取消持久化列表枚举、冷会话摘要收集和每一次搜索调用；即使同时收到上限拒绝或陈旧拒绝，也以取消为准。部署若未挂载该服务，或索引／查询故障无法恢复，也会返回 `internal` 业务错误，以便客户端保留仅基于元数据的匹配项。
 

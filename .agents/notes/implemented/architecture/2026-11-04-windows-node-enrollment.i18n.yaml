@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-04-windows-node-enrollment.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-04-windows-node-enrollment.md
+document:
+  en: 74f988832547e82d336a989e202f0cfaf309f145
+  zh: bb8b7ad75070fda6690abdff499955e3cbb1c3b3
+/agent-note-windows-node-enrollment:
+  en: 64ba4104d3da55ec
+  zh: 87b1d394e523ef17
+/agent-note-windows-node-enrollment/problem:
+  en: 678d521b1b96bccc
+  zh: b61b2dbf117de4c4
+/agent-note-windows-node-enrollment/decision:
+  en: 87b6a84f55f6a170
+  zh: 353e0d435b7c1795
+/agent-note-windows-node-enrollment/alternatives-considered:
+  en: 208f6452fde123b8
+  zh: 4ee7dc2f93ca8f34
+/agent-note-windows-node-enrollment/consequences:
+  en: fd27ec503c6f5936
+  zh: 5ff9c9f9a077830b
+/agent-note-windows-node-enrollment/verification:
+  en: 3f70469aff2d3393
+  zh: 2a266f7167689ce0

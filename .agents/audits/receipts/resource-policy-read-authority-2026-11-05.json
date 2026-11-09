@@ -1,0 +1,160 @@
+{
+  "id": "B505",
+  "title": "Queued administrative resource qualification reads expose policy after administrator demotion has committed",
+  "status": "fixed_named_current_administrator_and_one_connection_lifetime_scenarios_verified_remaining_project_review_open",
+  "sourceFixed": true,
+  "paths": [
+    "gateway/src/resource-access.ts",
+    "gateway/src/admin-api.ts",
+    "gateway/src/steward-access.ts"
+  ],
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z/resource-policy-read-before.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z",
+  "receipt": "receipts/resource-policy-read-authority-2026-11-05.json",
+  "evidence": "Six actual loopback Gateway HTTP routes with real PostgreSQL authentication and policy services return200after current administrator demotion commits before the resource read. Each positive control returns the expected enabled policy. A test-owned barrier delays only service entry; no authority or database result is mocked. Runtime starts are forbidden. Steward directory review remains pending.",
+  "at": "2026-11-04T18:01:30.485756+00:00",
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "counterproofs": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z/resource-policy-read-before.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z/steward-directory-read-before.json"
+  ],
+  "currentSourceRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z/resource-policy-read-fixed.json",
+  "assembledGatewayRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z/resource-policy-real-gateway-transcript.json",
+  "expectedTranscript": "gateway/tests/expected/resource-policy-read.jsonl",
+  "correctness": "All six administrative qualification GETs and steward directory receive the authenticated current actor. The common reader retains active organization/account/administrator membership on the same transaction connection as the policy query. Prior withdrawal returns403; two physical relation-lock controls prove already-admitted reads hold concurrent demotion until commit and later reads refuse. No role, account, policy revision, Runtime or model is allocated by reading.",
+  "cases": {
+    "assembledGatewayScenarios": 51,
+    "successfulCurrentAdministratorReads": 7,
+    "withdrawalsBeforeReadAdmission": 42,
+    "concurrentDemotionWaitsForAdmittedRead": 2,
+    "independentOriginalFailureRechecks": 7,
+    "existingAdminApiFocusedCases": 5,
+    "existingAdminApiFilteredCases": 67,
+    "repeatedNode22ArtifactScenarios": 4,
+    "repeatedNode24ArtifactScenarios": 4
+  },
+  "sourceCoverage": {
+    "total": {
+      "lines": {
+        "total": 49,
+        "covered": 44,
+        "skipped": 0,
+        "pct": 89.79
+      },
+      "statements": {
+        "total": 61,
+        "covered": 48,
+        "skipped": 0,
+        "pct": 78.68
+      },
+      "functions": {
+        "total": 16,
+        "covered": 15,
+        "skipped": 0,
+        "pct": 93.75
+      },
+      "branches": {
+        "total": 66,
+        "covered": 42,
+        "skipped": 0,
+        "pct": 63.63
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/resource-access.ts": {
+      "lines": {
+        "total": 34,
+        "covered": 30,
+        "skipped": 0,
+        "pct": 88.23
+      },
+      "functions": {
+        "total": 10,
+        "covered": 9,
+        "skipped": 0,
+        "pct": 90
+      },
+      "statements": {
+        "total": 42,
+        "covered": 33,
+        "skipped": 0,
+        "pct": 78.57
+      },
+      "branches": {
+        "total": 48,
+        "covered": 29,
+        "skipped": 0,
+        "pct": 60.41
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/steward-access.ts": {
+      "lines": {
+        "total": 15,
+        "covered": 14,
+        "skipped": 0,
+        "pct": 93.33
+      },
+      "functions": {
+        "total": 6,
+        "covered": 6,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 19,
+        "covered": 15,
+        "skipped": 0,
+        "pct": 78.94
+      },
+      "branches": {
+        "total": 18,
+        "covered": 13,
+        "skipped": 0,
+        "pct": 72.22
+      }
+    }
+  },
+  "checks": {
+    "ordinaryGatewayTypecheck": "passed_after_peer_NodeSqlite_return_typing_update",
+    "ordinaryGatewayProductionBuild": "passed",
+    "focusedLint": "passed",
+    "threeChangedBilingualPairs": "passed",
+    "sixAffectedMarkdownSourcesLinksAndAnchors": "passed",
+    "whitespaceAndNewlines": "passed",
+    "normalNode22And24Artifacts": "four repeated representative scenarios each"
+  },
+  "sourceHashes": {
+    "gateway/src/resource-access.ts": "f63efe9429579781cb5db2238ea1dbcc8e7f917563c736621349384a39bcbda8",
+    "gateway/src/steward-access.ts": "683204d3160c6f39852f18f32ae51f3acd0dc89f654ec859acc1c4f31561e98d",
+    "gateway/src/admin-api.ts": "b07e63205e90f74b744795cb7c136a2a1706f3d474f4f4e5397cbef3e45333e6",
+    "gateway/tests/fixtures/resource-policy-read.mjs": "e29edc85b187857031ada1ad22764b1bbcaeff4fdccb0769e7157bc9b2b8855a",
+    "gateway/tests/resource-policy-read-postgres.spec.ts": "fb19e2f61c2fa700ad0f8d46d31aa5040fddae1130da5d13c27e933c76f6add1"
+  },
+  "observedRawPhases": "The six *-observations-original.json files retain original policy HTTP200counterproofs. The steward directory original is retained by the failed before report; its per-entry raw observation was later overwritten by fixed checks and is not presented as original.",
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z/note-review.json",
+  "limits": [
+    "Full-file coverage remains partial; no exclusions or thresholds were changed.",
+    "Global doc-quick retains earlier existing/concurrent failures; only the current affected pairs and links are accepted.",
+    "Native Windows/SSH and production two-computer acceptance remain open.",
+    "The initial whole Gateway typecheck failure was a concurrent NodeSqlite run-result annotation and is preserved separately; it is superseded by the final passing check."
+  ],
+  "frozenDelivery": {
+    "at": "2026-11-04T18:02:42.537355+00:00",
+    "finding": "B505",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z/B505-resource-policy-read-authority",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T174010Z/B505-resource-policy-read-authority.delta.tar.gz",
+    "archiveSha256": "c9aa4625f045182c80524db0c23f937f762986e9e051599c7719c689b987f07b",
+    "manifestSha256": "4a6ce910fbcd368b9090264d48cd62b515d759386b0614059027d01204c5cf55",
+    "ownedPaths": 16,
+    "readOnlyPrerequisites": 5,
+    "compiledGatewayFiles": 251,
+    "wholeProjectComplete": false
+  }
+}

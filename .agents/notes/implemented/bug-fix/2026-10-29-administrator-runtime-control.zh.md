@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-[Admin 路由](../../../../gateway/src/admin-api.ts)向个人与项目的启动、停止、重启传递服务端认证的管理员 id。请求体不能选择该发起者。[`InstanceManager`](../../../../gateway/src/instances.ts)按目标、意图和发起管理员区分待完成启动。显式控制在串行等待和准入等待之后、取消排队启动之前、终止旧跟踪句柄之前，以及最终分配或热复用交接之前检查当前权限。
+[Admin 路由](../../../../gateway/src/admin-api.ts)向个人与项目的启动、停止、重启传递服务端认证的管理员 id。请求体不能选择该发起者。浏览器项目设置入口也传递认证的管理员，覆盖被动启动与热复用；手动停止的 Runtime 继续拒绝被唤起。[`InstanceManager`](../../../../gateway/src/instances.ts)按目标、意图和发起管理员区分待完成启动。显式控制在串行等待和准入等待之后、取消排队启动之前、终止旧跟踪句柄之前，以及最终分配或热复用交接之前检查当前权限。
 
 [PostgreSQL 仓库](../../../../gateway/src/postgres/instance-repository.ts)将当前组织、账号和管理员成员关系锁保留至启动或停止意图提交。最终个人准入在同一管理员事务中读取当前所有者策略；分别检查会让其中一项在等待另一项时过期。SQLite 在立即事务中完成对应读写。资源或 supervisor 等待前释放数据库连接与权限锁。
 
@@ -45,3 +45,5 @@ PostgreSQL 用户读取联合当前组织、成员关系和账号给出有效状
 [管理响应记录](../../../../gateway/tests/fixtures/administrator-rpc-withdrawal.mjs)使用真实 PostgreSQL 身份、浏览器认证、Runtime 凭据及当前 Runtime 准入，再撤销操作员角色或停用组织。另一账号的终端和插件元数据保持私有；已获准的流在后续私有数据到达前中断；当前管理员能收到正常响应，操作引用归零。夹具拥有回环 HTTP Runtime，不证明原生进程隔离。
 
 [保留 Runtime 实录](../../../../gateway/tests/fixtures/central-runtime-control.mjs) 通过真实 PostgreSQL 和自有 HTTP 响应覆盖已认证的精确停止与重启、过期代次、获准停止后的管理员撤权及项目字节保留。回环载体证明实际响应已清理；不验证原生进程限制。
+
+[项目设置实录](../../../../gateway/tests/fixtures/administrator-settings-start.ts)通过浏览器认证与 PostgreSQL 覆盖真实本地进程分配前的六种已提交资格撤销、当前及恢复权限的管理员、热复用和手动停止拒绝。该原生验证使用 macOS；Linux 账号准备和 Windows 监督仍需单独验证。

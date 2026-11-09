@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-06-center-serves-release-assets.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-06-center-serves-release-assets.md
+document:
+  en: 8409fa4d019c35db3b566b0559109352c069c8e4
+  zh: 46d1cc705b96fc16006f185ca8bd027b7581e247
+/agent-note-the-center-serves-release-bundled-web-assets-from-its-own-release-files:
+  en: d52edea31401313e
+  zh: 3bcf9c95e40a4567
+/agent-note-the-center-serves-release-bundled-web-assets-from-its-own-release-files/problem:
+  en: a9d1974285d7f9bf
+  zh: e5103431cda0fcc0
+/agent-note-the-center-serves-release-bundled-web-assets-from-its-own-release-files/decision:
+  en: 988852b3fb4b98a6
+  zh: b21f9d38ae448e4c
+/agent-note-the-center-serves-release-bundled-web-assets-from-its-own-release-files/alternatives-considered:
+  en: 956a82de17f1c9f5
+  zh: f539a5104b0a0776
+/agent-note-the-center-serves-release-bundled-web-assets-from-its-own-release-files/consequences:
+  en: 7fe018be76c381a4
+  zh: 7d9e53370873a28a
+/agent-note-the-center-serves-release-bundled-web-assets-from-its-own-release-files/testing:
+  en: 562057c47dd84284
+  zh: 0c016bb0d89177c1

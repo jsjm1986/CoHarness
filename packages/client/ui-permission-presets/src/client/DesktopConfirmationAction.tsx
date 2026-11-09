@@ -37,14 +37,14 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
   const active = useRef<AbortController | undefined>(undefined)
   const ready = connectionState === 'connected' && host?.executionAuthorityRequired === true
   const environmentReason = host?.computerUseUnavailableReason
-  const read = useCallback(async () => {
+  const read = useCallback(async (priority?: 'low') => {
     active.current?.abort()
     const request = new AbortController()
     active.current = request
     setValue(previous => previous !== undefined && previous !== null && 'unavailableReason' in previous ? previous : undefined)
     setBusy(true); setError(false)
     try {
-      const response = await connection.api.desktop.status({ sessionId }, request.signal)
+      const response = await connection.api.desktop.status({ sessionId }, request.signal, priority)
       if (request.signal.aborted) return
       if (!response.result.ok) throw new Error('desktop status refused')
       setValue(response.result.value)
@@ -79,7 +79,7 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
     // changed session binding counts as unread, and every open refreshes.
     if (open || !sameOwner || readFor.current?.ready !== true || readFor.current.environmentReason !== environmentReason) {
       readFor.current = { connection, sessionId, ready: true, environmentReason }
-      void read()
+      void read(open ? undefined : 'low')
     }
     return () => { active.current?.abort() }
   }, [open, ready, read, connection, sessionId, environmentReason])

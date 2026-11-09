@@ -1,3 +1,4 @@
+import { useProjectChoices } from '../components/project-choices.tsx'
 import { Archive, FileText, Filter, History, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
@@ -16,7 +17,6 @@ import {
   type AdminDocumentDetail,
   type AdminDocumentMetrics,
   type AdminUser,
-  type Project,
 } from '../api.ts'
 import {
   Button,
@@ -46,7 +46,7 @@ export function DocumentsPage() {
   const [metrics, setMetrics] = useState<AdminDocumentMetrics | null>(null)
   const [rows, setRows] = useState<AdminDocument[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
+  const { projects, setProjects, readNames, moreNames } = useProjectChoices()
   const [draft, setDraft] = useState<Draft>(EMPTY)
   const [active, setActive] = useState<Draft>(EMPTY)
   const [page, setPage] = useState(0)
@@ -113,7 +113,7 @@ export function DocumentsPage() {
   }, [])
 
   useEffect(() => {
-    void Promise.all([listUsers(), listProjects()]).then(([nextUsers, nextProjects]) => {
+    void Promise.all([listUsers(), listProjects(undefined, 'directory')]).then(([nextUsers, nextProjects]) => {
       setUsers(nextUsers)
       setProjects(nextProjects)
     }).catch(cause => setError(messageFrom(cause)))
@@ -144,7 +144,7 @@ export function DocumentsPage() {
       setDetail(next)
       setOwnerId(next.document.owner === null ? '' : String(next.document.owner.id))
       if (next.document.scope.kind === 'project' && next.document.scope.id !== undefined) {
-        const project = await getProject(next.document.scope.id)
+        const project = await getProject(next.document.scope.id, 'members')
         setMemberIds(new Set(project.members.map(member => member.userId)))
       }
     } catch (cause) {
@@ -255,7 +255,8 @@ export function DocumentsPage() {
           <div className="filterGrid">
             <Field label={t('labelQuery')}><div className="inputWithIcon"><Search aria-hidden="true" /><input className="input" value={draft.query} onChange={event => setDraft({ ...draft, query: event.target.value })} placeholder={t('queryPlaceholder')} /></div></Field>
             <Field label={t('labelScope')}><select className="select" value={draft.scope} onChange={event => setDraft({ ...draft, scope: event.target.value as Draft['scope'] })}><option value="">{t('scopeAll')}</option><option value="personal">{t('scopePersonal')}</option><option value="project">{t('scopeProject')}</option></select></Field>
-            <Field label={t('labelProject')}><select className="select" value={draft.projectId} onChange={event => setDraft({ ...draft, projectId: event.target.value })}><option value="">{t('projectAll')}</option>{projects.map(project => <option key={project.id} value={project.id}>{t('entryWithId', { name: project.name, id: String(project.id) })}</option>)}</select></Field>
+            <Field label={t('labelProject')}><select className="select" value={draft.projectId} onFocus={() => readNames()} onChange={event => { readNames([Number(event.target.value)]); setDraft({ ...draft, projectId: event.target.value }) }}><option value="">{t('projectAll')}</option>{projects.map(project => <option key={project.id} value={project.id}>{t('entryWithId', { name: project.name, id: String(project.id) })}</option>)}</select></Field>
+            {moreNames()}
             <Field label={t('labelOwner')}><select className="select" value={draft.ownerUserId} onChange={event => setDraft({ ...draft, ownerUserId: event.target.value })}><option value="">{t('ownerAll')}</option>{users.map(user => <option key={user.id} value={user.id}>{t('entryWithId', { name: user.displayName, id: String(user.id) })}</option>)}</select></Field>
           <Field label={t('labelState')}><select className="select" value={draft.state} onChange={event => setDraft({ ...draft, state: event.target.value as Draft['state'] })}><option value="active">{t('stateActive')}</option><option value="trash">{t('stateTrash')}</option><option value="purged">{t('statePurged')}</option><option value="missing">{t('stateMissing')}</option><option value="all">{t('stateAll')}</option></select></Field>
           </div>

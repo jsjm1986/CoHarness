@@ -204,6 +204,8 @@ export interface ConnectionHandle {
   readonly documentIdentity?: ConnectionDocumentIdentity
   /** Resolved connection budgets reused by entry metadata reads; configurable through connection.recovery. */
   readonly metadataTiming: { requestTimeoutMs: number; retryAfterMs: number }
+  /** Document's configured ceiling on concurrent explicit Runtime preparations. */
+  readonly entryRequestLimit?: number
   /** Forwarded-event and answer participation selected at installation. */
   readonly interactions: ConnectionInteractions
   /** Shared api client (fixture or real, decided at boot from the page URL). */
@@ -252,7 +254,7 @@ export interface ConnectionHandle {
   readonly setBaseTarget?: (target: ConnectionRuntimeTarget) => void
   /** Subscribe to the bootstrap runtime declared by its first HTTP handshake. */
   readonly onRuntimeTarget?: (listener: (target: ConnectionRuntimeTarget) => void) => () => void
-  /** Pin an application-generated private download or preview URL to this document’s account. */
+  /** Pin an application-generated private resource URL to this account and connection's Runtime. */
   readonly privateResourceUrl?: (value: string) => string
   /** Confirm the authenticated account observed by the page's account service. */
   readonly confirmPrincipal?: (id: number) => void
@@ -378,6 +380,7 @@ function createConnectionHandle(
   })
   const handle: ConnectionHandle = {
     metadataTiming: { requestTimeoutMs: bootstrapRecovery.generationReadyTimeoutMs, retryAfterMs: bootstrapRecovery.backoffMaxMs },
+    entryRequestLimit: bootstrapRecovery.maxConcurrentEntryRequests,
     interactions,
     ...(sharedState.documentIdentity === undefined ? {} : { documentIdentity: sharedState.documentIdentity }),
     wireApi: api,
@@ -459,7 +462,7 @@ function createConnectionHandle(
         sharedState.mapRemote = undefined
       }
     },
-    privateResourceUrl: value => sharedState.identity?.privateUrl(value) ?? value,
+    privateResourceUrl: value => sharedState.identity?.privateUrl(value, target) ?? value,
     confirmPrincipal: (id) => { sharedState.identity?.confirm(id) },
     invalidatePrincipal: () => { sharedState.identity?.invalidate() },
     ...(sharedState.identity === undefined ? {} : { onPrincipalChange: sharedState.identity.subscribe }),

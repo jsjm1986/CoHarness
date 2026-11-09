@@ -85,7 +85,7 @@ function harness(path = 'a.txt') {
       tab: {
         id: 'tab-1' as TabId, kind: 'workspace-file', contentId: workspaceResourceAddress(sessionId, path),
         title: path, visible,
-        actions: { bindCommands: () => () => {}, openResource: () => {}, openTab: () => {}, close },
+        actions: { bindCommands: () => () => {}, openResource: () => {}, openTab: () => {}, setPanelMode: () => {}, close },
         navigation: { address: workspaceResourceAddress(sessionId, path), revision, params: line === undefined ? undefined : { line } },
         signal: new AbortController().signal,
       },

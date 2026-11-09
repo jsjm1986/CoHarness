@@ -26,6 +26,8 @@ description: "组织部署模式、浏览器入口范围与电脑的显式接入
 
 部署页沿用现有 Gateway 配置、公开访问和服务控制。在预期的主入口启用多电脑，填写已配置在 `HGW_PUBLIC_ORIGINS` 中的地址。主入口仍可运行本机 Runtime。其他电脑保留自己的 Gateway 地址，通过现有来源配置同时允许本机和主入口的浏览器来源。
 
+Admin 项目列表按当前选择的电脑读取可见项目的名称和本地路径，每次最多 32 个。打开项目时只读取该项目。所属电脑不可用时，列表保留项目编号。文档、插件、SSH、Webhook 和成员管理控件只读取当前可见或所选项目的名称。仅核验成员时无需读取项目名称和路径。
+
 Admin 中的项目模型分配、项目额度、项目用量和成员贡献报表，均跟随当前浏览器文档选择的电脑。带主入口电脑编号的链接使用选择器中具名的主入口选项，链接的管理目标保持不变。组织模型 Provider、角色／用户模型权限、角色／用户额度及组织总用量由主入口统一管理，不依赖当前选择的电脑。读取这些设置不会启动项目 Runtime。
 
 Admin 部署页先加载入口策略，再加载状态与备份快照，同一时刻只保留一轮状态与备份读取，定时触发不叠加请求，页面卸载时取消读取。已有读取未结束时，显式刷新等待其后的新快照。入口模式元数据与用户端使用同一账号读取接口，配置写入继续核验管理员权限。
@@ -35,9 +37,9 @@ Admin 部署页先加载入口策略，再加载状态与备份快照，同一�
 3. 打开该电脑自己的部署页，在“连接到主入口”填写中心地址和接入码。保存私有配置，核对允许来源；需要时按现有流程保存并应用配置，再启动已安装的接入服务。生成的代理配置绑定预期组织和电脑，服务连接核验 Gateway 身份和发布版本。
 4. 确认主入口列表显示连接，再使用现有 Admin 功能配置电脑使用权、能力资格和 Runtime。项目邀请要求用户具备项目所在电脑的使用权限。
 
-向导不安装软件，也不分发数据库凭据或主密钥。单独安装经过核对的 [Linux 服务](../../deploy/harness-node-agent.service) 或 [macOS LaunchAgent](../../deploy/macos/node-agent.plist)，使其操作系统账号、不可变发布路径、`HGW_STATE_ROOT` 和 `HGW_NODE_CONNECTION_FILE` 与 Gateway 一致。Linux 默认使用 `harness-node-agent.service`，可通过 `HGW_NODE_AGENT_SERVICE` 设置；macOS 默认使用 `com.maycran.harness-node-agent`，可通过 `HGW_NODE_AGENT_LABEL` 和 `HGW_LAUNCHD_DOMAIN` 设置。服务运行 `node lib/node-agent-main.js`，加载前需调整模板路径。缺少服务或来源配置时，页面显示准备步骤。
+向导不安装软件，也不分发数据库凭据或主密钥。单独安装经过核对的 [Linux 服务](../../deploy/harness-node-agent.service) 或 [macOS LaunchAgent](../../deploy/macos/node-agent.plist)，使其操作系统账号、不可变发布路径、`HGW_STATE_ROOT` 和 `HGW_NODE_CONNECTION_FILE` 与 Gateway 一致。Linux 默认使用 `harness-node-agent.service`，可通过 `HGW_NODE_AGENT_SERVICE` 设置；macOS 默认使用 `com.maycran.harness-node-agent`，可通过 `HGW_NODE_AGENT_LABEL` 和 `HGW_LAUNCHD_DOMAIN` 设置。服务运行 `node lib/node-agent-main.js`，加载前需调整模板路径。Windows 通过[计划任务模板](../../deploy/windows/node-agent-task.ps1)注册同一编译入口：`HarnessNodeAgent` 任务（`HGW_NODE_AGENT_SERVICE`）开机即以 SYSTEM 身份运行并在失败时重启，读取同一私有配置文件并追加独立日志。缺少服务或来源配置时，页面显示准备步骤。
 
-`HGW_NODE_CONNECTION_FILE` 默认位于 `<HGW_STATE_ROOT>/node-connection.json`。该私有文件保存修订号、准确电脑身份、主入口地址、本机回环 Gateway 地址、凭证文件路径及待消费接入码，权限为0600，采用原子写入，接入后清除接入码。重新接入使用新的凭证文件路径。接入码不写入 URL、命令参数或浏览器持久存储，节点代理不需要数据库凭据。没有私有配置文件时，仍可使用现有环境变量配置代理。
+`HGW_NODE_CONNECTION_FILE` 默认位于 `<HGW_STATE_ROOT>/node-connection.json`。该私有文件保存修订号、准确电脑身份、主入口地址、本机回环 Gateway 地址、凭证文件路径及待消费接入码，仅文件属主及 SYSTEM、Administrators 可访问（macOS/Linux 为 0600 权限，Windows 为限定 ACL），采用原子写入，接入后清除接入码。重新接入使用新的凭证文件路径。接入码不写入 URL、命令参数或浏览器持久存储，节点代理不需要数据库凭据。没有私有配置文件时，仍可使用现有环境变量配置代理。
 
 ## 转换与恢复
 

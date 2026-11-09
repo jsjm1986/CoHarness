@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-05-project-recovery-reauthorization.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-05-project-recovery-reauthorization.md
+document:
+  en: 336f12cf5860475fc757ca770093609b588df4c8
+  zh: 2f245cffe4f262499792eba118e2ef3bb2fc3241
+/agent-note-scoped-backup-coverage-and-recovery-reauthorization:
+  en: 675e0fc57bfa6f9e
+  zh: 3adef5ba2230c1a6
+/agent-note-scoped-backup-coverage-and-recovery-reauthorization/problem:
+  en: 7c8c3e6796056eab
+  zh: 9cef2238491bcc4b
+/agent-note-scoped-backup-coverage-and-recovery-reauthorization/decision:
+  en: e5d47f507d5616a8
+  zh: 537d943488159ccb
+/agent-note-scoped-backup-coverage-and-recovery-reauthorization/alternatives-considered:
+  en: 9fb0377d7f48fd4e
+  zh: 60879c73dbb16239
+/agent-note-scoped-backup-coverage-and-recovery-reauthorization/consequences:
+  en: 3fc8aa5da9682bda
+  zh: 8fb523f3c7b6bdfa
+/agent-note-scoped-backup-coverage-and-recovery-reauthorization/verification:
+  en: d6f35d4f8532fbbc
+  zh: 86d01a4411edcbc3

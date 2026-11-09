@@ -153,12 +153,16 @@ export class GatewayRuntimeRouter {
    * Resolve placement before invoking local lifecycle, policy projection or proxy handlers.
    * @param user - authenticated account; explicit environment access is rechecked by the directory.
    * @param selection - URL selection and optional legacy cookie.
+   * @param checked - optional exact allocation already authorized for the same authenticated HTTP request.
    * @returns one authorized local context; a cookie may be repaired, while an explicit target never falls back.
    * @throws RuntimeCatalogError for unavailable, inaccessible, mismatched or remote environments.
    * @throws InvalidRuntimeTargetError for malformed explicit legacy targets.
    */
-  async resolve(user: UserRow, selection: RuntimeSelection): Promise<ResolvedRuntimeRoute> {
-    const placement = await this.placement(user, selection), { environment, target } = placement
+  async resolve(user: UserRow, selection: RuntimeSelection, checked?:RuntimePlacement): Promise<ResolvedRuntimeRoute> {
+    const placement = checked ?? await this.placement(user, selection), { environment, target } = placement
+    if (checked && (placement.environment?.id!==selection.runtimeId || placement.target!==selection.target)) {
+      throw new RuntimeCatalogError(400,'runtime-catalog/target-mismatch')
+    }
     if (!placement.local) {
       throw new RuntimeCatalogError(503, 'runtime-catalog/remote-unavailable')
     }

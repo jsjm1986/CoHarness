@@ -100,12 +100,10 @@ describe('apply wiring', () => {
     expect(conversationHeader?.store).toBe(conversationSession?.store)
     expect(details?.store).toBeUndefined()
     expect(chatView?.store).toBe(conversationSession?.store)
-    // The hero holes ride the conversation entry's children declaration (the
-    // empty-state occupant is gone). Both are root-scoped: the new-session
-    // screen precedes the session either would belong to.
+    // The preset picker follows the Runtime of an already-bound blank Session.
     expect(b.slots.spec('conversation.hero.brand.mark')).toEqual({ kind: 'single', scope: 'root' })
     expect(b.slots.spec('conversation.hero.workspace')).toEqual({ kind: 'single', scope: 'root' })
-    expect(b.slots.spec('conversation.hero.agentPreset')).toEqual({ kind: 'single', scope: 'root' })
+    expect(b.slots.spec('conversation.hero.agentPreset')).toEqual({ kind: 'single', scope: 'session-maybe' })
     // The conversation body is a session-maybe Factory: its strict-session
     // `views` local position defaults to the conversation.session entry.
     expect(b.slots.snapshot('factory:conversation.content')).toMatchObject([{

@@ -19,6 +19,8 @@ kind: "package-reference"
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
+`hmr/authorize-reload` 事件允许部署插件在变更作用于运行中的插件树前核验待生效的 profile、配置和模块。核验拒绝时，原插件继续运行。
+
 -----
 
 <a id="use-this-package"></a>

@@ -18,8 +18,9 @@ import type {
 } from './sessions.ts'
 import type { ToolEventView } from './events.ts'
 import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import type { WorkspaceId } from './workspace.ts'
-import type { UserDocIdType } from '@deepseek-ai/dsh-userdoc'
+import type { WorkspaceId, WorkspaceView } from './workspace.ts'
+import { imageMediaTypeSchema, promptContentPartSchema } from './prompt-wire.ts'
+export { imageMediaTypeSchema, promptContentPartSchema } from './prompt-wire.ts'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -39,6 +40,16 @@ export const messageIdSchema = z.string().min(1) as unknown as z.ZodType<Message
  * DAG (both casts used at module top level; a cycle is a load-time TDZ).
  */
 export const workspaceIdSchema = z.string().min(1) as unknown as z.ZodType<WorkspaceId>
+
+/** WorkspaceView row of every workspace.* response. */
+export const workspaceViewSchema = z.object({
+  workspaceId: workspaceIdSchema,
+  path: z.string(),
+  title: z.string(),
+  sessionIds: z.array(sessionIdSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}) satisfies z.ZodType<Wire<WorkspaceView>>
 
 /** Draft id: the opaque browser reservation identity. */
 export const sessionDraftIdSchema = z.string().min(1) as unknown as z.ZodType<SessionDraftId>
@@ -139,11 +150,21 @@ export const sessionCreateRequestSchema = z.object({
   agentPreset: z.string().optional(),
   sshTarget: z.number().int().positive().optional(),
   visibility: z.union([z.literal('project'), z.literal('private')]).optional(),
+  defaultWorkspace: z.literal(true).optional(),
+  includeWorkspace: z.literal(true).optional(),
+  includeInitialHistory: z.literal(true).optional(),
   reuseWorkspaceBlank: z.literal(true).optional(),
   draftId: sessionDraftIdSchema.optional(),
 }).refine(
   payload => payload.workspaceId === undefined || payload.cwd === undefined,
   { message: 'session.create accepts workspaceId or cwd, not both' },
+).refine(
+  payload => payload.defaultWorkspace !== true ||
+    (payload.workspaceId === undefined && payload.cwd === undefined && payload.sshTarget === undefined),
+  { message: 'defaultWorkspace requires the local Host default directory' },
+).refine(
+  payload => payload.includeWorkspace !== true || payload.workspaceId !== undefined || payload.defaultWorkspace === true,
+  { message: 'includeWorkspace requires a workspace selection' },
 ).refine(
   payload => payload.reuseWorkspaceBlank !== true
     || (payload.workspaceId !== undefined && payload.sessionId !== undefined),
@@ -152,14 +173,6 @@ export const sessionCreateRequestSchema = z.object({
   payload => payload.draftId === undefined || payload.sessionId !== undefined,
   { message: 'session.create draftId requires a preallocated sessionId' },
 ) satisfies z.ZodType<Wire<RequestPayload<'session.create'>>>
-
-/** session.create response value. */
-export const sessionCreateValueSchema = z.object({
-  sessionId: sessionIdSchema,
-  agentPreset: z.string().optional(),
-  sshTarget: z.number().int().positive().optional(),
-  draft: z.literal(true).optional(),
-}) satisfies z.ZodType<Wire<ResponseValue<'session.create'>>>
 
 /** session.rename request payload (raw title; host-side normalization decides acceptance). */
 export const sessionRenameRequestSchema = z.object({
@@ -213,6 +226,7 @@ export function validHistorySelection(request: {
 /** session.history request payload (beforeSeq/maxMessages page backwards from the window tail). */
 export const sessionHistoryRequestSchema = z.object({
   sessionId: sessionIdSchema,
+  onlyActive: z.literal(true).optional(),
   toolCallId: historyToolCallIdSchema.optional(),
   beforeSeq: z.number().int().nonnegative().optional(),
   maxMessages: z.number().int().positive().optional(),
@@ -290,6 +304,21 @@ export const sessionProjectionsBlockSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 }) as unknown as z.ZodType<Wire<SessionProjectionsBlock>>
 
+/** Create receipt with the caller's decoder for an optional logical or fetch-encoded history page.
+ * @param history - page decoder returning the same logical history as a separate active Session read.
+ * @returns the bounded create receipt decoder.
+ */
+export function sessionCreateResultSchema(history: z.ZodType<Wire<ResponseValue<'session.history'>>>): z.ZodType<Wire<ResponseValue<'session.create'>>> {
+  return z.object({ sessionId: sessionIdSchema, agentPreset: z.string().optional(), sshTarget: z.number().int().positive().optional(),
+    draft: z.literal(true).optional(), workspace: workspaceViewSchema.optional(), initialHistory: history.optional() })
+}
+
+/** Logical session.create response. HTTP carriers decode the optional page from their bounded record representation. */
+export const sessionCreateValueSchema: z.ZodType<Wire<ResponseValue<'session.create'>>> = sessionCreateResultSchema(z.object({
+  events: z.array(historyEntrySchema), hasMore: z.boolean(), projections: sessionProjectionsBlockSchema.optional(),
+  omittedSpans: z.array(historyOmittedSpanSchema).optional(),
+}))
+
 /** Host-side validation for the persisted Session-list projection. */
 export const sessionListMetadataProjectionSchema: z.ZodType<SessionListMetadata> = z.object({
   blank: z.boolean(),
@@ -340,21 +369,6 @@ export const sessionSelectModelValueSchema = z.object({
 /** ContentBlock passthrough: core is merge-extensible — the type discriminant envelope is strict, the rest stays wide. */
 export const contentBlockSchema = z.looseObject({ type: z.string() })
 
-/** Raster image media types accepted by the version-one browser wire. */
-export const imageMediaTypeSchema = z.union([
-  z.literal('image/png'),
-  z.literal('image/jpeg'),
-  z.literal('image/webp'),
-  z.literal('image/gif'),
-])
-
-/** Prompt wire content is intentionally narrower than merge-extensible durable core content. */
-export const promptContentPartSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), text: z.string() }),
-  z.object({ type: z.literal('image'), mediaType: imageMediaTypeSchema, data: z.string(), name: z.string().optional() }),
-  z.object({ type: z.literal('document'), docId: z.string().min(1) as unknown as z.ZodType<UserDocIdType> }),
-])
-
 /** session.prompt request payload, including optional browser-local request metadata. */
 export const sessionPromptRequestSchema = z.object({
   sessionId: sessionIdSchema,
@@ -362,7 +376,15 @@ export const sessionPromptRequestSchema = z.object({
   content: z.array(promptContentPartSchema),
   clientTimeZone: z.string().optional(),
   requestId: rpcIdSchema.optional(),
-}) as unknown as z.ZodType<RequestPayload<'session.prompt'>>
+  durable: z.literal(true).optional(),
+}).refine(input => input.durable !== true || (input.requestId !== undefined && input.requestId.length > 0 && input.requestId.length <= 256),
+  { message: 'durable prompt admission requires a bounded requestId' })
+
+/** Receipt lookup for one immutable browser intent in the authenticated Session. */
+export const sessionPromptStatusRequestSchema = z.object({ sessionId: sessionIdSchema, requestId: rpcIdSchema.refine(id => id.length > 0 && id.length <= 256), confirmInput: z.literal(true).optional() }) satisfies z.ZodType<Wire<RequestPayload<'session.promptStatus'>>>
+
+/** A positive receipt represents a flushed input. */
+export const sessionPromptStatusValueSchema = z.object({ state: z.enum(['accepted', 'unknown']), inputProof:z.string().regex(/^[a-f0-9]{64}$/u).optional() }) satisfies z.ZodType<Wire<ResponseValue<'session.promptStatus'>>>
 
 /** session.prompt response value. */
 export const sessionPromptValueSchema = z.object({

@@ -911,3 +911,22 @@ it('opens an explicit personal carrier when the bootstrap connection belongs to 
     expect(url.searchParams.get('dshTarget')).toBe('personal')
   } finally { globalThis.fetch = oldFetch }
 })
+
+it('pins pooled private resources to their owning Runtime without changing the bootstrap target', async () => {
+  ;(globalThis as Win).location = { hostname: 'gateway.example', search: '', origin: 'https://gateway.example' }
+  const handle = await mount()
+  const base = { kind: 'personal' as const, runtimeId: '10000000-0000-4000-8000-000000000001' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']> }
+  const remote = { kind: 'project' as const, projectId: 7, runtimeId: '10000000-0000-4000-8000-000000000002' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']> }
+  handle.confirmPrincipal!(7)
+  handle.setBaseTarget!(base)
+  const pooled = handle.forTarget!(remote)
+  const stream = new URL(pooled.privateResourceUrl!('/api/remote-desktop/stream?token=one-time'), 'https://gateway.example')
+  expect(stream.searchParams.get('dshRuntime')).toBe(remote.runtimeId)
+  expect(stream.searchParams.get('dshTarget')).toBe('project:7')
+  expect(stream.searchParams.get('dshPrincipal')).toBe('7')
+  const original = new URL(handle.privateResourceUrl!('/api/remote-desktop/stream?token=other'), 'https://gateway.example')
+  expect(original.searchParams.get('dshRuntime')).toBe(base.runtimeId)
+  expect(pooled.privateResourceUrl!('https://external.example/api/file')).toBe('https://external.example/api/file')
+  const documents = new URL(pooled.privateResourceUrl!('/api/documents/scope/content?scope=personal&dshNode=node-b'), 'https://gateway.example')
+  expect(documents.searchParams.has('dshRuntime')).toBe(false)
+})

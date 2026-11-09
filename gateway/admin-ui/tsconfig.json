@@ -18,6 +18,8 @@
       "@deepseek-ai/cosmokit": ["../../vendor/cosmokit/lib/types/index.d.ts"],
       "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-client-runtime/client": ["../../packages/client/runtime/src/client/index.ts"],
+      "@deepseek-ai/dsh-host-apiproxy/api": ["../../packages/host/apiproxy/src/api/index.ts"],
+      "@deepseek-ai/dsh-host-apiproxy/api/*": ["../../packages/host/apiproxy/src/api/*.ts"],
       "@deepseek-ai/dsh-client-ui-primitives": ["./src/model-settings-primitives.ts"],
       "@deepseek-ai/dsh-native-command": [
         "../../packages/util/native-command/lib/types/index.d.ts"

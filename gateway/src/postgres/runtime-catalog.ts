@@ -9,6 +9,7 @@ import type { Queryable } from './database.ts'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
 
 interface Row {
+  metadata_on_node?:boolean
   id: string
   kind: 'user' | 'project'
   public_id: string
@@ -56,12 +57,37 @@ function decodeCursor(value: string | undefined, expected: Omit<Cursor, 'after'>
 
 /** PostgreSQL-backed environment metadata with current actor and project authorization. */
 export class PostgresRuntimeCatalog {
+  /** Bound on resolve memo entries; resolution staleness is capped by {@link RESOLVE_MEMO_MS}, not eviction. */
+  private static readonly RESOLVE_MEMO_MAX = 512
+  /** Exact-id resolution shares one round trip across a forwarded-request burst; owner and landing selectors stay
+   * unmemoized because ambiguity and landing order must observe every concurrent environment change. */
+  private static readonly RESOLVE_MEMO_MS = 800
+  private readonly resolveMemo = new Map<string, { at: number; value: Promise<RuntimeCatalogEntry> }>()
+
   /**
    * @param context - authenticated organization and local Gateway node.
    * @param limits - deployment-validated row and complete-response byte limits.
    */
   constructor(private readonly context: Pick<PostgresRuntimeContext, 'organizationId' | 'nodeId'> & { pool: Queryable },
     private readonly limits: RuntimeCatalogLimits, private readonly entryNodeId?: RuntimeNodeId) {}
+
+  /** Run one catalog resolution per key per TTL window; denials and results share the same short staleness budget. */
+  private resolveMemoized(key: string, load: () => Promise<RuntimeCatalogEntry>): Promise<RuntimeCatalogEntry> {
+    const hit = this.resolveMemo.get(key)
+    const now = Date.now()
+    if (hit !== undefined && now - hit.at < PostgresRuntimeCatalog.RESOLVE_MEMO_MS) return hit.value
+    const held = { at: now, value: load() }
+    held.value = held.value.then(entry => entry, (error: unknown) => {
+      if (this.resolveMemo.get(key) === held) this.resolveMemo.delete(key)
+      throw error
+    })
+    this.resolveMemo.set(key, held)
+    if (this.resolveMemo.size > PostgresRuntimeCatalog.RESOLVE_MEMO_MAX) {
+      const oldest = this.resolveMemo.keys().next().value
+      if (oldest !== undefined) this.resolveMemo.delete(oldest)
+    }
+    return held.value
+  }
 
   /**
    * List the actor's personal and authorized project environments without contacting nodes.
@@ -70,8 +96,12 @@ export class PostgresRuntimeCatalog {
    * @returns one page restricted to current account and project access.
    * @throws RuntimeCatalogError for malformed pagination, revoked authority, or an oversized row.
    */
-  pageForAccount(actor: UserRow, query: RuntimeCatalogQuery): Promise<RuntimeCatalogPage> {
-    return this.page(actor, query, 'account')
+  async pageForAccount(actor: UserRow, query: RuntimeCatalogQuery): Promise<RuntimeCatalogPage> {
+    if (query.projectId === undefined) return this.page(actor, query, 'account')
+    if (!/^[1-9][0-9]*$/u.test(query.projectId) || !Number.isSafeInteger(Number(query.projectId))) {
+      throw new RuntimeCatalogError(400, 'runtime-catalog/invalid-id')
+    }
+    return this.page(actor, query, 'account', undefined, { kind: 'project', id: Number(query.projectId) })
   }
 
   /**
@@ -98,6 +128,9 @@ export class PostgresRuntimeCatalog {
 
   /**
    * Resolve one authorized environment before its placement is dispatched by the runtime router.
+   * Owner, node, and identity of an exact environment are immutable while active, so one request burst reuses a
+   * positive resolution for at most {@link RESOLVE_MEMO_MS} milliseconds; retirement and access loss still bind
+   * within that window because downstream attach fences on generation and live instance rows.
    * @param actor - authenticated account whose current access is rechecked.
    * @param id - untrusted environment UUID from the request URL.
    * @returns the exact authorized environment and its node, without starting or contacting it.
@@ -105,9 +138,11 @@ export class PostgresRuntimeCatalog {
    */
   async resolveForAccount(actor: UserRow, id: string): Promise<RuntimeCatalogEntry> {
     if (!UUID.test(id)) throw new RuntimeCatalogError(400, 'runtime-catalog/invalid-id')
-    const entry = (await this.page(actor, { limit: '1' }, 'account', id as RuntimeId)).items[0]
-    if (entry === undefined) throw new RuntimeCatalogError(404, 'runtime-catalog/not-found')
-    return entry
+    return this.resolveMemoized(`account:${actor.id}:${id}`, async () => {
+      const entry = (await this.page(actor, { limit: '1' }, 'account', id as RuntimeId)).items[0]
+      if (entry === undefined) throw new RuntimeCatalogError(404, 'runtime-catalog/not-found')
+      return entry
+    })
   }
 
   /**
@@ -174,7 +209,8 @@ export class PostgresRuntimeCatalog {
         AND ($3<>'admin' OR m.role='admin')
     ), entries AS (
       SELECT r.id,r.owner_kind kind,COALESCE(u.public_id,p.public_id)::text public_id,
-        COALESCE(NULLIF(u.display_name,''),u.username::text,p.name::text) name,
+        CASE WHEN b.project_id IS NOT NULL THEN '#'||p.public_id::text ELSE COALESCE(NULLIF(u.display_name,''),u.username::text,p.name::text) END name,
+        b.project_id IS NOT NULL metadata_on_node,
         n.id node_id,n.name::text node_name,n.status node_status,n.last_heartbeat_at,
         i.observed_state,i.generation::text,i.provisioning_state,
         CASE WHEN $11::boolean AND r.node_id=$12::uuid THEN 0 ELSE 1 END landing_node,
@@ -190,6 +226,7 @@ export class PostgresRuntimeCatalog {
         AND owner_membership.organization_id=r.organization_id AND ($3='admin' OR owner_membership.status='active')
       LEFT JOIN harness.projects p ON r.owner_kind='project' AND p.id=r.owner_id
         AND p.organization_id=r.organization_id AND ($3='admin' OR p.status='active')
+      LEFT JOIN harness.project_content_placement b ON b.organization_id=r.organization_id AND b.runtime_id=r.id
       LEFT JOIN harness.project_members pm ON pm.project_id=p.id AND pm.organization_id=r.organization_id AND pm.user_id=a.id
       WHERE r.organization_id=$1 AND r.retired_at IS NULL AND ($4::uuid IS NULL OR r.id>$4::uuid)
         AND ($6::uuid IS NULL OR r.id=$6::uuid)
@@ -217,6 +254,7 @@ export class PostgresRuntimeCatalog {
     for (const row of page.entries.slice(0, limit)) {
       const entry: RuntimeCatalogEntry = {
         id: row.id as RuntimeId,
+        ...row.metadata_on_node?{metadataOnNode:true as const}:{},
         owner: { kind: row.kind === 'user' ? 'personal' : 'project', id: publicNumber(row.public_id, 'Runtime owner'), name: row.name },
         node: { id: row.node_id as RuntimeNodeId, name: row.node_name, status: row.node_status,
           lastHeartbeatAt: row.last_heartbeat_at === null ? null : new Date(row.last_heartbeat_at).toISOString() },

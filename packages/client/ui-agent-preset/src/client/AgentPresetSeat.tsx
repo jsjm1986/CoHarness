@@ -98,8 +98,8 @@ export function AgentPresetSeat({
   }, [state.error])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    if (developerTools) void load()
+  }, [developerTools, load])
 
   // The component stays registered while hidden, so clear local disclosure
   // state explicitly; otherwise an external off/on edit can revive an open

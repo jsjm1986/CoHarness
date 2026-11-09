@@ -52,7 +52,7 @@ export interface SessionsPortList {
 }
 
 /** The sessions-service face injected into sibling domains. */
-export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'runtimeTargetFor' | 'usingRuntime' | 'createSession'> {
+export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'runtimeTargetFor' | 'usingRuntime' | 'createSession' | 'preparedOperationsAvailable' | 'createPreparedSession'> {
   /** Workspace frames from explicitly opened foreign Runtimes; reading starts no transport. */
   readonly workspaceSnapshots?: ObservableSnapshot<readonly RuntimeWorkspaceSnapshot[]>
   /**

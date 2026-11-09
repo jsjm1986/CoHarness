@@ -13,7 +13,7 @@
   },
   "fixes": [
     "Private capture verifies the selected directory object and complete authorized file inventory before publication. Recovery of a recorded published directory settles that admitted snapshot using directory identity and protected marker evidence.",
-    "Ordinary later file changes reconcile independently: exact originals retain creator provenance; atomic replacements acquire distinct unattributed incarnations. The directory actor is not assigned to external saves.",
+    "Ordinary later file changes reconcile independently: exact originals retain creator identity; atomic replacements acquire distinct unattributed incarnations. The directory actor is not assigned to external saves.",
     "Legacy directory intents without a recorded source object retain complete target-inventory verification. A substituted target carrying the old marker is rejected."
   ],
   "acceptance": {

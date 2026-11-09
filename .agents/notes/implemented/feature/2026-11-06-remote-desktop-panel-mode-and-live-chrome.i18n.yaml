@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-06-remote-desktop-panel-mode-and-live-chrome.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-06-remote-desktop-panel-mode-and-live-chrome.md
+document:
+  en: 43a492aadd03aba836b736f3b9909c397f1d375d
+  zh: bfab144ac5297857a5361b2750820ac1c0883922
+/agent-note-remote-desktop-tabs-drive-the-panel-display-mode-through-their-bound-actions:
+  en: d66655fe374ba3e6
+  zh: f9bb44176bfd0af8
+/agent-note-remote-desktop-tabs-drive-the-panel-display-mode-through-their-bound-actions/problem:
+  en: ba7f0b8805a28aff
+  zh: ee983c8252ff9b65
+/agent-note-remote-desktop-tabs-drive-the-panel-display-mode-through-their-bound-actions/decision:
+  en: 5c9ff573804d6e6d
+  zh: ebbd7e8e6ca607fa
+/agent-note-remote-desktop-tabs-drive-the-panel-display-mode-through-their-bound-actions/alternatives-considered:
+  en: 8412a4ca10a611fa
+  zh: 91db567bae4e198e
+/agent-note-remote-desktop-tabs-drive-the-panel-display-mode-through-their-bound-actions/consequences:
+  en: 6ff197f70a2ae017
+  zh: 53e8b0e8fec40105
+/agent-note-remote-desktop-tabs-drive-the-panel-display-mode-through-their-bound-actions/testing:
+  en: 8ac2f472d267ef4e
+  zh: a0bb0a23eb4e3c12

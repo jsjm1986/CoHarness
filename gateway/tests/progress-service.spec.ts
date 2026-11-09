@@ -34,6 +34,11 @@ function scriptedPool(handlers: Handler[]): Pool & { query: ReturnType<typeof vi
         return { rows: ids.map(id => ({ id })), rowCount: ids.length }
       }
       if (/SELECT 1 FROM harness\.(organizations|projects)/.test(sql)) return { rows: [{}], rowCount: 1 }
+      // Project reads route through the placement join; unplaced rows keep the harness schema.
+      if (/FROM harness\.projects p LEFT JOIN harness\.project_content_placement/.test(sql)) {
+        return { rows: [{ id: '00000000-0000-4000-8000-000000000009', name_version: null, node_id: null, runtime_id: null, volume_id: null, writer_epoch: null }], rowCount: 1 }
+      }
+      if (/FROM harness\.project_content_placement b\s+JOIN harness\.projects p/.test(sql)) return { rows: [], rowCount: 0 }
       if (/generation_id=\$3 RETURNING project_id/.test(sql)) return { rows: [{}], rowCount: 1 }
       if (/INSERT INTO harness\.project_journal_materials/.test(sql)) return { rows: [], rowCount: 1 }
 
@@ -294,8 +299,8 @@ describe('PostgresProgressService.sweep', () => {
     ])
     const service = serviceFor(pool)
     await service.sweep()
-    // No lease, no material, no model — only the three reads happened.
-    expect(pool.query).toHaveBeenCalledTimes(3)
+    // No lease, no material, no model — only the placement join and the three reads happened.
+    expect(pool.query).toHaveBeenCalledTimes(4)
     const old = new Date(Date.now() - 2 * 60 * 60_000)
     const pool2 = scriptedPool([
       { match: /GROUP BY pid/, result: () => rows([{ pid: 'p-internal', mx: old }]) },
@@ -308,7 +313,7 @@ describe('PostgresProgressService.sweep', () => {
     // intervalMs default (4h) blocks because last_run_at is now.
     const service2 = serviceFor(pool2)
     await service2.sweep()
-    expect(pool2.query).toHaveBeenCalledTimes(3)
+    expect(pool2.query).toHaveBeenCalledTimes(4)
   })
 
   it('records last_error and leaves the watermark behind when the model fails', async () => {

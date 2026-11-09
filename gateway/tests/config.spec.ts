@@ -10,6 +10,24 @@ import {
 } from '../src/config.ts'
 
 describe('loadConfig', () => {
+  it('configures native PostgreSQL connection resolution and bounds wrapper readiness', () => {
+    expect(loadConfig({}).pgConnectionCommand[0]).toMatch(/hgw-pg-client(?:\.exe)?$/u)
+    expect(loadConfig({}).pgConnectionTimeoutMs).toBe(30000)
+    expect(loadConfig({ HGW_PG_CONNECTION_COMMAND: 'custom-resolver --fixed', HGW_PG_CONNECTION_TIMEOUT_MS: '45000' }))
+      .toMatchObject({ pgConnectionCommand: ['custom-resolver', '--fixed'], pgConnectionTimeoutMs: 45000 })
+    expect(() => loadConfig({ HGW_PG_CONNECTION_COMMAND: '' })).toThrow('HGW_PG_CONNECTION_COMMAND')
+    for (const value of ['0', '-1', '1.5', 'invalid', String(MAX_TIMER_DELAY_MS + 1)]) {
+      expect(() => loadConfig({ HGW_PG_CONNECTION_TIMEOUT_MS: value })).toThrow('HGW_PG_CONNECTION_TIMEOUT_MS')
+    }
+  })
+  it('refuses a workspace that normalizes to its managed parent', () => {
+    expect(() => loadConfig({ HGW_STEWARD: 'on', HGW_STEWARD_ROOT: '/srv/steward/',
+      HGW_STEWARD_WORKSPACE: '/srv/steward/child/..' })).toThrow('strict descendant')
+    expect(() => loadConfig({ HGW_LAUNCHER: 'systemd', HGW_PROJECT_PATH_ROOTS: '/srv/projects/',
+      HGW_PROJECTS_ROOT: '/srv/projects/child/..' })).toThrow('strict descendant')
+    expect(() => loadConfig({ HGW_LAUNCHER: 'systemd', HGW_PROJECT_PATH_ROOTS: '/srv/projects/',
+      HGW_USER_PROJECTS_ROOT: '/srv/projects/child/..' })).toThrow('strict descendant')
+  })
   it('shares font metadata only among local runtimes and accepts an explicit opt-out', () => {
     const cfg = loadConfig({})
     expect(cfg.officeFontMetadataCacheDirectory).toBe(resolve(cfg.stateRoot, 'cache', 'office-font-metadata'))
@@ -396,6 +414,10 @@ describe('loadConfig', () => {
     expect(loadConfig({}).steward.enabled).toBe(false)
     const enabled = loadConfig({ HGW_STEWARD: 'on', HGW_STEWARD_ROOT: '/srv/harness-steward' })
     expect(enabled.steward.enabled).toBe(true)
+    expect(enabled.steward.prepareTimeoutMs).toBe(60000)
+    expect(enabled.steward.prepareKillGraceMs).toBe(1000)
+    expect(loadConfig({ HGW_STEWARD_PREPARE_KILL_GRACE_MS: '2000' }).steward.prepareKillGraceMs).toBe(2000)
+    expect(loadConfig({ HGW_STEWARD_PREPARE_TIMEOUT_MS: '120000' }).steward.prepareTimeoutMs).toBe(120000)
     expect(enabled.steward.workspacePath).toBe('/srv/harness-steward/workspace')
     expect(enabled.projectPathRoots).toContain('/srv/harness-steward')
     expect(loadConfig({}).projectPathRoots).not.toContain('/srv/harness-steward')
@@ -414,6 +436,11 @@ describe('loadConfig', () => {
       .toThrow(/HGW_STEWARD_RUNTIME_USER/)
     expect(() => loadConfig({ HGW_STEWARD: 'on', HGW_STEWARD_RUNTIME_USER: 'not a user' }))
       .toThrow(/HGW_STEWARD_RUNTIME_USER/)
+  })
+
+  it.each(['0', '-1', 'invalid', '1.5', '2147483648'])('rejects an invalid steward preparation timer: %s', value => {
+    expect(() => loadConfig({ HGW_STEWARD_PREPARE_TIMEOUT_MS: value })).toThrow(/HGW_STEWARD_PREPARE_TIMEOUT_MS/)
+    expect(() => loadConfig({ HGW_STEWARD_PREPARE_KILL_GRACE_MS: value })).toThrow(/HGW_STEWARD_PREPARE_KILL_GRACE_MS/)
   })
 
   it('parses steward read-only roots and rejects malformed declarations', () => {

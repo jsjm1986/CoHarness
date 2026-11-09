@@ -467,7 +467,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'BeginSubmissionInput',
-    declaration: 'export interface BeginSubmissionInput {\n    readonly mode: \'queue\' | \'steer\';\n    readonly text: string;\n    readonly images: readonly PendingSubmissionImage[];\n    readonly onRetire?: (retirement: PendingSubmissionRetirement) => void;\n}',
+    declaration: 'export interface BeginSubmissionInput {\n    readonly mode: \'queue\' | \'steer\';\n    readonly text: string;\n    readonly images: readonly PendingSubmissionImage[];\n    readonly documentIds?: readonly string[];\n    readonly onRetire?: (retirement: PendingSubmissionRetirement) => void;\n}',
   },
   {
     name: 'BoundActions',
@@ -699,7 +699,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ISession',
-    declaration: 'export interface ISession {\n    publishInteraction(entry: SessionPublishedInteraction): () => void;\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+    declaration: 'export interface ISession {\n    publishInteraction(entry: SessionPublishedInteraction): () => void;\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly hasDurableAdmission?: () => boolean;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
   },
   {
     name: 'KeyedHooksSources',

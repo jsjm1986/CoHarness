@@ -9,6 +9,8 @@ kind: "package-reference"
 
 此 Cordis 浏览器插件在一个多面板对话工作台中展示最多四个已有 Workspace Session。它负责 Workspace／会话选择器，以及面板选择、顺序、比例和模式切换的操作；它消费 `conversationViewport` 能力，通过 ui-conversation 声明的 slots 贡献工具栏、空状态和面板头，并通过 ui-workspace 声明的 `sidebar.workspaces.workbench` 孔位贡献侧栏面板。
 
+在多电脑入口，「全部空间」搜索本标签页已经载入的个人及项目对话。选择某台电脑的个人 Runtime 或项目，即可分页搜索其中有权访问的对话。未查询的位置保持空闲，刷新权限时会先清除旧结果，验权通过后重新显示。新建的窗格使用目标 Runtime 确认的工作区和初始历史，单独打开已有对话则重新验证。项目所属电脑仍在读取项目名称时就能打开对话，每个已保存的窗格也会在自身验证通过后独立就绪。
+
 插件不导入 ConversationRoot、ChatView、InputBar 或其他呈现实现。conversation slot 的拥有者通过显式 SessionProvider 渲染各面板，因此每个面板都从同一对象层获取独立的 Session 标准 props、会话 store、projection 和注入操作。根 slot 的注入控件会在渲染时解析活动面板；缓存的根注入不会固定持有某个 Session 或 runtime target。布局菜单的展开状态由页面根级临时选择器 store 持有，因此从 Hero 移到 Session 页头时仍保留用户的打开操作；选中菜单项或主动关闭会收起菜单。
 
 选择器列出各个已授权电脑的个人对话，以及现有成员权限允许的项目对话。个人历史摘要由已经运行的 Runtime 同步，浏览目录不会启动其他 Runtime。新建个人对话会捕获精确 Runtime，不同 Runtime 上相同的 Session id 保持独立。单电脑展示隐藏电脑标识，并分别保留入口本机的各个 Runtime 选择。

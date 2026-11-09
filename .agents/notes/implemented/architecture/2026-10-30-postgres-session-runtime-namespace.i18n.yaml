@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-30-postgres-session-runtime-namespace.md
 document:
-  en: 0fff8d8d16731e8becfe5d41a3b741d02dffc30e
-  zh: b5d4723479eba6febd9ff9d225736a0c78629464
+  en: 5b539488ea62244dcdd23556fb4505b7e2195140
+  zh: cf1dbf2ac994ddaef53ee64579778fb62ed6d6d1
 /agent-note-postgresql-sessions-keep-host-identity-inside-each-runtime:
   en: 5aad95e3ba0a5ff7
   zh: 6bf45a8317ce9420
@@ -15,8 +15,8 @@ document:
   en: 14f2fed51a85dfdd
   zh: 57d21551bcd0cd54
 /agent-note-postgresql-sessions-keep-host-identity-inside-each-runtime/alternatives-considered:
-  en: 931bd0236914f752
-  zh: 669fbc50f53faf97
+  en: bdd9304006b567f7
+  zh: cf5456ba872e3e8d
 /agent-note-postgresql-sessions-keep-host-identity-inside-each-runtime/consequences:
   en: c21083045064c627
   zh: 363bc598b5f100ee

@@ -6,6 +6,7 @@ import { PostgresNodeAccessService } from './postgres/node-access-service.ts'
 import { GatewayNodeChannels } from './node-channel.ts'
 import { GatewayNodeServices } from './node-service.ts'
 import { GatewayNodeServiceProxy } from './node-service-proxy.ts'
+import { forwardIssuerOf, verifyGatewayForward } from './forwarded-principal.ts'
 import { NodeResourceBudget } from './node-resource-budget.ts'
 import { NodeResourcePressure } from './node-resource-pressure.ts'
 import { GatewayModelBudget } from './gateway-model-budget.ts'
@@ -24,8 +25,7 @@ import { GatewayPluginManagement } from './plugin-management.ts'
 import { GatewayTerminalManagement } from './terminal-management.ts'
 import { randomBytes } from 'node:crypto'
 import { DOCUMENT_STORE_UNAVAILABLE_CODE, UserDocError } from '@deepseek-ai/dsh-userdoc'
-import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { prepareStewardWorktree } from './steward-worktree.ts'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { createAdminApiHandler } from './admin-api.ts'
@@ -55,7 +55,7 @@ import {
 } from './postgres/database.ts'
 import { PostgresConversationStore } from './postgres/conversation-repository.ts'
 import { DesktopCoordinator } from './desktop-coordinator.ts'
-import { ConversationArchiveService } from './postgres/conversation-archive-service.ts'
+import { NodeArchiveRouter } from './node-archive-router.ts'
 import { createArchiveRuntimeReader } from './archive-runtime-reader.ts'
 import { PostgresDesktopCoordinatorRepository } from './postgres/desktop-coordinator-repository.ts'
 import { PostgresInstanceRepository } from './postgres/instance-repository.ts'
@@ -82,9 +82,32 @@ import { PostgresWebhookEndpointService, WebhookSecretCipher } from './postgres/
 import { GatewayWebhookIntake } from './webhook-intake.ts'
 import { loadPrincipalKeys, PRINCIPAL_HEADER } from './principal.ts'
 import { createProxyHandlers } from './proxy.ts'
+import { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { PostgresAccessMonitor, scopeAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
+import { PrimaryProjectNames } from './primary-project-names.ts'
+import { NodeContentDocuments } from './node-content-documents.ts'
+import { NodeDocumentAuthority } from './node-content-documents-authority.ts'
+import { NodeContentMigrationAdmin } from './node-content-migration-admin.ts'
+import { NodeContentSourceRetirement } from './node-content-source-retirement.ts'
+import { NodeContentPublication } from './node-content-publication.ts'
+import { nodeCorePublicationChecks } from './node-content-core-publication.ts'
+import { createNodePluginProofs } from './node-content-plugin-proofs.ts'
+import { NativePeerProjectSnapshots } from './peer-native-project-snapshots.ts'
+import { PeerPersonalFiles } from './peer-backup-personal-files.ts'
+import { NodeProjectFiles } from './node-content-files.ts'
+import { GatewayExecutionIdentity } from './execution-identity.ts'
+import { NodeProjectMetadata } from './node-content-projects.ts'
+import { NodeContentConnection } from './node-content-connection.ts'
+import { PeerBackupRelay } from './peer-backup-relay.ts'
+import { createPeerBackupGateway } from './peer-backup-gateway.ts'
+import { PeerProjectFileGate } from './peer-backup-file-gate.ts'
+import { projectNodeDrafts } from './project-node-drafts.ts'
+import { NodePrivateSqliteHost } from './node-private-sqlite-host.ts'
+import { PersonalNodeIndex } from './personal-index.ts'
+import { LocalNodeDrafts } from './node-drafts.ts'
+import { workbenchRows } from './workbench-rows.ts'
 import { createGatewayWorkbenchCatalogHandler } from './workbench.ts'
 import { PostgresWorkspaceCatalog } from './workspace-catalog.ts'
 import {
@@ -106,6 +129,7 @@ import { PostgresDocumentCatalogService } from './postgres/document-catalog-serv
 import { PostgresDocumentLocations } from './postgres/document-locations.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, scopeCookie, type GatewayDeps } from './server.ts'
+import { ReleaseAssets } from './release-assets.ts'
 import { GatewayPerformanceObserver } from './performance-observer.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
 import { removeBootstrapAdminPassword, writeBootstrapAdminPassword } from './bootstrap-admin.ts'
@@ -113,14 +137,22 @@ import type { GatewayModelGovernanceService } from './services.ts'
 
 
 const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
+/** Consumed nonces of accepted forwarded assertions: nonce → expiresAt. */
+const forwardNonceLedger = new Map<string, number>()
 const cfg = loadConfig(effectiveEnvironment)
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
 const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
 const pool = createPostgresPool(databaseUrl, {
   max: cfg.databaseMaxConnections,
+  min: cfg.databaseMinConnections,
   maxCheckoutQueue: cfg.databaseMaxCheckoutQueue,
   connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
 })
+if (cfg.databaseMinConnections > 0) {
+  void Promise.all(Array.from({ length: cfg.databaseMinConnections },
+    async () => { (await pool.connect()).release() }))
+    .catch((error: unknown) => { console.error('[gateway] PostgreSQL pool warm-up failed:', error) })
+}
 const startupAbort = new AbortController()
 const onStartupSignal = (): void => { startupAbort.abort() }
 process.once('SIGINT', onStartupSignal)
@@ -192,23 +224,34 @@ async function assertCurrentDataEpoch(): Promise<void> {
 const auth = new PostgresAuthService(context, cfg)
 const users = new PostgresUserService(context, cfg)
 const userPreferences = new PostgresAccountPreferencesService(context, cfg)
-const projects = new PostgresProjectService(context, cfg, context.nodeId)
+const contentVolume = new NodeContentConnection(cfg, context)
+const nodeProjects = new NodeProjectMetadata(context, contentVolume)
+const nodeFiles = new NodeProjectFiles(cfg,context,contentVolume,createNodePluginProofs(effectiveEnvironment.HGW_NODE_PLUGIN_PROOFS_FILE,cfg.runtimeRequestTimeoutMs))
+const executionIdentity = new GatewayExecutionIdentity(context.pool,context.nodeId,contentVolume)
+const projects = new PostgresProjectService(context, cfg, context.nodeId, {metadata:nodeProjects,
+  ...(cfg.nodeContent ? {requirePhysical:true,publication:()=>publication,ready:()=>contentVolume.ready()} : {})})
 const audit = new PostgresAuditService(context)
 const governance: GatewayModelGovernanceService = new PostgresModelGovernanceService(
   context,
   new OrganizationModelCredentialCipher(
     loadOrganizationModelCredentialKey(cfg.organizationModelCredentialKeyFile),
   ),
-  cfg.usageTimeZone,
+  cfg.usageTimeZone, contentVolume,
 )
-const collaboration = new PostgresCollaborationService(context, context.nodeId as import('./runtime-catalog.ts').RuntimeNodeId)
-const documentCatalog = new PostgresDocumentCatalogService(context, cfg.archiveRetentionDays, context.nodeId as import('./runtime-catalog.ts').RuntimeNodeId)
+const collaboration = new PostgresCollaborationService(context, context.nodeId as RuntimeNodeId, contentVolume, nodeProjects)
 const documentLocations = new PostgresDocumentLocations(context, cfg.runtimeCatalog, context.nodeId as import('./runtime-catalog.ts').RuntimeNodeId)
+const personalDocumentGate=cfg.nodeContent?new PeerProjectFileGate(cfg.stateRoot,'personal-document-handoff'):undefined
+const nodeDocuments:NodeContentDocuments = new NodeContentDocuments(new NodeDocumentAuthority(context,documentLocations,contentVolume),input=>localDocuments.inspectPublicationRoot(input),
+  personalDocumentGate?{gate:personalDocumentGate,inspect:(user,maxRows,cursor)=>localDocuments.inspectPersonalHistory(user,maxRows,cursor)}:undefined)
+const documentCatalog = new PostgresDocumentCatalogService(context, cfg.archiveRetentionDays, context.nodeId as RuntimeNodeId, nodeDocuments)
 const documentCatalogHandlers = createDocumentCatalogHandlers(documentCatalog, audit)
 const push = createPostgresPushService(context, cfg)
 const principalKeys = loadPrincipalKeys(cfg.principalKeyDir, cfg.organizationSlug, cfg.principalAssertionTtlMs)
-const instanceRepository = new PostgresInstanceRepository(context, cfg.instancePortBase)
-const conversations = new PostgresConversationStore(pool)
+// Peer gateways verify forwarded-request assertions against this published key.
+await pool.query('UPDATE harness.compute_nodes SET principal_public_key=$3 WHERE organization_id=$1 AND id=$2',
+  [context.organizationId, context.nodeId, principalKeys.publicKeyPem])
+const instanceRepository = new PostgresInstanceRepository(context, cfg.instancePortBase, nodeProjects, nodeFiles, cfg.runtimeTokenCacheMs)
+const conversations = new PostgresConversationStore(pool, contentVolume)
 // Launcher is local child-process (dev) unless HGW_LAUNCHER=systemd (Linux prod);
 // the systemd options factory is only evaluated in the systemd case.
 const launcher = selectLauncher(cfg, () => ({
@@ -244,8 +287,17 @@ await resourceBudget.configure()
 const gatewayModelBudget = await GatewayModelBudget.open(resourceBudget, join(nodeControlPaths(cfg.stateRoot).gatewayModels, context.nodeId))
 const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs)
 const localAccessMonitor = scopeAccessMonitor(accessMonitor, context.nodeId as RuntimeNodeId)
-const progress = new PostgresProgressService(context, { collaboration, governance, budget: gatewayModelBudget, accessMonitor: localAccessMonitor,
-  usage: new PostgresProgressUsage(context, governance, cfg.progress.usageReplayBatchSize, assertCurrentDataEpoch),
+const principalDirectory = new NodePrincipalDirectory(context, cfg.runtimeTokenCacheMs)
+localAccessMonitor.subscribe(() => {
+  instanceRepository.invalidateRuntimeTokenCache()
+})
+// Issuer-key entries are keyed by *foreign* nodes: a revocation on another
+// node emits that node's id, which the scoped monitor would filter out.
+accessMonitor.subscribe(() => {
+  principalDirectory.invalidate()
+})
+const progress = new PostgresProgressService(context, { nodeContent: contentVolume, collaboration, governance, budget: gatewayModelBudget, accessMonitor: localAccessMonitor,
+  usage: new PostgresProgressUsage(context, governance, cfg.progress.usageReplayBatchSize, assertCurrentDataEpoch, contentVolume),
   trackWrite: operation => trackWriter(operation), assertDataEpoch: assertCurrentDataEpoch,
   beforeDispatch: async () => {
     await assertCurrentDataEpoch()
@@ -257,14 +309,15 @@ const instances = new InstanceManager(instanceRepository, cfg, launcher, {
 }, resourceBudget, gatewayModelBudget)
 const desktops = new DesktopCoordinator(new PostgresDesktopCoordinatorRepository(context), instances, cfg.desktop, audit)
 await desktops.initialize()
-const archives = new ConversationArchiveService(context, cfg.archiveRetentionDays)
+const archives = new NodeArchiveRouter(context, cfg.archiveRetentionDays,contentVolume)
 archives.setRuntimeReader(createArchiveRuntimeReader({ cfg, users, projects, instances, principals: principalKeys.signer,
   authorizeAdministrator: id => instanceRepository.authorizeAdministrator(id) }))
 
 const nodeConfiguration = new NodeConfigurationStore(context, cfg, effectiveEnvironment, nodeConfigurationAuthority(context))
 await nodeConfiguration.initialize()
 const backups = new PostgresBackupService(context)
-const deploymentCommands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand, cfg.psqlCommand)
+const deploymentCommands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand, cfg.psqlCommand,
+  { command: cfg.pgConnectionCommand, timeoutMs: cfg.pgConnectionTimeoutMs })
 
 const MAINTENANCE_GATE_CACHE_MS = 300
 let stoppingWriters = false
@@ -353,8 +406,17 @@ const tunnelAccess = new GatewayTunnelAccess({
   probeIntervalMs: cfg.tunnelProbeIntervalMs,
   envBinaryPath: cfg.cloudflaredBin,
 })
-const pluginState = new PostgresPluginState(context)
-const stewardQuery = new StewardQueryService(context, cfg.steward.enabled)
+const pluginState = new PostgresPluginState(context, contentVolume, nodeFiles)
+// Statements run on their own small pool: a session-state escape (deny-listed
+// functions, advisory locks, listeners) can then never reach a connection the
+// rest of the Gateway shares; journals still write through the main pool.
+const stewardStatementPool = createPostgresPool(databaseUrl, {
+  max: 4,
+  maxCheckoutQueue: cfg.databaseMaxCheckoutQueue,
+  connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
+  application_name: 'dsh-steward-query',
+})
+const stewardQuery = new StewardQueryService(context, cfg.steward.enabled, stewardStatementPool)
 const performanceObserver = new GatewayPerformanceObserver({
   enabled: cfg.performanceEnabled,
   eventLoopResolutionMs: cfg.performanceEventLoopResolutionMs,
@@ -376,11 +438,32 @@ const nodeServiceProxy = new GatewayNodeServiceProxy({
   resetScopeCookie: () => scopeCookie('personal', cfg),
   authorizeAdministratorNode: (actor, id) => nodeAccess.authorizeAdministratorNode(actor, id),
   authorizeAccountNode: (actor, id) => computerAccess.authorize(actor.id, id),
-}, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor)
+}, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor,
+async (target, user, request) => {
+  // Attach the placement this Gateway already authorized so the destination
+  // can adopt it as a checked placement; scope and runtime storage are
+  // node-local data the destination resolves itself.
+  const environment = target.environment
+  return principalKeys.signer.issueForward({
+    issuerNode: context.nodeId, audienceNode: target.nodeId, user,
+    selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
+    ...(environment === undefined || target.resolvedTarget === undefined
+      ? {} : { context: { environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name } } }),
+    request,
+  })
+})
 const runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter({ collaboration, instances }), {
   catalog: runtimeCatalog, localNodeId: context.nodeId as RuntimeNodeId,
 })
+const nodeSqlite=new NodePrivateSqliteHost(cfg.stateRoot,cfg.runtimeRequestTimeoutMs)
+const personalIndex = new PersonalNodeIndex(cfg.stateRoot,nodeSqlite)
+const workspaceCatalog = new PostgresWorkspaceCatalog(context, context.nodeId as RuntimeNodeId, personalIndex, contentVolume)
 const deps: GatewayDeps = {
+  revalidateOnComputer:token=>auth.validateOnComputer(token),
+  projectMetadata: nodeProjects,
+  projectNames: new PrimaryProjectNames(context, () => topology.read(), cfg.projectNameKeyFile, cfg.upstreamTimeoutMs),
+  personalDirectory: workspaceCatalog,
+  nodeContent: contentVolume,
   topology,
   nodeConnection: new GatewayNodeConnection(context, cfg, effectiveEnvironment, nodeConfigurationAuthority(context), topology),
   documentLocations,
@@ -394,6 +477,34 @@ const deps: GatewayDeps = {
   nodeServiceIdentity: {
     nodeId: context.nodeId as RuntimeNodeId, organizationId: context.organizationId,
     authorize: (token, input) => nodeAccess.authorizeChannel(token, input),
+  },
+  forwardedPrincipal: async assertion => {
+    // Any failure here — malformed assertion, directory outage, bad issuer —
+    // resolves to null so the request falls back to ordinary session
+    // validation; a broken forward path must not become a 500.
+    try {
+      const issuerNode = forwardIssuerOf(assertion)
+      const issuerKey = issuerNode === null ? null : await principalDirectory.issuerKey(issuerNode)
+      const claims = issuerKey === null ? null
+        : verifyGatewayForward(assertion, issuerKey, {
+          audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug })
+      if (claims === null) return null
+      // A captured assertion stays replayable within its TTL unless the nonce
+      // is consumed; the ledger is bounded by assertion expiry and each issued
+      // assertion mints a fresh nonce, so a duplicate is replay evidence.
+      const now = Date.now()
+      for (const [nonce, expiry] of forwardNonceLedger) if (expiry <= now) forwardNonceLedger.delete(nonce)
+      if (forwardNonceLedger.has(claims.nonce)) return null
+      // Clamp retained expiry to the issued lifetime and bound the map: a
+      // hostile issuer could mint far-future expiresAt claims and grow the
+      // ledger unboundedly. Clearing under pressure only widens the replay
+      // window for assertions still inside their TTL.
+      if (forwardNonceLedger.size >= 4096) forwardNonceLedger.clear()
+      forwardNonceLedger.set(claims.nonce, Math.min(claims.expiresAt, now + cfg.principalAssertionTtlMs))
+      return claims
+    } catch {
+      return null
+    }
   },
   runtimeRouter,
   performance: performanceObserver,
@@ -436,6 +547,7 @@ const deps: GatewayDeps = {
   migrationPlan: () => migrationPlan(pool, cfg.deployMigrationsDir),
   maintenanceGate,
   writerSpan,
+  releaseAssets: ReleaseAssets.forConfig(cfg),
   databasePerformance: () => ({
     total: pool.totalCount,
     idle: pool.idleCount,
@@ -452,7 +564,8 @@ const deps: GatewayDeps = {
 }
 
 await assertCurrentDataEpoch()
-onWritesReopened = () => { scheduleModelGovernanceRefresh(deps) }
+const reopenModelGovernance = (): void => { scheduleModelGovernanceRefresh(deps) }
+onWritesReopened = reopenModelGovernance
 try {
   await admitWriter(async () => {
     if (await deps.users.count() === 0) {
@@ -485,7 +598,9 @@ const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
 await accessMonitor.synchronize()
 // Browser document operations run against each scope's filesystem root so a
 // panel read never starts a runtime; chat/agent work still launches one.
-const localDocuments = new LocalDocumentBroker({
+const recoveryFileGate=cfg.nodeContent && effectiveEnvironment.HGW_PEER_BACKUP_CONFIG_FILE ? new PeerProjectFileGate(cfg.stateRoot) : undefined
+const localDocuments:LocalDocumentBroker = new LocalDocumentBroker({
+  projectFileAdmission:recoveryFileGate,personalFileAdmission:personalDocumentGate,
   cfg,
   nodeId: context.nodeId as RuntimeNodeId,
   computerAccess: deps.computerAccess,
@@ -520,14 +635,42 @@ const documentAdmin = createGatewayDocumentAdminHandler({
   maxResponseBytes: cfg.upstreamResponseLimitBytes,
   local: localDocuments,
 })
+const localDrafts = new LocalNodeDrafts(cfg.stateRoot,nodeSqlite,cfg.draftHistory)
+const draftStore = projectNodeDrafts(context, localDrafts, contentVolume,cfg.draftHistory)
+const publication:NodeContentPublication = new NodeContentPublication({
+  ...nodeCorePublicationChecks({conversations,collaboration,execution:executionIdentity,progress,plugins:pluginState,files:nodeFiles}),
+  workspace:input=>workspaceCatalog.verifyNodeContent(input),
+  documents:input=>nodeDocuments.verifyNodeContent(input),
+  drafts:input=>draftStore.verifyNodeContent(input),
+  archive:input=>archives.verifyNodeContent(input,'archive'),
+  search:input=>archives.verifyNodeContent(input,'search'),
+})
+deps.contentMigrations = new NodeContentMigrationAdmin(context,()=>contentVolume.ready(),instances,publication)
+deps.sourceRetirement = new NodeContentSourceRetirement(context,()=>contentVolume.ready())
+const peerBackupRelay = new PeerBackupRelay(nodeServices, cfg.nodeService, cfg.upstreamTimeoutMs, accessMonitor)
+const peerFileSource=effectiveEnvironment.HGW_PEER_PROJECT_SNAPSHOTS_FILE
+const peerFiles=peerFileSource?new NativePeerProjectSnapshots(peerFileSource,cfg.runtimeRequestTimeoutMs,context,contentVolume,nodeFiles,
+  input=>localDocuments.snapshotProjectDocumentRoots({organizationId:context.organizationId,nodeId:context.nodeId,projectPublicId:input.projectId,
+    rootId:input.rootId,origin:input.origin,projectPath:input.workspace,cursor:input.cursor})):undefined
+const peerBackups = await createPeerBackupGateway({ context, stateRoot: cfg.stateRoot, invalidate: id => peerBackupRelay.invalidate(id), configFile: effectiveEnvironment.HGW_PEER_BACKUP_CONFIG_FILE,
+  ...(effectiveEnvironment.HGW_PEER_PERSONAL_SNAPSHOTS_FILE ? { personalFiles:new PeerPersonalFiles(context.pool,cfg.usersRoot,
+    effectiveEnvironment.HGW_PEER_PERSONAL_SNAPSHOTS_FILE,cfg.runtimeRequestTimeoutMs,
+    (owner,root,cursor,rows)=>localDocuments.snapshotPersonalDocumentRoots(owner,root,cursor,rows)) } : {}),
+  nodeContent: contentVolume, files:peerFiles, forward: peerBackupRelay.forward,
+  recovery:recoveryFileGate?{config:cfg,volume:contentVolume,instances,fileGate:recoveryFileGate}:undefined,
+  reservedRoots: [cfg.stateRoot, cfg.usersRoot, cfg.projectsRoot, cfg.userProjectsRoot, cfg.projectRuntimesRoot, cfg.backupDir, ...cfg.projectPathRoots] })
 const server = createGatewayServer(deps, {
+  peerBackups,
+  workbenchRows: workbenchRows(context, workspaceCatalog, collaboration, cfg.runtimeCatalog, contentVolume),
+  nodeDrafts: draftStore,
   browserDocuments: createBrowserDocumentHandler({ locations: documentLocations, organizationId: context.organizationId,
+    overview: documentCatalog, overviewConcurrency: cfg.nodeService.maxConnections, overviewDeadlineMs: cfg.documentOverviewDeadlineMs,
     origin: cfg.publicOrigins[0]!, responseLimit: cfg.upstreamResponseLimitBytes,
     transfer: { instances: deps.instances, users, projects, collaboration, principals: principalKeys.signer, audit, catalog: documentCatalog,
       maxResponseBytes: cfg.upstreamResponseLimitBytes, upstreamTimeoutMs: cfg.upstreamTimeoutMs } }),
   ...proxyHandlers,
   workbenchCatalog: createGatewayWorkbenchCatalogHandler({
-    workspaceCatalog: new PostgresWorkspaceCatalog(context, context.nodeId as import('./runtime-catalog.ts').RuntimeNodeId),
+    workspaceCatalog,
     instances,
     collaboration,
     principals: principalKeys.signer,
@@ -582,8 +725,10 @@ const server = createGatewayServer(deps, {
   }),
   admin: createAdminApiHandler(deps, documentAdmin, proxyHandlers.invalidateAccess),
   runtime: createRuntimeApiHandler({
+    executionIdentity,
+    nodeContent: contentVolume,
+    workspaceCatalog,
     renewStreamPrincipals: proxyHandlers.streamPrincipals?.renew.bind(proxyHandlers.streamPrincipals),
-    workspaceCatalog: new PostgresWorkspaceCatalog(context),
     documentStore: invocation => localDocuments.serveRuntimeStore(invocation),
     accessMonitor: localAccessMonitor,
     executionWatchHeartbeatMs: cfg.executionWatchHeartbeatMs,
@@ -745,26 +890,19 @@ resourcePressure.start()
  * restart a crashed Runtime. The fenced run retries when a boot-time
  * maintenance window closes.
  */
+const stewardPreparation = new AbortController()
 const ensureStewardSpace = async (): Promise<void> => {
   if (!cfg.steward.enabled || projects.ensureSteward === undefined) return
-  mkdirSync(cfg.steward.workspacePath, { recursive: true })
-  if (cfg.steward.sourcePath !== '' && !existsSync(join(cfg.steward.workspacePath, '.git'))) {
-    const worktree = (args: readonly string[]): void => {
-      execFileSync('git', ['-C', cfg.steward.sourcePath, 'worktree', 'add', ...args, cfg.steward.workspacePath, 'HEAD'], { stdio: 'pipe' })
-    }
-    try {
-      worktree(['-b', 'steward-workspace'])
-    } catch {
-      // The provisioning branch survives a deleted workspace directory;
-      // fall back to a detached checkout rather than resetting its commits.
-      worktree(['--detach'])
-    }
-  }
+  await prepareStewardWorktree(cfg.steward, stewardPreparation.signal)
+  stewardPreparation.signal.throwIfAborted()
   const steward = await projects.ensureSteward({ name: cfg.steward.projectName, path: cfg.steward.workspacePath })
+  stewardPreparation.signal.throwIfAborted()
   await instances.ensureRunning({ kind: 'project', id: steward.id, name: steward.name, path: steward.path, steward: true }, 'explicit')
 }
 const stewardEnsure = fencedTask('steward space', ensureStewardSpace)
-onWritesReopened = () => stewardEnsure.run()
+// Both reopen effects must run: assigning a bare closure would discard the
+// model-governance refresh registered earlier.
+onWritesReopened = () => { reopenModelGovernance(); stewardEnsure.run() }
 stewardEnsure.run()
 
 const reaperTask = fencedTask('idle reaper', async () => {
@@ -814,6 +952,8 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   if (shuttingDown) return
   shuttingDown = true
   stoppingWriters = true
+  instances.beginShutdown()
+  stewardPreparation.abort(new Error('Gateway is stopping steward workspace preparation'))
   clearInterval(heartbeatTimer)
   const forced = setTimeout(() => {
     console.error(`[gateway] forced shutdown after ${String(SHUTDOWN_TIMEOUT_MS)}ms (${signal})`)
@@ -831,7 +971,9 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
       if (result.status === 'rejected') failures.push(result.reason)
     }
   }
+  await settle([() => peerBackups.close()])
   await settle([
+    () => peerBackupRelay.close(),
     () => nodeServiceProxy?.close(),
     () => progress.close(), () => gatewayModelBudget.close(), () => resourcePressure.dispose(), () => tunnelAccess.shutdown(), () => nodeChannels.close(),
     () => nodeServices.close(),
@@ -848,9 +990,10 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   await settle([() => accessMonitor.close()])
   await settle([() => closeListeningServer(server), () => closeListeningServer(intake)])
   await settle([() => waitForWriters()])
+  await settle([() => localDrafts.close(), () => personalIndex.close()])
   await settle([() => heartbeatInFlight])
   await settle([() => deps.instances.stopAll()])
-  await settle([() => pool.end()])
+  await settle([() => pool.end(), () => contentVolume.close()])
   await settle([() => performanceObserver.dispose()])
   clearTimeout(forced)
   if (failures.length > 0) console.error('[gateway] shutdown failed:', new AggregateError(failures, 'Gateway shutdown failed'))

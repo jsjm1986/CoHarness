@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/docs/node-agent/README.md
 document:
-  en: 42786411c05980f592c0f14f0dae038ffb3a4c82
-  zh: f378ea586cdd1bb5c83dad8346853f603f55eea9
+  en: 7bc926b9ac61263dcc9c4bfbdf3d431d3d0999b8
+  zh: 1dc2f16c05f1ff43e6d1514b669f476b25af1a5a
 /:
   en: 9437b0da044bb538
   zh: 0a314f5801ab579d
@@ -12,8 +12,8 @@ document:
   en: 6179834d0029efdb
   zh: 3c542cd871d8ed88
 /node-agent-access-reference/summary:
-  en: 681e2d1d409bc4d9
-  zh: b2a4afba7ebbc233
+  en: 835009e53c40b545
+  zh: ad8aaacf9b2b3633
 /node-agent-access-reference/contents:
   en: ca6365fe086f39c2
   zh: 85eaded30539a999
@@ -27,23 +27,23 @@ document:
   en: ea2738d2015bba5c
   zh: b6a517eed41dce20
 /node-agent-access-reference/existing-gateway-services:
-  en: 640cf7910d0fb955
-  zh: 479cd37d11a52e46
+  en: f830ae95389997dc
+  zh: b7bb3102da2ab23f
 /node-agent-access-reference/runtime-isolation:
-  en: 1e8440428a9b3f09
-  zh: a45f870c70c5cd67
+  en: 0b6bb0cb410a8022
+  zh: 17566ca21ac7a10b
 /node-agent-access-reference/runtime-isolation/allocation-and-administration:
   en: 4d754d650d9a3633
   zh: ce30e7eb03ff2df5
 /node-agent-access-reference/configuration:
-  en: 336554bd9baf797d
-  zh: 1e931fda81d50d91
+  en: f3e8f57b74f23be5
+  zh: 991b2bf1c9d08f99
 /node-agent-access-reference/recovery:
   en: b734d9a59b34d6ca
   zh: a8c5aa980240f366
 /node-agent-access-reference/verification:
-  en: 4e605ec8086ad348
-  zh: 68ea052683ee56f5
+  en: 0e09da63680150df
+  zh: 561184d28bf1566d
 /node-agent-access-reference/dev-note:
   en: 94d09b0bc0c78320
   zh: 2a0525c2352ca392

@@ -59,6 +59,8 @@ The limit counts the exact owner's synchronous producer starts and `running` or 
 <a id="lifecycle"></a>
 ### Lifecycle
 
+Automatic idle release tracks producer resource acknowledgments separately from terminal records. A throwing teardown cancellation can force-fail and remove the record without blocking provider removal; its raw `done` promise and output drain still retain the Runtime and exact owner until resource release completes. A rejected `done` or failed cleanup leaves release unconfirmed and blocks automatic idle release. Explicit administrative shutdown retains its existing authority.
+
 The registry closes admission before cancelling or awaiting jobs during service disposal. A captured service reference cannot start work during or after shutdown; accepted jobs retain their cleanup path.
 
 Jobs belong to their owner and backend, not to the producer tool, so producer or controller reloads do not stop them. When an agent that owns jobs is disposed, its jobs are cancelled, their producers awaited, and their snapshots removed; service disposal does the same for every remaining job. A cancellation that throws during teardown force-fails the record and warns that the work may be orphaned, so teardown never deadlocks. Failure-text conversion is contained as well: an unrenderable producer, source, cancellation, or observer exception cannot interrupt settlement or starve other listeners.

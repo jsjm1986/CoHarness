@@ -11,7 +11,11 @@ EnvironmentFile=-/srv/harness/gateway-data/node-launch.env
 Environment=HGW_STATE_ROOT=/srv/harness/gateway-data
 Environment=HGW_NODE_CONNECTION_FILE=/srv/harness/gateway-data/node-connection.json
 ExecStart=/usr/local/bin/node lib/node-agent-main.js
-Restart=on-failure
+Restart=always
+# A clean exit 0 is a deliberate park: the agent returns cleanly only on a
+# terminal refusal (detached/mode-disabled) or a signal-driven stop, and both
+# must not be revived. Abnormal exits always restart.
+RestartPreventExitStatus=0
 RestartSec=5
 UMask=0077
 NoNewPrivileges=true

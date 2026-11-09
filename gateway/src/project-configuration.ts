@@ -16,6 +16,7 @@ export interface ProjectConfigurationView {
     themePolicy: boolean
     runtimeSettings: boolean
     projectModels: boolean
+    /** Current manager may edit standard-project membership; reserved Steward spaces always return false. */
     members: boolean
     sshTargets: boolean
     filesystem: false

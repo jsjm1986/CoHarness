@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/strict-managed-workspace-descendants/guide.md
+document:
+  en: 2aadad6e9ca384086b412d1a6f6bf118f3235ade
+  zh: 34cb7bdb2842c7a053d41603e4135a438173970b
+/:
+  en: c9fb85b5faabf109
+  zh: 7abae318a2d23e4b
+/managed-workspace-containment:
+  en: 5def7909799c4f04
+  zh: ca72b6310e5c564b
+/managed-workspace-containment/change:
+  en: dc23d331e2168d63
+  zh: c905dca87d7f5cea
+/managed-workspace-containment/migration:
+  en: 50d1d7487e07caca
+  zh: 6f8f062b97d9e363

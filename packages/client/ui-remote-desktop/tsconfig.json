@@ -27,6 +27,9 @@
       "path": "../runtime"
     },
     {
+      "path": "../ui-dockkit"
+    },
+    {
       "path": "../ui-renderer"
     },
     {

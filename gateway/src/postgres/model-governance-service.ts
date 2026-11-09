@@ -440,6 +440,7 @@ export class PostgresModelGovernanceService {
     private readonly context: PostgresRuntimeContext,
     private readonly credentialCipher: OrganizationModelCredentialCipher,
     private readonly timeZone = 'Asia/Shanghai',
+    private readonly nodeContent?: Pick<import('../node-content-store.ts').NodeContentStore,'read'>,
   ) {
     new Intl.DateTimeFormat('en-US', { timeZone }).format()
   }
@@ -773,6 +774,40 @@ export class PostgresModelGovernanceService {
     const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
     if (project === null) throw new Error(`unknown project ${String(projectId)}`)
     return this.projectProviderRows(this.context.pool, project, projectId)
+  }
+
+  /**
+   * Qualify a prepared project model read using one current database snapshot without loading node metadata.
+   * @param projectId - public project identifier on this Gateway's computer.
+   * @param actorUserId - server-authenticated browser account.
+   * @returns whether the authorized reader currently manages the project; throws when reading is forbidden.
+   */
+  async authorizeProjectModelRead(projectId: number, actorUserId: number): Promise<boolean> {
+    const result = await this.context.pool.query<{ can_manage: boolean }>(`SELECT
+      (membership.role='admin' OR COALESCE(project.owner_user_id=actor.id,false)) can_manage
+      FROM harness.organizations organization
+      JOIN harness.users actor ON actor.organization_id=organization.id
+      JOIN harness.memberships membership ON membership.organization_id=actor.organization_id
+        AND membership.user_id=actor.id AND membership.status='active'
+      JOIN harness.password_credentials credential ON credential.user_id=actor.id
+      JOIN harness.projects project ON project.organization_id=organization.id
+      JOIN harness.project_mounts mount ON mount.organization_id=project.organization_id AND mount.project_id=project.id
+        AND mount.status='active' AND mount.node_id=$4
+      LEFT JOIN harness.project_members member ON member.organization_id=project.organization_id
+        AND member.project_id=project.id AND member.user_id=actor.id
+      WHERE organization.id=$1 AND organization.status='active' AND actor.public_id=$2
+        AND actor.status='active' AND actor.deleted_at IS NULL AND NOT credential.must_change_password
+        AND project.public_id=$3 AND project.status='active'
+        AND harness.computer_use_allowed(organization.id,actor.id,mount.node_id)
+        AND (project.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL)
+          OR project.kind='steward' AND membership.role='admin' AND EXISTS (
+            SELECT 1 FROM harness.steward_access_policies policy
+            WHERE policy.organization_id=organization.id AND policy.user_id=actor.id
+              AND policy.node_id=mount.node_id AND policy.enabled))`,
+    [this.context.organizationId, actorUserId, projectId, this.context.nodeId])
+    const current = result.rows[0]
+    if (current === undefined) throw new CollaborationDeniedError('forbidden')
+    return current.can_manage
   }
 
   /** Describe the project-owned pi-ai namespace used by the project settings UI. */
@@ -1560,7 +1595,7 @@ export class PostgresModelGovernanceService {
         await verifyExecutionAttribution(client, {
           organizationId: this.context.organizationId, runtime: subject,
           sessionId: event.sessionId, inputIds: event.executionInputIds, primaryActorUserId: event.actorUserId,
-        })
+        }, this.nodeContent)
       }
       const billingUserId = async (id: number): Promise<string | null> => {
         if (!hasExecutionInputs) return internalUserId(client, this.context.organizationId, id)

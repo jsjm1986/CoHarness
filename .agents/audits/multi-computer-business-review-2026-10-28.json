@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-02T08:46:54.035013+00:00",
+  "updatedAt": "2026-11-05T03:37:25.532071+00:00",
   "status": "in_progress",
   "objectiveUnchanged": true,
   "scope": "Review all implemented and newly exposed multi-computer features plus explicit design gates across the original12 business domains. Planned and intentionally unavailable capabilities are not mislabeled as verified or as completed implementations.",
@@ -96,7 +96,7 @@
     ".agents/notes/implemented/architecture/2026-10-30-entry-topology-and-independent-node-authority.md",
     "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/deployment-modes/guide.md"
   ],
-  "policyProvenance": "Latest human-authorized product handoff from the multi-computer architecture chat, received in this audit chat on2026-10-30. Requirements are the review target; peer-reported checks and in-flight implementation are not independent audit acceptance.",
+  "requirementsSource": "Latest human-authorized product handoff from the multi-computer architecture chat, received in this audit chat on2026-10-30. Requirements are the review target; peer-reported checks and in-flight implementation are not independent audit acceptance.",
   "areas": [
     {
       "id": "environment-identity",
@@ -283,7 +283,7 @@
       "requirements": [
         "Personal bytes remain on the owning computer; shared project bytes remain central.",
         "Path equality across computers is not document or storage ownership.",
-        "Upload ids, private document provenance, preview caches, terminals and tool sessions retain exact environment and actor identity.",
+        "Upload ids, private document creator and owner identities, preview caches, terminals and tool sessions retain exact environment and actor identity.",
         "Revocation must fence active streams and queued writes without resurrecting retired ownership."
       ],
       "sources": [
@@ -306,7 +306,7 @@
       "auditStatus": "in_progress",
       "requirements": [
         "User/org quota admission stays authoritative across computers; local node pressure is separately bounded.",
-        "Model requests, child processes and nested runtimes carry exact environment/generation/operation provenance.",
+        "Model requests, child processes and nested runtimes carry exact environment, generation and operation identities.",
         "Do not release occupation or permit replacement while stop outcome remains uncertain.",
         "Preserve historical usage attribution and prevent duplicate per-node quota allowances."
       ],
@@ -490,7 +490,7 @@
   },
   "currentProductIntent": "Preserve the mature single-computer multiuser system by default; an explicit organization mode adds managed computers through a primary while every directly visited computer retains local-only browser scope. Existing Runtime, project and capability permission identities remain authoritative.",
   "confirmedProductRules": {
-    "provenance": "Actual human messages and clarification replies read from 多电脑连接架构 on2026-10-28, not inferred from a draft.",
+    "requirementsSource": "Actual human messages and clarification replies read from 多电脑连接架构 on2026-10-28, not inferred from a draft.",
     "projectPlacement": "Each project owns one computer initially; different projects can belong to different computers, including non-center computers.",
     "personalMultiplicity": "A user may own multiple independent personal RuntimeIds on the same computer, controlled by permissions and quotas.",
     "deviceAccess": "A user may have access to one or several managed computers; the Web UI identifies the selected computer/runtime and its actual permissions.",
@@ -2453,5 +2453,735 @@
     "wholeCoveredStatements": 107,
     "wholeCoveredBranches": 58,
     "globalReviewComplete": false
+  },
+  "auditContinuation20261104MaintenanceAuthority": {
+    "at": "2026-11-04T16:00:32.776437+00:00",
+    "receipt": "receipts/private-postgres-and-restore-authority-2026-11-04.json",
+    "findings": {
+      "B491": "Resolve native connection options with libpq and transfer connection input through a bounded framed private channel. Passwords stay out of actual native pg_dump/psql arguments; wrapper SQL waits for the exact nonce acknowledgement, including early-EOF refusal and joined local child lifetime.",
+      "B497": "Require a nonempty normalized strict-descendant result; reject Windows drive and share roots and retain disjoint paths on different volumes. Four Windows grammar counterexamples now pass alongside actual Gateway source/built refusal checks.",
+      "B498": "Pair uppercase PG_RESTORE.EXE with psql.exe using case-insensitive executable recognition.",
+      "B499": "Execute current content and peer backup authority guards around the actual SQL archive import in its existing single transaction, preventing retired Runtime resurrection and credential/policy rollback."
+    },
+    "currentSchema114FullArchiveCasesPassed": 2,
+    "protectedGuardsOwner": "parallel node-content feature",
+    "rootOwner": "Actual SQL transaction insertion, full archive integration regressions and maintenance private input",
+    "nextReview": [
+      "Node content collaboration private roots and revoked accounts",
+      "Cross-node archive and search routing",
+      "Offline content refusal and retired placements",
+      "Delete/recreate lineage and complete migration publication"
+    ],
+    "unconfirmedReview": "Backup migrationVersion preflight before entering restoring",
+    "wholeFeatureProductionAcceptance": false,
+    "wholeProjectComplete": false,
+    "realResponsesDeferred": true
+  },
+  "currentNodeDocumentAdministratorReview": {
+    "id": "B500",
+    "title": "Administrator document listing, counters and detail omit published node-owned documents and mask content database outage",
+    "status": "peer_fixed_named_scenarios_independently_verified_global_review_open",
+    "paths": [
+      "gateway/src/postgres/document-catalog-service.ts",
+      "gateway/src/admin-api.ts",
+      "gateway/src/node-content-documents.ts"
+    ],
+    "sourceFixed": true,
+    "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-before.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z",
+    "receipt": "receipts/admin-node-document-catalog-2026-11-05.json",
+    "evidence": "Actual attested local PGDATA, separate control/content databases and authenticated Gateway HTTP reproduce200empty list,200zero counters and404detail for the existing node entry. Disabling actual content database connections preserves these misleading results. Same-path foreign-node detail stays404; demoted administrator stays403. Physical two-computer and copy acceptance not claimed.",
+    "wholeProjectComplete": false,
+    "at": "2026-11-04T16:07:45.539687+00:00",
+    "observations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-observations.json",
+    "sourceWitness": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/before-source-hashes.json",
+    "syntheticOnly": true,
+    "physicalContentDatabase": true,
+    "differentPhysicalComputers": false,
+    "productionWrites": false,
+    "fixOwnerThread": "01a1821f-1577-7472-93db-3bd83ee42345",
+    "rootOwns": "Independent read-only reproduction and regression recheck",
+    "next": [
+      "Peer wires node document administrator read and lifecycle adapters",
+      "Re-run the exact authenticated requests and outage/demotion controls",
+      "Continue independent copy/authorization review"
+    ],
+    "updatedAt": "2026-11-04T16:42:03.240427+00:00",
+    "currentRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-current-recheck.json",
+    "currentObservations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-recheck-observations.json",
+    "rootReadOnlyPeerSourceWitness": [
+      {
+        "path": "gateway/src/browser-documents.ts",
+        "sha256": "08ad83c9e02c14995b23a4f5422f084721f2e21601f72227093f8c315a8e1786",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/admin-api.ts",
+        "sha256": "dc7aa717e3c60324150665cce49dfb8916950b1139b1584f0a03e4fefbadb0b3",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/postgres/document-catalog-service.ts",
+        "sha256": "a43bcdf48e070019427ce23c06638c585337d63d20d6a35afe1c85d7ad0758ff",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-documents.ts",
+        "sha256": "7b791483b12c9f630740c8ca3aafa4dfec908965260ab198e12bd433137b3c27",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-documents-admin.ts",
+        "sha256": "626b761579735a7abe69ac37e288b477aafbfcc1b4de701c67ae6d0acf826a34",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-documents-authority.ts",
+        "sha256": "47c3006cebcaeb73d0f7f57681586bf5fd121484cb54981b1736417a9c056305",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-collaboration.ts",
+        "sha256": "a3abd3b026260f010f8454c35ec659e500c71549cfdb0c2d1266caa3421c25ac",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-store.ts",
+        "sha256": "15bbd2ae87432a4d440c666c9e53650b62837d62adeec432f1da4df6b0a5a1ba",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/workbench-rows.ts",
+        "sha256": "c9bb4dfb951c88c3d1351da5a1db49f22ffe09202c60c3dd69b79f28ab62a8ff",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/deploy/node-content/migrations/013_conversation_acl.sql",
+        "sha256": "9cd6ff2ecba43a95f1837383fbed9e4015d401d8afde608b56be2855507e1b0c",
+        "owner": "parallel_feature_not_root_patch"
+      }
+    ],
+    "independentRecheckDelivery": {
+      "at": "2026-11-04T16:40:38.832197+00:00",
+      "findings": [
+        "B502"
+      ],
+      "independentlyRechecked": [
+        "B500",
+        "B501"
+      ],
+      "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority",
+      "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority.delta.tar.gz",
+      "archiveSha256": "d3b34e9acce67d968a7a5cdf9637937608e69a0e81991969150f864f8f40296f",
+      "manifestSha256": "45eaf5b55132c688fdcd127cc4009f12482290930a49175cdcd3002c656ebe10",
+      "ownedPaths": 15,
+      "readOnlyPeerFiles": 10,
+      "compiledConsumptionFiles": 182,
+      "wholeProjectComplete": false
+    },
+    "wholeFeatureProductionAcceptance": false,
+    "verifiedCurrentRequests": [
+      "local published document list200andcontainsactualnodecatalogId",
+      "metrics200total1bytes17",
+      "detail200samecatalogId",
+      "same-pathforeign-nodecatalogId404",
+      "physicalcontentdatabaseconnectionsdisabled:list/metrics/detail503",
+      "samecookieafteradministratordemotion403"
+    ]
+  },
+  "currentNodeConversationRevocationReview": {
+    "id": "B501",
+    "title": "Node content conversation reads return project metadata after membership revocation commits during the content query",
+    "status": "peer_fixed_named_scenarios_independently_verified_global_review_open",
+    "paths": [
+      "gateway/src/node-content-collaboration.ts",
+      "gateway/src/workbench-rows.ts"
+    ],
+    "sourceFixed": true,
+    "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-and-revocation-before.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z",
+    "receipt": "receipts/node-conversation-read-revocation-2026-11-05.json",
+    "evidence": "A real ACCESS EXCLUSIVE content relation lock stops listProjectRows after governance actor resolution. Project membership deletion commits and is verified absent; releasing the content lock still returns Session ID, title and cwd. Exact production NodeContentStore queries and separate databases; the Session-only project publication is explicitly synthetic and does not establish full application publication readiness.",
+    "wholeProjectComplete": false,
+    "at": "2026-11-04T16:12:18.150959+00:00",
+    "observations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/node-revocation-and-admin-observations-before.json",
+    "sourceWitness": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/revocation-before-source-hashes.json",
+    "fixOwnerThread": "01a1821f-1577-7472-93db-3bd83ee42345",
+    "requiredReview": [
+      "access",
+      "readableSessionIds",
+      "listActivity",
+      "listProjectRows",
+      "listConversations"
+    ],
+    "safeOutcomes": [
+      "Refuse or remove data after completed governance revocation",
+      "Hold current governance authorization through content read so revocation cannot complete first"
+    ],
+    "syntheticOnly": true,
+    "productionWrites": false,
+    "paidModelApisCalled": false,
+    "updatedAt": "2026-11-04T16:42:03.240427+00:00",
+    "currentRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-current-recheck.json",
+    "currentObservations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-recheck-observations.json",
+    "rootReadOnlyPeerSourceWitness": [
+      {
+        "path": "gateway/src/browser-documents.ts",
+        "sha256": "08ad83c9e02c14995b23a4f5422f084721f2e21601f72227093f8c315a8e1786",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/admin-api.ts",
+        "sha256": "dc7aa717e3c60324150665cce49dfb8916950b1139b1584f0a03e4fefbadb0b3",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/postgres/document-catalog-service.ts",
+        "sha256": "a43bcdf48e070019427ce23c06638c585337d63d20d6a35afe1c85d7ad0758ff",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-documents.ts",
+        "sha256": "7b791483b12c9f630740c8ca3aafa4dfec908965260ab198e12bd433137b3c27",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-documents-admin.ts",
+        "sha256": "626b761579735a7abe69ac37e288b477aafbfcc1b4de701c67ae6d0acf826a34",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-documents-authority.ts",
+        "sha256": "47c3006cebcaeb73d0f7f57681586bf5fd121484cb54981b1736417a9c056305",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-collaboration.ts",
+        "sha256": "a3abd3b026260f010f8454c35ec659e500c71549cfdb0c2d1266caa3421c25ac",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/node-content-store.ts",
+        "sha256": "15bbd2ae87432a4d440c666c9e53650b62837d62adeec432f1da4df6b0a5a1ba",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/src/workbench-rows.ts",
+        "sha256": "c9bb4dfb951c88c3d1351da5a1db49f22ffe09202c60c3dd69b79f28ab62a8ff",
+        "owner": "parallel_feature_not_root_patch"
+      },
+      {
+        "path": "gateway/deploy/node-content/migrations/013_conversation_acl.sql",
+        "sha256": "9cd6ff2ecba43a95f1837383fbed9e4015d401d8afde608b56be2855507e1b0c",
+        "owner": "parallel_feature_not_root_patch"
+      }
+    ],
+    "independentRecheckDelivery": {
+      "at": "2026-11-04T16:40:38.832197+00:00",
+      "findings": [
+        "B502"
+      ],
+      "independentlyRechecked": [
+        "B500",
+        "B501"
+      ],
+      "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority",
+      "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority.delta.tar.gz",
+      "archiveSha256": "d3b34e9acce67d968a7a5cdf9637937608e69a0e81991969150f864f8f40296f",
+      "manifestSha256": "45eaf5b55132c688fdcd127cc4009f12482290930a49175cdcd3002c656ebe10",
+      "ownedPaths": 15,
+      "readOnlyPeerFiles": 10,
+      "compiledConsumptionFiles": 182,
+      "wholeProjectComplete": false
+    },
+    "wholeFeatureProductionAcceptance": false,
+    "verifiedCurrentOrdering": "Real content relation lock; project membership deletion commits before unlocking; authorized read refuses and returns no rows."
+  },
+  "currentBrowserFanoutReview": {
+    "id": "B502",
+    "title": "Browser administrator document fan-out continues both target uploads after administrator demotion when project write memberships remain",
+    "status": "fixed_named_scenarios_source_and_artifacts_verified_global_review_open",
+    "paths": [
+      "gateway/src/document-transfer.ts",
+      "gateway/src/browser-documents.ts"
+    ],
+    "sourceFixed": true,
+    "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-copy-before.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z",
+    "receipt": "receipts/browser-document-fanout-authority-2026-11-05.json",
+    "evidence": "Normal createBrowserDocumentHandler and real loopback upload requests with actual PostgreSQL role and project permissions: demotion commits after first upload creation, yet both target chunk writes and completions succeed as member. Stable administrator and single-member copy controls pass. Controlled protocol upstream is explicitly identified; no physical two-computer acceptance is claimed.",
+    "wholeProjectComplete": false,
+    "at": "2026-11-04T16:24:47.037334+00:00",
+    "observations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-copy-demote-during-first-target-observations.json",
+    "owner": "Root owns narrow current-role renewal and corresponding regressions; peer owns new node document adapters",
+    "fullGatewayFixture": "gateway/tests/fixtures/browser-document-fanout.mjs",
+    "fullGatewayStatus": "authenticated_source_and_ordinary_Node22_Node24_JS_transcript_passed",
+    "productionWrites": false,
+    "paidModelApisCalled": false,
+    "updatedAt": "2026-11-04T16:42:03.240427+00:00",
+    "delivery": {
+      "at": "2026-11-04T16:40:38.832197+00:00",
+      "findings": [
+        "B502"
+      ],
+      "independentlyRechecked": [
+        "B500",
+        "B501"
+      ],
+      "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority",
+      "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority.delta.tar.gz",
+      "archiveSha256": "d3b34e9acce67d968a7a5cdf9637937608e69a0e81991969150f864f8f40296f",
+      "manifestSha256": "45eaf5b55132c688fdcd127cc4009f12482290930a49175cdcd3002c656ebe10",
+      "ownedPaths": 15,
+      "readOnlyPeerFiles": 10,
+      "compiledConsumptionFiles": 182,
+      "wholeProjectComplete": false
+    },
+    "verification": [
+      {
+        "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/fanout-transfer-final-cases.json",
+        "passed": 38,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-fanout-current-source-cases.json",
+        "passed": 36,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-copy-current-source-cases.json",
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/fanout-built22-cases.json",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/fanout-built24-cases.json",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-current-recheck.json",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "originalCounterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-copy-before.json",
+    "fullGatewayCounterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-fanout-full-gateway-original.json",
+    "rawProtocolObservationPhase": "fixed_source",
+    "wholeSourceCoverage": {
+      "total": {
+        "lines": {
+          "total": 956,
+          "covered": 597,
+          "skipped": 0,
+          "pct": 62.44
+        },
+        "statements": {
+          "total": 1079,
+          "covered": 644,
+          "skipped": 0,
+          "pct": 59.68
+        },
+        "functions": {
+          "total": 141,
+          "covered": 95,
+          "skipped": 0,
+          "pct": 67.37
+        },
+        "branches": {
+          "total": 1062,
+          "covered": 554,
+          "skipped": 0,
+          "pct": 52.16
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/document-transfer.ts": {
+        "lines": {
+          "total": 956,
+          "covered": 597,
+          "skipped": 0,
+          "pct": 62.44
+        },
+        "functions": {
+          "total": 141,
+          "covered": 95,
+          "skipped": 0,
+          "pct": 67.37
+        },
+        "statements": {
+          "total": 1079,
+          "covered": 644,
+          "skipped": 0,
+          "pct": 59.68
+        },
+        "branches": {
+          "total": 1062,
+          "covered": 554,
+          "skipped": 0,
+          "pct": 52.16
+        }
+      }
+    },
+    "builds": {
+      "fanout-gateway-build.json": {
+        "status": "failed",
+        "startedAt": "2026-11-04T16:27:38.319184+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.build.json"
+        ],
+        "exitCode": 2,
+        "finishedAt": "2026-11-04T16:27:45.284799+00:00"
+      },
+      "fanout-selected-artifact-build.json": {
+        "status": "passed",
+        "startedAt": "2026-11-04T16:30:40.333079+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/tsconfig.fanout-build.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-11-04T16:30:46.844988+00:00"
+      },
+      "fanout-gateway-typecheck.json": {
+        "status": "passed",
+        "startedAt": "2026-11-04T16:30:41.452705+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/typescript/bin/tsc",
+          "--noEmit",
+          "-p",
+          "tsconfig.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-11-04T16:30:52.099395+00:00"
+      }
+    },
+    "counting": "38 unit cases; one real Gateway transcript contains3 scenarios. The3 independent protocol controls and repeated Node22/24 transcript runs are not counted as new business scenarios.",
+    "limits": [
+      "Selected19-entry Gateway consumption build passes; whole shared production build was blocked at16:27 by the parallel node-content-plugin-proofs app-boot declaration mapping.",
+      "Full document-transfer file coverage remains62.44% lines; no100% or whole-project coverage claim.",
+      "No physical two-computer or paid model acceptance."
+    ]
+  },
+  "currentRestoreSchemaPreflightReview": {
+    "at": "2026-11-04T18:05:14.499028+00:00",
+    "receipt": "receipts/restore-schema-preflight-2026-11-05.json",
+    "sourceFixed": true,
+    "actualCliCases": 9,
+    "fullSqlAuthorityCases": 4,
+    "wholeProjectComplete": false
+  },
+  "currentResourcePolicyReadReview": {
+    "at": "2026-11-04T18:05:14.499028+00:00",
+    "receipt": "receipts/resource-policy-read-authority-2026-11-05.json",
+    "sourceFixed": true,
+    "actualGatewayScenarios": 51,
+    "runtimeStarts": 0,
+    "policyMutationByRead": false,
+    "wholeProjectComplete": false
+  },
+  "currentStewardWorktreePreparationReview": {
+    "at": "2026-11-04T19:02:38.454720+00:00",
+    "finding": "B506",
+    "receipt": "receipts/steward-worktree-native-preparation-2026-11-05.json",
+    "sourceFixed": true,
+    "realGatewayTranscript": true,
+    "normalNodeArtifactVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "wholeProjectComplete": false
+  },
+  "currentRuntimeStartShutdownReview": {
+    "at": "2026-11-04T19:16:51.958886+00:00",
+    "finding": "B507",
+    "receipt": "receipts/runtime-start-shutdown-order-2026-11-05.json",
+    "sourceFixed": true,
+    "closureBeforeWriterDrain": true,
+    "readyProcessTerminationDeferredToStopAll": true,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "wholeProjectComplete": false
+  },
+  "currentAdministratorReadPublicationReview": {
+    "at": "2026-11-04T19:55:40.148271+00:00",
+    "finding": "B508",
+    "receipt": "receipts/administrator-read-publication-2026-11-05.json",
+    "sourceFixed": true,
+    "assembledScenarios": 161,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "temporaryNativeClustersRemoved": true,
+    "wholeProjectComplete": false
+  },
+  "currentProjectSettingsStartReview": {
+    "at": "2026-11-04T20:20:29.160567+00:00",
+    "finding": "B509",
+    "receipt": "receipts/administrator-project-settings-start-2026-11-05.json",
+    "sourceFixed": true,
+    "nativeCases": 10,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "allOwnedTemporaryNativeClustersRemoved": true,
+    "wholeProjectComplete": false
+  },
+  "currentBackupWorkAuthorityReview": {
+    "at": "2026-11-04T20:50:29.287638+00:00",
+    "finding": "B510",
+    "receipt": "receipts/backup-work-administrator-authority-2026-11-05.json",
+    "sourceFixed": true,
+    "nativeScenarios": 27,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "allOwnedTemporaryNativeClustersRemoved": true,
+    "wholeProjectComplete": false
+  },
+  "currentBackupSelectionReview": {
+    "at": "2026-11-04T21:07:02.557489+00:00",
+    "finding": "B511",
+    "receipt": "receipts/backup-selection-validation-2026-11-05.json",
+    "sourceFixed": true,
+    "newNativeSelections": 20,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "wholeProjectComplete": false
+  },
+  "currentCommandAndPlanRecheck": {
+    "at": "2026-11-04T21:07:02.557489+00:00",
+    "receipt": "receipts/command-plan-current-recheck-2026-11-05.json",
+    "corePassed": 169,
+    "postgresPassed": 2,
+    "paidModelApisCalled": false
+  },
+  "currentModelDiscoveryReadReview": {
+    "id": "B512",
+    "title": "Organization model discovery publishes private results after administrator authority is withdrawn during the provider request",
+    "status": "fixed_final_read_authority_source_and_normal_node_artifacts_verified_remaining_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/admin-api.ts"
+    ],
+    "receipt": "receipts/model-discovery-read-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z",
+    "wholeProjectComplete": false,
+    "evidence": "Actual credential preparation plus held loopback provider responses prove the original disclosure;14new late-withdrawal scenarios now refuse publication.90HTTP unit cases and57runnable scenario instances pass; ordinary Node22/24 each pass46PostgreSQL cases."
+  },
+  "currentAllocationSourceReview": {
+    "at": "2026-11-04T21:48:55.376591+00:00",
+    "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/current-allocation-scan.json",
+    "productionSourceFiles": 2991,
+    "rawAllocationSites": 44,
+    "unmatchedHistoricalOwnerKeys": 16,
+    "classification": "Nine sites belong to the peer-owned node content/private database/native backup work. Seven sites are known subprocess provider internals or scanner key-name differences: shared SubprocessRuntime admission precedes protected provider allocation; managed range exit owns release. This source inspection does not independently accept the new peer helpers.",
+    "newConfirmedBugs": 0,
+    "wholeResourceReviewComplete": false,
+    "wholeProjectComplete": false
+  },
+  "currentDocumentLinuxReconciliation": {
+    "at": "2026-11-04T21:48:55.376591+00:00",
+    "receipt": "receipts/document-linux-pending-reconciliation-2026-11-05.json",
+    "newTestsExecuted": 0,
+    "wholeProjectComplete": false
+  },
+  "currentProjectModelReadReview": {
+    "id": "B513",
+    "title": "Project model settings and credential reads retain obsolete access and editing authority; discovery publishes after ownership or membership withdrawal",
+    "status": "fixed_current_project_and_exact_computer_read_authority_source_and_normal_node_artifacts_verified_remaining_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts",
+      "gateway/src/services.ts",
+      "gateway/src/postgres/model-governance-service.ts"
+    ],
+    "receipt": "receipts/project-model-read-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z",
+    "wholeProjectComplete": false,
+    "evidence": "Six real authority interleavings reproduce the defect.78new runnable PostgreSQL/HTTP scenarios and both ordinary Node22/24artifacts pass.128focused PostgreSQL cases,8HTTP unit cases,3test wiring gates, full Gateway typecheck/build and scoped docs/lint pass; see receipt for overlap and limits."
+  },
+  "currentModelDiscoveryRedirectReview": {
+    "id": "B514",
+    "title": "Model discovery follows foreign-origin redirects with Anthropic API keys and deployment authentication headers",
+    "status": "fixed_shared_helper_and_normal_package_exports_verified_full_project_build_acceptance_open",
+    "sourceFixed": true,
+    "paths": [
+      "packages/llm/llm/src/discovery.ts"
+    ],
+    "receipt": "receipts/model-discovery-redirect-authority-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z",
+    "wholeProjectComplete": false,
+    "evidence": "Two owned HTTP origins reproduce Anthropic/custom-header forwarding.87helper/consumer tests pass with100% measured coverage of discovery.ts;24new actual Gateway/PG scenarios and normal Node22/24root/subpath exports pass. Full repository build remains explicitly unsuccessful outside this scoped repair."
+  },
+  "currentManagementPasswordQualificationReview": {
+    "id": "B515",
+    "title": "Queued management requests can write configuration after a required password reset has revoked the browser session",
+    "status": "fixed_named_management_password_admission_source_and_emitted_replays_verified_remaining_callers_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/administrator-authority.ts",
+      "gateway/src/postgres/administrator-authority.ts",
+      "gateway/src/postgres/project-management-authority.ts"
+    ],
+    "receipt": "receipts/management-password-qualification-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T223451Z",
+    "wholeProjectComplete": false,
+    "evidence": "Three real queued-write password-reset counterproofs are repaired.511unique named cases pass, including259core cases with100percent measured coverage of all three changed authority files.137public scenario instances and122ordinary Node22/24scenarios per version pass. Remaining callers and whole-project acceptance remain open."
+  },
+  "currentSharedArchiveTransactionReview": {
+    "id": "B516",
+    "title": "Mixed shared and node-volume archive operations wait for another connection from their own exhausted governance pool",
+    "status": "fixed_shared_archive_transaction_and_physical_volume_http_artifacts_verified_remaining_archive_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/node-archive-router.ts",
+      "gateway/src/postgres/conversation-archive-service.ts"
+    ],
+    "receipt": "receipts/archive-governance-transaction-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z",
+    "wholeProjectComplete": false,
+    "evidence": "Real one-connection archive-list and emitted HTTP draft-cleanup counterproofs are repaired.159distinct targeted cases pass, including13actual Gateway/physical-volume scenarios and ordinary Node22/24replays. Complete repository build passes8steps. Whole-file archive coverage and complete business review remain open."
+  },
+  "latestFullBuildAcceptance": {
+    "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-complete-build-accepted.log",
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "clientArtifacts": 266,
+    "qualification": "Native, Host compiler/bundle, Client compiler/bundle, Web, Host aggregate and Client aggregate all pass. The final Host-only check after mechanical test formatting also passes. Initial99diagnostics are retained; most came from four Web tests importing Client Context declarations into the Host program."
+  },
+  "currentProjectReadPublicationReview": {
+    "id": "B517",
+    "title": "Project metadata and management flags can retain withdrawn membership, ownership or login authority after asynchronous preparation",
+    "status": "fixed_directory_detail_current_authority_and_computer_binding_verified_remaining_project_read_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/collaboration.ts",
+      "gateway/src/services.ts",
+      "gateway/src/postgres/collaboration-service.ts",
+      "gateway/src/server.ts"
+    ],
+    "receipt": "receipts/project-read-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z",
+    "wholeProjectComplete": false,
+    "evidence": "Four real Gateway/PostgreSQL late-revocation counterproofs plus two borrowed-view and two prepared-computer HTTP regressions are repaired.136distinct named cases pass, including44new real HTTP scenarios and ordinary Node22/24replays. Configuration and invitation review remains open."
+  },
+  "currentProjectConfigurationPublicationReview": {
+    "id": "B518",
+    "title": "Project configuration reads retain revoked browser authority, stale ownership and capabilities after metadata preparation",
+    "status": "fixed_current_configuration_read_authority_and_reserved_capabilities_verified_remaining_business_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts",
+      "gateway/src/project-configuration.ts"
+    ],
+    "receipt": "receipts/project-configuration-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z",
+    "wholeProjectComplete": false,
+    "evidence": "Real configuration revocation and stale-capability failures are repaired, including Steward membership capability matching its actual refusal.227distinct targeted cases pass;69realHTTPread scenarios replay in ordinary Node22/24. Invitation and remaining business review stay open."
+  },
+  "currentProjectInvitationPublicationReview": {
+    "id": "B519",
+    "title": "Project invitation lists publish withdrawn project data and invitations between other accounts after management loss",
+    "status": "fixed_project_invitation_final_authority_and_participant_visibility_verified_remaining_business_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts"
+    ],
+    "receipt": "receipts/project-invitation-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z",
+    "wholeProjectComplete": false,
+    "evidence": "Sixteen real project invitation read refusals and cross-account visibility failures are repaired.233distinct targeted cases pass;92realHTTPread scenarios replay in ordinary Node22/24. Incoming/outgoing participant history and pending rows are retained; whole business review remains open."
+  },
+  "currentInfrastructureHelperReview": {
+    "at": "2026-11-05T01:53:37.236746+00:00",
+    "receipt": "receipts/resource-infrastructure-review-2026-11-05.json",
+    "status": "named_current_infrastructure_and_post_wait_resource_qualification_verified_remaining_review_open",
+    "newConfirmedBugs": 0,
+    "distinctNamedPassedCases": 125,
+    "additionalNodeServiceCases": 49,
+    "newHeldNodeLockCases": 7,
+    "wholeProjectComplete": false
+  },
+  "currentDocumentationQualityReview": {
+    "at": "2026-11-05T02:27:11.082689+00:00",
+    "receipt": "receipts/documentation-quality-review-2026-11-05.json",
+    "status": "two_retained_documentation_quick_failures_repaired_current_checks_pass_remaining_business_review_open",
+    "documentationQuickPassed": 20,
+    "targetedTestsPassed": 148,
+    "historicalCapturedFieldsPreserved": 1847,
+    "newBusinessFindings": 0,
+    "wholeProjectComplete": false
+  },
+  "currentInvitationInboxPublicationReview": {
+    "id": "B520",
+    "title": "Account invitation history and pending counts publish after browser withdrawal, and former managers retain invitations between other accounts",
+    "status": "fixed_account_invitation_final_browser_and_management_authority_verified_remaining_business_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts"
+    ],
+    "receipt": "receipts/invitation-inbox-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z",
+    "wholeProjectComplete": false,
+    "evidence": "Twenty-six real HTTP counterproof failures are repaired;252distinct targeted cases pass. The new invitation route measures31/31statements,32/32branch outcomes and8/8functions; ordinary Node22/24each replay36real PostgreSQL HTTP scenarios. Participant history and all invitation rows remain intact."
+  },
+  "currentAccountUsagePublicationReview": {
+    "id": "B521",
+    "title": "Account usage summaries publish withdrawn account or project data, while invalid monthly inputs return server failures",
+    "status": "fixed_account_usage_final_authority_selected_billing_owner_and_month_validation_verified_remaining_business_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts"
+    ],
+    "receipt": "receipts/account-usage-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z",
+    "wholeProjectComplete": false,
+    "evidence": "Twenty-seven real usage withdrawal cases and ten invalid-month failures are repaired;155distinct targeted cases pass. The changed route measures35/35statements,32/32branch outcomes and4/4functions. Ordinary Node22/24each replay57summary scenarios and12intake transcript rows. All20documentation quick checks pass."
+  },
+  "currentArchiveHistoricalCreatorReview": {
+    "id": "B522",
+    "title": "Node-volume archive creator filters hide retained history after the creator is disabled or logically deleted",
+    "status": "fixed_historical_creator_lookup_with_current_administrator_authority_verified_remaining_archive_search_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/postgres/conversation-archive-service.ts"
+    ],
+    "receipt": "receipts/archive-historical-creator-filters-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z",
+    "wholeProjectComplete": false,
+    "evidence": "Two real mixed-store creator filters omit node history after actual account disablement/deletion; the correction restores retained history and labels without widening current administrator or Runtime access.99distinct cases pass,19realHTTPscenarios replay on ordinary Node22/24, and20documentation quick checks pass."
   }
 }

@@ -855,6 +855,7 @@ function safeTransferResponse(value: unknown): Record<string, unknown> {
       }
       return {
         status: 'copied',
+        ...(item.historyUnconfirmed===true?{ historyUnconfirmed:true }:{}),
         source: { name: sourceInfo.name, bytes: sourceInfo.bytes, mediaType: sourceInfo.mediaType },
         target: {
           docId: targetInfo.docId,

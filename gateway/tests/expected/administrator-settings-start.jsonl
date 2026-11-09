@@ -1,0 +1,10 @@
+{"scenario":"current","status":302,"location":"/","selectionChanged":true,"code":null,"allocated":1,"resident":1}
+{"scenario":"warm-current","status":302,"location":"/","selectionChanged":true,"code":null,"allocated":0,"resident":1}
+{"scenario":"role","status":403,"location":null,"selectionChanged":false,"code":"forbidden","allocated":0,"resident":0}
+{"scenario":"disabled-account","status":403,"location":null,"selectionChanged":false,"code":"forbidden","allocated":0,"resident":0}
+{"scenario":"deleted-account","status":403,"location":null,"selectionChanged":false,"code":"forbidden","allocated":0,"resident":0}
+{"scenario":"disabled-membership","status":403,"location":null,"selectionChanged":false,"code":"forbidden","allocated":0,"resident":0}
+{"scenario":"missing-membership","status":403,"location":null,"selectionChanged":false,"code":"forbidden","allocated":0,"resident":0}
+{"scenario":"disabled-organization","status":403,"location":null,"selectionChanged":false,"code":"forbidden","allocated":0,"resident":0}
+{"scenario":"restored","status":302,"location":"/","selectionChanged":true,"code":null,"allocated":1,"resident":1}
+{"scenario":"manual-stop","status":409,"location":null,"selectionChanged":false,"code":"INSTANCE_STOPPED","allocated":0,"resident":0}

@@ -1,5 +1,6 @@
 /** PostgreSQL records of authenticated execution inputs and current actor eligibility. @module */
 
+import {requireNodeContentRelations,type NodeContentCheckInput} from './node-content-publication.ts'
 import { createHash } from 'node:crypto'
 import type { ServerResponse } from 'node:http'
 import type { Pool, PoolClient } from 'pg'
@@ -11,6 +12,7 @@ import type { GatewayPrincipalClaims } from './principal.ts'
 import type { DesktopHolder } from './desktop-coordinator.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
+import { getProjectContentBinding, NodeContentUnavailable, type NodeContentStore } from './node-content-store.ts'
 
 /** A refused execution identity request, without database or credential details. */
 export class ExecutionIdentityError extends Error {
@@ -114,7 +116,11 @@ function transferHash(sender: string, inputs: string[], primary: number | undefi
   return createHash('sha256').update(JSON.stringify({ sender, inputs: inputs.toSorted(), primary: primary ?? null, unverified })).digest('hex')
 }
 
-type ExecutionRuntimeSubject = RuntimeCredentialSubject & { target: RuntimeCredentialSubject['target'] & { runtimeId: RuntimeId } }
+type ExecutionStorage = { schema: 'harness' | 'node_content'; db: Queryable }
+type ExecutionRuntimeSubject = RuntimeCredentialSubject & {
+  target: RuntimeCredentialSubject['target'] & { runtimeId: RuntimeId }
+  storage: ExecutionStorage
+}
 
 function scope(subject: ExecutionRuntimeSubject, sessionId: string): [string, string, number, string, RuntimeId] {
   return [subject.organizationId, subject.target.kind, subject.target.id, sessionId, subject.target.runtimeId]
@@ -135,7 +141,15 @@ export async function verifyExecutionAttribution(database: Queryable, input: {
   sessionId: string
   inputIds: readonly string[]
   primaryActorUserId: number
-}): Promise<void> {
+}, nodeContent?: Pick<NodeContentStore,'read'>): Promise<void> {
+  const binding = input.runtime.kind === 'project' && input.runtime.runtimeId !== undefined
+    ? await getProjectContentBinding(database,input.organizationId,input.runtime.runtimeId) : undefined
+  if (binding === undefined) return verifyAttributionStorage(database,{ schema:'harness',db:database },input)
+  if (nodeContent === undefined) throw new NodeContentUnavailable()
+  return nodeContent.read(binding,tx=>verifyAttributionStorage(database,{schema:'node_content',db:tx},input))
+}
+
+async function verifyAttributionStorage(database: Queryable, storage: ExecutionStorage, input: Parameters<typeof verifyExecutionAttribution>[1]): Promise<void> {
   const sessionId = identity(input.sessionId)
   if (!Array.isArray(input.inputIds) || input.inputIds.length === 0
     || !Number.isSafeInteger(input.primaryActorUserId) || input.primaryActorUserId <= 0
@@ -143,21 +157,21 @@ export async function verifyExecutionAttribution(database: Queryable, input: {
     throw new ExecutionIdentityError(403, 'execution attribution requires witnesses and a primary actor')
   }
   const ids = [...new Set(input.inputIds.map(inputId))]
-  const inputs = await database.query<{ actor_user_ids: string[]; runtime_id: RuntimeId | null }>(`SELECT actor_user_ids,runtime_id
-    FROM harness.execution_inputs WHERE organization_id=$1 AND runtime_kind=$2 AND runtime_public_id=$3 AND id=ANY($4::uuid[])`,
+  const inputs = await storage.db.query<{ actor_user_ids: string[]; runtime_id: RuntimeId | null }>(`SELECT actor_user_ids,runtime_id
+    FROM ${storage.schema}.execution_inputs WHERE organization_id=$1 AND runtime_kind=$2 AND runtime_public_id=$3 AND id=ANY($4::uuid[])`,
   [input.organizationId, input.runtime.kind, input.runtime.id, ids])
   const runtimes = new Set(inputs.rows.map(row => row.runtime_id))
   if (inputs.rows.length !== ids.length || runtimes.size !== 1) throw new ExecutionIdentityError(403, 'execution attribution belongs to another runtime')
   const runtimeId = input.runtime.runtimeId ?? inputs.rows[0]!.runtime_id
   if (!runtimes.has(runtimeId)) throw new ExecutionIdentityError(403, 'execution attribution belongs to another runtime')
   const coordinates = [input.organizationId, input.runtime.kind, input.runtime.id, sessionId, runtimeId]
-  const state = await database.query<{ actor_witnesses: Record<string, string> }>(
-    `SELECT actor_witnesses FROM harness.execution_sessions WHERE ${SESSION_COORDINATES}
+  const state = await storage.db.query<{ actor_witnesses: Record<string, string> }>(
+    `SELECT actor_witnesses FROM ${storage.schema}.execution_sessions WHERE ${SESSION_COORDINATES}
       AND runtime_id IS NOT DISTINCT FROM $5::uuid`, coordinates,
   )
   if (state.rows.length !== 1) throw new ExecutionIdentityError(403, 'execution attribution belongs to another runtime')
-  const scopes = await database.query<{ witness: string }>(
-    `SELECT DISTINCT witness FROM (SELECT unnest(input_ids) witness FROM harness.execution_scopes
+  const scopes = await storage.db.query<{ witness: string }>(
+    `SELECT DISTINCT witness FROM (SELECT unnest(input_ids) witness FROM ${storage.schema}.execution_scopes
       WHERE ${SESSION_COORDINATES} AND runtime_id IS NOT DISTINCT FROM $5::uuid
         AND input_ids && $6::uuid[]) scoped WHERE witness=ANY($6::uuid[])`,
     [...coordinates, ids],
@@ -242,7 +256,14 @@ export class GatewayExecutionIdentity {
    * @param pool - organization records and execution ownership.
    * @param nodeId - server-owned computer for use permission and capability qualification.
    */
-  constructor(private readonly pool: Pool, private readonly nodeId: string) {}
+  constructor(private readonly pool: Pool, private readonly nodeId: string,
+    private readonly nodeContent?: Pick<NodeContentStore, 'read' | 'write'>) {}
+
+  /** Check local immutable execution and authorization receipts for the Runtime handler's installed content store. */
+  async verifyNodeContent(input:NodeContentCheckInput):Promise<void>{
+    if(!this.nodeContent || input.binding.nodeId!==this.nodeId) throw new NodeContentUnavailable()
+    await requireNodeContentRelations(input.local,['execution_sessions','execution_inputs','execution_scopes','execution_relays','desktop_session_confirmations'])
+  }
 
   /**
    * Register immutable Session lineage without granting any execution authority.
@@ -266,7 +287,7 @@ export class GatewayExecutionIdentity {
     }
     await this.inRuntime(subject, async (client, subject) => {
       if (parent !== undefined) await this.session(client, subject, parent, false)
-      await client.query(`INSERT INTO harness.execution_sessions(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,parent_session_id,is_seeded)
+      await subject.storage.db.query(`INSERT INTO ${subject.storage.schema}.execution_sessions(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,parent_session_id,is_seeded)
         VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`, [...scope(subject, sessionId), parent ?? null, seeded])
       const stored = await this.session(client, subject, sessionId)
       if (stored.parent_session_id !== (parent ?? null) || stored.is_seeded !== seeded) {
@@ -362,7 +383,7 @@ export class GatewayExecutionIdentity {
         const capturedScope = await this.readScope(client, subject, parentId, inputId(request.scopeId))
         await this.assertCapturedScope(client, subject, capturedScope, inputs, captured, request.unverifiedHistory)
         const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
-        await client.query(`UPDATE harness.execution_sessions SET inheritance_hash=$6 WHERE ${SESSION_SCOPE}`, [...scope(subject, sessionId), hash])
+        await subject.storage.db.query(`UPDATE ${subject.storage.schema}.execution_sessions SET inheritance_hash=$6 WHERE ${SESSION_SCOPE}`, [...scope(subject, sessionId), hash])
         await this.merge(client, subject, sessionId, child, receipts, capturedScope.primary_actor_user_id, capturedScope.unverified)
         return this.createScope(client, subject, sessionId, inputs, capturedScope.primary_actor_user_id, capturedScope.unverified)
       }
@@ -381,7 +402,7 @@ export class GatewayExecutionIdentity {
       if (inputs.length === 0 && witnesses.size !== 0) throw new ExecutionIdentityError(403, 'empty inheritance cannot omit recorded parent actors')
       const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
       const primary = captured === undefined ? null : await this.capturedPrimary(client, subject, receipts, captured)
-      await client.query(`UPDATE harness.execution_sessions SET inheritance_hash=$6 WHERE ${SESSION_SCOPE}`, [...scope(subject, sessionId), hash])
+      await subject.storage.db.query(`UPDATE ${subject.storage.schema}.execution_sessions SET inheritance_hash=$6 WHERE ${SESSION_SCOPE}`, [...scope(subject, sessionId), hash])
       const recorded = await this.merge(client, subject, sessionId, child, receipts, child.primary_actor_user_id ?? primary, unverified)
       return request.scoped === true ? this.createScope(client, subject, sessionId, inputs, primary, unverified) : recorded
     })
@@ -413,17 +434,17 @@ export class GatewayExecutionIdentity {
       if (request.scopeId !== undefined) {
         const capturedScope = await this.readScope(client, subject, senderId, inputId(request.scopeId))
         await this.assertCapturedScope(client, subject, capturedScope, inputs, captured, request.unverifiedHistory)
-        const previous = await client.query<{ request_hash: string }>(`SELECT request_hash FROM harness.execution_relays
+        const previous = await subject.storage.db.query<{ request_hash: string }>(`SELECT request_hash FROM ${subject.storage.schema}.execution_relays
           WHERE ${SESSION_SCOPE} AND message_id=$6`, [...scope(subject, sessionId), messageId])
         if (previous.rows[0] !== undefined && previous.rows[0].request_hash !== hash) throw new ExecutionIdentityError(409, 'execution relay conflicts with its first admission')
-        await client.query(`INSERT INTO harness.execution_relays(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,message_id,request_hash)
+        await subject.storage.db.query(`INSERT INTO ${subject.storage.schema}.execution_relays(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,message_id,request_hash)
           VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`, [...scope(subject, sessionId), messageId, hash])
         const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
         await this.merge(client, subject, sessionId, receiver, receipts, capturedScope.primary_actor_user_id, capturedScope.unverified)
         return this.createScope(client, subject, sessionId, inputs, capturedScope.primary_actor_user_id, capturedScope.unverified)
       }
       const unverified = sender.unverified_history || request.unverifiedHistory === true
-      const previous = await client.query<{ request_hash: string }>(`SELECT request_hash FROM harness.execution_relays
+      const previous = await subject.storage.db.query<{ request_hash: string }>(`SELECT request_hash FROM ${subject.storage.schema}.execution_relays
         WHERE ${SESSION_SCOPE} AND message_id=$6`, [...scope(subject, sessionId), messageId])
       if (previous.rows[0] !== undefined) {
         if (previous.rows[0].request_hash !== hash) throw new ExecutionIdentityError(409, 'execution relay conflicts with its first admission')
@@ -439,7 +460,7 @@ export class GatewayExecutionIdentity {
       if (inputs.length === 0 && witnesses.size !== 0) throw new ExecutionIdentityError(403, 'empty relay cannot omit recorded sender actors')
       const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
       const primary = captured === undefined ? receiver.primary_actor_user_id : await this.capturedPrimary(client, subject, receipts, captured)
-      await client.query(`INSERT INTO harness.execution_relays(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,message_id,request_hash)
+      await subject.storage.db.query(`INSERT INTO ${subject.storage.schema}.execution_relays(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,message_id,request_hash)
         VALUES($1,$2,$3,$4,$5,$6,$7)`, [...scope(subject, sessionId), messageId, hash])
       const recorded = await this.merge(client, subject, sessionId, receiver, receipts, primary, unverified)
       return request.scoped === true ? this.createScope(client, subject, sessionId, inputs, primary, unverified) : recorded
@@ -454,7 +475,7 @@ export class GatewayExecutionIdentity {
    */
   async hasScopes(subject: RuntimeCredentialSubject, sessionId: string): Promise<boolean> {
     return this.inRuntime(subject, async (client, owner) => {
-      const result = await client.query(`SELECT 1 FROM harness.execution_scopes WHERE ${SESSION_SCOPE} LIMIT 1`, scope(owner, sessionId))
+      const result = await owner.storage.db.query(`SELECT 1 FROM ${owner.storage.schema}.execution_scopes WHERE ${SESSION_SCOPE} LIMIT 1`, scope(owner, sessionId))
       return result.rowCount !== 0
     })
   }
@@ -525,7 +546,7 @@ export class GatewayExecutionIdentity {
       const actor = await this.principalActor(client, subject, sessionId, principal)
       const coordinates = [...scope(subject, sessionId), nodeId, subject.generation, desktop, actor]
       if (!request.confirmed) {
-        await client.query(`DELETE FROM harness.desktop_session_confirmations WHERE ${SESSION_SCOPE}
+        await subject.storage.db.query(`DELETE FROM ${subject.storage.schema}.desktop_session_confirmations WHERE ${SESSION_SCOPE}
           AND node_id=$6 AND generation=$7 AND desktop=$8 AND user_id=$9`, coordinates)
         await client.query('SELECT harness.invalidate_access($1,$2::jsonb)', [subject.organizationId, JSON.stringify({ userId: principal.user.id })])
         return
@@ -535,7 +556,7 @@ export class GatewayExecutionIdentity {
         COALESCE(p.revision,0)::text project_revision FROM harness.desktop_access_policies u
         LEFT JOIN harness.desktop_access_policies p ON p.organization_id=u.organization_id AND p.project_id=$3 AND p.node_id=$4
         WHERE u.organization_id=$1 AND u.user_id=$2 AND u.node_id=$4`, [subject.organizationId, actor, subject.projectInternalId ?? null, nodeId])
-      await client.query(`INSERT INTO harness.desktop_session_confirmations
+      await subject.storage.db.query(`INSERT INTO ${subject.storage.schema}.desktop_session_confirmations
         (organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,node_id,generation,desktop,user_id,user_policy_revision,project_policy_revision)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
         ON CONFLICT (organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,node_id,generation,desktop,user_id)
@@ -622,6 +643,20 @@ export class GatewayExecutionIdentity {
 
   private async confirmedDesktopActors(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string,
     nodeId: string, desktop: string, actors: string[]): Promise<number> {
+    if (subject.storage.schema === 'node_content') {
+      const local = await subject.storage.db.query<{ user_id: string; user_revision: string; project_revision: string }>(`SELECT user_id,
+        user_policy_revision::text user_revision,project_policy_revision::text project_revision FROM node_content.desktop_session_confirmations
+        WHERE ${SESSION_SCOPE} AND node_id=$6 AND generation=$7 AND desktop=$8 AND user_id=ANY($9::uuid[]) FOR SHARE`,
+      [...scope(subject, sessionId), nodeId, subject.generation, desktop, actors])
+      if (local.rows.length === 0) return 0
+      const valid = await client.query(`SELECT u.user_id FROM jsonb_to_recordset($4::jsonb) r(user_id uuid,user_revision bigint,project_revision bigint)
+        JOIN harness.desktop_access_policies u ON u.organization_id=$1 AND u.node_id=$2 AND u.user_id=r.user_id
+          AND u.enabled AND u.revision=r.user_revision
+        JOIN harness.desktop_access_policies p ON p.organization_id=$1 AND p.node_id=$2 AND p.project_id=$3
+          AND p.enabled AND p.revision=r.project_revision FOR SHARE OF u,p`,
+      [subject.organizationId,nodeId,subject.projectInternalId,JSON.stringify(local.rows)])
+      return valid.rows.length
+    }
     const confirmations = await client.query(`SELECT c.user_id FROM harness.desktop_session_confirmations c
         JOIN harness.desktop_access_policies u ON u.organization_id=c.organization_id AND u.user_id=c.user_id
           AND u.node_id=c.node_id AND u.enabled AND u.revision=c.user_policy_revision
@@ -685,7 +720,7 @@ export class GatewayExecutionIdentity {
     // The reported uncertainty survives a subsequent authorization refusal.
     // Keep this commit outside the transaction whose result may be a denial.
     await this.inRuntime(subject, async (client, subject) => {
-      await client.query(`UPDATE harness.execution_sessions SET unverified_history=true,revision=revision+1,updated_at=now()
+      await subject.storage.db.query(`UPDATE ${subject.storage.schema}.execution_sessions SET unverified_history=true,revision=revision+1,updated_at=now()
         WHERE ${SESSION_SCOPE} AND NOT unverified_history`, scope(subject, sessionId))
     })
   }
@@ -709,18 +744,19 @@ export class GatewayExecutionIdentity {
       const state = await this.session(client, subject, sessionId)
       const actor = await this.principalActor(client, subject, sessionId, principal)
       if (subject.target.kind === 'project') {
-        const root = await client.query<{ root_session_id: string }>(
-          'SELECT root_session_id FROM harness.conversation_sessions WHERE organization_id=$1 AND id=$2 AND runtime_id=$3', [subject.organizationId, sessionId, subject.target.runtimeId],
+        const root = await subject.storage.db.query<{ root_session_id: string }>(`SELECT root_session_id FROM ${subject.storage.schema}.conversation_sessions WHERE organization_id=$1 AND id=$2 AND runtime_id=$3`, [subject.organizationId, sessionId, subject.target.runtimeId],
         )
         const rootId = root.rows[0]?.root_session_id
         if (rootId === undefined) throw new ExecutionIdentityError(404, 'execution question Session is unavailable')
-        await client.query(`INSERT INTO harness.conversation_interaction_responses(
-          organization_id,runtime_id,interaction_kind,interaction_id,conversation_id,responder_user_id,outcome,call_id)
-          VALUES($1,$7,'question',$2,$3,$4,$5::jsonb,$6) ON CONFLICT DO NOTHING`,
-        [subject.organizationId, questionId, rootId, actor, answer, callId, subject.target.runtimeId])
-        const claim = await client.query(`SELECT 1 FROM harness.conversation_interaction_responses
+        await subject.storage.db.query(`INSERT INTO ${subject.storage.schema}.conversation_interaction_responses(
+          organization_id,runtime_id,interaction_kind,interaction_id,conversation_id,responder_user_id,outcome,call_id${subject.storage.schema === 'node_content' ? ',has_answers' : ''})
+          VALUES($1,$7,'question',$2,$3,$4,${subject.storage.schema === 'harness' ? '$5::jsonb' : '$5::json'},$6${subject.storage.schema === 'node_content' ? ',$8' : ''}) ON CONFLICT DO NOTHING`,
+        [subject.organizationId, questionId, rootId, actor, answer, callId, subject.target.runtimeId,
+          ...subject.storage.schema === 'node_content' ? [typeof request.answer === 'object' && request.answer !== null
+            && 'answers' in request.answer && Array.isArray(request.answer.answers)] : []])
+        const claim = await subject.storage.db.query(`SELECT 1 FROM ${subject.storage.schema}.conversation_interaction_responses
           WHERE organization_id=$1 AND interaction_kind='question' AND interaction_id=$2
-            AND runtime_id=$6 AND conversation_id=$3 AND responder_user_id=$4 AND outcome=$5::jsonb`,
+            AND runtime_id=$6 AND conversation_id=$3 AND responder_user_id=$4 AND ${subject.storage.schema === 'harness' ? 'outcome=$5::jsonb' : 'outcome::text=$5::text'}`,
         [subject.organizationId, questionId, rootId, actor, answer, subject.target.runtimeId])
         if (claim.rowCount !== 1) throw new ExecutionIdentityError(409, 'execution question was claimed by another response')
       }
@@ -762,8 +798,8 @@ export class GatewayExecutionIdentity {
   }
 
   private async readScope(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, id: string): Promise<ExecutionScopeRow> {
-    const rows = await client.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
-      FROM harness.execution_scopes WHERE ${SESSION_SCOPE} AND id=$6`, [...scope(subject, sessionId), id])
+    const rows = await subject.storage.db.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
+      FROM ${subject.storage.schema}.execution_scopes WHERE ${SESSION_SCOPE} AND id=$6`, [...scope(subject, sessionId), id])
     const row = rows.rows[0]
     if (row === undefined) throw new ExecutionIdentityError(403, 'execution scope belongs to another Session or runtime')
     return row
@@ -782,23 +818,28 @@ export class GatewayExecutionIdentity {
     inputs: string[], primary: string | null, unverified: boolean): Promise<ExecutionIdentityState> {
     const ids = [...new Set(inputs)].sort()
     const fingerprint = createHash('sha256').update(JSON.stringify({ ids, primary, unverified })).digest('hex')
-    const existing = await client.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
-      FROM harness.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$6`, [...scope(subject, sessionId), fingerprint])
+    const existing = await subject.storage.db.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
+      FROM ${subject.storage.schema}.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$6`, [...scope(subject, sessionId), fingerprint])
     if (existing.rows[0] !== undefined) return this.scopeState(client, subject, existing.rows[0])
-    const changed = await client.query<{ revision: string }>(`UPDATE harness.execution_sessions SET revision=revision+1,updated_at=now()
+    const changed = await subject.storage.db.query<{ revision: string }>(`UPDATE ${subject.storage.schema}.execution_sessions SET revision=revision+1,updated_at=now()
       WHERE ${SESSION_SCOPE} RETURNING revision::text`, scope(subject, sessionId))
-    await client.query(`INSERT INTO harness.execution_scopes(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,fingerprint,revision,input_ids,primary_actor_user_id,unverified)
+    await subject.storage.db.query(`INSERT INTO ${subject.storage.schema}.execution_scopes(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,fingerprint,revision,input_ids,primary_actor_user_id,unverified)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
     [...scope(subject, sessionId), fingerprint, changed.rows[0]!.revision, ids, primary, unverified])
-    const rows = await client.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
-      FROM harness.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$6`, [...scope(subject, sessionId), fingerprint])
+    const rows = await subject.storage.db.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
+      FROM ${subject.storage.schema}.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$6`, [...scope(subject, sessionId), fingerprint])
     return this.scopeState(client, subject, rows.rows[0]!)
   }
 
   private inRuntime<T>(subject: RuntimeCredentialSubject, work: (client: PoolClient, owner: ExecutionRuntimeSubject) => Promise<T>): Promise<T> {
     return transaction(this.pool, async client => {
       const runtimeId = await this.runtimeIdentity(client, subject)
-      return work(client, { ...subject, target: { ...subject.target, runtimeId } })
+      const target = { ...subject.target, runtimeId }
+      const binding = subject.contentBinding
+      if (binding === undefined) return work(client, { ...subject, target, storage: { schema: 'harness', db: client } })
+      if (this.nodeContent === undefined || binding.organizationId !== subject.organizationId || binding.runtimeId !== runtimeId
+        || binding.nodeId !== this.nodeId || binding.projectId !== subject.projectInternalId || target.kind !== 'project') throw new NodeContentUnavailable()
+      return this.nodeContent.write(binding, tx => work(client, { ...subject, target, storage: { schema: 'node_content', db: tx } }), subject.generation)
     })
   }
 
@@ -816,8 +857,8 @@ export class GatewayExecutionIdentity {
   }
 
   private async session(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, lock = true): Promise<SessionRow> {
-    const result = await client.query<SessionRow>(`SELECT revision::text,parent_session_id,is_seeded,actor_witnesses,
-      primary_actor_user_id,unverified_history,inheritance_hash FROM harness.execution_sessions
+    const result = await subject.storage.db.query<SessionRow>(`SELECT revision::text,parent_session_id,is_seeded,actor_witnesses,
+      primary_actor_user_id,unverified_history,inheritance_hash FROM ${subject.storage.schema}.execution_sessions
       WHERE ${SESSION_SCOPE}${lock ? ' FOR UPDATE' : ''}`, scope(subject, sessionId))
     const row = result.rows[0]
     if (row === undefined) throw new ExecutionIdentityError(404, 'execution Session is not registered in this runtime')
@@ -826,8 +867,8 @@ export class GatewayExecutionIdentity {
 
   private async relatedSessions(client: PoolClient, subject: ExecutionRuntimeSubject, sender: string, receiver: string): Promise<[SessionRow, SessionRow]> {
     // Opposite-direction relays share lock ordering to avoid deadlock.
-    const rows = await client.query<SessionRow & { session_id: string }>(`SELECT revision::text,session_id,parent_session_id,is_seeded,
-      actor_witnesses,primary_actor_user_id,unverified_history,inheritance_hash FROM harness.execution_sessions
+    const rows = await subject.storage.db.query<SessionRow & { session_id: string }>(`SELECT revision::text,session_id,parent_session_id,is_seeded,
+      actor_witnesses,primary_actor_user_id,unverified_history,inheritance_hash FROM ${subject.storage.schema}.execution_sessions
       WHERE organization_id=$1 AND runtime_kind=$2 AND runtime_public_id=$3 AND session_id=ANY($4::text[]) AND runtime_id=$5
       ORDER BY session_id FOR UPDATE`, [subject.organizationId, subject.target.kind, subject.target.id, [sender, receiver],
       subject.target.runtimeId])
@@ -837,7 +878,7 @@ export class GatewayExecutionIdentity {
   }
 
   private async receipt(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string | undefined, id: string): Promise<InputRow> {
-    const result = await client.query<InputRow>(`SELECT input.* FROM harness.execution_inputs input
+    const result = await subject.storage.db.query<InputRow>(`SELECT input.* FROM ${subject.storage.schema}.execution_inputs input
       WHERE input.id=$1 AND input.organization_id=$2 AND input.runtime_kind=$3 AND input.runtime_public_id=$4 AND input.runtime_id=$5`,
     [id, subject.organizationId, subject.target.kind, subject.target.id, subject.target.runtimeId])
     const row = result.rows[0]
@@ -973,23 +1014,45 @@ export class GatewayExecutionIdentity {
       if (result.rows.some(actor => publicNumber(actor.public_id, 'execution actor') !== subject.target.id)) throw new ExecutionIdentityError(403, 'personal execution cannot borrow another account')
       return
     }
-    const sessions = await client.query<{ visibility: string; creator_user_id: string }>(`SELECT r.visibility,r.creator_user_id
-      FROM harness.conversation_sessions c JOIN harness.conversation_sessions r ON r.id=c.root_session_id AND r.organization_id=c.organization_id AND r.runtime_namespace=c.runtime_namespace
-      JOIN harness.projects p ON p.id=c.project_id AND p.organization_id=c.organization_id
+    const { schema, db } = subject.storage
+    if (schema === 'node_content') {
+      const active = await client.query(`SELECT 1 FROM harness.projects p JOIN harness.project_content_placement b
+        ON (b.organization_id,b.project_id)=(p.organization_id,p.id)
+        WHERE p.organization_id=$1 AND p.id=$2 AND p.status='active' AND b.runtime_id=$3 AND b.node_id=$4
+        AND b.volume_id=$5 AND b.writer_epoch=$6 FOR SHARE OF p,b`,
+      [subject.organizationId,subject.projectInternalId,subject.target.runtimeId,this.nodeId,subject.contentBinding!.volumeId,subject.contentBinding!.writerEpoch])
+      if (active.rowCount !== 1) throw new ExecutionIdentityError(403, 'project execution placement is unavailable')
+    }
+    const projectJoin = (table: 'c' | 'd'): string => schema === 'harness'
+      ? `JOIN harness.projects p ON p.id=${table}.project_id AND p.organization_id=${table}.organization_id AND p.status='active'` : ''
+    const projectLock = schema === 'harness' ? ',p' : ''
+    const sessions = await db.query<{ visibility: string; creator_user_id: string }>(`SELECT r.visibility,r.creator_user_id
+      FROM ${schema}.conversation_sessions c JOIN ${schema}.conversation_sessions r ON r.id=c.root_session_id AND r.organization_id=c.organization_id AND r.runtime_namespace=c.runtime_namespace
+      ${projectJoin('c')}
       WHERE c.organization_id=$1 AND c.id=$2 AND c.runtime_id=$4 AND c.project_id=$3 AND c.status<>'deleted' AND r.status<>'deleted'
-        AND p.status='active' FOR SHARE OF c,r,p`, [subject.organizationId, sessionId, subject.projectInternalId, subject.target.runtimeId])
+        FOR SHARE OF c,r${projectLock}`, [subject.organizationId, sessionId, subject.projectInternalId, subject.target.runtimeId])
     // An unmaterialized draft's write authority comes from its unexpired same-project
     // reservation, which names the creator and visibility.
-    const session = sessions.rows[0] ?? (await client.query<{ visibility: string; creator_user_id: string | null }>(
+    const session = sessions.rows[0] ?? (await db.query<{ visibility: string; creator_user_id: string | null }>(
       `SELECT d.visibility,d.user_id AS creator_user_id
-        FROM harness.conversation_draft_reservations d
-        JOIN harness.projects p ON p.id=d.project_id AND p.organization_id=d.organization_id
+        FROM ${schema}.conversation_draft_reservations d
+        ${projectJoin('d')}
         WHERE d.organization_id=$1 AND d.session_id=$2 AND d.runtime_id=$4 AND d.project_id=$3
-          AND d.lease_expires_at > now() AND p.status='active'
-          AND NOT EXISTS (SELECT 1 FROM harness.conversation_sessions c
+          AND d.lease_expires_at > now()
+          AND NOT EXISTS (SELECT 1 FROM ${schema}.conversation_sessions c
             WHERE c.organization_id=d.organization_id AND c.runtime_namespace=d.runtime_namespace AND c.id=d.session_id)
-        FOR SHARE OF d,p`, [subject.organizationId, sessionId, subject.projectInternalId, subject.target.runtimeId])).rows[0]
+        FOR SHARE OF d${projectLock}`, [subject.organizationId, sessionId, subject.projectInternalId, subject.target.runtimeId])).rows[0]
     if (session === undefined) throw new ExecutionIdentityError(403, 'execution Session is not writable in this runtime')
+    // Steward policy writers serialize with the actor locks held by this transaction.
+    const project = await client.query(`SELECT 1 FROM harness.projects p
+      WHERE p.organization_id=$1 AND p.id=$2 AND p.status='active'
+        AND (p.kind='standard' OR (
+          SELECT count(*) FROM harness.steward_access_policies sp
+          JOIN harness.memberships m ON m.organization_id=sp.organization_id AND m.user_id=sp.user_id
+          WHERE sp.organization_id=p.organization_id AND sp.node_id=$4 AND sp.enabled
+            AND sp.user_id=ANY($3::uuid[]) AND m.role='admin'
+        )=cardinality($3::uuid[]))`, [subject.organizationId, subject.projectInternalId, actorIds, this.nodeId])
+    if (project.rowCount !== 1) throw new ExecutionIdentityError(403, 'project execution qualification is unavailable')
     if (capability === 'memory' && session.visibility === 'private') throw new ExecutionIdentityError(403, 'project memory is read-only in private conversations')
     const members = await client.query<{ user_id: string; access_mode: string }>(`SELECT user_id,access_mode FROM harness.project_members
       WHERE organization_id=$1 AND project_id=$2 AND user_id=ANY($3::uuid[]) FOR SHARE`,
@@ -1005,7 +1068,7 @@ export class GatewayExecutionIdentity {
     kind: 'message' | 'question', hash: string, actor: string, previousId?: string): Promise<InputRow> {
     const previous = previousId === undefined ? undefined : await this.receipt(client, subject, sessionId, previousId)
     if (previous !== undefined && (previous.message_id !== messageId || previous.kind !== kind)) throw new ExecutionIdentityError(403, 'execution edit changes its input binding')
-    const existing = await client.query<InputRow>(`SELECT * FROM harness.execution_inputs WHERE ${SESSION_SCOPE}
+    const existing = await subject.storage.db.query<InputRow>(`SELECT * FROM ${subject.storage.schema}.execution_inputs WHERE ${SESSION_SCOPE}
       AND message_id=$6 AND kind=$7 AND previous_input_id IS NOT DISTINCT FROM $8::uuid
       ${previousId === undefined ? '' : 'AND created_by_user_id=$9 AND content_hash=$10'}`,
     [...scope(subject, sessionId), messageId, kind, previousId ?? null, ...previousId === undefined ? [] : [actor, hash]])
@@ -1015,7 +1078,7 @@ export class GatewayExecutionIdentity {
       return found
     }
     const actors = [...new Set([...(previous?.actor_user_ids ?? []), actor])]
-    const inserted = await client.query<InputRow>(`INSERT INTO harness.execution_inputs(organization_id,runtime_kind,runtime_public_id,
+    const inserted = await subject.storage.db.query<InputRow>(`INSERT INTO ${subject.storage.schema}.execution_inputs(organization_id,runtime_kind,runtime_public_id,
       session_id,runtime_id,message_id,kind,content_hash,created_by_user_id,actor_user_ids,previous_input_id)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
     [...scope(subject, sessionId), messageId, kind, hash, actor, actors, previousId ?? null])
@@ -1026,7 +1089,7 @@ export class GatewayExecutionIdentity {
     receipts: InputRow[], primary: string | null, unverified: boolean): Promise<ExecutionIdentityState> {
     const witnesses = { ...state.actor_witnesses }
     for (const receipt of receipts) for (const actor of receipt.actor_user_ids) witnesses[actor] ??= receipt.id
-    const changed = await client.query<{ revision: string }>(`UPDATE harness.execution_sessions SET actor_witnesses=$6::jsonb,primary_actor_user_id=$7,
+    const changed = await subject.storage.db.query<{ revision: string }>(`UPDATE ${subject.storage.schema}.execution_sessions SET actor_witnesses=$6::jsonb,primary_actor_user_id=$7,
       unverified_history=unverified_history OR $8,revision=revision+1,updated_at=now() WHERE ${SESSION_SCOPE} RETURNING revision::text`,
     [...scope(subject, sessionId), JSON.stringify(witnesses), primary, unverified])
     return this.state(client, subject, { ...state, revision: changed.rows[0]!.revision, actor_witnesses: witnesses, primary_actor_user_id: primary,
@@ -1048,7 +1111,7 @@ export class GatewayExecutionIdentity {
       }
       return this.state(client, subject, state)
     }
-    await client.query('UPDATE harness.execution_inputs SET entered_at=now() WHERE id=$1', [receipt.id])
+    await subject.storage.db.query(`UPDATE ${subject.storage.schema}.execution_inputs SET entered_at=now() WHERE id=$1`, [receipt.id])
     return this.merge(client, subject, sessionId, state, [receipt], receipt.created_by_user_id, unverified)
   }
 

@@ -7,20 +7,9 @@
 import { z } from 'zod'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
-import type { WorkspaceView } from './workspace.ts'
-import { sessionIdSchema, workspaceIdSchema } from './sessions.schema.ts'
+import { sessionIdSchema, workspaceIdSchema, workspaceViewSchema } from './sessions.schema.ts'
 
-export { workspaceIdSchema } from './sessions.schema.ts'
-
-/** WorkspaceView row of every workspace.* response. */
-export const workspaceViewSchema = z.object({
-  workspaceId: workspaceIdSchema,
-  path: z.string(),
-  title: z.string(),
-  sessionIds: z.array(sessionIdSchema),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-}) satisfies z.ZodType<Wire<WorkspaceView>>
+export { workspaceIdSchema, workspaceViewSchema } from './sessions.schema.ts'
 
 /** workspace.list request payload (empty object literal). */
 export const workspaceListRequestSchema = z.object({}) satisfies z.ZodType<Wire<RequestPayload<'workspace.list'>>>

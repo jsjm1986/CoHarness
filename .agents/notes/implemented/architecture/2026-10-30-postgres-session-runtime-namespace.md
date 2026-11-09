@@ -22,7 +22,7 @@ Maintenance selection carries the reviewed Runtime/Host pair through preview, br
 
 **Find a matching Session first and infer its Runtime.** Rejected because equal identifiers can have several authorized or unauthorized owners.
 
-**Assign unknown history to a newly allocated Runtime.** Rejected because an allocation proves neither the origin nor authority over older data.
+**Assign unknown history to a newly allocated Runtime.** Rejected because an allocation establishes neither the Runtime that originally held the data nor permission to access it.
 
 ## Consequences
 

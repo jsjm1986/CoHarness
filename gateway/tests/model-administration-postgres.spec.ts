@@ -68,6 +68,8 @@ describePg('PostgreSQL administrator model authority', () => {
           VALUES($1,$2::text,$2::text,$3) RETURNING id,public_id`, [organizationId, username, root])).rows[0]!
         await pool.query('INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,$3)',
           [organizationId, row.id, username === 'administrator' ? 'admin' : 'member'])
+        await pool.query('INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,$2,false)',
+          [row.id, 'fixture-password-hash'])
         users.push({ uuid: row.id, id: Number(row.public_id) })
       }
       const project = (await pool.query<{ id: string; public_id: string }>("INSERT INTO harness.projects(organization_id,name) VALUES($1,'Model project') RETURNING id,public_id", [organizationId])).rows[0]!
@@ -118,7 +120,7 @@ describePg('PostgreSQL administrator model authority', () => {
   for (const operation of ['provider', 'model', 'settings', 'credential-set', 'credential-unset', 'user-access', 'project-access',
     'project-access-all', 'role-quota', 'user-quota', 'project-quota'] as const) {
     it.each(['role', 'disabled-account', 'deleted-account', 'disabled-membership', 'missing-membership', 'disabled-organization',
-      'other-organization', 'current'] as const)(`retains current administrator authority for ${operation} after configuration admission: %s`, async change => {
+      'password-required', 'missing-credential', 'other-organization', 'current'] as const)(`retains current administrator authority for ${operation} after configuration admission: %s`, async change => {
       const f = await fixture(), name = `model-administrator-${randomUUID()}`
       const reader = createPostgresPool(databaseUrl!, { max: 1, application_name: name })
       const service = new PostgresModelGovernanceService({ ...f.context, pool: reader }, new OrganizationModelCredentialCipher(Buffer.alloc(32, 9)))
@@ -138,6 +140,8 @@ describePg('PostgreSQL administrator model authority', () => {
         else if (change === 'disabled-membership') await blocker.query("UPDATE harness.memberships SET status='disabled' WHERE user_id=$1", [f.actor.uuid])
         else if (change === 'missing-membership') await blocker.query('DELETE FROM harness.memberships WHERE user_id=$1', [f.actor.uuid])
         else if (change === 'disabled-organization') await blocker.query("UPDATE harness.organizations SET status='disabled' WHERE id=$1", [f.context.organizationId])
+        else if (change === 'password-required') await blocker.query('UPDATE harness.password_credentials SET must_change_password=true WHERE user_id=$1', [f.actor.uuid])
+        else if (change === 'missing-credential') await blocker.query('DELETE FROM harness.password_credentials WHERE user_id=$1', [f.actor.uuid])
         await blocker.query('COMMIT')
         const result = await pending
         if (change === 'current') {

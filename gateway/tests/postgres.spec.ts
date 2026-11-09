@@ -248,6 +248,9 @@ describePg('PostgreSQL baseline', () => {
       { table_name: 'document_operation_items' },
       { table_name: 'document_operations' },
       { table_name: 'document_projection_checkpoints' },
+      { table_name: 'document_scope_placement' },
+      { table_name: 'document_scope_writers' },
+      { table_name: 'document_transfer_delivery' },
     ])
     const archiveTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables WHERE table_schema='harness' AND table_name LIKE 'conversation_archive_%' ORDER BY table_name`)
@@ -288,6 +291,7 @@ describePg('PostgreSQL baseline', () => {
       organization_id,username,display_name,home_path
     ) VALUES($1,'alice','Alice','/tmp/alice') RETURNING id`, [organizationId])
     userId = user.rows[0]!.id
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [userId])
     baselineNodeId = (await pool.query<{ id: string }>(`INSERT INTO harness.compute_nodes(organization_id,name)
       VALUES($1,'baseline-storage') RETURNING id`, [organizationId])).rows[0]!.id
     baselineRuntimeId = (await pool.query<{ runtime_id: RuntimeId }>(`INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port)
@@ -1459,6 +1463,8 @@ describePg('PostgreSQL baseline', () => {
       VALUES($1,$2,'member'),($1,$3,'member'),($1,$4,'member'),($1,$5,'admin')
       ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,status='active'`,
     [organizationId, userId, memberId, readerId, administratorId])
+    await pool.query(`INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password)
+      SELECT id,'fixture',false FROM harness.users WHERE id=ANY($1::uuid[])`, [[memberId, readerId, administratorId]])
     const node = await pool.query<{ id: string }>(`INSERT INTO harness.compute_nodes(
       organization_id,name
     ) VALUES($1,$2) RETURNING id`, [organizationId, `collaboration-${suffix}`])
@@ -3130,6 +3136,7 @@ describePg('PostgreSQL baseline', () => {
     const actor = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(
       organization_id,username,display_name,home_path) VALUES($1,'archive-owner','Archive owner','/tmp/archive-owner') RETURNING id,public_id`, [org])).rows[0]!
     await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [org, actor.id])
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [actor.id])
     await pool.query('INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port) VALUES($1,$2,$3,47500)',
       [org, actor.id, context.nodeId])
     const runtime = await new PostgresInstanceRepository(context, 47500).resolveTarget({ kind: 'user', id: Number(actor.public_id) })

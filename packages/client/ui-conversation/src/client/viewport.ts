@@ -16,6 +16,7 @@ export const WORKBENCH_PANE_LIMIT = 4
 interface ViewState {
   mode: ConversationViewportMode
   pendingIdentity?: true
+  paneVerification?: NonNullable<ConversationViewportSnapshot['paneVerification']>
   paneIds: SessionId[]
   activePaneId?: SessionId
   paneRatios: number[]
@@ -78,6 +79,8 @@ export function createConversationViewportStore(): EngineStoreHandle<ViewState, 
         draft.mode = state.mode
         if (state.pendingIdentity === undefined) delete draft.pendingIdentity
         else draft.pendingIdentity = state.pendingIdentity
+        if (state.paneVerification === undefined) delete draft.paneVerification
+        else draft.paneVerification = state.paneVerification
         draft.paneIds = state.paneIds
         draft.paneRatios = state.paneRatios
         draft.collapsedIds = state.collapsedIds
@@ -127,6 +130,7 @@ export class ConversationViewportController implements ConversationViewport {
         // Strips follow the pane set: a removed pane can never stay collapsed.
         next.collapsedIds = next.collapsedIds.filter(id => next.paneIds.includes(id))
         if (next.mode !== state.mode || next.pendingIdentity !== state.pendingIdentity || next.activePaneId !== state.activePaneId
+          || next.paneVerification !== state.paneVerification
           || next.paneIds.length !== state.paneIds.length
           || next.paneIds.some((id, index) => id !== state.paneIds[index])
           || next.paneRatios.some((ratio, index) => ratio !== state.paneRatios[index])
@@ -156,8 +160,10 @@ export class ConversationViewportController implements ConversationViewport {
     if (this.disposed || principal === this.persistenceScope) return
     // Supersede stale view intents, but never an intent holding an input
     // block: that hold belongs to an in-flight user operation whose commit
-    // must still land when the Host settles it.
-    if (this.persistenceScope !== undefined
+    // must still land when the Host settles it. A bare revocation
+    // (principal === undefined) is the unverified renewal interval — the
+    // pending intent still belongs to the same account, not a stale one.
+    if (principal !== undefined && this.persistenceScope !== undefined
       && this.sessions.list.getSnapshot().navigationBlockedSessionId === undefined) this.sessions.beginNavigation()
     this.persistenceScope = principal
     this.unavailablePanes.clear()
@@ -433,6 +439,20 @@ export class ConversationViewportController implements ConversationViewport {
    */
   needsCatalogRestore(): boolean { return this.restorationPending }
 
+  setPaneVerification(states: NonNullable<ConversationViewportSnapshot['paneVerification']>): void {
+    const panes = this.store.getSnapshot().paneIds
+    const current = this.store.getSnapshot().paneVerification
+    const entries = panes.flatMap(id => states[id] === undefined ? [] : [[id, states[id]] as const])
+    if (entries.length === Object.keys(current ?? {}).length && entries.every(([id, status]) => current?.[id] === status)) return
+    this.restoringWorkbenches = true
+    try {
+      this.store.update((draft) => {
+        if (entries.length === 0) delete draft.paneVerification
+        else draft.paneVerification = Object.fromEntries(entries)
+      })
+    } finally { this.restoringWorkbenches = false }
+  }
+
   markCatalogReady(unavailable: ReadonlySet<SessionId> = this.unavailablePanes): void {
     const restoring = this.restorationPending
     if (this.persistenceScope === 'local' && this.keyVersion === 2 && this.sessions.keyFor !== undefined) {
@@ -471,6 +491,21 @@ export class ConversationViewportController implements ConversationViewport {
       if (active === undefined) delete draft.activePaneId
       else draft.activePaneId = active
       draft.paneRatios = normalizedRatios(draft.paneIds.length, target.paneRatios)
+      // Surviving panes keep their verification entries so a same-content
+      // switch leaves the snapshot untouched; entries of dropped panes go.
+      const current = draft.paneVerification
+      if (current !== undefined) {
+        const kept: Partial<Record<SessionId, NonNullable<(typeof current)[SessionId]>>> = {}
+        for (const id of draft.paneIds) {
+          const entry = current[id]
+          if (entry !== undefined) kept[id] = entry
+        }
+        const keys = Object.keys(kept)
+        const same = keys.length === Object.keys(current).length
+        if (same) return
+        if (keys.length === 0) delete draft.paneVerification
+        else draft.paneVerification = kept
+      }
     })
     this.reconcileSessions()
     this.selectWorkbenchFocus()
@@ -485,7 +520,7 @@ export class ConversationViewportController implements ConversationViewport {
     // its localized default label instead of a fixed-language fallback.
     this.workbenches.set(id, { id, name: name.trim(), paneIds: [], paneRatios: [], updatedAt: Date.now() })
     this.activeWorkbenchId = id
-    this.store.update((draft) => { draft.mode = 'workbench'; draft.paneIds = []; delete draft.activePaneId; draft.paneRatios = [] })
+    this.store.update((draft) => { draft.mode = 'workbench'; draft.paneIds = []; delete draft.paneVerification; delete draft.activePaneId; draft.paneRatios = [] })
     this.persistWorkbenches()
     return id
   }
@@ -509,6 +544,7 @@ export class ConversationViewportController implements ConversationViewport {
     this.prepareWorkbenchRestore(target.paneIds)
     this.store.update((draft) => {
       draft.mode = 'workbench'
+      delete draft.paneVerification
       const pending = this.keyVersion === 2 && this.sessions.keyFor !== undefined
       draft.paneIds = pending ? [] : [...target.paneIds]
       draft.paneRatios = pending ? [] : [...target.paneRatios]
@@ -585,11 +621,15 @@ export class ConversationViewportController implements ConversationViewport {
     if (this.workbenches.size === 0) this.workbenches.set('default', { id: 'default', name: '', paneIds: [], paneRatios: [], updatedAt: Date.now() })
     const active = this.workbenches.get(this.activeWorkbenchId)
     this.store.update((draft) => {
+      delete draft.paneVerification
       draft.mode = record?.mode ?? 'single'
       const pending = this.keyVersion === 2 && this.sessions.keyFor !== undefined
       if (pending) draft.pendingIdentity = true
       else delete draft.pendingIdentity
       draft.paneIds = pending || active === undefined ? [] : [...active.paneIds]
+      if (record?.mode === 'workbench' && record.version === 3 && this.persistenceScope?.startsWith('account:')) {
+        draft.paneVerification = Object.fromEntries(draft.paneIds.map(id => [id, 'checking' as const]))
+      }
       draft.paneRatios = normalizedRatios(draft.paneIds.length, active?.paneRatios ?? [])
       const id = pending ? undefined : active?.activePaneId ?? draft.paneIds[0]
       if (id === undefined) delete draft.activePaneId
@@ -642,7 +682,8 @@ export class ConversationViewportController implements ConversationViewport {
     const multi = this.enabled && state.mode === 'workbench' && (this.keyVersion === 3 || this.sessions.keyFor === undefined)
     if (multi && (this.sessions.list.getSnapshot().phase !== 'ready'
       || (this.workspaces !== undefined && this.workspaces.list.getSnapshot().phase !== 'ready'))) return
-    const ids = multi ? state.paneIds.filter(id => validSession(this.sessions, id, this.workspaces)) : []
+    const ids = multi ? state.paneIds.filter(id => state.paneVerification?.[id] === undefined
+      && validSession(this.sessions, id, this.workspaces)) : []
     if (ids.length === this.stagedIds.length && ids.every((id, index) => id === this.stagedIds[index])) return
     this.stagedIds = ids
     this.sessions.setAdditionalStaged(ids)
@@ -656,6 +697,7 @@ export class ConversationViewportController implements ConversationViewport {
   }
 
   private select(sessionId: SessionId): void {
+    if (this.store.getSnapshot().paneVerification?.[sessionId] !== undefined) return
     // Pane focus can come from a restored layout rather than a user pick, so
     // it must not publish the Agent on its own — engagement still resolves it.
     if (this.sessions.list.getSnapshot().current !== sessionId) this.sessions.open(sessionId, { activate: false })

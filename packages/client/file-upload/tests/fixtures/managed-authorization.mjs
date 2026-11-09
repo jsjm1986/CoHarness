@@ -63,6 +63,50 @@ try {
     return { status: response.status, body: await response.json() }
   }
   const collaboration = new PostgresCollaborationService(f.context)
+  if (only === undefined) {
+    const { Context } = await import('@deepseek-ai/cordis')
+    const clientRoot = new Context()
+    const clientEntry = path => new URL(`packages/${path}/${mode === 'src' ? 'src/client/index.ts' : 'lib/client.js'}`, root).href
+    const { installConnection, clientSessionKey } = await import(clientEntry('client/connection'))
+    const { apply } = await import(clientEntry('client/file-upload'))
+    const origin = ctx.webServer.getOrigin()
+    installConnection(clientRoot, { location: { hostname: '127.0.0.1', origin, search: '' } })
+    const connection = clientRoot.get('connection')
+    assert.ok(connection)
+    connection.confirmPrincipal(f.admin.id)
+    connection.setBaseTarget({ kind: 'personal' })
+    const id = await f.session(), handle = await ctx.agents.create({ sessionId: SessionId(id) })
+    handles.push(handle)
+    const key = clientSessionKey({ kind: 'project', projectId: f.project.id, runtimeId: f.project.runtimeId }, SessionId(id))
+    const previous = globalThis.__DSH_FILE_UPLOAD__
+    let addressed = 0
+    globalThis.__DSH_FILE_UPLOAD__ = { fetch: async (path, init) => {
+      const url = new URL(path, origin)
+      assert.equal(url.searchParams.get('dshRuntime'), f.project.runtimeId)
+      assert.equal(url.searchParams.get('dshTarget'), `project:${f.project.id}`)
+      assert.equal(url.searchParams.get('dshPrincipal'), String(f.admin.id))
+      assert.equal(url.searchParams.get('sessionId'), id)
+      addressed += 1
+      return fetch(url, { ...init, headers: { ...f.headers(f.project, f.admin), ...init.headers } })
+    } }
+    try {
+      await clientRoot.plugin({ apply }).await()
+      for (const body of [new Blob(['scoped']), new ReadableStream({ start(c) { c.enqueue(Buffer.from('scoped')); c.close() } })]) {
+        const result = await clientRoot.fileUpload.upload(key, body, 'scoped.txt', AbortSignal.timeout(10000))
+        assert.equal(result.ok, true)
+        const chunks = []
+        for await (const chunk of ctx.attachments.readFileStream(result.value.file)) chunks.push(Buffer.from(chunk))
+        assert.equal(Buffer.concat(chunks).toString(), 'scoped')
+        assert.equal(ctx.fileUploads.resolve(handle.agent, result.value.receiptId).bytes, 6)
+      }
+      console.log(JSON.stringify({ scenario: 'runtime-qualified-browser', addressed, originalSessionVerified: true,
+        distinctBootstrapRetained: true, bytesVerified: true, signedManagedHost: true }))
+    } finally {
+      if (previous === undefined) delete globalThis.__DSH_FILE_UPLOAD__
+      else globalThis.__DSH_FILE_UPLOAD__ = previous
+      await clientRoot.fiber.dispose()
+    }
+  }
   for (const restriction of only === undefined ? ['private', 'read-only'] : []) {
     const id = await f.session(), handle = await ctx.agents.create({ sessionId: SessionId(id) })
     handles.push(handle)

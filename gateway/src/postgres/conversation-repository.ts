@@ -1,3 +1,4 @@
+import {requireNodeContentRelations,type NodeContentCheckInput} from '../node-content-publication.ts'
 import { conversationQueryFieldsV1 } from './conversation-query-fields-v1.ts'
 import { createHash } from 'node:crypto'
 import { escapeLiteral, type Pool, type PoolClient, type QueryResultRow } from 'pg'
@@ -7,6 +8,7 @@ import { encodeSearchText, literalSearchParts } from './search-text.ts'
 import { literalLikePattern } from './literal-like-pattern.ts'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type { RuntimeId } from '../runtime-catalog.ts'
+import { NodeContentUnavailable, type NodeContentBinding, type NodeContentStore } from '../node-content-store.ts'
 
 export type ConversationVisibility = 'personal' | 'project' | 'private'
 
@@ -443,8 +445,11 @@ interface ConversationSearchInsertRow {
   time: number
 }
 
+type ContentSchema = 'harness' | 'node_content'
+
 async function insertConversationEvents(
   client: PoolClient,
+  schema: ContentSchema,
   scope: ConversationRuntimeScope,
   sessionId: string,
   events: readonly { event: ConversationEvent; json: string; payloadBytes: number }[],
@@ -466,7 +471,7 @@ async function insertConversationEvents(
       values.push(scope.organizationId, scope.runtimeId, sessionId, event.seq, event.type, event.time, json, payloadBytes, serialized(conversationQueryFieldsV1(event)))
       return `($${String(base + 1)},$${String(base + 2)},$${String(base + 3)},$${String(base + 4)},$${String(base + 5)},to_timestamp($${String(base + 6)}/1000.0),$${String(base + 7)}::json,$${String(base + 8)},$${String(base + 9)}::jsonb)`
     }).join(',')
-    await client.query(`INSERT INTO harness.conversation_events(
+    await client.query(`INSERT INTO ${schema}.conversation_events(
       organization_id,runtime_id,session_id,seq,event_type,occurred_at,event,payload_bytes,query_fields
     ) VALUES${rows}`, values)
     offset += batch.length
@@ -475,6 +480,7 @@ async function insertConversationEvents(
 
 async function insertConversationSearch(
   client: PoolClient,
+  schema: ContentSchema,
   scope: ConversationRuntimeScope,
   sessionId: string,
   rows: readonly ConversationSearchInsertRow[],
@@ -497,7 +503,7 @@ async function insertConversationSearch(
       values.push(scope.organizationId, scope.runtimeId, sessionId, seq, role, encoded.text, time, encoded.nulParts)
       return `($${String(base + 1)},$${String(base + 2)},$${String(base + 3)},$${String(base + 4)},$${String(base + 5)},$${String(base + 6)},to_timestamp($${String(base + 7)}/1000.0),$${String(base + 8)}::text[])`
     }).join(',')
-    await client.query(`INSERT INTO harness.conversation_search(organization_id,runtime_id,session_id,event_seq,role,content,occurred_at,content_nul_parts)
+    await client.query(`INSERT INTO ${schema}.conversation_search(organization_id,runtime_id,session_id,event_seq,role,content,occurred_at,content_nul_parts)
       VALUES${placeholders}`, values)
     offset += batch.length
   }
@@ -766,6 +772,15 @@ export interface ConversationRuntimeScope {
   readonly runtimeId: RuntimeId
 }
 
+type WriterSelector = { readonly internalId: string } | { readonly publicId: number }
+interface Writer { id: string; administrator: boolean }
+type ContentTransactions = Pick<NodeContentStore, 'read' | 'write'>
+interface NodeRepository { store: ContentTransactions; binding: NodeContentBinding; generation: number }
+
+function writerKey(selector: WriterSelector): string {
+  return 'internalId' in selector ? 'internal:' + selector.internalId : 'public:' + String(selector.publicId)
+}
+
 type ConversationScopedTable = 'conversation_sessions' | 'conversation_events' | 'conversation_search'
   | 'conversation_append_batches' | 'conversation_draft_reservations'
 
@@ -775,7 +790,17 @@ export class ConversationRepository {
   private readonly organizationSql: string
   private readonly runtimeSql: string
 
-  constructor(private readonly pool: Pool, scope: ConversationRuntimeScope) {
+  private readonly schema: ContentSchema
+  private readonly reader: Queryable
+  private readonly mutator: Queryable
+  private readonly heldWriters = new WeakMap<PoolClient, ReadonlyMap<string, Writer>>()
+
+  constructor(private readonly pool: Pool, scope: ConversationRuntimeScope, private readonly local?: NodeRepository) {
+    this.schema = local === undefined ? 'harness' : 'node_content'
+    this.reader = local === undefined ? pool : { query: <R extends QueryResultRow>(sql: string, values?: readonly unknown[]) =>
+      local.store.read(local.binding, tx => tx.query<R>(sql, values === undefined ? [] : [...values]), undefined, local.generation) }
+    this.mutator = local === undefined ? pool : { query: <R extends QueryResultRow>(sql: string, values?: readonly unknown[]) =>
+      local.store.write(local.binding, tx => tx.query<R>(sql, values === undefined ? [] : [...values]), local.generation) }
     this.scope = Object.freeze({ ...scope })
     this.organizationSql = `${escapeLiteral(scope.organizationId)}::uuid`
     this.runtimeSql = `${escapeLiteral(scope.runtimeId)}::uuid`
@@ -783,11 +808,12 @@ export class ConversationRepository {
 
   private predicate(alias?: string): string {
     const prefix = alias === undefined ? '' : `${alias}.`
-    return `${prefix}organization_id=${this.organizationSql} AND ${prefix}runtime_namespace=${this.runtimeSql}::text`
+    const shared=this.schema==='harness'?` AND NOT EXISTS(SELECT FROM harness.project_content_placement b WHERE b.organization_id=${this.organizationSql} AND b.runtime_id=${this.runtimeSql})`:''
+    return `${prefix}organization_id=${this.organizationSql} AND ${prefix}runtime_namespace=${this.runtimeSql}::text${shared}`
   }
 
   private rows(table: ConversationScopedTable): string {
-    return `(SELECT * FROM harness.${table} WHERE ${this.predicate()})`
+    return `(SELECT * FROM ${this.schema}.${table} WHERE ${this.predicate()})`
   }
 
   private assertOrganization(organizationId: string): void {
@@ -798,8 +824,48 @@ export class ConversationRepository {
     if (runtimeId !== undefined && runtimeId !== this.scope.runtimeId) throw conversationWriteDenied('conversation belongs to another Runtime')
   }
 
+  private readSnapshot<T>(work: (client: PoolClient) => Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (this.local !== undefined) return this.local.store.read(this.local.binding, work, signal, this.local.generation)
+    return transaction(this.pool, async client => {
+      await checkedQuery(client, 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY', [], signal)
+      return work(client)
+    }, signal)
+  }
+
+  private mutate<T>(writers: readonly WriterSelector[], work: (client: PoolClient) => Promise<T>): Promise<T> {
+    const local = this.local
+    if (local === undefined) return transaction(this.pool, work)
+    const commit = (allowed: ReadonlyMap<string, Writer>) => local.store.write(local.binding, async client => {
+      this.heldWriters.set(client, allowed)
+      try { return await work(client) } finally { this.heldWriters.delete(client) }
+    }, local.generation)
+    if (writers.length === 0) return commit(new Map())
+    return transaction(this.pool, async control => {
+      const allowed = new Map<string, Writer>()
+      const b=local.binding
+      const internal=[...new Set(writers.flatMap(selector=>'internalId' in selector?[selector.internalId]:[]))]
+      const publicIds=[...new Set(writers.flatMap(selector=>'publicId' in selector?[selector.publicId]:[]))]
+      const result=await control.query<Writer & {public_id:string}>(
+        'SELECT id,public_id::text,administrator FROM harness.node_project_content_writers($1,$2,$3,$4,$5,$6,$7,$8)',
+        [b.organizationId,b.projectId,b.runtimeId,b.nodeId,b.volumeId,b.writerEpoch,internal,publicIds])
+      for (const row of result.rows) {
+        allowed.set(writerKey({internalId:row.id}),row)
+        allowed.set(writerKey({publicId:Number(row.public_id)}),row)
+      }
+      if (!writers.every(selector=>allowed.has(writerKey(selector)))) throw conversationWriteDenied('The contributing account no longer has write access on this computer and project.')
+      // Hold current writer grants through the acknowledged local content commit.
+      return commit(allowed)
+    })
+  }
+
+  private projectWriter(client: PoolClient, organizationId: string, projectId: string, selector: WriterSelector): Promise<Writer | undefined> {
+    if (this.local === undefined) return this.checkProjectWriter(client, organizationId, projectId, selector)
+    if (organizationId !== this.local.binding.organizationId || projectId !== this.local.binding.projectId) throw conversationWriteDenied('Project content placement mismatch')
+    return Promise.resolve(this.heldWriters.get(client)?.get(writerKey(selector)))
+  }
+
   /** Lock the account and project before reading current writer authority. */
-  private async projectWriter(
+  private async checkProjectWriter(
     client: PoolClient,
     organizationId: string,
     projectId: string,
@@ -952,7 +1018,7 @@ export class ConversationRepository {
       this.assertSameHeader(row, header)
       return row
     }
-    await client.query(`INSERT INTO harness.conversation_sessions(
+    await client.query(`INSERT INTO ${this.schema}.conversation_sessions(
       id,organization_id,creator_user_id,project_id,parent_session_id,root_session_id,visibility,
       session_format_version,created_at,updated_at,cwd,seed_length,origin,delegation_depth,agent_preset,draft,title,ssh_target_id,runtime_id
     ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,to_timestamp($9/1000.0),to_timestamp($9/1000.0),$10,$11,$12,$13,$14,$15,$16,$17,$18)`, [
@@ -968,13 +1034,18 @@ export class ConversationRepository {
     return insertedRow
   }
 
+  private rootWriter(header?: ConversationHeader): WriterSelector[] {
+    return header !== undefined && header.parentSessionId === undefined && header.creatorUserId !== undefined
+      ? [{ internalId: header.creatorUserId }] : []
+  }
+
   /**
    * Materialize unchanged metadata idempotently; project roots require current writer authority after lock acquisition.
    * @param header - complete Session metadata, including the project creator.
    * @returns completion after materialization commits; denies an inactive or unauthorized creator.
    */
   async create(header: ConversationHeader): Promise<void> {
-    await transaction(this.pool, async client => { await this.ensureMaterialized(client, header) })
+    await this.mutate(this.rootWriter(header), async client => { await this.ensureMaterialized(client, header) })
   }
 
   /**
@@ -996,7 +1067,7 @@ export class ConversationRepository {
       || (input.projectId !== undefined && input.visibility !== 'project' && input.visibility !== 'private')) {
       throw new Error('draft reservation has invalid scope visibility')
     }
-    return await transaction(this.pool, async client => {
+    return await this.mutate(input.userId === undefined ? [] : [{ internalId: input.userId }], async client => {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         `draft:${JSON.stringify([input.organizationId, this.scope.runtimeId, input.scopeKey, input.draftId])}`,
       ])
@@ -1023,7 +1094,7 @@ export class ConversationRepository {
           status: string; runtime_id: RuntimeId | null; project_id: string | null; creator_user_id: string | null; archive_state: string | null; archive_restored_at: Date | null
         }>(`SELECT r.status,r.runtime_id,r.project_id,r.creator_user_id,a.state archive_state,a.restored_at archive_restored_at
           FROM ${this.rows('conversation_sessions')} r
-          LEFT JOIN harness.conversation_archive_records a
+          LEFT JOIN ${this.schema}.conversation_archive_records a
             ON a.organization_id=r.organization_id AND a.root_session_id=r.id AND a.runtime_id=r.runtime_id
           WHERE r.organization_id=$1 AND r.id=$2`, [input.organizationId, lineage.rows[0]!.root_session_id])
         const row = root.rows[0]
@@ -1037,13 +1108,13 @@ export class ConversationRepository {
         }
       } else {
         const tombstone = await client.query<{ state: string; restored_at: Date | null }>(
-          `SELECT state,restored_at FROM harness.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2 AND runtime_id=$3`,
+          `SELECT state,restored_at FROM ${this.schema}.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2 AND runtime_id=$3`,
           [input.organizationId, reservedSessionId, input.runtimeId])
         const state = tombstone.rows[0]?.state
         if (state === 'trash' || state === 'purged' || (state === 'archived' && tombstone.rows[0]!.restored_at === null)) throw unavailable()
       }
       await client.query(
-        `DELETE FROM harness.conversation_draft_reservations
+        `DELETE FROM ${this.schema}.conversation_draft_reservations
          WHERE organization_id=$1 AND (runtime_id IS NULL OR runtime_namespace=${this.runtimeSql}::text) AND lease_expires_at <= now()`,
         [input.organizationId],
       )
@@ -1072,7 +1143,7 @@ export class ConversationRepository {
           || row.ssh_target_id !== (input.sshTarget === undefined ? null : String(input.sshTarget))) {
           throw new Error(`draft reservation "${input.draftId}" conflicts with its existing scope`)
         }
-        const renewed = await client.query<{ lease_expires_at_ms: string }>(`UPDATE harness.conversation_draft_reservations
+        const renewed = await client.query<{ lease_expires_at_ms: string }>(`UPDATE ${this.schema}.conversation_draft_reservations
           SET updated_at=now(),lease_expires_at=now()+interval '1 hour'
           WHERE ${this.predicate()} AND organization_id=$1 AND scope_key=$2 AND draft_id=$3
           RETURNING (extract(epoch FROM lease_expires_at)*1000)::bigint::text lease_expires_at_ms`,
@@ -1090,7 +1161,7 @@ export class ConversationRepository {
       if (sessionCollision.rows[0] !== undefined) {
         throw new Error(`session "${input.sessionId}" is already reserved by another draft`)
       }
-      const inserted = await client.query<{ lease_expires_at_ms: string }>(`INSERT INTO harness.conversation_draft_reservations(
+      const inserted = await client.query<{ lease_expires_at_ms: string }>(`INSERT INTO ${this.schema}.conversation_draft_reservations(
         organization_id,runtime_id,scope_key,draft_id,session_id,user_id,project_id,cwd,visibility,agent_preset,ssh_target_id,lease_expires_at
       ) VALUES($1,${this.runtimeSql},$2,$3,$4,$5,$6,$7,$8,$9,$10,now()+interval '1 hour')
       RETURNING (extract(epoch FROM lease_expires_at)*1000)::bigint::text lease_expires_at_ms`, [
@@ -1110,7 +1181,7 @@ export class ConversationRepository {
   /** Renew a draft lease; missing or mismatched reservations are idempotent false results. */
   async heartbeatDraft(organizationId: string, scopeKey: string, draftId: string, sessionId: string): Promise<boolean> {
     this.assertOrganization(organizationId)
-    const result = await this.pool.query(`UPDATE harness.conversation_draft_reservations
+    const result = await this.mutator.query(`UPDATE ${this.schema}.conversation_draft_reservations
       SET updated_at=now(),lease_expires_at=now()+interval '1 hour'
       WHERE ${this.predicate()} AND organization_id=$1 AND scope_key=$2 AND draft_id=$3 AND session_id=$4 AND lease_expires_at > now()`,
     [organizationId, scopeKey, draftId, sessionId])
@@ -1126,7 +1197,7 @@ export class ConversationRepository {
     projectId?: string
   }): Promise<boolean> {
     this.assertOrganization(input.organizationId)
-    const result = await this.pool.query(`UPDATE harness.conversation_draft_reservations
+    const result = await this.mutator.query(`UPDATE ${this.schema}.conversation_draft_reservations
       SET updated_at=now(),lease_expires_at=now()+interval '1 hour'
       WHERE ${this.predicate()} AND organization_id=$1 AND draft_id=$2 AND session_id=$3
         AND lease_expires_at > now()
@@ -1139,7 +1210,7 @@ export class ConversationRepository {
   /** Release one draft lease after materialization or abandonment. */
   async releaseDraft(organizationId: string, scopeKey: string, draftId: string, sessionId?: string): Promise<void> {
     this.assertOrganization(organizationId)
-    await this.pool.query(`DELETE FROM harness.conversation_draft_reservations
+    await this.mutator.query(`DELETE FROM ${this.schema}.conversation_draft_reservations
       WHERE ${this.predicate()} AND organization_id=$1 AND scope_key=$2 AND draft_id=$3
         AND ($4::text IS NULL OR session_id=$4)`, [organizationId, scopeKey, draftId, sessionId ?? null])
   }
@@ -1153,7 +1224,7 @@ export class ConversationRepository {
     projectId?: string
   }): Promise<void> {
     this.assertOrganization(input.organizationId)
-    await this.pool.query(`DELETE FROM harness.conversation_draft_reservations
+    await this.mutator.query(`DELETE FROM ${this.schema}.conversation_draft_reservations
       WHERE ${this.predicate()} AND organization_id=$1 AND draft_id=$2 AND session_id=$3
         AND (($4::uuid IS NOT NULL AND user_id=$4 AND project_id IS NULL)
           OR ($5::uuid IS NOT NULL AND project_id=$5 AND ($4::uuid IS NULL OR user_id=$4)))`,
@@ -1163,13 +1234,13 @@ export class ConversationRepository {
   /** Release every reservation that points at a materialized session. */
   async releaseDraftForSession(organizationId: string, sessionId: string): Promise<void> {
     this.assertOrganization(organizationId)
-    await this.pool.query(`DELETE FROM harness.conversation_draft_reservations WHERE ${this.predicate()} AND organization_id=$1 AND session_id=$2`, [organizationId, sessionId])
+    await this.mutator.query(`DELETE FROM ${this.schema}.conversation_draft_reservations WHERE ${this.predicate()} AND organization_id=$1 AND session_id=$2`, [organizationId, sessionId])
   }
 
   /** Whether an unexpired draft lease binds this Session id to the project. */
   async hasProjectDraftReservation(organizationId: string, sessionId: string, projectId: string): Promise<boolean> {
     this.assertOrganization(organizationId)
-    const result = await this.pool.query(`SELECT 1 FROM ${this.rows('conversation_draft_reservations')} conversation_draft_reservations
+    const result = await this.reader.query(`SELECT 1 FROM ${this.rows('conversation_draft_reservations')} conversation_draft_reservations
       WHERE organization_id=$1 AND session_id=$2 AND project_id=$3 AND lease_expires_at > now()`,
     [organizationId, sessionId, projectId])
     return (result.rowCount ?? 0) > 0
@@ -1213,7 +1284,12 @@ export class ConversationRepository {
       checksum.update(json)
     }
     const batchChecksum = checksum.update(']').digest()
-    return transaction(this.pool, async (client) => {
+    const writers = this.rootWriter(header)
+    if (this.local !== undefined) for (const event of events) {
+      const publicId = participantUserId(event)
+      if (publicId !== undefined) writers.push({ publicId })
+    }
+    return this.mutate(writers, async (client) => {
       // A batch key is shared by this Runtime's Sessions; equal keys serialize before their Session locks.
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`batch:${JSON.stringify([this.scope.organizationId, this.scope.runtimeId, batchId])}`])
       if (header !== undefined && header.id !== sessionId) throw new Error('conversation append header id mismatch')
@@ -1279,8 +1355,8 @@ export class ConversationRepository {
             : { count: current.count + 1, first: Math.min(current.first, event.time), last: Math.max(current.last, event.time) })
         }
       }
-      await insertConversationEvents(client, this.scope, sessionId, encodedEvents)
-      await insertConversationSearch(client, this.scope, sessionId, searchRows)
+      await insertConversationEvents(client, this.schema, this.scope, sessionId, encodedEvents)
+      await insertConversationSearch(client, this.schema, this.scope, sessionId, searchRows)
       for (const [publicUserId, contribution] of contributions) {
         let writer: { id: string; administrator: boolean } | undefined
         if (sessionRow.project_id === null) {
@@ -1299,17 +1375,17 @@ export class ConversationRepository {
         if (sessionRow.visibility === 'private' && contributorId !== sessionRow.creator_user_id && writer?.administrator !== true) {
           throw conversationWriteDenied(`private conversation ${sessionRow.root_session_id} rejects another contributor`)
         }
-        await client.query(`INSERT INTO harness.conversation_participants(
+        await client.query(`INSERT INTO ${this.schema}.conversation_participants(
           organization_id,runtime_id,conversation_id,user_id,first_contributed_at,last_contributed_at,contribution_count
         ) VALUES($1,${this.runtimeSql},$2,$3,to_timestamp($4/1000.0),to_timestamp($5/1000.0),$6)
         ON CONFLICT(organization_id,runtime_namespace,conversation_id,user_id) DO UPDATE SET
-          first_contributed_at=LEAST(harness.conversation_participants.first_contributed_at,excluded.first_contributed_at),
-          last_contributed_at=GREATEST(harness.conversation_participants.last_contributed_at,excluded.last_contributed_at),
-          contribution_count=harness.conversation_participants.contribution_count+excluded.contribution_count`,
+          first_contributed_at=LEAST(${this.schema}.conversation_participants.first_contributed_at,excluded.first_contributed_at),
+          last_contributed_at=GREATEST(${this.schema}.conversation_participants.last_contributed_at,excluded.last_contributed_at),
+          contribution_count=${this.schema}.conversation_participants.contribution_count+excluded.contribution_count`,
         [sessionRow.organization_id, sessionRow.root_session_id, contributorId,
           contribution.first, contribution.last, contribution.count])
       }
-      await client.query(`UPDATE harness.conversation_sessions SET
+      await client.query(`UPDATE ${this.schema}.conversation_sessions SET
         next_seq=$2,event_count=event_count+$3,total_payload_bytes=total_payload_bytes+$4,
         has_visible_content=$5,visible_content_seq=$6,last_prompt_at=CASE
           WHEN $7::bigint IS NULL THEN last_prompt_at
@@ -1320,7 +1396,7 @@ export class ConversationRepository {
       [sessionId, events.at(-1)!.seq + 1, events.length, bytes,
         hasVisibleContent, visibleContentSeq, lastPromptAt])
       if (sessionRow.root_session_id !== sessionId) {
-        await client.query(`UPDATE harness.conversation_sessions SET
+        await client.query(`UPDATE ${this.schema}.conversation_sessions SET
           has_visible_content=has_visible_content OR $2,
           draft=CASE WHEN $2 THEN false ELSE draft END,
           visible_content_seq=CASE WHEN $2 THEN GREATEST(COALESCE(visible_content_seq,-1),$3) ELSE visible_content_seq END,
@@ -1330,7 +1406,7 @@ export class ConversationRepository {
           updated_at=now() WHERE ${this.predicate()} AND id=$1`,
         [sessionRow.root_session_id, hasVisibleContent, visibleContentSeq, lastPromptAt])
       }
-      await client.query(`INSERT INTO harness.conversation_append_batches(organization_id,runtime_id,batch_id,session_id,first_seq,event_count,checksum)
+      await client.query(`INSERT INTO ${this.schema}.conversation_append_batches(organization_id,runtime_id,batch_id,session_id,first_seq,event_count,checksum)
         VALUES(${this.organizationSql},${this.runtimeSql},$1,$2,$3,$4,$5)`, [batchId, sessionId, events[0]!.seq, events.length, batchChecksum])
       return 'inserted'
     })
@@ -1363,7 +1439,7 @@ export class ConversationRepository {
       events: ConversationEvent[]
     },
   ): Promise<{ status: 'committed' | 'current'; revision: string; nextSeq: number; seedLength: number | null }> {
-    return await transaction(this.pool, async (client) => {
+    return await this.mutate([], async (client) => {
       const lineage = await client.query<{ organization_id: string; root_session_id: string }>(`SELECT
         c.organization_id,c.root_session_id FROM ${this.rows('conversation_sessions')} c
         JOIN ${this.rows('conversation_sessions')} r ON r.id=c.root_session_id AND r.organization_id=c.organization_id
@@ -1398,7 +1474,7 @@ export class ConversationRepository {
         || migrated.events.some((event, index) => event.seq !== index || typeof event.type !== 'string' || event.type === '')) {
         throw new Error(`conversation session ${sessionId} migration returned an invalid successor body`)
       }
-      const receipt = await client.query<{ id: string }>(`INSERT INTO harness.conversation_migrations(
+      const receipt = await client.query<{ id: string }>(`INSERT INTO ${this.schema}.conversation_migrations(
         organization_id,runtime_id,session_id,migration_id,from_format_version,to_format_version,source_revision,event_count
       ) VALUES(${this.organizationSql},${this.runtimeSql},$1,$2,$3,$4,$5,$6) ON CONFLICT (organization_id,runtime_namespace,session_id,migration_id) DO NOTHING RETURNING id`,
       [sessionId, migrationId, sessionRow.session_format_version, targetFormatVersion,
@@ -1412,7 +1488,7 @@ export class ConversationRepository {
           seedLength: storedSeedLength,
         }
       }
-      await client.query(`INSERT INTO harness.conversation_migrated_events(
+      await client.query(`INSERT INTO ${this.schema}.conversation_migrated_events(
         migration_id,organization_id,runtime_id,session_id,seq,event_type,occurred_at,event,payload_bytes
       ) SELECT $1,organization_id,runtime_id,session_id,seq,event_type,occurred_at,event,payload_bytes
         FROM ${this.rows('conversation_events')} conversation_events WHERE session_id=$2`, [receiptRow.id, sessionId])
@@ -1438,12 +1514,12 @@ export class ConversationRepository {
         const promptTime = eventPromptTime(event)
         if (promptTime !== undefined) lastPromptAt = Math.max(lastPromptAt ?? 0, promptTime)
       }
-      await client.query(`DELETE FROM harness.conversation_events WHERE ${this.predicate()} AND session_id=$1`, [sessionId])
-      await client.query(`DELETE FROM harness.conversation_search WHERE ${this.predicate()} AND session_id=$1`, [sessionId])
-      await insertConversationEvents(client, this.scope, sessionId, encodedEvents)
-      await insertConversationSearch(client, this.scope, sessionId, searchRows)
+      await client.query(`DELETE FROM ${this.schema}.conversation_events WHERE ${this.predicate()} AND session_id=$1`, [sessionId])
+      await client.query(`DELETE FROM ${this.schema}.conversation_search WHERE ${this.predicate()} AND session_id=$1`, [sessionId])
+      await insertConversationEvents(client, this.schema, this.scope, sessionId, encodedEvents)
+      await insertConversationSearch(client, this.schema, this.scope, sessionId, searchRows)
       const nextSeq = migrated.events.length === 0 ? 0 : migrated.events.at(-1)!.seq + 1
-      await client.query(`UPDATE harness.conversation_sessions SET
+      await client.query(`UPDATE ${this.schema}.conversation_sessions SET
         session_format_version=$2,seed_length=$3,next_seq=$4,event_count=$5,total_payload_bytes=$6,
         has_visible_content=$7,visible_content_seq=$8,
         last_prompt_at=CASE WHEN $9::bigint IS NULL THEN NULL ELSE to_timestamp($9/1000.0) END,
@@ -1451,7 +1527,7 @@ export class ConversationRepository {
       [sessionId, migrated.sessionFormatVersion, migrated.seedLength, nextSeq, migrated.events.length,
         bytes, hasVisibleContent, visibleContentSeq, lastPromptAt])
       if (sessionRow.root_session_id !== sessionId) {
-        await client.query(`UPDATE harness.conversation_sessions SET
+        await client.query(`UPDATE ${this.schema}.conversation_sessions SET
           has_visible_content=tree.has_visible_content,visible_content_seq=tree.visible_content_seq,
           last_prompt_at=tree.last_prompt_at,updated_at=now()
           FROM (SELECT bool_or(has_visible_content) has_visible_content,
@@ -1488,7 +1564,7 @@ export class ConversationRepository {
       throw new ConversationReadError('protocol', 'conversation readFrom seq must be a non-negative safe integer')
     }
     try {
-      return await this.readFromWith(this.pool, sessionId, fromSeq, signal)
+      return await this.readFromWith(this.reader, sessionId, fromSeq, signal)
     } catch (error: unknown) {
       const normalized = normalizeReadError(error, signal)
       if (normalized !== undefined) throw normalized
@@ -1499,7 +1575,7 @@ export class ConversationRepository {
   /** Read one conversation header and revision without touching its event rows. */
   async readHeader(sessionId: string, signal?: AbortSignal): Promise<ConversationHeader | undefined> {
     try {
-      const result = await checkedQuery<StoredHeaderRow>(this.pool, `SELECT ${HEADER_COLUMNS}
+      const result = await checkedQuery<StoredHeaderRow>(this.reader, `SELECT ${HEADER_COLUMNS}
         FROM ${this.rows('conversation_sessions')} conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
       const row = result.rows[0]
       return row === undefined ? undefined : headerFromRow(row)
@@ -1524,8 +1600,7 @@ export class ConversationRepository {
       throw new ConversationReadError('protocol', 'conversation history index maxItems is invalid')
     }
     try {
-      return await transaction(this.pool, async (client) => {
-        await checkedQuery(client, 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY', [], signal)
+      return await this.readSnapshot(async (client) => {
         const headerResult = await checkedQuery<StoredHeaderRow>(client, `SELECT ${HEADER_COLUMNS}
           FROM ${this.rows('conversation_sessions')} conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
         const headerRow = headerResult.rows[0]
@@ -1572,7 +1647,7 @@ export class ConversationRepository {
           const first = items[0]!
           const last = items.at(-1)!
           const search = await checkedQuery<HistoryIndexSearchRow>(client, `SELECT event_seq::text,role,
-              harness.conversation_search_text(content,content_nul_parts,320) AS content
+              ${this.schema}.conversation_search_text(content,content_nul_parts,320) AS content
             FROM ${this.rows('conversation_search')} conversation_search
             WHERE session_id=$1 AND role IN ('user','assistant')
               AND event_seq >= $2 AND event_seq <= $3
@@ -1641,8 +1716,7 @@ export class ConversationRepository {
     const queryLimit = Math.min(MAX_PAGE_QUERY_EVENTS, maxEvents + 1)
     assertSignal(signal)
     try {
-      return await transaction(this.pool, async (client) => {
-        await checkedQuery(client, 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY', [], signal)
+      return await this.readSnapshot(async (client) => {
         const headerResult = await checkedQuery<StoredHeaderRow>(client, `SELECT ${HEADER_COLUMNS}
           FROM ${this.rows('conversation_sessions')} conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
         const headerRow = headerResult.rows[0]
@@ -1707,8 +1781,7 @@ export class ConversationRepository {
 
   /** Read metadata, revision, and events from one PostgreSQL snapshot. */
   async load(sessionId: string): Promise<StoredConversation | undefined> {
-    return await transaction(this.pool, async (client) => {
-      await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+    return await this.readSnapshot(async (client) => {
       const header = await client.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
         FROM ${this.rows('conversation_sessions')} conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId])
       const row = header.rows[0]
@@ -1723,7 +1796,7 @@ export class ConversationRepository {
 
   async revision(sessionId: string, signal?: AbortSignal): Promise<string | undefined> {
     try {
-      const result = await checkedQuery<{ version: string; next_seq: string }>(this.pool, `SELECT version::text,next_seq::text
+      const result = await checkedQuery<{ version: string; next_seq: string }>(this.reader, `SELECT version::text,next_seq::text
         FROM ${this.rows('conversation_sessions')} conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
       const row = result.rows[0]
       return row === undefined ? undefined : `${row.version}:${row.next_seq}`
@@ -1736,7 +1809,7 @@ export class ConversationRepository {
 
   async list(organizationId: string, projectId?: string): Promise<ConversationHeader[]> {
     this.assertOrganization(organizationId)
-    const result = await this.pool.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
+    const result = await this.reader.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
       FROM ${this.rows('conversation_sessions')} conversation_sessions
       WHERE organization_id=$1 AND status<>'deleted'
         AND (($2::uuid IS NULL AND project_id IS NULL) OR project_id=$2)
@@ -1752,7 +1825,7 @@ export class ConversationRepository {
   }): Promise<ConversationListSnapshot[]> {
     this.assertOrganization(scope.organizationId)
     this.assertRuntime(scope.runtimeId)
-    const result = await this.pool.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
+    const result = await this.reader.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
       FROM ${this.rows('conversation_sessions')} conversation_sessions
       WHERE organization_id=$1 AND status<>'deleted'
         AND (($2::uuid IS NULL AND project_id IS NULL) OR project_id=$2)
@@ -1782,9 +1855,9 @@ export class ConversationRepository {
     if (query.trim() === '') return []
     const text = encodeSearchText(query).text
     const pattern = literalLikePattern(text)
-    const literal = 's.content ILIKE $4 AND harness.conversation_search_literal(s.content,s.content_nul_parts,$5::text[])'
-    const result = await this.pool.query<{ session_id: string; event_seq: string; content: string }>(`SELECT s.session_id,s.event_seq,
-        harness.conversation_search_text(s.content,s.content_nul_parts) AS content
+    const literal = `s.content ILIKE $4 AND ${this.schema}.conversation_search_literal(s.content,s.content_nul_parts,$5::text[])`
+    const result = await this.reader.query<{ session_id: string; event_seq: string; content: string }>(`SELECT s.session_id,s.event_seq,
+        ${this.schema}.conversation_search_text(s.content,s.content_nul_parts) AS content
       FROM ${this.rows('conversation_search')} s
       JOIN ${this.rows('conversation_sessions')} c ON c.id=s.session_id
       WHERE c.organization_id=$1 AND ((${literal}) OR s.content % $2)
@@ -1795,18 +1868,18 @@ export class ConversationRepository {
   /** Remove one root conversation tree and return owned file paths for cleanup. */
   async removeTree(organizationId: string, rootSessionId: string): Promise<string[]> {
     this.assertOrganization(organizationId)
-    return await transaction(this.pool, async client => {
+    return await this.mutate([], async client => {
       const files = await client.query<{ local_path: string }>(`SELECT f.local_path
-        FROM harness.content_files f
+        FROM ${this.schema}.content_files f
         JOIN ${this.rows('conversation_sessions')} s ON s.id=f.session_id AND s.organization_id=f.organization_id AND s.runtime_namespace=f.runtime_namespace
         WHERE f.organization_id=$1 AND s.root_session_id=$2`, [organizationId, rootSessionId])
-      await client.query(`DELETE FROM harness.content_files WHERE ${this.predicate()} AND organization_id=$1 AND session_id IN
+      await client.query(`DELETE FROM ${this.schema}.content_files WHERE ${this.predicate()} AND organization_id=$1 AND session_id IN
         (SELECT id FROM ${this.rows('conversation_sessions')} conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [organizationId, rootSessionId])
-      await client.query(`DELETE FROM harness.conversation_draft_reservations
+      await client.query(`DELETE FROM ${this.schema}.conversation_draft_reservations
         WHERE ${this.predicate()} AND organization_id=$1 AND session_id IN
           (SELECT id FROM ${this.rows('conversation_sessions')} conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`,
       [organizationId, rootSessionId])
-      await client.query(`DELETE FROM harness.conversation_sessions WHERE ${this.predicate()} AND organization_id=$1 AND root_session_id=$2`, [organizationId, rootSessionId])
+      await client.query(`DELETE FROM ${this.schema}.conversation_sessions WHERE ${this.predicate()} AND organization_id=$1 AND root_session_id=$2`, [organizationId, rootSessionId])
       return files.rows.map(row => row.local_path)
     })
   }
@@ -1814,10 +1887,22 @@ export class ConversationRepository {
 
 /** Produce repositories for authenticated Runtime requests without retaining request state. */
 export class PostgresConversationStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly pool: Pool, private readonly local?: ContentTransactions) {}
+
+  /** Check the actual installed Session adapter against the prospective volume. */
+  async verifyNodeContent(input:NodeContentCheckInput):Promise<void>{
+    if(!this.local) throw new NodeContentUnavailable()
+    await requireNodeContentRelations(input.local,['conversation_sessions','conversation_events','conversation_append_batches','conversation_search',
+      'conversation_draft_reservations','conversation_migrations','conversation_migrated_events'])
+    await input.local.query('SELECT id FROM node_content.conversation_sessions WHERE organization_id=$1 AND runtime_id=$2 LIMIT 1',
+      [input.binding.organizationId,input.binding.runtimeId])
+  }
 
   /** @param scope - verified organization and Runtime allocation. @returns storage restricted to those coordinates. */
-  forRuntime(scope: ConversationRuntimeScope): ConversationRepository {
-    return new ConversationRepository(this.pool, scope)
+  forRuntime(scope: ConversationRuntimeScope, subject?: { generation: number; contentBinding?: NodeContentBinding }): ConversationRepository {
+    const binding = subject?.contentBinding
+    if (subject === undefined || binding === undefined) return new ConversationRepository(this.pool, scope)
+    if (this.local === undefined || binding.organizationId !== scope.organizationId || binding.runtimeId !== scope.runtimeId) throw new NodeContentUnavailable()
+    return new ConversationRepository(this.pool, scope, { store: this.local, binding, generation: subject.generation })
   }
 }

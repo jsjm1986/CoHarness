@@ -4888,6 +4888,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: '.change - fresh current projection or clear tombstone.' }],
   },
   {
+    name: 'hmr/authorize-reload',
+    mode: 'parallel',
+    signature: '\'hmr/authorize-reload\'(source: \'profile\' | \'configuration\' | \'modules\'): void | Promise<void>',
+    summary: 'Check prospective configuration or module replacement before the live tree changes.',
+    description: 'Check prospective configuration or module replacement before the live tree changes.',
+    parameters: [{ name: 'source', description: 'the kind of reload the supervisor is about to apply.' }],
+  },
+  {
     name: 'hmr/change',
     mode: 'emit',
     signature: '\'hmr/change\'(url: string): void',

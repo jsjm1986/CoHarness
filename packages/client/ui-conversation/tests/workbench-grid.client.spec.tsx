@@ -52,6 +52,9 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     actions={store.actions}
     renderSlot={renderSlot}
     renderFactorySlot={((_key: string, owner: Record<string, unknown>) => { contentOwners.push(owner); return null }) as ConversationRootProps['renderFactorySlot']}
+    onIntentInput={() => {}} onIntentRetry={() => {}} onIntentHide={() => {}} onRetryNodeDraft={() => {}}
+    useConversationIntents={bindSnapshotSelector(createSnapshotStore<import('@deepseek-ai/dsh-client-runtime/client').ConversationIntentsSnapshot>({ saved: [] }))}
+    useDraftFailures={bindSnapshotSelector(createSnapshotStore<readonly { sessionId: SessionId; versionUnavailable: boolean }[]>([]))}
     useViewportAvailable={bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} })}
     useSessions={bindSnapshotSelector(createSnapshotStore<SessionListState>(
       { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',

@@ -18,6 +18,7 @@ it.skipIf(databaseUrl === undefined)('retains current project authority through 
     const result = await promisify(execFile)(process.execPath, [
       ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
       fileURLToPath(new URL('./fixtures/project-management.mjs', import.meta.url)), mode,
+      ...(mode === 'lib' && process.env.DSH_GATEWAY_ARTIFACT_ROOT !== undefined ? [process.env.DSH_GATEWAY_ARTIFACT_ROOT] : []),
     ], { cwd: root, timeout: 60_000, killSignal: 'SIGKILL', env: {
       ...process.env, NODE_OPTIONS: undefined, NODE_PATH: undefined,
       DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'),

@@ -1,4 +1,5 @@
 /** Private startup protocol and kernel boot identity for local runtime ownership. */
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { isAbsolute } from 'node:path'
 import { z } from 'zod'
@@ -27,6 +28,18 @@ export async function localKernelBootId(signal?: AbortSignal): Promise<string> {
   if (process.platform === 'linux') value = await readFile('/proc/sys/kernel/random/boot_id', { encoding: 'utf8', signal })
   else if (process.platform === 'darwin') {
     value = (await runGatewayChildCommand('/usr/sbin/sysctl', ['-n', 'kern.bootsessionuuid'], 5000, signal, 1024)).stdout
+  } else if (process.platform === 'win32') {
+    // Windows exposes no boot UUID; the CIM last-boot timestamp is the stable
+    // kernel-boot identity and is hashed into UUID form for one representation.
+    const { stdout } = await runGatewayChildCommand('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      '& { (Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString("o") }',
+    ], 10_000, signal, 1024)
+    const digest = createHash('sha256').update(`win32-boot:${stdout.trim()}`).digest()
+    digest[6] = (digest[6]! & 0x0f) | 0x50
+    digest[8] = (digest[8]! & 0x3f) | 0x80
+    value = `${digest.subarray(0, 4).toString('hex')}-${digest.subarray(4, 6).toString('hex')}`
+      + `-${digest.subarray(6, 8).toString('hex')}-${digest.subarray(8, 10).toString('hex')}-${digest.subarray(10, 16).toString('hex')}`
   } else throw new Error(`Recoverable local runtime ownership is unsupported on ${process.platform}`)
   signal?.throwIfAborted()
   return z.string().uuid().parse(value.trim().toLowerCase())

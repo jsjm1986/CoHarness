@@ -1,6 +1,6 @@
 /** Personal Runtime allocation, shared limits and node-owned retirement through real PostgreSQL providers. */
 import { randomBytes, randomUUID } from 'node:crypto'
-import { mkdtemp, mkdir, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Pool } from 'pg'
@@ -54,6 +54,8 @@ describePg('personal Runtime management across computers', () => {
     const usersA = new PostgresUserService(a, cfgA), usersB = new PostgresUserService(b, cfgB)
     const admin = await usersA.create({ username: 'administrator', password: 'test-password', role: 'admin' })
     const user = await usersA.create({ username: 'executor', password: 'test-password' })
+    await usersA.changeOwnPassword(admin.id, 'test-password')
+    await usersA.changeOwnPassword(user.id, 'test-password')
     const userId = (await pool.query<{ id: string }>('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2', [organizationId, user.id])).rows[0]!.id
     const serviceA = new PostgresRuntimeManagement(a, cfgA), serviceB = new PostgresRuntimeManagement(b, cfgB)
     const repositoryA = new PostgresInstanceRepository(a, cfgA.instancePortBase), repositoryB = new PostgresInstanceRepository(b, cfgB.instancePortBase)
@@ -101,6 +103,74 @@ describePg('personal Runtime management across computers', () => {
     expect(await f.repositoryA.snapshotOf(target)).toMatchObject({ state: 'stopped', generation: 1 })
     expect((await pool.query('SELECT 1 FROM harness.runtime_destructive_operations WHERE organization_id=$1', [f.organizationId])).rowCount).toBe(0)
     expect((await pool.query('SELECT 1 FROM harness.projects WHERE organization_id=$1 AND public_id=$2', [f.organizationId, project.id])).rowCount).toBe(1)
+  })
+
+  it('seeds a separate resident steward project per node, each bound to its home node', async () => {
+    const f = await fixture(), pathA = join(f.root, 'steward-a'), pathB = join(f.root, 'steward-b')
+    await mkdir(pathA); await mkdir(pathB)
+    const serviceA = new PostgresProjectService(f.a, f.cfgA), serviceB = new PostgresProjectService(f.b, f.cfgB)
+    const seededA = await serviceA.ensureSteward({ name: 'Reserved maintenance', path: pathA })
+    const seededB = await serviceB.ensureSteward({ name: 'Reserved maintenance', path: pathB })
+    expect(seededB.id).not.toBe(seededA.id)
+    const bound = await pool.query<{ steward_node_id: string; name: string }>(`SELECT p.steward_node_id::text,p.name::text
+      FROM harness.projects p WHERE p.organization_id=$1 AND p.kind='steward' ORDER BY p.public_id`, [f.organizationId])
+    expect(bound.rows.map(row => row.steward_node_id).sort()).toEqual([f.a.nodeId, f.b.nodeId].sort())
+    const mounts = await pool.query<{ node_id: string; status: string }>(`SELECT pm.node_id,pm.status
+      FROM harness.project_mounts pm JOIN harness.projects p ON p.id=pm.project_id AND p.organization_id=pm.organization_id
+      WHERE pm.organization_id=$1 AND p.kind='steward' ORDER BY pm.node_id`, [f.organizationId])
+    expect(mounts.rows.map(row => row.node_id).sort()).toEqual([f.a.nodeId, f.b.nodeId].sort())
+    expect(mounts.rows.map(row => row.status)).toEqual(['active', 'active'])
+    expect(await serviceB.stewardProject()).toMatchObject({ id: seededB.id, path: await realpath(pathB) })
+    const allocations = await pool.query<{ assigned_node_id: string }>(`SELECT i.assigned_node_id
+      FROM harness.instances i JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
+      WHERE i.organization_id=$1 AND p.kind='steward'`, [f.organizationId])
+    expect(allocations.rows.map(row => row.assigned_node_id).sort()).toEqual([f.a.nodeId, f.b.nodeId].sort())
+    // A repeat seeding on node A stays idempotent against its own steward project.
+    const again = await serviceA.ensureSteward({ name: 'Reserved maintenance', path: pathA })
+    expect(again.id).toBe(seededA.id)
+    expect((await pool.query('SELECT COUNT(*)::int count FROM harness.projects WHERE organization_id=$1 AND kind=$2',
+      [f.organizationId, 'steward'])).rows[0]!.count).toBe(2)
+  })
+
+  it('recovers a bound steward row that lost its active mount instead of reporting a collision', async () => {
+    const f = await fixture(), pathA = join(f.root, 'steward-a'), pathB = join(f.root, 'steward-b')
+    await mkdir(pathA); await mkdir(pathB)
+    const serviceA = new PostgresProjectService(f.a, f.cfgA), serviceB = new PostgresProjectService(f.b, f.cfgB)
+    await serviceA.ensureSteward({ name: 'Reserved maintenance', path: pathA })
+    const seededB = await serviceB.ensureSteward({ name: 'Reserved maintenance', path: pathB })
+    // Strip node B's active mount: the bound row survives so the next seeding
+    // collides on projects_steward_per_node and must recover, not throw.
+    await pool.query(`UPDATE harness.project_mounts pm SET status='missing'
+      FROM harness.projects p WHERE p.id=pm.project_id AND p.organization_id=pm.organization_id
+        AND pm.organization_id=$1 AND p.kind='steward' AND pm.node_id=$2`, [f.organizationId, f.b.nodeId])
+    const recovered = await serviceB.ensureSteward({ name: 'Reserved maintenance', path: pathB })
+    expect(recovered.id).toBe(seededB.id)
+    const mount = await pool.query<{ local_path: string; status: string }>(`SELECT pm.local_path,pm.status
+      FROM harness.project_mounts pm JOIN harness.projects p ON p.id=pm.project_id AND p.organization_id=pm.organization_id
+      WHERE pm.organization_id=$1 AND p.kind='steward' AND pm.node_id=$2 AND pm.status='active'`, [f.organizationId, f.b.nodeId])
+    expect(await Promise.all(mount.rows.map(row => realpath(row.local_path)))).toEqual([await realpath(pathB)])
+    const allocation = await pool.query<{ assigned_node_id: string }>(`SELECT i.assigned_node_id
+      FROM harness.instances i JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
+      WHERE i.organization_id=$1 AND p.kind='steward'`, [f.organizationId])
+    expect(allocation.rows.map(row => row.assigned_node_id).sort()).toEqual([f.a.nodeId, f.b.nodeId].sort())
+    expect((await pool.query('SELECT COUNT(*)::int count FROM harness.projects WHERE organization_id=$1 AND kind=$2',
+      [f.organizationId, 'steward'])).rows[0]!.count).toBe(2)
+  })
+
+  it('reconverges the bound steward mount when the configured workspace path moves', async () => {
+    const f = await fixture(), pathA = join(f.root, 'steward-a'), moved = join(f.root, 'steward-moved')
+    await mkdir(pathA); await mkdir(moved)
+    const serviceA = new PostgresProjectService(f.a, f.cfgA)
+    const seeded = await serviceA.ensureSteward({ name: 'Reserved maintenance', path: pathA })
+    // A workspace path that changed since seeding must update the live mount,
+    // not leave the Runtime pointed at the retired directory.
+    const converged = await serviceA.ensureSteward({ name: 'Reserved maintenance', path: moved })
+    expect(converged.id).toBe(seeded.id)
+    const mount = await pool.query<{ local_path: string; canonical_path: string }>(`SELECT pm.local_path,pm.canonical_path
+      FROM harness.project_mounts pm JOIN harness.projects p ON p.id=pm.project_id AND p.organization_id=pm.organization_id
+      WHERE pm.organization_id=$1 AND p.kind='steward' AND pm.node_id=$2 AND pm.status='active'`, [f.organizationId, f.a.nodeId])
+    expect(await Promise.all(mount.rows.map(row => realpath(row.local_path)))).toEqual([await realpath(moved)])
+    expect(await Promise.all(mount.rows.map(row => realpath(row.canonical_path)))).toEqual([await realpath(moved)])
   })
 
   it('retains override revisions through inheritance and refuses stale editors and administrators', async () => {

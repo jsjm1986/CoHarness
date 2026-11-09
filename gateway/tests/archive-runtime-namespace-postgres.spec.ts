@@ -29,6 +29,7 @@ describePg('archive Runtime namespace', () => {
     const owner = (await pool.query<{ id: string; public_id: string }>("INSERT INTO harness.users(organization_id,username,display_name,home_path) VALUES($1,'owner','Owner','/tmp/archive-owner') RETURNING id,public_id", [organizationId])).rows[0]!
     await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [organizationId, owner.id])
     await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)', [organizationId, context.nodeId, owner.id])
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [owner.id])
     const instances = new PostgresInstanceRepository(context, 48_000); await instances.initialize()
     const runtime = await instances.resolveTarget({ kind: 'user', id: Number(owner.public_id) })
     const siblingId = (await pool.query<{ runtime_id: RuntimeId }>("INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port,storage_layout) VALUES($1,$2,$3,48001,'isolated') RETURNING runtime_id", [organizationId, owner.id, context.nodeId])).rows[0]!.runtime_id

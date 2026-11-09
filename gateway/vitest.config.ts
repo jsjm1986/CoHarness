@@ -53,6 +53,7 @@ export default defineConfig({
       { find: /^@deepseek-ai\/dsh-userdoc$/, replacement: pkg('packages/attachment/userdoc') },
       { find: '@deepseek-ai/dsh-userdoc-gateway/protocol', replacement: pkg('packages/attachment/userdoc-gateway', 'protocol.js') },
       { find: '@deepseek-ai/dsh-userdoc-gateway/server', replacement: pkg('packages/attachment/userdoc-gateway', 'server.js') },
+      { find: /^@deepseek-ai\/dsh-schedule$/, replacement: fileURLToPath(new URL('../packages/schedule/schedule/lib/index.js',import.meta.url)) },
       { find: /^@deepseek-ai\/dsh-userdoc-local$/, replacement: pkg('packages/attachment/userdoc-local') },
       { find: /^@deepseek-ai\/dsh-host-userdoc-http$/, replacement: pkg('packages/host/userdoc-http') },
       { find: /^@deepseek-ai\/cordis$/, replacement: pkg('vendor/cordis') },

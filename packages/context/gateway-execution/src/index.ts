@@ -9,6 +9,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, freezeMessage, MessageId, type UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-hmr'
 import { readGatewayResponseJson, type GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
 import type { ToolExecution, ToolExecutionToken } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-jobs'
@@ -25,7 +26,7 @@ import { GatewayDesktopPolicy } from './desktop.ts'
 import { GatewaySshAuthorization } from './ssh.ts'
 import { GatewayUserTerminalAuthorization } from './user-terminal.ts'
 import { registerWebhookDispatch } from './webhook.ts'
-import { gatewayPluginManagementAuthorization, parseInstallSourcePolicy } from './plugin-management.ts'
+import { gatewayPluginManagementAuthorization, parseInstallSourcePolicy, verifyGatewayProjectProfile } from './plugin-management.ts'
 import type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
 
 export type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
@@ -120,6 +121,9 @@ export class GatewayExecution extends ExecutionAuthority {
     ctx.sessionProjections.register(EXECUTION_PROJECTION)
     /* v8 ignore next -- Cordis resolves the schema default before mounting this plugin. */
     this.jobStopTimeoutMs = config.jobStopTimeoutMs ?? 30_000
+    if (ctx.gatewayRuntime.identity.kind === 'project') {
+      ctx.on('hmr/authorize-reload',()=>verifyGatewayProjectProfile(ctx.gatewayRuntime,this.lifetime.signal))
+    }
     const policy = gatewayPluginManagementAuthorization({
       current: () => ctx.gatewayRuntime.interactive(),
       request: (path, options) => ctx.gatewayRuntime.request(path, options),

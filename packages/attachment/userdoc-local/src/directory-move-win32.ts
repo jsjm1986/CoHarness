@@ -45,16 +45,16 @@ export async function withWindowsDirectoryMove<T>(
       (handle: number | bigint, buffer: Buffer) => number
     >
     const rename = library.func('__stdcall', 'MoveFileExW', 'int', ['str16', 'str16', 'uint']) as KoffiFunc<(source: string, target: string, flags: number) => number>
+    // Synchronous calls keep GetLastError honest: koffi's async path runs on a
+    // worker thread but delivers the callback on the JS thread, where the
+    // thread-local error code no longer belongs to the failed call.
     const native = <Args extends unknown[], R extends number | bigint>(
       call: KoffiFunc<(...args: Args) => R>, args: Args, syscall: string, path: string, failed: (result: R) => boolean,
-    ): Promise<R> => new Promise((accept, reject) => {
-      call.async(...args, (error: unknown, result: R) => {
-        const code = lastError()
-        if (error !== null) reject(error instanceof Error ? error : new Error('Windows directory operation failed.', { cause: error }))
-        else if (failed(result)) reject(windowsError(syscall, code, path))
-        else accept(result)
-      })
-    })
+    ): R => {
+      const result = call(...args)
+      if (failed(result)) throw windowsError(syscall, lastError(), path)
+      return result
+    }
     const roots = [{ root, expected: expectedRoot }, { root: targetRoot, expected: expectedTargetRoot }]
     const parents = new Set([root, targetRoot])
     for (const [selectedRoot, path] of [[root, source], [targetRoot, target]] as const) {
@@ -65,14 +65,14 @@ export async function withWindowsDirectoryMove<T>(
       }
     }
     for (const path of parents) {
-      const handle = await native(create,
+      const handle = native(create,
         [toNamespacedPath(path), 0, 3, null, 3, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0],
         'CreateFileW', path, result => BigInt(result) === -1n)
       cleanups.push(() => {
         if (close(handle) === 0) throw windowsError('CloseHandle', lastError(), path)
       })
       const info = Buffer.alloc(52)
-      await native(inspect, [handle, info], 'GetFileInformationByHandle', path, result => result === 0)
+      native(inspect, [handle, info], 'GetFileInformationByHandle', path, result => result === 0)
       const attributes = info.readUInt32LE(0)
       if ((attributes & FILE_ATTRIBUTE_DIRECTORY) === 0 || (attributes & FILE_ATTRIBUTE_REPARSE_POINT) !== 0) {
         throw new Error('Document move requires real Windows parent directories.')
@@ -104,8 +104,21 @@ export async function withWindowsDirectoryMove<T>(
       sync: () => verify(),
       rename: async () => {
         await verify()
-        await native(rename, [toNamespacedPath(source), toNamespacedPath(target), MOVEFILE_WRITE_THROUGH],
-          'MoveFileExW', source, result => result === 0)
+        const sourcePath = toNamespacedPath(source), targetPath = toNamespacedPath(target)
+        await new Promise<void>((accept, reject) => {
+          // Write-through completion is real I/O and stays off the JS thread, but
+          // its callback cannot read the worker's GetLastError: a failed result
+          // re-runs the atomic rename synchronously to classify the refusal. A
+          // retry that succeeds means the destination only then became free.
+          rename.async(sourcePath, targetPath, MOVEFILE_WRITE_THROUGH, (error: unknown, result: number) => {
+            if (error !== null) {
+              reject(error instanceof Error ? error : new Error('Windows directory rename failed.', { cause: error }))
+            } else if (result !== 0) accept()
+            else if (rename(sourcePath, targetPath, MOVEFILE_WRITE_THROUGH) === 0) {
+              reject(windowsError('MoveFileExW', lastError(), source))
+            } else accept()
+          })
+        })
         renamed = true
       },
     })
@@ -122,4 +135,23 @@ export async function withWindowsDirectoryMove<T>(
   }
   if (!outcome.ok) throw outcome.error
   return outcome.value
+}
+
+/**
+ * Replace one verified, private recovery file by a same-volume write-through move.
+ * @param source - newly created and flushed sibling or verified replacement hard link.
+ * @param destination - existing file within the exclusively owned restore directory.
+ * @returns after Windows completes the namespace change.
+ */
+export async function replaceRecoveredFileWindows(source: string, destination: string): Promise<void> {
+  const koffi = (await import('koffi')).default
+  const library = koffi.load('kernel32.dll')
+  try {
+    const move = library.func('__stdcall', 'MoveFileExW', 'int', ['str16', 'str16', 'uint']) as (from: string, to: string, flags: number) => number
+    const lastError = library.func('__stdcall', 'GetLastError', 'uint', []) as () => number
+    const MOVEFILE_REPLACE_EXISTING = 1
+    if (!move(toNamespacedPath(source), toNamespacedPath(destination), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+      throw windowsError('MoveFileExW', lastError(), destination)
+    }
+  } finally { library.unload() }
 }

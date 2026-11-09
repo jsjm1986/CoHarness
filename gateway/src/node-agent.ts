@@ -12,15 +12,21 @@ import {
   type NodeCredential, type NodeEnrollmentToken, type NodeIdentity, type NodeLease,
 } from './node-access.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
+import { NodeDialer, type NodeDialReason } from './node-dialer.ts'
 import { runNodeChannel, type NodeChannelClientEvent } from './node-channel-client.ts'
 import { loadNodeChannelClientLimits, type NodeChannelClientLimits } from './node-channel-protocol.ts'
 import { nodeServiceLocalOrigin } from './node-service-stream.ts'
+import { privateFileState, syncStateDirectory, tightenPrivateFileAcl } from './node-private-file.ts'
 
 /** Explicit node-process configuration; credentials are persisted separately from deployment settings. */
 export interface NodeAgentConfig {
   /** Local Gateway identity fixed by the operator; enrollment cannot change the computer or organization. */
   expectedIdentity?: Pick<NodeIdentity, 'organizationId' | 'nodeId'>
   centerUrl: string
+  /** Ordered origins dialed to reach the center; defaults to `[centerUrl]`. Identity stays `centerUrl`. */
+  centerDialUrls: readonly string[]
+  /** After a dial fallback, the first fresh attempt at least this long later re-probes candidate 0. */
+  dialPreferredRetryMs: number
   stateFile: string
   enrollmentToken?: NodeEnrollmentToken
   requestTimeoutMs: number
@@ -36,7 +42,7 @@ export interface NodeAgentConfig {
 /** Local failures and authenticated center refusals exposed by the node process. */
 export type NodeAgentErrorCode = typeof NODE_ACCESS_ERROR_CODES[number]
   | 'node-agent/invalid-timing' | 'node-agent/center-url-required' | 'node-agent/invalid-center-url'
-  | 'node-agent/invalid-enrollment-token' | 'node-agent/state-unreadable' | 'node-agent/state-must-be-private'
+  | 'node-agent/invalid-enrollment-token' | 'node-agent/invalid-dial-urls' | 'node-agent/state-unreadable' | 'node-agent/state-must-be-private'
   | 'node-agent/invalid-state' | 'node-agent/center-identity-mismatch' | 'node-agent/pending-enrollment-mismatch'
   | 'node-agent/enrollment-required' | 'node-agent/transport-unavailable' | 'node-agent/invalid-response'
   | 'node-agent/center-refused' | 'node-agent/unsupported-platform' | 'node-agent/unsupported-architecture'
@@ -53,7 +59,7 @@ const FAILURE_MESSAGES: Record<NodeAgentErrorCode, string> = {
   'node-access/revision-conflict': 'Node access changed. Refresh its Admin entry before retrying.',
   'node-access/already-connected': 'Another agent holds this node lease. Stop that agent or wait for its lease to expire before restarting.',
   'node-access/lease-lost': 'The connection lease expired or changed. The agent will request a new lease.',
-  'node-access/unsupported-platform': 'This center accepts macOS and Linux nodes. Use a supported host.',
+  'node-access/unsupported-platform': 'This center accepts macOS, Linux and Windows nodes. Use a supported host.',
   'node-access/unsupported-protocol': 'The center does not accept this control protocol. Install a compatible agent release.',
   'node-access/response-too-large': 'The center metadata exceeds its response limit. Ask an administrator to review directory limits.',
   'node-access/busy': 'The center is at its control-request capacity. The agent will retry the same control operation.',
@@ -65,8 +71,9 @@ const FAILURE_MESSAGES: Record<NodeAgentErrorCode, string> = {
   'node-agent/center-url-required': 'Set HGW_NODE_CENTER_URL to the center HTTPS origin before starting the agent.',
   'node-agent/invalid-center-url': 'The center URL must be an HTTPS origin without credentials, a path or query fields; loopback HTTP is supported for local verification.',
   'node-agent/invalid-enrollment-token': 'The enrollment token is malformed. Copy the complete ticket from Admin.',
+  'node-agent/invalid-dial-urls': 'Each HGW_NODE_CENTER_DIAL_URLS entry must be an HTTPS origin without credentials, a path or query fields; loopback HTTP is supported for local verification; the list holds no empty or duplicate entries.',
   'node-agent/state-unreadable': 'The node credential file cannot be opened. Check its owner, permissions and file type.',
-  'node-agent/state-must-be-private': 'The credential file must be owned by this operating-system account with mode 0600. Fix its ownership and permissions before restarting.',
+  'node-agent/state-must-be-private': 'The credential file must be private to this operating-system account (mode 0600 on macOS/Linux, an exclusive ACL on Windows). Fix its ownership and permissions before restarting.',
   'node-agent/invalid-state': 'The credential file is invalid. Preserve it and ask an administrator to reissue access into a new private state file.',
   'node-agent/center-identity-mismatch': 'The center identity differs from the saved node identity. Check the center URL and credential file before restarting.',
   'node-agent/pending-enrollment-mismatch': 'This state file contains another pending ticket. Resume it or use a new private state file for the replacement ticket.',
@@ -74,7 +81,7 @@ const FAILURE_MESSAGES: Record<NodeAgentErrorCode, string> = {
   'node-agent/transport-unavailable': 'The center connection is unavailable. The agent will retry the same control operation; check the network if this persists.',
   'node-agent/invalid-response': 'The center returned an invalid or oversized control response. Check the center URL and release compatibility.',
   'node-agent/center-refused': 'The center refused the control request. Check its URL, ingress configuration and release compatibility.',
-  'node-agent/unsupported-platform': 'This agent supports macOS and Linux. Use a supported host.',
+  'node-agent/unsupported-platform': 'This agent supports macOS, Linux and Windows. Use a supported host.',
   'node-agent/unsupported-architecture': 'This agent supports x64 and arm64 hosts. Use a supported architecture.',
   'node-agent/state-changed': 'The credential file changed during enrollment. Check which process owns that file before restarting.',
   'node-agent/invalid-channel-config': 'A node control-channel limit is invalid. Check HGW_NODE_AGENT_CHANNEL settings before restarting.',
@@ -105,9 +112,10 @@ export class NodeAgentError extends Error {
 /** Process events contain only public identities and safe, declared failure codes. */
 export type NodeAgentEvent =
   | { status: 'enrolled'; nodeId: NodeIdentity['nodeId'] }
-  | { status: 'connected'; nodeId: NodeIdentity['nodeId']; epoch: NodeLease['epoch']; executionReady: false }
+  | { status: 'connected'; nodeId: NodeIdentity['nodeId']; epoch: NodeLease['epoch']; executionReady: boolean }
   | { status: 'degraded'; reason: NodeAgentErrorCode }
   | { status: 'stopped' | 'stopped-lease-uncertain' }
+  | { status: 'dial-origin'; origin: string; reason: NodeDialReason }
   | NodeChannelClientEvent
 
 function timer(value: string | undefined, fallback: number): number {
@@ -117,13 +125,28 @@ function timer(value: string | undefined, fallback: number): number {
   return number
 }
 
-function centerUrl(value: string | undefined): string {
+function httpOrigin(value: string, required: NodeAgentErrorCode, invalid: NodeAgentErrorCode): string {
   let url: URL
-  try { url = new URL(value ?? '') } catch { throw new NodeAgentError('node-agent/center-url-required') }
+  try { url = new URL(value) } catch { throw new NodeAgentError(required) }
   const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]'
   if ((url.protocol !== 'https:' && !(loopback && url.protocol === 'http:')) || url.username !== '' || url.password !== ''
-    || url.search !== '' || url.hash !== '' || url.pathname !== '/') throw new NodeAgentError('node-agent/invalid-center-url')
+    || url.search !== '' || url.hash !== '' || url.pathname !== '/') throw new NodeAgentError(invalid)
   return url.origin
+}
+
+function centerUrl(value: string | undefined): string {
+  return httpOrigin(value ?? '', 'node-agent/center-url-required', 'node-agent/invalid-center-url')
+}
+
+function centerDialUrls(value: string | undefined, center: string): string[] {
+  if (value === undefined || value.trim() === '') return [center]
+  const origins = value.split(',').map(entry => {
+    const trimmed = entry.trim()
+    if (trimmed === '') throw new NodeAgentError('node-agent/invalid-dial-urls')
+    return httpOrigin(trimmed, 'node-agent/invalid-dial-urls', 'node-agent/invalid-dial-urls')
+  })
+  if (new Set(origins).size !== origins.length) throw new NodeAgentError('node-agent/invalid-dial-urls')
+  return origins
 }
 
 /**
@@ -144,8 +167,11 @@ export function loadNodeAgentConfig(environment: NodeJS.ProcessEnv): NodeAgentCo
     }
   }
   catch (error) { throw new NodeAgentError('node-agent/invalid-channel-config', false, error) }
+  const url = centerUrl(environment.HGW_NODE_CENTER_URL)
   return {
-    centerUrl: centerUrl(environment.HGW_NODE_CENTER_URL),
+    centerUrl: url,
+    centerDialUrls: centerDialUrls(environment.HGW_NODE_CENTER_DIAL_URLS, url),
+    dialPreferredRetryMs: timer(environment.HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS, 60_000),
     stateFile: resolve(environment.HGW_NODE_AGENT_STATE_FILE ?? join(homedir(), '.dsh-node', 'access.json')),
     ...(enrollment?.success ? { enrollmentToken: enrollment.data } : {}),
     requestTimeoutMs: timer(environment.HGW_NODE_AGENT_REQUEST_TIMEOUT_MS, 10_000),
@@ -170,7 +196,9 @@ async function readState(file: string): Promise<AgentState | undefined> {
   }
   try {
     const info = await handle.stat()
-    if (!info.isFile() || info.size > 4096 || (info.mode & 0o077) !== 0 || info.uid !== process.getuid!()) throw new NodeAgentError('node-agent/state-must-be-private')
+    const privacy = await privateFileState(file, info, 4096)
+    if (privacy === 'unreadable') throw new NodeAgentError('node-agent/state-unreadable')
+    if (privacy !== 'private') throw new NodeAgentError('node-agent/state-must-be-private')
     const bytes = Buffer.alloc(4097)
     let bytesRead = 0
     while (bytesRead < bytes.length) {
@@ -189,10 +217,6 @@ async function readState(file: string): Promise<AgentState | undefined> {
 
 // Enrollment may commit before its response arrives. Flush the node-generated
 // credential before exchange so that a restart can repeat that exact exchange.
-async function syncDirectory(path: string): Promise<void> {
-  const directory = await open(path, 'r')
-  try { await directory.sync() } finally { await directory.close() }
-}
 
 async function writeState(file: string, value: AgentState): Promise<void> {
   const temporary = `${file}.${randomUUID()}.tmp`
@@ -201,7 +225,8 @@ async function writeState(file: string, value: AgentState): Promise<void> {
     try { await handle.writeFile(JSON.stringify(value) + '\n'); await handle.sync() }
     finally { await handle.close() }
     await rename(temporary, file)
-    await syncDirectory(dirname(file))
+    await tightenPrivateFileAcl(file)
+    await syncStateDirectory(dirname(file))
   } finally { await rm(temporary, { force: true }) }
 }
 
@@ -210,7 +235,7 @@ async function initialState(config: NodeAgentConfig): Promise<AgentState> {
   if (created !== undefined) {
     const parent = dirname(created)
     for (let directory = dirname(config.stateFile);; directory = dirname(directory)) {
-      await syncDirectory(directory)
+      await syncStateDirectory(directory)
       if (directory === parent) break
     }
   }
@@ -230,15 +255,19 @@ async function initialState(config: NodeAgentConfig): Promise<AgentState> {
   })
 }
 
-async function request(config: NodeAgentConfig, path: string, token: string, body: unknown, signal: AbortSignal): Promise<unknown> {
+async function request(config: NodeAgentConfig, dialer: NodeDialer, path: string, token: string, body: unknown, signal: AbortSignal): Promise<unknown> {
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(config.requestTimeoutMs)])
+  const origin = dialer.current()
   let response: Response
   try {
-    response = await fetch(`${config.centerUrl}/internal/nodes/${path}`, {
+    response = await fetch(`${origin}/internal/nodes/${path}`, {
       method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify(body), redirect: 'manual', signal: deadline,
     })
-  } catch (error) { throw new NodeAgentError('node-agent/transport-unavailable', true, error) }
+  } catch (error) {
+    dialer.failed(origin, error)
+    throw new NodeAgentError('node-agent/transport-unavailable', true, error)
+  }
   const retryableRefusal = response.status === 429 || response.status >= 500
   let value: unknown
   try { value = await readResponseJson(response, 4096) }
@@ -270,7 +299,7 @@ function identityMatches(expected: NodeIdentity, found: NodeIdentity): void {
  * @throws NodeAgentError for unsupported hosts, invalid local state or nonretryable center refusals.
  */
 export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal, report: (event: NodeAgentEvent) => void): Promise<void> {
-  if (process.platform !== 'darwin' && process.platform !== 'linux') throw new NodeAgentError('node-agent/unsupported-platform')
+  if (process.platform !== 'darwin' && process.platform !== 'linux' && process.platform !== 'win32') throw new NodeAgentError('node-agent/unsupported-platform')
   if (process.arch !== 'x64' && process.arch !== 'arm64') throw new NodeAgentError('node-agent/unsupported-architecture')
   signal.throwIfAborted()
   let state = await initialState(config)
@@ -280,6 +309,8 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
   }
   if (state.identity !== null) verifyExpected(state.identity)
   const connectionId = randomUUID()
+  const dialer = new NodeDialer(config.centerDialUrls, config.dialPreferredRetryMs,
+    (origin, reason) => { report({ status: 'dial-origin', origin, reason }) })
   let lease: NodeLease | undefined
   let mayHaveLease = false
   let degraded: NodeAgentErrorCode | undefined
@@ -296,7 +327,7 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
       try {
         if (channelFailure.signal.aborted) throw channelFailure.signal.reason
         if (state.identity === null) {
-          const value = await request(config, 'enroll', state.enrollmentToken!, {
+          const value = await request(config, dialer, 'enroll', state.enrollmentToken!, {
             protocolVersion: 1, credential: state.credential, platform: process.platform, architecture: process.arch,
           }, signal)
           const parsed = nodeIdentitySchema.safeParse(value)
@@ -316,8 +347,11 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
         mayHaveLease = true
         let value: unknown
         try {
-          value = lease === undefined ? await request(config, 'connect', state.credential, { connectionId }, signal)
-            : await request(config, 'heartbeat', state.credential, { connectionId, epoch: lease.epoch }, signal)
+          // executionReady means a local Gateway endpoint is configured, not
+          // that it was probed; a dead or outdated local Gateway still reports
+          // ready and its service calls fail per request (fail-safe direction).
+          value = lease === undefined ? await request(config, dialer, 'connect', state.credential, { connectionId, executionReady: config.localGatewayUrl !== undefined }, signal)
+            : await request(config, dialer, 'heartbeat', state.credential, { connectionId, epoch: lease.epoch }, signal)
         } catch (error) {
           if (!previousAcquisition && error instanceof NodeAgentError && error.refused) mayHaveLease = false
           throw error
@@ -329,7 +363,7 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
         lease = parsed.data
         if (acquiring && config.channel !== undefined) {
           const stop = new AbortController()
-          const completion = runNodeChannel({ centerUrl: config.centerUrl, credential: state.credential, lease,
+          const completion = runNodeChannel({ dialer, credential: state.credential, lease,
             limits: config.channel, requestTimeoutMs: config.requestTimeoutMs, retryMs: config.retryMs,
             ...(config.localGatewayUrl === undefined ? {} : { localGatewayUrl: config.localGatewayUrl, maxServices: config.maxServices }) },
           AbortSignal.any([signal, stop.signal]), report).catch(error => {
@@ -337,7 +371,7 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
           })
           channel = { stop, completion }
         }
-        if (acquiring || degraded !== undefined) report({ status: 'connected', nodeId: lease.nodeId, epoch: lease.epoch, executionReady: false })
+        if (acquiring || degraded !== undefined) report({ status: 'connected', nodeId: lease.nodeId, epoch: lease.epoch, executionReady: lease.executionReady })
         degraded = undefined
         await delay(lease.heartbeatMs, undefined, { signal: AbortSignal.any([signal, channelFailure.signal]) })
       } catch (error) {
@@ -347,7 +381,13 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
           await stopChannel(); lease = undefined; mayHaveLease = false
           return
         }
-        if (error instanceof NodeAgentError && error.refused && error.code === 'node-access/lease-lost') {
+        // lease-lost and already-connected are both recoverable refusals: the
+        // recorded holder is gone or is our own just-stopped incarnation whose
+        // lease still has TTL, so drop state and let the retry loop reacquire
+        // once the center's lease actually expires. A second agent holding the
+        // lease forever keeps this instance degraded rather than exit-churning
+        // under the supervision floor.
+        if (error instanceof NodeAgentError && error.refused && ['node-access/lease-lost', 'node-access/already-connected'].includes(error.code)) {
           await stopChannel()
           lease = undefined
           mayHaveLease = false
@@ -363,7 +403,7 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
     await stopChannel()
     if (lease !== undefined) {
       try {
-        await request(config, 'disconnect', state.credential, { connectionId, epoch: lease.epoch }, AbortSignal.timeout(config.requestTimeoutMs))
+        await request(config, dialer, 'disconnect', state.credential, { connectionId, epoch: lease.epoch }, AbortSignal.timeout(config.requestTimeoutMs))
         mayHaveLease = false
       } catch (error) {
         if (!(error instanceof NodeAgentError)) throw error

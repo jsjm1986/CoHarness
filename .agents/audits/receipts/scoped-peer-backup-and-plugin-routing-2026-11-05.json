@@ -1,0 +1,302 @@
+{
+  "at": "2026-11-05T07:39:54.383709+08:00",
+  "scope": "Scoped peer-backup recovery hardening and default Web plugin multi-computer routing audit",
+  "status": "scoped-candidate-verified-production-release-pending",
+  "rosterCount": 51,
+  "uniquePluginTests": 539,
+  "pluginTestEvidence": {
+    "plugin-routing-tests.log": 225,
+    "plugin-connection-final.log": 36,
+    "plugin-native-final.log": 28,
+    "plugin-additional-consumers.log": 157,
+    "documents-component-audit.log": 93
+  },
+  "assembledUploadSnapshot": "plugin-upload-assembled.log",
+  "postgresEvidence": [
+    "peer-backup-current-authority.log",
+    "takeover-current-authority.log"
+  ],
+  "nativeBrowserEvidence": {
+    "mac": [
+      "Real form login returned to Admin; single entry scope verified",
+      "Real personal publication dialog checked unpublished history and refused an unready confirmation",
+      "Real Admin form persisted a paused governance policy on the exact selected pair",
+      "Another authenticated tab retained the first tab’s unsaved policy form",
+      "390px viewport kept actions and unsaved form accessible without page overflow"
+    ],
+    "windows": [
+      "Windows native candidate accepted real form login and kept its direct entry local",
+      "Windows Admin loaded the shared accounts without starting a Runtime"
+    ],
+    "windowsEntry": {
+      "mode": "multi",
+      "role": "standalone",
+      "scope": "local"
+    },
+    "runtimeStarts": 0
+  },
+  "buildReceipt": ".artifacts/multi-node-audit-20261105/backup-candidate-build-final.json",
+  "trackedSourceFiles": 743,
+  "trackedSourceDrift": [],
+  "candidateInstall": {
+    "installed": true,
+    "files": 890,
+    "nativeDependencies": "read-only existing ABI",
+    "productionRestarted": false,
+    "slot": "release-5"
+  },
+  "production": {
+    "restartPerformed": false,
+    "runtimeCount": 33,
+    "ready": 4,
+    "stopped": 29,
+    "generationStateDigest": "4d846257ea9f3db224486fd1a3a5b5aa",
+    "evidence": ".artifacts/multi-node-audit-20261105/production-after-plugin-audit.txt",
+    "publicHealth": 200,
+    "localHealth": 200
+  },
+  "coverageLimits": [
+    "Personal and governance exports remain explicitly partial and isolated-recovery-only.",
+    "Mac lacks the qualified project volume and online APFS snapshot service.",
+    "Full physical replacement, permanent-source-loss fencing and sustained RPO/RTO still need final acceptance.",
+    "Windows native desktop video and all user workflows are not certified by these Admin checks.",
+    "Ubuntu was not probed while awaiting recovery.",
+    "Production Gateway replacement has not been performed because Windows shutdown stops owned Runtimes."
+  ],
+  "cleanup": {
+    "mac": {
+      "fixtureOnly": true,
+      "privatePostgresStopped": true,
+      "privateSshControlClosed": true,
+      "lastCandidateRetained": true,
+      "productionRestarted": false
+    },
+    "windows": {
+      "removed": [
+        "release",
+        "release-2",
+        "release-3",
+        "release-4"
+      ],
+      "retained": "release-5",
+      "productionTouched": false,
+      "usage": {
+        "integratedGuard": true,
+        "beforeMiB": 432,
+        "lowestMiB": 292,
+        "reserveMiB": 224,
+        "capMiB": 320,
+        "peakCommitMiB": 192.63671875,
+        "elapsedMs": 390749,
+        "reason": "stop"
+      }
+    }
+  },
+  "checks": {
+    "workspaceConstraints": "passed",
+    "focusedLint": "passed",
+    "exportJsdoc": "passed",
+    "translationPairs": 5,
+    "agentNoteFormat": "passed",
+    "relativeMarkdownLinks": "passed",
+    "markdownWrap": "passed",
+    "diffWhitespace": "passed"
+  },
+  "laterHandoffs": [
+    {
+      "receivedAt": "2026-11-05T08:05:46.939358+08:00",
+      "scope": "Archive connection-pool reuse after retained governance admission",
+      "sources": [
+        {
+          "path": "gateway/src/node-archive-router.ts",
+          "deliveredSha256": "3bd779bc3930d7ec9b606484c7aa5d2d37bcd598576e93da75bdc513af75b9b9",
+          "currentSha256": "3bd779bc3930d7ec9b606484c7aa5d2d37bcd598576e93da75bdc513af75b9b9",
+          "matchesDelivered": true
+        },
+        {
+          "path": "gateway/src/postgres/conversation-archive-service.ts",
+          "deliveredSha256": "77a21eb3f751115c3c54f06eeea06ac2f940ff8ea8434a5484c7470ad0e83766",
+          "currentSha256": "77a21eb3f751115c3c54f06eeea06ac2f940ff8ea8434a5484c7470ad0e83766",
+          "matchesDelivered": true
+        }
+      ],
+      "reviewerEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-frozen-delivery.json",
+      "reviewerReportedDistinctTests": 159,
+      "includedInVerifiedCandidate": false,
+      "productionRestarted": false,
+      "nextAction": "Integrate the stable archive delivery into the next candidate and rerun affected assembled archive/backup flows; preserve the prior scoped candidate evidence."
+    },
+    {
+      "issue": "B517",
+      "receivedAt": "2026-11-05T09:03:44.126713+08:00",
+      "scope": "Revalidate project directory and detail publication after metadata waits",
+      "sources": [
+        {
+          "path": "gateway/src/collaboration.ts",
+          "deliveredSha256": "3a7bddbb32321d73a4be0fa2ec806efd5bb3407123212172009e4b997b257131",
+          "currentSha256": "3a7bddbb32321d73a4be0fa2ec806efd5bb3407123212172009e4b997b257131",
+          "matchesDelivered": true
+        },
+        {
+          "path": "gateway/src/postgres/collaboration-service.ts",
+          "deliveredSha256": "09e36e2f249cc1caf731b09aebd034a893685335accf550fe817221865c0d680",
+          "currentSha256": "09e36e2f249cc1caf731b09aebd034a893685335accf550fe817221865c0d680",
+          "matchesDelivered": true
+        },
+        {
+          "path": "gateway/src/server.ts",
+          "deliveredSha256": "f301a623fb9c47346dbcd2631fee191200c6aff2aaff2084347da4dd5df35cb1",
+          "currentSha256": "f301a623fb9c47346dbcd2631fee191200c6aff2aaff2084347da4dd5df35cb1",
+          "matchesDelivered": true
+        },
+        {
+          "path": "gateway/src/services.ts",
+          "deliveredSha256": "ea35709fd7dacc57efce929fa1f68cf57308a6d66f55172dfef361d4146f81c2",
+          "currentSha256": "ea35709fd7dacc57efce929fa1f68cf57308a6d66f55172dfef361d4146f81c2",
+          "matchesDelivered": true
+        }
+      ],
+      "reviewerEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-stable-sources.json",
+      "reviewerReportedDistinctTests": 136,
+      "reviewerReportedBuiltHttpScenariosPerNodeVersion": 44,
+      "includedInVerifiedCandidate": false,
+      "productionRestarted": false,
+      "nextAction": "Integrate current-authority project reads and all API consumers in the next candidate, then validate permission withdrawal and delayed publication through the real Gateway."
+    },
+    {
+      "issue": "B518",
+      "receivedAt": "2026-11-05T09:43:42.058983+08:00",
+      "scope": "Revalidate configuration reads after permission, ownership and capability changes; Steward members capability is false",
+      "sources": [
+        {
+          "path": "gateway/src/server.ts",
+          "currentAtReceiptSha256": "6f3bef1ac3e6abcc063cb973782adb35a9b0bcbe4da69d59fe8194aaa5390061"
+        },
+        {
+          "path": "gateway/src/project-configuration.ts",
+          "currentAtReceiptSha256": "d47e8d808a7cd4b9070d2bdf12d4604ca138a21e690e2f1dd95ab5fae7e6a8f3"
+        }
+      ],
+      "reviewerEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z/B518-project-configuration-publication.delta.tar.gz",
+      "reviewerArchiveSha256": "c8b81b68167783278f6b1661a25e0aea486a8f0d42a7e0f2b015d40032606418",
+      "includedInVerifiedCandidate": false,
+      "productionRestarted": false,
+      "integrationOrder": "Apply the narrow B518 delta, then B519; retain existing Runtime and computer filters. The B519 server snapshot supersedes earlier server snapshots."
+    },
+    {
+      "issue": "B519",
+      "receivedAt": "2026-11-05T09:43:42.058983+08:00",
+      "scope": "Revalidate invitation reads after project-management permission is withdrawn",
+      "sources": [
+        {
+          "path": "gateway/src/server.ts",
+          "deliveredSha256": "6f3bef1ac3e6abcc063cb973782adb35a9b0bcbe4da69d59fe8194aaa5390061",
+          "currentSha256": "6f3bef1ac3e6abcc063cb973782adb35a9b0bcbe4da69d59fe8194aaa5390061",
+          "matchesDelivered": true
+        }
+      ],
+      "reviewerEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/B519-project-invitation-publication.delta.tar.gz",
+      "reviewerArchiveSha256": "f5554a8e78af518dccde06c2f42269b6f629e4dafae37e5b543e087efbf98bb5",
+      "includedInVerifiedCandidate": false,
+      "productionRestarted": false,
+      "integrationOrder": "Apply the narrow B518 delta, then B519; retain existing Runtime and computer filters. The B519 server snapshot supersedes earlier server snapshots."
+    },
+    {
+      "issue": "B520",
+      "receivedAt": "2026-11-05T10:47:02.529780+08:00",
+      "scope": "Revalidate global invitation inbox and count publication; preserve the caller’s own invitation history while filtering other accounts by current project-management authority",
+      "sources": [
+        {
+          "path": "gateway/src/server.ts",
+          "currentAtReceiptSha256": "3a5e2651f0d2c42732d8400ae00c29f42802c0556132e43b5cccf6b701197b53"
+        }
+      ],
+      "reviewerEvidence": {
+        "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/B520-invitation-inbox-publication.delta.tar.gz",
+        "sha256": "6ab01176c91843769d4f1c5ca7460c361e0dc42d870392008676643222187237",
+        "narrowPatchPaths": []
+      },
+      "reviewerReportedDistinctTests": 252,
+      "reviewerReportedRealHttpScenariosPerNodeVersion": 36,
+      "reviewerReportedNewRouteCoverage": {
+        "statements": "31/31",
+        "branches": "32/32",
+        "functions": "8/8"
+      },
+      "includedInVerifiedCandidate": false,
+      "productionRestarted": false,
+      "nextAction": "Use the narrow patch after the earlier publication fixes, preserving Runtime and computer filtering, and rerun invitation-publication acceptance in the next candidate."
+    },
+    {
+      "issue": "B521",
+      "receivedAt": "2026-11-05T11:15:05.490840+08:00",
+      "scope": "Revalidate usage publication after preparation and return a client error for an invalid month; denied project reads retain their original target",
+      "sources": [
+        {
+          "path": "gateway/src/server.ts",
+          "currentAtReceiptSha256": "795563c92d5bd46faed1c5eedd56a5f5578b3f6d6e2a88ddb17a465085acc7f6"
+        }
+      ],
+      "reviewerEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/B521-account-usage-publication.delta.tar.gz",
+      "reviewerArchiveSha256": "4d3858ed918427f43494f6881fc9a105d5fab629517a5c9e9204ffedbbdf7e21",
+      "narrowPatchPaths": [],
+      "reviewerReportedDistinctTests": 155,
+      "reviewerReportedRealPgHttpScenarios": 57,
+      "reviewerReportedRouteCoverage": {
+        "statements": "35/35",
+        "branches": "32/32",
+        "functions": "4/4"
+      },
+      "reviewerReportedBuiltReplayPerNodeVersion": {
+        "versions": [
+          "22",
+          "24"
+        ],
+        "summaryLines": 57,
+        "runtimeIntakeLines": 12
+      },
+      "validationAttribution": "Independent reviewer; not rerun by this candidate task.",
+      "includedInVerifiedCandidate": false,
+      "productionRestarted": false,
+      "paidApiInvoked": false,
+      "nextAction": "Integrate the narrow delta after B520, preserving other server segments and exact Runtime/node filtering, then rerun scoped usage-publication acceptance."
+    }
+  ],
+  "candidateMatchesCurrentTree": false,
+  "pendingSourceFiles": [
+    "gateway/src/collaboration.ts",
+    "gateway/src/node-archive-router.ts",
+    "gateway/src/postgres/collaboration-service.ts",
+    "gateway/src/postgres/conversation-archive-service.ts",
+    "gateway/src/project-configuration.ts",
+    "gateway/src/server.ts",
+    "gateway/src/services.ts"
+  ],
+  "releaseRecommendation": "Integrate and verify the recorded later fixes before production promotion.",
+  "combinedLaterPublicationEvidence": {
+    "reviewerReportedDistinctTests": 233,
+    "reviewerReportedRealHttpScenariosPerNodeVersion": 92,
+    "nodeVersions": [
+      "22",
+      "24"
+    ],
+    "gatewayTypecheckAndEmit": "reviewer-reported-passed",
+    "paidApiInvoked": false,
+    "scopeLimit": "Does not establish complete peer-backup or whole-project acceptance."
+  },
+  "laterDocumentationHandoffs": [
+    {
+      "issue": "E521",
+      "receivedAt": "2026-11-05T10:47:02.529780+08:00",
+      "scope": "Session-format index and authored terminology checks; preserve historical commands and diagnostics",
+      "reviewerEvidence": {
+        "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/documentation-quality-review.delta.tar.gz",
+        "sha256": "2c0b5f6cfd4b3fe3eafb1c6d6486d3601a10fc68472bade78ce87aaae903c645",
+        "narrowPatchPaths": []
+      },
+      "reviewerReportedHistoricalItemsPreserved": 1847,
+      "reviewerReportedDocsQuickChecks": 20,
+      "validationAttribution": "Independent reviewer; not rerun by this scoped candidate task."
+    }
+  ]
+}

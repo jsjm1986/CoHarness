@@ -21,8 +21,12 @@ Archive list, status, empty-draft preview, detail and export now retain current 
 
 Blank-draft reservations refuse archived roots until restored, including a retry that proposes another Session id for the same draft. A reservation released during the root-lock wait returns HTTP400 and requires a new attempt. Empty-draft preview and confirmation exclude archived, trashed and purged roots and recent restorations; restoring an old blank Session gives it a fresh cleanup interval.
 
+Mixed shared and node-volume archive pages and empty-draft batches reuse the caller's governance transaction. They work with a single available governance connection; pagination, per-item eligibility and current administrator checks remain in force.
+
+Creator filters keep retained disabled and logically deleted accounts visible in both archive stores, under current administrator qualification.
+
 ## Migration
 
 1. Upgrade the complete Gateway and bundled Admin UI together; Gateway startup applies migration097. Update custom clients to the record routes and opaque IDs. Clear stale browser assets if a legacy path returns410. Do not substitute Host IDs for missing archive IDs.
 2. Check every bulk result by `archiveId` before reporting success. After lost authority, refresh the account, organization status, role and membership before retrying.
-3. Confirm that equal Host IDs in two Runtimes list as distinct records, actions and acknowledgements stay with their owning Runtime, and one purge preserves the other record and its files. Confirm that an active administrator can restore and trash an archive. Withdraw that administrator's qualification before a queued operation is accepted and confirm that both archive state and command ledger remain unchanged. See the [archive reference](../../../../gateway/README.md).
+3. Verify distinct records for equal Host IDs in different Runtimes; actions and acknowledgements retain their Runtime, and one purge preserves the other record and its files. Confirm restore/trash succeeds for an active administrator. Withdraw qualification before queued admission and verify unchanged archive state and command ledger. See the [archive reference](../../../../gateway/README.md).

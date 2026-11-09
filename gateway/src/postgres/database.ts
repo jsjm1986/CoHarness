@@ -1,3 +1,4 @@
+import { observeOperationSql } from '../operation-timing.ts'
 import { backfillConversationQueryFieldsV1 } from './conversation-query-migration-v1.ts'
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
@@ -46,6 +47,7 @@ export interface Queryable {
 
 /** Gateway-only pool option; pg itself does not expose a pending-queue bound. */
 export interface GatewayPoolConfig extends PoolConfig {
+  traceRole?: 'governance'|'content'
   maxCheckoutQueue?: number
 }
 
@@ -96,7 +98,7 @@ type CheckoutCallback = Parameters<Pool['connect']>[0]
 class GatewayPostgresPool extends Pool {
   private readonly checkout: CheckoutState
 
-  constructor(options: PoolConfig, limit: number) {
+  constructor(options: PoolConfig, limit: number, private readonly traceRole:'governance'|'content') {
     super(options)
     this.checkout = { pending: 0, limit, rejected: 0 }
     checkoutStates.set(this, this.checkout)
@@ -123,7 +125,7 @@ class GatewayPostgresPool extends Pool {
       try {
         super.connect((error, client, release) => {
           settle()
-          callback(error, client === undefined ? undefined : guardCheckedOutClient(client), release)
+          callback(error, client === undefined ? undefined : guardCheckedOutClient(client,this.traceRole), release)
         })
       } catch (error) {
         settle()
@@ -138,7 +140,7 @@ class GatewayPostgresPool extends Pool {
     }
     return connecting.then(client => {
       settle()
-      return guardCheckedOutClient(client)
+      return guardCheckedOutClient(client,this.traceRole)
     }, error => {
       settle()
       throw error
@@ -172,7 +174,7 @@ export async function databaseUrlFromFile(env: NodeJS.ProcessEnv = process.env):
 }
 
 export function createPostgresPool(connectionString: string, overrides: GatewayPoolConfig = {}): Pool {
-  const { maxCheckoutQueue, ...poolOverrides } = overrides
+  const { maxCheckoutQueue, traceRole='governance', ...poolOverrides } = overrides
   const checkoutQueueLimit = checkoutLimit(maxCheckoutQueue)
   const pool = new GatewayPostgresPool({
     connectionString,
@@ -185,7 +187,7 @@ export function createPostgresPool(connectionString: string, overrides: GatewayP
     idle_in_transaction_session_timeout: DEFAULT_DATABASE_IDLE_TRANSACTION_TIMEOUT_MS,
     Client: GatewayPostgresClient,
     ...poolOverrides,
-  }, checkoutQueueLimit)
+  }, checkoutQueueLimit,traceRole)
   // `pg.Pool` emits an `error` event when an idle client is terminated by the
   // server or network.  Without a listener Node treats that event as
   // uncaught and takes the Gateway down, even though a later checkout could
@@ -211,9 +213,10 @@ const checkedOutErrorGuard = new WeakSet<PoolClient>()
  * connection through its own rejection. Once the client is idle again the
  * pool's own `error` listener owns removal and may co-report the same event.
  */
-function guardCheckedOutClient(client: PoolClient): PoolClient {
+function guardCheckedOutClient(client: PoolClient,role:'governance'|'content'='governance'): PoolClient {
   if (typeof client.on !== 'function' || checkedOutErrorGuard.has(client)) return client
   checkedOutErrorGuard.add(client)
+  if (typeof client.query==='function') observeOperationSql(client,role)
   client.on('error', (error: unknown) => {
     console.error(`[gateway] PostgreSQL checked-out client error (${errorCodeForDiagnostics(error)})`)
   })
@@ -279,6 +282,8 @@ export function isTransientDatabaseError(error: unknown): boolean {
     seen.add(current)
     const code = errorCode(current)
     if (code !== undefined && (TRANSIENT_DATABASE_CODES.has(code) || code.startsWith('08'))) return true
+    // pg can report a socket closed before startup completes without an errno or SQLSTATE.
+    if (code === undefined && current instanceof Error && current.message === 'Connection terminated unexpectedly') return true
     current = typeof current === 'object' ? (current as { cause?: unknown }).cause : undefined
   }
   return false

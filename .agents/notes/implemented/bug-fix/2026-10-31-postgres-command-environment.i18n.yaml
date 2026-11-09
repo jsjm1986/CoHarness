@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-postgres-command-environment.md
 document:
-  en: 148b508d11f29be7abf31bd70efe838500598e4d
-  zh: 3b4dad755c4edccd213dd5ca2920c66dcb5f50b8
+  en: d991d4cabe34fe402605ccd0cd5b41cfa546e6de
+  zh: 090fbec34b97e205dfda2ea2978b1da80a1c7337
 /agent-note-postgresql-command-environment:
   en: aba259925e5d69a6
   zh: a8bb2c65ef2ddaec
@@ -12,11 +12,11 @@ document:
   en: e01f2d2cbf6489ac
   zh: 87a354d18d36e808
 /agent-note-postgresql-command-environment/decision:
-  en: f2a41d5b3e19e17a
-  zh: 3bac6f7d6cdfe224
+  en: 47ec5fdab812198f
+  zh: e51aeb8df8024842
 /agent-note-postgresql-command-environment/alternatives-considered:
   en: 2afe8f0e06364baa
   zh: 3bc0c05bb6edd876
 /agent-note-postgresql-command-environment/consequences:
-  en: c56229d79b724235
-  zh: 84c62f781ec060d9
+  en: 5dc567598e0f055b
+  zh: b85da689619f6ec8

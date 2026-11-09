@@ -70,7 +70,10 @@
           "imported": "execFileSync",
           "local": "execFileSync"
         }
-      ]
+      ],
+      "currentObservation": false,
+      "retiredAt": "2026-11-04T19:02:38.454720+00:00",
+      "receipt": "receipts/steward-worktree-native-preparation-2026-11-05.json"
     },
     {
       "path": "gateway/src/launcher.ts",
@@ -438,8 +441,9 @@
       "method": "execFileSync",
       "expression": "execFileSync",
       "owner": "ensureStewardSpace",
-      "status": "pending_review_peer_index_composition_ownership_respected",
-      "currentObservation": true
+      "status": "retired_raw_allocation_replaced_by_owned_managed_provider_B506",
+      "currentObservation": false,
+      "receipt": "receipts/steward-worktree-native-preparation-2026-11-05.json"
     },
     {
       "path": "gateway/src/launcher.ts",
@@ -999,7 +1003,7 @@
       "status": "managed_admission_source_built_verified"
     }
   ],
-  "updatedAt": "2026-11-02T21:12:14.361405+00:00",
+  "updatedAt": "2026-11-05T03:37:25.532071+00:00",
   "scanner": {
     "sourceFilesParsed": 2769,
     "limitations": [
@@ -2445,7 +2449,7 @@
     "receipt": "receipts/job-capture-admission-2026-11-02.json",
     "productionProcessAllocationsAdded": 0,
     "status": "named_cases_verified_full_local_job_registry_100_percent_other_allocations_open",
-    "ownershipRule": "The existing exact-owner start reservation spans execution provenance capture and producer startup; failed capture releases only that reservation. Other owners remain independent.",
+    "ownershipRule": "The existing exact-owner start reservation spans execution identity capture and producer startup; failed capture releases only that reservation. Other owners remain independent.",
     "ownedTestResources": "Native ephemeral loopback HTTP work responses and actual SDK runtimes. Both original extra producers and final admitted work are explicitly stopped and joined."
   },
   "httpLeaseRetirement": {
@@ -2584,490 +2588,15 @@
     "wholeProjectComplete": false
   },
   "currentAllocationSourceReview": {
-    "at": "2026-11-02T07:37:34.588562+00:00",
-    "receipt": "receipts/gateway-account-lookup-ownership-2026-11-02.json",
-    "scannerReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/allocation-scan-final.json",
-    "rawScan": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/current-allocation-scan-final.json",
-    "productionSourceFiles": 2877,
-    "allocationSites": 36,
-    "sites": [
-      {
-        "path": "gateway/src/child-command.ts",
-        "line": 20,
-        "module": "node:child_process",
-        "method": "execFile",
-        "expression": "execute",
-        "owner": "runGatewayChildCommand",
-        "classification": "administrative_native_command_environment_deadline_cancellation_and_close_verified",
-        "findings": [
-          "B128",
-          "B314",
-          "B316",
-          "B319"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "gateway/src/local-runtime-supervisor.ts",
-        "line": 118,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "supervise",
-        "classification": "one_runtime_under_inherited_owner_lease_posix_scope_verified",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "gateway/src/tunnel-process.ts",
-        "line": 67,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "spawnTunnelProcess",
-        "classification": "owned_native_connector_registration_close_and_cancellation_verified",
-        "findings": [
-          "B106",
-          "B107",
-          "B109",
-          "B110",
-          "B117"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "apps/plugin-market-generator/src/fetchers.ts",
-        "line": 152,
-        "module": "node:child_process",
-        "method": "execFile",
-        "expression": "run",
-        "owner": "git",
-        "classification": "development_cli_git_named_transport_and_objects_cases_verified_product_admission_not_applicable",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "gateway/src/deployment-commands.ts",
-        "line": 156,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "run",
-        "classification": "maintenance_child_environment_and_named_pipe_closure_verified_argument_transport_and_wrapper_owner_review_open",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "gateway/src/index.ts",
-        "line": 752,
-        "module": "node:child_process",
-        "method": "execFileSync",
-        "expression": "execFileSync",
-        "owner": null,
-        "classification": "pending_review_peer_index_composition_ownership_respected",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "gateway/src/launcher.ts",
-        "line": 166,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "start",
-        "classification": "runtime_cold_start_and_exact_generation_handoff_verified",
-        "findings": [
-          "B25",
-          "B104",
-          "B105"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "native/system/packages/entry/src/index.ts",
-        "line": 120,
-        "module": "node:child_process",
-        "method": "spawnSync",
-        "expression": "spawnSync",
-        "owner": "probe",
-        "classification": "public_native_capability_probe_source_and_node22_node24_client_closure_verified",
-        "findings": [
-          "B322"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/boot/plugin-market/src/parse-thread.ts",
-        "line": 79,
-        "module": "node:worker_threads",
-        "method": "Worker",
-        "expression": "Worker",
-        "owner": "runParser",
-        "classification": "current_source_and_rebuilt_worker_admission_verified",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/bundle/web-app/src/index.ts",
-        "line": 136,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "spawnBrowserLauncher",
-        "classification": "administrative_browser_helper_cancellation_and_native_close_verified_os_delegation_external",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
-        "line": 64,
-        "module": "node:worker_threads",
-        "method": "Worker",
-        "expression": "Worker",
-        "owner": "openBrowserWorker",
-        "classification": "admission_integrated_targeted_verified",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
-        "line": 68,
-        "module": "node:worker_threads",
-        "method": "Worker",
-        "expression": "Worker",
-        "owner": "openBrowserWorker",
-        "classification": "admission_integrated_targeted_verified",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/experimental/inspector/src/host/bridge/controller.ts",
-        "line": 359,
-        "module": "node:worker_threads",
-        "method": "Worker",
-        "expression": "Worker",
-        "owner": "spawnWorker",
-        "classification": "current_real_worker_completion_retry_and_native_bundles_verified_whole_inventory_open",
-        "findings": [
-          "B04",
-          "B297"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/experimental/inspector/src/host/bridge/controller.ts",
-        "line": 368,
-        "module": "node:worker_threads",
-        "method": "Worker",
-        "expression": "Worker",
-        "owner": "spawnWorker",
-        "classification": "current_real_worker_completion_retry_and_native_bundles_verified_whole_inventory_open",
-        "findings": [
-          "B04",
-          "B297"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/host/directory-picker-native/src/win32-dialog-host.ts",
-        "line": 29,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "spawnDialogWorker",
-        "classification": "driver_lifetime_verified_native_windows_platform_acceptance_open",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/host/directory-picker-native/src/win32-dialog-host.ts",
-        "line": 31,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "spawnDialogWorker",
-        "classification": "driver_lifetime_verified_native_windows_platform_acceptance_open",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/host/open-in-app/src/resolver.ts",
-        "line": 76,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": null,
-        "classification": "desktop_http_current_authorization_and_per_handoff_admission_verified_native_lifetime_review_open",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/sandbox/sandbox-local/src/index.ts",
-        "line": 70,
-        "module": "node:child_process",
-        "method": "spawnSync",
-        "expression": "spawnSync",
-        "owner": "defaultProbeBwrap",
-        "classification": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
-        "findings": [
-          "B322"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/sandbox/sandbox-local/src/index.ts",
-        "line": 88,
-        "module": "node:child_process",
-        "method": "spawnSync",
-        "expression": "spawnSync",
-        "owner": "defaultProbeSeatbelt",
-        "classification": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
-        "findings": [
-          "B322"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/sandbox/sandbox-local/src/index.ts",
-        "line": 106,
-        "module": "node:child_process",
-        "method": "spawnSync",
-        "expression": "spawnSync",
-        "owner": "defaultProbeWindowsAcl",
-        "classification": "native_probe_timeout_closure_and_cached_fail_closed_verdict_verified_remaining_inventory_open",
-        "findings": [
-          "B322"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/sdk/client/src/client.ts",
-        "line": 297,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "start",
-        "classification": "managed_sdk_parent_admission_and_original_child_cleanup_retry_source_native_artifact_verified_whole_inventory_open",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/session/session-persistence-jsonl/src/migration-verifier.ts",
-        "line": 257,
-        "module": "node:worker_threads",
-        "method": "Worker",
-        "expression": "Worker",
-        "owner": "runVerificationWorker",
-        "classification": "admission_integrated_targeted_verified",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/index.ts",
-        "line": 339,
-        "module": "node-pty",
-        "method": "spawn",
-        "expression": "requireNodePty().spawn",
-        "owner": "spawnTerminalProcess",
-        "classification": "provider_payload_called_below_subprocess_runtime_admission_native_platform_scope_retained",
-        "findings": [
-          "B386",
-          "B368",
-          "B313"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
-        "line": 91,
-        "module": "node:child_process",
-        "method": "execFile",
-        "expression": "execFile",
-        "owner": "querySystemctl",
-        "classification": "native_query_probe_and_signal_deadlines_named_real_clients_verified_complete_inventory_open",
-        "findings": [
-          "B313",
-          "B320"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
-        "line": 140,
-        "module": "node:child_process",
-        "method": "spawnSync",
-        "expression": "(internals.spawnSync ?? spawnSync)",
-        "owner": "probeLinuxScope",
-        "classification": "administrative_native_probe_explicit_deadline_and_force_close_reviewed_no_workload_permit_recursion",
-        "findings": [
-          "B320",
-          "B322"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
-        "line": 185,
-        "module": "node:child_process",
-        "method": "spawnSync",
-        "expression": "(internals.spawnSync ?? spawnSync)",
-        "owner": "probeLinuxManager",
-        "classification": "administrative_native_probe_explicit_deadline_and_force_close_reviewed_no_workload_permit_recursion",
-        "findings": [
-          "B320",
-          "B322"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/linux-scope.ts",
-        "line": 705,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "(internals.spawn ?? spawn)",
-        "owner": "launchLinuxScope",
-        "classification": "provider_payload_called_below_subprocess_runtime_admission_native_platform_scope_retained",
-        "findings": [
-          "B386",
-          "B368",
-          "B313"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/process-inspector.ts",
-        "line": 129,
-        "module": "node:child_process",
-        "method": "execFileSync",
-        "expression": "execFileSync",
-        "owner": "defaultProcessInspectorInternals",
-        "classification": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/spawn.ts",
-        "line": 121,
-        "module": "node:child_process",
-        "method": "spawnSync",
-        "expression": "spawnSync",
-        "owner": "taskkillProcessTree",
-        "classification": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/spawn.ts",
-        "line": 470,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "(internals.spawn ?? spawn)",
-        "owner": "spawnSubprocess",
-        "classification": "provider_payload_called_below_subprocess_runtime_admission_native_platform_scope_retained",
-        "findings": [
-          "B386",
-          "B368",
-          "B313"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/windows-inspector.ts",
-        "line": 157,
-        "module": "node:child_process",
-        "method": "spawnSync",
-        "expression": "spawnSync",
-        "owner": "taskkillTree",
-        "classification": "named_native_control_deadline_and_quiescence_scope_verified_complete_platform_and_file_review_open",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/subprocess/subprocess-local/src/windows-job.ts",
-        "line": 135,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "(internals.spawn ?? spawn)",
-        "owner": "launchWindowsJob",
-        "classification": "provider_payload_called_below_subprocess_runtime_admission_native_platform_scope_retained",
-        "findings": [
-          "B386",
-          "B368",
-          "B313"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/test-support/session-snapshot/src/launcher.ts",
-        "line": 137,
-        "module": "node:child_process",
-        "method": "spawn",
-        "expression": "spawn",
-        "owner": "launchAcpTestAgent",
-        "classification": "test_only_acp_named_stdio_callback_and_refused_fallback_closure_verified_product_admission_not_applicable",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/typert/generator/src/tsdown-plugin.ts",
-        "line": 194,
-        "module": "node:worker_threads",
-        "method": "Worker",
-        "expression": "Worker",
-        "owner": "spawnWorker",
-        "classification": "build_only_worker_named_success_and_failure_closure_verified_product_admission_not_applicable",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/typert/generator/src/tsdown-plugin.ts",
-        "line": 202,
-        "module": "node:worker_threads",
-        "method": "Worker",
-        "expression": "Worker",
-        "owner": "spawnWorker",
-        "classification": "build_only_worker_named_success_and_failure_closure_verified_product_admission_not_applicable",
-        "findings": [],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      },
-      {
-        "path": "packages/util/native-command/src/runner.ts",
-        "line": 31,
-        "module": "node:child_process",
-        "method": "execFile",
-        "expression": "execFile",
-        "owner": null,
-        "classification": "direct_native_helper_cancellation_source_and_public_node22_node24_verified_native_desktop_acceptance_open",
-        "findings": [
-          "B312"
-        ],
-        "reviewScope": "Current call ownership and prior named evidence; syntactic discovery is not full file or platform coverage."
-      }
-    ],
-    "historicalCandidateKeysUnmatchedBeforeRepair": 11,
-    "omittedAccountSitesRemovedBySharedOwner": 3,
-    "remainingHistoricalKeyMismatches": 8,
-    "mismatchDisposition": "Seven existing provider/probe ownership keys are classified; the peer-owned index bootstrap Git worktree call remains a named pending review. This is not an all-allocation completeness claim.",
-    "limitations": [
-      "Alias and namespace discovery is syntactic and may include shadowed bindings.",
-      "An unmatched key is a review candidate, not a confirmed allocation defect.",
-      "Dynamic and third-party process creation needs separate consumer inspection."
-    ],
-    "helperConsumersRepaired": [
-      {
-        "path": "gateway/src/document-storage.ts",
-        "owner": "account",
-        "helper": "runGatewayChildCommand",
-        "kind": "administrative_identity_query"
-      },
-      {
-        "path": "gateway/src/project-runtime-data.ts",
-        "owner": "executionOwner",
-        "helper": "runGatewayChildCommand",
-        "kind": "administrative_identity_query"
-      }
-    ],
-    "wholeProjectComplete": false
+    "at": "2026-11-05T01:51:48.244292+00:00",
+    "productionSourceFiles": 2998,
+    "rawAllocationSites": 44,
+    "unmatchedHistoricalOwnerKeys": 16,
+    "newConfirmedBugs": 0,
+    "wholeResourceReviewComplete": false,
+    "wholeProjectComplete": false,
+    "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T012240Z/current-allocation-review.json",
+    "classification": "Nine peer infrastructure sites and seven known provider internals are individually annotated. Two infrastructure process owners and current resource qualification have fresh named source/ordinary Node evidence. Remaining native backup platform paths retain inspection-only status."
   },
   "resourceRequirementRefresh": {
     "at": "2026-11-02T07:37:34.588562+00:00",
@@ -3171,10 +2700,324 @@
   "postgresMaintenanceArgumentPrivacy": {
     "finding": "B491",
     "receipt": "receipts/postgres-command-argument-privacy-2026-11-03.json",
-    "status": "confirmed_native_process_argument_exposure_fix_design_open",
+    "status": "fixed_named_scenarios_verified_global_review_open",
     "actualNativePasswordArgumentVisible": true,
     "syntheticOnly": true,
     "cancelledClientJoined": true,
-    "sourceFixed": false
+    "sourceFixed": true,
+    "currentReceipt": "receipts/private-postgres-and-restore-authority-2026-11-04.json",
+    "currentActualNativePasswordArgumentVisible": false,
+    "originalArgumentExposureRetained": true,
+    "privateFrameAndAckBounded": true,
+    "exactLocalChildJoined": true,
+    "physicalRemoteChildExitClaimed": false
+  },
+  "currentRestoreSchemaPreflightReview": {
+    "at": "2026-11-04T18:05:14.499028+00:00",
+    "receipt": "receipts/restore-schema-preflight-2026-11-05.json",
+    "sourceFixed": true,
+    "actualCliCases": 9,
+    "fullSqlAuthorityCases": 4,
+    "wholeProjectComplete": false
+  },
+  "currentResourcePolicyReadReview": {
+    "at": "2026-11-04T18:05:14.499028+00:00",
+    "receipt": "receipts/resource-policy-read-authority-2026-11-05.json",
+    "sourceFixed": true,
+    "actualGatewayScenarios": 51,
+    "runtimeStarts": 0,
+    "policyMutationByRead": false,
+    "wholeProjectComplete": false
+  },
+  "maintenanceSchemaInspection": {
+    "at": "2026-11-04T18:05:14.499028+00:00",
+    "finding": "B503",
+    "source": "gateway/src/deployment-commands.ts:inspectDumpMigrations",
+    "classification": "bounded_administrative_native_helper",
+    "owner": "deployment data lease and joined local command lifecycle",
+    "capturedStdoutLimitBytes": 4194304,
+    "cancellationAndOutputFailureJoinReader": true,
+    "recursiveRuntimeAdmission": false,
+    "remainingAllocationInventoryOpen": true
+  },
+  "currentStewardWorktreePreparationReview": {
+    "at": "2026-11-04T19:02:38.454720+00:00",
+    "finding": "B506",
+    "receipt": "receipts/steward-worktree-native-preparation-2026-11-05.json",
+    "sourceFixed": true,
+    "realGatewayTranscript": true,
+    "normalNodeArtifactVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "wholeProjectComplete": false
+  },
+  "stewardPreparationAllocation": {
+    "at": "2026-11-04T19:02:38.454720+00:00",
+    "source": "gateway/src/steward-worktree.ts",
+    "classification": "bounded_administrative_managed_subprocess",
+    "provider": "@deepseek-ai/dsh-subprocess-local",
+    "lifetime": "One per-preparation Context retains its provider until accepted commands and managed process ranges settle; caller deadline or Gateway shutdown aborts then joins.",
+    "recursiveRuntimeAdmission": false,
+    "environment": "Gateway-filtered explicit environment with ambient-name tombstones",
+    "receipt": "receipts/steward-worktree-native-preparation-2026-11-05.json",
+    "residualAllocationReviewOpen": true
+  },
+  "currentRuntimeStartShutdownReview": {
+    "at": "2026-11-04T19:16:51.958886+00:00",
+    "finding": "B507",
+    "receipt": "receipts/runtime-start-shutdown-order-2026-11-05.json",
+    "sourceFixed": true,
+    "closureBeforeWriterDrain": true,
+    "readyProcessTerminationDeferredToStopAll": true,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "wholeProjectComplete": false
+  },
+  "currentAdministratorReadPublicationReview": {
+    "at": "2026-11-04T19:55:40.148271+00:00",
+    "finding": "B508",
+    "receipt": "receipts/administrator-read-publication-2026-11-05.json",
+    "sourceFixed": true,
+    "assembledScenarios": 161,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "temporaryNativeClustersRemoved": true,
+    "wholeProjectComplete": false
+  },
+  "currentProjectSettingsStartReview": {
+    "at": "2026-11-04T20:20:29.160567+00:00",
+    "finding": "B509",
+    "receipt": "receipts/administrator-project-settings-start-2026-11-05.json",
+    "sourceFixed": true,
+    "nativeCases": 10,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "allOwnedTemporaryNativeClustersRemoved": true,
+    "wholeProjectComplete": false
+  },
+  "currentBackupWorkAuthorityReview": {
+    "at": "2026-11-04T20:50:29.287638+00:00",
+    "finding": "B510",
+    "receipt": "receipts/backup-work-administrator-authority-2026-11-05.json",
+    "sourceFixed": true,
+    "nativeScenarios": 27,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "allOwnedTemporaryNativeClustersRemoved": true,
+    "wholeProjectComplete": false
+  },
+  "currentBackupSelectionReview": {
+    "at": "2026-11-04T21:07:02.557489+00:00",
+    "finding": "B511",
+    "receipt": "receipts/backup-selection-validation-2026-11-05.json",
+    "sourceFixed": true,
+    "newNativeSelections": 20,
+    "normalNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "wholeProjectComplete": false
+  },
+  "currentCommandAndPlanRecheck": {
+    "at": "2026-11-04T21:07:02.557489+00:00",
+    "receipt": "receipts/command-plan-current-recheck-2026-11-05.json",
+    "corePassed": 169,
+    "postgresPassed": 2,
+    "paidModelApisCalled": false
+  },
+  "currentModelDiscoveryReadReview": {
+    "id": "B512",
+    "title": "Organization model discovery publishes private results after administrator authority is withdrawn during the provider request",
+    "status": "fixed_final_read_authority_source_and_normal_node_artifacts_verified_remaining_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/admin-api.ts"
+    ],
+    "receipt": "receipts/model-discovery-read-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z",
+    "wholeProjectComplete": false,
+    "evidence": "Actual credential preparation plus held loopback provider responses prove the original disclosure;14new late-withdrawal scenarios now refuse publication.90HTTP unit cases and57runnable scenario instances pass; ordinary Node22/24 each pass46PostgreSQL cases."
+  },
+  "currentDocumentLinuxReconciliation": {
+    "at": "2026-11-04T21:48:55.376591+00:00",
+    "receipt": "receipts/document-linux-pending-reconciliation-2026-11-05.json",
+    "newTestsExecuted": 0,
+    "wholeProjectComplete": false
+  },
+  "currentProjectModelReadReview": {
+    "id": "B513",
+    "title": "Project model settings and credential reads retain obsolete access and editing authority; discovery publishes after ownership or membership withdrawal",
+    "status": "fixed_current_project_and_exact_computer_read_authority_source_and_normal_node_artifacts_verified_remaining_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts",
+      "gateway/src/services.ts",
+      "gateway/src/postgres/model-governance-service.ts"
+    ],
+    "receipt": "receipts/project-model-read-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z",
+    "wholeProjectComplete": false,
+    "evidence": "Six real authority interleavings reproduce the defect.78new runnable PostgreSQL/HTTP scenarios and both ordinary Node22/24artifacts pass.128focused PostgreSQL cases,8HTTP unit cases,3test wiring gates, full Gateway typecheck/build and scoped docs/lint pass; see receipt for overlap and limits."
+  },
+  "currentModelDiscoveryRedirectReview": {
+    "id": "B514",
+    "title": "Model discovery follows foreign-origin redirects with Anthropic API keys and deployment authentication headers",
+    "status": "fixed_shared_helper_and_normal_package_exports_verified_full_project_build_acceptance_open",
+    "sourceFixed": true,
+    "paths": [
+      "packages/llm/llm/src/discovery.ts"
+    ],
+    "receipt": "receipts/model-discovery-redirect-authority-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z",
+    "wholeProjectComplete": false,
+    "evidence": "Two owned HTTP origins reproduce Anthropic/custom-header forwarding.87helper/consumer tests pass with100% measured coverage of discovery.ts;24new actual Gateway/PG scenarios and normal Node22/24root/subpath exports pass. Full repository build remains explicitly unsuccessful outside this scoped repair."
+  },
+  "currentManagementPasswordQualificationReview": {
+    "id": "B515",
+    "title": "Queued management requests can write configuration after a required password reset has revoked the browser session",
+    "status": "fixed_named_management_password_admission_source_and_emitted_replays_verified_remaining_callers_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/administrator-authority.ts",
+      "gateway/src/postgres/administrator-authority.ts",
+      "gateway/src/postgres/project-management-authority.ts"
+    ],
+    "receipt": "receipts/management-password-qualification-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T223451Z",
+    "wholeProjectComplete": false,
+    "evidence": "Three real queued-write password-reset counterproofs are repaired.511unique named cases pass, including259core cases with100percent measured coverage of all three changed authority files.137public scenario instances and122ordinary Node22/24scenarios per version pass. Remaining callers and whole-project acceptance remain open."
+  },
+  "currentSharedArchiveTransactionReview": {
+    "id": "B516",
+    "title": "Mixed shared and node-volume archive operations wait for another connection from their own exhausted governance pool",
+    "status": "fixed_shared_archive_transaction_and_physical_volume_http_artifacts_verified_remaining_archive_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/node-archive-router.ts",
+      "gateway/src/postgres/conversation-archive-service.ts"
+    ],
+    "receipt": "receipts/archive-governance-transaction-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z",
+    "wholeProjectComplete": false,
+    "evidence": "Real one-connection archive-list and emitted HTTP draft-cleanup counterproofs are repaired.159distinct targeted cases pass, including13actual Gateway/physical-volume scenarios and ordinary Node22/24replays. Complete repository build passes8steps. Whole-file archive coverage and complete business review remain open."
+  },
+  "latestFullBuildAcceptance": {
+    "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-complete-build-accepted.log",
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "clientArtifacts": 266,
+    "qualification": "Native, Host compiler/bundle, Client compiler/bundle, Web, Host aggregate and Client aggregate all pass. The final Host-only check after mechanical test formatting also passes. Initial99diagnostics are retained; most came from four Web tests importing Client Context declarations into the Host program."
+  },
+  "currentProjectReadPublicationReview": {
+    "id": "B517",
+    "title": "Project metadata and management flags can retain withdrawn membership, ownership or login authority after asynchronous preparation",
+    "status": "fixed_directory_detail_current_authority_and_computer_binding_verified_remaining_project_read_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/collaboration.ts",
+      "gateway/src/services.ts",
+      "gateway/src/postgres/collaboration-service.ts",
+      "gateway/src/server.ts"
+    ],
+    "receipt": "receipts/project-read-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z",
+    "wholeProjectComplete": false,
+    "evidence": "Four real Gateway/PostgreSQL late-revocation counterproofs plus two borrowed-view and two prepared-computer HTTP regressions are repaired.136distinct named cases pass, including44new real HTTP scenarios and ordinary Node22/24replays. Configuration and invitation review remains open."
+  },
+  "currentProjectConfigurationPublicationReview": {
+    "id": "B518",
+    "title": "Project configuration reads retain revoked browser authority, stale ownership and capabilities after metadata preparation",
+    "status": "fixed_current_configuration_read_authority_and_reserved_capabilities_verified_remaining_business_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts",
+      "gateway/src/project-configuration.ts"
+    ],
+    "receipt": "receipts/project-configuration-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T010338Z",
+    "wholeProjectComplete": false,
+    "evidence": "Real configuration revocation and stale-capability failures are repaired, including Steward membership capability matching its actual refusal.227distinct targeted cases pass;69realHTTPread scenarios replay in ordinary Node22/24. Invitation and remaining business review stay open."
+  },
+  "currentProjectInvitationPublicationReview": {
+    "id": "B519",
+    "title": "Project invitation lists publish withdrawn project data and invitations between other accounts after management loss",
+    "status": "fixed_project_invitation_final_authority_and_participant_visibility_verified_remaining_business_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts"
+    ],
+    "receipt": "receipts/project-invitation-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z",
+    "wholeProjectComplete": false,
+    "evidence": "Sixteen real project invitation read refusals and cross-account visibility failures are repaired.233distinct targeted cases pass;92realHTTPread scenarios replay in ordinary Node22/24. Incoming/outgoing participant history and pending rows are retained; whole business review remains open."
+  },
+  "currentInfrastructureHelperReview": {
+    "at": "2026-11-05T01:53:37.236746+00:00",
+    "receipt": "receipts/resource-infrastructure-review-2026-11-05.json",
+    "status": "named_current_infrastructure_and_post_wait_resource_qualification_verified_remaining_review_open",
+    "newConfirmedBugs": 0,
+    "distinctNamedPassedCases": 125,
+    "additionalNodeServiceCases": 49,
+    "newHeldNodeLockCases": 7,
+    "wholeProjectComplete": false
+  },
+  "currentDocumentationQualityReview": {
+    "at": "2026-11-05T02:27:11.082689+00:00",
+    "receipt": "receipts/documentation-quality-review-2026-11-05.json",
+    "status": "two_retained_documentation_quick_failures_repaired_current_checks_pass_remaining_business_review_open",
+    "documentationQuickPassed": 20,
+    "targetedTestsPassed": 148,
+    "historicalCapturedFieldsPreserved": 1847,
+    "newBusinessFindings": 0,
+    "wholeProjectComplete": false
+  },
+  "currentInvitationInboxPublicationReview": {
+    "id": "B520",
+    "title": "Account invitation history and pending counts publish after browser withdrawal, and former managers retain invitations between other accounts",
+    "status": "fixed_account_invitation_final_browser_and_management_authority_verified_remaining_business_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts"
+    ],
+    "receipt": "receipts/invitation-inbox-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z",
+    "wholeProjectComplete": false,
+    "evidence": "Twenty-six real HTTP counterproof failures are repaired;252distinct targeted cases pass. The new invitation route measures31/31statements,32/32branch outcomes and8/8functions; ordinary Node22/24each replay36real PostgreSQL HTTP scenarios. Participant history and all invitation rows remain intact."
+  },
+  "currentAccountUsagePublicationReview": {
+    "id": "B521",
+    "title": "Account usage summaries publish withdrawn account or project data, while invalid monthly inputs return server failures",
+    "status": "fixed_account_usage_final_authority_selected_billing_owner_and_month_validation_verified_remaining_business_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/server.ts"
+    ],
+    "receipt": "receipts/account-usage-publication-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z",
+    "wholeProjectComplete": false,
+    "evidence": "Twenty-seven real usage withdrawal cases and ten invalid-month failures are repaired;155distinct targeted cases pass. The changed route measures35/35statements,32/32branch outcomes and4/4functions. Ordinary Node22/24each replay57summary scenarios and12intake transcript rows. All20documentation quick checks pass."
+  },
+  "currentArchiveHistoricalCreatorReview": {
+    "id": "B522",
+    "title": "Node-volume archive creator filters hide retained history after the creator is disabled or logically deleted",
+    "status": "fixed_historical_creator_lookup_with_current_administrator_authority_verified_remaining_archive_search_review_open",
+    "sourceFixed": true,
+    "paths": [
+      "gateway/src/postgres/conversation-archive-service.ts"
+    ],
+    "receipt": "receipts/archive-historical-creator-filters-2026-11-05.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z",
+    "wholeProjectComplete": false,
+    "evidence": "Two real mixed-store creator filters omit node history after actual account disablement/deletion; the correction restores retained history and labels without widening current administrator or Runtime access.99distinct cases pass,19realHTTPscenarios replay on ordinary Node22/24, and20documentation quick checks pass."
   }
 }

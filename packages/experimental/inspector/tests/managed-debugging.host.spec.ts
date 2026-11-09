@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 
+/** Coverage instrumentation slows the fixture composition several-fold on shared runners. */
+const FIXTURE_TIMEOUT_MS = Math.max(60_000, 16 * Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0))
+
 it('refuses managed Inspector startup and closes live debugging through the real Web composition', async () => {
   const mode = process.env.DSH_EXAMPLE_MODE ?? 'src'
   if (mode !== 'src' && mode !== 'lib') throw new Error('Inspector startup example requires src or lib')
@@ -16,7 +19,7 @@ it('refuses managed Inspector startup and closes live debugging through the real
       ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
       fileURLToPath(new URL('./fixtures/managed-debugging.mjs', import.meta.url)), mode,
       ...(process.env.DSH_INSPECTOR_ARTIFACT_ROOT === undefined ? [] : [process.env.DSH_INSPECTOR_ARTIFACT_ROOT]),
-    ], { cwd: root, timeout: 60_000, killSignal: 'SIGKILL', env: { ...process.env,
+    ], { cwd: root, timeout: FIXTURE_TIMEOUT_MS, killSignal: 'SIGKILL', env: { ...process.env,
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_MANAGED_DATA_MANIFEST: undefined,
       DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), DSH_TELEMETRY_DISABLED: '1', TMPDIR: root,
       TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
@@ -27,4 +30,4 @@ it('refuses managed Inspector startup and closes live debugging through the real
     })
     await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./managed-debugging/expected.jsonl', import.meta.url)))
   } finally { await rm(root, { recursive: true, force: true }) }
-}, 70_000)
+}, FIXTURE_TIMEOUT_MS + 10_000)

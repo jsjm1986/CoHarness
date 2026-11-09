@@ -158,10 +158,12 @@ try{
  let updateBatches=0
  const failingPool={connect:async()=>{
   const client=await pool.connect()
-  return new Proxy(client,{get(target,key){
-   if(key==='query')return async(...args)=>{if(typeof args[0]==='string'&&args[0].startsWith('UPDATE harness.conversation_events event SET query_fields')&&++updateBatches===2)throw new Error('Injected second query-field batch failure');return target.query(...args)}
-   const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value
-  }})
+  const underlying=client.query.bind(client)
+  client.query=async(...args)=>{
+   if(typeof args[0]==='string'&&args[0].startsWith('UPDATE harness.conversation_events event SET query_fields')&&++updateBatches===2)throw new Error('Injected second query-field batch failure')
+   return underlying(...args)
+  }
+  return client
  }}
  await assert.rejects(runMigrations(failingPool,await through(100)),/Injected second query-field batch failure/)
  assert.equal(updateBatches,2)

@@ -1,0 +1,19 @@
+{
+  "id": "B504",
+  "title": "Migration118references document_scope_placement.root_id without a matching unique key and prevents an empty database from migrating",
+  "status": "peer_fixed_named_migration_and_organization_isolation_scenarios_independently_verified",
+  "sourceFixed": true,
+  "paths": [
+    "gateway/deploy/postgres/migrations/118_personal_document_history.sql"
+  ],
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/restore-current-authority-controls.json",
+  "evidence": "Current complete migrations through118 succeed on owned PostgreSQL17.6. Independent Root check reconstructs the original single-column FK and observes42830, refuses a foreign-organization document root with23503 and accepts the same-organization import. Governance rows are synthetic; this does not establish physical node-content import acceptance.",
+  "receipt": "receipts/personal-document-history-foreign-key-2026-11-05.json",
+  "at": "2026-11-04T17:36:38.346280+00:00",
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "currentRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/migration118-root-recheck.json",
+  "observations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/migration118-isolation-observations.json",
+  "currentIntegrationRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/schema118-preflight-authority-controls.json"
+}

@@ -53,7 +53,7 @@
         "no new membership/project/directory/success audit on denial",
         "pending invitation retained after temporary access revocation",
         "fresh authorized retry succeeds",
-        "authenticated self ownership/provenance survives spoofed body fields",
+        "authenticated self ownership and creator identity survives spoofed body fields",
         "expired pending invitation unchanged when eligibility denies renewal",
         "retained host bytes and all affected members invalidated"
       ]

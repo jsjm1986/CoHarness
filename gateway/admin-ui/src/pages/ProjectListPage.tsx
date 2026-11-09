@@ -1,8 +1,8 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowUpRight, CheckCircle2, Folder, FolderKanban, Plus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { createProject, listProjects, type Project } from '../api.ts'
+import { createProject, getOwnerProjectDisplays, listProjects, type Project } from '../api.ts'
 import { ProjectDirectoryBrowser } from '../components/ProjectDirectoryBrowser.tsx'
 import {
   Button,
@@ -28,6 +28,25 @@ export function ProjectListPage() {
   const [originFilter, setOriginFilter] = useState<'all' | 'admin' | 'user'>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [displayPage, setDisplayPage] = useState(1)
+  const [nameError, setNameError] = useState(false)
+  const [nameAttempt, setNameAttempt] = useState(0)
+  const directoryRequest = useRef<AbortController | undefined>(undefined)
+  const visibleProjects = useMemo(() => projects.slice(0, displayPage * 32), [projects, displayPage])
+  useEffect(() => {
+    const selected = visibleProjects.filter(row => row.metadataOnNode && !row.ownerDisplayLoaded).slice(0, 32)
+    if (!selected.length) return
+    const controller = new AbortController()
+    setNameError(false)
+    void getOwnerProjectDisplays(selected, controller.signal).then(values => {
+      if (controller.signal.aborted) return
+      setProjects(previous => previous.map(row => {
+        const original = selected.find(item => item.id === row.id && item.nodeId === row.nodeId && item.runtimeId === row.runtimeId)
+        return original && values.has(row.id) ? { ...row, ...values.get(row.id), ownerDisplayLoaded: true } : row
+      }))
+    }, () => { if (!controller.signal.aborted) setNameError(true) })
+    return () => { controller.abort() }
+  }, [visibleProjects, nameAttempt])
   const [createOpen, setCreateOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -37,18 +56,29 @@ export function ProjectListPage() {
   usePendingEdits(pending || createOpen && (name !== '' || selectedPath !== undefined))
 
   const reload = useCallback(async (showLoading = false) => {
+    directoryRequest.current?.abort()
+    const controller = new AbortController()
+    directoryRequest.current = controller
     if (showLoading) setLoading(true)
+    setProjects([])
+    setNameError(false)
     try {
-      setProjects(await listProjects(originFilter === 'all' ? undefined : originFilter))
+      const rows = await listProjects(originFilter === 'all' ? undefined : originFilter, 'directory', controller.signal)
+      if (controller.signal.aborted) return
+      setProjects(rows)
+      setDisplayPage(1)
       setError('')
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (!controller.signal.aborted) setError(messageFrom(cause))
     } finally {
-      if (showLoading) setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
   }, [originFilter])
 
-  useEffect(() => { void reload(true) }, [reload])
+  useEffect(() => {
+    void reload(true)
+    return () => { directoryRequest.current?.abort() }
+  }, [reload])
 
   function openCreate() {
     setCreateError('')
@@ -126,7 +156,7 @@ export function ProjectListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {projects.map(project => (
+                  {visibleProjects.map(project => (
                     <tr key={project.id}>
                       <td>
                         <Link className="projectLink" to={`/projects/${project.id}`}>
@@ -149,7 +179,7 @@ export function ProjectListPage() {
               </table>
             </div>
             <div className="mobileList">
-              {projects.map(project => (
+              {visibleProjects.map(project => (
                 <Link className="mobileItem mobileProjectLink" key={project.id} to={`/projects/${project.id}`}>
                   <div className="mobileItemHeader">
                     <div className="projectIdentity">
@@ -169,6 +199,9 @@ export function ProjectListPage() {
           </>
         )}
       </Section>
+
+      {nameError && <p role="status" className="muted">{t('ownerUnavailable')} <Button onClick={() => { setNameAttempt(n => n + 1) }}>{t('loadNames')}</Button></p>}
+      {visibleProjects.length < projects.length && <Button onClick={() => { setDisplayPage(n => n + 1) }}>{t('moreProjects')}</Button>}
 
       <Dialog
         open={createOpen}

@@ -6,6 +6,8 @@
  */
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 import { parseManagedSnapshot, type ManagedSnapshot } from '../managed-files.ts'
+import { transaction, type Queryable } from './database.ts'
+import { lockAdministrator } from './administrator-authority.ts'
 
 export type BackupStatus = 'recording' | 'verified' | 'failed' | 'restored'
 
@@ -60,6 +62,14 @@ export class PostgresBackupService {
   /** @param context - database and organization owned by this Gateway */
   constructor(private readonly context: PostgresRuntimeContext) {}
 
+  private withAdministrator<T>(actor: number | undefined, operation: (database: Queryable) => Promise<T>): Promise<T> {
+    if (actor === undefined) return operation(this.context.pool)
+    return transaction(this.context.pool, async client => {
+      await lockAdministrator(client, this.context, actor)
+      return operation(client)
+    })
+  }
+
   /** Newest-first registry rows for the admin deployment page and the applier. */
   async list(limit = 50): Promise<BackupRecordView[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new RangeError('backup limit out of range')
@@ -70,9 +80,18 @@ export class PostgresBackupService {
     return result.rows.map(view)
   }
 
-  /** One registry row or 404; the applier resolves the pending restore target through it. */
-  async get(id: string): Promise<BackupRecordView> {
-    const result = await this.context.pool.query<Record<string, unknown>>(
+  /**
+   * Read an organization-owned registry row or report404.
+   * @param id - selected backup identity.
+   * @param actor - authenticated administrator retained through this read; omission permits trusted applier work.
+   * @returns the selected backup metadata.
+   */
+  get(id: string, actor?: number): Promise<BackupRecordView> {
+    return this.withAdministrator(actor, database => this.getWithin(database, id))
+  }
+
+  private async getWithin(database: Queryable, id: string): Promise<BackupRecordView> {
+    const result = await database.query<Record<string, unknown>>(
       `${PROJECTION} WHERE b.organization_id=$1 AND b.id=$2`,
       [this.context.organizationId, id],
     )
@@ -84,7 +103,8 @@ export class PostgresBackupService {
   /**
    * Record a finished dump with its managed-file manifest. `migrationVersion`
    * and `writeEpoch` pin the backup to the schema and fencing it was taken
-   * under so a restore can report drift instead of guessing.
+   * under so a restore can report drift instead of guessing. A supplied administrator
+   * retains current authority through insertion and the returned row; null permits trusted applier work.
    */
   async record(input: {
     path: string
@@ -96,31 +116,42 @@ export class PostgresBackupService {
     /** Public user number of the administrator, or null for the applier. */
     actor: number | null
   }): Promise<BackupRecordView> {
-    let actorUuid: string | null = null
-    if (input.actor !== null) {
-      const user = await this.context.pool.query<{ id: string }>(
-        'SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2',
-        [this.context.organizationId, String(input.actor)],
+    return this.withAdministrator(input.actor ?? undefined, async database => {
+      let actorUuid: string | null = null
+      if (input.actor !== null) {
+        const user = await database.query<{ id: string }>(
+          'SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2',
+          [this.context.organizationId, String(input.actor)],
+        )
+        actorUuid = user.rows[0]!.id
+      }
+      const inserted = await database.query<{ id: string }>(
+        `INSERT INTO harness.backup_records(organization_id,path,migration_version,write_epoch,size_bytes,sha256,managed_files,created_by)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+        [this.context.organizationId, input.path, input.migrationVersion, input.writeEpoch.toString(),
+          input.sizeBytes, input.sha256, JSON.stringify(parseManagedSnapshot(input.managedSnapshot)), actorUuid],
       )
-      actorUuid = user.rows[0]?.id ?? null
-    }
-    const inserted = await this.context.pool.query<{ id: string }>(
-      `INSERT INTO harness.backup_records(organization_id,path,migration_version,write_epoch,size_bytes,sha256,managed_files,created_by)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-      [this.context.organizationId, input.path, input.migrationVersion, input.writeEpoch.toString(),
-        input.sizeBytes, input.sha256, JSON.stringify(parseManagedSnapshot(input.managedSnapshot)), actorUuid],
-    )
-    return this.get(inserted.rows[0]!.id)
+      return this.getWithin(database, inserted.rows[0]!.id)
+    })
   }
 
-  /** Mark a dump verified (`pg_restore --list` succeeded) or failed. */
-  async setVerified(id: string, verified: boolean, error?: string): Promise<BackupRecordView> {
-    const updated = await this.context.pool.query(
-      `UPDATE harness.backup_records SET status=CASE WHEN status='restored' AND $3='verified' THEN 'restored' ELSE $3 END, verified_at=CASE WHEN $3='verified' THEN now() ELSE verified_at END, error=$4
-       WHERE organization_id=$1 AND id=$2 AND status IN ('recording','verified','failed','restored')`,
-      [this.context.organizationId, id, verified ? 'verified' : 'failed', error ?? null],
-    )
-    if (updated.rowCount !== 1) throw new BackupError(409, 'backup-state-conflict')
-    return this.get(id)
+  /**
+   * Record verification success or failure under current supplied administrator authority.
+   * @param id - organization-owned backup identity.
+   * @param verified - whether the complete artifact passed verification.
+   * @param error - failure diagnostic without credentials.
+   * @param actor - initiating administrator retained through update and response read; omission permits trusted applier work.
+   * @returns the committed registry state.
+   */
+  setVerified(id: string, verified: boolean, error?: string, actor?: number): Promise<BackupRecordView> {
+    return this.withAdministrator(actor, async database => {
+      const updated = await database.query(
+        `UPDATE harness.backup_records SET status=CASE WHEN status='restored' AND $3='verified' THEN 'restored' ELSE $3 END, verified_at=CASE WHEN $3='verified' THEN now() ELSE verified_at END, error=$4
+         WHERE organization_id=$1 AND id=$2 AND status IN ('recording','verified','failed','restored')`,
+        [this.context.organizationId, id, verified ? 'verified' : 'failed', error ?? null],
+      )
+      if (updated.rowCount !== 1) throw new BackupError(409, 'backup-state-conflict')
+      return this.getWithin(database, id)
+    })
   }
 }

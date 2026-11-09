@@ -46,7 +46,7 @@ it.each([
   expect(() => jobs.get(id, owner?.id)).toThrow('unknown job')
 })
 
-it('reserves exact-owner capacity before invoking execution-authority capture', async () => {
+it('reserves exact-owner capacity before invoking execution identity capture', async () => {
   const ctx = new Context(), settled = Promise.withResolvers<JobOutcome>()
   onTestFinished(async () => { settled.resolve({ status: 'killed' }); await ctx.fiber.dispose() })
   await ctx.plugin(AgentRegistry)
@@ -60,7 +60,7 @@ it('reserves exact-owner capacity before invoking execution-authority capture', 
     starts++
     return { cancel: () => { settled.resolve({ status: 'killed' }) }, done: settled.promise }
   } }
-  // The registry consumes only this external provider's synchronous authority capture.
+  // The registry consumes only this external provider's synchronous execution identity capture.
   ctx.provide('executionAuthority', { capture: () => {
     if (!capturing) {
       capturing = true
@@ -75,7 +75,7 @@ it('reserves exact-owner capacity before invoking execution-authority capture', 
   expect(ctx.jobs.list(ownerId).map(job => job.id)).toEqual([id])
 })
 
-it('releases reserved capacity when execution-authority capture refuses the start', async () => {
+it('releases reserved capacity when execution identity capture refuses the start', async () => {
   const ctx = new Context(), settled = Promise.withResolvers<JobOutcome>()
   onTestFinished(async () => { settled.resolve({ status: 'killed' }); await ctx.fiber.dispose() })
   await ctx.plugin(AgentRegistry)
@@ -85,7 +85,7 @@ it('releases reserved capacity when execution-authority capture refuses the star
   const owner = { id, ctx: ctx.plugin(() => {}).ctx, options: {}, session: Session.create(id) } as unknown as Agent
   await ctx.agents.register(owner)
   let refuse = true, starts = 0
-  const failure = new Error('execution-authority unavailable')
+  const failure = new Error('execution identity unavailable')
   ctx.provide('executionAuthority', { capture: () => {
     if (refuse) throw failure
     return { parentSessionId: id, inputs: [], unverifiedHistory: true }
@@ -103,7 +103,7 @@ it('releases reserved capacity when execution-authority capture refuses the star
   expect(ctx.jobs.get(accepted, id).status).toBe('running')
 })
 
-it('keeps another exact owner available while authority capture holds a capacity slot', async () => {
+it('keeps another exact owner available while execution identity capture holds a capacity slot', async () => {
   const ctx = new Context(), settled = Promise.withResolvers<JobOutcome>()
   onTestFinished(async () => { settled.resolve({ status: 'killed' }); await ctx.fiber.dispose() })
   await ctx.plugin(AgentRegistry)

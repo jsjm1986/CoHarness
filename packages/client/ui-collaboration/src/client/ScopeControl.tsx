@@ -39,6 +39,7 @@ export interface ScopeControlInjected {
   toggleFavorite?: () => void
   /** Read another bounded page of center metadata. */
   loadEnvironments?: (cursor?: string) => Promise<void>
+  loadProjectNames?: (nodeId: CollaborationComputerId, ids: readonly number[], signal: AbortSignal) => Promise<void>
   /** Open the authenticated selection page without changing other tabs. */
   chooseEnvironment?: () => void
   /** Open the current exact environment in a separate browser tab. */
@@ -118,7 +119,7 @@ export function ScopeControl({
   wide, useCollaboration, useDeployment, useSessions, switchScope, stageVisibility, refreshDeployment,
   createProject, listComputers, listInvitations, inviteMember, acceptInvitation, listUsers, getInvitationCount,
   loadProjectConfiguration, setProjectThemePolicy, listProjectSshTargets, shareProjectSshTarget, t,
-  loadEnvironments, openEnvironmentTab, dismissScopeOffer, dismissScopeError, toggleFavorite,
+  loadEnvironments, loadProjectNames, openEnvironmentTab, dismissScopeOffer, dismissScopeError, toggleFavorite,
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const deployment = useDeployment(snapshot => snapshot)
@@ -191,6 +192,62 @@ export function ScopeControl({
   const [invitationCount, setInvitationCount] = useState(0)
   const [projectQuery, setProjectQuery] = useState('')
   const context = state.context
+  const nameRequest = useRef<AbortController | undefined>(undefined)
+  const localNamesRead = useRef<string | undefined>(undefined)
+  const [namesBusy, setNamesBusy] = useState(false)
+  const [namesError, setNamesError] = useState(false)
+  useEffect(() => () => { nameRequest.current?.abort() }, [context?.user.id, open])
+  const unresolved = new Map<CollaborationComputerId, { name: string; ids: number[] }>()
+  for (const project of context?.projects ?? []) {
+    if (!project.metadataOnNode || project.ownerDisplayLoaded || !project.nodeId) continue
+    if (!deployment.aggregateComputers && project.nodeId !== deployment.context?.entry.nodeId) continue
+    const group = unresolved.get(project.nodeId) ?? { name: project.nodeName ?? project.nodeId, ids: [] }
+    if (group.ids.length < 32) group.ids.push(project.projectId)
+    unresolved.set(project.nodeId, group)
+  }
+  const loadNames = (id: CollaborationComputerId): void => {
+    const group = unresolved.get(id)
+    if (!group || !loadProjectNames || !state.contextVerified) return
+    nameRequest.current?.abort()
+    const controller = new AbortController()
+    nameRequest.current = controller
+    setNamesBusy(true); setNamesError(false)
+    void loadProjectNames(id, group.ids, controller.signal).catch(() => {
+      if (!controller.signal.aborted) setNamesError(true)
+    }).finally(() => { if (nameRequest.current === controller) setNamesBusy(false) })
+  }
+  const localOwner = deployment.aggregateComputers ? undefined : deployment.context?.entry.nodeId
+  useEffect(() => {
+    if (!open || !state.contextVerified) { localNamesRead.current = undefined; return }
+    if (!localOwner || !unresolved.has(localOwner)) return
+    const view = `${context?.user.id}:${localOwner}`
+    if (localNamesRead.current === view) return
+    localNamesRead.current = view
+    loadNames(localOwner)
+  })
+  const showNameControl = deployment.aggregateComputers || namesError || localNamesRead.current !== undefined && !namesBusy
+  const [onlyOwner] = unresolved.size === 1 ? unresolved.keys() : []
+  const projectNames = loadProjectNames && unresolved.size && state.contextVerified && showNameControl ? <div className={css.pageLabel}>
+    {onlyOwner ? <Button disabled={namesBusy} onClick={() => { loadNames(onlyOwner) }}>{t('scope.loadNames')}</Button>
+      : <select value="" aria-label={t('scope.loadNames')} disabled={namesBusy}
+        onChange={(event) => { loadNames(event.target.value as CollaborationComputerId) }}>
+        <option value="">{t('scope.loadNames')}</option>
+        {[...unresolved].map(([id, group]) => <option value={id} key={id}>{group.name}</option>)}
+      </select>}
+    {namesError && <span role="status">{t('scope.namesUnavailable')}</span>}
+  </div> : null
+  const activeProjectId = context?.scope.kind === 'project' ? context.scope.projectId : undefined
+  const activeProject = activeProjectId === undefined ? undefined : context?.projects.find(row => row.projectId === activeProjectId)
+  useEffect(() => {
+    if (!state.contextVerified || !loadProjectNames || !activeProject?.metadataOnNode
+      || activeProject.ownerDisplayLoaded || !activeProject.nodeId) return
+    const controller = new AbortController()
+    void loadProjectNames(activeProject.nodeId, [activeProject.projectId], controller.signal).catch(() => {
+      if (!controller.signal.aborted) setNamesError(true)
+    })
+    return () => { controller.abort() }
+  }, [state.contextVerified, context?.user.id, activeProject?.nodeId, activeProject?.projectId,
+    activeProject?.ownerDisplayLoaded, loadProjectNames])
   const available = state.status === 'ready' && context !== undefined
   // Child dialogs stack over the page, which stays mounted underneath and
   // hides itself from the accessibility tree until they close.
@@ -636,6 +693,7 @@ export function ScopeControl({
                     {t(state.environments?.nextCursor ? 'scope.loadedSpaces' : 'scope.allSpaces')} · {destinations.length}
                   </div>
                   <div className={css.pageSearch}>{searchField}</div>
+                  {projectNames}
                   {deployment.phase === 'error' && <div className={css.pageLabel} role="alert">{t('deployment.readFailed')} {refreshDeployment && <Button onClick={() => void refreshDeployment()}>{t('deployment.retry')}</Button>}</div>}
                   {state.environmentsError && <div className={css.pageLabel} role="status">{t('computer.directoryError')}</div>}
                   {state.spacePreferencesError && <div className={css.pageLabel} role="status">{t('scope.favoriteFailed')}</div>}
@@ -764,7 +822,7 @@ export function ScopeControl({
           open={open}
           onClose={() => { setOpen(false) }}
           items={deployment.phase === 'error' ? [{ id: 'deployment:refresh', label: t('deployment.readFailed'), disabled: refreshDeployment === undefined }, ...entries] : entries}
-          header={menuHeader}
+          header={<>{menuHeader}{projectNames}</>}
           {...footerEntries.length > 0 ? { footer: footerEntries } : {}}
           /* The rail keeps the portaled menu, which is the shared bottom
              sheet below the compact breakpoint. */

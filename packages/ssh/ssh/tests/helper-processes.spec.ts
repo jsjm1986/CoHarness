@@ -284,6 +284,7 @@ describe.skipIf(process.platform === 'win32')('SSH helper process settlement', (
       const unused = await test.owner.prepare(ordinaryRequest)
       await vi.advanceTimersByTimeAsync(5000)
       await vi.waitFor(async () => { expect(await readdir(test.root)).toEqual([]) })
+      await vi.waitFor(async () => { await expect(test.owner.wait(unused.id)).rejects.toThrow('Unknown or expired') })
       await expect(test.owner.start(unused.id)).rejects.toThrow('Unknown or expired')
       const run = await test.prepare(ordinaryRequest)
       const started = test.owner.start(run.id)

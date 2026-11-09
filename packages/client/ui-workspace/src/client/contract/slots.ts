@@ -195,6 +195,12 @@ export type WorkspaceBrowserInjected = {
   startRuntimeSession?: (target: import('@deepseek-ai/dsh-client-runtime/client').SessionRuntimeTarget, workspaceId?: WorkspaceId) => Promise<void>
   /** Refresh the granted personal computer directory without opening Runtime connections. */
   refreshComputers?: () => Promise<void>
+  /** Maximum expanded groups reading simultaneously within this document’s entry request budget. */
+  computerPageConcurrency?: number
+  /** Read only one expanded Runtime's passive directory. */
+  loadComputerRows?: (target: SessionRuntimeTarget, more?: boolean, signal?: AbortSignal) => Promise<void>
+  /** Read the next central page of granted computers. */
+  loadMoreComputers?: () => Promise<void>
   hooks: DirectoryPickingInjected['hooks'] & {
     /** Current conversation presentation; workbench mode temporarily replaces the history tree. */
     viewport: HostObservable<ConversationViewportSnapshot>

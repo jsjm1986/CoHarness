@@ -15,7 +15,7 @@ import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
 import { assertTrustedAuthority } from './api-request-trust.ts'
 import { bindRequestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/request-scope'
 import { BrowserAuth } from './browser-auth.ts'
-import { DEFAULT_BROWSER_RPC_TIMEOUT_MS } from './browser-timing.ts'
+import { DEFAULT_BROWSER_RPC_TIMEOUT_MS, DEFAULT_ENTRY_REQUEST_LIMIT } from './browser-timing.ts'
 import { HostConnectionService } from './rpc-host.ts'
 import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
 
@@ -129,6 +129,8 @@ export interface ConnectionConfig {
     generationReadyWarnMs?: number
     /** Hard readiness deadline in milliseconds. */
     generationReadyTimeoutMs?: number
+    /** Concurrent explicit Runtime preparations admitted per browser document. */
+    maxConcurrentEntryRequests?: number
   }
   /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
@@ -161,6 +163,7 @@ export const Config: z<ConnectionConfig> = z.object({
     streamOpenTimeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(3_000),
     generationReadyWarnMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(3_000),
     generationReadyTimeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(15_000),
+    maxConcurrentEntryRequests: z.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_ENTRY_REQUEST_LIMIT),
   }).default({
     backoffBaseMs: 500,
     backoffFactor: 2,
@@ -168,6 +171,7 @@ export const Config: z<ConnectionConfig> = z.object({
     streamOpenTimeoutMs: 3_000,
     generationReadyWarnMs: 3_000,
     generationReadyTimeoutMs: 15_000,
+    maxConcurrentEntryRequests: DEFAULT_ENTRY_REQUEST_LIMIT,
   }),
   trustedHosts: z.array(String).default([]),
   cookieMaxAgeDays: z.natural().min(1).default(30),

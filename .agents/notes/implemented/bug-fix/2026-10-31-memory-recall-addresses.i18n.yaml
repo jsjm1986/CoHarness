@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.md
 document:
-  en: de08eff6aab5b06f9bd492204b7691322aaec742
-  zh: 38a54ae39a4693e11d730b4b8fb9b4ae7e6ad68b
+  en: 6550f5dedf3d0a235b2ceb708651115b23cf5b4a
+  zh: 641ff938f1df75677dfae7ed08054c56c3ff0692
 /agent-note-recall-addresses-describe-admitted-content:
   en: 3ce0cad18b2b8693
   zh: 21154fef27b830c9
@@ -21,5 +21,5 @@ document:
   en: c0a4f6712cc0022f
   zh: aeeff95cb0ad4bad
 /agent-note-recall-addresses-describe-admitted-content/verification:
-  en: f9df3d54da012344
-  zh: ce0bf07809908111
+  en: e7c6eb78135c3168
+  zh: fda728693da388d8

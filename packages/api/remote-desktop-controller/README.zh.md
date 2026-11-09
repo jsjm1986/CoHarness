@@ -45,7 +45,7 @@ kind: "package-reference"
 <a id="client-half"></a>
 ## Client 半边
 
-`@deepseek-ai/dsh-api-remote-desktop-controller/client` 安装 `ctx.remoteDesktops`（`ClientRemoteDesktops`）：自挂载生成的 `remoteDesktop` Remote 贡献（`./remote`），把每个 `{ ok }` 线侧结果转为抛出的错误，并把 `attach` 返回的 `{ path, token }` 解析为相对 `location` 的绝对 `ws(s)://` URL，再经 `connection.privateResourceUrl` 钉住 `dshTarget`/`dshPrincipal`，让 Gateway 的 upgrade 把 WebSocket 代理到铸造 token 的那个 runtime——仅靠 scope cookie 并不可靠。UI 插件（`ui-remote-desktop`、`ui-remote-desktop-admin`）消费该服务而非直接使用线侧命名空间。
+`@deepseek-ai/dsh-api-remote-desktop-controller/client` 安装 `ctx.remoteDesktops`（`ClientRemoteDesktops`）：自挂载生成的 `remoteDesktop` Remote 贡献（`./remote`），把每个 `{ ok }` 线侧结果转为抛出的错误，并把 `attach` 返回的 `{ path, token }` 解析为相对 `location` 的绝对 `ws(s)://` URL，再经目标 Session 的 `connection.forSession(sessionId).privateResourceUrl` 钉住 `dshRuntime`/`dshTarget`/`dshPrincipal`，让 Gateway 的 upgrade 把 WebSocket 代理到铸造 token 的那个 runtime——仅靠 scope cookie 并不可靠。UI 插件（`ui-remote-desktop`、`ui-remote-desktop-admin`）消费该服务而非直接使用线侧命名空间。
 
 **运行时不变量：** 未发布配套入口。授权、附件与审计的真相存于 `ctx.remoteDesktop`；控制器是无状态的请求翻译器，自身没有可分歧的观察。
 

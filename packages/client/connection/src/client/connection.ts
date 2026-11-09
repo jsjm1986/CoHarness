@@ -1,6 +1,7 @@
 import type { HostDescription, IApiClient, HostFrame, MuxFrame, RpcError, RpcRequest } from './api.ts'
 import { ApiTransportError } from './api.ts'
 import { StreamTermination } from './stream-termination.ts'
+import { DEFAULT_ENTRY_REQUEST_LIMIT } from '../browser-timing.ts'
 
 /** Reconnect/backoff tunables (deployment-varying — no hardcoded tunables; these become the
  *  future `ctx.connection` plugin's Config). All fields optional; defaults below. */
@@ -18,6 +19,8 @@ export interface ConnectionConfig {
   generationReadyWarnMs?: number
   /** Hard deadline for the readiness handshake. */
   generationReadyTimeoutMs?: number
+  /** Concurrent explicit Runtime preparations admitted per browser document. */
+  maxConcurrentEntryRequests?: number
 }
 
 const CONNECTION_DEFAULTS: Required<ConnectionConfig> = {
@@ -27,6 +30,7 @@ const CONNECTION_DEFAULTS: Required<ConnectionConfig> = {
   streamOpenTimeoutMs: 3_000,
   generationReadyWarnMs: 3_000,
   generationReadyTimeoutMs: 15_000,
+  maxConcurrentEntryRequests: DEFAULT_ENTRY_REQUEST_LIMIT,
 }
 
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -37,6 +41,9 @@ const MAX_TIMER_DELAY_MS = 2_147_483_647
  */
 export function resolveConnectionConfig(config: ConnectionConfig): Required<ConnectionConfig> {
   const resolved = { ...CONNECTION_DEFAULTS, ...config }
+  if (!Number.isSafeInteger(resolved.maxConcurrentEntryRequests) || resolved.maxConcurrentEntryRequests < 1) {
+    throw new RangeError('maxConcurrentEntryRequests must be a positive safe integer')
+  }
   for (const [name, value] of [
     ['backoffBaseMs', resolved.backoffBaseMs],
     ['backoffMaxMs', resolved.backoffMaxMs],

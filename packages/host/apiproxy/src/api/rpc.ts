@@ -40,6 +40,7 @@ export interface RpcErrorDetailsMap {
     reason: 'not-member' | 'conversation-not-found' | 'forbidden' | 'visibility-locked' | 'gateway-unavailable'
   }
   'session-not-found': { sessionId: SessionId }
+  'prompt-durability-unavailable': { sessionId: SessionId }
   /**
    * Archiving was refused because the session still has running work;
    * `activity` names the families the providers reported, so a caller can

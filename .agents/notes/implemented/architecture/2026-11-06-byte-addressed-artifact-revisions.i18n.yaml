@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-06-byte-addressed-artifact-revisions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-06-byte-addressed-artifact-revisions.md
+document:
+  en: b3992ad0e92f6b49827ec104482f38e857ff2420
+  zh: f6db843dd46c12c5c561f937af0adc4d9189b7be
+/agent-note-byte-addressed-artifact-revisions-and-unpinned-immutable-delivery:
+  en: f0d6d6627392ba9a
+  zh: 03ca760ced42edea
+/agent-note-byte-addressed-artifact-revisions-and-unpinned-immutable-delivery/problem:
+  en: 0c72fdd61f8abdfb
+  zh: 7c4ccf94ec6ae927
+/agent-note-byte-addressed-artifact-revisions-and-unpinned-immutable-delivery/decision:
+  en: aacc29fd4791464f
+  zh: 442fdb2bb0c1d6aa
+/agent-note-byte-addressed-artifact-revisions-and-unpinned-immutable-delivery/alternatives-considered:
+  en: d7f804617394b5fb
+  zh: 891d4439765b0459
+/agent-note-byte-addressed-artifact-revisions-and-unpinned-immutable-delivery/consequences:
+  en: a1b08a6e9619a4e8
+  zh: c24fd125ceda93d8
+/agent-note-byte-addressed-artifact-revisions-and-unpinned-immutable-delivery/testing:
+  en: 1518fcdcf5e91f72
+  zh: bc7077df84def7d7

@@ -284,6 +284,40 @@ describePg('PostgreSQL login admission', () => {
     }
   })
 
+  it('revokes a session that is briefly locked by a concurrent renewal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hgw-revoke-wait-'))
+    onTestFinished(() => rm(root, { recursive: true, force: true }))
+    const slug = `revoke-wait-${randomUUID()}`
+    const organizationId = (await pool.query<{ id: string }>(`INSERT INTO harness.organizations(slug,display_name)
+      VALUES($1,'Revoke wait') RETURNING id`, [slug])).rows[0]!.id
+    onTestFinished(() => removeFixtureOrganization(pool, organizationId))
+    await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'auth-node')`, [organizationId])
+    const context = await resolvePostgresRuntimeContext(pool, slug, 'auth-node'), cfg = testConfig(root)
+    const users = new PostgresUserService(context, cfg)
+    await users.create({ username: 'actor', password: 'correct-password', role: 'user' })
+    const login = await new PostgresAuthService(context, cfg).login('actor', 'correct-password', '127.0.0.1', 'revoke fixture')
+    if (typeof login === 'string') throw new Error('Authentication fixture login failed')
+    const tokenHash = createHash('sha256').update(login.token).digest()
+    const contendedPool = createPostgresPool(databaseUrl!, { max: 1, lock_timeout: 100 })
+    onTestFinished(() => contendedPool.end())
+    const blocker = await pool.connect()
+    try {
+      await blocker.query('BEGIN')
+      await blocker.query(`SELECT id FROM harness.auth_sessions
+        WHERE organization_id=$1 AND token_hash=$2 FOR UPDATE`, [organizationId, tokenHash])
+      const revoke = new PostgresAuthService({ ...context, pool: contendedPool }, cfg).revoke(login.token)
+      await new Promise(resolve => setTimeout(resolve, 300))
+      await blocker.query('COMMIT')
+      await expect(revoke).resolves.toBeUndefined()
+      const row = (await pool.query<{ reason: string | null }>(`SELECT revoked_reason::text reason
+        FROM harness.auth_sessions WHERE organization_id=$1 AND token_hash=$2`, [organizationId, tokenHash])).rows[0]!
+      expect(row.reason).toBe('logout')
+    } finally {
+      await blocker.query('ROLLBACK')
+      blocker.release()
+    }
+  })
+
   it.each([
     { identity: 'member', alias: 'MEMBER', kind: 'ASCII' },
     { identity: 'client', alias: 'clİent', kind: 'PostgreSQL locale' },

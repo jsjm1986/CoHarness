@@ -55,10 +55,11 @@ it.each([
   const signal = new AbortController().signal
   const invoke: unknown = Reflect.get(Reflect.get(routed, domain), method)
   if (typeof invoke !== 'function') throw new Error('Public Session operation missing')
-  await Reflect.apply(invoke, undefined, [payload, signal])
+  const options = domain === 'desktop' && method === 'status' ? ['low'] : []
+  await Reflect.apply(invoke, undefined, [payload, signal, ...options])
   const expected = domain === 'subagents' ? { ...payload, parentSessionId: id, childSessionId: id }
     : { ...payload, sessionId: id, ...(method === 'confirm' ? { rootSessionId: id } : {}),
       ...(method === 'insertSessionBefore' ? { beforeSessionId: id } : {}) }
-  expect(sink).toHaveBeenCalledWith(expected, signal)
+  expect(sink).toHaveBeenCalledWith(expected, signal, ...options)
   expect(payload.content).toBe(key)
 })

@@ -5,14 +5,14 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Pool } from 'pg'
+import type { Pool, QueryResultRow } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import WebSocket, { WebSocketServer } from 'ws'
 import { InstanceManager } from '../src/instances.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
-import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
+import { createPostgresPool, runMigrations, type Queryable } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { PostgresRuntimeCatalog } from '../src/postgres/runtime-catalog.ts'
@@ -307,7 +307,35 @@ describePg('PostgreSQL runtime environment directory', () => {
     await expect(f.catalog.resolveForAccount(f.member, randomUUID())).rejects.toMatchObject({ status: 404 })
     await expect(f.catalog.resolveForAccount(f.member, 'personal')).rejects.toMatchObject({ status: 400 })
     await pool.query('DELETE FROM harness.instances WHERE runtime_id=$1', [own.id])
-    await expect(f.catalog.resolveForAccount(f.member, own.id)).rejects.toMatchObject({ status: 404 })
+    await expect(new PostgresRuntimeCatalog(f.context, f.cfg.runtimeCatalog).resolveForAccount(f.member, own.id))
+      .rejects.toMatchObject({ status: 404 })
+  })
+
+  it('shares one resolution round trip within a burst and revalidates after the memo window', async () => {
+    const f = await fixture()
+    const own = (await f.catalog.pageForAccount(f.member, {})).items[0]!
+    let catalogQueries = 0
+    const counting: Queryable = {
+      query: <R extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
+        if (text.includes('harness.runtime_environments')) catalogQueries += 1
+        return f.context.pool.query<R>(text, values as unknown[] | undefined)
+      },
+    }
+    const catalog = new PostgresRuntimeCatalog({ ...f.context, pool: counting }, f.cfg.runtimeCatalog)
+    const [first, second] = await Promise.all([
+      catalog.resolveForAccount(f.member, own.id),
+      catalog.resolveForAccount(f.member, own.id),
+    ])
+    expect(second).toEqual(first)
+    expect(await catalog.resolveForAccount(f.member, own.id)).toEqual(first)
+    expect(catalogQueries).toBe(1)
+    await new Promise(resolve => setTimeout(resolve, 850))
+    expect(await catalog.resolveForAccount(f.member, own.id)).toEqual(first)
+    expect(catalogQueries).toBe(2)
+    const denied = randomUUID()
+    await expect(catalog.resolveForAccount(f.member, denied)).rejects.toMatchObject({ status: 404 })
+    await expect(catalog.resolveForAccount(f.member, denied)).rejects.toMatchObject({ status: 404 })
+    expect(catalogQueries).toBe(4)
   })
 
   it('rejects forged identities, changed owners and reassignment of an active process', async () => {
@@ -372,6 +400,26 @@ describePg('PostgreSQL runtime environment directory', () => {
       body: new URLSearchParams({ username: 'admin', password: 'pw-12345678' }) })
     await login.arrayBuffer()
     const cookie = login.headers.get('set-cookie')!.split(';')[0]!
+    const memberLogin = await fetch(`${base}/login`, { method: 'POST', redirect: 'manual', headers: { origin: base },
+      body: new URLSearchParams({ username: 'member', password: 'pw-12345678' }) })
+    await memberLogin.arrayBuffer()
+    const memberCookie = memberLogin.headers.get('set-cookie')!.split(';')[0]!
+    const projectPage = async (projectId: string) => {
+      const result = await fetch(`${base}/account/api/runtimes?projectId=${projectId}`, { headers: { cookie: memberCookie } })
+      return { status: result.status, body: await result.json() as RuntimeCatalogPage }
+    }
+    const projectNumber = String(f.project.id)
+    expect(await projectPage(projectNumber)).toMatchObject({ status: 200, body: { items: [], nextCursor: null } })
+    await f.projects.setMember(f.project.id, f.member.id, 'ro', f.admin.id)
+    expect(await projectPage(projectNumber)).toMatchObject({ status: 200, body: {
+      items: [{ owner: { kind: 'project', id: f.project.id }, node: { id: f.context.nodeId } }], nextCursor: null } })
+    await pool.query(`UPDATE harness.computer_use_permissions g SET enabled=false FROM harness.users u
+      WHERE u.organization_id=$1 AND u.public_id=$2 AND g.organization_id=u.organization_id AND g.user_id=u.id AND g.node_id=$3`,
+      [f.organizationId, f.member.id, f.context.nodeId])
+    expect(await projectPage(projectNumber)).toMatchObject({ status: 200, body: { items: [], nextCursor: null } })
+    for (const invalid of ['0', '1.5', '9007199254740992', projectNumber + '&projectId=' + projectNumber]) {
+      expect((await projectPage(invalid)).status).toBe(400)
+    }
     const account = await fetch(`${base}/account/api/runtimes?limit=1`, { headers: { cookie } })
     const page = await account.json() as RuntimeCatalogPage
     const admin = await fetch(`${base}/admin/api/runtimes`, { headers: { cookie } })

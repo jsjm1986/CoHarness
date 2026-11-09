@@ -13,6 +13,7 @@ import { createExecutionFixture, type Receipt } from './execution-fixture.ts'
 import { PRINCIPAL_HEADER } from '../src/principal.ts'
 import { PostgresWebhookDeliveryService, type WebhookEndpointId } from '../src/postgres/webhook-delivery-service.ts'
 import { PostgresWebhookEndpointService, WebhookSecretCipher } from '../src/postgres/webhook-endpoint-service.ts'
+import { hashPassword } from '../src/password.ts'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
@@ -28,6 +29,8 @@ async function fixture(options: { executionWatchHeartbeatMs?: number; executionW
 }
 
 async function endpointFor(f: Awaited<ReturnType<typeof fixture>>, kind: 'user' | 'project' = 'user'): Promise<{ endpointId: WebhookEndpointId; configurationRevision: string }> {
+  await pool.query(`INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password)
+    VALUES($1,$2,false) ON CONFLICT (user_id) DO NOTHING`, [f.admin.uuid, await hashPassword('webhook-fixture-password')])
   const service = new PostgresWebhookEndpointService(f.context, new WebhookSecretCipher(Buffer.alloc(32, 7)))
   const created = await service.create(f.admin.id, { name: `fixture-${randomUUID()}`, provider: 'github', source: 'fixture',
     events: [], actions: [], repositories: [], titleTemplate: 'Fixture event', promptTemplate: 'Fixture prompt', workspacePath: '/unused',

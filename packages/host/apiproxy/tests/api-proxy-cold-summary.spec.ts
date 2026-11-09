@@ -184,7 +184,9 @@ it('rechecks current collaboration visibility on every memoized listing', async 
   readable = false
   expect(await f.list()).toEqual([])
   expect(f.readFrom).toHaveBeenCalledTimes(1)
-  expect(filter).toHaveBeenCalledTimes(2)
+  // Visibility is checked inside the shared baseline and again at the list
+  // boundary; the second listing stops at the inner filter.
+  expect(filter).toHaveBeenCalledTimes(3)
 })
 
 it('does not retain a summary when cancellation arrives during revision verification', async () => {

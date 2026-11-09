@@ -1,6 +1,6 @@
 /** Administrator-owned resource qualification, separate from per-Session confirmation and leases. */
 import type { PoolClient } from 'pg'
-import { transaction } from './postgres/database.ts'
+import { transaction, type Queryable } from './postgres/database.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { lockAdministrator } from './postgres/administrator-authority.ts'
 
@@ -37,21 +37,38 @@ export class ResourceAccess {
   /**
    * Read the current decision, retaining a false default for unconfigured owners.
    * @param owner - account or project within this organization.
+   * @param actorUserId - current administrator; omission permits trusted internal reads.
    * @returns the saved policy or the revision-zero default.
    */
-  async get(owner: ResourcePolicyOwner): Promise<ResourceAccessPolicy> {
-    const table = owner.kind === 'user' ? 'users' : 'projects'
-    const column = owner.kind === 'user' ? 'user_id' : 'project_id'
-    const result = await this.context.pool.query<{ enabled: boolean | null; revision: string | null }>(
-      `SELECT p.enabled,p.revision::text FROM harness.${table} o LEFT JOIN harness.${this.resource}_access_policies p
-        ON p.organization_id=o.organization_id AND p.${column}=o.id AND p.node_id=$3
-        WHERE o.organization_id=$1 AND o.public_id=$2 ${owner.kind === 'user' ? 'AND o.deleted_at IS NULL'
-          : 'AND EXISTS(SELECT 1 FROM harness.instances i WHERE i.organization_id=o.organization_id AND i.project_id=o.id AND i.assigned_node_id=$3)'}`,
-      [this.context.organizationId, owner.id, this.context.nodeId],
-    )
-    const row = result.rows[0]
-    if (row === undefined) throw new ResourceAccessError(404, `${this.resource} policy owner not found`)
-    return { ...owner, enabled: row.enabled ?? false, revision: row.revision ?? '0' }
+  async get(owner: ResourcePolicyOwner, actorUserId?: number): Promise<ResourceAccessPolicy> {
+    return this.readWithAdministrator(actorUserId, async database => {
+      const table = owner.kind === 'user' ? 'users' : 'projects'
+      const column = owner.kind === 'user' ? 'user_id' : 'project_id'
+      const result = await database.query<{ enabled: boolean | null; revision: string | null }>(
+        `SELECT p.enabled,p.revision::text FROM harness.${table} o LEFT JOIN harness.${this.resource}_access_policies p
+          ON p.organization_id=o.organization_id AND p.${column}=o.id AND p.node_id=$3
+          WHERE o.organization_id=$1 AND o.public_id=$2 ${owner.kind === 'user' ? 'AND o.deleted_at IS NULL'
+            : 'AND EXISTS(SELECT 1 FROM harness.instances i WHERE i.organization_id=o.organization_id AND i.project_id=o.id AND i.assigned_node_id=$3)'}`,
+        [this.context.organizationId, owner.id, this.context.nodeId],
+      )
+      const row = result.rows[0]
+      if (row === undefined) throw new ResourceAccessError(404, `${this.resource} policy owner not found`)
+      return { ...owner, enabled: row.enabled ?? false, revision: row.revision ?? '0' }
+    })
+  }
+
+  /**
+   * Retain current administrator eligibility on the connection performing the read.
+   * @param actorUserId - authenticated administrator; absence selects a trusted internal read.
+   * @param read - policy query using the retained transaction connection.
+   * @returns the query result after the administrator transaction commits.
+   */
+  protected readWithAdministrator<T>(actorUserId: number | undefined, read: (database: Queryable) => Promise<T>): Promise<T> {
+    if (actorUserId === undefined) return read(this.context.pool)
+    return transaction(this.context.pool, async client => {
+      await lockAdministrator(client, this.context, actorUserId)
+      return read(client)
+    })
   }
 
   /**

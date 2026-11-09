@@ -58,6 +58,9 @@ describePg('organization computer use', () => {
     const admin = await users.create({ username: 'admin', password: 'pw-12345678', role: 'admin' })
     const member = await users.create({ username: 'member', password: 'pw-12345678' })
     const remote = await remoteUsers.create({ username: 'remote', password: 'pw-12345678', role: 'admin' })
+    await users.changeOwnPassword(admin.id, 'pw-12345678')
+    await users.changeOwnPassword(member.id, 'pw-12345678')
+    await remoteUsers.changeOwnPassword(remote.id, 'pw-12345678')
     const access = new PostgresComputerAccess(a, cfg.runtimeCatalog), remoteAccess = new PostgresComputerAccess(b, cfg.runtimeCatalog)
     const projects = new PostgresProjectService(b, cfg)
     const project = await projects.createManaged({ name: 'Remote project', ownerUserId: remote.id })
@@ -294,6 +297,40 @@ describePg('organization computer use', () => {
     expect(await repository.authenticateRuntimeCleanupToken(token)).not.toBeNull()
     const runtime = (await new PostgresRuntimeCatalog(f.a, f.cfg.runtimeCatalog).pageForAdministrator(f.admin, {})).items.find(item => item.owner.id === f.member.id && item.owner.kind === 'personal')!
     await expect(new PostgresRuntimeCatalog(f.a, f.cfg.runtimeCatalog).resolveForAccount(f.member, runtime.id)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('memoizes runtime token verdicts until invalidation or a local fencing write', async () => {
+    const f = await fixture()
+    let witnessQueries = 0
+    const countingPool = new Proxy(pool, { get(actual, key) {
+      if (key === 'query') return async (sql: string, values?: readonly unknown[]) => {
+        if (typeof sql === 'string' && sql.includes('i.runtime_token_hash=$3')) witnessQueries++
+        return actual.query(sql, values === undefined ? undefined : [...values])
+      }
+      const value: unknown = Reflect.get(actual, key, actual)
+      return typeof value === 'function' ? value.bind(actual) : value
+    } })
+    const repository = new PostgresInstanceRepository({ ...f.a, pool: countingPool }, f.cfg.instancePortBase,
+      undefined, undefined, 60_000)
+    const target = { kind: 'user' as const, id: f.member.id }
+    const token = 'private-fixture-runtime'
+    const started = await repository.beginStart(target, Date.now(), createHash('sha256').update(token).digest(), 'explicit')
+    expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
+    expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
+    expect(witnessQueries).toBe(1)
+    // The durable verdict still answers until the subscription wake clears it.
+    await f.access.set(f.admin, f.member.id, f.a.nodeId, { enabled: false, revision: '1' })
+    expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
+    repository.invalidateRuntimeTokenCache()
+    expect(await repository.authenticateRuntimeToken(token)).toBeNull()
+    // A local fencing write clears the same process without waiting for the channel.
+    // The revoked runtime has meanwhile drained to stopped, as the node agent settles it.
+    expect(await repository.markStopped(target, started)).toBe(true)
+    await f.access.set(f.admin, f.member.id, f.a.nodeId, { enabled: true, revision: '2' })
+    const generation = await repository.beginStart(target, Date.now(), createHash('sha256').update(token).digest(), 'explicit')
+    expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
+    expect(await repository.markStopped(target, generation)).toBe(true)
+    expect(await repository.authenticateRuntimeToken(token)).toBeNull()
   })
 
   it('binds a runtime generation to its live node connection without releasing cleanup or another computer', async () => {

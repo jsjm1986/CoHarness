@@ -22,9 +22,15 @@ export interface WorkbenchCatalog {
   personal: { id: number; name: string }
   /** Whether the personal runtime's Session and archive directories were both read successfully. */
   personalComplete: boolean
+  /** Only the selected Runtime's bounded pages have been read. */
+  paged?: boolean
+  /** Other granted conversations may be outside the currently loaded search scope. */
+  scopePartial?: boolean
+  nextCursor?: string | null
+  moreComputers?: boolean
   activeRuntime: SessionRuntimeTarget
   projects: readonly ({ projectId: number; name: string; mode: 'ro' | 'rw' }
-    & Pick<SessionRuntimeTarget, 'nodeId' | 'nodeName'>)[]
+    & Pick<SessionRuntimeTarget, 'nodeId' | 'nodeName' | 'runtimeId'>)[]
   items: readonly WorkbenchConversation[]
   /** Allocated personal environments visible at this Gateway, including stopped Runtimes. */
   personalRuntimes?: readonly Extract<SessionRuntimeTarget, { kind: 'personal' }>[]
@@ -65,6 +71,7 @@ export function parseWorkbenchCatalog(value: unknown): WorkbenchCatalog {
     if (typeof row.projectId !== 'number' || !Number.isSafeInteger(row.projectId) || row.projectId <= 0
       || typeof row.name !== 'string' || (row.mode !== 'ro' && row.mode !== 'rw')) throw new Error('invalid workbench project')
     return { projectId: row.projectId, name: row.name, mode: row.mode,
+      ...(row.runtimeId === undefined ? {} : { runtimeId: row.runtimeId as NonNullable<SessionRuntimeTarget['runtimeId']> }),
       ...(row.nodeId === undefined ? {} : { nodeId: row.nodeId as NonNullable<SessionRuntimeTarget['nodeId']> }),
       ...(row.nodeName === undefined ? {} : { nodeName: row.nodeName as string }),
     }
@@ -101,6 +108,8 @@ export function parseWorkbenchCatalog(value: unknown): WorkbenchCatalog {
     })
   }
   return { personal: { id: personal.id, name: personal.name }, personalComplete: root.personalComplete,
+    ...(typeof root.scopePartial === 'boolean' ? { scopePartial: root.scopePartial } : {}),
+    ...(root.paged === true ? { paged: true, moreComputers: typeof root.computerCursor === 'string', nextCursor: typeof root.nextCursor === 'string' ? root.nextCursor : null } : {}),
     activeRuntime: activeRuntime as unknown as SessionRuntimeTarget, projects, items,
     ...(personalRuntimes === undefined ? {} : { personalRuntimes }) }
 }

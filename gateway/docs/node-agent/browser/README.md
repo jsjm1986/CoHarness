@@ -31,6 +31,8 @@ The document manager has one entry and separate computer-local locations. Its he
 
 Copy plans capture source and destination computers and scopes. Previews read only the selected files' metadata. Commit rechecks both permissions and streams a verified snapshot through the existing resumable upload protocol. The copy receives its own document identity and retains source lineage. Copying or reading documents does not start a Runtime. Personal document access requires a retained account home on that computer; a computer use grant alone creates no storage. Revocation hides the computer's metadata and refuses its content and subsequent writes. An unavailable location reports its own failure; it never selects another computer's identically named file.
 
+When attaching a copy to a conversation, the Gateway rechecks that exact Session, Runtime and computer before opening the source. A completed copy remains usable if the activity record is unavailable. Refresh its history before submitting another copy.
+
 ## Admin navigation
 
 The Admin computer card retains the current page when changing computers. User details list computer use grants, account-wide Runtime assignments and effective allocation limits. Organization defaults are in Deployment; user overrides are in user details. Allocation retries retain their request id. Lifecycle confirmations identify the computer, Runtime UUID and displayed generation. Plugin, terminal and Webhook execution selectors identify a specific Runtime; plugin configuration and terminal cleanup keep that identity through completion. The project-settings shortcut opens the project's assigned environment.
@@ -42,6 +44,8 @@ Account choices, account edits, password resets, organization models, usage and 
 Mobile Runtime management uses the existing item-list layout with every lifecycle action directly available. Runtime limits sit in a separate disclosure. Failed or unconfirmed writes retain the last displayed grants and quota fields; refresh their authoritative state before another write. Lifecycle failures remain visible inside their confirmation dialog. Refreshing metadata never replays a mutation.
 
 Workbench and Admin links retain their local destination through sign-in and required password setup. The account forms carry `returnTo`; the Gateway accepts only local workbench and Admin UI addresses and rejects external destinations and API routes.
+
+On a computer with a verified local content volume, the first access to an empty personal document root preserves its filesystem identity. To publish an existing account catalog, request `GET /admin/api/documents/personal/{userId}/migration?dshNode={nodeId}` on its owning computer. Review the file and history counts and any blockers. Submit the same root UUID, both digests, inspection limits and node UUID by POST to that URL. A changed journal, unassigned transfer, revoked computer grant or mismatched file prevents publication. Files stay in place and the original catalog remains frozen.
 
 ## Browser API
 

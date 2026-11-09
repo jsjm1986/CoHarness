@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-08-pending-intents-survive-renewal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-08-pending-intents-survive-renewal.md
+document:
+  en: 5b5cfb2748a04f09e03e47ee9a0133466268e06b
+  zh: 5c261f1b75d6939f34c4775722b6c19701f1a9ce
+/agent-note-pending-conversation-intents-survive-same-account-renewal:
+  en: 1ee1518e424eccef
+  zh: ee3cccf4df96e63f
+/agent-note-pending-conversation-intents-survive-same-account-renewal/problem:
+  en: 3e899e8730bf4c02
+  zh: e7983f7da792d315
+/agent-note-pending-conversation-intents-survive-same-account-renewal/decision:
+  en: ff88b03e41ba3ce9
+  zh: 9e87e6fd9a342d3a
+/agent-note-pending-conversation-intents-survive-same-account-renewal/alternatives-considered:
+  en: 07a37d607a25930b
+  zh: 5cc1910abb0c87fc
+/agent-note-pending-conversation-intents-survive-same-account-renewal/consequences:
+  en: 39307c37ef961ed1
+  zh: 5de4556a4ad65404
+/agent-note-pending-conversation-intents-survive-same-account-renewal/verification:
+  en: baa20f1578e8768c
+  zh: 5593ee5995f00429

@@ -34,7 +34,8 @@ import { Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
-import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
+import { precompressBody, selectVariant } from '@deepseek-ai/dsh-host-webserver'
+import type { IndexInjection, PrecompressedBody } from '@deepseek-ai/dsh-host-webserver'
 import { exactPackageSpecifier, parseDshClient, stripClientSuffix } from './client/manifest.ts'
 import type { WebBootBatch, WebBootBatchPhase, WebBootEntry, WebBootGraph, WebBootRelease } from './client/manifest.ts'
 
@@ -164,10 +165,10 @@ interface ComboResource {
   bundle: Buffer
 }
 
-/** One lazily materialized immutable response body. */
+/** One lazily materialized immutable response body and its precompressed variants. */
 interface LazyResponse {
   contentType: string
-  body: () => Promise<Buffer>
+  body: PrecompressedBody
 }
 
 /** Fields shared by every generated combo plan. */
@@ -194,6 +195,7 @@ const COMBO_REVISION_PLACEHOLDER = '0'.repeat(HASH_REVISION_LENGTH)
 const SOURCE_URL_TRAILER = /(?:^|\r?\n)\/\/# sourceURL=([^\s"'`\\*]+)(?:\r?\n)?$/
 /** Published package-local client chunk names accepted by the on-demand route. */
 const CLIENT_CHUNK = /^client\.[A-Za-z0-9][A-Za-z0-9._-]*\.js$/
+/** Every `client.js` sibling the revision commits to: chunks and all source maps. */
 
 /** Resolve `exports["./client"]` to a relative path, accepting the string and one-level conditional forms. */
 function clientExportOf(pkgName: string, exportsField: unknown): string | undefined {
@@ -214,7 +216,7 @@ function shortHash(input: string): string {
 }
 
 /** Hash several response fields without allowing bytes to move across field boundaries. */
-function framedHash(domain: string, parts: readonly string[]): string {
+function framedHash(domain: string, parts: readonly (string | Buffer)[]): string {
   const hash = createHash('sha1').update(domain).update('\0')
   for (const part of parts) hash.update(`${String(Buffer.byteLength(part))}:`).update(part)
   return hash.digest('hex').slice(0, HASH_REVISION_LENGTH)
@@ -737,7 +739,7 @@ export class ClientModuleRegistry extends Service {
    * @returns the exact response also exposed by the optional Web route.
    */
   async fetchBundle(request: Request): Promise<Response> {
-    const resource = await this.bundleResource(request.method, request.url)
+    const resource = await this.bundleResource(request.method, request.url, request.headers.get('accept-encoding') ?? undefined)
     const body = resource.body === undefined ? null : Uint8Array.from(resource.body)
     return new Response(body, {
       status: resource.status,
@@ -836,11 +838,11 @@ export class ClientModuleRegistry extends Service {
     const batchResponses = new Map<string, LazyResponse>()
     for (const artifact of artifacts) {
       batchResponses.set(`/${artifact.descriptor.url}`, this.responses.get(`/${artifact.descriptor.url}`) ?? {
-        body: artifact.scriptBody,
+        body: precompressBody(artifact.scriptBody, this.precompressError),
         contentType: 'text/javascript; charset=utf-8',
       })
       batchResponses.set(artifact.sourceMapUrl, this.responses.get(artifact.sourceMapUrl) ?? {
-        body: artifact.sourceMapBody,
+        body: precompressBody(artifact.sourceMapBody, this.precompressError),
         contentType: 'application/json; charset=utf-8',
       })
     }
@@ -848,11 +850,11 @@ export class ClientModuleRegistry extends Service {
     for (const record of this.table.values()) {
       const artifact = buildCombo([record], this.readSourceMap, record.entry.rev)
       responses.set(`/${artifact.url}`, responses.get(`/${artifact.url}`) ?? this.responses.get(`/${artifact.url}`) ?? {
-        body: artifact.scriptBody,
+        body: precompressBody(artifact.scriptBody, this.precompressError),
         contentType: 'text/javascript; charset=utf-8',
       })
       responses.set(artifact.sourceMapUrl, responses.get(artifact.sourceMapUrl) ?? this.responses.get(artifact.sourceMapUrl) ?? {
-        body: artifact.sourceMapBody,
+        body: precompressBody(artifact.sourceMapBody, this.precompressError),
         contentType: 'application/json; charset=utf-8',
       })
     }
@@ -1010,11 +1012,12 @@ export class ClientModuleRegistry extends Service {
   }
 
   /**
-   * Read the activation-time bundle snapshot.
+   * Read a bundle snapshot: the entry artifact plus the package-local chunks
+   * its revision commits to.
    * @param pkgName - package that declares the client bundle.
    * @param clientPath - absolute path of the built client artifact.
    * @returns the immutable bytes plus the pre-read filesystem baseline.
-   * @throws {MissingClientBundleError} when the read fails with `ENOENT`; other filesystem errors are rethrown unchanged.
+   * @throws {MissingClientBundleError} when the entry read fails with `ENOENT`; other filesystem errors are rethrown unchanged.
    */
   private initialBundleSnapshot(pkgName: string, clientPath: string): {
     bundle: Buffer
@@ -1028,6 +1031,11 @@ export class ClientModuleRegistry extends Service {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       throw new MissingClientBundleError(pkgName, clientPath, error)
     }
+  }
+
+  /** Report a failed background encoding; the dropped variant leaves the ready codings and identity served. */
+  private readonly precompressError = (error: unknown): void => {
+    this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
   }
 
   /** Treat a missing, torn, or malformed development map as an identity section. */
@@ -1182,28 +1190,33 @@ export class ClientModuleRegistry extends Service {
     }
     const response: LazyResponse = sourceMap
       ? {
-        body: lazyBody(() => buildComboSourceMap([resource()], this.readSourceMap, fileName)),
+        body: precompressBody(lazyBody(() => buildComboSourceMap([resource()], this.readSourceMap, fileName)), this.precompressError),
         contentType: 'application/json; charset=utf-8',
       }
       : {
         // Filename-relative trailer resolves under the chunk's own directory.
-        body: lazyBody(() => buildComboScript([resource()], mapKey.slice(`/plugins/${record.entry.id}/`.length))),
+        body: precompressBody(lazyBody(() => buildComboScript([resource()], mapKey.slice(`/plugins/${record.entry.id}/`.length))), this.precompressError),
         contentType: 'text/javascript; charset=utf-8',
       }
-    const materialize = response.body
-    response.body = async () => {
-      try {
-        return await materialize()
-      } catch (error) {
-        if (this.responses.get(resourceUrl) === response) this.responses.delete(resourceUrl)
-        throw error
-      }
+    const materialize = response.body.identity.bind(response.body)
+    response.body = {
+      ...response.body,
+      identity: async () => {
+        try {
+          return await materialize()
+        } catch (error) {
+          if (this.responses.get(resourceUrl) === response) this.responses.delete(resourceUrl)
+          throw error
+        }
+      },
     }
     this.responses.set(resourceUrl, response)
     return response
   }
 
-  private async bundleResource(method: string | undefined, url: string): Promise<{
+  private async bundleResource(
+    method: string | undefined, url: string, acceptEncoding: string | string[] | undefined,
+  ): Promise<{
     status: number
     headers?: Record<string, string>
     body?: Buffer
@@ -1215,10 +1228,16 @@ export class ClientModuleRegistry extends Service {
       ?? this.previousBatchResponses.get(resourceUrl)
       ?? this.chunkResponse(requestUrl)
     if (response !== undefined) {
+      const variant = selectVariant(response.body, acceptEncoding)
       return {
         status: 200,
-        headers: { 'content-type': response.contentType, 'cache-control': IMMUTABLE_CACHE },
-        ...(method === 'HEAD' ? {} : { body: await response.body() }),
+        headers: {
+          'content-type': response.contentType,
+          'cache-control': IMMUTABLE_CACHE,
+          vary: 'Accept-Encoding',
+          ...(variant === undefined ? {} : { 'content-encoding': variant.coding }),
+        },
+        ...(method === 'HEAD' ? {} : { body: await (variant?.body ?? response.body.identity()) }),
       }
     }
     // Anything else under /plugins (including unadvertised combinations and
@@ -1228,7 +1247,7 @@ export class ClientModuleRegistry extends Service {
 
   private readonly serveBundle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server requests. */
-    const response = await this.bundleResource(req.method, req.url ?? '/')
+    const response = await this.bundleResource(req.method, req.url ?? '/', req.headers['accept-encoding'])
     res.writeHead(response.status, response.headers)
     res.end(response.body)
   }

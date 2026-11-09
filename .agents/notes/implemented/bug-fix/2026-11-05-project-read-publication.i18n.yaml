@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-05-project-read-publication.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-05-project-read-publication.md
+document:
+  en: 450c8e0ef37e05b758aac0bd7933416cd0c2966f
+  zh: 255480f86d66b4434e74a80227bd11f0e6f9b5d0
+/agent-note-project-metadata-publication-uses-current-read-authority:
+  en: 007e02edb4c76f8b
+  zh: 1d64480c448b5601
+/agent-note-project-metadata-publication-uses-current-read-authority/problem:
+  en: 291ff646bb6b91c9
+  zh: 81dcd72066775ff0
+/agent-note-project-metadata-publication-uses-current-read-authority/decision:
+  en: aae5937aaa9f17de
+  zh: 8acbefedb1bf17a4
+/agent-note-project-metadata-publication-uses-current-read-authority/alternatives-considered:
+  en: 55817ee5f25a3890
+  zh: 827b6c3f26c0a5e5
+/agent-note-project-metadata-publication-uses-current-read-authority/consequences:
+  en: 96ef0b2abca6a9e4
+  zh: bc2691a4945c69b0

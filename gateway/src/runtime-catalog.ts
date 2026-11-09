@@ -20,6 +20,8 @@ export interface RuntimeCatalogLimits {
 
 /** Authorized environment metadata, including its last reported process state. */
 export interface RuntimeCatalogEntry {
+  /** The selected project computer serves its name and workflow path. */
+  metadataOnNode?:true
   id: RuntimeId
   owner: { kind: 'personal' | 'project'; id: number; name: string }
   node: { id: RuntimeNodeId; name: string; status: 'active' | 'draining' | 'offline'; lastHeartbeatAt: string | null }
@@ -43,6 +45,8 @@ export interface RuntimeCatalogQuery {
   limit?: string
   /** Up to 32 comma-separated UUIDs to resolve through the same current authorization query. */
   ids?: string
+  /** One account project public ID, resolved through current project membership and computer grants. */
+  projectId?: string
 }
 
 /** Expected directory refusals with stable machine-readable error codes. */

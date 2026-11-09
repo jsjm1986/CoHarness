@@ -1,6 +1,6 @@
 import { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 /** Workbench controls, Workspace/session chooser, and compact pane tabs. */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { HostObservable, PropsHooks, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconFolderOpenOutline16, IconLogoutOutline16,
@@ -19,8 +19,13 @@ import { WorkspaceFileBrowser, type ListWorkspaceDirectory, type OpenWorkspaceRe
 
 /** Initial and user-requested increments of visible chooser rows. */
 const CONVERSATION_PAGE_SIZE = 50
+const stableAuthority = { subscribe: () => () => {}, getSnapshot: () => 0 }
 
 interface Actions {
+  catalogAuthority?: { subscribe(notify: () => void): () => void; getSnapshot(): number }
+  readProjectDisplay?: (scope: string, signal: AbortSignal) => Promise<{ projectId: number; name: string } | undefined>
+  moreComputers?: (signal: AbortSignal) => Promise<void>
+  readCatalog?: (signal: AbortSignal, visible?: { scope?: string; q?: string; cursor?: string }) => Promise<WorkbenchCatalog>
   listWorkbenches?: () => readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
   currentWorkbench?: () => { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number } | undefined
   needsCatalogRestore?: () => boolean
@@ -62,9 +67,10 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
  * @returns the toolbar and its controlled picker dialog.
  */
 export function WorkbenchToolbar({
-  viewport, tabbed, inline = false, layout, onSelectLayout, toolsHostId, useStore, actions, useSessions, useWorkspaces, useDeployment,
-  chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode,
-  listWorkbenches, currentWorkbench, needsCatalogRestore, switchWorkbench, createWorkbench, renameWorkbench,
+  viewport, tabbed, inline = false, layout, onSelectLayout, toolsHostId, useStore, actions, useSessions,
+  useWorkspaces, useDeployment, chooseSession, focusSession, createSession, hydrateCatalog, readCatalog,
+  readProjectDisplay, moreComputers, catalogAuthority, catalogUnavailable, setMode, listWorkbenches,
+  currentWorkbench, needsCatalogRestore, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
   listWorkspaceDirectory, openWorkspaceResource, filesAvailable, openFiles, t,
 }: Props) {
@@ -74,7 +80,9 @@ export function WorkbenchToolbar({
   const deployment = useDeployment(value => value)
   const [query, setQuery] = useState('')
   const [visibleCount, setVisibleCount] = useState(CONVERSATION_PAGE_SIZE)
+  const [continuation, setContinuation] = useState<{ scope: string; query: string; cursor: string }>()
   const [workspace, setWorkspace] = useState('')
+  const [chosenProject, setChosenProject] = useState<Pick<WorkbenchCatalog['projects'][number], 'projectId' | 'runtimeId' | 'nodeId'>>()
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   /** Non-focused panes asking for attention: pending interaction, in pane order. */
@@ -86,11 +94,17 @@ export function WorkbenchToolbar({
   const [workbenchDialog, setWorkbenchDialog] = useState<'create' | 'rename' | 'duplicate' | undefined>()
   const [deleteWorkbenchOpen, setDeleteWorkbenchOpen] = useState(false)
   const [workbenchName, setWorkbenchName] = useState('')
-  const [catalog, setCatalog] = useState<WorkbenchCatalog | undefined>()
+  const authority = catalogAuthority ?? stableAuthority
+  const revision = useSyncExternalStore(
+    onChange => authority.subscribe(onChange), () => authority.getSnapshot(), () => authority.getSnapshot())
+  const [receivedCatalog, setCatalog] = useState<WorkbenchCatalog | undefined>()
+  const [receivedRevision, setReceivedRevision] = useState(revision)
+  const catalog = revision === receivedRevision ? receivedCatalog : undefined
   const [catalogAttempt, setCatalogAttempt] = useState(0)
   const [catalogPhase, setCatalogPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [pending, setPending] = useState(false)
   const pendingOperation = useRef<AbortController | undefined>(undefined)
+  useEffect(() => () => { pendingOperation.current?.abort() }, [revision])
   const [error, setError] = useState<string | undefined>()
   const [legacyRestore, setLegacyRestore] = useState<LegacyWorkbenchRestore>()
   const [restoreOpen, setRestoreOpen] = useState(false)
@@ -99,6 +113,7 @@ export function WorkbenchToolbar({
   const [restoreError, setRestoreError] = useState<string>()
   const restoreRequest = useRef<AbortController | undefined>(undefined)
   const activeWorkbenchId = currentWorkbench?.()?.id
+  const wasOpen = useRef(false)
   useEffect(() => {
     restoreRequest.current?.abort()
     restoreRequest.current = undefined
@@ -107,25 +122,50 @@ export function WorkbenchToolbar({
     setRestoreOwners({})
   }, [activeWorkbenchId])
   useEffect(() => () => { restoreRequest.current?.abort(); restoreRequest.current = undefined }, [])
-  useEffect(() => { setVisibleCount(CONVERSATION_PAGE_SIZE) }, [pickerOpen, query, workspace])
+  useEffect(() => { setVisibleCount(CONVERSATION_PAGE_SIZE); setContinuation(undefined) }, [pickerOpen, query, workspace, revision])
+  const paged = readCatalog !== undefined && (catalog === undefined || catalog.paged === true)
+  const remoteScope = paged ? workspace : ''
+  const remoteQuery = paged ? query : ''
+  const remotePage = paged ? continuation : undefined
   const restoreDemand = needsCatalogRestore?.() === true
   useEffect(() => {
     // Chooser opens pull the directory each time; a saved layout awaiting
     // catalog reconciliation pulls once so the restore evaluation has candidates.
-    if (!pickerOpen && !restoreDemand) return
+    const closing = wasOpen.current && !pickerOpen
+    wasOpen.current = pickerOpen
+    if (closing || (!pickerOpen && !restoreDemand)) return
     const abort = new AbortController()
     setCatalogPhase('loading')
-    void loadWorkbenchCatalog(abort.signal).then((next) => {
-      if (abort.signal.aborted) return
-      setCatalog(next)
+    const token = pickerOpen && revision === receivedRevision && remotePage?.scope === remoteScope && remotePage.query === remoteQuery
+      ? remotePage.cursor : undefined
+    const visible = pickerOpen && paged ? { scope: remoteScope, ...(remoteQuery === '' ? {} : { q: remoteQuery }),
+      ...(token === undefined ? {} : { cursor: token }) } : undefined
+    void (readCatalog === undefined ? loadWorkbenchCatalog(abort.signal) : readCatalog(abort.signal, visible)).then((next) => {
+      if (abort.signal.aborted || authority.getSnapshot() !== revision) return
+      setReceivedRevision(revision)
+      setCatalog((previous) => {
+        if (!next.paged || token === undefined || previous === undefined) return next
+        const rows = new Map([...previous.items, ...next.items].map(row => [clientSessionKey(row.runtime, row.sessionId), row]))
+        return { ...next, items: [...rows.values()] }
+      })
       setCatalogPhase('ready')
+      if (pickerOpen && next.paged && workspace !== '' && readProjectDisplay) {
+        void readProjectDisplay(workspace, abort.signal).then((display) => {
+          if (abort.signal.aborted || !display) return
+          setCatalog(current => current && { ...current, projects: current.projects.map(row =>
+            row.projectId === display.projectId ? { ...row, name: display.name } : row) })
+        }).catch(() => {
+          // Authorized rows remain usable under the project's number while the owner name is unavailable.
+        })
+      }
     }, () => {
       if (abort.signal.aborted) return
+      if (readCatalog) setCatalog(undefined)
       setCatalogPhase('error')
       catalogUnavailable?.()
     })
     return () => { abort.abort() }
-  }, [pickerOpen, catalogAttempt, restoreDemand])
+  }, [pickerOpen, catalogAttempt, restoreDemand, deployment.context?.revision, remoteScope, remoteQuery, remotePage, revision])
   useEffect(() => () => {
     const request = pendingOperation.current
     pendingOperation.current = undefined
@@ -206,10 +246,19 @@ export function WorkbenchToolbar({
   }
   const selectedPersonal = workspace.startsWith('personal:')
     ? personalRuntimes.find(item => personalKey(item) === workspace)
-    : workspace === 'personal' && personalRuntimes.length === 1 ? personalRuntimes[0] : undefined
+    : workspace === 'personal' && personalRuntimes.length === 1 && personalRuntimes[0]?.runtimeId === undefined
+      && !catalog?.moreComputers ? personalRuntimes[0] : undefined
   const selectedProject = workspace === 'personal' || workspace.startsWith('personal:') || workspace === ''
     ? undefined
-    : catalog?.projects.find(project => String(project.projectId) === workspace)
+    : catalog?.projects.find(project => String(project.projectId) === workspace && project.projectId === chosenProject?.projectId
+      && (chosenProject.runtimeId === undefined || project.runtimeId === chosenProject.runtimeId)
+      && (chosenProject.nodeId === undefined || project.nodeId === chosenProject.nodeId))
+  useEffect(() => {
+    if (selectedProject?.runtimeId !== undefined && chosenProject?.runtimeId === undefined) setChosenProject(selectedProject)
+  }, [selectedProject, chosenProject])
+  const creatableScope = (readCatalog === undefined || catalog !== undefined)
+    && (selectedPersonal !== undefined || selectedProject !== undefined && selectedProject.mode !== 'ro'
+      && (!catalog?.paged || selectedProject.runtimeId !== undefined))
   // `archivedById` merges every pooled runtime's archive set; the Workspace
   // mirror covers a non-pooled runtime whose sessions list keeps archived rows
   // unpartitioned.
@@ -238,9 +287,13 @@ export function WorkbenchToolbar({
     }]
   })
   const browserKey = (item: WorkbenchConversation): SessionId => clientSessionKey(item.runtime, item.sessionId)
-  const catalogItems = catalog === undefined ? fallbackCandidates : [...new Map([
+  // The remote directory is authoritative only once the deployment context
+  // verifies multi-computer mode: a single-node runtime has no `/account/api`
+  // surface at all, so its own session store remains the complete catalog.
+  const remoteDirectory = readCatalog !== undefined && deployment.context?.mode === 'multi'
+  const catalogItems = catalog === undefined ? remoteDirectory ? [] : fallbackCandidates : [...new Map([
     ...catalog.items.map(item => [browserKey(item), item] as const),
-    ...(!catalog.personalComplete ? fallbackCandidates.filter(item => item.runtime.kind === 'personal'
+    ...(!catalog.paged && !catalog.personalComplete ? fallbackCandidates.filter(item => item.runtime.kind === 'personal'
       && catalog.personalRuntimes?.some(target => target.runtimeId === item.runtime.runtimeId) === true)
       .map(item => [browserKey(item), item] as const) : []),
   ]).values()].filter(item => deployment.aggregateComputers || item.runtime.kind !== 'personal'
@@ -250,10 +303,9 @@ export function WorkbenchToolbar({
     return (!item.blank || browserKey(item) === sessions.current)
       && !isArchived(browserKey(item))
       && (workspace === '' || workspace === projectId || (item.runtime.kind === 'personal' && workspace === personalKey(item.runtime)))
-      && `${item.title ?? item.sessionId} ${item.cwd ?? ''} ${deployment.showComputer ? item.runtime.nodeName ?? '' : ''} ${item.runtime.kind === 'project'
-        ? item.runtime.projectName
-        : catalog?.personal.name ?? ''}`
-        .toLocaleLowerCase().includes(query.toLocaleLowerCase())
+      && (catalog?.paged || [item.title, item.sessionId, item.cwd, deployment.showComputer ? item.runtime.nodeName : undefined,
+        item.runtime.kind === 'project' ? item.runtime.projectName : catalog?.personal.name]
+        .some(value => value?.toLocaleLowerCase().includes(query.toLocaleLowerCase())))
   })
   const finish = (result: AddPaneResult): void => {
     if (result.ok || result.reason === 'duplicate') { actions.closePicker(); setError(undefined) }
@@ -289,8 +341,7 @@ export function WorkbenchToolbar({
   }
   const create = (): void => {
     /* v8 ignore next -- the create button is disabled during pending and read-only workspaces */
-    if (pending || workspace === '' || selectedProject?.mode === 'ro'
-      || workspace.startsWith('personal') && selectedPersonal === undefined) {
+    if (pending || !creatableScope) {
       if (selectedProject?.mode === 'ro') setError(t('readOnly'))
       return
     }
@@ -301,6 +352,7 @@ export function WorkbenchToolbar({
         // The name rides the target so a runtime first opened by this create
         // still stamps workspaceName on its summaries (pane scope label).
         ...(selectedProject === undefined ? {} : { projectName: selectedProject.name }),
+        ...(selectedProject?.runtimeId === undefined ? {} : { runtimeId: selectedProject.runtimeId }),
         ...(selectedProject?.nodeId === undefined ? {} : { nodeId: selectedProject.nodeId }),
         ...(selectedProject?.nodeName === undefined ? {} : { nodeName: selectedProject.nodeName }),
       }
@@ -453,9 +505,26 @@ export function WorkbenchToolbar({
             open={workspaceMenuOpen}
             onClose={() => { setWorkspaceMenuOpen(false) }}
             selectedId={workspace}
-            onSelect={(id) => { setWorkspace(id); setWorkspaceMenuOpen(false) }}
+            onSelect={(id) => {
+              if (id === 'more-computers' && moreComputers !== undefined) {
+                const request = new AbortController()
+                pendingOperation.current?.abort()
+                pendingOperation.current = request
+                setPending(true)
+                void moreComputers(request.signal).then(() => { if (!request.signal.aborted) setCatalogAttempt(n => n + 1) },
+                  () => { if (!request.signal.aborted) setError(t('unavailable')) }).finally(() => {
+                  if (pendingOperation.current === request) { pendingOperation.current = undefined; setPending(false) }
+                })
+              } else {
+                const onlyPersonal = id === 'personal' && !catalog?.moreComputers && personalRuntimes.length === 1 ? personalRuntimes[0] : undefined
+                setWorkspace(onlyPersonal === undefined ? id : personalKey(onlyPersonal))
+                setChosenProject(catalog?.projects.find(project => String(project.projectId) === id))
+              }
+              setWorkspaceMenuOpen(false)
+            }}
             portal dense align="end" listClassName={css.workspaceMenu}
             items={[
+              ...(catalog?.moreComputers && moreComputers !== undefined ? [{ id: 'more-computers', label: t('moreComputers') }] : []),
               { id: '', label: <span className={css.workspaceOption}><strong>{t('allWorkspaces')}</strong><small>{t('workspace')}</small></span> },
               { id: 'personal', label: <span className={css.workspaceOption}>
                 <strong>{t('personal')}</strong><small>{catalog?.personal.name ?? ''}</small></span> },
@@ -479,15 +548,19 @@ export function WorkbenchToolbar({
           />
         </div>
         {catalogPhase === 'loading' && <p className={css.notice} role="status">{t('catalogLoading')}</p>}
-        {(catalogPhase === 'error' || catalog?.personalComplete === false) && <p className={css.notice} role="status">
-          {t(catalogPhase === 'error' ? 'catalogError' : 'catalogIncomplete')}
+        {(catalogPhase === 'error' || catalog && !catalog.paged && !catalog.personalComplete) && <p className={css.notice} role="status">
+          {t(catalogPhase === 'error' ? catalogAuthority ? 'directoryUnavailable' : 'catalogError' : 'catalogIncomplete')}
           <Button size="sm" disabled={catalogPhase === 'loading'} onClick={() => { setCatalogAttempt(value => value + 1) }}>{t('retryCatalog')}</Button>
+        </p>}
+        {catalogPhase === 'ready' && catalog?.scopePartial === true && <p className={css.notice} role="status">
+          {t(query ? 'loadedSearch' : 'loadedDirectory')}
+          <Button variant="ghost" size="sm" onClick={() => { setWorkspaceMenuOpen(true) }}>{t('chooseSearchScope')}</Button>
         </p>}
         {full && <div className={css.notice} role="status">{t('limit')} <Button size="sm" onClick={() => { actions.openPicker(true) }}>{t('replace')}</Button></div>}
         {error !== undefined && <p role="alert" className={css.notice}>{error}</p>}
         <div className={css.catalogSummary}><span>{t('history')}</span><span>{candidates.length}</span></div>
         <div className={css.candidates}>
-          {candidates.length === 0 && catalogPhase === 'ready' && catalog?.personalComplete !== false
+          {candidates.length === 0 && catalogPhase === 'ready' && (catalog?.scopePartial === false || catalog?.personalComplete !== false)
             && <p className={css.notice}>{t('noSessions')}</p>}
           {candidates.slice(0, visibleCount).map((item) => {
             const pinned = viewport.paneIds.includes(browserKey(item))
@@ -510,6 +583,14 @@ export function WorkbenchToolbar({
               </button>
             )
           })}
+          {catalog?.paged && catalog.nextCursor && candidates.length <= visibleCount && <Button variant="ghost" size="sm"
+            disabled={pending || catalogPhase === 'loading'} onClick={() => {
+              if (catalog.nextCursor) {
+                setContinuation({ scope: workspace, query, cursor: catalog.nextCursor,
+                })
+                setVisibleCount(n => n + CONVERSATION_PAGE_SIZE)
+              }
+            }}>{t('moreRows')}</Button>}
           {candidates.length > visibleCount && <Button variant="ghost" size="sm" disabled={pending}
             onClick={() => { setVisibleCount(count => count + CONVERSATION_PAGE_SIZE) }}>
             {t('moreConversations', { count: candidates.length - visibleCount })}
@@ -519,8 +600,8 @@ export function WorkbenchToolbar({
           <span>{t(workspace === 'personal' && selectedPersonal === undefined
             ? deployment.showComputer ? 'chooseComputer' : 'choosePersonalRuntime' : 'chooseWorkspace')}</span>
           {pending && <Button variant="outline" size="sm" onClick={cancelPending}>{t('cancelPending')}</Button>}
-          <Button variant="primary" size="sm" disabled={viewport.pendingIdentity === true || workspace === '' || pending || full || selectedProject?.mode === 'ro'
-            || workspace.startsWith('personal') && selectedPersonal === undefined} onClick={create}>{t(pending ? 'creating' : 'create')}</Button>
+          <Button variant="primary" size="sm" disabled={viewport.pendingIdentity === true || !creatableScope || pending || full}
+            onClick={create}>{t(pending ? 'creating' : 'create')}</Button>
         </div>
       </Modal>
       <Modal open={restoreOpen && legacyRestore !== undefined} onClose={closeRestore}

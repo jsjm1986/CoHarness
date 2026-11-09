@@ -28,7 +28,7 @@ import {
   sessionHistoryIndexRequestSchema,
   sessionListRequestSchema,
   sessionModelsRequestSchema,
-  sessionPromptRequestSchema,
+  sessionPromptRequestSchema, sessionPromptStatusRequestSchema,
   sessionRenameRequestSchema,
   sessionSearchRequestSchema,
   sessionSelectModelRequestSchema,
@@ -112,6 +112,7 @@ const UNARY_ROUTES: UnaryRoutes = {
   'session.selectModel': { schema: sessionSelectModelRequestSchema, invoke: (api, r) => api.sessions.selectModel(r) },
   'session.rename': { schema: sessionRenameRequestSchema, invoke: (api, r) => api.sessions.rename(r) },
   'session.fork': { schema: sessionForkRequestSchema, invoke: (api, r) => api.sessions.fork(r) },
+  'session.promptStatus': { schema: sessionPromptStatusRequestSchema, invoke: (api, r, signal) => api.sessions.promptStatus(r, signal) },
   'session.prompt': { schema: sessionPromptRequestSchema, invoke: (api, r) => api.sessions.prompt(r) },
   'session.attachment': { schema: sessionAttachmentRequestSchema, invoke: (api, r) => api.sessions.attachment(r) },
   'session.updateQueue': { schema: sessionUpdateQueueRequestSchema, invoke: (api, r) => api.sessions.updateQueue(r) },
@@ -185,6 +186,24 @@ function fullResponse(narrow: RpcResponse<unknown>): Response {
   return Response.json(body)
 }
 
+/** Preserve a committed create receipt when its authorized tail cannot fit in the bounded response. */
+async function preparedCreateResponse(api: ApiProxy, rpcId: RpcId, created: ResponseValue<'session.create'>,
+  requested: RequestPayload<'session.create'>, signal: AbortSignal, limit: number): Promise<Response> {
+  if (created.sessionId !== requested.sessionId || !created.workspace
+    || requested.workspaceId !== undefined && created.workspace.workspaceId !== requested.workspaceId) {
+    return errorResponse(rpcId, { code: 'bad-request', message: 'Prepared Session did not confirm its requested destination', details: { issues: [] } })
+  }
+  const history = await api.sessions.history({ rpcId, payload: { sessionId: created.sessionId, detail: 'conversation', onlyActive: true } }, signal)
+  if (!history.result.ok) return fullResponse(history)
+  const encoder = new TextEncoder()
+  const overhead = encoder.encode(JSON.stringify({ ...created, initialHistory: null })).byteLength - 'null'.length
+  const packed = encodeHistoryServerResponse(rpcId, history.result.value, Math.max(1, limit - overhead))
+  if (!packed.result.ok) return Response.json(packed)
+  const text = JSON.stringify({ type: 'server-response', rpcId, result: { ok: true, value: { ...created, initialHistory: packed.result.value } } })
+  if (encoder.encode(text).byteLength > limit) return fullResponse({ rpcId, result: { ok: true, value: created } })
+  return new Response(text, { headers: { 'content-type': 'application/json' } })
+}
+
 /**
  * Parse the payload and invoke one unary route. Generic over the map key so
  * the row's schema/invoke pairing typechecks; the request cast collapses the
@@ -202,14 +221,25 @@ async function handleUnary<K extends keyof RpcMethodMap>(
   message: ClientRequest,
   signal: AbortSignal,
   historyPageTargetBytes: number,
+  prepared = false,
 ): Promise<Response> {
   const route = UNARY_ROUTES[method]
   const payload = route.schema.safeParse(message.payload)
   if (!payload.success) {
     return errorResponse(message.rpcId, { code: 'bad-request', message: `invalid payload for ${method}`, details: { issues: payload.error.issues } })
   }
+  const creation = prepared && method === 'session.create' ? payload.data as RequestPayload<'session.create'> : undefined
+  const initial = creation?.includeInitialHistory === true
+  if (initial && (!creation.sessionId || !creation.draftId ||
+    !creation.defaultWorkspace && !(creation.workspaceId && creation.includeWorkspace))) {
+    return errorResponse(message.rpcId, { code: 'bad-request', message: 'A prepared tail requires a reserved Session and workspace', details: { issues: [] } })
+  }
   try {
     const response = await route.invoke(api, { rpcId: message.rpcId, payload: payload.data }, signal)
+    if (initial && response.result.ok) {
+      return await preparedCreateResponse(api, response.rpcId, response.result.value as ResponseValue<'session.create'>,
+        creation, signal, historyPageTargetBytes)
+    }
     if (
       response.result.ok
       && (method === 'session.history' || method === 'subagent.history')
@@ -404,7 +434,12 @@ export function toFetchHandler(
     async fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
       const req = input instanceof Request ? input : new Request(input, init)
       const url = new URL(req.url)
-      const path = url.pathname
+      // Older Hosts reject this versioned route before they can create an unbound draft.
+      const prepared = req.method === 'POST' && /^\/api\/prepare\/v1\/session\.(?:create|history)$/u.test(url.pathname)
+      const durable = req.method === 'POST' && url.pathname === '/api/admit/v1/session.prompt'
+      const status = req.method === 'POST' && url.pathname === '/api/admit/v1/session.status'
+      const path = prepared ? url.pathname.replace('/prepare/v1/', '/')
+        : durable ? '/api/session.prompt' : status ? '/api/session.promptStatus' : url.pathname
 
       // No-envelope read channels (SSE GET streams + host-only download):
       // physical routes that answer directly, without a wire envelope.
@@ -488,6 +523,19 @@ export function toFetchHandler(
       const message: ClientRequest = envelope.data
       if (message.method !== method) {
         return errorResponse(message.rpcId, { code: 'bad-request', message: `method "${message.method}" does not match path "${method}"`, details: { issues: [] } })
+      }
+      if (prepared || durable || status) {
+        const start = performance.now()
+        let timed = message
+        if ((durable && method === 'session.prompt' || prepared && method === 'session.history') &&
+          typeof message.payload === 'object' && message.payload !== null && !Array.isArray(message.payload)) {
+          timed = { ...message, payload: { ...message.payload, ...(durable ? { durable: true } : { onlyActive: true }) } }
+        }
+        const result = await handleUnary(api, method, timed, req.signal, historyPageTargetBytes, prepared)
+        if (/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(req.headers.get('x-dsh-operation-id') ?? '')) {
+          result.headers.set('x-dsh-host-duration-ms', (performance.now() - start).toFixed(2))
+        }
+        return result
       }
       if (!serverTiming) return handleUnary(api, method, message, req.signal, historyPageTargetBytes)
       const startedAt = performance.now()

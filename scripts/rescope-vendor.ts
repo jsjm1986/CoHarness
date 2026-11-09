@@ -375,8 +375,8 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
     // The real package references in files whose other `cordis` strings are preset ids.
     id: 'agent-preset-spec-framework-import',
     file: 'packages/client/ui-agent-preset/tests/apply.client.spec.ts',
-    find: "import { Context } from 'cordis'",
-    replace: "import { Context } from '@deepseek-ai/cordis'",
+    find: "import { Context, Service } from 'cordis'",
+    replace: "import { Context, Service } from '@deepseek-ai/cordis'",
     expect: 1,
   },
   {

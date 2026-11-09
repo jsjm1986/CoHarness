@@ -139,3 +139,18 @@ it('broadcasts only invalidate policy and cannot replace another tab’s current
   expect(second.runtime.getSnapshot()).toMatchObject({ context: { entry: { nodeId: a } } })
   expect(first.forTarget).not.toHaveBeenCalled(); expect(second.forTarget).not.toHaveBeenCalled()
 })
+
+it('coalesces foreground events while rechecking a deployment read that began before focus', async () => {
+  const pending = Promise.withResolvers<Response>()
+  const fetcher = vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValueOnce(Response.json(response('2')))
+  vi.stubGlobal('fetch', fetcher)
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  const f = fixture()
+  window.dispatchEvent(new Event('focus'))
+  document.dispatchEvent(new Event('visibilitychange'))
+  window.dispatchEvent(new Event('focus'))
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  pending.resolve(Response.json(response('1')))
+  await vi.waitFor(() =>{  expect(f.runtime.getSnapshot().context?.revision).toBe('2') })
+  expect(fetcher).toHaveBeenCalledTimes(2)
+})

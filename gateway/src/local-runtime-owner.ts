@@ -2,12 +2,22 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { closeSync, constants, fstatSync } from 'node:fs'
 import { lstat, mkdir, open, rename, rm, type FileHandle } from 'node:fs/promises'
+import { createServer } from 'node:net'
 import { isAbsolute, join } from 'node:path'
 import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import { z } from 'zod'
+import { privateDirectoryState, privateFileState, probeWindowsAclPrivate, syncStateDirectory, tightenPrivateFileAcl,
+  type PrivateFileState, type WindowsAclProbe } from './node-private-file.ts'
 
 const OWNER_RECORD_BYTES = 65_536
+/**
+ * Bound on a replayed 'private' Windows ACL verdict inside one store. Each
+ * verdict costs a PowerShell spawn while the record open/read and lock-inode
+ * checks stay per-request, so a committed verdict replays briefly; failures
+ * never replay, and a changed record-file identity re-probes before expiry.
+ */
+const PRIVATE_ACL_CACHE_MS = 10_000
 const identitySchema = z.object({
   node: z.string().min(1),
   kind: z.enum(['user', 'project']),
@@ -62,6 +72,8 @@ export class LocalRuntimeOwnerStore {
   readonly recordPath: string
   readonly lockPath: string
   readonly cancellationPath: string
+  private directoryAclAt: number | undefined
+  private recordAcl: { at: number; mtimeMs: number; ctimeMs: number; size: number } | undefined
 
   constructor(readonly directory: string, identity: unknown) {
     if (!isAbsolute(directory)) throw new Error('Local runtime ownership requires an absolute private directory')
@@ -89,8 +101,8 @@ export class LocalRuntimeOwnerStore {
     }
     try {
       const stat = await handle.stat()
-      if (!stat.isFile() || stat.size > OWNER_RECORD_BYTES || (stat.mode & 0o077) !== 0
-        || process.getuid !== undefined && stat.uid !== process.getuid()) {
+      if (await privateFileState(this.recordPath, stat, OWNER_RECORD_BYTES, undefined,
+        (file, signal) => this.recordAclProbe(file, stat, signal)) !== 'private') {
         throw new Error('Local runtime owner record is not a bounded private file')
       }
       const bytes = Buffer.alloc(OWNER_RECORD_BYTES + 1)
@@ -134,6 +146,7 @@ export class LocalRuntimeOwnerStore {
   }
 
   private async openLease(create: boolean, kernelBootId?: string): Promise<LocalRuntimeOwnerLease> {
+    if (process.platform === 'win32') return await this.openPipeLease(create, kernelBootId)
     const handle = await open(this.lockPath, constants.O_RDWR | (create ? constants.O_CREAT : 0) | constants.O_NOFOLLOW, 0o600)
     try {
       await tryLockExclusive(handle.fd)
@@ -155,11 +168,61 @@ export class LocalRuntimeOwnerStore {
     }
   }
 
+  /**
+   * Windows kernel lease: an exclusively named pipe replaces the POSIX lock
+   * descriptor. Pipe names are machine-unique, `listen` refuses duplicates and
+   * the kernel releases the name on owner death, matching flock semantics;
+   * the `.lock` file remains the durable inode witness. No descriptor is
+   * inheritable on Windows, so the supervisor acquires this lease itself
+   * instead of adopting a descriptor.
+   */
+  private async openPipeLease(create: boolean, kernelBootId?: string): Promise<LocalRuntimeOwnerLease> {
+    if (create) {
+      const handle = await open(this.lockPath, constants.O_RDWR | constants.O_CREAT, 0o600)
+      try { await handle.sync() } finally { await handle.close() }
+      await syncStateDirectory(this.directory)
+    }
+    const stat = await lstat(this.lockPath, { bigint: true })
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Local runtime ownership lock is not a private file')
+    const witness = { device: String(stat.dev), inode: String(stat.ino) }
+    const server = createServer()
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(this.pipeName, () => { server.off('error', reject); resolve() })
+    })
+    try {
+      const lease = new LocalRuntimeOwnerLease(this, {
+        fd: -1,
+        stat: async () => {
+          const current = await lstat(this.lockPath, { bigint: true })
+          return { device: String(current.dev), inode: String(current.ino) }
+        },
+        close: () => new Promise<void>(resolve => server.close(() => resolve())),
+      }, witness)
+      await lease.verify()
+      await this.read(kernelBootId)
+      return lease
+    } catch (error) {
+      await new Promise<void>(resolve => server.close(() => resolve()))
+      throw error
+    }
+  }
+
+  /** Machine-unique pipe name bound to this exact private lock path. */
+  get pipeName(): string {
+    return `\\\\.\\pipe\\dsh-owner-${createHash('sha256').update(this.lockPath).digest('hex').slice(0, 32)}`
+  }
+
   /** Record stop intent even while another process holds the allocation lease. */
   async cancel(): Promise<void> {
     await this.prepareDirectory()
+    if (process.platform === 'win32') {
+      const existing = await lstat(this.cancellationPath).catch(() => undefined)
+      if (existing?.isSymbolicLink()) throw new Error('Local runtime cancellation path is a reparse point')
+    }
     const handle = await open(this.cancellationPath, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW, 0o600)
     try { await handle.sync() } finally { await handle.close() }
+    await syncStateDirectory(this.directory)
   }
 
   /** @returns whether stop intent fences this generation's pending allocation. */
@@ -177,9 +240,44 @@ export class LocalRuntimeOwnerStore {
 
   private async verifyDirectory(): Promise<void> {
     const stat = await lstat(this.directory)
-    if (!stat.isDirectory() || (stat.mode & 0o077) !== 0 || process.getuid !== undefined && stat.uid !== process.getuid()) {
+    if (await privateDirectoryState(this.directory, stat, undefined, this.directoryAclProbe) !== 'private') {
       throw new Error('Local runtime ownership requires a private directory')
     }
+  }
+
+  /**
+   * ACL probe for the owning directory: replay a committed 'private' verdict
+   * while it stays within {@link PRIVATE_ACL_CACHE_MS}, re-probe every other
+   * verdict so the check stays fail-closed. The directory lstat and
+   * reparse-point checks still run on every call.
+   */
+  private readonly directoryAclProbe: WindowsAclProbe = async (file, signal) => {
+    const now = Date.now()
+    if (this.directoryAclAt !== undefined && now - this.directoryAclAt < PRIVATE_ACL_CACHE_MS) return 'private'
+    const state = await probeWindowsAclPrivate(file, signal)
+    this.directoryAclAt = state === 'private' ? now : undefined
+    return state
+  }
+
+  /**
+   * ACL probe for the record file: replay a 'private' verdict only while the
+   * just-opened file keeps the identity that earned it. Republish renames a
+   * new file into place, which changes mtimeMs/ctimeMs/size and forces a
+   * fresh probe ahead of {@link PRIVATE_ACL_CACHE_MS}.
+   * @param file - record path, fixed per store.
+   * @param stat - stat result already read from this read's open handle.
+   * @param signal - caller cancellation for the child process.
+   * @returns the cached or freshly probed verdict.
+   */
+  private async recordAclProbe(file: string, stat: { mtimeMs: number; ctimeMs: number; size: number },
+    signal?: AbortSignal): Promise<PrivateFileState> {
+    const now = Date.now(), cached = this.recordAcl
+    if (cached !== undefined && now - cached.at < PRIVATE_ACL_CACHE_MS
+      && cached.mtimeMs === stat.mtimeMs && cached.ctimeMs === stat.ctimeMs && cached.size === stat.size) return 'private'
+    const state = await probeWindowsAclPrivate(file, signal)
+    this.recordAcl = state === 'private'
+      ? { at: now, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs, size: stat.size } : undefined
+    return state
   }
 }
 
@@ -217,6 +315,39 @@ export class LocalRuntimeOwnerLease {
     if (current?.nonce !== record.nonce || current.token !== record.token || current.phase !== 'reserved'
       || await store.cancelled()) throw new Error('Local runtime inherited reservation is fenced')
     return lease
+  }
+
+  /**
+   * Windows-only self-acquisition for the supervisor, which cannot inherit a
+   * descriptor: it claims the named-pipe lease itself, retrying while the
+   * launching Gateway still holds it, then applies the same reservation
+   * fences as {@link inherit}.
+   * @param store - generation-specific private journal.
+   * @param expected - reservation delivered over the private startup channel.
+   * @param timeoutMs - bounded wait for the launcher's lease release.
+   * @returns the same kernel lease, owned by this process until close or exit.
+   */
+  static async adopt(store: LocalRuntimeOwnerStore, expected: unknown, timeoutMs: number): Promise<LocalRuntimeOwnerLease> {
+    const record = recordSchema.parse(expected)
+    const deadline = performance.now() + timeoutMs
+    for (;;) {
+      try {
+        const lease = await store.acquireExisting()
+        try {
+          const current = await store.read()
+          if (current?.nonce !== record.nonce || current.token !== record.token || current.phase !== 'reserved'
+            || await store.cancelled()) throw new Error('Local runtime inherited reservation is fenced')
+          return lease
+        } catch (error) {
+          await lease.close().catch(() => {})
+          throw error
+        }
+      } catch (error) {
+        const occupied = (error as NodeJS.ErrnoException).code === 'EADDRINUSE'
+        if (!occupied || performance.now() >= deadline) throw error
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+    }
   }
 
   /** Descriptor stays caller-owned until inherited allocation has acknowledged its handoff. */
@@ -305,8 +436,8 @@ export class LocalRuntimeOwnerLease {
       try { await handle.writeFile(text); await handle.sync() } finally { await handle.close() }
       await this.verify()
       await rename(path, this.store.recordPath)
-      const directory = await open(this.store.directory, 'r')
-      try { await directory.sync() } finally { await directory.close() }
+      await tightenPrivateFileAcl(this.store.recordPath)
+      await syncStateDirectory(this.store.directory)
     } finally { await rm(path, { force: true }) }
   }
 }

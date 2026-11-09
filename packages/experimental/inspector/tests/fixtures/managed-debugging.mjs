@@ -1,6 +1,7 @@
 /** Real Loader/Web composition keeps unrestricted debugging out of managed execution. */
 import assert from 'node:assert/strict'
 import { createRequire, syncBuiltinESMExports } from 'node:module'
+import { writeSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -8,6 +9,9 @@ import WebSocket from 'ws'
 
 const [mode, artifactRoot] = process.argv.slice(2)
 assert.ok(mode === 'src' || mode === 'lib')
+const t0 = Date.now()
+const mark = step => writeSync(2, `[fixture] ${step} +${Date.now() - t0}ms\n`)
+mark('argv parsed')
 const root = new URL('../../../../../', import.meta.url)
 const entry = path => path === 'experimental/inspector' && artifactRoot !== undefined
   ? pathToFileURL(join(artifactRoot, mode === 'src' ? 'src/index.ts' : 'lib/index.js')).href
@@ -17,11 +21,19 @@ const OriginalWorker = threads.Worker, workers = []
 threads.Worker = class extends OriginalWorker {
   constructor(...args) {
     super(...args)
-    const record = { exited: false }
+    const target = args[0] instanceof URL ? args[0].href : String(args[0])
+    const stack = (new Error().stack ?? '').split('\n').slice(2, 5).join(' | ')
+    const record = { exited: false, tid: this.threadId, target: target.slice(0, 90), stack,
+      // The tracked assertions belong to the Inspector's own Worker; pool
+      // Workers spawned lazily inside a combo window (tsx's esbuild service
+      // is the observed case) never exit and must not join the wait set.
+      inspector: /[\\/]inspector[\\/]/.test(stack) }
     record.completion = new Promise(ready => this.once('exit', () => { record.exited = true; ready() }))
     workers.push(record)
+    mark(`worker spawned tid=${String(this.threadId)} inspector=${String(record.inspector)} target=${record.target}`)
   }
 }
+const inspectorWorkers = from => workers.slice(from).filter(worker => worker.inspector)
 syncBuiltinESMExports()
 const print = console.log
 console.log = (...args) => {
@@ -29,7 +41,9 @@ console.log = (...args) => {
   Reflect.apply(print, console, args)
 }
 const { boot } = await import(entry('boot/app-boot'))
+mark('app-boot imported')
 const { default: ExecutionAuthority } = await import(entry('context/execution-authority'))
+mark('execution-authority imported')
 class FixtureAuthority extends ExecutionAuthority {
   stamp() { throw new Error('Fixture does not stamp messages') }
   answer() { throw new Error('Fixture does not answer questions') }
@@ -52,8 +66,11 @@ try {
     { name: entry('host/webserver'), config: { host: '127.0.0.1', port: 0 } },
     { name: entry('client/connection') },
   ]))
+  mark('config written')
   ctx = await boot('inspector-managed-debugging', config)
+  mark('boot settled')
   const origin = ctx.webServer.getOrigin()
+  mark('origin acquired')
   const fetchBootstrap = async () => {
     const response = await fetch(ctx.connection.authenticatedUrl(`${origin}/api/experimental-inspector/bootstrap`))
     await response.body?.cancel()
@@ -93,6 +110,7 @@ try {
             uncertain: async () => { uncertainties++ } }
         } }))
         const id = `debug-${control}-${String(isolated)}-${timing}`
+        mark(`${id} loader.create`)
         const pending = ctx.loader.create({ id, name: entry('experimental/inspector'),
           ...isolated ? { isolate: { executionAuthority: true, executionAuthorityRequired: true } } : {}, config: { port: 0, captureFetch: false } })
           .then(async () => {
@@ -103,31 +121,44 @@ try {
           }).catch(error => ({ ready: false, forbidden: error.message.includes('Inspector requires an independent local runtime') }))
         if (timing === 'queued') { await entered.promise; policy = await install(); grant.resolve() }
         const outcome = await pending
-        if (outcome.ready) { status = await fetchBootstrap(); evaluated = await evaluate() }
+        mark(`${id} loader settled ready=${outcome.ready}`)
+        if (outcome.ready) { status = await fetchBootstrap(); mark(`${id} bootstrap ${status}`); evaluated = await evaluate(); mark(`${id} evaluated=${evaluated}`) }
         if (timing === 'running') {
           policy = await install()
-          await Promise.all(workers.slice(before).map(worker => worker.completion))
-          closedByPolicy = workers.slice(before).every(worker => worker.exited)
+          await Promise.all(inspectorWorkers(before).map(worker => worker.completion))
+          closedByPolicy = inspectorWorkers(before).every(worker => worker.exited)
           const response = await fetch(`${origin}/inspector/devtools/devtools_app.html`)
           status = response.status; await response.body?.cancel()
         }
-        await mounted?.fiber?.dispose()
+        const disposing = mounted?.fiber?.dispose()
+        const disposalWatch = setTimeout(() => {
+          mark(`${id} dispose slow: workers=${JSON.stringify(inspectorWorkers(before).map(w => w.exited))}`)
+        }, 20_000)
+        await disposing
+        clearTimeout(disposalWatch)
+        mark(`${id} fiber disposed`)
         socket?.terminate(); socket = undefined
-        await Promise.all(workers.slice(before).map(worker => worker.completion))
+        mark(`${id} socket terminated`)
+        const settleWatch = setTimeout(() => {
+          mark(`${id} workers wait: ${JSON.stringify(workers.slice(before).map(w => ({ exited: w.exited, tid: w.tid, target: w.target, stack: w.stack })))}`)
+        }, 15_000)
+        await Promise.all(inspectorWorkers(before).map(worker => worker.completion))
+        clearTimeout(settleWatch)
+        mark(`${id} workers settled`)
         console.log(JSON.stringify({ control, isolated, timing, ...outcome, evaluated,
           ...status === undefined ? {} : { status }, closedByPolicy,
           published: ctx.get('inspector') !== undefined,
-          workers: workers.length - before, exited: workers.slice(before).every(worker => worker.exited),
+          workers: inspectorWorkers(before).length, exited: inspectorWorkers(before).every(worker => worker.exited),
           admissions, releases, uncertainties }))
         if (control === 'independent' || timing === 'running') {
           assert.equal(outcome.ready, true)
           assert.equal(evaluated, true)
-          assert.equal(workers.length - before, 1)
+          assert.equal(inspectorWorkers(before).length, 1)
           if (timing === 'running') { assert.equal(closedByPolicy, true); assert.equal(status, 404) }
           else assert.equal(status, 200)
         } else {
           assert.deepEqual(outcome, { ready: false, forbidden: true })
-          assert.equal(workers.length - before, 0)
+          assert.equal(inspectorWorkers(before).length, 0)
           assert.equal(evaluated, false)
         }
         assert.equal(ctx.get('inspector'), undefined)

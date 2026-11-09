@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-05-resource-policy-read-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-05-resource-policy-read-authority.md
+document:
+  en: 233a88b92d889569c36b4618c1da1718044e8a91
+  zh: 562fb018fca2f023d5d3dbdf265e6fd76912ca89
+/agent-note-resource-policy-readers-retain-the-current-administrator:
+  en: cacf16aee18f0dac
+  zh: 6b7ef904751f2b9b
+/agent-note-resource-policy-readers-retain-the-current-administrator/problem:
+  en: 19fbf894b102a43f
+  zh: 916ad8e381f36a4d
+/agent-note-resource-policy-readers-retain-the-current-administrator/decision:
+  en: b90615f9fe5a35f6
+  zh: 403a63dc7fb0bb20
+/agent-note-resource-policy-readers-retain-the-current-administrator/alternatives-considered:
+  en: 1de6e01983f4d1ba
+  zh: ee32bf0674617879
+/agent-note-resource-policy-readers-retain-the-current-administrator/consequences:
+  en: 91fb85a87ba3a2fd
+  zh: a5f09d58037cdd28

@@ -48,6 +48,7 @@ export interface WorkspaceListSnapshot {
 
 type WorkspaceDelta =
   | { type: 'upsert'; workspace: WorkspaceView }
+  | { type: 'location'; workspace: WorkspaceView }
   | { type: 'remove'; workspaceId: WorkspaceId }
   | { type: 'order'; workspaceIds: readonly WorkspaceId[] }
 
@@ -470,15 +471,23 @@ export class WorkspaceManager {
     this.notifier.markDirty()
   }
 
+  /** Merge the membership of one prepared conversation without discarding unseen siblings.
+   * @param view - verified location and membership for the prepared Session only.
+   */
+  acceptLocation(view: WorkspaceView): void {
+    this.upsert(view, undefined, true)
+  }
+
   /** Upsert one Host view, optionally retaining the local object that materialized it. */
-  private upsert(view: WorkspaceView, identity?: Workspace): void {
+  private upsert(view: WorkspaceView, identity?: Workspace, location = false): void {
     if (this.removedIds.has(view.workspaceId)) return
-    this.refreshFrames?.push({ type: 'upsert', workspace: view })
+    this.refreshFrames?.push({ type: location ? 'location' : 'upsert', workspace: view })
     const index = this.items.findIndex(item => item.getSnapshot().view?.workspaceId === view.workspaceId)
     // Mutation responses and changed frames race (two carriers, no ordering):
     // reject a snapshot strictly older than the installed projection so a
     // late unary response cannot roll back a newer frame.
     const installed = index === -1 ? undefined : this.items[index]?.getSnapshot().view
+    if (location && installed !== undefined) view = mergeWorkspaceLocation(installed, view)
     if (installed !== undefined && Date.parse(view.updatedAt) < Date.parse(installed.updatedAt)) return
     if (!this.committedOrder.includes(view.workspaceId)) {
       this.committedOrder = [view.workspaceId, ...this.committedOrder]
@@ -556,8 +565,22 @@ function upsertWorkspace(items: readonly WorkspaceView[], workspace: WorkspaceVi
     : items.map((item, position) => position === index ? workspace : item)
 }
 
+/** Preserve complete Workspace membership when applying a single-session location.
+ * @param previous - existing Workspace directory row.
+ * @param location - authenticated partial Workspace from session preparation.
+ * @returns the newer location and all known members.
+ */
+export function mergeWorkspaceLocation(previous: WorkspaceView, location: WorkspaceView): WorkspaceView {
+  const newest = Date.parse(previous.updatedAt) > Date.parse(location.updatedAt) ? previous : location
+  return { ...newest, sessionIds: [...new Set([...previous.sessionIds, ...location.sessionIds])] }
+}
+
 /** Replay one ordered delta over a baseline: upsert in place, or drop the removed id. */
 function applyWorkspaceDelta(items: readonly WorkspaceView[], delta: WorkspaceDelta): WorkspaceView[] {
+  if (delta.type === 'location') {
+    const previous = items.find(item => item.workspaceId === delta.workspace.workspaceId)
+    return upsertWorkspace(items, previous === undefined ? delta.workspace : mergeWorkspaceLocation(previous, delta.workspace))
+  }
   if (delta.type === 'upsert') return upsertWorkspace(items, delta.workspace)
   if (delta.type === 'remove') {
     return items.filter(workspace => workspace.workspaceId !== delta.workspaceId)

@@ -103,7 +103,7 @@ function signedPayload(value: unknown, privateKey: KeyObject): string {
   return `${payload}.${signature}`
 }
 
-function verifiedPayload(assertion: string, publicKey: KeyObject, label: string): unknown {
+export function verifiedPayload(assertion: string, publicKey: KeyObject, label: string): unknown {
   const parts = assertion.split('.')
   if (parts.length !== 2 || parts[0] === '' || parts[1] === '') throw new Error(`invalid ${label}`)
   const payload = parts[0]!
@@ -128,6 +128,10 @@ type PrincipalInput = {
     purpose?: GatewayPrincipalPurpose
     now?: number
   }
+
+// Windows V8 processes resample their own coarse system-clock baseline every minute.
+// One rounded-up 15.625 ms clock tick covers an immediately delivered assertion.
+const WINDOWS_PRINCIPAL_CLOCK_TICK_MS = 16
 
 /** Signs short-lived request principals for one Gateway organization. */
 export class GatewayPrincipalSigner {
@@ -175,7 +179,8 @@ export class GatewayPrincipalSigner {
   }
 
   private signPrincipal(input: PrincipalInput, lifetimeMs: number): string {
-    const issuedAt = input.now ?? Date.now()
+    const now = input.now ?? Date.now()
+    const issuedAt = process.platform === 'win32' ? now - WINDOWS_PRINCIPAL_CLOCK_TICK_MS : now
     const claims: GatewayPrincipalClaims = {
       version: 1,
       issuer: 'harness-gateway',
@@ -190,7 +195,7 @@ export class GatewayPrincipalSigner {
       scope: input.scope,
       runtime: input.runtime,
       issuedAt,
-      expiresAt: issuedAt + lifetimeMs,
+      expiresAt: now + lifetimeMs,
       nonce: randomUUID(),
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     }
@@ -204,6 +209,31 @@ export class GatewayPrincipalSigner {
       throw new Error('expired or foreign principal assertion')
     }
     return claims
+  }
+
+  /** Sign one bounded assertion that a peer Gateway verified its session already. */
+  issueForward(input: {
+    issuerNode: string
+    audienceNode: string
+    user: UserRow
+    selection?: { runtimeId: string | null; target: string | null }
+    context?: unknown
+    /** Exact request binding; without it the assertion is a bearer credential. */
+    request?: { method: string; path: string; sessionHash: string }
+    now?: number
+  }): string {
+    const now = input.now ?? Date.now()
+    const issuedAt = process.platform === 'win32' ? now - WINDOWS_PRINCIPAL_CLOCK_TICK_MS : now
+    const claims = {
+      version: 1, issuer: 'harness-gateway', audience: 'dsh-node',
+      issuerNode: input.issuerNode, audienceNode: input.audienceNode,
+      organization: this.organization, user: input.user,
+      ...(input.selection === undefined ? {} : { selection: input.selection }),
+      ...(input.context === undefined ? {} : { context: input.context }),
+      ...(input.request === undefined ? {} : { request: input.request }),
+      issuedAt, expiresAt: now + this.ttlMs, nonce: randomUUID(),
+    }
+    return signedPayload(claims, this.privateKey)
   }
 
   /** Issue a non-expiring capability for one lazy project-root materialization. */

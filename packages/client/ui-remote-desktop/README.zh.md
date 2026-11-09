@@ -29,7 +29,7 @@ kind: "package-reference"
 
 端点不可用时，标签页在确认、挂接或启动 RFB 之前停止。提示说明图形桌面与 VNC 前提，并允许明确重试状态读取。提供服务的节点本身没有 GUI 时，已配置的外部 VNC 目标仍可使用。
 
-标签页经 `ctx.remoteDesktops` 读取端点状态。当调用方的授权集尚未获得确认时，卡片标明确切级别——**仅查看**或**可操控**——以及管理员开启录制时的录制标志；**确认并连接**记录确认并完成挂载。当确认已覆盖授权时，标签页直接挂载。拒绝会以稳定能力码呈现本地化提示并提供**重试**。存活的附件显示有效级别并提供**断开连接**；已关闭的流提供**重新连接**，按已记录的确认重走 status → attach 流程。
+标签页经 `ctx.remoteDesktops` 读取端点状态。当调用方的授权集尚未获得确认时，卡片标明确切级别——**仅查看**或**可操控**——以及管理员开启录制时的录制标志；**确认并连接**记录确认并完成挂载。当确认已覆盖授权时，标签页直接挂载。拒绝会以稳定能力码呈现本地化提示并提供**重试**。存活的附件在切换标签页时保持正文挂载——该类型声明了 `keepMounted`，因此切换标签不会重新挂接，也不会重新挑战凭证——并在流存活后向面板请求一次全屏；操作者退出全屏后，直到正文重新挂载才会再次请求。存活工具栏带有有效级别与录制标志、**适应**/**1:1** 缩放切换（原始像素超出视口可拖动平移）、画质预设菜单、可操控授权下的 **Ctrl+Alt+Del**、面板全屏切换以及**断开连接**。已关闭的流提供**重新连接**，按已记录的确认重走 status → attach 流程。
 
 <a id="understand-the-implementation"></a>
 ## 实现解析
@@ -38,6 +38,8 @@ kind: "package-reference"
 <summary>实现细节——点击展开</summary>
 
 全部授权都在能力层执行：标签页仅通过 `ctx.remoteDesktops`（remote-desktop controller 的 client 半边）执行 `status → confirm → attach`，并用打包的 `@novnc/novnc` `RFB` 类挂载返回的 `ws(s)://` 流 URL。`viewOnly` 跟随挂载 spec 的级别，但 VNC provider 还会在流内部过滤客户端输入消息，因此伪造的操控请求在仅查看授权下仍无法注入输入。引导入口仅列出调用者当前会话可挂接的授权（`listGrants` 带 `attachable`），绑定其他会话的会话作用域授权不会成为目标。授权、级别、撤销与审计管理位于同级的 `ui-remote-desktop-admin` 设置节中。
+
+工具栏在存活流上就地调参而不重连：缩放对应 `scaleViewport` 或 `clipViewport`/`dragViewport`，预设对应 Tight `qualityLevel`/`compressionLevel`；`resizeSession` 请求具备 ExtendedDesktopSize 能力的服务器跟随容器尺寸，无此能力的服务器会忽略该请求。全屏请求经 `tab.actions.setPanelMode` 发出，即面板自身的显示模式动作。
 
 `openScreen` 回调属于注入面的一部分，因此测试可在没有 RFB 引擎的情况下挂载标签页主体。
 

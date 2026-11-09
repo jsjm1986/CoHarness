@@ -113,7 +113,7 @@
     "otherPeerWork": "REAL001 delay and REAL025 realtime completion projection remain open. Peer owns realtime UI projection.",
     "policyPackageReadability": "Peer reproduced missing policy-plugin imports for new B project29 although files exist: copied lib directories root:root mode0770 cannot be traversed by assigned UID993. Test runtime stopped; peer owns materializePolicyPackage in gateway/src/instances.ts. It will normalize published code permissions without opening workspace or credential directories.",
     "readiness": "Required Host plugin import failure can still advertise ready; recorded for further review after root readability repair, without claiming a diagnosed cause.",
-    "merge": "Apply only the sixteen B392 source paths onto the existing candidate. Preserve peer Local documentation/terminal changes. The cumulative capsule retains older Local reference inputs for provenance; rebuild combined packages and do not overwrite a newer peer Local artifact."
+    "merge": "Apply only the sixteen B392 source paths onto the existing candidate. Preserve peer Local documentation/terminal changes. The cumulative capsule retains older Local reference inputs as original-source evidence; rebuild combined packages and do not overwrite a newer peer Local artifact."
   },
   "externalSourceChangesExcluded": {
     "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",

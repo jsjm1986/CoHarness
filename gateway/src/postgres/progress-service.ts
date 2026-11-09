@@ -1,3 +1,5 @@
+import { NodeContentCollaboration,type CollaborationContentStore } from '../node-content-collaboration.ts'
+import {requireNodeContentRelations,type NodeContentCheckInput} from '../node-content-publication.ts'
 import type { RuntimeId } from '../runtime-catalog.ts'
 /**
  * Human-facing project progress journal. The digest sweep detects
@@ -11,8 +13,9 @@ import type { RuntimeId } from '../runtime-catalog.ts'
 import type { Pool, PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { attributionHeaders } from '@deepseek-ai/dsh-llm'
-import { transaction } from './database.ts'
-import { internalProjectId, type PostgresRuntimeContext } from './runtime-context.ts'
+import { transaction, type Queryable } from './database.ts'
+import { NodeContentUnavailable,type NodeContentBinding,type NodeContentStore } from '../node-content-store.ts'
+import { type PostgresRuntimeContext } from './runtime-context.ts'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type { GatewayModelGovernanceService } from '../services.ts'
 import type { PostgresCollaborationService } from './collaboration-service.ts'
@@ -161,6 +164,7 @@ interface MaterialRow {
   readonly text: string
 }
 
+interface JournalProject { id:string; schema:'harness'|'node_content'; binding?:NodeContentBinding; nameVersion?:string }
 interface StateRow {
   readonly watermark_ts: Date | null
   readonly watermark_session: string | null
@@ -187,56 +191,56 @@ interface JournalRow {
  * The `visible` CTE: project-visible root conversations of one project, with
  * display titles (same derivation the activity feed uses).
  */
-const VISIBLE_CTE = `visible AS (
-  SELECT r.organization_id,r.runtime_id,r.runtime_namespace,r.id,COALESCE(to_json(harness.human_session_title(r.title)), (SELECT harness.conversation_search_text(search.content,search.content_nul_parts,80)
-    FROM harness.conversation_search search
+const VISIBLE_CTE = (schema:JournalProject['schema']):string=>`visible AS (
+  SELECT r.organization_id,r.runtime_id,r.runtime_namespace,r.id,COALESCE(to_json(${schema}.human_session_title(r.title)), (SELECT ${schema}.conversation_search_text(search.content,search.content_nul_parts,80)
+    FROM ${schema}.conversation_search search
     WHERE search.organization_id=r.organization_id AND search.runtime_namespace=r.runtime_namespace AND search.session_id=r.id AND search.role='user'
-      AND harness.human_session_title(search.content) IS NOT NULL
+      AND ${schema}.human_session_title(search.content) IS NOT NULL
     ORDER BY search.occurred_at,search.event_seq LIMIT 1)) title
-  FROM harness.conversation_sessions r
+  FROM ${schema}.conversation_sessions r
   WHERE r.organization_id=$1 AND r.project_id=$2 AND r.id=r.root_session_id
     AND r.status<>'deleted' AND r.visibility='project'
 )`
 
 /** Count-only reads need source identities, without resolving display titles from message history. */
-const VISIBLE_ROOTS_CTE = `visible AS (SELECT r.organization_id,r.runtime_id,r.runtime_namespace,r.id FROM harness.conversation_sessions r
+const VISIBLE_ROOTS_CTE = (schema:JournalProject['schema']):string=>`visible AS (SELECT r.organization_id,r.runtime_id,r.runtime_namespace,r.id FROM ${schema}.conversation_sessions r
   WHERE r.organization_id=$1 AND r.project_id=$2 AND r.id=r.root_session_id
     AND r.status<>'deleted' AND r.visibility='project')`
 
 /** Exclude committed sources before joining and decoding their event JSON. */
-const MEMBER_INPUTS = `pending_messages AS MATERIALIZED (
-  SELECT s.organization_id,s.runtime_id,s.runtime_namespace,s.session_id,s.event_seq,s.content,s.content_nul_parts,s.role FROM harness.conversation_search s JOIN visible v ON v.organization_id=s.organization_id AND v.runtime_namespace=s.runtime_namespace AND v.id=s.session_id
+const MEMBER_INPUTS = (schema:JournalProject['schema']):string=>`pending_messages AS MATERIALIZED (
+  SELECT s.organization_id,s.runtime_id,s.runtime_namespace,s.session_id,s.event_seq,s.content,s.content_nul_parts,s.role FROM ${schema}.conversation_search s JOIN visible v ON v.organization_id=s.organization_id AND v.runtime_namespace=s.runtime_namespace AND v.id=s.session_id
   WHERE s.role='user' AND s.occurred_at>now()-($3::text||' days')::interval
-    AND ${unconsumedSql('s.session_id', "'message:'||s.event_seq::text", 's.runtime_namespace')}
+    AND ${unconsumedSql(schema,'s.session_id', "'message:'||s.event_seq::text", 's.runtime_namespace')}
 ), pending_answers AS MATERIALIZED (
   SELECT c.organization_id,c.runtime_id,c.runtime_namespace,c.conversation_id,c.interaction_id,c.call_id,c.outcome,c.responder_user_id,c.responded_at,c.interaction_kind
-    FROM harness.conversation_interaction_responses c JOIN visible v ON v.organization_id=c.organization_id AND v.runtime_namespace=c.runtime_namespace AND v.id=c.conversation_id
-  WHERE c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
+    FROM ${schema}.conversation_interaction_responses c JOIN visible v ON v.organization_id=c.organization_id AND v.runtime_namespace=c.runtime_namespace AND v.id=c.conversation_id
+  WHERE c.interaction_kind='question' AND ${schema==='harness'?"jsonb_typeof(c.outcome->'answers')='array'":'c.has_answers'}
     AND c.responded_at>now()-($3::text||' days')::interval
-    AND ${unconsumedSql('c.conversation_id', "'question:'||c.interaction_id", 'c.runtime_namespace')}
+    AND ${unconsumedSql(schema,'c.conversation_id', "'question:'||c.interaction_id", 'c.runtime_namespace')}
 )`
 
 /** Member-authored feed rows (messages plus claimed question answers). */
-const MEMBER_ROWS = `
+const MEMBER_ROWS = (schema:JournalProject['schema']):string=>`
   SELECT 'decision' kind, c.organization_id,c.runtime_id,c.runtime_namespace,c.conversation_id session_id, COALESCE(res.seq,-1) seq,
-    c.responded_at ts, NULL::json text, to_json(u.display_name) actor_label,
+    c.responded_at ts, NULL::json text, ${schema==='harness'?'to_json(u.display_name)':'NULL::json'} actor_label,c.responder_user_id responder,
     (call_args.query_fields->>'argumentsJson')::json question_args, c.outcome,
     'question:'||c.interaction_id entry_id
   FROM pending_answers c
   JOIN visible v ON v.organization_id=c.organization_id AND v.runtime_namespace=c.runtime_namespace AND v.id=c.conversation_id
-  JOIN harness.users u ON u.id=c.responder_user_id AND u.organization_id=c.organization_id
-  LEFT JOIN harness.conversation_events res ON res.organization_id=c.organization_id AND res.runtime_namespace=c.runtime_namespace AND res.session_id=c.conversation_id
+  ${schema==='harness'?'JOIN harness.users u ON u.id=c.responder_user_id AND u.organization_id=c.organization_id':''}
+  LEFT JOIN ${schema}.conversation_events res ON res.organization_id=c.organization_id AND res.runtime_namespace=c.runtime_namespace AND res.session_id=c.conversation_id
     AND res.event_type='tool/result' AND res.query_fields->>'callId'=c.call_id
-  LEFT JOIN harness.conversation_events call_args ON call_args.organization_id=c.organization_id AND call_args.runtime_namespace=c.runtime_namespace AND call_args.session_id=c.conversation_id
+  LEFT JOIN ${schema}.conversation_events call_args ON call_args.organization_id=c.organization_id AND call_args.runtime_namespace=c.runtime_namespace AND call_args.session_id=c.conversation_id
     AND call_args.event_type='tool/call' AND call_args.query_fields->>'callId'=c.call_id
-  WHERE c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
+  WHERE c.interaction_kind='question'
   UNION ALL
   SELECT 'member',e.organization_id,e.runtime_id,e.runtime_namespace,e.session_id,e.seq,e.occurred_at ts,
-    harness.conversation_search_text(search_row.content,search_row.content_nul_parts,500) text,
-    (e.query_fields->>'actorLabelJson')::json actor_label,
+    ${schema}.conversation_search_text(search_row.content,search_row.content_nul_parts,500) text,
+    (e.query_fields->>'actorLabelJson')::json actor_label,NULL::uuid responder,
     NULL, NULL, 'message:'||e.seq::text
   FROM pending_messages search_row
-  JOIN harness.conversation_events e ON e.organization_id=search_row.organization_id AND e.runtime_namespace=search_row.runtime_namespace AND e.session_id=search_row.session_id AND e.seq=search_row.event_seq
+  JOIN ${schema}.conversation_events e ON e.organization_id=search_row.organization_id AND e.runtime_namespace=search_row.runtime_namespace AND e.session_id=search_row.session_id AND e.seq=search_row.event_seq
   JOIN visible v ON v.organization_id=e.organization_id AND v.runtime_namespace=e.runtime_namespace AND v.id=e.session_id
   WHERE search_row.role='user' AND e.query_fields->>'actorUid' IS NOT NULL`
 
@@ -244,14 +248,14 @@ const MEMBER_ROWS = `
 const MATERIAL_RECEIPT = materialReceiptSql('f.session_id', 'f.entry_id')
 
 /** Arrival order and timestamp rounding cannot exclude an unconsumed source row. */
-const UNCONSUMED = unconsumedSql('f.session_id', 'f.entry_id', 'f.runtime_namespace')
+const UNCONSUMED = (schema:JournalProject['schema']):string=>unconsumedSql(schema,'f.session_id', 'f.entry_id', 'f.runtime_namespace')
 
 function materialReceiptSql(session: string, entry: string): string {
   return `pg_catalog.sha256(pg_catalog.convert_to(${session},'UTF8')||pg_catalog.decode('00','hex')||pg_catalog.convert_to(${entry},'UTF8'))`
 }
 
-function unconsumedSql(session: string, entry: string, runtimeNamespace: string): string {
-  return `NOT EXISTS(SELECT 1 FROM harness.project_journal_materials consumed
+function unconsumedSql(schema:JournalProject['schema'],session: string, entry: string, runtimeNamespace: string): string {
+  return `NOT EXISTS(SELECT 1 FROM ${schema}.project_journal_materials consumed
     WHERE consumed.organization_id=$1 AND consumed.project_id=$2 AND consumed.receipt=${materialReceiptSql(session, entry)}
       AND consumed.runtime_namespace=${runtimeNamespace} AND consumed.session_id=${session} AND consumed.entry_id=${entry})`
 }
@@ -418,9 +422,10 @@ export class PostgresProgressService {
     private readonly context: PostgresRuntimeContext,
     private readonly deps: {
       readonly collaboration: Pick<PostgresCollaborationService, 'projectForUser'>
+      readonly nodeContent?: CollaborationContentStore & Pick<NodeContentStore,'readVolume'> | undefined
       readonly governance?: GatewayModelGovernanceService | undefined
       readonly budget?: Pick<GatewayModelBudget, 'run'> | undefined
-      readonly usage?: Pick<PostgresProgressUsage, 'prepare' | 'complete' | 'flush'> | undefined
+      readonly usage?: (Pick<PostgresProgressUsage, 'prepare' | 'complete' | 'flush'> & Partial<Pick<PostgresProgressUsage,'verifyNodeContent'>>) | undefined
       readonly accessMonitor?: GatewayAccessMonitor | undefined
       /** Fresh maintenance and restored-data fence, evaluated after node admission. */
       readonly beforeDispatch?: (() => Promise<void>) | undefined
@@ -440,6 +445,17 @@ export class PostgresProgressService {
     })
   }
 
+  /** Check the live journal and its durable usage publisher on the selected node. */
+  async verifyNodeContent(input:NodeContentCheckInput):Promise<void>{
+    if(!this.deps.nodeContent || this.deps.usage?.verifyNodeContent===undefined || input.binding.nodeId!==this.context.nodeId
+      || input.binding.organizationId!==this.context.organizationId) throw new NodeContentUnavailable()
+    await this.deps.usage.verifyNodeContent(input)
+    await requireNodeContentRelations(input.local,['project_journal','project_journal_state','project_journal_materials'])
+    const project:JournalProject={id:input.binding.projectId,schema:'node_content',binding:input.binding}
+    await this.pending(project,input.local)
+    await this.entries(project,input.local)
+  }
+
   private get pool(): Pool { return this.context.pool }
 
   /**
@@ -451,29 +467,24 @@ export class PostgresProgressService {
    * @returns journal page with status
    */
   async progressForUser(projectId: number, userId: number): Promise<ProgressPage> {
-    const authority = await this.deps.collaboration.projectForUser(projectId, userId)
-    if (authority === null) throw new CollaborationDeniedError('not-member')
-    const internal = await internalProjectId(this.pool, this.context.organizationId, projectId)
-    if (internal === null) throw new CollaborationDeniedError('not-member')
-    const state = await this.stateRow(internal)
-    const pending = await this.pending(internal)
-    const entries = await this.entries(internal)
+    const authority = await this.deps.collaboration.projectForUser(projectId,userId)
+    if (!authority) throw new CollaborationDeniedError('not-member')
+    const internal = await this.availableProject(projectId)
     const enabled = this.config.enabled && this.deps.budget !== undefined && this.deps.usage !== undefined
       && (await this.resolveEndpoints(projectId)).length > 0
-    const status: ProgressStatus = {
-      enabled,
-      pending: pending.count,
-      generating: this.generating(state),
-      ...(state?.last_run_at == null ? {} : { lastRunAt: state.last_run_at.toISOString() }),
-      ...(state?.last_error == null ? {} : { lastError: state.last_error }),
-      canGenerate: authority.mode === 'rw' || authority.administrator,
+    const read = async (data:Queryable,canGenerate:boolean):Promise<ProgressPage> => {
+      const state = await this.stateRow(internal,data)
+      const pending = await this.pending(internal,data)
+      const entries = await this.entries(internal,data)
+      return {enabled, current: entries.find(entry=>entry.kind==='current'), periods: entries.filter(entry=>entry.kind==='period'),
+        status: {enabled,pending:pending.count,generating:this.generating(state),canGenerate,
+          ...(state?.last_run_at == null ? {} : {lastRunAt:state.last_run_at.toISOString()}),
+          ...(state?.last_error == null ? {} : {lastError:state.last_error})}}
     }
-    return {
-      enabled,
-      current: entries.find(entry => entry.kind === 'current'),
-      periods: entries.filter(entry => entry.kind === 'period'),
-      status,
+    if (internal.binding && this.deps.nodeContent) {
+      return new NodeContentCollaboration(this.pool,this.deps.nodeContent,internal.binding).withProjectRead(userId,projectId,read)
     }
+    return read(this.database(internal),authority.mode==='rw'||authority.administrator)
   }
 
   /**
@@ -493,8 +504,7 @@ export class PostgresProgressService {
     const authority = await this.deps.collaboration.projectForUser(projectId, userId)
     if (authority === null) throw new CollaborationDeniedError('not-member')
     if (authority.mode !== 'rw' && !authority.administrator) throw new CollaborationDeniedError('forbidden')
-    const internal = await internalProjectId(this.pool, this.context.organizationId, projectId)
-    if (internal === null) throw new CollaborationDeniedError('not-member')
+    const internal = await this.availableProject(projectId)
     if (this.closed || !this.config.enabled || this.deps.budget === undefined || this.deps.usage === undefined
       || (await this.resolveEndpoints(projectId)).length === 0) {
       return { started: false, reason: 'unavailable' }
@@ -542,8 +552,8 @@ export class PostgresProgressService {
     for (const candidate of candidates) {
       if (this.closed) return
       if (ran >= this.config.sweepMaxProjects) return
-      const internal = candidate.projectId
       try {
+        const project=candidate.publicId,internal=candidate
         const state = await this.stateRow(internal)
         if (this.generating(state)) continue
         const pending = await this.pending(internal)
@@ -553,27 +563,26 @@ export class PostgresProgressService {
         const spaced = state?.last_run_at == null || now - state.last_run_at.getTime() >= this.config.intervalMs
         const enough = pending.hasDecision || pending.count >= this.config.minActivity
         if (!quiet || !spaced || !enough) continue
-        const project = await this.publicIdOf(internal)
-        if (project === null) continue
         const lease = await this.acquire(internal)
         if (lease === null) continue
         await this.runPass(project, internal, lease)
         ran += 1
       } catch (error) {
         // One broken project must not starve the rest of the sweep.
-        console.error(`[gateway] project progress digest skipped ${internal}:`, error)
+        console.error(`[gateway] project progress digest skipped ${candidate.id}:`, error)
       }
     }
   }
 
   /** Local-computer projects with shared-visible member activity inside the scan window. */
-  private async candidates(): Promise<{ projectId: string }[]> {
-    const result = await this.pool.query<{ pid: string }>(`
+  private async candidates(): Promise<Array<JournalProject & {publicId:number}>> {
+    const result = await this.pool.query<{ pid: string;public_id:string }>(`
       WITH live_projects AS (SELECT p.id FROM harness.projects p JOIN harness.organizations o ON o.id=p.organization_id
         WHERE p.organization_id=$1 AND p.status='active' AND o.status='active'
           AND harness.project_node_id(p.organization_id,p.id)=$3
+          AND NOT EXISTS(SELECT FROM harness.project_content_placement b WHERE b.organization_id=p.organization_id AND b.project_id=p.id)
           AND EXISTS(SELECT 1 FROM harness.compute_nodes n WHERE n.id=$3 AND n.organization_id=$1 AND n.status='active'))
-      SELECT pid FROM (
+      SELECT pid,p.public_id::text FROM (
         SELECT r.project_id::text pid
         FROM harness.conversation_search s
         JOIN harness.conversation_sessions r ON r.organization_id=s.organization_id AND r.runtime_namespace=s.runtime_namespace AND r.id=s.session_id
@@ -589,18 +598,82 @@ export class PostgresProgressService {
         WHERE c.organization_id=$1 AND r.id=r.root_session_id AND r.status<>'deleted' AND r.visibility='project'
           AND c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
           AND c.responded_at > now() - ($2::text || ' days')::interval
-      ) recent GROUP BY pid`,
+      ) recent JOIN harness.projects p ON p.id=recent.pid::uuid AND p.organization_id=$1 GROUP BY pid,p.public_id`,
     [this.context.organizationId, String(this.config.materialWindowDays), this.context.nodeId])
-    return result.rows.map(row => ({ projectId: row.pid }))
+    const visible:Array<JournalProject & {publicId:number}>=result.rows.map(row=>({id:row.pid,publicId:Number(row.public_id),schema:'harness'}))
+    const placed=(await this.pool.query<{pid:string;public_id:string;key:NodeContentBinding & {nameVersion:string}}>(`SELECT b.project_id::text pid,p.public_id::text,
+      harness.project_content_key(b.organization_id,b.project_id) key FROM harness.project_content_placement b
+      JOIN harness.projects p ON (p.organization_id,p.id)=(b.organization_id,b.project_id) WHERE b.organization_id=$1 AND b.node_id=$2 AND p.status='active'`,
+    [this.context.organizationId,this.context.nodeId])).rows
+    if (!placed.length || !this.deps.nodeContent) return visible
+    let active:Set<string>
+    try {
+      const recent=await this.deps.nodeContent.readVolume(async local=>(await local.query<{id:string}>(`WITH allowed AS(
+        SELECT s.project_id,s.runtime_id,s.organization_id FROM jsonb_to_recordset($1::jsonb) k("organizationId" uuid,"projectId" uuid,"nodeId" uuid,"runtimeId" uuid,"volumeId" uuid,"writerEpoch" bigint)
+        JOIN node_content.spaces s ON (s.organization_id,s.project_id,s.node_id,s.runtime_id,s.volume_id,s.writer_epoch)=
+         (k."organizationId",k."projectId",k."nodeId",k."runtimeId",k."volumeId",k."writerEpoch") AND s.publication_state<>'retired' AND NOT EXISTS(SELECT FROM node_content.recovery_candidates rc
+           WHERE rc.organization_id=s.organization_id AND rc.runtime_id=s.runtime_id AND rc.phase<>'active')),
+        roots AS (SELECT r.organization_id,r.runtime_id,r.id,a.project_id FROM allowed a JOIN node_content.conversation_sessions r
+         ON (r.organization_id,r.project_id,r.runtime_id)=(a.organization_id,a.project_id,a.runtime_id)
+         WHERE r.id=r.root_session_id AND r.visibility='project' AND r.status<>'deleted')
+        SELECT r.project_id id FROM roots r JOIN node_content.conversation_search t ON (t.organization_id,t.runtime_id,t.session_id)=(r.organization_id,r.runtime_id,r.id)
+         WHERE t.role='user' AND t.occurred_at>now()-($2::text||' days')::interval
+        UNION SELECT r.project_id FROM roots r JOIN node_content.conversation_interaction_responses q ON (q.organization_id,q.runtime_id,q.conversation_id)=(r.organization_id,r.runtime_id,r.id)
+         WHERE q.interaction_kind='question' AND q.has_answers AND q.responded_at>now()-($2::text||' days')::interval`,
+      [JSON.stringify(placed.map(p=>p.key)),String(this.config.materialWindowDays)])).rows)
+      active=new Set(recent.map(r=>r.id))
+    } catch(error) {
+      if (!(error instanceof NodeContentUnavailable)) throw error
+      return visible
+    }
+    for(const p of placed) if(active.has(p.pid)) visible.push({id:p.pid,publicId:Number(p.public_id),schema:'node_content',binding:p.key,nameVersion:p.key.nameVersion})
+    return visible
+  }
+
+  private async availableProject(projectId:number):Promise<JournalProject> {
+    const result=await this.pool.query<{id:string;node_id:string|null;runtime_id:RuntimeId;volume_id:string;writer_epoch:string;name_version:string}>(`SELECT p.id,p.logical_name_id name_version,b.node_id,b.runtime_id,b.volume_id,b.writer_epoch::text
+      FROM harness.projects p LEFT JOIN harness.project_content_placement b ON b.organization_id=p.organization_id AND b.project_id=p.id
+      WHERE p.organization_id=$1 AND p.public_id=$2 AND p.status='active'`,[this.context.organizationId,projectId])
+    const row=result.rows[0]
+    if (!row) throw new CollaborationDeniedError('not-member')
+    if (row.node_id===null) return {id:row.id,schema:'harness'}
+    if (row.node_id!==this.context.nodeId || this.deps.nodeContent===undefined) throw new NodeContentUnavailable('The project journal requires its owning volume.')
+    return {id:row.id,schema:'node_content',nameVersion:row.name_version,binding:{organizationId:this.context.organizationId,projectId:row.id,nodeId:row.node_id,
+      runtimeId:row.runtime_id,volumeId:row.volume_id,writerEpoch:row.writer_epoch}}
+  }
+
+  private database(project:JournalProject,write=false):Queryable {
+    if (!project.binding) return this.pool
+    const binding=project.binding,store=this.deps.nodeContent
+    if (!store) throw new NodeContentUnavailable()
+    return {query:(sql,values)=> {
+      const execute=(tx:PoolClient)=>tx.query(sql,values===undefined?[]:[...values])
+      return write?this.contentTransaction(project,execute):store.read(binding,execute)
+    }}
+  }
+
+  private contentTransaction<T>(project:JournalProject,operation:(tx:PoolClient)=>Promise<T>):Promise<T> {
+    const b=project.binding
+    if (!b) return transaction(this.pool,operation)
+    const store=this.deps.nodeContent
+    if (!store) throw new NodeContentUnavailable()
+    return transaction(this.pool,async control=>{
+      const selected=await control.query(`SELECT FROM harness.project_content_placement b JOIN harness.projects p
+        ON (p.organization_id,p.id)=(b.organization_id,b.project_id) JOIN harness.organizations o ON o.id=p.organization_id
+        WHERE b.organization_id=$1 AND b.project_id=$2 AND b.runtime_id=$3 AND b.node_id=$4 AND b.volume_id=$5 AND b.writer_epoch=$6
+          AND p.status='active' AND o.status='active' FOR SHARE OF b,p,o`,[b.organizationId,b.projectId,b.runtimeId,b.nodeId,b.volumeId,b.writerEpoch])
+      if (selected.rowCount!==1) throw new NodeContentUnavailable('The project journal placement changed.')
+      return store.write(b,operation)
+    })
   }
 
   /** Unconsumed member-visible rows inside the source window, including delayed arrivals. */
-  private async pending(internal: string): Promise<{ count: number; latest: Date | null; hasDecision: boolean }> {
-    const result = await this.pool.query<{ pending: number; latest: Date | null; decided: boolean }>(`
-      WITH ${VISIBLE_ROOTS_CTE}, ${MEMBER_INPUTS}, feed AS (${MEMBER_ROWS})
+  private async pending(internal: JournalProject,query=this.database(internal)): Promise<{ count: number; latest: Date | null; hasDecision: boolean }> {
+    const result = await query.query<{ pending: number; latest: Date | null; decided: boolean }>(`
+      WITH ${VISIBLE_ROOTS_CTE(internal.schema)}, ${MEMBER_INPUTS(internal.schema)}, feed AS (${MEMBER_ROWS(internal.schema)})
       SELECT count(*)::int pending, max(f.ts) latest, coalesce(bool_or(f.kind='decision'),false) decided
       FROM feed f WHERE f.ts > now() - ($3::text || ' days')::interval`,
-    [this.context.organizationId, internal, String(this.config.materialWindowDays)])
+    [this.context.organizationId, internal.id, String(this.config.materialWindowDays)])
     const row = result.rows[0]
     return { count: Number(row?.pending ?? 0), latest: row?.latest ?? null, hasDecision: row?.decided === true }
   }
@@ -611,33 +684,39 @@ export class PostgresProgressService {
    * merged tail past `limit` may be missing rows, so callers consume only the
    * complete prefix and retain the rest for a later pass.
    */
-  private async material(internal: string): Promise<{ rows: MaterialRow[]; limit: MaterialRow | null }> {
-    const parameters = [this.context.organizationId, internal, String(this.config.materialWindowDays)]
-    const members = await this.pool.query<MaterialKeyRow & {
+  private async material(internal: JournalProject): Promise<{ rows: MaterialRow[]; limit: MaterialRow | null }> {
+    const parameters = [this.context.organizationId, internal.id, String(this.config.materialWindowDays)]
+    const members = await this.database(internal).query<MaterialKeyRow & {
       kind: 'decision' | 'member'; session_id: string; seq: string; ts: Date
-      text: string | null; actor_label: string | null; outcome: unknown; question_args: string | null
+      text: string | null; actor_label: string | null; outcome: unknown; question_args: string | null; responder:string|null
       title: string | null
     }>(`
-      WITH ${VISIBLE_CTE}, ${MEMBER_INPUTS}, feed AS (${MEMBER_ROWS})
+      WITH ${VISIBLE_CTE(internal.schema)}, ${MEMBER_INPUTS(internal.schema)}, feed AS (${MEMBER_ROWS(internal.schema)})
       SELECT f.*, v.title, ${MATERIAL_TIME} FROM feed f JOIN visible v ON v.organization_id=f.organization_id AND v.runtime_namespace=f.runtime_namespace AND v.id=f.session_id
       WHERE f.ts > now() - ($3::text || ' days')::interval
       ORDER BY f.ts, f.runtime_namespace COLLATE "C", f.session_id COLLATE "C", f.seq, f.entry_id COLLATE "C" LIMIT $4`,
     [...parameters, this.config.maxMaterialRows])
-    const agents = await this.pool.query<MaterialKeyRow & {
+    const agents = await this.database(internal).query<MaterialKeyRow & {
       session_id: string; seq: string; ts: Date; text: string | null; title: string | null
     }>(`
-      WITH ${VISIBLE_CTE}, feed AS (
+      WITH ${VISIBLE_CTE(internal.schema)}, feed AS (
         SELECT 'agent' kind, e.organization_id,e.runtime_id,e.runtime_namespace,e.session_id, e.seq, e.occurred_at ts,
-          harness.conversation_search_text(search_row.content,search_row.content_nul_parts,300) text, 'message:'||e.seq::text entry_id
-        FROM harness.conversation_search search_row
-        JOIN harness.conversation_events e ON e.organization_id=search_row.organization_id AND e.runtime_namespace=search_row.runtime_namespace AND e.session_id=search_row.session_id AND e.seq=search_row.event_seq
+          ${internal.schema}.conversation_search_text(search_row.content,search_row.content_nul_parts,300) text, 'message:'||e.seq::text entry_id
+        FROM ${internal.schema}.conversation_search search_row
+        JOIN ${internal.schema}.conversation_events e ON e.organization_id=search_row.organization_id AND e.runtime_namespace=search_row.runtime_namespace AND e.session_id=search_row.session_id AND e.seq=search_row.event_seq
         JOIN visible v ON v.organization_id=e.organization_id AND v.runtime_namespace=e.runtime_namespace AND v.id=e.session_id
         WHERE search_row.role='assistant')
       SELECT f.*, v.title, ${MATERIAL_TIME} FROM feed f JOIN visible v ON v.organization_id=f.organization_id AND v.runtime_namespace=f.runtime_namespace AND v.id=f.session_id
-      WHERE ${UNCONSUMED}
+      WHERE ${UNCONSUMED(internal.schema)}
         AND f.ts > now() - ($3::text || ' days')::interval
       ORDER BY f.ts, f.runtime_namespace COLLATE "C", f.session_id COLLATE "C", f.seq, f.entry_id COLLATE "C" LIMIT $4`,
     [...parameters, this.config.maxAssistantRows])
+    const responders=internal.binding ? [...new Set(members.rows.flatMap(r=>r.responder?[r.responder]:[]))] : []
+    const names=new Map<string,string>()
+    if (responders.length) {
+      const people=await this.pool.query<{id:string;display_name:string}>('SELECT id,display_name FROM harness.users WHERE organization_id=$1 AND id=ANY($2::uuid[])',[this.context.organizationId,responders])
+      for (const p of people.rows) names.set(p.id,p.display_name)
+    }
     const rows: MaterialRow[] = []
     for (const row of members.rows) {
       const text = row.kind === 'decision'
@@ -645,7 +724,7 @@ export class PostgresProgressService {
         : (row.text ?? '')
       rows.push({
         kind: row.kind, sessionId: row.session_id, sessionTitle: row.title,
-        actor: row.actor_label, ...materialKey(row), text,
+        actor: row.actor_label ?? (row.responder?names.get(row.responder)??null:null), ...materialKey(row), text,
       })
     }
     for (const row of agents.rows) {
@@ -669,16 +748,16 @@ export class PostgresProgressService {
   }
 
   /** Acquire or renew a generation only for an active project fixed to this computer. */
-  private async acquire(internal: string): Promise<string | null> {
+  private async acquire(internal: JournalProject): Promise<string | null> {
     const lease = randomUUID()
-    const result = await this.pool.query(
-      `INSERT INTO harness.project_journal_state(organization_id,project_id,generating_since,updated_at,generation_id)
-       SELECT $1,id,now(),now(),$4 FROM harness.projects
-       WHERE organization_id=$1 AND id=$2 AND status='active' AND harness.project_node_id(organization_id,id)=$5
+    const result = await this.database(internal,true).query(
+      `INSERT INTO ${internal.schema}.project_journal_state(organization_id,project_id,generating_since,updated_at,generation_id)
+       ${internal.binding ? "SELECT $1,project_id,now(),now(),$4 FROM node_content.spaces WHERE organization_id=$1 AND project_id=$2 AND node_id=$5"
+          : "SELECT $1,id,now(),now(),$4 FROM harness.projects WHERE organization_id=$1 AND id=$2 AND status='active' AND harness.project_node_id(organization_id,id)=$5"}
        ON CONFLICT (project_id) DO UPDATE SET generating_since=now(),updated_at=now(),generation_id=excluded.generation_id
-         WHERE harness.project_journal_state.generating_since IS NULL
-            OR harness.project_journal_state.generating_since < now() - ($3::text || ' milliseconds')::interval`,
-      [this.context.organizationId, internal, String(this.config.leaseMs), lease, this.context.nodeId])
+         WHERE ${internal.schema}.project_journal_state.generating_since IS NULL
+            OR ${internal.schema}.project_journal_state.generating_since < now() - ($3::text || ' milliseconds')::interval`,
+      [this.context.organizationId, internal.id, String(this.config.leaseMs), lease, this.context.nodeId])
     return result.rowCount === 1 ? lease : null
   }
 
@@ -687,12 +766,12 @@ export class PostgresProgressService {
    * covering entries, source receipts and progress position. Failures record
    * `last_error` and leave source receipts uncommitted for a later pass.
    */
-  private runPass(publicId: number, internal: string, lease: string, actorId = 0): Promise<void> {
+  private runPass(publicId: number, internal: JournalProject, lease: string, actorId = 0): Promise<void> {
     const operation = () => this.runPassOwned(publicId, internal, lease, actorId)
     return this.deps.trackWrite === undefined ? operation() : this.deps.trackWrite(operation)
   }
 
-  private async runPassOwned(publicId: number, internal: string, lease: string, actorId: number): Promise<void> {
+  private async runPassOwned(publicId: number, internal: JournalProject, lease: string, actorId: number): Promise<void> {
     const pass = { projectId: publicId, actorId, controller: new AbortController() }
     const signal = AbortSignal.any([this.stop.signal, pass.controller.signal])
     try {
@@ -709,7 +788,7 @@ export class PostgresProgressService {
       const material = receipts.filter(row => row.text !== '')
       if (material.length === 0) {
         if (receipts.length === 0) await this.clearLease(internal, lease)
-        else await transaction(this.pool, async client => {
+        else await this.contentTransaction(internal, async client => {
           await this.deps.assertDataEpoch?.()
           signal.throwIfAborted()
           await this.assertVisible(client, internal, receipts)
@@ -760,35 +839,35 @@ export class PostgresProgressService {
       const content = resolveDigestOutput(raw, material, this.config.maxItemsPerSection)
       const last = material[material.length - 1]!
       const memberRows = material.filter(row => row.kind !== 'agent').length
-      await transaction(this.pool, async (client) => {
+      await this.contentTransaction(internal, async (client) => {
         await this.deps.assertDataEpoch?.()
         signal.throwIfAborted()
         await this.assertVisible(client, internal, receipts)
         await this.renewLease(client, internal, lease)
-        await client.query(`INSERT INTO harness.project_journal(
+        await client.query(`INSERT INTO ${internal.schema}.project_journal(
             organization_id,project_id,kind,content,activity_count,model,generated_at,created_at,updated_at)
           VALUES($1,$2,'current',$3::json,$4,$5,now(),now(),now())
           ON CONFLICT (organization_id,project_id) WHERE kind='current'
           DO UPDATE SET content=excluded.content,activity_count=excluded.activity_count,
             model=excluded.model,generated_at=excluded.generated_at,invalidated_at=NULL,updated_at=now()`,
-        [this.context.organizationId, internal, JSON.stringify(content), memberRows, model])
-        await client.query(`INSERT INTO harness.project_journal(
+        [this.context.organizationId, internal.id, JSON.stringify(content), memberRows, model])
+        await client.query(`INSERT INTO ${internal.schema}.project_journal(
             organization_id,project_id,kind,period_key,content,activity_count,
             period_start,period_end,model,generated_at,created_at,updated_at)
           VALUES($1,$2,'period',$3,$4::json,$5,$6,$7,$8,now(),now(),now())
           ON CONFLICT (organization_id,project_id,period_key) WHERE kind='period'
           DO UPDATE SET content=excluded.content,activity_count=excluded.activity_count,
             period_end=excluded.period_end,model=excluded.model,generated_at=excluded.generated_at,invalidated_at=NULL,updated_at=now()`,
-        [this.context.organizationId, internal, periodKey, JSON.stringify(content), memberRows,
+        [this.context.organizationId, internal.id, periodKey, JSON.stringify(content), memberRows,
           material[0]!.timestamp, last.timestamp, model])
         await this.recordReceipts(client, internal, receipts)
-        await client.query(`UPDATE harness.project_journal_state
+        await client.query(`UPDATE ${internal.schema}.project_journal_state
           SET (watermark_ts,watermark_runtime_namespace,watermark_session,watermark_seq)=(
             SELECT ts,namespace,sid,seq FROM (VALUES(watermark_ts,watermark_runtime_namespace,watermark_session,watermark_seq),($3::timestamptz,$7::text,$4::text,$5::bigint))
               AS keys(ts,namespace,sid,seq) ORDER BY ts DESC NULLS LAST,namespace COLLATE "C" DESC NULLS LAST,sid COLLATE "C" DESC NULLS LAST,seq DESC NULLS LAST LIMIT 1),
             last_run_at=now(),generating_since=NULL,last_error=NULL,updated_at=now()
           WHERE organization_id=$1 AND project_id=$2 AND generation_id=$6`,
-        [this.context.organizationId, internal,
+        [this.context.organizationId, internal.id,
           last.timestamp, last.sessionId, last.seq, lease, last.runtimeNamespace])
         signal.throwIfAborted()
       })
@@ -907,7 +986,7 @@ export class PostgresProgressService {
   }
 
   /** One non-streaming OpenAI-completions request bounded by the request timeout. */
-  private async callModel(projectId: number, internal: string, lease: string, material: readonly MaterialRow[],
+  private async callModel(projectId: number, internal: JournalProject, lease: string, material: readonly MaterialRow[],
     actorId: number, previous: DigestEndpoint, prompt: string, callerSignal: AbortSignal): Promise<string> {
     const budget = this.deps.budget
     const usageJournal = this.deps.usage
@@ -920,8 +999,8 @@ export class PostgresProgressService {
       const active = await this.pool.query(`SELECT 1 FROM harness.projects WHERE organization_id=$1 AND public_id=$2 AND status='active' AND harness.project_node_id(organization_id,id)=$3 AND harness.project_node_id(organization_id,id)=$3`,
         [this.context.organizationId, projectId, this.context.nodeId])
       if (active.rowCount !== 1) throw new Error('Project is no longer active')
-      await this.renewLease(this.pool, internal, lease)
-      await this.assertVisible(this.pool, internal, material)
+      await this.renewLease(this.database(internal,true), internal, lease)
+      await this.contentTransaction(internal,tx=>this.assertVisible(tx, internal, material))
       if (actorId !== 0) {
         const authority = await this.deps.collaboration.projectForUser(projectId, actorId)
         if (authority === null || (authority.mode !== 'rw' && !authority.administrator)) throw new CollaborationDeniedError('forbidden')
@@ -931,8 +1010,8 @@ export class PostgresProgressService {
       admissionSignal.throwIfAborted()
       const request: ProgressModelRequest = { model: endpoint.model, messages: [{ role: 'user', content: prompt }],
         max_tokens: endpoint.maxOutputTokens, temperature: 0.2, stream: false }
-      const id = await usageJournal.prepare({ projectId, internalProjectId: internal, actorId, operationId,
-        provider: endpoint.provider, credentialSource: endpoint.credentialSource, request })
+      const id = await usageJournal.prepare({ projectId, internalProjectId: internal.id, actorId, operationId,
+        provider: endpoint.provider, credentialSource: endpoint.credentialSource, request },internal.binding)
       const signal = AbortSignal.any([admissionSignal, AbortSignal.timeout(this.config.requestTimeoutMs)])
       let status: ProgressRequestOutcome['status'] = 'failed', usage: ProgressRequestOutcome['usage'], response: string | undefined
       let failed: unknown
@@ -966,8 +1045,8 @@ export class PostgresProgressService {
       } finally {
         try {
           await usageJournal.complete(id, { status, ...(usage === undefined ? {} : { usage }),
-            ...(response === undefined ? {} : { response }) })
-          await usageJournal.flush(id)
+            ...(response === undefined ? {} : { response }) },internal.binding)
+          await usageJournal.flush(id,internal.binding)
         } catch (error) {
           throw new ProgressUsageDeliveryError('Digest usage remains pending delivery', {
             cause: failed === undefined ? error : new AggregateError([failed, error], 'Model request and usage delivery failed'),
@@ -978,10 +1057,10 @@ export class PostgresProgressService {
   }
 
   /** Read the per-project digest state row, if any. */
-  private async stateRow(internal: string): Promise<StateRow | undefined> {
-    const result = await this.pool.query<StateRow>(`SELECT watermark_ts,watermark_runtime_namespace,watermark_session,watermark_seq,
-      last_run_at,generating_since,last_error FROM harness.project_journal_state
-      WHERE organization_id=$1 AND project_id=$2`, [this.context.organizationId, internal])
+  private async stateRow(internal: JournalProject,data=this.database(internal)): Promise<StateRow | undefined> {
+    const result = await data.query<StateRow>(`SELECT watermark_ts,watermark_runtime_namespace,watermark_session,watermark_seq,
+      last_run_at,generating_since,last_error FROM ${internal.schema}.project_journal_state
+      WHERE organization_id=$1 AND project_id=$2`, [this.context.organizationId, internal.id])
     return result.rows[0]
   }
 
@@ -992,12 +1071,12 @@ export class PostgresProgressService {
   }
 
   /** Journal rows of one project: current first, then periods newest-first. */
-  private async entries(internal: string): Promise<ProgressEntry[]> {
-    const result = await this.pool.query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
-      period_start,period_end,model,generated_at FROM harness.project_journal
+  private async entries(internal: JournalProject,query=this.database(internal)): Promise<ProgressEntry[]> {
+    const result = await query.query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
+      period_start,period_end,model,generated_at FROM ${internal.schema}.project_journal
       WHERE organization_id=$1 AND project_id=$2 AND invalidated_at IS NULL
       ORDER BY CASE kind WHEN 'current' THEN 0 ELSE 1 END, period_key DESC LIMIT 26`,
-    [this.context.organizationId, internal])
+    [this.context.organizationId, internal.id])
     return result.rows.map(row => ({
       id: row.id,
       kind: row.kind,
@@ -1012,42 +1091,34 @@ export class PostgresProgressService {
   }
 
   /** The period entry currently open for `periodKey`, if any. */
-  private async periodEntry(internal: string, periodKey: string): Promise<JournalRow | undefined> {
-    const result = await this.pool.query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
-      period_start,period_end,model,generated_at FROM harness.project_journal
+  private async periodEntry(internal: JournalProject, periodKey: string): Promise<JournalRow | undefined> {
+    const result = await this.database(internal).query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
+      period_start,period_end,model,generated_at FROM ${internal.schema}.project_journal
       WHERE organization_id=$1 AND project_id=$2 AND invalidated_at IS NULL AND kind='period' AND period_key=$3`,
-    [this.context.organizationId, internal, periodKey])
+    [this.context.organizationId, internal.id, periodKey])
     return result.rows[0]
   }
 
   /** The rolling current entry, if any. */
-  private async currentEntry(internal: string): Promise<JournalRow | undefined> {
-    const result = await this.pool.query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
-      period_start,period_end,model,generated_at FROM harness.project_journal
+  private async currentEntry(internal: JournalProject): Promise<JournalRow | undefined> {
+    const result = await this.database(internal).query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
+      period_start,period_end,model,generated_at FROM ${internal.schema}.project_journal
       WHERE organization_id=$1 AND project_id=$2 AND invalidated_at IS NULL AND kind='current'`,
-    [this.context.organizationId, internal])
+    [this.context.organizationId, internal.id])
     return result.rows[0]
   }
 
-  private async publicIdOf(internal: string): Promise<number | null> {
-    const result = await this.pool.query<{ public_id: string }>(
-      'SELECT public_id::text FROM harness.projects WHERE organization_id=$1 AND id=$2 AND harness.project_node_id(organization_id,id)=$3',
-      [this.context.organizationId, internal, this.context.nodeId])
-    const value = result.rows[0]?.public_id
-    return value === undefined ? null : Number(value)
-  }
-
-  private async projectName(internal: string): Promise<string | undefined> {
-    const result = await this.pool.query<{ name: string }>(
-      'SELECT name FROM harness.projects WHERE organization_id=$1 AND id=$2',
-      [this.context.organizationId, internal])
+  private async projectName(internal: JournalProject): Promise<string | undefined> {
+    const result=await this.database(internal).query<{name:string}>(internal.binding
+      ? 'SELECT node_content.project_name_at($1,$2,$3,$4) name'
+      : 'SELECT name FROM harness.projects WHERE organization_id=$1 AND id=$2',[this.context.organizationId,internal.id,...internal.binding?[internal.binding.runtimeId,internal.nameVersion]:[]])
     return result.rows[0]?.name
   }
 
-  private async clearLease(internal: string, lease: string, client: Pick<Pool, 'query'> = this.pool): Promise<void> {
-    await client.query(`UPDATE harness.project_journal_state
+  private async clearLease(internal: JournalProject, lease: string, client: Queryable = this.database(internal,true)): Promise<void> {
+    await client.query(`UPDATE ${internal.schema}.project_journal_state
       SET generating_since=NULL,last_error=NULL,updated_at=now() WHERE organization_id=$1 AND project_id=$2 AND generation_id=$3`,
-    [this.context.organizationId, internal, lease])
+    [this.context.organizationId, internal.id, lease])
   }
 
   /**
@@ -1055,44 +1126,43 @@ export class PostgresProgressService {
    * failed attempt still stamps `last_run_at`, so the interval gate backs off
    * repeated failures instead of retrying on every sweep tick.
    */
-  private async fail(internal: string, lease: string, message: string): Promise<void> {
-    await this.pool.query(`UPDATE harness.project_journal_state
+  private async fail(internal: JournalProject, lease: string, message: string): Promise<void> {
+    await this.database(internal,true).query(`UPDATE ${internal.schema}.project_journal_state
       SET generating_since=NULL,last_error=$3,last_run_at=now(),updated_at=now()
       WHERE organization_id=$1 AND project_id=$2 AND generation_id=$4`,
-    [this.context.organizationId, internal, message.slice(0, 500), lease])
+    [this.context.organizationId, internal.id, message.slice(0, 500), lease])
   }
 
   /** Retain or lock the exact digest generation before dispatch and before publishing either journal entry. */
-  private async renewLease(client: Pick<Pool, 'query'>, internal: string, lease: string): Promise<void> {
-    const result = await client.query(`UPDATE harness.project_journal_state SET generating_since=now(),updated_at=now()
+  private async renewLease(client:Queryable, internal: JournalProject, lease: string): Promise<void> {
+    const result = await client.query(`UPDATE ${internal.schema}.project_journal_state SET generating_since=now(),updated_at=now()
       WHERE organization_id=$1 AND project_id=$2 AND generation_id=$3 RETURNING project_id`,
-    [this.context.organizationId, internal, lease])
+    [this.context.organizationId, internal.id, lease])
     if (result.rowCount !== 1) throw new Error('Project progress generation was superseded')
   }
 
   /** Recheck shared source visibility after admission and lock it through the journal transaction. */
-  private async assertVisible(client: Pick<Pool, 'query'>, internal: string, material: readonly MaterialRow[]): Promise<void> {
+  private async assertVisible(client:Queryable, internal: JournalProject, material: readonly MaterialRow[]): Promise<void> {
     const identities = [...new Map(material.map(row => [JSON.stringify([row.runtimeNamespace, row.sessionId]), row])).values()]
     const result = await client.query(`SELECT source.id FROM
       unnest($3::text[],$4::text[]) selected(runtime_namespace,session_id)
-      JOIN harness.conversation_sessions source ON source.organization_id=$1 AND source.project_id=$2
+      JOIN ${internal.schema}.conversation_sessions source ON source.organization_id=$1 AND source.project_id=$2
         AND source.runtime_namespace=selected.runtime_namespace AND source.id=selected.session_id
       WHERE source.id=source.root_session_id AND source.status<>'deleted' AND source.visibility='project'
-        AND EXISTS(SELECT 1 FROM harness.projects p JOIN harness.organizations o ON o.id=p.organization_id
-          WHERE p.id=$2 AND p.organization_id=$1 AND p.status='active' AND o.status='active'
-            AND harness.project_node_id(p.organization_id,p.id)=$5)
+        AND ${internal.binding ? 'EXISTS(SELECT FROM node_content.spaces p WHERE p.project_id=$2 AND p.organization_id=$1 AND p.node_id=$5)'
+          : "EXISTS(SELECT FROM harness.projects p JOIN harness.organizations o ON o.id=p.organization_id WHERE p.id=$2 AND p.organization_id=$1 AND p.status='active' AND o.status='active' AND harness.project_node_id(p.organization_id,p.id)=$5)"}
       ORDER BY source.runtime_namespace COLLATE "C",source.id COLLATE "C" FOR SHARE OF source`,
-    [this.context.organizationId, internal, identities.map(row => row.runtimeNamespace), identities.map(row => row.sessionId), this.context.nodeId])
+    [this.context.organizationId, internal.id, identities.map(row => row.runtimeNamespace), identities.map(row => row.sessionId), this.context.nodeId])
     if (result.rows.length !== identities.length) throw new Error('Project progress material is no longer shared')
   }
 
   /** Commit exact source identities with the publication that consumed them. */
-  private async recordReceipts(client: Pick<Pool, 'query'>, internal: string, material: readonly MaterialRow[]): Promise<void> {
+  private async recordReceipts(client:Queryable, internal: JournalProject, material: readonly MaterialRow[]): Promise<void> {
     if (material.length === 0) return
-    await client.query(`INSERT INTO harness.project_journal_materials(organization_id,project_id,runtime_id,session_id,entry_id,receipt)
+    await client.query(`INSERT INTO ${internal.schema}.project_journal_materials(organization_id,project_id,runtime_id,session_id,entry_id,receipt)
       SELECT $1,$2,f.runtime_id,f.session_id,f.entry_id,${MATERIAL_RECEIPT}
       FROM unnest($3::text[],$4::text[],$5::uuid[]) AS f(session_id,entry_id,runtime_id) ON CONFLICT DO NOTHING`,
-    [this.context.organizationId, internal, material.map(row => row.sessionId), material.map(row => row.entryId), material.map(row => row.runtimeId)])
+    [this.context.organizationId, internal.id, material.map(row => row.sessionId), material.map(row => row.entryId), material.map(row => row.runtimeId)])
   }
 }
 

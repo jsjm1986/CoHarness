@@ -89,7 +89,10 @@ it('shows the exact target and saves only explicit confirmation and withdrawal g
   render(<DesktopConfirmationAction {...f.props} />)
   // The trigger's status dot reads eagerly at mount; opening still refreshes.
   await waitFor(() => { expect(f.status).toHaveBeenCalledOnce() })
+  expect(f.status.mock.calls[0]?.[2]).toBe('low')
   fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
+  await waitFor(() => { expect(f.status).toHaveBeenCalledTimes(2) })
+  expect(f.status.mock.calls[1]?.[2]).toBeUndefined()
   await screen.findByText('display-0')
   expect(screen.getByText('root')).toBeTruthy()
   expect(screen.getByText('node')).toBeTruthy()

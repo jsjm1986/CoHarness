@@ -23,6 +23,7 @@ import { RuntimeCatalogError, type RuntimeCatalogEntry, type RuntimeId, type Run
 import { NodeAccessError, type NodeCredential, type NodeLease } from '../src/node-access.ts'
 import { GatewayNodeChannels } from '../src/node-channel.ts'
 import { runNodeChannel } from '../src/node-channel-client.ts'
+import { NodeDialer, type NodeDialReason } from '../src/node-dialer.ts'
 import { loadNodeChannelClientLimits, NODE_CHANNEL_PROTOCOL } from '../src/node-channel-protocol.ts'
 import { GatewayNodeServices, loadNodeServiceConfig } from '../src/node-service.ts'
 import { GatewayNodeServiceProxy } from '../src/node-service-proxy.ts'
@@ -56,7 +57,15 @@ async function close(server: Server): Promise<void> {
   await new Promise<void>((done, reject) => { server.close(error => { if (error) reject(error); else done() }) })
 }
 
-async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false) {
+/** A closed loopback port: the first dial candidate answers ECONNREFUSED. */
+async function deadPort(): Promise<string> {
+  const probe = createServer()
+  const url = await listen(probe)
+  await close(probe)
+  return url
+}
+
+async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false, dialFallback = false) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-node-service-'))
   releases.push(() => rm(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'accounts.sqlite'))
@@ -191,8 +200,11 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   })
   const remoteBase = await listen(remote), base = await listen(center)
   centerConfig.publicOrigins.push(base); remoteConfig.publicOrigins.push(base, remoteBase)
-  agent = runNodeChannel({ centerUrl: base, credential, lease,
-    limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: 60_000,
+  const dialEvents: Array<{ origin: string; reason: NodeDialReason }> = []
+  const dialUrls = dialFallback ? [await deadPort(), base] : [base]
+  agent = runNodeChannel({ dialer: new NodeDialer(dialUrls, 60_000, (origin, reason) => { dialEvents.push({ origin, reason }) }),
+    credential, lease,
+    limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: dialFallback ? 5 : 60_000,
     localGatewayUrl: remoteBase, maxServices: centerConfig.nodeService.maxPerNode }, agentStop.signal,
   event => { if (event.status === 'channel-ready') ready.resolve() },
   async () => ({ platform: 'linux', architecture: 'x64', uptimeSeconds: 1, executionReady: false }))
@@ -205,7 +217,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   }
   const cookie = await login('owner')
   return { base, remoteBase, nodeId, localNodeId, environment, cookie, login, admin, users, channels, services, proxy, lease, credential, centerDeps,
-    remoteStarts, localStarts,
+    remoteStarts, localStarts, dialEvents,
     slow, slowResponse, counters: () => ({ localCalls, remoteCalls }), remoteHttpConnections: () => remoteHttpSockets.size,
     disableForwarding: () => { centerDeps.nodeServiceProxy = undefined },
     misbind: () => { remoteDeps.nodeServiceIdentity!.nodeId = localNodeId },
@@ -213,7 +225,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     replaceChannel: async () => {
       Object.assign(lease, { connectionId: randomUUID(), epoch: String(BigInt(lease.epoch) + 1n) })
       const stop = new AbortController(), replacementReady = deferred<void>()
-      const replacement = runNodeChannel({ centerUrl: base, credential, lease: { ...lease },
+      const replacement = runNodeChannel({ dialer: new NodeDialer([base], 60_000, () => {}), credential, lease: { ...lease },
         limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: 60_000,
         localGatewayUrl: remoteBase, maxServices: centerConfig.nodeService.maxPerNode }, stop.signal,
       event => { if (event.status === 'channel-ready') replacementReady.resolve() },
@@ -264,13 +276,24 @@ it('keeps the idle outbound control socket active independently of authority ren
     socket.send(JSON.stringify({ ...lease, kind: 'ready', channelVersion: 1 }))
   })
   const origin = await listen(server)
-  channel = runNodeChannel({ centerUrl: origin, credential: `dsh_node_${randomBytes(32).toString('base64url')}` as NodeCredential,
+  channel = runNodeChannel({ dialer: new NodeDialer([origin], 60_000, () => {}),
+    credential: `dsh_node_${randomBytes(32).toString('base64url')}` as NodeCredential,
     lease, limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: 60_000 }, stop.signal, () => {})
   await ping.promise
   stop.abort()
   await channel
   await closed.promise
   expect(sockets.clients.size).toBe(0)
+})
+
+it('dials the channel and its service streams through the next candidate after a refusal', async () => {
+  const f = await fixture({}, false, false, true)
+  expect(f.dialEvents).toEqual([{ origin: f.base, reason: 'node-dial/transport-failure' }])
+  const response = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, {
+    method: 'POST', headers: { cookie: f.cookie, origin: f.base, 'content-type': 'application/octet-stream' }, body: 'x',
+  })
+  expect(response.status).toBe(200)
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
 })
 
 it('forwards an exact remote environment with the existing login and streams binary request chunks', async () => {
@@ -401,6 +424,55 @@ it('pins the browser SVG icon to its referring tab when several personal Runtime
   expect(response.url).toBe(`${f.base}/favicon.svg?dshRuntime=${f.environment.id}`)
   expect(await response.json()).toMatchObject({ node: f.nodeId, runtime: f.environment.id, path: `/favicon.svg?dshRuntime=${f.environment.id}` })
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
+})
+
+it('forwards content-addressed browser assets to the referring Runtime without redirecting', async () => {
+  const f = await fixture({}, true)
+  const referer = `${f.base}/?dshRuntime=${f.environment.id}`
+  const forwarded = [
+    '/assets/index-ABc12345.js',
+    '/plugins/combo.js??@deepseek-ai/dsh-client-modules/client.js&rev=abcdef123456',
+    '/plugins/@deepseek-ai/dsh-client-modules/client.lazy.js?rev=abcdef123456',
+    '/plugins/@deepseek-ai/dsh-client-modules/client.lazy.js.map?rev=abcdef123456',
+  ]
+  for (const path of forwarded) {
+    const response = await fetch(`${f.base}${path}`, { headers: { cookie: f.cookie, referer }, redirect: 'manual' })
+    expect(response.status).toBe(200)
+    expect(response.url).toBe(`${f.base}${path}`)
+    const value = await response.json() as { node: string, runtime: string, path: string }
+    expect(value.node).toBe(f.nodeId)
+    expect(value.runtime).toBe(f.environment.id)
+    expect(value.path).toBe(`${path}${path.includes('?') ? '&' : '?'}dshRuntime=${f.environment.id}`)
+  }
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: forwarded.length })
+})
+
+it('keeps pinning runtime-specific and unrevisioned browser resource URLs', async () => {
+  const f = await fixture({}, true)
+  const referer = `${f.base}/?dshRuntime=${f.environment.id}`
+  for (const path of [
+    '/plugins/events',
+    '/plugins/combo.js',
+    '/plugins/@deepseek-ai/dsh-client-modules/client.js',
+    '/plugins/@deepseek-ai/dsh-client-modules/client.lazy.js',
+    '/assets/plugin-client.js',
+  ]) {
+    const response = await fetch(`${f.base}${path}`, { headers: { cookie: f.cookie, referer }, redirect: 'manual' })
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe(`${path}?dshRuntime=${f.environment.id}`)
+    await response.arrayBuffer()
+  }
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+})
+
+it('rejects an unauthenticated content-addressed asset before any forwarding', async () => {
+  const f = await fixture({}, true)
+  const response = await fetch(`${f.base}/plugins/combo.js??@deepseek-ai/dsh-client-modules/client.js&rev=abcdef123456`, {
+    headers: { referer: `${f.base}/?dshRuntime=${f.environment.id}` }, redirect: 'manual',
+  })
+  expect(response.status).toBe(401)
+  await response.arrayBuffer()
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
 })
 
 it('delivers parsed scope changes to the existing owning service and rejects selector conflicts before starting', async () => {
@@ -603,6 +675,58 @@ it('refuses inaccessible environments and mismatched targets without a local fal
     expect(response.status).toBe(status); await response.arrayBuffer()
   }
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+})
+
+it('checks the selected computer before each versioned operation on the primary and directly on the owner', async () => {
+  const f = await fixture({}, true)
+  const services = ['/api/prepare/v1/session.create', '/api/prepare/v1/session.history',
+    '/api/admit/v1/session.prompt', '/api/admit/v1/session.status']
+  const send = async (base: string, path: string, selector: string, forwardedTo?: string) => {
+    const response = await fetch(`${base}${path}?dshRuntime=${f.environment.id}&dshTarget=personal${selector}`, {
+      method: 'POST', headers: { cookie: f.cookie, origin: base,
+        ...(forwardedTo ? { [NODE_SERVICE_TARGET_HEADER]: forwardedTo } : {}) },
+      ...(path === '/account/api/scope' ? { body: JSON.stringify({ kind: 'personal' }) } : {}),
+    })
+    await response.arrayBuffer()
+    return response.status
+  }
+  for (const path of [...services, '/account/api/scope']) {
+    // The first hop already chose this Gateway. A move cannot turn the receiver into a second forwarder.
+    expect(await send(f.base, path, '', f.localNodeId)).toBe(409)
+    for (const base of [f.base, f.remoteBase]) {
+      expect(await send(base, path, '&dshNode=' + f.localNodeId)).toBe(400)
+      expect(await send(base, path, `&dshNode=${f.nodeId}&dshNode=${f.localNodeId}`)).toBe(400)
+    }
+  }
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+  expect(f.remoteStarts).toEqual([])
+  for (const path of services) {
+    expect(await send(f.base, path, '&dshNode=' + f.nodeId)).toBe(200)
+    expect(await send(f.base, path, '')).toBe(200)
+  }
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 8 })
+  expect(await send(f.base, '/account/api/scope', '&dshNode=' + f.nodeId)).toBe(204)
+  expect(f.remoteStarts).toEqual([f.admin.id])
+})
+
+it.each([true, false])('rechecks a placement moved after the outgoing service stream opens (original node pin %s)', async pinned => {
+  const f = await fixture({}, true)
+  const open = f.services.open.bind(f.services)
+  const moved = vi.spyOn(f.services, 'open').mockImplementationOnce(async (node, signal) => {
+    const stream = await open(node, signal)
+    f.environment.node = { ...f.environment.node, id: f.localNodeId }
+    return stream
+  })
+  const selectors = new URLSearchParams({ dshRuntime: f.environment.id, dshTarget: 'personal' })
+  if (pinned) selectors.set('dshNode', f.nodeId)
+  const response = await fetch(`${f.base}/api/admit/v1/session.prompt?${selectors}`, {
+    method: 'POST', headers: { cookie: f.cookie, origin: f.base }, body: '{}',
+  })
+  expect(moved).toHaveBeenCalledOnce()
+  expect(response.status).toBe(pinned ? 400 : 409)
+  expect(await response.json()).toEqual({ error: pinned ? 'node-service/invalid-target' : 'node-service/mismatch' })
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+  expect(f.remoteStarts).toEqual([])
 })
 
 it('keeps control probes available at the service limit and closes admitted streams on revocation', async () => {

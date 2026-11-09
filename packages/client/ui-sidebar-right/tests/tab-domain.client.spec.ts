@@ -35,7 +35,7 @@ function layouts() {
 }
 
 function harness() {
-  const navigator = { openResourceIn: vi.fn(), openTabIn: vi.fn(), closeIn: vi.fn() } satisfies
+  const navigator = { openResourceIn: vi.fn(), openTabIn: vi.fn(), closeIn: vi.fn(), setPanelModeIn: vi.fn() } satisfies
     SidebarRightNavigator & Record<string, ReturnType<typeof vi.fn>>
   const pin = vi.fn<(address: string, signal: AbortSignal) => void>()
   const domain = new TabDomain(navigator, pin)
@@ -191,6 +191,8 @@ describe('TabDomain — a tab\'s own actions', () => {
     const { tabActions } = domain.occurrence(SESSION, recordOf(current(), tabId))
     tabActions.openTab('files', { replaceTab: true })
     expect(navigator.openTabIn).toHaveBeenLastCalledWith(SESSION, 'files', { replaceTab: tabId })
+    tabActions.setPanelMode('fullscreen')
+    expect(navigator.setPanelModeIn).toHaveBeenLastCalledWith(SESSION, 'fullscreen')
     tabActions.close()
     expect(navigator.closeIn).toHaveBeenCalledWith(SESSION, tabId)
   })

@@ -1,0 +1,87 @@
+{
+  "id": "B507",
+  "title": "Gateway waits for writer quiescence before cancelling the Runtime start that holds that writer",
+  "status": "fixed_real_pressure_wait_shutdown_and_normal_node_artifacts_verified_remaining_platforms_open",
+  "sourceFixed": true,
+  "at": "2026-11-04T19:15:14.881611+00:00",
+  "paths": [
+    "gateway/src/index.ts",
+    "gateway/src/instances.ts"
+  ],
+  "receipt": "receipts/runtime-start-shutdown-order-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/shutdown-runtime-start-before.json",
+  "originalObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/shutdown-runtime-start-original-observations.json",
+  "originalResult": "Actual Gateway health200 and a durable steward Runtime in starting/waiting with zero admitted launch credits. SIGTERM triggers the ten-second forced exit1 while the Runtime remains starting/waiting. Only listener allocation is replaced with real loopback port0; no admission, launcher, authentication or database result is mocked.",
+  "correction": "InstanceManager.beginShutdown synchronously closes start admission and cancels outstanding capacity/pressure waits before writer drainage. Existing ready processes remain available until the original stopAll stage, which reuses the same closure step and joins accepted starts before stopping local processes. Closed managers refuse warm reuse and fresh starts; already accepted operations entering after closure cannot prepare or allocate a process.",
+  "checks": {
+    "unitRegression": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/runtime-start-shutdown-unit-cases.json",
+      "passed": 91,
+      "skipped": 0,
+      "qualification": "The final test-only adjustment replaces Promise.withResolvers with ordinary Promise construction for the Gateway es2023 TypeScript library. The four relevant current-source cases are repeated with coverage afterward."
+    },
+    "currentScopedCoverage": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/shutdown-coverage-cases.json",
+      "passed": 4,
+      "filteredNotExecuted": 82,
+      "methodCoverage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/shutdown-new-method-coverage.json",
+      "wholeFileCoverage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/shutdown-coverage/coverage-summary.json",
+      "wholeFileMetrics": {
+        "lines": 55.43,
+        "statements": 51.25,
+        "functions": 63.07,
+        "branches": 33.53
+      },
+      "thresholdsOrExclusionsChanged": false
+    },
+    "actualGateway": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/runtime-start-shutdown-public-cases.json",
+      "passed": 1,
+      "skipped": 0,
+      "expectedTranscript": "gateway/tests/expected/runtime-start-shutdown.jsonl",
+      "result": "Graceful exit0, no forced shutdown, same steward generation stopped, last allocation observation waiting retained, zero paid model requests."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/shutdown-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "passed": 2,
+      "typescriptLoader": false
+    },
+    "typecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/runtime-start-shutdown-final-typecheck.log",
+    "ordinaryFullGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/runtime-start-shutdown-production-build.log",
+    "focusedLint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/runtime-start-shutdown-lint.log",
+    "twoBilingualPairs": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/runtime-start-shutdown-pairing-check.log",
+    "fourMarkdownSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/runtime-start-shutdown-markdown-links.log"
+  },
+  "intermediateCheckCorrections": [
+    "An intermediate state assertion expected allocation_state unknown after stop; the repository intentionally retains the last waiting observation. The fixture now checks stopped state while retaining that observation.",
+    "An initially broader cancellation entry check changed concurrent ordinary stop/warm-reuse semantics; the guard is limited to manager shutdown and the preexisting concurrent-stop regression passes.",
+    "The test helper was aligned with the Gateway es2023 TypeScript library without changing production compiler settings."
+  ],
+  "limits": [
+    "The assembled pressure-credit scenario runs on the unprivileged macOS launcher; Linux account provisioning and native Windows remain separate acceptance.",
+    "No running allocation is released merely because shutdown begins; provider-confirmed termination still owns resource reclamation.",
+    "The whole-file coverage numbers come from four selected shutdown cases, not from the91-case regression run and not from a full-project coverage run.",
+    "All12project audit domains and the real paid Responses check remain open/deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "frozenDelivery": {
+    "at": "2026-11-04T19:16:18.952668+00:00",
+    "finding": "B507",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/B507-runtime-start-shutdown",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T190523Z/B507-runtime-start-shutdown.delta.tar.gz",
+    "archiveSha256": "583a6d73513f89d0dba2ac0e8bd84ff325e65c501a1b3b11147f9820b02c880f",
+    "manifestSha256": "b8b4375ef5afdfa4c62e14bdff0aa523288e8af418c5f7fa328c28ca18a5eb82",
+    "ownedPaths": 12,
+    "readOnlyPrerequisites": 6,
+    "compiledGatewayFiles": 256,
+    "migrationAndArtifactFiles": 375,
+    "wholeProjectComplete": false
+  }
+}

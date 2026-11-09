@@ -43,6 +43,7 @@ try {
       const actor = await users.create({ username: 'administrator', password: 'pw-12345678', role: 'admin' })
       const owner = await users.create({ username: 'archive-owner', password: 'pw-12345678', role: 'admin' })
       await users.changeOwnPassword(actor.id, 'pw-12345678')
+      await users.changeOwnPassword(owner.id, 'pw-12345678')
       const repository = new PostgresInstanceRepository(context, cfg.instancePortBase)
       manager = new InstanceManager(repository, cfg); await manager.stateOf(owner.id)
       const archives = new ConversationArchiveService(context), rootSessionId = `archive-${randomUUID()}`

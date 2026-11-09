@@ -14,6 +14,8 @@ import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import { parseManagedSnapshot } from '../managed-files.ts'
 import { lockAdministrator } from './administrator-authority.ts'
+import { assertRestoreMigrationVersion } from './restore-schema.ts'
+import { BackupError } from './backup-service.ts'
 
 /** Database-wide exclusion shared by data snapshots, restores and maintenance exit. */
 export const DEPLOYMENT_DATA_LOCK = 'coharness:database-and-managed-files'
@@ -176,7 +178,7 @@ export class PostgresMaintenanceService {
         return operation(client, actorUuid)
       })
     } catch (error) {
-      if (error instanceof MaintenanceError || error instanceof CollaborationDeniedError) throw error
+      if (error instanceof MaintenanceError || error instanceof CollaborationDeniedError || error instanceof BackupError) throw error
       throw new MaintenanceError(503, 'deployment-unavailable', { cause: error })
     }
   }
@@ -483,7 +485,7 @@ export class PostgresMaintenanceService {
     })
   }
 
-  /** Append one ledger row for an HTTP-facing actor; detail stays free of secrets. */
+  /** Append one ledger row while retaining a supplied administrator's current authority; null permits trusted applier work. */
   async logOperation(
     kind: DeploymentOperationKind,
     status: DeploymentOperationStatus,
@@ -491,7 +493,8 @@ export class PostgresMaintenanceService {
     detail: Record<string, unknown>,
     nodeName?: string,
   ): Promise<string> {
-    return this.insertOperation(kind, status, await this.actorUuid(actor), detail, nodeName)
+    return this.administrationTransaction(actor, (client, actorUserId) =>
+      this.insertOperation(kind, status, actorUserId, detail, nodeName, client))
   }
 
   /** Append one ledger row under an already-resolved internal actor uuid. */
@@ -553,22 +556,23 @@ export class PostgresMaintenanceService {
   }
 
   /**
-   * Register a restore while retaining administrator and verified backup eligibility.
+   * Register a restore while retaining administrator and current-schema backup eligibility.
    * @param actor - current administrator, or explicit null for the trusted applier.
-   * @param backupId - verified complete backup in this organization.
+   * @param backupId - verified complete backup in this organization at the current migration version.
    * @returns the accepted pending request; the independent applier claims it after commit.
    */
   async requestRestore(actor: number | null, backupId: string): Promise<DeploymentOperationView> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(backupId)) throw new MaintenanceError(400, 'invalid-backup-id')
     return this.administrationTransaction(actor, async (client, actorUserId) => {
-      const selected = await client.query<{ status: string; sha256: string | null; managed_files: unknown }>(
-        'SELECT status,sha256,managed_files FROM harness.backup_records WHERE organization_id=$1 AND id=$2 FOR SHARE',
+      const selected = await client.query<{ status: string; sha256: string | null; managed_files: unknown; migration_version: number }>(
+        'SELECT status,sha256,managed_files,migration_version FROM harness.backup_records WHERE organization_id=$1 AND id=$2 FOR SHARE',
         [this.context.organizationId, backupId])
       const backup = selected.rows[0]
       if (backup === undefined) throw new MaintenanceError(404, 'backup-not-found')
       if (backup.status !== 'verified' && backup.status !== 'restored') throw new MaintenanceError(409, 'backup-not-verified')
       if (backup.sha256 === null || backup.managed_files === null || Array.isArray(backup.managed_files)) throw new MaintenanceError(409, 'backup-lacks-complete-managed-data-manifest')
       parseManagedSnapshot(backup.managed_files)
+      await assertRestoreMigrationVersion(client, backup.migration_version)
       let id: string
       try {
         const inserted = await client.query<{ id: string }>(

@@ -9,7 +9,7 @@ English | [中文](guide.zh.md)
 
 ## Change
 
-Personal and project Runtime start, stop and restart retain the authenticated initiating administrator through lookup, lifecycle and admission waits. Revoked authority returns403. Different administrators do not share pending starts. Final personal admission checks current owner policy and administrator authority together.
+Personal and project Runtime start, stop and restart retain the authenticated initiating administrator through lookup, lifecycle and admission waits. Revoked authority returns403. Different administrators do not share pending starts. The browser project-settings link retains this authority for passive startup and warm reuse; a manually stopped Runtime still requires explicit startup. Final personal admission checks current owner policy and administrator authority together.
 
 An approved stop can finish before authority is revoked. Restart then returns403 and leaves the Runtime stopped. A refused request does not undo an already approved cancellation or stop. Exact administrator stop and restart of a reserved Steward Runtime require current administrator authority and the selected generation, without requiring Steward data qualification. Project deletion remains refused.
 

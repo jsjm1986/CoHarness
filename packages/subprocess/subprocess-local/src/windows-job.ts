@@ -36,6 +36,9 @@ export interface WindowsJobInternals {
   probeCurrentTokenJobSupport?: typeof probeCurrentTokenJobSupport
 }
 
+/** Bound for a connected runner to act on a terminate request before it is presumed wedged. */
+const RUNNER_TERMINATE_TIMEOUT_MS = 5_000
+
 type RunnerProcess = Omit<ReturnType<typeof spawn>, 'send' | 'stdio'> & {
   send?: ReturnType<typeof spawn>['send']
   stdio: Array<Readable | Writable | null>
@@ -71,6 +74,7 @@ class WindowsJobOwner implements BoundProcessOwner {
   private cancellationReason: unknown
   private cancellationReasonSet = false
   private terminationSent = false
+  private infrastructureFailed = false
 
   constructor(
     private readonly runner: RunnerProcess,
@@ -86,18 +90,46 @@ class WindowsJobOwner implements BoundProcessOwner {
       this.cancellationReason = cancellationReason
       this.cancellationReasonSet = true
     }
-    if (this.terminationSent || !this.runner.connected) return
+    if (this.terminationSent) return
     this.terminationSent = true
+    // A runner that accepts the IPC write but never processes it — or whose
+    // channel is already gone — still owns its Job; bound the wait and let
+    // Job close sweep the tree when the deadline path kills the owner.
+    const deadline = setTimeout(() => {
+      this.failAndKill(new Error('Windows Job runner did not process its terminate request'), true)
+    }, RUNNER_TERMINATE_TIMEOUT_MS)
+    deadline.unref()
+    void this.exited.then(() => { clearTimeout(deadline) }, () => { clearTimeout(deadline) })
+    if (!this.runner.connected) {
+      // No result can ever arrive over a dead channel; fail fast while the
+      // armed deadline still covers a wedged process holding its Job.
+      this.failAndKill(new Error('Windows Job runner lost its IPC channel before its terminate request'))
+      return
+    }
     try {
       this.runner.send?.({ type: 'terminate' }, (error) => {
-        if (error === null || this.directResultType() !== undefined) return
-        this.failInfrastructure(error)
-        this.terminateForHostExit()
+        if (error === null) return
+        this.failAndKill(error)
       })
     } catch (error) {
-      this.failInfrastructure(error)
-      this.terminateForHostExit()
+      this.failAndKill(error)
     }
+  }
+
+  private failAndKill(error: unknown, wedged = false): void {
+    // A latched direct result must not be rewritten by an infrastructure
+    // failure, and a mere delivery failure needs no kill — the runner is
+    // already on its own exit path. A wedge (deadline or dead channel) is
+    // different: the runner still owns the Job handle, so kill it and let
+    // the exit path settle the managed range.
+    if (this.directResultType() !== undefined) {
+      if (wedged) this.terminateForHostExit()
+      return
+    }
+    if (this.infrastructureFailed) return
+    this.infrastructureFailed = true
+    this.failInfrastructure(error)
+    this.terminateForHostExit()
   }
 
   mapStartFailure(failure: unknown, serialized: SerializedRunnerError): unknown {

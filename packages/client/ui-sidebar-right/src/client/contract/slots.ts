@@ -26,7 +26,7 @@ import type { RightbarOwnerProps } from '@deepseek-ai/dsh-client-ui-layout/clien
 // The locale plugin's own merge carries the shared `common` vocabulary that the
 // lookup chain consults after this namespace misses.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { DockMode, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SlotHookFactory } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TabHookContext } from '../tab-info.ts'
 import type { SidebarRightKey } from '../locales.ts'
@@ -156,6 +156,12 @@ export interface SidebarRightTabActions {
    * @param options - placement and that kind's navigation parameters.
    */
   openTab<K extends string>(kind: K, options?: SidebarRightTabPlacement & { readonly params?: SidebarRightTabParamsFor<K> }): void
+  /**
+   * Set the right panel's display mode, the same action as its chrome button;
+   * the mode is surface-wide, not pane- or tab-scoped.
+   * @param mode - `push` docks the panel beside content, `fullscreen` covers the frame.
+   */
+  setPanelMode(mode: DockMode): void
   /** Close this tab. */
   close(): void
 }

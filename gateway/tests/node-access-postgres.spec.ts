@@ -160,7 +160,9 @@ describePg('PostgreSQL outbound node access', () => {
     await expect(f.nodes.issue(f.admin, { name: 'center', requestId: randomUUID() })).rejects.toMatchObject({ code: 'node-access/name-conflict' })
     await expect(f.nodes.mutate(f.admin, f.context.nodeId, { action: 'revoke', revision: 1 })).rejects.toMatchObject({ status: 404 })
     await expect(f.nodes.enroll(ticket.token, { ...enrollment(credential()), protocolVersion: 2 })).rejects.toMatchObject({ code: 'node-access/unsupported-protocol' })
-    await expect(f.nodes.enroll(ticket.token, { ...enrollment(credential()), platform: 'win32' })).rejects.toMatchObject({ code: 'node-access/unsupported-platform' })
+    await expect(f.nodes.enroll(ticket.token, { ...enrollment(credential()), platform: 'freebsd' })).rejects.toMatchObject({ code: 'node-access/unsupported-platform' })
+    const windows = await f.issue('windows-node')
+    expect((await f.nodes.enroll(windows.token, { ...enrollment(credential()), platform: 'win32' })).nodeId).toBe(windows.nodeId)
     await pool.query("UPDATE harness.node_agent_enrollments SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", [ticket.enrollmentId])
     await expect(f.nodes.enroll(ticket.token, enrollment(credential()))).rejects.toMatchObject({ status: 401 })
   })
@@ -299,7 +301,19 @@ describePg('PostgreSQL outbound node access', () => {
     }
   })
 
-  it('authorizes one current channel with three database round trips', async () => {
+  it('lets the agent computer gateway re-verify its own lease while foreign computers stay mode-disabled', async () => {
+    const f = await fixture(), ticket = await f.issue(), secret = credential()
+    await f.nodes.enroll(ticket.token, enrollment(secret))
+    const lease = await f.nodes.connect(secret, { connectionId: randomUUID() })
+    const local = new PostgresNodeAccessService({ ...f.context, nodeId: ticket.nodeId }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
+    await expect(local.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch })).resolves.toEqual(lease)
+    const other = await f.nodes.issue(f.admin, { name: 'other', requestId: randomUUID() })
+    const foreign = new PostgresNodeAccessService({ ...f.context, nodeId: other.nodeId }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
+    await expect(foreign.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch }))
+      .rejects.toMatchObject({ status: 409, code: 'node-access/mode-disabled' })
+  })
+
+  it('authorizes one current channel with one database round trip', async () => {
     const f = await fixture(), ticket = await f.issue(), secret = credential()
     await f.nodes.enroll(ticket.token, enrollment(secret))
     const lease = await f.nodes.connect(secret, { connectionId: randomUUID() })
@@ -312,9 +326,30 @@ describePg('PostgreSQL outbound node access', () => {
       const nodes = new PostgresNodeAccessService({ ...f.context, pool: reader }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
       await expect(nodes.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch })).resolves.toEqual(lease)
       const statements = queries.flatMap(query => query.mock.calls.map(([statement]) => statement))
-      expect(statements).toHaveLength(3)
-      expect(statements[0]).toBe('BEGIN')
-      expect(statements.at(-1)).toBe('COMMIT')
+      expect(statements).toHaveLength(1)
+      expect(statements[0]).toContain('harness.node_channel_lease')
+    } finally {
+      await reader.end()
+      for (const query of queries) query.mockRestore()
+    }
+  })
+
+  it('renews a current lease with one database round trip', async () => {
+    const f = await fixture(), ticket = await f.issue(), secret = credential()
+    await f.nodes.enroll(ticket.token, enrollment(secret))
+    const lease = await f.nodes.connect(secret, { connectionId: randomUUID() })
+    const reader = createPostgresPool(databaseUrl!, { max: 1 })
+    const queries: Array<MockInstance<PoolClient['query']>> = []
+    reader.on('connect', client => {
+      queries.push(vi.spyOn(client, 'query'))
+    })
+    try {
+      const nodes = new PostgresNodeAccessService({ ...f.context, pool: reader }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
+      await expect(nodes.heartbeat(secret, { connectionId: lease.connectionId, epoch: lease.epoch }))
+        .resolves.toMatchObject({ connectionId: lease.connectionId, epoch: lease.epoch })
+      const statements = queries.flatMap(query => query.mock.calls.map(([statement]) => statement))
+      expect(statements).toHaveLength(1)
+      expect(statements[0]).toContain('harness.node_heartbeat')
     } finally {
       await reader.end()
       for (const query of queries) query.mockRestore()
@@ -502,7 +537,7 @@ describePg('PostgreSQL outbound node access', () => {
       const controller = new AbortController()
       let connected = false, ready!: () => void, refused!: (error: unknown) => void
       const readiness = new Promise<void>((done, reject) => { ready = done; refused = reject })
-      const completion = runNodeAgent({ centerUrl: f.base, stateFile: join(f.root, file), enrollmentToken: ticket.token,
+      const completion = runNodeAgent({ centerUrl: f.base, centerDialUrls: [f.base], dialPreferredRetryMs: 60_000, stateFile: join(f.root, file), enrollmentToken: ticket.token,
         requestTimeoutMs: 10_000, retryMs: 100 }, controller.signal, event => {
         if (event.status === 'connected') { connected = true; ready() }
       }).then(() => { if (!connected) refused(new Error('Node agent stopped before readiness')); return null }, error => { refused(error); return error as unknown })

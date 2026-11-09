@@ -317,15 +317,18 @@ describe('the new-session chip', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('hides the seat while developer tools are disabled', () => {
-    const { devTools } = renderSeat({}, true)
-    expect(screen.queryByRole('button')).not.toBeNull()
-
-    act(() => { devTools.set(false) })
+  it('loads the seat only while developer tools permit the control and refreshes when shown again', () => {
+    const { devTools, load } = renderSeat({}, false)
     expect(screen.queryByRole('button')).toBeNull()
-
+    expect(load).not.toHaveBeenCalled()
     act(() => { devTools.set(true) })
     expect(screen.queryByRole('button')).not.toBeNull()
+    expect(load).toHaveBeenCalledTimes(1)
+    act(() => { devTools.set(false) })
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(load).toHaveBeenCalledTimes(1)
+    act(() => { devTools.set(true) })
+    expect(load).toHaveBeenCalledTimes(2)
   })
 
   it('closes on an outside dismissal', () => {

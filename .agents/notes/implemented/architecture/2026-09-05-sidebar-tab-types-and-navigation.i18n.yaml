@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-05-sidebar-tab-types-and-navigation.md
 document:
-  en: ed2b60dc462a125447d1f361953841dc418e1b4b
-  zh: d9c16e0547b58d6f63e692a52cbd421f95a4029c
+  en: 4abf06601981a4f4939adad79749054896204b6e
+  zh: 4a5bb6d8f97c053c4037c185821c4ec6b86d6cf6
 /agent-note-right-sidebar-tab-types-and-navigation:
   en: 2860d8acc82e4a85
   zh: 7b09ac61a684e36d
@@ -33,8 +33,8 @@ document:
   en: 6386bde2654f9a0a
   zh: 700439be6a01e162
 /agent-note-right-sidebar-tab-types-and-navigation/alternatives-considered:
-  en: 4edc01aac710c33b
-  zh: 0f3e56ff18cf9ae0
+  en: ebdaf4586dd7143c
+  zh: 20bbf339393e8941
 /agent-note-right-sidebar-tab-types-and-navigation/consequences:
   en: 3cdb1159ee55d851
   zh: dcd068005e678a89

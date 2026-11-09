@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SourceMap } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { brotliDecompressSync, gunzipSync } from 'node:zlib'
 import { pathToFileURL } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { Context, FiberState, type Fiber } from '@deepseek-ai/cordis'
@@ -166,7 +167,7 @@ function construct(packageNames: string[]): ClientModuleRegistry {
 }
 
 /** Invoke the registered plugin route and capture status, headers, and bytes. */
-async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET'): Promise<{
+async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET', acceptEncoding?: string): Promise<{
   status: number
   headers: Record<string, string> | undefined
   body: Buffer
@@ -186,7 +187,12 @@ async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET
     },
   } as unknown as ServerResponse
   const resolved = new URL(url, 'http://localhost/')
-  await (await route).handler({ method, url: `${resolved.pathname}${resolved.search}` } as IncomingMessage, response)
+  const request = {
+    method,
+    url: `${resolved.pathname}${resolved.search}`,
+    headers: acceptEncoding === undefined ? {} : { 'accept-encoding': acceptEncoding },
+  } as IncomingMessage
+  await (await route).handler(request, response)
   return { status, headers, body }
 }
 
@@ -804,6 +810,49 @@ describe('client bundle activation', () => {
     }
   })
 
+  it('keeps the filesystem metadata policy for unmarked artifacts beside sibling chunks', () => {
+    const packageName = '@fixture/chunk-revision'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    writeFileSync(clientPath, 'module.exports = {}\n')
+    const timestamp = new Date(1_700_000_000_000)
+    utimesSync(clientPath, timestamp, timestamp)
+    writeFileSync(join(dirname(clientPath), 'client.extra.js'), 'module.exports = { chunk: 1 }\n')
+    const first = construct([packageName]).graph().entries[0]!
+    writeFileSync(join(dirname(clientPath), 'client.extra.js'), 'module.exports = { chunk: 2 }\n')
+    const changed = construct([packageName]).graph().entries[0]!
+    expect(changed.rev).toBe(first.rev)
+  })
+
+  it('serves Brotli, gzip, or identity for one immutable response by Accept-Encoding', async () => {
+    const packageName = '@fixture/precompressed'
+    writeBuiltPackage(packageName, {})
+    const { service, route } = constructWithRoute([packageName])
+    const url = service.graph().entries[0]!.url
+
+    const identity = await routeRequest(route, url, 'GET', 'identity')
+    expect(identity.status).toBe(200)
+    expect(identity.headers?.['content-encoding']).toBeUndefined()
+    expect(identity.headers?.vary).toBe('Accept-Encoding')
+    const plain = identity.body
+
+    // Variants compress in the background; poll until Brotli settles.
+    await expect.poll(async () => (
+      (await routeRequest(route, url, 'GET', 'br')).headers?.['content-encoding']
+    )).toBe('br')
+    const brotli = await routeRequest(route, url, 'GET', 'gzip, br')
+    expect(brotli.headers?.['content-encoding']).toBe('br')
+    expect(brotliDecompressSync(brotli.body)).toEqual(plain)
+
+    const gzip = await routeRequest(route, url, 'GET', 'gzip')
+    expect(gzip.headers?.['content-encoding']).toBe('gzip')
+    expect(gunzipSync(gzip.body)).toEqual(plain)
+
+    const unsupported = await routeRequest(route, url, 'GET', 'deflate')
+    expect(unsupported.headers?.['content-encoding']).toBeUndefined()
+    expect(unsupported.body).toEqual(plain)
+  })
+
   it.each(['bytes', 'build stamp'])('agrees with a fresh registry after rebuilding changed %s', (change) => {
     const packageName = '@fixture/changed-rebuild'
     const clientPath = writePackage(packageName)
@@ -966,6 +1015,7 @@ describe('client bundle activation', () => {
     expect(singleMap.headers).toEqual({
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'public, max-age=31536000, immutable',
+      vary: 'Accept-Encoding',
     })
     expect(JSON.parse(singleMap.body.toString('utf8'))).toMatchObject({
       version: 3,

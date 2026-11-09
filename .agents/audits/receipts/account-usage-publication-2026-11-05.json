@@ -1,0 +1,215 @@
+{
+  "id": "B521",
+  "at": "2026-11-05T03:11:50.609913+00:00",
+  "title": "Account usage summaries publish withdrawn account or project data, while invalid monthly inputs return server failures",
+  "status": "fixed_account_usage_final_authority_selected_billing_owner_and_month_validation_verified_remaining_business_review_open",
+  "sourceFixed": true,
+  "paths": [
+    "gateway/src/server.ts"
+  ],
+  "receipt": "receipts/account-usage-publication-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z",
+  "counterproof": {
+    "actualHttpScenarios": 57,
+    "revokedUsagePublished": [
+      "personal:disabled-account",
+      "personal:deleted-account",
+      "personal:disabled-membership",
+      "personal:missing-membership",
+      "personal:disabled-organization",
+      "personal:password-reset",
+      "personal:password-required",
+      "personal:missing-credential",
+      "personal:logout",
+      "personal:session-expired",
+      "project:removed-member",
+      "project:disabled-account",
+      "project:deleted-account",
+      "project:disabled-membership",
+      "project:missing-membership",
+      "project:disabled-organization",
+      "project:password-reset",
+      "project:password-required",
+      "project:missing-credential",
+      "project:logout",
+      "project:session-expired",
+      "project:computer-disabled",
+      "project:foreign-computer-only",
+      "project:project-archived",
+      "project:mount-disabled",
+      "project:steward-withdrawn",
+      "project:steward-demoted"
+    ],
+    "revokedUsageFailures": 27,
+    "invalidMonthFailures": [
+      {
+        "scope": "personal",
+        "month": "",
+        "status": 500
+      },
+      {
+        "scope": "personal",
+        "month": "2026-00",
+        "status": 500
+      },
+      {
+        "scope": "personal",
+        "month": "2026-13",
+        "status": 500
+      },
+      {
+        "scope": "personal",
+        "month": "November",
+        "status": 500
+      },
+      {
+        "scope": "personal",
+        "month": "2026-1",
+        "status": 500
+      },
+      {
+        "scope": "project",
+        "month": "",
+        "status": 500
+      },
+      {
+        "scope": "project",
+        "month": "2026-00",
+        "status": 500
+      },
+      {
+        "scope": "project",
+        "month": "2026-13",
+        "status": 500
+      },
+      {
+        "scope": "project",
+        "month": "November",
+        "status": 500
+      },
+      {
+        "scope": "project",
+        "month": "2026-1",
+        "status": 500
+      }
+    ],
+    "runtimeStarts": 0,
+    "quotaRowsPreserved": true,
+    "productionFixedBeforeCounterproof": false
+  },
+  "correction": "The original billing owner and selected computer are captured before summary preparation. Publication rechecks the browser session and password/account qualification; project summaries also require current project, mount, exact-computer and Steward authority. Readonly members remain eligible. Initial Runtime selection keeps its existing rules; an inaccessible legacy cookie may repair before preparation, while a withdrawn prepared project read never switches to personal totals. Invalid explicit YYYY-MM values are refused before summary reads.",
+  "checks": {
+    "distinctNamedCases": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-acceptance-union.json",
+      "passed": 155,
+      "failed": 0,
+      "pending": 0,
+      "repeatedRunsNotDoubleCounted": true,
+      "breakdown": {
+        "server": 140,
+        "postgresProvidersAndPublicReplays": 15
+      }
+    },
+    "realSummaryReplay": {
+      "spec": "gateway/tests/account-usage-read-postgres.spec.ts",
+      "expected": "gateway/tests/expected/projects/account-usage-read.jsonl",
+      "scenarios": 57,
+      "governancePoolMaximum": 1,
+      "qualification": "Real login, PostgreSQL Runtime directory, quota storage and summary service. Twenty-seven withdrawal failures and ten malformed-month failures are repaired. Personal/project limits2841/4173remain on their original owner; quota rows are retained and Runtime starts remain zero."
+    },
+    "ordinaryNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "summaryScenariosPerVersion": 57,
+      "intakeTranscriptRowsPerVersion": 12,
+      "typescriptLoader": false,
+      "gatewayProductionJs": 262,
+      "artifactFiles": 406,
+      "qualification": "Two public fixtures replay from ordinary unchanged emit. The12intake rows include11HTTP reports and one account billing aggregate, covering three personal Runtimes on two logical PostgreSQL computer identities; no physical multi-computer or Windows/Linux acceptance claim."
+    },
+    "changedRouteCoverage": {
+      "file": "gateway/src/server.ts",
+      "sourceSha256": "795563c92d5bd46faed1c5eedd56a5f5578b3f6d6e2a88ddb17a465085acc7f6",
+      "firstLine": 1291,
+      "lastLineExclusive": 1325,
+      "statements": {
+        "covered": 35,
+        "total": 35
+      },
+      "branches": {
+        "covered": 32,
+        "total": 32
+      },
+      "functions": {
+        "covered": 4,
+        "total": 4
+      },
+      "wholeFile100PercentClaimed": false
+    },
+    "fullGatewayTypecheck": {
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-typecheck-final.log",
+      "exitCode": 0
+    },
+    "ordinaryGatewayBuild": {
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-production-build-final.log",
+      "exitCode": 0
+    },
+    "lint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-lint-final.json",
+      "actualDistinctFiles": 3,
+      "selectedFiles": 5,
+      "diagnostics": 0,
+      "qualification": "Both MJS fixtures are ignored by existing lint configuration and run successfully as actual source and ordinary artifact fixtures."
+    },
+    "docs": {
+      "quick": {
+        "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-documentation-quick-final.log",
+        "passed": 20,
+        "failed": 0,
+        "skipped": 0,
+        "dependencyInstallOrPostinstall": false
+      },
+      "markdownLinks": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-markdown-links.json",
+      "markdownSources": 6,
+      "pairs": 3,
+      "guideStructure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-upgrade-guide-structure.json",
+      "guideWords": 227
+    },
+    "ownedNativeClusters": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/native-postgres-lifecycle-summary.json",
+    "whitespace": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-whitespace.log",
+    "sourceScope": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-owned-source-scope.json"
+  },
+  "verificationQualification": "The initial related run passed14cases and failed one existing usage-intake fixture because its new management administrator had not completed required password setup. Its own fixture now completes that password before allocation. The failed case and current summary replay pass in the final two-file run; the155case union counts each identity once. An initial test-helper type assertion also required an explicit subject parameter; the final full Gateway check passes. All initial evidence remains retained.",
+  "noteReview": {
+    "retainedActive": "2026-11-05-project-read-publication",
+    "newNote": false,
+    "archivedNotesEdited": false,
+    "reason": "The existing current-publication decision also owns selected usage attribution and final browser/project qualification; initial Runtime routing remains separately owned."
+  },
+  "earlierSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/prior-frozen-sources-check.json",
+  "stableSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/account-usage-stable-sources.json",
+  "delivery": {
+    "at": "2026-11-05T03:10:16.718237+00:00",
+    "finding": "B521",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T024709Z/B521-account-usage-publication.delta.tar.gz",
+    "archiveSha256": "4d3858ed918427f43494f6881fc9a105d5fab629517a5c9e9204ffedbbdf7e21",
+    "manifestSha256": "64b875d7c8acff546a6de8f7845e06c1c79f6fc1d93e0e833a26034230e049f4",
+    "ownedPaths": 16,
+    "readOnlySources": 17,
+    "gatewayProductionJs": 262,
+    "artifactFiles": 406,
+    "wholeProjectComplete": false
+  },
+  "limits": [
+    "All12business domains remain in progress. Changed-route100percent measurement is not whole-file or whole-project coverage.",
+    "Peer transport implementation is unchanged. Source inspection confirms forwarded browser cookies use normal destination authentication; it does not substitute for fresh physical multi-computer deployment acceptance.",
+    "Remaining archive/search, resource/helper allocation and native-platform review remains open. The earlier complete E5168-step repository build remains separately attributed.",
+    "Real paid Responses verification remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

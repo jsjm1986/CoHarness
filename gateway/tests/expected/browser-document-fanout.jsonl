@@ -1,0 +1,3 @@
+{"scenario":"stable-admin","targets":2,"copied":2,"denied":0,"runtimeStarts":0}
+{"scenario":"demoted-fanout","targets":2,"copied":0,"denied":2,"runtimeStarts":0}
+{"scenario":"single-member","targets":1,"copied":1,"denied":0,"runtimeStarts":0}

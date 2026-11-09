@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-11-05-managed-prompt-receipts-and-reply-participants.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-05-managed-prompt-receipts-and-reply-participants.md
+document:
+  en: b9f914708777dcc47164974e1d8d16be09182392
+  zh: ebcf8783101af2db0729b95ceb60c34577dcc8c2
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-05-managed-prompt-receipts-and-reply-participants:
+  en: 200a0c5d8655c59d
+  zh: b673ebac358a893b
+/2026-11-05-managed-prompt-receipts-and-reply-participants/summary:
+  en: bc752f719e333274
+  zh: 003255da3b429348
+/2026-11-05-managed-prompt-receipts-and-reply-participants/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-05-managed-prompt-receipts-and-reply-participants/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-05-managed-prompt-receipts-and-reply-participants/compatibility:
+  en: fd0ec805ce3142d1
+  zh: 099f1b14a5d0be83
+/2026-11-05-managed-prompt-receipts-and-reply-participants/verification:
+  en: 4746cc2c00a86066
+  zh: fd6fccfd35248fa5
+/2026-11-05-managed-prompt-receipts-and-reply-participants/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

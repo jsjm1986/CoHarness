@@ -348,6 +348,46 @@ describe('InstanceManager', () => {
     expect(manager.capacitySnapshot()).toMatchObject({ resident: 0, starting: 0 })
   })
 
+  it('refuses an accepted start reaching its operation after shutdown begins', async () => {
+    const { alice, root, manager } = await setup()
+    const starting = manager.ensureRunning(alice)
+    manager.beginShutdown()
+    await expect(starting).rejects.toMatchObject({ reason: 'cancelled' })
+    expect(manager.capacitySnapshot()).toMatchObject({ resident: 0, starting: 0, queued: 0 })
+    expect(existsSync(join(root, 'users', alice.username, 'dsh', 'profiles', 'web'))).toBe(false)
+  })
+
+  it('closes start admission before writer draining while retaining ready processes', async () => {
+    const { alice, manager, users } = await setup({ HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '3' })
+    const bob = await users.create({ username: 'bob', password: 'pw-123456' })
+    const cara = await users.create({ username: 'cara', password: 'pw-123456' })
+    await manager.ensureRunning(alice)
+    let entered!: () => void, release!: () => void
+    const entry = new Promise<void>(resolve => { entered = resolve })
+    const barrier = new Promise<void>(resolve => { release = resolve })
+    manager.beforeStart = async () => { entered(); await barrier }
+    const starting = manager.ensureRunning(bob).then(() => undefined, (error: unknown) => error)
+    await entry
+    const queued = manager.ensureRunning(cara).then(() => undefined, (error: unknown) => error)
+    try {
+      await vi.waitFor(() => { expect(manager.capacitySnapshot().queued).toBe(1) })
+      manager.beginShutdown()
+      manager.beginShutdown()
+      expect(await queued).toMatchObject({ reason: 'closed' })
+      await expect(manager.ensureRunning(alice)).rejects.toMatchObject({ reason: 'closed' })
+      await expect(manager.ensureRunning(bob)).rejects.toMatchObject({ reason: 'closed' })
+      const refused = manager.startRequest(cara, 'explicit')
+      await expect(refused.admission).rejects.toMatchObject({ reason: 'closed' })
+      await expect(refused.completion).rejects.toMatchObject({ reason: 'closed' })
+      expect(await manager.isLive(alice.id)).toBe(true)
+      expect(manager.capacitySnapshot()).toMatchObject({ resident: 2, queued: 0 })
+    } finally { release() }
+    expect(await starting).toMatchObject({ reason: 'cancelled' })
+    await manager.stopAll()
+    expect(manager.capacitySnapshot()).toMatchObject({ resident: 0, starting: 0, queued: 0 })
+    expect(await manager.isLive(alice.id)).toBe(false)
+  })
+
   it('shutdown waits for a cancelled cold start to settle before returning', async () => {
     const { alice, manager } = await setup()
     let entered!: () => void, release!: () => void
@@ -843,16 +883,18 @@ describe('InstanceManager', () => {
     } finally { await manager.stopAll(); await queued }
   })
 
-  it('refuses administrator authority revoked during a resident-capacity wait', async () => {
+  it.each(['role', 'password-reset'] as const)('refuses administrator %s withdrawal during a resident-capacity wait', async change => {
     const { root, alice, manager, users } = await setup({ HGW_RUNTIME_MAX_RESIDENT: '1', HGW_RUNTIME_MAX_STARTING: '1' })
     const target = await users.create({ username: 'controlled-user', password: 'pw-123456' })
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await users.create({ username: 'keeper-admin', password: 'pw-123456', role: 'admin' })
     await manager.ensureRunning(alice)
     const pending = manager.ensureRunning(target, 'explicit', actor.id).catch((error: unknown) => error)
     try {
       await expect.poll(() => manager.capacitySnapshot().queued).toBe(1)
-      users.setRole(actor.id, 'user')
+      if (change === 'role') users.setRole(actor.id, 'user')
+      else await users.resetPassword(actor.id, 'pw-replacement')
       await manager.stop(alice.id)
       expect(await pending).toMatchObject({ code: 'forbidden' })
       expect(await manager.stateOf(target.id)).toBe('stopped')
@@ -863,6 +905,7 @@ describe('InstanceManager', () => {
   it('refuses administrator authority revoked during policy preparation before allocation', async () => {
     const { root, alice, manager, users } = await setup()
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await users.create({ username: 'keeper-admin', password: 'pw-123456', role: 'admin' })
     manager.beforeStart = () => { users.setRole(actor.id, 'user') }
     await expect(manager.ensureRunning(alice, 'explicit', actor.id)).rejects.toMatchObject({ code: 'forbidden' })
@@ -870,9 +913,10 @@ describe('InstanceManager', () => {
     expect(existsSync(join(root, 'users', alice.username, 'dsh', 'child-port'))).toBe(false)
   })
 
-  it('rechecks the administrator inside the final personal policy read after its wait', async () => {
+  it.each(['role', 'password-reset'] as const)('rechecks administrator %s qualification inside the final personal policy read', async change => {
     const { root, alice, manager, users } = await setup()
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await users.create({ username: 'keeper-admin', password: 'pw-123456', role: 'admin' })
     const repository = Reflect.get(manager, 'repository') as InstanceRepository
     const read = repository.personalPolicy.bind(repository)
@@ -885,7 +929,10 @@ describe('InstanceManager', () => {
     })
     const pending = manager.ensureRunning(alice, 'explicit', actor.id).catch((error: unknown) => error)
     try {
-      await observed; users.setRole(actor.id, 'user'); release()
+      await observed
+      if (change === 'role') users.setRole(actor.id, 'user')
+      else await users.resetPassword(actor.id, 'pw-replacement')
+      release()
       expect(await pending).toMatchObject({ code: 'forbidden' })
       expect(existsSync(join(root, 'users', alice.username, 'dsh', 'child-port'))).toBe(false)
       expect(await manager.stateOf(alice.id)).toBe('stopped')
@@ -895,6 +942,7 @@ describe('InstanceManager', () => {
   it('refuses administrator warm handoff when the owner becomes inactive during refresh', async () => {
     const { alice, manager, users } = await setup()
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await manager.ensureRunning(alice)
     manager.beforeUse = () => { users.setStatus(alice.id, 'disabled') }
     await expect(manager.ensureRunning(alice, 'explicit', actor.id)).rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE' })
@@ -903,7 +951,9 @@ describe('InstanceManager', () => {
   it('separates pending starts from different initiating administrators', async () => {
     const { alice, manager, users } = await setup()
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     const keeper = await users.create({ username: 'keeper-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(keeper.id, 'pw-123456')
     let entered!: () => void, release!: () => void
     const observed = new Promise<void>(resolve => { entered = resolve })
     const gate = new Promise<void>(resolve => { release = resolve })
@@ -926,6 +976,7 @@ describe('InstanceManager', () => {
     const { alice, manager, users } = await setup({ HGW_RUNTIME_MAX_RESIDENT: '1', HGW_RUNTIME_MAX_STARTING: '1' })
     const target = await users.create({ username: 'controlled-user', password: 'pw-123456' })
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await users.create({ username: 'keeper-admin', password: 'pw-123456', role: 'admin' })
     await manager.ensureRunning(alice)
     const pending = manager.ensureRunning(target)
@@ -939,9 +990,10 @@ describe('InstanceManager', () => {
     } finally { await manager.stopAll(); await pending.catch(() => {}) }
   })
 
-  it('rechecks administrator authority after lifecycle serialization before stopping', async () => {
+  it.each(['role', 'password-reset'] as const)('rechecks administrator %s qualification after lifecycle serialization before stopping', async change => {
     const { alice, manager, users } = await setup()
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await users.create({ username: 'keeper-admin', password: 'pw-123456', role: 'admin' })
     await manager.ensureRunning(alice)
     let entered!: () => void, release!: () => void, admitted!: () => void
@@ -957,7 +1009,10 @@ describe('InstanceManager', () => {
     try {
       await observed
       stopping = manager.stop(alice.id, 'manual', actor.id).catch((error: unknown) => error)
-      await admission; users.setRole(actor.id, 'user'); release()
+      await admission
+      if (change === 'role') users.setRole(actor.id, 'user')
+      else await users.resetPassword(actor.id, 'pw-replacement')
+      release()
       await warm
       expect(await stopping).toMatchObject({ code: 'forbidden' })
       expect(await manager.isLive(alice.id)).toBe(true)
@@ -967,6 +1022,7 @@ describe('InstanceManager', () => {
   it('refuses warm administrator reuse after its policy callback outlives authority', async () => {
     const { alice, manager, users } = await setup()
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await users.create({ username: 'keeper-admin', password: 'pw-123456', role: 'admin' })
     await manager.ensureRunning(alice)
     manager.beforeUse = () => { users.setRole(actor.id, 'user') }
@@ -977,6 +1033,7 @@ describe('InstanceManager', () => {
   it('retains an older process handle when administrator authority expires during generation lookup', async () => {
     const { alice, manager, users } = await setup()
     const actor = await users.create({ username: 'acting-admin', password: 'pw-123456', role: 'admin' })
+    await users.changeOwnPassword(actor.id, 'pw-123456')
     await users.create({ username: 'keeper-admin', password: 'pw-123456', role: 'admin' })
     const running = await manager.ensureRunning(alice)
     const repository = Reflect.get(manager, 'repository') as InstanceRepository

@@ -1,4 +1,6 @@
 import { DeploymentContextRuntime } from './deployment-context.ts'
+import { GatewayEntryRequests } from './entry-requests.ts'
+import { ConversationIntents } from './conversation-intents.ts'
 export type { ClientDeploymentContext, DeploymentContextSnapshot } from './deployment-context.ts'
 /** Browser runtime services for slots, sessions, workspaces, and connection-stream delivery. */
 import type { Context } from '@deepseek-ai/cordis'
@@ -30,6 +32,7 @@ export { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/ds
 
 export { clientSessionKey, parseClientSessionKey, runtimeTargetKey, addressRuntimeUrl } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+export type { ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { RuntimeEnvironment,RuntimeEnvironments } from './runtime-environments.ts'
 
 export { NavigationController, commitSessionNavigation } from './navigation.ts'
@@ -73,6 +76,9 @@ export type {
 export { settingsControlState, settingsFieldControlState } from './contract/settings-scope.ts'
 export { onSettingsNavigation, requestSettingsSection } from './contract/settings-navigation.ts'
 export type { SettingsNavigationRequest } from './contract/settings-navigation.ts'
+export type { ConversationIntent, ConversationIntentsSnapshot } from './conversation-intents.ts'
+export { NodeDraft, type NodeDraftOwner } from './node-draft.ts'
+export type { OwnerProjectDisplay, ProjectOwnerRef } from './project-metadata.ts'
 export { sessionPersistenceKey } from './session-persistence.ts'
 export { PermissionCatalogDirectory, PermissionCatalogMirror } from './permission-catalog.ts'
 export type { SessionPermissionCatalog } from './permission-catalog.ts'
@@ -286,6 +292,24 @@ declare module '@deepseek-ai/cordis' {
      * @returns true when a Browser consumer accepts the link; absent handlers retain external navigation.
      */
     'web/browser-open'(request: { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; url: string }): true | undefined
+    /** Resolve saved input before augmenting an existing conversation.
+     * @mode bail
+     * @param sessionId - exact authorized Session.
+     * @returns whether the source draft was read.
+     */
+    'conversation/prepare-input'(sessionId: import('@deepseek-ai/dsh-session/types').SessionId): Promise<boolean> | undefined
+    /** Append text typed during authorization to the exact Session's existing composer.
+     * @mode bail
+     * @param payload - verified Session and new unsent text.
+     * @returns true when the existing draft adopted the text.
+     */
+    'conversation/append-input'(payload: { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; text: string }): true | undefined
+    /** Begin the immediate composer for a verified fresh-conversation destination.
+     * @mode bail
+     * @param choice - exact selected Runtime and optional projected Workspace.
+     * @returns true when the client shell accepts the navigation.
+     */
+    'workspaces/start-prepared'(choice: { target: import('./contract/sessions.ts').SessionRuntimeTarget; workspaceId?: import('@deepseek-ai/dsh-api-remotes/client').WorkspaceId }): true | undefined
     /**
      * Initialize one Session's composer draft after a New Session navigation
      * commits. A prefill only — listeners mutate the unsent draft and never
@@ -315,6 +339,10 @@ declare module '@deepseek-ai/cordis' {
     projectUiPolicy: import('./project-policy.ts').ProjectUiPolicyRuntime
     /** Browser-ingress deployment policy; independent of the selected Runtime. */
     deploymentContext: DeploymentContextRuntime
+    /** In-flight Gateway operations scoped to this authenticated browser document. */
+    gatewayEntryRequests: GatewayEntryRequests
+    /** Unsent input for this document’s explicit conversation navigation. */
+    conversationIntents: ConversationIntents
     /** Per-runtime permission preset catalog directory; one mirror per pooled connection. */
     permissionCatalog: import('./permission-catalog.ts').PermissionCatalogDirectory
     /** Passive authorized management destinations; subscribing never starts a Runtime. */
@@ -341,6 +369,63 @@ export function apply(ctx: Context): void {
   const deploymentContext = new DeploymentContextRuntime(connection.metadataTiming)
   ctx.provide('deploymentContext', deploymentContext)
   ctx.effect(() => deploymentContext.start(connection, ctx.projectUiPolicy), 'runtime: entry deployment context')
+  const principal = () => ctx.projectUiPolicy.getSnapshot().verifiedAccountId
+  const intents = new ConversationIntents()
+  ctx.provide('conversationIntents', intents)
+  ctx.effect(() => {
+    let account = principal()
+    const stop = ctx.projectUiPolicy.subscribe(() => {
+      // A bare revocation is the unverified renewal interval, not an account
+      // change: only a different verified identity forfeits this document's
+      // pending input. The fence's principal change disposes the whole fiber.
+      const next = principal()
+      if (next === undefined || next === account) return
+      account = next
+      intents.clear()
+    })
+    const beforeUnload = (event: BeforeUnloadEvent): void => {
+      if (intents.hasUnsavedDrafts()) event.preventDefault()
+    }
+    const windowEvents = globalThis as {
+      addEventListener?: typeof window.addEventListener
+      removeEventListener?: typeof window.removeEventListener
+    }
+    windowEvents.addEventListener?.('beforeunload', beforeUnload)
+    return () => { stop(); windowEvents.removeEventListener?.('beforeunload', beforeUnload); intents.clear() }
+  }, 'runtime: pending conversation drafts')
+  const entryRequests = new GatewayEntryRequests(connection, principal, () => deploymentContext.getSnapshot().context?.mode === 'multi', {
+    ready: () => {
+      const host = connection.hostDescription.getSnapshot()
+      return host !== undefined && (host.executionAuthorityRequired !== true
+        || (principal() !== undefined && deploymentContext.getSnapshot().context !== undefined))
+    },
+    subscribe: (listener) => {
+      const stops = [connection.hostDescription.subscribe(listener),
+        ctx.projectUiPolicy.subscribe(listener), deploymentContext.subscribe(listener)]
+      return () => { for (const stop of stops) stop() }
+    },
+  })
+  ctx.provide('gatewayEntryRequests', entryRequests)
+  ctx.effect(() => {
+    let account = principal()
+    const stopAccount = ctx.projectUiPolicy.subscribe(() => {
+      const next = principal()
+      // A bare revocation is the unverified renewal interval, not an account
+      // change: in-flight entry requests — including a pending session.create
+      // — keep their authorization under the same identity that returns.
+      if (next === undefined || next === account) return
+      account = next; entryRequests.invalidate()
+    })
+    let revision = deploymentContext.getSnapshot().context?.revision
+    const stopPolicy = deploymentContext.subscribe(() => {
+      const next = deploymentContext.getSnapshot().context?.revision
+      // While the context is unverified there is no deployment revision to
+      // supersede; withdrawing in-flight work then is a renewal artifact.
+      if (next === undefined || next === revision) return
+      revision = next; entryRequests.invalidate()
+    })
+    return async () => { stopAccount(); stopPolicy(); await entryRequests.dispose() }
+  }, 'runtime: document entry requests')
   const conversation = {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),

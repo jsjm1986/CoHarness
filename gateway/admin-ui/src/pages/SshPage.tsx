@@ -1,3 +1,4 @@
+import { useProjectChoices } from '../components/project-choices.tsx'
 /** Registered SSH targets, project sharing, and account qualification. */
 import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -106,7 +107,7 @@ function fieldsOf(draft: TargetDraft): AdminSshTargetFields {
 export function SshPage() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: sshZh, en: sshEn }), [])
   const [targets, setTargets] = useState<AdminSshTarget[] | null>(null)
-  const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([])
+  const { projects, setProjects, readNames, moreNames } = useProjectChoices()
   const [loadingProjects, setLoadingProjects] = useState(true)
   const [projectsError, setProjectsError] = useState('')
   const [error, setError] = useState('')
@@ -122,8 +123,8 @@ export function SshPage() {
   useEffect(() => {
     let disposed = false
     setLoadingProjects(true); setProjectsError('')
-    const projectRead = listProjects().then(rows => {
-      if (!disposed) setProjects(rows.map(project => ({ id: project.id, name: project.name })))
+    const projectRead = listProjects(undefined, 'directory').then(rows => {
+      if (!disposed) setProjects(rows)
       return rows
     }).catch((cause: unknown) => {
       if (!disposed) setProjectsError(messageOf(cause))
@@ -132,6 +133,7 @@ export function SshPage() {
     void Promise.all([listSshTargets(), projectRead]).then(([ssh]) => {
       if (disposed) return
       setTargets(ssh.targets)
+      readNames(ssh.targets.flatMap(target => target.sharedProjects))
       setError('')
     }).catch((cause: unknown) => { if (!disposed) setError(messageOf(cause)) })
     return () => { disposed = true; generation.current++ }
@@ -227,7 +229,7 @@ export function SshPage() {
                     <td><StatusBadge tone={target.enabled ? 'success' : 'neutral'}>{target.enabled ? t('statusEnabled') : t('statusDisabled')}</StatusBadge></td>
                     <td>
                       <IconButton label={t('edit')} icon={Pencil} onClick={() => { setEditing({ target, draft: draftOf(target) }) }} />
-                      <IconButton label={t('shareAction')} icon={Share2} onClick={() => { setSharing(target) }} />
+                      <IconButton label={t('shareAction')} icon={Share2} onClick={() => { setSharing(target); readNames() }} />
                       <Button variant="ghost" onClick={() => void toggle(target)} disabled={acting}>{target.enabled ? t('disable') : t('enable')}</Button>
                       <IconButton label={t('delete')} icon={Trash2} onClick={() => { setRemoving(target) }} />
                     </td>
@@ -286,6 +288,7 @@ export function SshPage() {
             />
           ))
         )}
+        {sharing && moreNames()}
       </Dialog>
       <ConfirmDialog
         open={removing !== null}

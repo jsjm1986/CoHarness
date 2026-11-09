@@ -1,6 +1,6 @@
 import type { RuntimeId } from '../runtime-catalog.ts'
 /** Audited SQL execution channel for the resident steward runtime. */
-import { Query, type PoolClient } from 'pg'
+import { Query, type Pool, type PoolClient } from 'pg'
 import { connectFromPool } from './database.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 
@@ -57,6 +57,30 @@ export interface StewardQueryResult {
 function classify(sql: string): 'read' | 'write' {
   const stripped = sql.replace(LEADING_NOISE, '')
   return READONLY_HEAD.test(stripped) ? 'read' : 'write'
+}
+
+/**
+ * Functions denied on the read lane: every entry escapes the READ ONLY
+ * wrapper — `set_config` and session-level advisory locks persist on the
+ * pooled connection past COMMIT, signaling functions reach other backends,
+ * file readers exfiltrate host files, `dblink`/`postgres_fdw` open side
+ * channels, and `pg_sleep` burns pool slots. The write lane still permits
+ * them through an approved statement; dry-run EXPLAIN never executes.
+ */
+const READ_LANE_DENY = /\b(?:pg_terminate_backend|pg_cancel_backend|pg_signal_backend|pg_reload_conf|pg_log_backend_memory_contexts|set_config|pg_advisory_lock|pg_advisory_lock_shared|pg_advisory_unlock|pg_advisory_unlock_shared|pg_advisory_unlock_all|pg_try_advisory_lock|pg_try_advisory_lock_shared|pg_notify|pg_read_file|pg_read_binary_file|pg_stat_file|pg_ls_dir|pg_ls_logdir|pg_ls_waldir|pg_ls_archive_statusdir|pg_ls_tmpdir|lo_import|lo_export|dblink|dblink_exec|dblink_send_query|dblink_cancel_query|dblink_connect|dblink_connect_u|postgres_fdw_disconnect|postgres_fdw_disconnect_all|pg_sleep)\b/i
+
+/**
+ * Scrub comments, string bodies and identifier quoting so the deny-list reads
+ * identifier text only — neither a literal containing a denied name nor a
+ * `pg_catalog.` qualifier or quoted form can shift the verdict.
+ */
+function scrubbedSql(sql: string): string {
+  return sql
+    .replace(/--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\$([a-zA-Z_][a-zA-Z_0-9]*)?\$[\s\S]*?\$\1\$/g, ' ')
+    .replace(/'(?:[^']|'')*'/g, "''")
+    .replace(/"([^"]|"")*"/g, '$1')
+    .replace(/\bpg_catalog\s*\.\s*/gi, '')
 }
 
 /**
@@ -140,10 +164,32 @@ function boundedStatement(
   })
 }
 
+/**
+ * Parse the durable tool-call arguments behind an approval. `callId` links the
+ * claimed interaction to the `tool/call` event, whose `data.arguments` is the
+ * serialized argument object the operator previewed. Any absence or malformed
+ * payload returns null, which fails the approval closed.
+ */
+function approvedArguments(callId: string | null, argumentsJson: string | null): { sql?: unknown } | null {
+  if (callId === null || argumentsJson === null) return null
+  try {
+    const parsed: unknown = JSON.parse(argumentsJson)
+    return typeof parsed === 'object' && parsed !== null ? parsed as { sql?: unknown } : null
+  } catch {
+    return null
+  }
+}
+
 export class StewardQueryService {
+  /**
+   * @param statements - dedicated statement pool. Statements run on their own
+   *   connections so a session-state leak can never reach the shared gateway
+   *   pool; journals and target checks still use `context.pool`.
+   */
   constructor(
     private readonly context: PostgresRuntimeContext,
     private readonly enabled: boolean,
+    private readonly statements: Pool,
   ) {}
 
   /**
@@ -154,8 +200,8 @@ export class StewardQueryService {
   async stewardTarget(projectInternalId: string | undefined): Promise<boolean> {
     if (!this.enabled || projectInternalId === undefined) return false
     const result = await this.context.pool.query(
-      `SELECT 1 FROM harness.projects WHERE organization_id=$1 AND id=$2 AND kind='steward' AND status='active'`,
-      [this.context.organizationId, projectInternalId],
+      `SELECT 1 FROM harness.projects WHERE organization_id=$1 AND id=$2 AND kind='steward' AND status='active' AND steward_node_id=$3`,
+      [this.context.organizationId, projectInternalId, this.context.nodeId],
     )
     return result.rows.length > 0
   }
@@ -177,6 +223,10 @@ export class StewardQueryService {
       throw new StewardQueryError(413, 'steward-statement-too-large', `statement exceeds ${MAX_STATEMENT_BYTES} bytes`)
     }
     const classification = classify(statement)
+    if (classification === 'read' && READ_LANE_DENY.test(scrubbedSql(statement))) {
+      await this.journal(subject, statement, classification, input.dryRun === true, 'denied', null, null, null, 'statement-forbidden', input.approvalId)
+      throw new StewardQueryError(403, 'steward-statement-forbidden', 'the statement calls a function whose effects escape the read-only lane')
+    }
     if (input.dryRun) {
       return this.explain(subject, statement, classification, input.approvalId, input.rowLimit)
     }
@@ -185,7 +235,7 @@ export class StewardQueryService {
       throw new StewardQueryError(403, 'steward-approval-required', 'write statements require an approved in-session interaction')
     }
 
-    const client = await connectFromPool(this.context.pool)
+    const client = await connectFromPool(this.statements)
     let failure: Error | null = null
     let afterRelease: (() => Promise<void>) | undefined
     try {
@@ -193,7 +243,7 @@ export class StewardQueryService {
       await client.query(`SET LOCAL statement_timeout = ${STATEMENT_TIMEOUT_MS}`)
       let responderInternalId: string | null = null
       if (classification === 'write') {
-        responderInternalId = await this.verifyApproval(client, input.approvalId!, subject.projectInternalId, subject.runtimeId)
+        responderInternalId = await this.verifyApproval(client, input.approvalId!, subject.projectInternalId, subject.runtimeId, statement)
         if (responderInternalId === null) {
           await client.query('ROLLBACK')
           afterRelease = () => this.journal(subject, statement, classification, false, 'denied', null, null, null, 'approval-invalid', input.approvalId)
@@ -232,7 +282,14 @@ export class StewardQueryService {
       failure = error instanceof Error ? error : new Error(String(error))
       throw error
     } finally {
-      // Releasing with the error destroys a dead connection instead of lending it out again.
+      // DISCARD ALL clears any session residue — GUCs, advisory locks,
+      // listeners, prepared statements — before the connection is lent again;
+      // a failure destroys the client instead. The error path already lends
+      // nothing back: release(error) removes it from the pool.
+      if (failure === null) {
+        try { await client.query('DISCARD ALL') }
+        catch (error) { failure = error instanceof Error ? error : new Error(String(error)) }
+      }
       if (failure === null) client.release()
       else client.release(failure)
       // Best-effort journals borrow from the pool after this query releases it.
@@ -241,13 +298,17 @@ export class StewardQueryService {
   }
 
   private async explain(subject: StewardQuerySubject, statement: string, classification: 'read' | 'write', approvalId: string | undefined, rowLimit: number): Promise<StewardQueryResult> {
-    const client = await connectFromPool(this.context.pool)
+    const client = await connectFromPool(this.statements)
     let failure: Error | null = null
     let afterRelease: (() => Promise<void>) | undefined
     try {
       await client.query('BEGIN READ ONLY')
       await client.query(`SET LOCAL statement_timeout = ${STATEMENT_TIMEOUT_MS}`)
-      const { output, bytes } = await boundedStatement(client, `EXPLAIN ${statement}`, classification, true, rowLimit)
+      // An explicit ANALYZE OFF option list keeps a payload-led ANALYZE or
+      // option parenthesization from re-enabling execution: once options are
+      // closed the grammar requires an ExplainableStmt, so a leading ANALYZE
+      // in the statement is a syntax error, and ANALYZE OFF is pinned anyway.
+      const { output, bytes } = await boundedStatement(client, `EXPLAIN (ANALYZE OFF) ${statement}`, classification, true, rowLimit)
       await client.query('COMMIT')
       afterRelease = () => this.journal(subject, statement, classification, true, 'ok', null, output.rowCount, bytes, null, approvalId)
       return output
@@ -258,6 +319,10 @@ export class StewardQueryService {
       failure = error instanceof Error ? error : new Error(String(error))
       throw error
     } finally {
+      if (failure === null) {
+        try { await client.query('DISCARD ALL') }
+        catch (error) { failure = error instanceof Error ? error : new Error(String(error)) }
+      }
       if (failure === null) client.release()
       else client.release(failure)
       await afterRelease?.()
@@ -276,13 +341,23 @@ export class StewardQueryService {
    * exactly one write. The outcome column stores the literal wire verdict
    * `'allowed-once'`.
    */
-  private async verifyApproval(client: PoolClient, approvalId: string, projectInternalId: string, runtimeId: RuntimeId): Promise<string | null> {
+  private async verifyApproval(client: PoolClient, approvalId: string, projectInternalId: string, runtimeId: RuntimeId, statement: string): Promise<string | null> {
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [JSON.stringify([this.context.organizationId, runtimeId, approvalId])])
-    const result = await client.query<{ responder: string }>(`SELECT r.responder_user_id::text responder
+    const result = await client.query<{ responder: string; callId: string | null; arguments: string | null }>(`SELECT r.responder_user_id::text responder, r.call_id AS "callId", call.arguments
       FROM harness.conversation_interaction_responses r
       JOIN harness.conversation_sessions c ON c.organization_id=r.organization_id AND c.runtime_namespace=r.runtime_namespace AND c.id=r.conversation_id
       JOIN harness.conversation_sessions root ON root.organization_id=c.organization_id AND root.runtime_namespace=c.runtime_namespace
         AND root.id=c.root_session_id AND root.project_id=$3
+      LEFT JOIN LATERAL (
+        SELECT e.event#>>'{data,arguments}' AS arguments
+        FROM harness.conversation_events e
+        JOIN harness.conversation_sessions es ON es.id=e.session_id
+          AND es.organization_id=r.organization_id AND es.runtime_namespace=r.runtime_namespace
+          AND (es.id=r.conversation_id OR es.root_session_id=r.conversation_id)
+        WHERE r.call_id IS NOT NULL AND e.event_type='tool/call'
+          AND e.event->'data'->>'callId'=r.call_id
+        ORDER BY e.seq LIMIT 1
+      ) call ON true
       JOIN harness.users u ON u.organization_id=r.organization_id AND u.id=r.responder_user_id AND u.status='active'
       JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
         AND m.status='active' AND m.role='admin'
@@ -290,7 +365,7 @@ export class StewardQueryService {
         AND sp.node_id=harness.project_node_id(r.organization_id,$3) AND sp.enabled
       WHERE r.organization_id=$1 AND r.runtime_id=$4 AND r.interaction_kind='approval' AND r.interaction_id=$2
         AND harness.project_computer_use_allowed(r.organization_id,u.id,$3)
-        AND r.responded_at > now() - interval '${APPROVAL_TTL_MINUTES} minutes'
+        AND r.responded_at > clock_timestamp() - interval '${APPROVAL_TTL_MINUTES} minutes'
         AND r.outcome = to_jsonb('allowed-once'::text)
         AND NOT EXISTS (
           SELECT 1 FROM harness.steward_query_log l
@@ -298,7 +373,14 @@ export class StewardQueryService {
             AND l.classification='write' AND l.dry_run=false AND l.status='ok')
       ORDER BY r.responded_at DESC LIMIT 1`,
     [this.context.organizationId, approvalId, projectInternalId, runtimeId])
-    return result.rows[0]?.responder ?? null
+    const row = result.rows[0]
+    if (row === undefined) return null
+    // The approval spends only the statement the operator saw: the ask carried
+    // the tool call's callId, whose durable tool/call event logged the exact
+    // arguments. A different statement under the same approval id denies.
+    const args = approvedArguments(row.callId, row.arguments)
+    if (args === null || args.sql !== statement) return null
+    return row.responder
   }
 
   /** Record a best-effort outcome outside the statement transaction. */

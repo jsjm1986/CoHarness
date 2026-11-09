@@ -1,0 +1,174 @@
+{
+  "id": "B514",
+  "title": "Model discovery follows foreign-origin redirects with Anthropic API keys and deployment authentication headers",
+  "status": "fixed_shared_helper_and_normal_package_exports_verified_full_project_build_acceptance_open",
+  "sourceFixed": true,
+  "at": "2026-11-04T22:32:28.445347+00:00",
+  "paths": [
+    "packages/llm/llm/src/discovery.ts"
+  ],
+  "receipt": "receipts/model-discovery-redirect-authority-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-redirect-before.log",
+  "originalObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-redirect-negative-observations.json",
+  "originalResult": "Two owned loopback HTTP origins show native Fetch forwarding Anthropic x-api-key and a custom route-secret header across a302redirect. OpenAI Authorization is stripped by Fetch, but its custom route-secret header still crosses the origin. Same-origin controls succeed. Only synthetic credentials were used.",
+  "correction": "The shared HTTP discovery owner follows only same-origin redirects without URL credentials, retaining Fetch’s redirect count limit. Every discarded response is cancelled before the next dispatch or refusal, and cancellation between responses prevents another request. Both Gateway and pi-ai consumers use this owner.",
+  "checks": {
+    "helperAndPiAiConsumer": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-consumer-cases.json",
+      "passed": 87,
+      "skipped": 0,
+      "newCases": 13
+    },
+    "changedWholeFileCoverage": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-consumer-coverage/coverage-summary.json",
+      "source": "packages/llm/llm/src/discovery.ts",
+      "metrics": {
+        "lines": 100,
+        "statements": 100,
+        "functions": 100,
+        "branches": 100
+      },
+      "thresholdsUnchanged": true,
+      "newExclusions": false,
+      "qualification": "The initial helper-only selection passed54tests but missed existing enriched-map parser coverage. Adding the owning pi-ai consumer suite covers the complete changed source file without altering thresholds."
+    },
+    "actualGateway": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/model-discovery-redirect-public-cases.json",
+      "passed": 4,
+      "skipped": 0,
+      "newPublicSpecCases": 1,
+      "newPublicSpecInternalScenarios": 24,
+      "retainedOrganizationProjectAndSqliteScenarioInstances": 135,
+      "expectedTranscript": "gateway/tests/expected/projects/model-discovery-redirect.jsonl",
+      "qualification": "Real browser authentication, encrypted PostgreSQL credential preparation, stored/draft credentials, organization/project settings, all three supported protocols, two owned HTTP origins. Foreign destinations receive zero requests; same-origin redirects succeed."
+    },
+    "gatewayConsumerAndCommandWiring": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-gateway-wiring-and-consumer-cases.json",
+      "passed": 31,
+      "skipped": 0
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/redirect-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "gatewayScenariosPerVersion": 24,
+      "packageExportFaces": [
+        "root",
+        "discovery"
+      ],
+      "realHttpScenariosPerExport": 4,
+      "typescriptLoader": false,
+      "qualification": "Unchanged ordinary Gateway emit and ordinary LLM Host compiler/bundle outputs. The LLM package and both exports are frozen locally; existing package-owned installed dependencies retain their workspace resolution."
+    },
+    "packageEmit": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-package-emit.log",
+    "fullGatewayTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-gateway-typecheck.log",
+    "ordinaryFullGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-gateway-production-build.log",
+    "focusedLint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-redirect-final-lint.json",
+      "files": 4,
+      "diagnostics": 0
+    },
+    "threeBilingualPairs": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-redirect-pairing-check.log",
+    "sixMarkdownSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-redirect-markdown-links.log",
+    "namedUpgradeGuideStructure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-upgrade-guide-structure.json",
+    "publishedPackageLint": {
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-published-package-lint.log",
+      "exitCode": 0,
+      "warnings": [
+        "Existing ./src/* export matches no packed files; manifest unchanged by this repair."
+      ],
+      "zeroWarningsClaimed": false
+    },
+    "ownedClusterCleanup": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/native-postgres-lifecycle-summary.json"
+  },
+  "wholeProjectBuild": {
+    "command": "pnpm run build",
+    "status": "failed",
+    "passedSteps": [
+      "native addon",
+      "Host compiler",
+      "Host bundle"
+    ],
+    "failedSteps": [
+      "Client compiler",
+      "Host aggregate check"
+    ],
+    "skippedSteps": [
+      "Client bundle",
+      "Web build",
+      "Client aggregate check"
+    ],
+    "diagnosticCount": 98,
+    "diagnosticFiles": [
+      "apps/web/tests/managed-prompt-reload.e2e.ts",
+      "apps/web/tests/personal-runtime-latency.e2e.ts",
+      "packages/api/gateway/src/client/index.ts",
+      "packages/api/remotes/src/client/index.ts",
+      "packages/client/connection/src/client/api.ts",
+      "packages/client/connection/src/client/fixture.ts",
+      "packages/client/connection/src/client/index.ts",
+      "packages/client/connection/src/client/session-api.ts",
+      "packages/client/runtime/src/client/contract/session.ts",
+      "packages/client/runtime/src/client/contract/sessions.ts",
+      "packages/client/runtime/src/client/contract/store.ts",
+      "packages/client/runtime/src/client/conversation/event-registry.ts",
+      "packages/client/runtime/src/client/deployment-context.ts",
+      "packages/client/runtime/src/client/entry-requests.ts",
+      "packages/client/runtime/src/client/index.ts",
+      "packages/client/runtime/src/client/project-policy.ts",
+      "packages/client/runtime/src/client/sessions/conversation-assembler.ts",
+      "packages/client/runtime/src/client/sessions/conversation-context.ts",
+      "packages/client/runtime/src/client/sessions/conversation.ts",
+      "packages/client/runtime/src/client/sessions/lineage.ts",
+      "packages/client/runtime/src/client/sessions/manager.ts",
+      "packages/client/runtime/src/client/sessions/notifier.ts",
+      "packages/client/runtime/src/client/sessions/pool.ts",
+      "packages/client/runtime/src/client/sessions/service.ts",
+      "packages/client/runtime/src/client/sessions/session.ts",
+      "packages/client/runtime/src/client/slots.ts",
+      "packages/client/runtime/src/client/workspaces/manager.ts",
+      "packages/client/runtime/src/client/workspaces/service.ts",
+      "packages/client/ui-documents/src/client/DocumentsModal.tsx",
+      "packages/client/ui-slots/src/index.ts"
+    ],
+    "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/discovery-complete-build.log",
+    "allDiagnosticsAttributedToNewSourceBugs": false,
+    "qualification": "Host aggregate failure includes client-source inclusion and resulting face/type errors. No whole-project build success or diagnosis of every transitive diagnostic is claimed."
+  },
+  "peerQaReport": {
+    "at": "2026-11-04T22:32:28.445347+00:00",
+    "sourceThread": "01a1821f-1577-7472-93db-3bd83ee42345",
+    "status": "reported_not_independently_accepted",
+    "summary": "Peer reports governance119/node takeover016 acceptance and personal-backup PostgreSQL checks on independent Mac/Windows QA installations. Windows physical2GB budget requires serialized work. R50 production remains unchanged and unreleased. Peer will include the discovery repair and fix document UI union narrowing.",
+    "reportedText": "119治理+016节点接管测试和个人备份PG已通过",
+    "testCountsIndependentlyEstablished": false
+  },
+  "limits": [
+    "The full repository build failed in Client source and Host aggregate checking; no whole-project green status is claimed. Native, Host source and Host bundle steps passed.",
+    "The current repository has no registered verify-upgrade-guides script. Named guide structure,500word budget, pairing and links were checked without claiming a corpus-wide guide gate.",
+    "Normal Node22/24 execution here is macOS; no fresh Linux or Windows execution is claimed.",
+    "The unchanged packed source-export warning remains for classification; it is not represented as repaired.",
+    "All12 business domains remain in progress. Real paid Responses validation remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "frozenDelivery": {
+    "at": "2026-11-04T22:31:06.129288+00:00",
+    "finding": "B514",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/B514-model-discovery-redirect",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T220131Z/B514-model-discovery-redirect.delta.tar.gz",
+    "archiveSha256": "96363231c728b1755a447bbc466c4b1fbe706a5d9d76293bebb515d98b9e6363",
+    "manifestSha256": "7703457fe7e90f4654ba198be58f627f2e359a46feff33fa56ab48c1ee302dec",
+    "ownedPaths": 16,
+    "readOnlyPrerequisites": 6,
+    "compiledProductionJs": 288,
+    "gatewayProductionJs": 262,
+    "llmProductionJs": 26,
+    "artifactFiles": 482,
+    "wholeProjectComplete": false
+  }
+}

@@ -1,3 +1,9 @@
+import { createHash } from 'node:crypto'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import { sessionBackedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 /**
  * Web session model-directory and selection behavior: dynamic provider grouping,
  * provider-local catalog failures, logged-selection restoration without stale
@@ -28,6 +34,7 @@ import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '../src/api-proxy.ts'
+import { admittedPrompts } from '../src/prompt-receipts.ts'
 
 let nextRpc = 1
 function request<P>(payload: P): RpcRequest<P> {
@@ -83,7 +90,7 @@ async function harness(logged?: {
   model: string
   reasoningEffort?: ReasoningEffortId
   adapterDefaults?: { reasoningEffort?: true }
-}, options?: { withRegistry?: boolean }): Promise<{
+}, options?: { withRegistry?: boolean; persistenceRoot?: string }): Promise<{
   ctx: Context
   agent: Agent
   sessionId: SessionId
@@ -114,6 +121,7 @@ async function harness(logged?: {
     { provider: 'duplicate', id: 'same', name: 'Same' },
     { provider: 'duplicate', id: 'same', name: 'Same Again' },
   ]))
+  if (options?.persistenceRoot !== undefined) await ctx.plugin(JsonlSessionPersistence, { root: options.persistenceRoot, compression: 'none' })
   const session = ctx.sessions.create()
   if (logged !== undefined) {
     const { adapterDefaults, ...config } = logged
@@ -741,4 +749,116 @@ describe('Web session model selection', () => {
       .toEqual({ provider: 'deepseek-official', model: 'deepseek-reasoner' })
     await ctx.fiber.dispose()
   })
+})
+
+it('acknowledges one persisted inbox insertion after a lost response and rejects changed input on the same operation', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-prompt-receipt-'))
+  const { ctx, agent, sessionId } = await harness(undefined, { withRegistry: true, persistenceRoot: root })
+  try {
+    const writer = await ctx.sessionPersistence.create(agent.session.header)
+    ctx.effect(() => () => writer.close())
+    const inbox = sessionBackedInbox(agent)
+    const followup = vi.fn((message: UserMessage) => { inbox.splice('next-turn', Infinity, 0, [message]) })
+    Object.assign(agent, { followup })
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }), cwd: root })
+    const id = RpcId('same-operation')
+    const payload = { sessionId, requestId: id, mode: 'queue' as const, durable: true as const, content: [{ type: 'text' as const, text: 'one input' }] }
+    const [first, retry] = await Promise.all([api.sessions.prompt(request(payload)),api.sessions.prompt(request(payload))])
+    expect(first.result).toEqual({ ok: true, value: { accepted: true } })
+    expect(retry.result).toEqual(first.result)
+    expect(followup).toHaveBeenCalledTimes(1)
+    expect((await api.sessions.prompt(request({ ...payload, content: [{ type: 'text', text: 'different' }] }))).result)
+      .toMatchObject({ ok: false, error: { code: 'bad-request' } })
+    expect(expectValue(await api.sessions.promptStatus(request({ sessionId, requestId: id })))).toEqual({ state: 'accepted' })
+    const sha = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
+    expect(expectValue(await api.sessions.promptStatus(request({ sessionId, requestId: id, confirmInput: true })))).toEqual({
+      state: 'accepted', inputProof: sha([id, sha(['queue', null, payload.content])]),
+    })
+    expect(expectValue(await api.sessions.promptStatus(request({ sessionId, requestId: RpcId('unseen') })))).toEqual({ state: 'unknown' })
+    const persisted = await ctx.sessionPersistence.readPage(sessionId)
+    expect(persisted.events.filter(e => e.type === 'agent/inbox/spliced' && e.data.inserted.length > 0)).toHaveLength(1)
+  } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }) }
+})
+
+it('verifies the exact durable inbox event while later Session events commit, and refuses an unverified prefix', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-prompt-prefix-'))
+  const { ctx, agent, sessionId } = await harness(undefined, { withRegistry: true, persistenceRoot: root })
+  try {
+    const writer = await ctx.sessionPersistence.create(agent.session.header)
+    ctx.effect(() => () => writer.close())
+    const inbox = sessionBackedInbox(agent)
+    Object.assign(agent, { followup: (message: UserMessage) => { inbox.splice('next-turn', Infinity, 0, [message]) } })
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }), cwd: root })
+    const open = ctx.sessionPersistence.open.bind(ctx.sessionPersistence)
+    const otherSession = ctx.sessions.create()
+    const otherWriter = await ctx.sessionPersistence.create(otherSession.header)
+    ctx.effect(() => () => otherWriter.close())
+    await otherWriter.flush()
+    const handleModes = ['concurrent', 'id', 'key', 'digest', 'close'] as const
+    let mode: typeof handleModes[number] = 'concurrent'
+    let advanced = false
+    const openOverride = vi.spyOn(ctx.sessionPersistence, 'open').mockImplementation(async (...args) => {
+      if (mode === 'id' && args[1] === 'read') return open(otherSession.id, 'read')
+      const handle = await open(...args)
+      if (args[1] !== 'read') return handle
+      const read: typeof handle.read = async (...bounds) => {
+        const page = await handle.read(...bounds)
+        const [event] = page.events
+        if (!event || event.type !== 'agent/inbox/spliced') return page
+        if (mode === 'concurrent' && !advanced) {
+          advanced = true
+          agent.session.append('agent/inbox/spliced', { target: 'next-turn', start: 1, removedCount: 0, inserted: [] })
+          await ctx.sessions.flush(agent.session)
+        }
+        const [proof] = admittedPrompts(event)
+        if (!proof || mode !== 'key' && mode !== 'digest') return page
+        const changed = { ...proof, [mode]: '0'.repeat(64) }
+        const inserted = event.data.inserted.map(item => ({ ...item, source: { ...item.source, admission: changed } }))
+        return { ...page, events: [{ ...event, data: { ...event.data, inserted } }] }
+      }
+      const close = async (): Promise<void> => {
+        await handle.close()
+        if (mode === 'close') throw new Error('read handle close failed')
+      }
+      return new Proxy(handle, {
+        get(target, prop): unknown {
+          if (prop === 'read') return read
+          if (prop === 'close') return close
+          return Reflect.get(target, prop, target)
+        },
+      })
+    })
+    const requestId = RpcId('concurrent-operation')
+    const payload = { sessionId, requestId, mode: 'queue' as const, durable: true as const, content: [{ type: 'text' as const, text: 'one input' }] }
+    expect((await api.sessions.prompt(request(payload))).result).toEqual({ ok: true, value: { accepted: true } })
+    expect(advanced).toBe(true)
+    const [marker] = Object.values(ctx.sessionProjections.stateOf(agent.session, 'acceptedPromptReceipts')!)
+    advanced = false
+    await expect(ctx.sessionPersistence.readPage(sessionId, { direction: 'newer', fromSeq: marker!.seq, maxEvents: 1 }))
+      .rejects.toMatchObject({ code: 'dependency', message: 'session persistence revision changed during page read' })
+    expect(advanced).toBe(true)
+    for (const fault of handleModes.slice(1)) {
+      mode = fault
+      expect((await api.sessions.promptStatus(request({ sessionId, requestId }))).result).toMatchObject({
+        ok: false, error: { code: 'prompt-durability-unavailable' },
+      })
+    }
+    openOverride.mockRestore()
+    const failedFlush = vi.spyOn(ctx.sessions, 'flush').mockRejectedValueOnce(new Error('storage unavailable'))
+    expect((await api.sessions.promptStatus(request({ sessionId, requestId }))).result).toMatchObject({
+      ok: false, error: { code: 'prompt-durability-unavailable' },
+    })
+    failedFlush.mockRestore()
+    expect(expectValue(await api.sessions.promptStatus(request({ sessionId, requestId })))).toEqual({ state: 'accepted' })
+    const path = ctx.sessionPersistence.locate(agent.session.header)!.path
+    const bytes = await readFile(path)
+    const receiptRow = bytes.indexOf('"agent/inbox/spliced"')
+    expect(receiptRow).toBeGreaterThan(0)
+    try {
+      await writeFile(path, bytes.subarray(0, receiptRow + 4))
+      expect((await api.sessions.promptStatus(request({ sessionId, requestId }))).result).toMatchObject({
+        ok: false, error: { code: 'prompt-durability-unavailable' },
+      })
+    } finally { await writeFile(path, bytes) }
+  } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }) }
 })

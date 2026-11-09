@@ -97,6 +97,7 @@ describePg('deployment backup completeness', () => {
     const user = (await pool.query<{ id: string; public_id: string }>(
       "INSERT INTO harness.users(organization_id,username,display_name,home_path) VALUES($1,'alice','Alice',$2) RETURNING id,public_id",
       [organization, home])).rows[0]!
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [user.id])
     await pool.query(`INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port,generation)
       VALUES($1,$2,$3,49101,1)`, [organization, user.id, context.nodeId])
     await writeFile(cfg.managedDataApprovalFile!, '', { mode: 0o600 })
@@ -477,18 +478,59 @@ describePg('deployment backup completeness', () => {
 
   it('previews only verified applied node settings and keeps pending operations out of the result', async () => {
     const f = await fixture()
+    await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [f.context.organizationId, f.user.id])
+    const actor = Number(f.user.public_id)
     f.claim('@deepseek-ai/dsh-session-persistence-jsonl', 'directory', join(f.dsh, 'sessions'))
     await new NodeConfigurationStore(f.context, f.cfg, f.environment, nodeConfigurationAuthority(f.context)).initialize()
     await f.maintenance.enterMaintenance(null)
-    const record = await f.backups.create(null)
-    const preview = await f.backups.previewNodeConfiguration(record.id)
+    const record = await f.backups.create(actor)
+    const preview = await f.backups.previewNodeConfiguration(record.id, actor)
     expect(preview).toEqual({ backupId: record.id, configFile: f.cfg.nodeConfigFile,
       appliedRevision: 0, values: expect.objectContaining({ HGW_USERS_ROOT: f.cfg.usersRoot }), incompatibleFields: [] })
     expect(Object.keys(preview)).not.toContain('operation')
     expect(Object.keys(preview.values!)).not.toContain('HGW_DATABASE_URL')
     const member = record.managedSnapshot!.files.find(file => file.sourcePath === f.cfg.nodeConfigFile)!
     await writeFile(join(backupFilesDirectory(record.path), member.member), '{}')
-    await expect(f.backups.previewNodeConfiguration(record.id)).rejects.toThrow('digest mismatch')
+    await expect(f.backups.previewNodeConfiguration(record.id, actor)).rejects.toThrow('digest mismatch')
+  })
+
+  it('keeps captured files unregistered when administrator authority is withdrawn before registry admission', async () => {
+    const f = await fixture()
+    f.claim('@deepseek-ai/dsh-session-persistence-jsonl', 'directory', join(f.dsh, 'sessions'))
+    await mkdir(join(f.dsh, 'sessions'), { recursive: true })
+    await writeFile(join(f.dsh, 'sessions/session.jsonl'), 'synthetic retained Session')
+    await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [f.context.organizationId, f.user.id])
+    await f.maintenance.enterMaintenance(null)
+    const capture = f.commands.backup.bind(f.commands)
+    let capturedPath: string | undefined
+    vi.spyOn(f.commands, 'backup').mockImplementationOnce(async (...args) => {
+      const result = await capture(...args)
+      capturedPath = result.dumpPath
+      await pool.query("UPDATE harness.memberships SET role='member' WHERE user_id=$1", [f.user.id])
+      return result
+    })
+    await expect(f.backups.create(Number(f.user.public_id))).rejects.toMatchObject({ code: 'forbidden' })
+    expect(await new PostgresBackupService(f.context).list()).toEqual([])
+    expect(capturedPath).toBeTypeOf('string')
+    expect((await readFile(capturedPath!)).byteLength).toBeGreaterThan(0)
+    expect((await f.maintenance.listOperations()).find(operation => operation.kind === 'backup')?.status).toBe('failed')
+  })
+
+  it('preserves verification when an admitted verifier loses authority after checking the stored files', async () => {
+    const f = await fixture()
+    f.claim('@deepseek-ai/dsh-session-persistence-jsonl', 'directory', join(f.dsh, 'sessions'))
+    await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [f.context.organizationId, f.user.id])
+    await f.maintenance.enterMaintenance(null)
+    const record = await f.backups.create(null), files = f.commands.verifyStoredFiles.bind(f.commands)
+    vi.spyOn(f.commands, 'verifyStoredFiles').mockImplementationOnce(async (...args) => {
+      await files(...args)
+      await pool.query("UPDATE harness.memberships SET role='member' WHERE user_id=$1", [f.user.id])
+    })
+    const before = await pool.query<{ revision: string }>('SELECT xmin::text revision FROM harness.backup_records WHERE id=$1', [record.id])
+    await expect(f.backups.verify(record.id, undefined, Number(f.user.public_id))).rejects.toMatchObject({ code: 'forbidden' })
+    const after = await pool.query<{ revision: string }>('SELECT xmin::text revision FROM harness.backup_records WHERE id=$1', [record.id])
+    expect(after.rows).toEqual(before.rows)
+    expect((await new PostgresBackupService(f.context).get(record.id)).status).toBe('verified')
   })
 
   it('excludes configuration mutations while a backup owns the data lease and allows readonly restart initialization', async () => {

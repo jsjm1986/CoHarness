@@ -87,6 +87,8 @@ Node 半侧会在发布前快照每个 `client.js` 入口，并在不构建响�
 
 浏览器只对匹配的 owner revision 使用 chunk 表。仅含重建信息、不含完整图的帧会撤销旧表，并继续使用 owner revision URL，直到下一张图提供当前 chunk 身份。每个在途 chunk 独立拥有一次结算，由所有等待者共享；owner 失效后，同一 chunk 的新 factory 必须等待该结算完成才能被采用。过时结算只丢弃自己的 factory 一次，恢复执行的调用者不会删除较新的 factory 或已物化导出。
 
+每个物化的脚本或 map body 会在后台预压缩出 Brotli 与 gzip 变体，并以 `vary: accept-encoding` 应答 `Accept-Encoding`；编码失败只记录日志，identity 与任何已就绪编码继续提供服务。未知资源或 revision 返回 404。
+
 ### 启动 manifest 注入
 
 bundle 路由随注入的 `webServer` 生命周期注册：服务就绪时注册，服务被替换时移除并重新注册。模块组合与 `fetchBundle()` 在没有 Web server 时仍可用。
@@ -142,8 +144,8 @@ bundle 路由随注入的 `webServer` 生命周期注册：服务就绪时注册
 - **旧式产物的 revision**——未带标记产物标识文件系统代际，因此仅元数据变化也可能重载它们。监听器无法检测 mtime、ctime 和大小都无法反映的变化。
 - **有意采用扁平模块图**——每个 bundle 是一个模块节点，其边只指向表中的叶节点；接口（`loadCache`/`edges`/`invalidate`）已经支持通用模块图，因此可以改变 externalization 粒度而不更改接口。
 - **Bootstrap 与代码替换限制**——页面保留 modules bootstrap 和静态平台模块的身份。移除或替换 bootstrap 需要刷新页面；动态替换请求会报告页面本地错误，并保留其 fiber 与导出；替换包代码及其所有现有消费者不属于普通启停同步。
-- **惰性提供会保留已请求的 body**——Host 在内存中保留每个 bundle 与惰性响应计划；脚本或 map body 在首次 `GET` 后保留缓存，HMR 还会保留上一代启动响应。内存仅随客户端实际请求的响应 body 增长，同时保留一代竞态容忍。
-- **从未请求的上一代 map 会读取当前 map 文件**——combo revision 跟踪可执行 bundle，而不跟踪调试产物。若 HMR 在保留的旧 URL 首次收到 map `GET` 前重建 map，该响应会把当前 authored map 与旧 bundle offset 组合；在重建前请求 map 会固定该 URL 的响应。
+- **惰性提供会保留已请求的 body**——Host 在内存中保留每个 bundle 与惰性响应计划；脚本或 map body 及其压缩变体在首次 `GET` 后保留缓存，HMR 还会保留上一代启动响应。内存仅随客户端实际请求的响应 body 增长，同时保留一代竞态容忍。
+- **从未请求的上一代 map 会读取当前 map 文件**——保留下来的上一代响应保留其惰性 body，后者在物化时才读取 map 文件，而非发布时。若 HMR 在保留的旧 URL 首次收到 map `GET` 前重建 map，该响应会把当前 authored map 与旧 bundle offset 组合；在重建前请求 map 会固定该 URL 的响应。
 - **Host release 检测依赖图事件流**——页面只能从图帧得知 Host 换了 release。重启中的 Host 若在注册路由之前对 `/plugins/events` 返回非 200 状态，浏览器会永久关闭该事件流，页面在刷新前既不更新插件，也检测不到 release 变化。
 - **源码启动时 Host 半侧没有构建步骤**——从 TypeScript 源码启动的 Host 读取 `pnpm run dev:web` 放入其环境的 commit；没有该值的源码启动只发布版本号。
 

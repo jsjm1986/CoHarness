@@ -290,6 +290,8 @@ export interface UserDocTransferRequest {
   readonly planId?: string
   readonly source: UserDocScope
   readonly target: UserDocScope
+  /** Captured original Session ID for a managed copy-and-attach request. The target allocation and computer must be exact. */
+  readonly targetSessionId?: string
   readonly directory?: UserDocDirectoryId
   readonly documents: readonly UserDocTransferSelection[]
 }
@@ -319,6 +321,8 @@ export interface UserDocTransferTargetRef {
 export type UserDocTransferItem =
   | {
     readonly status: 'copied'
+    /** Destination bytes were committed while a catalog or audit receipt was unavailable. */
+    readonly historyUnconfirmed?: true
     readonly source: { readonly name: string; readonly bytes: number; readonly mediaType: string }
     readonly target: UserDocTransferTargetRef
   }
@@ -436,6 +440,9 @@ export interface UserDocCatalogOverview {
   readonly documents: readonly UserDocCatalogRow[]
   readonly metrics: UserDocCatalogMetrics
   readonly totalDocuments?: number
+  /** Counts cover the responding computers when an explicitly addressed document index is offline. */
+  readonly unavailableNodes?: readonly string[]
+  readonly partial?: boolean
   readonly nextCursor?: string
 }
 

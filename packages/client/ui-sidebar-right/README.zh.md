@@ -107,7 +107,7 @@ tab 类型分两阶段注册，随包发布的引导类型走的正是别的包�
 <a id="the-tab-domain"></a>
 ## Tab 域
 
-Tab 域按（Session，Tab id）保留带 brand 的 occurrence id、导航、中止信号与绑定动作。私有装配回调采用各 Session 的 store，立即对齐恢复的记录，再跟随其提交。重建某个 Session 的 store 会替换其采用关系，释放旧订阅与清理引用。记录消失或插件卸载才中止 signal，收起和切会话不销毁记录；undo 恢复的是新 occurrence。`useTabInfo()` 组合框架绑定的 store 与导航 hook，不在组件中手写订阅或在渲染时创建记录。`tab.actions` 始终作用于自己的会话；`tab.visible` 区分正文与标题并排除后台 Session；前台浮窗不受整栏收起影响。`adopt` 不在公开控制器上。
+Tab 域按（Session，Tab id）保留带 brand 的 occurrence id、导航、中止信号与绑定动作。私有装配回调采用各 Session 的 store，立即对齐恢复的记录，再跟随其提交。重建某个 Session 的 store 会替换其采用关系，释放旧订阅与清理引用。记录消失或插件卸载才中止 signal，收起和切会话不销毁记录；undo 恢复的是新 occurrence。`useTabInfo()` 组合框架绑定的 store 与导航 hook，不在组件中手写订阅或在渲染时创建记录。`tab.actions` 始终作用于自己的会话：除导航、命令绑定与关闭外，它还带有 `setPanelMode`，为正文内需要整幅画面的内容应用表面的 `push`/`fullscreen` 显示模式——与面板 chrome 控件同一操作。`tab.visible` 区分正文与标题并排除后台 Session；前台浮窗不受整栏收起影响。`adopt` 不在公开控制器上。
 
 类型声明 `keepMounted: true` 后，其已访问正文在切 tab、切会话、收起与重新停靠之间保持挂载。每个 View 通过 owner props 提供自己的稳定持有回调，因此重建 Session 注入绑定不会释放正文。未访问过的正文不会被提前挂载。
 

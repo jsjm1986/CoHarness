@@ -12,6 +12,7 @@
  * before-the-fact, while the header only reports what a session already runs.
  */
 
+import { symbols } from '@deepseek-ai/cordis'
 import type { ClientRemote, ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -56,6 +57,13 @@ export { AGENT_PRESET_SETTINGS_NS, writeDefaultPreset } from './settings-store.t
 export { presetDisplayText } from '@deepseek-ai/dsh-agent-preset-registry/display'
 export type { PresetDisplaySource, PresetDisplayText } from '@deepseek-ai/dsh-agent-preset-registry/display'
 
+type Presets = ClientRemote['agentPresets']
+
+/** The provider stays stable across reads although Cordis traces each call through its owning Session. */
+function rosterSource(value: Presets | undefined): Presets | undefined {
+  return (value as (Presets & { [symbols.original]?: Presets }) | undefined)?.[symbols.original] ?? value
+}
+
 /** Required services (cordis fiber inject). */
 export const inject = [
   'slots', 'locale', 'connection', 'remote', 'remote.agentPresets', 'settingsScope',
@@ -72,12 +80,15 @@ export function apply(ctx: ClientContext): void {
   // One roster, four surfaces. The chip is registered in a later scope, so it
   // subscribes here rather than being reached from this one.
   const rosterReaders = new Set<() => void>()
+  let rosterRevision = 0
+  const invalidateRoster = (): void => { rosterRevision++ }
   const section = new AgentPresetSectionController(
     ctx.remote,
     api,
     () => connection.hostDescription.getSnapshot()?.canOpenPath ?? false,
     ctx.settingsScope.describe(),
     () => {
+      invalidateRoster()
       void controller.load()
       for (const read of rosterReaders) read()
     },
@@ -95,6 +106,7 @@ export function apply(ctx: ClientContext): void {
     // The roster is a live directory and the default is a settings field, so
     // both an external settings edit and a reconnect can move this row.
     const refresh = (): void => {
+      invalidateRoster()
       void controller.load()
       // The section reads the same roster and marks the same default, so a
       // change made from either surface converges both.
@@ -107,7 +119,8 @@ export function apply(ctx: ClientContext): void {
       }),
       ctx.on('connection/reset', () => { refresh() }),
     ]
-    return () => { for (const dispose of disposers) dispose() }
+    const stopPrincipal = connection.onPrincipalChange?.(invalidateRoster)
+    return () => { stopPrincipal?.(); for (const dispose of disposers) dispose() }
   }, 'ui-agent-preset: settings refresh')
 
   // The conversational authoring entries — the settings section's button and
@@ -162,15 +175,37 @@ export function apply(ctx: ClientContext): void {
       if (cached !== undefined) return cached
       const binding = scope.sessions.binding(id)
       if (binding === undefined) throw new Error('Preset controls require a retained Session')
+      const getPresets = (): Presets | undefined => binding.ctx.get('remote.agentPresets') as Presets | undefined
+      const generation = () => binding.hostDescription?.getSnapshot()
+      let pending: {
+        owner: Presets
+        host: ReturnType<typeof generation>
+        revision: number
+        result: ReturnType<Presets['list']>
+      } | undefined
+      let active = true
+      const current = (): boolean => active && scope.sessions.binding(id) === binding
       const remote = { agentPresets: {
         ...scope.remote.agentPresets,
         list: async () => {
-          if (scope.sessions.binding(id) !== binding) throw new Error('Preset Session generation was released')
-          const presets = binding.ctx.get('remote.agentPresets') as ClientRemote['agentPresets'] | undefined
-          if (presets === undefined) throw new Error('Preset namespace is unavailable in this runtime')
-          const result = await presets.list()
-          if (scope.sessions.binding(id) !== binding) throw new Error('Preset Session generation was released')
-          return result
+          if (!current()) throw new Error('Preset Session generation was released')
+          const presets = getPresets()
+          const owner = rosterSource(presets)
+          if (presets === undefined || owner === undefined) throw new Error('Preset namespace is unavailable in this runtime')
+          const host = generation()
+          const revision = rosterRevision
+          if (!pending || pending.owner !== owner || pending.host !== host || pending.revision !== revision) {
+            pending = { owner, host, revision, result: presets.list() }
+          }
+          const flight = pending
+          try {
+            const result = await flight.result
+            if (!current() || generation() !== host
+              || revision !== rosterRevision || rosterSource(getPresets()) !== owner) {
+              throw new Error('Preset Session generation was released')
+            }
+            return result
+          } finally { if (pending === flight) pending = undefined }
         },
       } }
       const owned = {
@@ -187,7 +222,7 @@ export function apply(ctx: ClientContext): void {
       panes.set(id, owned)
       binding.ctx.effect(() => {
         const stop = scope.sessions.list.subscribe(() => { void owned.seat.apply() })
-        return () => { stop(); if (panes.get(id) === owned) panes.delete(id) }
+        return () => { active = false; pending = undefined; stop(); if (panes.get(id) === owned) panes.delete(id) }
       }, 'ui-agent-preset: pane identity')
       return owned
     }

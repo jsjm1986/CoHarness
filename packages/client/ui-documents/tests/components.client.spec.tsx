@@ -7,6 +7,7 @@ import { DocumentsModal } from '../src/client/DocumentsModal.tsx'
 import { DocumentsOverlay } from '../src/client/DocumentsOverlay.tsx'
 import modalCss from '../src/client/DocumentsModal.module.css'
 import { zh, type DocumentsKey } from '../src/client/locales.ts'
+import { clientSessionKey, type ClientRuntimeTarget, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 
 const useNoCurrentSession = (select: (state: { current: undefined }) => unknown) => select({ current: undefined })
 
@@ -1731,6 +1732,31 @@ describe('DocumentsModal', () => {
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', t('action.attach.error'))
     expect(client.transfer).not.toHaveBeenCalled()
     expect(attach).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('binds a conversation copy to the captured Runtime rather than the shared document scope (%s)', async (mismatch) => {
+    const client = makeClient(), attach = vi.fn(() => true)
+    const runtimeId = '11111111-1111-4111-8111-111111111111' as NonNullable<ClientRuntimeTarget['runtimeId']>
+    const other = '22222222-2222-4222-8222-222222222222' as NonNullable<ClientRuntimeTarget['runtimeId']>
+    const nodeId = '33333333-3333-4333-8333-333333333333' as NonNullable<ClientRuntimeTarget['nodeId']>
+    const sessionId = 'captured-native-session' as SessionId
+    const key = clientSessionKey({ kind: 'project', projectId: 41, runtimeId }, sessionId)
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} mode="select" attachmentTargetId={key}
+      attachmentScope={{ kind: 'project', projectId: 41, runtimeId: mismatch ? other : runtimeId, nodeId }}
+      onAttachDocument={attach} canAttachDocument={() => true} />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(namedButton('attach', 'report.pdf'))
+    if (mismatch) {
+      expect(await screen.findByRole('alert')).toHaveProperty('textContent', t('action.attach.error'))
+      expect(client.transfer).not.toHaveBeenCalled()
+      expect(attach).not.toHaveBeenCalled()
+    } else {
+      await waitFor(() =>{  expect(client.transfer).toHaveBeenCalledOnce() })
+      expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({
+        target: { kind: 'project', projectId: 41, runtimeId, nodeId }, targetSessionId: sessionId,
+      }))
+    }
   })
 
   it('retains a completed copy if the target locks during transfer, and retries attachment without another transfer', async () => {

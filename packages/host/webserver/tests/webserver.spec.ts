@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Duplex } from 'node:stream'
 import { pathToFileURL } from 'node:url'
-import { brotliDecompressSync } from 'node:zlib'
+import { brotliCompressSync, brotliDecompressSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, FiberState } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
@@ -381,6 +381,18 @@ describe('real Loader composition', () => {
     })
     server.register({
       kind: 'exact',
+      path: '/precompressed',
+      handler: (_req, res) => {
+        res.writeHead(200, {
+          'content-type': 'text/plain',
+          'content-encoding': 'br',
+          vary: 'accept-encoding',
+        })
+        res.end(brotliCompressSync(Buffer.from('precompressed-bytes')))
+      },
+    })
+    server.register({
+      kind: 'exact',
       path: '/range',
       handler: (_req, res) => {
         res.writeHead(206, { 'content-type': 'text/plain', 'content-range': 'bytes 0-15/160' })
@@ -410,6 +422,11 @@ describe('real Loader composition', () => {
       .headers.get('content-encoding')).toBeNull()
     expect((await request(server.port, '/range', { headers: { 'accept-encoding': 'gzip' } }))
       .headers.get('content-encoding')).toBeNull()
+    // A handler-owned content-encoding is never re-compressed by the middleware:
+    // the Brotli bytes below would break if gzip ran a second pass over them.
+    const precompressed = await request(server.port, '/precompressed', { headers: { 'accept-encoding': 'gzip' } })
+    expect(precompressed.headers.get('content-encoding')).toBe('br')
+    expect(precompressed.body).toBe('precompressed-bytes')
   })
 
   it('negotiates only accepted encodings and preserves response-owned headers in auto mode', async () => {

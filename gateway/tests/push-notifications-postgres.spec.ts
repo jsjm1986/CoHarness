@@ -255,7 +255,8 @@ describePg('PostgreSQL push ownership', () => {
     try {
       const node = (await pool.query<{ id: string }>("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'local') RETURNING id", [f.context.organizationId])).rows[0]!.id
       const steward = change.startsWith('steward-')
-      const project = (await pool.query<{ id: string }>("INSERT INTO harness.projects(organization_id,name,kind) VALUES($1,'Shared notification',$2) RETURNING id", [f.context.organizationId, steward ? 'steward' : 'standard'])).rows[0]!.id
+      const project = (await pool.query<{ id: string }>("INSERT INTO harness.projects(organization_id,name,kind,steward_node_id) VALUES($1,'Shared notification',$2,$3) RETURNING id",
+        [f.context.organizationId, steward ? 'steward' : 'standard', steward ? node : null])).rows[0]!.id
       await pool.query('INSERT INTO harness.instances(organization_id,project_id,assigned_node_id,port) VALUES($1,$2,$3,42000)', [f.context.organizationId, project, node])
       await pool.query("INSERT INTO harness.project_members(organization_id,project_id,user_id,access_mode) VALUES($1,$2,$3,'ro')", [f.context.organizationId, project, f.creator.id])
       await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)', [f.context.organizationId, node, f.creator.id])

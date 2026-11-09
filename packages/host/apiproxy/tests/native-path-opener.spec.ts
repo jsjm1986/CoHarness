@@ -6,7 +6,7 @@ type ExecFileCallback = (
 type ExecFileMock = (
   command: string,
   args: readonly string[],
-  options: { encoding: string; signal: AbortSignal; windowsHide: boolean },
+  options: { encoding: string; killSignal: NodeJS.Signals; windowsHide: boolean; signal?: AbortSignal },
   callback: ExecFileCallback,
 ) => ChildProcess
 
@@ -161,8 +161,7 @@ describe('native path opener', () => {
     const [command, args, options] = execFileMock.mock.calls[0]!
     expect(command).toBe('open')
     expect(args).toEqual(['/tmp/default.txt'])
-    expect(options.encoding).toBe('utf8')
-    expect(options.windowsHide).toBe(true)
+    expect(options).toEqual({ encoding: 'utf8', killSignal: 'SIGKILL', windowsHide: true })
     expect(options.signal).toBeUndefined()
 
     const commandError = Object.assign(new Error('open failed'), { code: 1 })

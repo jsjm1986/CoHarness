@@ -1,6 +1,6 @@
 /** Host pressure sampling and paced admission; running work has no numeric ceiling. */
 import { readFile } from 'node:fs/promises'
-import { availableParallelism, cpus } from 'node:os'
+import { availableParallelism, cpus, freemem, totalmem } from 'node:os'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { runGatewayChildCommand } from './child-command.ts'
 
@@ -69,7 +69,7 @@ export class NodeResourcePressure {
   /** Begin observations; the first publication follows one full CPU interval. */
   start(): void {
     if (this.timer !== undefined || this.closed) throw new Error('pressure sampler already started or closed')
-    if (process.platform !== 'darwin' && process.platform !== 'linux') throw new Error('node pressure admission requires macOS or Linux')
+    if (process.platform !== 'darwin' && process.platform !== 'linux' && process.platform !== 'win32') throw new Error('node pressure admission requires macOS, Linux or Windows')
     this.histogram.enable()
     const tick = (): void => {
       this.pending = Promise.resolve().then(async () => {
@@ -109,6 +109,13 @@ export class NodeResourcePressure {
     if (process.platform === 'darwin') {
       const { stdout } = await runGatewayChildCommand('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level'], this.config.sampleMs, undefined, 1024)
       memory = darwinMemoryPressure(stdout)
+    } else if (process.platform === 'win32') {
+      // Windows exposes no pressure flag; GlobalMemoryStatus free/total gives
+      // the same availability ratio the coordinator's reserve applies to.
+      const size = totalmem()
+      if (size <= 0) throw new Error('host available memory observation is missing')
+      memoryAvailableRatio = freemem() / size
+      memory = 'normal'
     } else {
       const info = await readFile('/proc/meminfo', 'utf8')
       const available = Number(/^MemAvailable:\s+(\d+)/m.exec(info)?.[1])

@@ -334,7 +334,8 @@ export class GatewayResourceBudget extends ResourceBudget {
         })
         if (!Array.isArray(response) || response.length !== batch.length) throw new Error('invalid resource status batch')
         for (const [index, { entry, request }] of batch.entries()) {
-          try { await this.acceptStatus(entry, request, resourceStatusSchema.parse(response[index]), true) } catch (error) {
+          // Another operation's authorization can delay a batched grant.
+          try { await this.acceptStatus(entry, request, resourceStatusSchema.parse(response[index]), batch.length === 1) } catch (error) {
             entry.result.reject(error)
             await this.cancel(entry)
           }

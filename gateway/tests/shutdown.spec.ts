@@ -61,10 +61,12 @@ function fixture(failing: readonly string[]) {
   const server = {}, intake = {}, timer = { unref: () => {} }
   const exit = vi.fn(), report = vi.fn(), clearTimeout = vi.fn()
   const sandbox = {
-    nodeServiceProxy: undefined, nodeChannels: { close: async () => {} }, nodeServices: { close: async () => {} },
+    nodeServiceProxy: undefined, nodeChannels: { close: asynchronous('channels') }, nodeServices: { close: asynchronous('services') },
     shuttingDown: false, stoppingWriters: false, console: { error: report },
     heartbeatTimer: 1, reaper: 2, archiveRetentionSweep: 3, documentRetentionSweep: 4, desktopSweep: 5, progressSweep: 6,
     SHUTDOWN_TIMEOUT_MS: 10000, setTimeout: () => timer, clearTimeout, clearInterval: () => {}, process: { exit },
+    instances: { beginShutdown: () => {} }, stewardPreparation: { abort: () => {} },
+    peerBackups: { close: asynchronous('peer-backups') }, peerBackupRelay: { close: asynchronous('relay') },
     progress: { close: asynchronous('progress') }, gatewayModelBudget: { close: asynchronous('model-budget') },
     resourcePressure: { dispose: asynchronous('pressure') }, tunnelAccess: { shutdown: asynchronous('tunnel') },
     reaperTask: { wait: asynchronous('reaper') }, archiveRetentionTask: { wait: asynchronous('archives') },
@@ -73,16 +75,20 @@ function fixture(failing: readonly string[]) {
     localDocuments: { dispose: asynchronous('documents') }, accessMonitor: { close: asynchronous('access') },
     server, intake, closeListeningServer: async (listener: unknown) => { operation(listener === server ? 'server' : 'intake')() },
     waitForWriters: asynchronous('writers'), heartbeatInFlight: Promise.resolve(),
+    localDrafts: { close: asynchronous('drafts') }, personalIndex: { close: asynchronous('index') },
     deps: { instances: { stopAll: asynchronous('instances') } }, pool: { end: asynchronous('pool') },
+    contentVolume: { close: asynchronous('volume') },
     performanceObserver: { dispose: operation('performance') },
   }
   return { sandbox, shutdown: loadShutdown(sandbox), calls, causes, exit, report, clearTimeout, timer }
 }
 
-const CLEANUP_ORDER = ['progress', 'model-budget', 'pressure', 'tunnel', 'reaper', 'archives', 'retention', 'desktop',
-  'progress-sweep', 'proxy', 'documents', 'access', 'server', 'intake', 'writers', 'instances', 'pool', 'performance']
+const CLEANUP_ORDER = ['peer-backups', 'relay', 'progress', 'model-budget', 'pressure', 'tunnel', 'channels', 'services',
+  'reaper', 'archives', 'retention', 'desktop', 'progress-sweep', 'proxy', 'documents', 'access', 'server', 'intake',
+  'writers', 'drafts', 'index', 'instances', 'pool', 'volume', 'performance']
 
-it.each(['progress', 'reaper', 'proxy', 'documents', 'access', 'server', 'instances', 'pool', 'performance'])(
+it.each(['peer-backups', 'relay', 'progress', 'reaper', 'channels', 'services', 'proxy', 'documents', 'access', 'server',
+  'drafts', 'index', 'instances', 'pool', 'volume', 'performance'])(
   'continues later shutdown stages after %s fails', async (failing) => {
     const f = fixture([failing])
     await f.shutdown('SIGTERM')
@@ -107,9 +113,12 @@ it('keeps its forced-shutdown deadline alive while a cleanup owner remains pendi
   const source = `
 const close = async () => {};
 let shuttingDown = false, stoppingWriters = false;
+const instances = { beginShutdown() {} }, stewardPreparation = { abort() {} };
 const heartbeatTimer = undefined, reaper = undefined, archiveRetentionSweep = undefined;
 const documentRetentionSweep = undefined, desktopSweep = undefined, progressSweep = undefined;
 const SHUTDOWN_TIMEOUT_MS = 20;
+const peerBackups = { close }, peerBackupRelay = { close }, nodeServiceProxy = undefined;
+const nodeChannels = { close }, nodeServices = { close };
 const progress = { close }, gatewayModelBudget = { close }, resourcePressure = { dispose: close };
 const tunnelAccess = { shutdown: close };
 const reaperTask = { wait: close }, archiveRetentionTask = { wait: close }, documentRetentionTask = { wait: close };
@@ -117,7 +126,9 @@ const desktopSweepTask = { wait: close }, progressSweepTask = { wait: close };
 const proxyHandlers = { close }, localDocuments = { dispose: close }, accessMonitor = { close };
 const server = {}, intake = {}, closeListeningServer = close;
 const waitForWriters = close, heartbeatInFlight = Promise.resolve();
+const localDrafts = { close }, personalIndex = { close };
 const deps = { instances: { stopAll: close } }, pool = { end: () => new Promise(() => {}) };
+const contentVolume = { close };
 const performanceObserver = { dispose() {} };
 ${shutdownScript()}
 void shutdown('SIGTERM');
@@ -204,8 +215,10 @@ it('cancels accepted tunnel startup before waiting for its HTTP writer to drain'
   await allocated.promise
   const exit = vi.fn(), close = async () => {}, timer = { unref: () => {} }
   const sandbox = {
-    nodeServiceProxy: undefined, nodeChannels: { close: async () => {} }, nodeServices: { close: async () => {} },
+    nodeServiceProxy: undefined, nodeChannels: { close }, nodeServices: { close },
     shuttingDown: false, stoppingWriters: false, console,
+    instances: { beginShutdown: () => {} }, stewardPreparation: { abort: () => {} },
+    peerBackups: { close }, peerBackupRelay: { close },
     heartbeatTimer: 1, reaper: 2, archiveRetentionSweep: 3, documentRetentionSweep: 4, desktopSweep: 5, progressSweep: 6,
     SHUTDOWN_TIMEOUT_MS: 10000, setTimeout: () => timer, clearTimeout: () => {}, clearInterval: () => {},
     process: { exit }, progress: { close }, gatewayModelBudget: { close }, resourcePressure: { dispose: close },
@@ -213,7 +226,9 @@ it('cancels accepted tunnel startup before waiting for its HTTP writer to drain'
     desktopSweepTask: { wait: close }, progressSweepTask: { wait: close }, proxyHandlers: { close }, localDocuments: { dispose: close },
     accessMonitor: { close }, server: {}, intake: {}, closeListeningServer: close,
     waitForWriters: () => { waiting.resolve(); return writers.promise }, heartbeatInFlight: Promise.resolve(), tunnelAccess,
-    deps: { instances: { stopAll: close } }, pool: { end: close }, performanceObserver: { dispose: () => {} },
+    localDrafts: { close }, personalIndex: { close },
+    deps: { instances: { stopAll: close } }, pool: { end: close }, contentVolume: { close },
+    performanceObserver: { dispose: () => {} },
   }
   const shutdown = loadShutdown(sandbox)
   const draining = shutdown('SIGTERM')

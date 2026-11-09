@@ -210,6 +210,10 @@ it('rejects an active Runtime mismatch before publishing new directory metadata 
     expect(f.forTarget).not.toHaveBeenCalled()
     expect(report).toHaveBeenCalledOnce()
     policy.setVerifiedAccountId(undefined)
+    expect(directory.getSnapshot()).toBe(before)
+    policy.setAccountPermissions('full')
+    expect(directory.getSnapshot()).toBe(before)
+    policy.setVerifiedAccountId(8)
     expect(directory.getSnapshot()).toEqual([])
   } finally { await f.ctx.fiber.dispose(); report.mockRestore() }
 })
@@ -244,6 +248,118 @@ it('waits for bootstrap identity verification before restoring only the saved fo
   } finally { await f.ctx.fiber.dispose() }
 })
 
+it.each(['recover', 'clear', 'relocated', 'unqualified'] as const)('keeps the offline selection until an authorized restore or explicit clear (%s)', async (action) => {
+  const raw = 'offline-on-b' as SessionId, saved = clientSessionKey(action === 'unqualified' ? { kind: 'personal' } : target(2), raw)
+  const key = `dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`
+  const pointer = { sessionId: saved, ...(action === 'relocated' ? { nodeId: target(3).nodeId } : {}) }
+  const storage = new Map([[key, JSON.stringify(pointer)]])
+  vi.stubGlobal('sessionStorage', { getItem: (k: string) => storage.get(k) ?? null,
+    setItem: (k: string, v: string) => { storage.set(k, v) } })
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : Response.json({ activeRuntime: target(1), personalWorkspaces: [group(1), group(2)], paged: true, items: [] })))
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: raw, updatedAt: 1, running: false, blank: false }] })
+  const check = vi.spyOn(f.sessions, 'ensureSession').mockRejectedValueOnce(new Error('Computer is offline'))
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0,
+      home: '/home/test', canOpenPath: true, executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    if (action === 'relocated' || action === 'unqualified') {
+      await vi.waitFor(() => { expect(f.workspaces.list.getSnapshot().directoryState).toBe('ready') })
+      await f.workspaces.refreshPersonalDirectory()
+      expect(check).not.toHaveBeenCalled()
+      expect(f.forTarget).not.toHaveBeenCalled()
+      expect(JSON.parse(storage.get(key)!)).toEqual(pointer)
+      return
+    }
+    await vi.waitFor(() => { expect(check).toHaveBeenCalledTimes(1) })
+    f.sessions.list.set({ ...f.sessions.list.getSnapshot(), phase: 'ready', current: undefined })
+    expect(JSON.parse(storage.get(key)!)).toEqual({ sessionId: saved })
+    if (action === 'clear') f.sessions.clear()
+    await f.workspaces.refreshPersonalDirectory()
+    if (action === 'recover') {
+      await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(saved) })
+      expect(check.mock.calls.map(([runtime]) => runtime.runtimeId)).toEqual([target(2).runtimeId, target(2).runtimeId])
+    } else {
+      expect(JSON.parse(storage.get(key)!)).toEqual({})
+      expect(check).toHaveBeenCalledTimes(1)
+    }
+  } finally { log.mockRestore(); await f.ctx.fiber.dispose() }
+})
+
+it('queues a restore retry that arrives while the previous open is still in flight', async () => {
+  const raw = 'retry-on-b' as SessionId, saved = clientSessionKey(target(2), raw)
+  const key = `dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`
+  const storage = new Map([[key, JSON.stringify({ sessionId: saved })]])
+  vi.stubGlobal('sessionStorage', { getItem: (k: string) => storage.get(k) ?? null,
+    setItem: (k: string, v: string) => { storage.set(k, v) } })
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : Response.json({ activeRuntime: target(1), personalWorkspaces: [group(1), group(2)], paged: true,
+      items: [{ sessionId: raw, runtime: target(2), title: 'Saved on B', updatedAt: 1, blank: false }] })))
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: raw, updatedAt: 1, running: false, blank: false }] })
+  const gate = deferred<boolean>()
+  const check = vi.spyOn(f.sessions, 'ensureSession').mockImplementationOnce(async () => gate.promise)
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0,
+      home: '/home/test', canOpenPath: true, executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    await vi.waitFor(() => { expect(check).toHaveBeenCalledTimes(1) })
+    await f.workspaces.refreshPersonalDirectory()
+    gate.resolve(false)
+    await vi.waitFor(() => { expect(check).toHaveBeenCalledTimes(2) })
+    await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(saved) })
+  } finally { gate.resolve(false); log.mockRestore(); await f.ctx.fiber.dispose() }
+})
+
+it('lets a new navigation supersede the saved target while the initial directory is loading', async () => {
+  const saved = clientSessionKey(target(2), 'previous' as SessionId)
+  const key = `dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`
+  const storage = new Map([[key, JSON.stringify({ sessionId: saved })]])
+  vi.stubGlobal('sessionStorage', { getItem: (k: string) => storage.get(k) ?? null,
+    setItem: (k: string, v: string) => { storage.set(k, v) } })
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  const response = Promise.withResolvers<Response>()
+  const request = vi.fn(() => response.promise)
+  vi.stubGlobal('fetch', request)
+  const check = vi.spyOn(f.sessions, 'ensureSession')
+  try {
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test',
+      canOpenPath: true, executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    await vi.waitFor(() => { expect(request).toHaveBeenCalledTimes(1) })
+    const navigation = f.sessions.beginNavigation()
+    response.resolve(Response.json({ activeRuntime: target(1), personalWorkspaces: [group(1), group(2)], paged: true, items: [] }))
+    await vi.waitFor(() => { expect(f.workspaces.list.getSnapshot().directoryState).toBe('ready') })
+    expect(navigation.aborted).toBe(false)
+    expect(check).not.toHaveBeenCalled()
+    expect(JSON.parse(storage.get(key)!)).toEqual({ sessionId: saved })
+  } finally { await f.ctx.fiber.dispose() }
+})
+
+it('adopts the migrated computer on the bootstrap target while stale requests stay rejected', async () => {
+  const f = await fixture()
+  const moved = { ...target(1), nodeId: target(2).nodeId, nodeName: target(2).nodeName }
+  try {
+    f.sessions.setBaseRuntimeTarget(moved)
+    expect(f.sessions.bootstrapRuntimeTarget()).toEqual(moved)
+    expect(f.forTarget).not.toHaveBeenCalled()
+  } finally { await f.ctx.fiber.dispose() }
+})
+
 it('does not overwrite a completed user selection when the saved restore lands late', async () => {
   const storage = new Map<string, string>()
   const rawSaved = 'saved-on-b' as SessionId, rawLocal = 'picked-local' as SessionId
@@ -271,10 +387,10 @@ it('does not overwrite a completed user selection when the saved restore lands l
     f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test', canOpenPath: true,
       executionAuthorityRequired: true })
     policy.setVerifiedAccountId(7)
-    // The restore still reaches its retained open on B, then must yield: the
-    // selection it would fill is already owned by the user's Session.
-    await vi.waitFor(() => { expect(f.remoteApi.callsOf('session.history')).not.toHaveLength(0) })
-    await Promise.resolve()
+    // The restore sees the committed selection and yields before opening B's
+    // runtime at all: the committed user's Session keeps the current slot.
+    await vi.waitFor(() => { expect(f.workspaces.list.getSnapshot().directoryState).toBe('ready') })
+    expect(f.remoteApi.callsOf('session.history')).toHaveLength(0)
     expect(f.sessions.list.getSnapshot().current).toBe(picked)
   } finally { await f.ctx.fiber.dispose() }
 })

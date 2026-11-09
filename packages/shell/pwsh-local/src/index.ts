@@ -44,10 +44,14 @@ export const ENV_OVERRIDES = {
  * executable fallback) writes the console/OEM code page by default, which
  * garbles non-ASCII output; pwsh 7 defaults to UTF-8 and is unaffected. The
  * statements ride on line 1 after `; ` separators so PowerShell error line
- * numbers stay accurate.
+ * numbers stay accurate. Under ConstrainedLanguage mode both type member
+ * writes are denied (`CannotCreateTypeConstrainedLanguage`), so the pin is
+ * gated on FullLanguage. pwsh 7 confined under CLM still emits UTF-8 by
+ * default; Windows PowerShell 5.1 confined under CLM cannot be pinned and
+ * still emits the OEM codepage — no CLM-legal pin exists.
  */
 export const ENCODING_PREAMBLE =
-  '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = [System.Text.UTF8Encoding]::new($false); '
+  'if ($ExecutionContext.SessionState.LanguageMode -eq \'FullLanguage\') { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = [System.Text.UTF8Encoding]::new($false) }; '
 
 /** Default SIGTERM→SIGKILL grace period (the `graceMs` config). */
 const DEFAULT_GRACE_MS = 3_000

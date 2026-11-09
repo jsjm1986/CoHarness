@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-07-forwarded-principal-hardening.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-07-forwarded-principal-hardening.md
+document:
+  en: 6f3e0ff9ce175f0afd359ec820813c88d44df53f
+  zh: 2a49d8b2c0832878983fdf94e70dfdd38a242684
+/agent-note-forwarded-principal-verification-fails-closed-and-cheap:
+  en: ec39a59c9aa79ca1
+  zh: 7f817bb83446b85d
+/agent-note-forwarded-principal-verification-fails-closed-and-cheap/problem:
+  en: 7f7ce408ad423a28
+  zh: 5ad2b3e301bb07da
+/agent-note-forwarded-principal-verification-fails-closed-and-cheap/decision:
+  en: 2f2fa4c53d13f208
+  zh: 520908553493a365
+/agent-note-forwarded-principal-verification-fails-closed-and-cheap/alternatives-considered:
+  en: 877722f631a34b0b
+  zh: b96bdfb7e30b640c
+/agent-note-forwarded-principal-verification-fails-closed-and-cheap/consequences:
+  en: d3c131227ca7a951
+  zh: 478497f0ddd2e443

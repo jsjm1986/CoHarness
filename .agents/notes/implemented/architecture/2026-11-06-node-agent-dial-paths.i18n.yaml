@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-06-node-agent-dial-paths.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-06-node-agent-dial-paths.md
+document:
+  en: 1a698a8b0f2955d991c3bdee8c051b4d7df3f7eb
+  zh: 332d4b7992b123aa9db5de3d4b4a9c8e489ba9f3
+/agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity:
+  en: 39069f2103fec5b7
+  zh: b47f869ae505b507
+/agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity/problem:
+  en: 1fb24df9180024de
+  zh: 0603af5e18a74be7
+/agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity/decision:
+  en: 0026f5347b2ef775
+  zh: 96e30be3ed9a5bc9
+/agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity/alternatives-considered:
+  en: b994435923cdda9a
+  zh: f5094a41493f31a3
+/agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity/consequences:
+  en: 1d354cef8f1d9775
+  zh: 4483b6200ebb7288
+/agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity/testing:
+  en: 72b7bf4f0fc4b5f0
+  zh: 1e88e0770c9dd05d

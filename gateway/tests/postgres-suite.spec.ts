@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 
 it('keeps additive organization fixtures from resetting their shared schema', () => {
-  const additive = ['steward.spec.ts', 'project-service-postgres.spec.ts', 'project-management-transcript.spec.ts',
+  const additive = ['steward.spec.ts', 'archive-pool-postgres.spec.ts', 'project-directory-read-postgres.spec.ts', 'project-service-postgres.spec.ts', 'project-management-transcript.spec.ts', 'project-model-read-postgres.spec.ts', 'model-discovery-redirect-postgres.spec.ts',
     'project-administration-transcript.spec.ts', 'project-deletion-transcript.spec.ts',
     'project-account-admission-transcript.spec.ts', 'project-invitation-admission-transcript.spec.ts', 'project-provisioning-transcript.spec.ts',
     'project-removal-transcript.spec.ts', 'node-resource-budget-postgres.spec.ts', 'runtime-stop-lease-postgres.spec.ts',

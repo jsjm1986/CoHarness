@@ -1,3 +1,7 @@
+import { opendir as openPublicationDirectory } from 'node:fs/promises'
+import { DatabaseSync } from 'node:sqlite'
+import type { PersonalDocumentHistoryWitness } from './node-content-personal-document-migration.ts'
+import type { DocumentRootProbe, DocumentRootWitness } from './node-content-documents-publication.ts'
 /**
  * Serve the browser document surface without starting a runtime. Each scope's
  * document operations run against the same filesystem root its runtime owns,
@@ -93,6 +97,9 @@ export interface LocalDocumentWriteAdmission {
 
 /** Dependencies the local document broker resolves per request. */
 export interface LocalDocumentBrokerDependencies {
+  /** Share this project's node-local file admission with the independently supervised recovery worker. */
+  readonly projectFileAdmission?: import('./peer-backup-file-gate.ts').PeerProjectFileGate
+  readonly personalFileAdmission?: import('./peer-backup-file-gate.ts').PeerProjectFileGate
   readonly cfg: GatewayConfig
   /** Registered owner of these filesystem roots; standalone stores omit computer addressing. */
   readonly nodeId?: RuntimeNodeId
@@ -329,6 +336,20 @@ async function routeInternalDocumentCall(
   }
 }
 
+const documentStorageDefaults = {
+      limits: LOCAL_LIMITS,
+      upload: {
+        chunkBytes: DEFAULT_UPLOAD_CHUNK_BYTES,
+        sessionTtlMs: DEFAULT_UPLOAD_SESSION_TTL_MS,
+        minFreeBytes: DEFAULT_UPLOAD_MIN_FREE_BYTES,
+        maxConcurrent: DEFAULT_UPLOAD_MAX_CONCURRENT,
+        cleanupIntervalMs: DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
+        manifestMaxBytes: DEFAULT_UPLOAD_MANIFEST_MAX_BYTES,
+      },
+      sweepIntervalMs: DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
+      trashRetentionMs: TRASH_RETENTION_MS,
+}
+
 /** One scope's lazily created filesystem engine plus the request-authority channel. */
 class LocalDocumentEntrySet {
   private readonly entries = new Map<string, CachedLocalDocumentEntry>()
@@ -340,6 +361,8 @@ class LocalDocumentEntrySet {
     private readonly writes: LocalDocumentWriteAdmission | undefined,
     private readonly deliver: (entry: LocalDocumentEntry, authority: LocalDocumentAuthority) => Promise<void>,
     private readonly ownsRoot: (target: RuntimeCredentialSubject['target'], root: string) => Promise<boolean>,
+    private readonly projectFiles?: LocalDocumentBrokerDependencies['projectFileAdmission'],
+    private readonly personalFiles?:LocalDocumentBrokerDependencies['personalFileAdmission'],
   ) {}
 
   async forRoot(root: string, runtimeRoot: string, runtimeAccount: string, sharedProject: boolean,
@@ -355,7 +378,9 @@ class LocalDocumentEntrySet {
     }
     const opening = (async () => {
       if (existing !== undefined) await this.closeCached(existing)
-      return this.open(key, runtimeRoot, runtimeAccount, sharedProject, target)
+      const open = () => this.open(key, runtimeRoot, runtimeAccount, sharedProject, target)
+      const gate=target.kind==='project'?this.projectFiles:this.personalFiles
+      return gate?gate.admit(target.id,open):open()
     })()
     const entry = { target, pending: opening }
     this.entries.set(key, entry)
@@ -388,7 +413,11 @@ class LocalDocumentEntrySet {
     const runtimeAccess = await documentRuntimeAccess(runtimeAccount, sharedProject, this.cfg.readinessTimeoutMs)
     const authority = new AsyncLocalStorage<LocalDocumentAuthority>()
     const catalog = this.catalog
-    const writes = this.writes
+    const original = this.writes
+    const gate=target.kind==='project'?this.projectFiles:this.personalFiles
+    const scoped=<T>(work:()=>Promise<T>)=>gate?gate.admit(target.id,work):work()
+    const writes:LocalDocumentWriteAdmission|undefined=original?{admit:work=>scoped(()=>original.admit(work)),retain:work=>scoped(()=>original.retain(work))}:
+      gate?{admit:scoped,retain:scoped}:undefined
     const engine = new LocalUserDocFs({
       root,
       controlRoot: identityLocations.filesRoot,
@@ -405,17 +434,7 @@ class LocalDocumentEntrySet {
         else await withDocumentWriter(authority, writes, store, store.writer?.active === true, operation)
       } }),
       legacyRoot: join(dirname(root), LEGACY_UPLOAD_DIR_NAME),
-      limits: LOCAL_LIMITS,
-      upload: {
-        chunkBytes: DEFAULT_UPLOAD_CHUNK_BYTES,
-        sessionTtlMs: DEFAULT_UPLOAD_SESSION_TTL_MS,
-        minFreeBytes: DEFAULT_UPLOAD_MIN_FREE_BYTES,
-        maxConcurrent: DEFAULT_UPLOAD_MAX_CONCURRENT,
-        cleanupIntervalMs: DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
-        manifestMaxBytes: DEFAULT_UPLOAD_MANIFEST_MAX_BYTES,
-      },
-      sweepIntervalMs: DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
-      trashRetentionMs: TRASH_RETENTION_MS,
+      ...documentStorageDefaults,
     })
     engine.attach()
     const gatewayRuntime = {
@@ -478,6 +497,19 @@ class LocalDocumentEntrySet {
         if (name === 'collaboration') return collaboration
         return undefined
       },
+    }
+    if(target.kind==='user'&&this.cfg.nodeContent&&this.catalog?.publishNewPersonalRoot){
+      try {
+        await this.catalog.publishNewPersonalRoot(target.id,async(cursor)=>{
+          await engine.warm()
+          const identities=engine.identities
+          if(!identities)throw new UserDocError('Personal document identity is unavailable.',DOCUMENT_STORE_UNAVAILABLE_CODE)
+          const rootId=await identities.rootId(),batch=await identities.projectionChanges(cursor,{limit:1,maxBytes:this.cfg.upstreamResponseLimitBytes})
+          const directory=await openPublicationDirectory(root)
+          try{return {rootId,head:batch.head,pending:await identities.hasPendingProjection(),empty:(await directory.read())===null&&!batch.head.sequence}}
+          finally{await directory.close()}
+        })
+      }catch(error){await engine.dispose();throw error}
     }
     const entry: LocalDocumentEntry = { engine, http: new UserDocHttpScope(host), authority }
     return entry
@@ -543,9 +575,87 @@ export class LocalDocumentBroker {
 
   constructor(private readonly deps: LocalDocumentBrokerDependencies) {
     this.entries = new LocalDocumentEntrySet(deps.cfg, deps.organizationId, deps.catalog, deps.writes,
-      (entry, authority) => this.flushProjection({ entry, authority }), (target, root) => this.ownsRoot(target, root))
+      (entry, authority) => this.flushProjection({ entry, authority }), (target, root) => this.ownsRoot(target, root),deps.projectFileAdmission,deps.personalFileAdmission)
     this.unsubscribeAccess = deps.accessMonitor?.subscribe(subject => this.closing
       ?? this.operate(undefined, async () => this.retireRemovedScopes(subject)))
+  }
+
+  /** Read the real Gateway-owned document UUID and unacknowledged journal before a project placement is published. */
+  async inspectPublicationRoot(input:DocumentRootProbe):Promise<DocumentRootWitness> {
+    return (await this.publicationProof(input)).witness
+  }
+
+  /** Resolve exactly the public and private document roots at a project's published backup watermark.
+   * @param input - selected project, committed identity and document cursor.
+   * @returns paths owned by the same UserDoc identity on this computer.
+   */
+  async snapshotProjectDocumentRoots(input:DocumentRootProbe & {rootId:string}){
+    const {locations,witness}=await this.publicationProof(input)
+    if(witness.rootId!==input.rootId || witness.pending || witness.head.sequence!==input.cursor.sequence || witness.head.ordinal!==input.cursor.ordinal)
+      throw new UserDocError('Project documents have not reached the selected backup checkpoint.',DOCUMENT_STORE_UNAVAILABLE_CODE)
+    return locations
+  }
+
+  private async publicationProof(input:DocumentRootProbe) {
+    if (input.organizationId!==this.deps.organizationId || this.deps.nodeId!==input.nodeId || !this.deps.catalog) {
+      throw new UserDocError('The document scope does not belong to this Gateway.',DOCUMENT_STORE_UNAVAILABLE_CODE)
+    }
+    const project=validateProjectRuntimePath(this.deps.cfg,input.projectPath,input.origin)
+    const root=join(project,'documents')
+    const locations=await documentIdentityLocations(this.deps.cfg,project,root,{organizationId:input.organizationId,
+      target:{kind:'project',id:input.projectPublicId},projectionOwner:async rootId=>{
+        const owner=await this.deps.catalog!.projectionOwner(rootId)
+        return owner===null?null:owner.kind==='personal'?{kind:'user',id:owner.userId}:{kind:'project',id:owner.projectId}
+      }})
+    const engine=new LocalUserDocFs({root,controlRoot:locations.filesRoot,identityLocations:locations,...documentStorageDefaults})
+    try {
+      await engine.warm()
+      const identity=engine.identities
+      if (!identity) throw new UserDocError('Document identity storage is unavailable.',DOCUMENT_STORE_UNAVAILABLE_CODE)
+      const rootId=await identity.rootId(), batch=await identity.projectionChanges(input.cursor,{limit:1,maxBytes:this.deps.cfg.upstreamResponseLimitBytes})
+      const dir=await openPublicationDirectory(root)
+      let empty:boolean
+      try { empty=(await dir.read())===null && batch.head.sequence===0 && batch.head.ordinal===0 } finally { await dir.close() }
+      return {locations,witness:{rootId,head:batch.head,pending:await identity.hasPendingProjection(),empty}}
+    } finally {await engine.dispose()}
+  }
+
+  /** Inspect all original lifecycle identities on this computer without borrowing any personal Runtime’s files. */
+  async inspectPersonalHistory(userId:number,maxRows:number,cursor:{sequence:number;ordinal:number}):Promise<PersonalDocumentHistoryWitness>{
+    return (await this.personalHistoryProof(userId,maxRows,cursor)).witness
+  }
+
+  /** Resolve the three account-owned UserDoc directories at the exact published cursor of this computer. */
+  async snapshotPersonalDocumentRoots(userId:number,rootId:string,cursor:{sequence:number;ordinal:number},maxRows:number){
+    const {locations,witness}=await this.personalHistoryProof(userId,maxRows,cursor)
+    if(rootId!==witness.rootId||witness.pending||witness.head.sequence!==cursor.sequence||witness.head.ordinal!==cursor.ordinal)
+      throw new UserDocError('Personal documents have not reached the selected backup checkpoint.',DOCUMENT_STORE_UNAVAILABLE_CODE)
+    return locations
+  }
+
+  private async personalHistoryProof(userId:number,maxRows:number,cursor:{sequence:number;ordinal:number}){
+    const user=await this.deps.users.getById(userId)
+    if(!user||!this.hasLocalHome(user)||user.status!=='active'||!this.deps.catalog)throw new UserDocError('Personal document ownership is unavailable.',DOCUMENT_PERMISSION_DENIED_CODE)
+    const root=resolve(user.homePath,'documents')
+    const locations=await documentIdentityLocations(this.deps.cfg,user.homePath,root,{organizationId:this.deps.organizationId,target:{kind:'user',id:userId},projectionOwner:async rootId=>{
+      const owner=await this.deps.catalog!.projectionOwner(rootId)
+      return owner===null?null:owner.kind==='personal'?{kind:'user',id:owner.userId}:{kind:'project',id:owner.projectId}
+    }})
+    const engine=new LocalUserDocFs({root,controlRoot:locations.filesRoot,identityLocations:locations,...documentStorageDefaults})
+    try{
+      await engine.warm()
+      const ids=engine.identities
+      if(!ids)throw new UserDocError('Personal document identity is unavailable.',DOCUMENT_STORE_UNAVAILABLE_CODE)
+      const sqlite=new DatabaseSync(join(locations.stateRoot,'metadata.sqlite'),{readOnly:true})
+      try {if(Number(sqlite.prepare('SELECT count(*) n FROM document_identities').get()?.n)>maxRows)throw new UserDocError('The selected history exceeds the approved row limit.',DOCUMENT_STORE_UNAVAILABLE_CODE)}
+      finally{sqlite.close()}
+      await ids.list()
+      const snapshot=await ids.snapshot()
+      if(snapshot.documents.length>maxRows)throw new UserDocError('The selected history exceeds the approved row limit.',DOCUMENT_STORE_UNAVAILABLE_CODE)
+      const batch=await ids.projectionChanges(cursor,{limit:1,maxBytes:this.deps.cfg.upstreamResponseLimitBytes})
+      return {locations,witness:{rootId:snapshot.rootId,head:batch.head,pending:await ids.hasPendingProjection(),empty:!snapshot.documents.length,
+        records:snapshot.documents.map(row=>({incarnationId:row.incarnationId,revision:row.revision,docId:row.docId,state:row.state,bytes:row.bytes,mediaType:row.mediaType,trashId:row.trash?.trashId??null}))}}
+    }finally{await engine.dispose()}
   }
 
   private hasLocalHome(user: UserRow): boolean {
@@ -972,10 +1082,13 @@ export class LocalDocumentBroker {
 
   private withAuthority<T>(authorized: AuthorizedLocalScope, request: UserDocRequest, operation: () => Promise<T>): Promise<T> {
     const method = request.method ?? 'GET'
-    if (this.deps.writes !== undefined && method !== 'GET' && method !== 'HEAD') {
-      return withDocumentWriter(authorized.entry.authority, this.deps.writes, authorized.authority, true, operation)
-    }
-    return authorized.entry.authority.run(authorized.authority, operation)
+    const work=()=>this.deps.writes !== undefined && method !== 'GET' && method !== 'HEAD'
+      ? withDocumentWriter(authorized.entry.authority,this.deps.writes,authorized.authority,true,operation)
+      : authorized.entry.authority.run(authorized.authority,operation)
+    const scope=authorized.authority.participant.scope
+    if(scope.kind==='project')return this.deps.projectFileAdmission?this.deps.projectFileAdmission.admit(scope.projectId,work):work()
+    const subject=authorized.authority.subject.target
+    return subject.kind==='user'&&this.deps.personalFileAdmission?this.deps.personalFileAdmission.admit(subject.id,work):work()
   }
 
   private async runCaptured(

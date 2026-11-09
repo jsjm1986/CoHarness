@@ -45,7 +45,7 @@ The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `r
 <a id="client-half"></a>
 ## Client half
 
-`@deepseek-ai/dsh-api-remote-desktop-controller/client` installs `ctx.remoteDesktops` (`ClientRemoteDesktops`): it self-mounts the generated `remoteDesktop` Remote contribution (`./remote`), converts each `{ ok }` wire result into thrown errors, and resolves `attach`'s `{ path, token }` to an absolute `ws(s)://` URL against `location`, pinned through `connection.privateResourceUrl` (`dshTarget`/`dshPrincipal`) so the Gateway upgrade reaches the runtime that minted the token — the scope cookie alone is not reliable for that. UI plugins (`ui-remote-desktop`, `ui-remote-desktop-admin`) consume this service rather than the wire namespace directly.
+`@deepseek-ai/dsh-api-remote-desktop-controller/client` installs `ctx.remoteDesktops` (`ClientRemoteDesktops`): it self-mounts the generated `remoteDesktop` Remote contribution (`./remote`), converts each `{ ok }` wire result into thrown errors, and resolves `attach`'s `{ path, token }` to an absolute `ws(s)://` URL against `location`, pinned through the addressed Session’s `connection.forSession(sessionId).privateResourceUrl` (`dshRuntime`/`dshTarget`/`dshPrincipal`) so the Gateway upgrade reaches the runtime that minted the token — the scope cookie alone is not reliable for that. UI plugins (`ui-remote-desktop`, `ui-remote-desktop-admin`) consume this service rather than the wire namespace directly.
 
 **Runtime invariant:** No companion is published. Grant, attachment, and audit truth live in `ctx.remoteDesktop`; the controller is a stateless request translator with no diverging observation of its own.
 

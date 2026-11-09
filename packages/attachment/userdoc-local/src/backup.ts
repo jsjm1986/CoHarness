@@ -1,7 +1,7 @@
 /** Verified deployment snapshots rebind logical document identities to restored filesystem objects. */
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { link, lstat, open, rename, rm, utimes } from 'node:fs/promises'
+import { link, lstat, open, readFile, rename, rm, utimes } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -10,6 +10,7 @@ import { DocumentIdentityStore, type DocumentIdentityRecord } from './identity.t
 import { DocumentIdentityStorage, type DocumentIdentityLocations } from './identity-storage.ts'
 import { isInside, pathForDocId } from './name.ts'
 import { withDocumentHandle } from './handle.ts'
+import { replaceRecoveredFileWindows } from './directory-move-win32.ts'
 import { syncDocumentDirectory, syncDocumentFile } from './directory-sync.ts'
 import type { DocumentFileObjectId } from './file-object.ts'
 import { loadNodeSqlite } from '@deepseek-ai/dsh-session-persistence-sqlite'
@@ -193,6 +194,23 @@ async function withVerifiedDomain<T>(
   })
 }
 
+async function syncRestoreState(locations:DocumentIdentityLocations,directories:ReadonlySet<string>,databasePath:string):Promise<void>{
+  // Windows cannot rename over the live marker, so the durable marker commit
+  // rewrites it through a fsynced temporary and MoveFileEx's replace flag.
+  if(process.platform==='win32'){
+    const marker=join(locations.filesRoot,'domain.json')
+    const temporary=join(locations.filesRoot,'.dsh-restore-'+randomUUID()+'.part')
+    try{
+      const bytes=await readFile(marker)
+      const handle=await open(temporary,'wx',0o600)
+      await withDocumentHandle(handle,async()=>{await handle.writeFile(bytes);await handle.sync()})
+      await replaceRecoveredFileWindows(temporary,marker)
+    }finally{await rm(temporary,{ force:true })}
+  }
+  for(const directory of directories) await syncDocumentDirectory(directory)
+  await syncDocumentFile(databasePath)
+}
+
 /**
  * Verify logical identity and original filesystem witnesses before accepting a deployment backup.
  * @param locations - Gateway-owned public, metadata and retained-object roots.
@@ -223,7 +241,11 @@ export async function restoreDocumentIdentityBackup(
         if (path === item.source) continue
         signal?.throwIfAborted()
         const temporary = join(dirname(path), `.dsh-restore-${randomUUID()}.part`)
-        try { await link(item.source, temporary); await rename(temporary, path) } finally { await rm(temporary, { force: true }) }
+        try {
+          await link(item.source, temporary)
+          if(process.platform==='win32')await replaceRecoveredFileWindows(temporary,path)
+          else await rename(temporary,path)
+        } finally { await rm(temporary, { force: true }) }
       }
     }
     for (const item of retained) {
@@ -254,11 +276,7 @@ export async function restoreDocumentIdentityBackup(
     const changedDirectories = new Set([
       locations.stateRoot, locations.filesRoot, ...[...retained, ...markers].flatMap(item => item.paths.map(path => dirname(path))),
     ])
-    for (const directory of changedDirectories) await syncDocumentDirectory(directory)
-    {
-      const handle = await open(storage.databasePath, process.platform === 'win32' ? constants.O_RDWR : constants.O_RDONLY | constants.O_NOFOLLOW)
-      await withDocumentHandle(handle, () => handle.sync())
-    }
+    await syncRestoreState(locations,changedDirectories,storage.databasePath)
     signal?.throwIfAborted()
   })
 }
@@ -381,11 +399,6 @@ export async function recoverDocumentIdentityMount(
     const database = new DatabaseSync(storage.databasePath)
     try { new DocumentIdentityStore(locations.root, database).recoverMount(storage.binding) } finally { database.close() }
     await storage.bindDomain(rootId, false)
-    await syncDocumentDirectory(locations.filesRoot)
-    await syncDocumentDirectory(locations.stateRoot)
-    {
-      const handle = await open(storage.databasePath, process.platform === 'win32' ? constants.O_RDWR : constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
-      await withDocumentHandle(handle, () => handle.sync())
-    }
+    await syncRestoreState(locations,new Set([locations.filesRoot,locations.stateRoot]),storage.databasePath)
   })
 }

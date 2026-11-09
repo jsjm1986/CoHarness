@@ -1,3 +1,4 @@
+import { timeOperation } from './operation-timing.ts'
 import { ServerResponse, type IncomingMessage } from 'node:http'
 import { dirname } from 'node:path'
 import { isIP } from 'node:net'
@@ -16,7 +17,7 @@ import type { EffectiveGrant } from './projects.ts'
 import { gateCopy, gateLanguage, stoppedPage, waitingPage, type GatePageLanguage } from './html.ts'
 import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, runtimeTargetOf, type ProjectRuntime, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner, type PrincipalScope } from './principal.ts'
-import { runtimeRequestPath } from './runtime-request-path.ts'
+import { isExplicitSessionRequest, runtimeRequestPath } from './runtime-request-path.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { StreamPrincipalLeases } from './stream-principal-leases.ts'
 import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
@@ -181,9 +182,9 @@ export function createProxyHandlers(
   async function revalidate(token: string | undefined, context: GatewayRequestContext): Promise<boolean> {
     await deps.accessMonitor?.synchronize()
     if (token === undefined) return false
-    const user = await deps.auth.validate(token)
+    const user = deps.revalidateOnComputer ? await deps.revalidateOnComputer(token) : await deps.auth.validate(token)
     if (user === null || user.id !== context.user.id || user.mustChangePassword) return false
-    if (deps.computerAccess !== undefined) {
+    if (deps.revalidateOnComputer === undefined && deps.computerAccess !== undefined) {
       try { await deps.computerAccess.authorize(user.id) }
       catch (error) { if (error instanceof ComputerAccessError) return false; throw error }
     }
@@ -203,6 +204,8 @@ export function createProxyHandlers(
     return true
   }
   server.on('proxyRes', (proxyResponse, req, res) => {
+    // Runtime plugins cannot replace the Gateway's authenticated response identity.
+    delete proxyResponse.headers['x-dsh-runtime-id']
     const location = proxyResponse.headers.location
     if (typeof location === 'string') {
       const rewritten = publicLocation(location)
@@ -274,6 +277,21 @@ export function createProxyHandlers(
     lang: GatePageLanguage,
   ): Promise<{ port: number; generation: number; target: RuntimeTarget } | null> {
     const target = targetFor(context)
+    const selection = new URL(req.url ?? '/', 'http://gateway')
+    if (isExplicitSessionRequest(req.method, selection.pathname)) {
+      const expectedScope = context.scope.kind === 'personal' ? 'personal' : `project:${context.scope.projectId}`
+      const nodes = selection.searchParams.getAll('dshNode')
+      if (context.environment === undefined || selection.searchParams.getAll('dshRuntime').length !== 1
+        || selection.searchParams.get('dshRuntime') !== context.environment.id || selection.searchParams.getAll('dshTarget').length !== 1
+        || selection.searchParams.get('dshTarget') !== expectedScope
+        || nodes.length > 1 || nodes.length === 1 && nodes[0] !== context.environment.nodeId) {
+        if (res !== null) res.writeHead(400, { 'content-type': 'application/json' }).end('{"error":"invalid-prepare-target"}')
+        return null
+      }
+      const endpoint = await instances.liveEndpoint(target) ?? await instances.ensureRunning(context.runtime, 'explicit')
+      res?.setHeader('x-dsh-runtime-id', context.environment.id)
+      return { ...endpoint, target }
+    }
     // Trust the live handle, not the `ready` row: an external kill or crash
     // leaves the row stale, and proxying that port yields instance-unreachable.
     const endpoint = await instances.liveEndpoint(target)
@@ -330,7 +348,7 @@ export function createProxyHandlers(
     scrubRuntimeHeaders(req)
     await deps.accessMonitor?.synchronize()
     if (res.destroyed) return
-    let ready = await ensureReady(req, res, context, lang)
+    let ready = await timeOperation('prepare',()=>ensureReady(req, res, context, lang))
     if (ready === null) return
     let operationLease = false
     try {
@@ -376,7 +394,7 @@ export function createProxyHandlers(
       }
     }
     try {
-      if (!await revalidate(token, context)) {
+      if (!await timeOperation('admit',()=>revalidate(token, context))) {
         if (!res.destroyed) {
           res.writeHead(403, { 'content-type': 'application/json' })
           res.end(JSON.stringify({ error: 'access-revoked' }))

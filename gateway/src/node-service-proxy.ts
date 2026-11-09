@@ -1,16 +1,19 @@
+import { operationPhase, timeOperation } from './operation-timing.ts'
+import { createHash } from 'node:crypto'
 /** Forward existing authenticated Gateway operations to their owning computer. */
 import { Agent, request, STATUS_CODES, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { isExplicitScopeRequest, isExplicitSessionRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
 import type { UserRow } from './auth.ts'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import type { RuntimePlacement, RuntimeSelection } from './runtime-router.ts'
-import { parseCookies, SCOPE_COOKIE } from './server.ts'
+import { parseCookies, SCOPE_COOKIE, SESSION_COOKIE } from './server.ts'
 import { RuntimeCatalogError } from './runtime-catalog.ts'
 import { nodeUuidSchema } from './node-access.ts'
 import { NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
+import { FORWARDED_PRINCIPAL_HEADER } from './forwarded-principal.ts'
 import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
 import { NodeServiceHttpPool } from './node-service-http-pool.ts'
@@ -32,8 +35,23 @@ export interface NodeServiceProxyDirectory {
   authorizeAccountNode?(actor: UserRow, id: RuntimeNodeId): Promise<void>
 }
 
-interface Target { nodeId: RuntimeNodeId; runtimeId?: RuntimeId; projectId?: number; resetCookie?: string }
+interface Target { nodeId: RuntimeNodeId; runtimeId?: RuntimeId; projectId?: number; resetCookie?: string;
+  /** Authorized environment and verified scope target, when resolution already ran. */
+  environment?: RuntimeCatalogEntry; resolvedTarget?: 'personal' | `project:${number}` }
 interface Active extends Target { userId: number; abort(): void }
+
+/** The request binding an issuer signs into a forwarded assertion. */
+interface ForwardRequest { method: string; path: string; sessionHash: string }
+
+/** Bind the assertion to this exact request line and the session cookie being forwarded. */
+function forwardRequestOf(req: IncomingMessage): ForwardRequest {
+  const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE) ?? ''
+  return {
+    method: req.method ?? 'GET',
+    path: new URL(req.url ?? '/', 'http://gateway').pathname,
+    sessionHash: createHash('sha256').update(token).digest('hex'),
+  }
+}
 
 const HOP_HEADERS = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade'])
 
@@ -86,7 +104,8 @@ export class GatewayNodeServiceProxy {
     private readonly services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'>,
     private readonly timeoutMs: number,
     config: NodeServiceConfig,
-    private readonly monitor?: GatewayAccessMonitor) {
+    private readonly monitor?: GatewayAccessMonitor,
+    private readonly forwardIssuer?: (target: Target, user: UserRow, request: ForwardRequest) => Promise<string>) {
     if (directory.resolvePlacement !== undefined && directory.resetScopeCookie === undefined) {
       throw new Error('Node service owner routing requires the Gateway scope-cookie formatter')
     }
@@ -104,12 +123,13 @@ export class GatewayNodeServiceProxy {
     }
   }
 
-  private async target(actor: UserRow, url: URL, cookie: string | undefined, method?: string): Promise<Target | null> {
+  private async target(actor: UserRow, url: URL, cookie: string | undefined, method?: string, onLocal?: (placement: RuntimePlacement) => void): Promise<Target | null> {
     const runtime = url.searchParams.get('dshRuntime'), node = url.searchParams.get('dshNode')
     // Account-wide metadata remains available before the user selects one of several personal Runtimes.
     if (/^\/account\/api\/(?:users|preferences|push-devices(?:\/[^/]+)?|workbench\/catalog|invitations(?:\/[^/]+\/accept|\/count)?)$/u.test(url.pathname)
       || url.pathname === '/account/api/projects' && method === 'GET') return null
-    if ((url.pathname.startsWith('/api/documents') || url.pathname === '/account/api/projects' && method === 'POST') && runtime === null) {
+    const nodeMetadata = method === 'GET' && (url.pathname === '/account/api/project-metadata' || url.pathname === '/account/api/node-document-overview')
+    if ((url.pathname.startsWith('/api/documents') || url.pathname === '/account/api/projects' && method === 'POST' || nodeMetadata) && runtime === null) {
       if (node === null) return null
       if (!nodeUuidSchema.safeParse(node).success) throw new NodeServiceError(400, 'node-service/invalid-target')
       if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
@@ -119,7 +139,7 @@ export class GatewayNodeServiceProxy {
       await this.directory.authorizeAccountNode(actor, nodeId)
       return nodeId === this.directory.localNodeId ? null : { nodeId }
     }
-    const managedRuntime = /^\/admin\/api\/runtimes\/([^/]+)\/(?:start|stop|restart|retire)$/.exec(url.pathname)?.[1]
+    const managedRuntime = /^\/admin\/api\/runtimes\/([^/]+)\/(?:start|stop|restart|retire|personal-directory\/promote)$/.exec(url.pathname)?.[1]
     if (url.pathname.startsWith('/admin/api/') && (runtime !== null || node !== null || managedRuntime !== undefined)) {
       if (actor.role !== 'admin') throw new NodeServiceError(403, 'node-service/invalid-target')
       if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
@@ -161,8 +181,12 @@ export class GatewayNodeServiceProxy {
       const target = projectTarget ?? requestedTarget
       const expected = environment.owner.kind === 'personal' ? 'personal' : `project:${String(environment.owner.id)}`
       if (target !== null && target !== expected) throw new RuntimeCatalogError(400, 'runtime-catalog/target-mismatch')
-      if (environment.node.id === this.directory.localNodeId) return null
-      return { nodeId: environment.node.id, runtimeId: environment.id,
+      if (environment.node.id === this.directory.localNodeId) {
+        if (placement?.local) onLocal?.(placement)
+        return null
+      }
+      return { nodeId: environment.node.id, runtimeId: environment.id, environment,
+        resolvedTarget: environment.owner.kind === 'personal' ? 'personal' : `project:${environment.owner.id}`,
         ...(placement?.resetScope === true ? { resetCookie: this.directory.resetScopeCookie!() } : {}),
         ...(environment.owner.kind === 'project' ? { projectId: environment.owner.id } : {}) }
     }
@@ -175,12 +199,14 @@ export class GatewayNodeServiceProxy {
     return operation
   }
 
-  private outgoing(req: IncomingMessage, target: Target, stream: Duplex | Agent, upgrade: boolean, body?: string) {
+  private outgoing(req: IncomingMessage, target: Target, stream: Duplex | Agent, upgrade: boolean, body?: string, assertion?: string) {
     const agent = stream instanceof Agent ? stream : new Agent({ keepAlive: false, maxSockets: 1 })
     if (!(stream instanceof Agent)) agent.createConnection = () => stream
     const forwarded = headers(req.headers, upgrade)
     forwarded[NODE_SERVICE_TARGET_HEADER] = target.nodeId
     delete forwarded['x-dsh-gateway-principal']
+    delete forwarded[FORWARDED_PRINCIPAL_HEADER]
+    if (assertion !== undefined) forwarded[FORWARDED_PRINCIPAL_HEADER] = assertion
     const path = target.runtimeId === undefined ? req.url ?? '/' : pinRuntimeRequestPath(req.url ?? '/', target.runtimeId)
     if (body !== undefined) forwarded['content-length'] = Buffer.byteLength(body)
     const outgoing = request({ hostname: 'node.gateway.invalid', port: 80, method: req.method,
@@ -197,10 +223,12 @@ export class GatewayNodeServiceProxy {
    * @param res - browser response; partial failures close the stream instead of reporting success.
    * @param actor - current authenticated account, also rechecked by the destination Gateway.
    * @param parsed - optional bounded body already consumed by the scope parser, with its authorized exact RuntimeId; omission streams the original request.
+   * @param onLocal - shares this request's already authorized local selection with its destination handler.
    * @returns true after a remote response completes, or false for a local request.
    */
-  http(req: IncomingMessage, res: ServerResponse, actor: UserRow, parsed?: { body: string; runtimeId: RuntimeId }): Promise<boolean> {
-    return this.track(this.forwardHttp(req, res, actor, parsed))
+  http(req: IncomingMessage, res: ServerResponse, actor: UserRow, parsed?: { body: string; runtimeId: RuntimeId },
+    onLocal?: (placement: RuntimePlacement) => void): Promise<boolean> {
+    return this.track(this.forwardHttp(req, res, actor, parsed, onLocal))
   }
 
   /**
@@ -217,30 +245,41 @@ export class GatewayNodeServiceProxy {
     return this.track(this.forwardSelectedHttp(req, res, { nodeId }, 0))
   }
 
-  private async forwardHttp(req: IncomingMessage, res: ServerResponse, actor: UserRow, parsed?: { body: string; runtimeId: RuntimeId }): Promise<boolean> {
+  private async forwardHttp(req: IncomingMessage, res: ServerResponse, actor: UserRow, parsed?: { body: string; runtimeId: RuntimeId },
+    onLocal?: (placement: RuntimePlacement) => void): Promise<boolean> {
     const url = new URL(req.url ?? '/', 'http://gateway')
     if (parsed !== undefined) url.searchParams.set('dshRuntime', parsed.runtimeId)
-    const target = await this.target(actor, url, req.headers.cookie, req.method)
+    const target = await this.target(actor, url, req.headers.cookie, req.method,onLocal)
     if (target === null) return false
-    return this.forwardSelectedHttp(req, res, target, actor.id, parsed?.body)
+    // A managed request has reached its selected Gateway. A newer placement requires a fresh request from the entry.
+    if (req.headers[NODE_SERVICE_TARGET_HEADER] !== undefined
+      && (isExplicitSessionRequest(req.method, url.pathname) || isExplicitScopeRequest(req.method, url))) {
+      throw new NodeServiceError(409, 'node-service/mismatch')
+    }
+    return this.forwardSelectedHttp(req,res,target,actor,parsed?.body)
   }
 
-  private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actorId: number, body?: string): Promise<boolean> {
+  private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actor: UserRow | number, body?: string): Promise<boolean> {
     if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
     await this.directory.assertNode?.(target.nodeId)
     const owner = new AbortController()
     const signal = AbortSignal.any([owner.signal, this.lifetime.signal])
     const abort = () => { if (!res.writableFinished) owner.abort() }
-    const active: Active = { ...target, userId: actorId, abort: () => { owner.abort() } }
+    const active: Active = { ...target, userId: typeof actor === 'number' ? actor : actor.id, abort: () => { owner.abort() } }
     this.active.add(active)
     req.once('aborted', abort); res.once('close', abort)
+    if (req.aborted || res.destroyed || res.writableEnded) owner.abort()
     let dispose = () => {}
     try {
-      const lease = await this.httpPool.acquire(target.nodeId, signal)
+      signal.throwIfAborted()
+      const lease = await timeOperation('nodeConnection',()=>this.httpPool.acquire(target.nodeId, signal))
+      const receivedHeaders=operationPhase('upstream')
       dispose = () => { lease.destroy() }
       signal.throwIfAborted()
       let complete = false
-      const operation = this.outgoing(req, target, lease.agent, false, body)
+      const assertion = typeof actor === 'number' || this.forwardIssuer === undefined
+        ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req))
+      const operation = this.outgoing(req, target, lease.agent, false, body, assertion)
       dispose = () => {
         if (complete) lease.release()
         else { operation.dispose(); lease.destroy() }
@@ -256,6 +295,7 @@ export class GatewayNodeServiceProxy {
           outgoing.once('response', response => {
             clearTimeout(timer)
             try {
+              receivedHeaders()
               if (response.headers[NODE_SERVICE_TARGET_HEADER] !== target.nodeId) throw new NodeServiceError(409, 'node-service/mismatch')
               signal.throwIfAborted()
               res.writeHead(response.statusCode ?? 502, responseHeaders(response.headers, target.resetCookie))
@@ -304,10 +344,15 @@ export class GatewayNodeServiceProxy {
     const signal = AbortSignal.any([owner.signal, this.lifetime.signal])
     const active: Active = { ...target, userId: actor.id, abort }
     this.active.add(active); socket.once('close', abort)
+    if (socket.destroyed) owner.abort()
     let dispose = () => {}
     try {
+      signal.throwIfAborted()
       const stream = await this.services.open(target.nodeId, signal)
-      const operation = this.outgoing(req, target, stream, true)
+      dispose = () => { stream.destroy() }
+      signal.throwIfAborted()
+      const operation = this.outgoing(req, target, stream, true, undefined,
+        this.forwardIssuer === undefined ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req)))
       dispose = operation.dispose
       const { outgoing } = operation
       const cancel = () => { outgoing.destroy(new NodeServiceError(409, 'node-service/cancelled')) }

@@ -209,7 +209,10 @@ describe('logical Workbench Runtime ownership', () => {
         })
         await waitFor(() => { expect(api.callsOf('session.prompt')).toHaveLength(1) })
         expect(input.state.getSnapshot().phase).toBe('submitting')
-        expect(JSON.parse(localStorage.getItem(key) ?? 'null')).toMatchObject({ draft: text })
+        expect(input.state.getSnapshot().draft).toBe(text)
+        // The unverified persistence owner must not receive a local copy; the
+        // node-confirmed channel keeps the draft on the owning Runtime instead.
+        expect(localStorage.getItem(key)).toBeNull()
         fireEvent.click(h.view.getByRole('button', { name: /^Plugins$/ }))
         expect(h.view.container.querySelectorAll('textarea')).toHaveLength(0)
         await act(async () => { admission.resolve(ok({ accepted: true as const })); await admission.promise })
@@ -229,7 +232,7 @@ describe('logical Workbench Runtime ownership', () => {
           else api.pushMux(frame)
         })
         await waitFor(() => { expect(input.state.getSnapshot().draft).toBe('') })
-        expect(JSON.parse(localStorage.getItem(key) ?? 'null')).toMatchObject({ draft: '' })
+        expect(localStorage.getItem(key)).toBeNull()
         fireEvent.click(h.view.getByRole('button', { name: /^Conversation$/ }))
         await waitFor(() => {
           expect([...h.view.container.querySelectorAll('textarea')].map(area => area.value)).toEqual(['', ''])

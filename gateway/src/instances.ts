@@ -253,7 +253,7 @@ export class RuntimeLeaseUnavailableError extends Error {
 /** Durable reason for a stopped runtime; a new runtime has no stop reason. */
 export type RuntimeStopReason = 'manual' | 'idle' | 'shutdown' | 'failed' | 'access-change'
 /** Process-only administrator control or quiescence for data-changing work; destructive protection is the default. */
-export type RuntimeStopPurpose = 'control' | 'destructive'
+export type RuntimeStopPurpose = 'control' | 'destructive' | 'content-publication'
 /** Explicit starts require an authenticated user action at the owning HTTP route. */
 export type RuntimeStartIntent = 'passive' | 'explicit' | 'webhook'
 
@@ -323,6 +323,9 @@ function leaseKey(target: RuntimeTarget, generation: number | undefined): string
 
 /** Durable instance rows required by {@link InstanceManager}. */
 export interface InstanceRepository {
+  /** Check physical project storage before a new process can write its profile or consume a startup lease. */
+  checkProjectStorage?(target:RuntimeTarget):Promise<void|(()=>Promise<void>)>
+
   /** Initialize missing assignments without treating startup as process termination. */
   initialize(): Promise<void>
   /**
@@ -633,6 +636,7 @@ export class InstanceManager {
   private readonly capacity: RuntimeCapacity
   private readonly residentLeases = new Map<string, RuntimeCapacityLease>()
   private readonly pendingStarts = new Map<string, RuntimeStartRequest>()
+  private closedStartRequest: RuntimeStartRequest | undefined
   private readonly startControllers = new Map<string, Set<AbortController>>()
   private readonly addressQueue = new Map<string, Promise<void>>()
   private readonly procs = new Map<string, InstanceProc>()
@@ -992,10 +996,11 @@ export class InstanceManager {
    * Request a Runtime start while allowing HTTP callers to observe admission before readiness.
    * @param subject - authorized user or project whose Runtime is required.
    * @param intent - passive, explicit or webhook start policy.
-   * @param administratorUserId - initiating administrator for explicit Admin control; omission permits trusted lifecycle maintenance.
+   * @param administratorUserId - initiating administrator for Admin control; omission permits trusted lifecycle maintenance.
    * @returns one shared operation per target, intent and initiating administrator while its start remains unsettled.
    */
   startRequest(subject: RuntimeSubject, intent: RuntimeStartIntent = 'passive', administratorUserId?: number): RuntimeStartRequest {
+    if (this.closedStartRequest !== undefined) return this.closedStartRequest
     const key = targetKey(runtimeTargetOf(subject))
     const requestKey = administratorUserId === undefined ? `${key}:${intent}` : `${key}:${intent}:administrator:${String(administratorUserId)}`
     const pending = this.pendingStarts.get(requestKey)
@@ -1031,6 +1036,7 @@ export class InstanceManager {
     const target = runtimeTargetOf(subject)
     return this.serialize(target, async () => {
       await this.initialized
+      if (this.closedStartRequest !== undefined) throw new RuntimeCapacityError('cancelled')
       if (administratorUserId !== undefined) await this.repository.authorizeAdministrator(administratorUserId)
       if (await this.repository.startEligibility(target) === null) {
         const previous = await this.repository.snapshotOf(target)
@@ -1329,8 +1335,11 @@ export class InstanceManager {
     const dshHome = runtime.dshHome
     mkdirSync(dshHome, { recursive: true })
     copyFileSync(source, join(dshHome, '.env'))
-    const owner = lstatSync(dshHome)
-    chownSync(join(dshHome, '.env'), owner.uid, owner.gid)
+    if (process.platform !== 'win32') {
+      const owner = lstatSync(dshHome)
+      chownSync(join(dshHome, '.env'), owner.uid, owner.gid)
+      chmodSync(join(dshHome, '.env'), 0o600)
+    }
   }
 
   private async start(
@@ -1343,6 +1352,7 @@ export class InstanceManager {
     const now = Date.now()
     const runtimeToken = randomBytes(32).toString('base64url')
     const runtimeTokenHash = createHash('sha256').update(runtimeToken).digest()
+    const verifyPreparedStorage=await this.repository.checkProjectStorage?.(descriptor.target)
     const generation = await this.repository.beginStart(
       descriptor.target,
       now,
@@ -1360,6 +1370,7 @@ export class InstanceManager {
       this.mountPolicyBundles(runtime)
       this.seedDefaultEnv(runtime)
       await this.beforeStart?.(runtime)
+      await verifyPreparedStorage?.()
       if (signal.aborted) throw new RuntimeCapacityError('cancelled')
       const gatewayCredential = JSON.stringify({
         version: 1,
@@ -1583,6 +1594,9 @@ export class InstanceManager {
    */
   async withStopped<T>(target: RuntimeTargetInput, operation: (lease?: RuntimeStopLease) => Promise<T>, actorUserId?: number, expectedGeneration?: number,
     purpose: RuntimeStopPurpose = 'destructive'): Promise<T> {
+    if (purpose === 'content-publication' && (this.repository.acquireStopLease === undefined || this.repository.confirmStopLease === undefined)) {
+      throw new RuntimeStopError(new Error('Content publication requires process-owned quiescence confirmation.'))
+    }
     if (this.repository.acquireStopLease !== undefined) {
       if (this.processOwner === undefined || this.repository.releaseStopLease === undefined) {
         throw new RuntimeStopError(new Error('Distributed destructive operations require Gateway process ownership'))
@@ -1789,12 +1803,26 @@ export class InstanceManager {
   }
 
   /**
+   * Refuse new starts and cancel pending admission before the Gateway drains accepted writers.
+   * Existing Runtime processes remain available until {@link stopAll} joins and stops them.
+   */
+  beginShutdown(): void {
+    if (this.closedStartRequest !== undefined) return
+    const refused = Promise.reject<never>(new RuntimeCapacityError('closed'))
+    void refused.catch((_closedStartRefusal: unknown) => {
+      // Shutdown owns this refusal even when no subsequent caller observes either result.
+    })
+    this.closedStartRequest = { admission: refused, completion: refused }
+    this.capacity.close()
+    for (const controllers of this.startControllers.values()) for (const controller of controllers) controller.abort()
+  }
+
+  /**
    * Drain tracked and recovered local runtimes despite individual failures; retain configured supervisor units.
    * @returns completion after all workers settle; rejects with the first failed worker's original error
    */
   async stopAll(): Promise<void> {
-    this.capacity.close()
-    for (const controllers of this.startControllers.values()) for (const controller of controllers) controller.abort()
+    this.beginShutdown()
     await this.initialized
     await Promise.allSettled([...this.pendingStarts.values()].map(operation => operation.completion))
     // Graceful shutdown terminates locally owned children; supervisor units

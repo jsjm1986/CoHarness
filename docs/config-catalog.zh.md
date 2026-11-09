@@ -535,6 +535,8 @@ export interface ConnectionConfig {
     generationReadyWarnMs?: number
     /** Hard readiness deadline in milliseconds. */
     generationReadyTimeoutMs?: number
+    /** Concurrent explicit Runtime preparations admitted per browser document. */
+    maxConcurrentEntryRequests?: number
   }
   /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
@@ -586,7 +588,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-client-modules`
 
 - `inject`: `loader`
-- `source`: [`packages/client/modules/src/index.ts:47`](../packages/client/modules/src/index.ts)
+- `source`: [`packages/client/modules/src/index.ts:48`](../packages/client/modules/src/index.ts)
 
 ```ts config-catalog
 /** Startup transport grouping; module application keeps the declared graph order. */
@@ -1377,7 +1379,7 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-gateway-execution`
 
 - `inject`: `gatewayRuntime` · `agents` · `sessions` · `sessionQuery` · `permissionPresets` · `sandboxPolicy` · `sessionProjections`
-- `source`: [`packages/context/gateway-execution/src/index.ts:34`](../packages/context/gateway-execution/src/index.ts)
+- `source`: [`packages/context/gateway-execution/src/index.ts:35`](../packages/context/gateway-execution/src/index.ts)
 
 ```ts config-catalog
 /** Reconnection applies to authorization updates, never to model or tool effects. */
@@ -1461,7 +1463,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-hmr`
 
 - `refs`: `ChokidarOptions` (`chokidar`)
-- `source`: [`packages/boot/hmr/src/index.ts:76`](../packages/boot/hmr/src/index.ts)
+- `source`: [`packages/boot/hmr/src/index.ts:81`](../packages/boot/hmr/src/index.ts)
 
 ```ts config-catalog
 /** Module roots and watcher timing, with Chokidar deployment options. */
@@ -1630,7 +1632,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-frontend-static`
 
 - `inject`: `webServer` · `connection`
-- `source`: [`packages/host/frontend-static/src/index.ts:29`](../packages/host/frontend-static/src/index.ts)
+- `source`: [`packages/host/frontend-static/src/index.ts:31`](../packages/host/frontend-static/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the dist anchor. */
@@ -1678,7 +1680,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-webserver`
 
-- `source`: [`packages/host/webserver/src/index.ts:78`](../packages/host/webserver/src/index.ts)
+- `source`: [`packages/host/webserver/src/index.ts:80`](../packages/host/webserver/src/index.ts)
 
 ```ts config-catalog
 /** Web server listen, TLS, and response-compression config. */
@@ -2660,7 +2662,7 @@ export type LaunchConfig = {
 
 - `inject`: `subprocess`
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/shell/pwsh-local/src/index.ts:59`](../packages/shell/pwsh-local/src/index.ts)
+- `source`: [`packages/shell/pwsh-local/src/index.ts:63`](../packages/shell/pwsh-local/src/index.ts)
 
 ```ts config-catalog
 /** Validated plugin configuration with live command budgets. */
@@ -4755,7 +4757,7 @@ export interface DocumentTransportConfig {
 
 ## `@deepseek-ai/dsh-userdoc-local`
 
-- `source`: [`packages/attachment/userdoc-local/src/index.ts:105`](../packages/attachment/userdoc-local/src/index.ts)
+- `source`: [`packages/attachment/userdoc-local/src/index.ts:106`](../packages/attachment/userdoc-local/src/index.ts)
 
 ```ts config-catalog
 /** Local document backend configuration. */

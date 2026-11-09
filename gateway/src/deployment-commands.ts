@@ -1,8 +1,8 @@
 /**
  * `pg_dump`/`pg_restore` subprocess runners and the managed-file consistency
  * manifest shared by the admin backup API and the standalone `pg:deploy`
- * applier. Commands stream the dump on stdout/stdin so a Docker Compose
- * `exec` command line works identically to a local `pg_dump` install.
+ * applier. Connections use private framed stdin; remote command prefixes
+ * include the execution-host adapter. Archive data retains streamed stdin/stdout.
  * Failure diagnostics retain a complete UTF-8 stderr prefix within eight KiB.
  */
 import { spawn } from 'node:child_process'
@@ -12,7 +12,7 @@ import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdir, mkdtemp, open, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
-import { Readable } from 'node:stream'
+import { Readable, Transform, Writable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { StringDecoder } from 'node:string_decoder'
 
@@ -21,6 +21,9 @@ import { compareManagedFiles, copyVerifiedFile, restoreManagedSnapshot, snapshot
 import type { DeploymentDataLease } from './postgres/deployment-lock.ts'
 import { scrubbedGatewayChildEnv } from './child-environment.ts'
 import { DEPLOYMENT_DATA_LOCK, DEPLOYMENT_SQL_LOCK } from './postgres/maintenance-service.ts'
+import { NODE_CONTENT_RESTORE_PREFIX, NODE_CONTENT_RESTORE_SUFFIX } from './node-content-restore-guard.ts'
+import { defaultPgConnectionCommand, nativePgClient, pgConnectionFrame, pgConnectionNonce, pgConnectionMarker, pgConnectionAcknowledgement, readPgConnection, PG_METADATA_BYTES } from './pg-client-protocol.ts'
+import { parseDumpMigrations, type DumpMigration } from './pg-dump-schema.ts'
 export type { ManagedFileEntry, ManagedSnapshot } from './managed-files.ts'
 
 const STDERR_CAPTURE_BYTES = 8 * 1024
@@ -41,6 +44,7 @@ CREATE TEMP TABLE hgw_saved_nodes ON COMMIT DROP AS SELECT id,organization_id,na
 CREATE TEMP TABLE hgw_saved_topology ON COMMIT DROP AS TABLE harness.deployment_topology;
 CREATE TEMP TABLE hgw_saved_agents ON COMMIT DROP AS TABLE harness.node_agents;
 CREATE TEMP TABLE hgw_saved_enrollments ON COMMIT DROP AS TABLE harness.node_agent_enrollments;
+${NODE_CONTENT_RESTORE_PREFIX}
 `
 
 const RESTORE_SUFFIX = `
@@ -74,6 +78,7 @@ DELETE FROM harness.deployment_operations;
 INSERT INTO harness.deployment_operations SELECT * FROM hgw_saved_operations;
 DELETE FROM harness.backup_records;
 INSERT INTO harness.backup_records SELECT * FROM hgw_saved_backups;
+${NODE_CONTENT_RESTORE_SUFFIX}
 `
 
 function sqlText(value: string): string { return `'${value.replaceAll("'", "''")}'` }
@@ -102,11 +107,24 @@ function lockRestoreSql(): string {
 }
 
 function pairedPsql(command: readonly string[]): string[] {
-  const positions = command.flatMap((argument, index) => /^pg_restore(?:\.exe)?$/u.test(basename(argument)) ? [index] : [])
+  const positions = command.flatMap((argument, index) => /^pg_restore(?:\.exe)?$/iu.test(basename(argument)) ? [index] : [])
   if (positions.length !== 1) throw new DeploymentCommandError('restore requires an explicit psql command for this pg_restore wrapper')
   const position = positions[0] as number
   return command.map((argument, index) => index === position
-    ? join(dirname(argument), basename(argument).endsWith('.exe') ? 'psql.exe' : 'psql') : argument)
+    ? join(dirname(argument), basename(argument).toLowerCase().endsWith('.exe') ? 'psql.exe' : 'psql') : argument)
+}
+
+/**
+ * Inspect only migration data through the configured offline restore client.
+ * @param command - native pg_restore or its configured execution-host wrapper.
+ * @param dumpPath - verified archive available on the Gateway host.
+ * @param signal - deployment data lease lifetime.
+ * @returns the migration identities without executing source SQL.
+ */
+export async function inspectDumpMigrations(command: readonly string[], dumpPath: string, signal?: AbortSignal): Promise<DumpMigration[]> {
+  const output = await run([...command, '--data-only', '--schema=harness', '--table=schema_migrations', '--no-owner', '--no-privileges', '--file=-'],
+    dumpPath, undefined, signal, { capture: true })
+  return parseDumpMigrations(output)
 }
 
 /** A deployment command runner bound to the configured pg_dump/pg_restore command lines. */
@@ -140,6 +158,14 @@ export class DeploymentCommandError extends Error {
   constructor(message: string) { super(message) }
 }
 
+/** Native connection resolution and wrapper readiness limits for maintenance commands. */
+export interface DeploymentConnectionOptions {
+  /** Local libpq adapter executable and fixed arguments. */
+  command: readonly string[]
+  /** Deadline for native resolution or the wrapper's private-input acknowledgement. */
+  timeoutMs: number
+}
+
 /** PostgreSQL tools retain their credential inputs without unrelated Gateway secrets. */
 function commandEnvironment(): NodeJS.ProcessEnv {
   const env = scrubbedGatewayChildEnv()
@@ -150,18 +176,26 @@ function commandEnvironment(): NodeJS.ProcessEnv {
   return env
 }
 
-async function run(argv: string[], input?: string | Readable, stdoutPath?: string, signal?: AbortSignal): Promise<void> {
+interface CommandOptions {
+  environment?: NodeJS.ProcessEnv
+  capture?: boolean
+  prefix?: Buffer
+  acknowledgement?: Buffer
+  readinessTimeoutMs?: number
+}
+
+async function run(argv: string[], input?: string | Readable, stdoutPath?: string, signal?: AbortSignal,
+  options: CommandOptions = {}): Promise<Buffer> {
   signal?.throwIfAborted()
   const [command, ...args] = argv
   if (command === undefined || command === '') throw new DeploymentCommandError('empty deployment command')
+  const hasInput = input !== undefined || options.prefix !== undefined
   const child = spawn(command, args, {
-    env: commandEnvironment(),
-    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    env: options.environment ?? commandEnvironment(),
+    stdio: [hasInput ? 'pipe' : 'ignore', 'pipe', 'pipe'],
   })
-  const stderrStream = child.stderr
-  const stdoutStream = child.stdout
-  const stdinStream = child.stdin
-  if (stderrStream === null || stdoutStream === null || (input !== undefined && stdinStream === null)) {
+  const stderrStream = child.stderr, stdoutStream = child.stdout, stdinStream = child.stdin
+  if (stderrStream === null || stdoutStream === null || (hasInput && stdinStream === null)) {
     if (child.pid !== undefined) child.kill('SIGKILL')
     throw new DeploymentCommandError('deployment command streams were not piped')
   }
@@ -171,46 +205,99 @@ async function run(argv: string[], input?: string | Readable, stdoutPath?: strin
     const remaining = STDERR_CAPTURE_BYTES - stderr.length
     if (remaining > 0) stderr = Buffer.concat([stderr, Buffer.from(chunk).subarray(0, remaining)])
   })
-  let commandError: Error | undefined
+  let acceptReady!: () => void, rejectReady!: (error: Error) => void
+  const ready = new Promise<void>((resolve, reject) => { acceptReady = resolve; rejectReady = reject })
+  void ready.catch(() => {})
+  let acknowledged = options.acknowledgement === undefined, offset = 0
+  if (acknowledged) acceptReady()
+  let commandError: Error | undefined, readinessError: Error | undefined
+  let readinessTimer: ReturnType<typeof setTimeout> | undefined
+  const failed = (code: number | null): DeploymentCommandError => {
+    const lines = new StringDecoder('utf8').write(stderr).trim().split('\n')
+    const detail = lines.find(line => /\berror:/iu.test(line)) ?? lines.at(-1) ?? ''
+    return new DeploymentCommandError(`deployment command failed (exit ${String(code)}): ${argv[0]}${detail === '' ? '' : ` — ${detail}`}`)
+  }
   const exited = new Promise<number | null>((resolve) => {
     child.once('error', error => { commandError = error })
-    child.once('close', exit => resolve(exit))
+    child.once('close', exit => {
+      clearTimeout(readinessTimer)
+      rejectReady(readinessError ?? commandError ?? (exit === 0
+        ? new DeploymentCommandError('PostgreSQL private connection input was not acknowledged.') : failed(exit)))
+      resolve(exit)
+    })
   })
+  if (options.readinessTimeoutMs !== undefined) {
+    readinessTimer = setTimeout(() => {
+      readinessError = new DeploymentCommandError('PostgreSQL private connection input timed out.')
+      if (child.pid !== undefined) child.kill('SIGKILL')
+    }, options.readinessTimeoutMs)
+  }
   const cancellation = signal === undefined ? undefined : addAbortListener(signal, () => {
     if (child.pid !== undefined) child.kill('SIGKILL')
   })
   child.once('close', () => { cancellation?.[Symbol.dispose]() })
-  const pipes: Promise<void>[] = []
-  if (input !== undefined && stdinStream !== null) {
-    pipes.push(pipeline(typeof input === 'string' ? createReadStream(input) : input, stdinStream).catch((error: unknown) => {
-      // Catalog readers may exit before consuming dump data; their exit status
-      // still determines success. Pipeline closes the unread source in either case.
+  const response = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      const expected = options.acknowledgement
+      if (acknowledged || expected === undefined) { callback(null, chunk); return }
+      const count = Math.min(expected.length - offset, chunk.length)
+      if (!chunk.subarray(0, count).equals(expected.subarray(offset, offset + count))) {
+        callback(new DeploymentCommandError('PostgreSQL command requires its private connection adapter.'))
+        return
+      }
+      offset += count
+      if (offset === expected.length) {
+        acknowledged = true
+        clearTimeout(readinessTimer)
+        acceptReady()
+      }
+      callback(null, chunk.subarray(count))
+    },
+  })
+  const captured: Buffer[] = []
+  let capturedBytes = 0
+  const output = stdoutPath === undefined ? new Writable({
+    write(chunk: Buffer, _encoding, callback) {
+      if (options.capture === true) {
+        capturedBytes += chunk.length
+        if (capturedBytes > PG_METADATA_BYTES) {
+          callback(new DeploymentCommandError('PostgreSQL private connection metadata exceeds its limit.'))
+          return
+        }
+        captured.push(chunk)
+      }
+      callback()
+    },
+  }) : createWriteStream(stdoutPath, { flags: 'wx', mode: 0o600 })
+  const pipes: Promise<void>[] = [pipeline(stdoutStream, response, output)]
+  if (hasInput && stdinStream !== null) {
+    const source = Readable.from((async function* () {
+      if (options.prefix !== undefined) {
+        yield options.prefix
+        await ready
+        signal?.throwIfAborted()
+      }
+      if (input !== undefined) yield* typeof input === 'string' ? createReadStream(input) : input
+    })())
+    pipes.push(pipeline(source, stdinStream).catch((error: unknown) => {
+      // Catalog readers may stop before EOF; their status still determines success.
       if (error instanceof Error && 'code' in error
         && (error.code === 'EPIPE' || error.code === 'ERR_STREAM_PREMATURE_CLOSE')) return
       throw error
     }))
   }
-  if (stdoutPath !== undefined) {
-    pipes.push(pipeline(stdoutStream, createWriteStream(stdoutPath, { flags: 'wx', mode: 0o600 })))
-  } else {
-    stdoutStream.resume()
-  }
-  const [code] = await Promise.all([
-    exited,
-    ...pipes,
-  ]).catch(async (error: unknown) => {
+  const [code] = await Promise.all([exited, ...pipes]).catch(async (error: unknown) => {
     if (child.pid !== undefined) child.kill('SIGKILL')
     await Promise.allSettled([exited, ...pipes])
-    throw error
+    signal?.throwIfAborted()
+    throw readinessError ?? commandError ?? error
   })
   if (commandError !== undefined) throw commandError
   signal?.throwIfAborted()
-  if (code !== 0) {
-    // A clipped final code point is not part of the diagnostic prefix.
-    const lines = new StringDecoder('utf8').write(stderr).trim().split('\n')
-    const detail = lines.find(line => /\berror:/iu.test(line)) ?? lines.at(-1) ?? ''
-    throw new DeploymentCommandError(`deployment command failed (exit ${String(code)}): ${argv[0]}${detail === '' ? '' : ` — ${detail}`}`)
-  }
+  if (readinessError !== undefined) throw readinessError
+  if (code !== 0) throw failed(code)
+  if (!acknowledged) throw new DeploymentCommandError('PostgreSQL private connection input was not acknowledged.')
+  return Buffer.concat(captured)
 }
 
 async function sha256File(path: string): Promise<string> {
@@ -234,13 +321,38 @@ async function flush(path: string): Promise<void> {
  * @param pgDumpCommand - dump executable and fixed wrapper arguments.
  * @param pgRestoreCommand - archive reader executable and fixed wrapper arguments.
  * @param psqlCommand - SQL executor; otherwise the matching pg_restore executable is replaced with its psql sibling.
+ * @param connection - local native resolver and private-input readiness deadline.
  * @returns backup, verification and transactional restoration operations.
  */
 export function createDeploymentCommands(
   pgDumpCommand: string[], pgRestoreCommand: string[], psqlCommand?: string[],
+  connection: DeploymentConnectionOptions = { command: defaultPgConnectionCommand(), timeoutMs: 30_000 },
 ): DeploymentCommands {
   if (pgDumpCommand.length === 0 || pgRestoreCommand.length === 0) {
     throw new DeploymentCommandError('pg_dump and pg_restore commands must not be empty')
+  }
+  if (connection.command.length === 0 || connection.command[0] === ''
+    || !Number.isInteger(connection.timeoutMs) || connection.timeoutMs < 1 || connection.timeoutMs > 2_147_483_647) {
+    throw new DeploymentCommandError('invalid PostgreSQL private connection resolver or readiness deadline')
+  }
+  const runDatabase = async (command: string[], databaseUrl: string, input?: Readable,
+    stdoutPath?: string, signal?: AbortSignal): Promise<void> => {
+    const frame = pgConnectionFrame(databaseUrl), nonce = pgConnectionNonce(), environment = commandEnvironment()
+    if (nativePgClient(command)) {
+      if (process.platform === 'win32' && dirname(command[0] as string) !== '.') {
+        const pathKey = Object.keys(environment).find(key => key.toUpperCase() === 'PATH') ?? 'PATH'
+        environment[pathKey] = `${dirname(command[0] as string)};${environment[pathKey] ?? ''}`
+      }
+      const bytes = await run([...connection.command, '--resolve-stdin-v1', nonce], Readable.from([frame]), undefined, signal,
+        { environment, capture: true, readinessTimeoutMs: connection.timeoutMs })
+      const resolved = readPgConnection(bytes, nonce)
+      for (const key of Object.keys(environment)) if (/^(?:PGSERVICE|PGPASSWORD)$/iu.test(key)) delete environment[key]
+      if (resolved.password !== undefined) environment.PGPASSWORD = resolved.password
+      await run([...command, '--dbname', resolved.connection], input, stdoutPath, signal, { environment })
+    } else {
+      await run([...command, pgConnectionMarker(nonce)], input, stdoutPath, signal,
+        { environment, prefix: frame, acknowledgement: pgConnectionAcknowledgement(nonce), readinessTimeoutMs: connection.timeoutMs })
+    }
   }
   return {
     async backup(backupDir, databaseUrl, managedPaths, signal) {
@@ -257,7 +369,7 @@ export function createDeploymentCommands(
         await flush(join(filesDir, 'manifest.json'))
         await flush(filesDir)
         try {
-          await run([...pgDumpCommand, '--dbname', databaseUrl, '--format=custom', '--compress=9'], undefined, partial, signal)
+          await runDatabase([...pgDumpCommand, '--format=custom', '--compress=9'], databaseUrl, undefined, partial, signal)
         } catch (error) {
           await rm(filesDir, { recursive: true, force: true })
           throw error
@@ -304,8 +416,8 @@ export function createDeploymentCommands(
           yield '\n-- Verify the same coordinating lease before committing.\n'
           yield requireRestoreLease(lease)
         })())
-        await run([...sqlCommand, '--no-psqlrc', '--set=ON_ERROR_STOP=on', '--single-transaction',
-          '--dbname', databaseUrl, '--file=-'], input, undefined, signal)
+        await runDatabase([...sqlCommand, '--no-psqlrc', '--set=ON_ERROR_STOP=on', '--single-transaction',
+          '--file=-'], databaseUrl, input, undefined, signal)
       } finally {
         await rm(directory, { recursive: true, force: true })
       }

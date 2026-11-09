@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Register macOS/Linux x64 or arm64 computers and connect their existing Gateway services through an outbound agent. The agent needs no PostgreSQL credential or inbound listener. Enrollment reports `executionReady: false` and grants no runtime authority. Computer use and capability qualifications have separate per-computer policies. The organization’s [deployment mode](../deployment-topology/README.md) controls aggregation; browser and Admin workflows retain explicit computer and Runtime identities. Each collaborative project belongs to its selected computer.
+Register macOS, Linux and Windows x64 or arm64 computers and connect their existing Gateway services through an outbound agent. The agent needs no PostgreSQL credential or inbound listener. Enrollment reports `executionReady: false` and grants no runtime authority. Computer use and capability qualifications have separate per-computer policies. The organization’s [deployment mode](../deployment-topology/README.md) controls aggregation; browser and Admin workflows retain explicit computer and Runtime identities. Each collaborative project belongs to its selected computer.
 
 ## Contents
 
@@ -81,7 +81,7 @@ Deploy the same built project on the managed computer. Its existing Gateway uses
 
 With multi-computer mode enabled at the primary and `HGW_NODE_LOCAL_GATEWAY_URL` configured for the agent, API requests with an authorized `dshRuntime` select that environment's computer. Administrator API requests may explicitly select `dshNode=<node UUID>`; current administrator authority is rechecked. The destination repeats existing browser-session, origin, account and business authorization. A target-node header is checked before its handlers run. The browser uses the center origin throughout.
 
-Existing personal/project selectors and the scope cookie also resolve placement from center metadata. Root HTML, assets, account APIs and runtime HTTP/WebSocket traffic use the selected computer. Scope changes parse their bounded request body before forwarding it to the exact Runtime. An ambiguous owner selector returns409 and requires `dshRuntime`; it never selects the first environment. Account context and workbench catalog responses include `environment: { id, nodeId }` when a directory is composed. Purpose-limited Admin APIs do not require the administrator to own a personal Runtime on the selected computer.
+Existing personal/project selectors and the scope cookie also resolve placement from center metadata. Root HTML, assets, account APIs and runtime HTTP/WebSocket traffic use the selected computer. A byte-deterministic browser URL — the `??` combo or a `rev`-stamped `client.*.js` chunk or source map under `/plugins`, or a content-hashed `/assets/*` path — is authorized under the Referer-selected Runtime and then forwarded in place rather than answered with a `dshRuntime` redirect, so the unpinned URL caches identically across computers; authorization always runs before forwarding. Runtime-specific or unrevisioned paths — `/plugins/events`, unrevisioned plugin or asset URLs — keep the redirect pin. Scope changes parse their bounded request body before forwarding it to the exact Runtime. An ambiguous owner selector returns409 and requires `dshRuntime`; it never selects the first environment. Account context and workbench catalog responses include `environment: { id, nodeId }` when a directory is composed. Purpose-limited Admin APIs do not require the administrator to own a personal Runtime on the selected computer.
 
 Account preferences, push-device registrations and `GET /account/api/projects` use shared account storage without selecting or contacting a Runtime. The workbench directory uses authorized placement metadata even when the selected allocation belongs to another computer. Project creation retains its explicit computer target. The browser’s SVG icon follows the referring tab’s verified Runtime selection.
 
@@ -100,6 +100,8 @@ A cancelled bridge retains its node service slot until socket and pipeline clean
 <a id="runtime-isolation"></a>
 
 ## Runtime isolation
+
+On Windows, the Gateway signs a validity start one system-clock tick (16 ms) before issuance. The expiration deadline still comes from the actual issuance time and the configured lifetime. The receiving Runtime checks the signature, exact identity, generation and both time boundaries.
 
 Lifecycle queues, private credentials, signed principals, resource registrations and Session execution records retain the allocated Runtime UUID. A credential and principal must agree on that UUID, owner and process generation. PostgreSQL preserves an owner/node generation counter across assignment retirement; generations are monotonic and may skip values. Confirmed-stop cleanup reclaims only the stopped Runtime's registrations. Queued work loses admission when its exact node connection becomes invalid, while active or uncertain occupation remains until owned cleanup is confirmed.
 
@@ -163,16 +165,20 @@ Node settings are resolved before file or network acquisition.
 | Node variable | Default | Meaning |
 |---|---|---|
 | `HGW_NODE_CENTER_URL` | Required | HTTPS origin; loopback HTTP is accepted locally |
-| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | Mode-0600 credential file owned by the agent's OS account |
+| `HGW_NODE_CENTER_DIAL_URLS` | `HGW_NODE_CENTER_URL` | Comma-separated ordered origins the agent dials instead; each follows the center-URL rule |
+| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | Credential file private to its owning account (mode 0600 on macOS/Linux, an ACL limited to the file owner plus SYSTEM and Administrators on Windows) |
 | `HGW_NODE_ENROLLMENT_TOKEN` | Required for a new state file | Administrator ticket; enrolled records use their saved credential |
 | `HGW_NODE_AGENT_REQUEST_TIMEOUT_MS` | 10000 | Network request and shutdown-release timeout |
 | `HGW_NODE_AGENT_RETRY_MS` | 3000 | Delay between idempotent control retries |
+| `HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS` | 60000 | After a dial fallback, the first fresh attempt at least this long later re-probes the first dial origin |
 | `HGW_NODE_AGENT_CHANNEL_ENABLED` | `1` | `0` disables the control socket; incompatible with a local service bridge |
 | `HGW_NODE_AGENT_CHANNEL_MAX_INFLIGHT` | 4 | Concurrent read-only probe handlers |
 | `HGW_NODE_AGENT_CHANNEL_MAX_FRAME_BYTES` | 16384 | Complete received/sent control-message byte limit |
 | `HGW_NODE_AGENT_CHANNEL_MAX_BUFFERED_BYTES` | 65536 | Outbound control buffer budget |
 | `HGW_NODE_LOCAL_GATEWAY_URL` | Unset | Fixed `http://127.0.0.1:<port>` or IPv6 loopback origin for the existing Gateway |
 | `HGW_NODE_AGENT_SERVICE_MAX_CONNECTIONS` | 16 | Concurrent local Gateway bridges, independent of probes |
+
+`HGW_NODE_CENTER_DIAL_URLS` names the transport, never the identity. Every listed origin must reach the same center: the credential file still binds `HGW_NODE_CENTER_URL`, and enrollment, identity and state checks do not move. The list covers deployments where the public origin is not the node's best route — an SSH reverse tunnel to loopback (`http://127.0.0.1:<port>`), a LAN address, a mesh overlay, then the public origin last. An attempt that gets no HTTP response — a refused connection, a timeout, a socket that dies before `open` — moves dialing to the next entry; any HTTP response, including a refusal, counts as reaching a center and never triggers failover. An in-flight attempt is never replayed to another origin; only the next fresh attempt sees the change.
 
 <a id="recovery"></a>
 
@@ -190,7 +196,7 @@ Connection leases are separate from maintenance writer acknowledgements. Enrolle
 
 ## Verification
 
-With `HGW_TEST_DATABASE_URL` selecting a disposable test database, `npm run test:postgres` includes an authenticated Gateway transcript and two independent source node processes. `npm run test:built-node-agent` builds and repeats the process scenario under plain Node. The scenarios cover simultaneous connections, independent stop, credential revocation, the real Admin client’s issue/reissue/revoke flow, and zero runtime launches. Loopback verification does not establish public-ingress, cross-computer or Windows acceptance.
+With `HGW_TEST_DATABASE_URL` selecting a disposable test database, `npm run test:postgres` includes an authenticated Gateway transcript and two independent source node processes. `npm run test:built-node-agent` builds and repeats the process scenario under plain Node. The scenarios cover simultaneous connections, independent stop, credential revocation, the real Admin client’s issue/reissue/revoke flow, and zero runtime launches. Loopback verification does not establish public-ingress, cross-computer or Windows runtime acceptance.
 
 `npm run test:built-node-service` uses two independent compiled Gateway processes, a compiled node-agent process, PostgreSQL and the shipped Web profile. Its recorded transcript verifies one center login, the existing remote Admin API, runtime startup on the selected computer, a real workspace event over the runtime WebSocket, and unavailable-node refusal without a center replacement. It requires built workspace artifacts and the same disposable database setting. Package tests also cover bounded binary transfer, partial HTTP delivery, node identity mismatch, independent control capacity, revocation and cancelled acquisition teardown.
 

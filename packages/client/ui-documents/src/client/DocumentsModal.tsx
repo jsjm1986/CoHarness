@@ -1,3 +1,4 @@
+import { parseClientSessionKey, type ClientRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type FC, type SyntheticEvent } from 'react'
 import {
   Button,
@@ -71,7 +72,7 @@ export interface DocumentsModalProps {
   /** Captured conversation identity; changing it clears attachment retry state. */
   attachmentTargetId?: string | undefined
   /** Document destination captured from the addressed composer, independent of the manager's browsing scope. */
-  attachmentScope?: UserDocScope | undefined
+  attachmentScope?: ClientRuntimeTarget | undefined
   /** Pin private downloads and previews to the document’s verified account. */
   privateResourceUrl?: ((url: string) => string) | undefined
   open: boolean
@@ -125,6 +126,7 @@ function uploadErrorMessage(error: unknown, t: (key: DocumentsKey) => string): s
 
 function documentErrorMessage(error: unknown, t: (key: DocumentsKey) => string): string {
   if (error instanceof UserDocHttpError) {
+    if (error.code === 'DOCUMENT_ATTACHMENT_TARGET_UNAVAILABLE') return t('action.attach.error')
     if (error.code === 'INSTANCE_STARTING') return t('error.runtimeStarting')
     if (error.code === 'INSTANCE_UNREACHABLE' || error.code === 'COLLABORATION_UNAVAILABLE'
       || error.code === 'DOCUMENT_SCOPE_TIMEOUT') {
@@ -579,6 +581,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const [overviewLoading, setOverviewLoading] = useState(false)
   const [overviewCopyRow, setOverviewCopyRow] = useState<OverviewCopyTarget | null>(null)
   const [overviewError, setOverviewError] = useState('')
+  const [unavailableDocumentComputers, setUnavailableDocumentComputers] = useState(0)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyItems, setHistoryItems] = useState<UserDocCatalogHistoryItem[]>([])
@@ -1384,8 +1387,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           }, requestSignal)
           : await userDocs.current.overview(requestSignal)
       if (requestSignal.aborted || generation !== overviewRequestGeneration.current) return false
-      overviewCache.current = { key, response }
+      overviewCache.current = response.partial ? null : { key, response }
       overviewLoadedKey.current = key
+      setUnavailableDocumentComputers(response.unavailableNodes?.length ?? 0)
       setOverviewRows([...response.documents])
       setOverviewEntry(allowedNodeId)
       setOverviewPage(1)
@@ -1444,6 +1448,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         ...(cursor === undefined ? {} : { cursor }),
       }, requestSignal)
       if (requestSignal.aborted || generation !== overviewRequestGeneration.current) return
+      setUnavailableDocumentComputers(response.unavailableNodes?.length ?? 0)
       setOverviewRows([...response.documents])
       setOverviewEntry(allowedNodeId)
       setOverviewNextCursor(response.nextCursor)
@@ -2338,6 +2343,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     const generation = attachmentGeneration.current
     const source = listingScope()
     const target = currentScopeDescriptor()
+    const address = attachmentTargetId === undefined ? undefined : parseClientSessionKey(attachmentTargetId)
+    const runtimeId = attachmentScope?.runtimeId ?? address?.runtime.runtimeId
+    if (address && (address.runtime.kind !== target.kind
+      || address.runtime.runtimeId !== undefined && address.runtime.runtimeId !== runtimeId
+      || address.runtime.kind === 'project' && target.kind === 'project' && address.runtime.projectId !== target.projectId)) {
+      setError(t('action.attach.error'))
+      return
+    }
     const keyOf = (doc: UserDocRef): string => `${scopeCacheKey(source)}:${doc.docId}`
     const missing = targets.filter(document => !copiedAttachments.current.has(keyOf(document)))
     setUploading(true)
@@ -2347,7 +2360,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     setProgress({ current: 0, total: targets.length, percent: 0 })
     try {
       const response = missing.length === 0 ? undefined : await userDocs.current.transfer({
-        version: 1, source, target,
+        version: 1, source, target: { ...target, ...(runtimeId === undefined ? {} : { runtimeId }) },
+        ...(attachmentTargetId && runtimeId && target.nodeId
+          ? { targetSessionId: address?.sessionId ?? attachmentTargetId } : {}),
         documents: missing.map(document => ({ docId: document.docId })),
       })
       if (generation !== attachmentGeneration.current) return
@@ -2359,6 +2374,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         const ref = copiedAttachments.current.get(keyOf(document))
         return ref === undefined ? [] : [ref]
       })
+      const historyUnconfirmed=response?.items.some(item=>item.status==='copied'&&item.historyUnconfirmed)
       const failedNames = response?.items.flatMap(item => item.status === 'failed' ? [item.source.name] : []) ?? []
       if (copied.length === 0) {
         setError(t('copy.partial', { count: String(failedNames.length) }))
@@ -2374,7 +2390,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       } else if (failedNames.length > 0) {
         clearSelection()
         setError(t('copy.partialAttached', { names: failedNames.join('、') }))
-      } else onClose()
+      } else if(historyUnconfirmed){clearSelection();setNotice(t('copy.historyUnconfirmed'))} else onClose()
     } catch (cause) {
       if (generation === attachmentGeneration.current) setError(documentErrorMessage(cause, t))
     } finally {
@@ -2890,6 +2906,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       } else {
         response = await userDocs.current.transfer(transferRequest)
       }
+      const historyUnconfirmed=response.items.some(item=>item.status==='copied'&&item.historyUnconfirmed)
       const copied = response.items.flatMap(item => item.status === 'copied' ? [item.target] : [])
       const failedItems = response.items.flatMap((item, index) => item.status === 'failed' && targets[index] !== undefined
         ? [{
@@ -2910,13 +2927,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       if (attachToCurrent) {
         const remaining = addToCapturedConversation(copied.map(ref => ({ ...ref, path: '' })))
         setPendingAttachments(remaining)
-        if (remaining.length === 0 && failed === 0) onClose()
+        if (remaining.length === 0 && failed === 0 && !historyUnconfirmed) onClose()
         else if (remaining.length > 0) setError(t('copy.attachPending', { names: remaining.map(ref => ref.name).join('、') }))
       }
       if (failed > 0) setModalError(t('copy.partial', { count: String(failed) }))
       else {
         setCopyTargets(null)
-        if (!attachToCurrent && copied.length > 0) noticeAfterCopy = t('copy.success', { target: option.label })
+        if(historyUnconfirmed)noticeAfterCopy=t('copy.historyUnconfirmed')
+        else if (!attachToCurrent && copied.length > 0) noticeAfterCopy = t('copy.success', { target: option.label })
       }
       clearSelection()
       if (overviewCopyRow !== null) {
@@ -3720,6 +3738,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       </div>
                     </header>
                     <div className={css.overviewToolbar} role="group" aria-label={t('modal.filters')}>{filterControls}{phone && <Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.more')} onClick={(event) => { actionReturnTarget.current = event.currentTarget; setMobileSheet({ kind: 'more' }) }}><IconEllipsisOutline16 size={16} /></Button>}</div>
+                    {unavailableDocumentComputers > 0 && <div className={css.notice} role="status">{t('overview.unavailable', { count: String(unavailableDocumentComputers) })}</div>}
                     {overviewError !== '' && <div className={css.error} role="alert">{overviewError}</div>}
                     {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewFiltered.length === 0 ? <p className={css.empty}>{t('scope.all.empty')}</p> : (
                       <div className={css.overviewList} role="list" data-documents-scrollport="overview">

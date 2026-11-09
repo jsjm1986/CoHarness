@@ -2,7 +2,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectionHandle, HostDescription } from '@deepseek-ai/dsh-client-connection/client'
 import type { SessionRuntimeTarget } from '../src/client/contract/sessions.ts'
-import { prepareGatewayRuntime } from '../src/client/prepare-runtime.ts'
+import { PreparedSessionApi, prepareGatewayRuntime } from '../src/client/prepare-runtime.ts'
+import { GatewayEntryRequests } from '../src/client/entry-requests.ts'
+import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { createSnapshotStore } from '../src/client/contract/store.ts'
 import { FakeApiClient } from './fake-api.client.ts'
 
@@ -21,6 +23,56 @@ function connection(host: HostDescription | undefined): ConnectionHandle {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers() })
 
 describe('explicit managed Runtime preparation', () => {
+  it('keeps in-flight preparation, history and creation separate across different physical placements of one allocation', async () => {
+    vi.stubGlobal('location', new URL('https://harness.invalid/'))
+    const before = '33333333-3333-4333-8333-333333333333' as NonNullable<SessionRuntimeTarget['nodeId']>
+    const after = '44444444-4444-4444-8444-444444444444' as NonNullable<SessionRuntimeTarget['nodeId']>
+    const requests = new GatewayEntryRequests({ ...connection(description()), entryRequestLimit: 2 }, () => 7, () => true)
+    const sessionId = 'one-session' as Parameters<typeof requests.history>[1]['sessionId']
+    const draft = { sessionId, draftId: 'draft-one' } as Parameters<typeof requests.create>[1]
+    const signal = new AbortController().signal
+    try {
+      for (const op of [
+        (destination: SessionRuntimeTarget) => requests.prepare(destination, signal),
+        (destination: SessionRuntimeTarget) => requests.history(destination, { sessionId }, signal),
+        (destination: SessionRuntimeTarget) => requests.create(destination, draft, signal),
+      ]) {
+        const observed: Array<string | null> = []
+        const release = Promise.withResolvers<undefined>()
+        vi.stubGlobal('fetch', async (incoming: URL | string) => {
+          observed.push(new URL(incoming, location.href).searchParams.get('dshNode'))
+          await release.promise
+          return new Response(null, { status: 403 })
+        })
+        const settled = Promise.allSettled([op({ ...target, nodeId: before }), op({ ...target, nodeId: after })])
+        release.resolve(undefined)
+        expect((await settled).map(result => result.status)).toEqual(['rejected', 'rejected'])
+        expect(observed).toEqual([before, after])
+      }
+    } finally { await requests.dispose() }
+  })
+
+  it.each([true, false])('sends the captured physical computer on every versioned operation when supplied (%s)', async (pinned) => {
+    const node = '33333333-3333-4333-8333-333333333333' as NonNullable<SessionRuntimeTarget['nodeId']>
+    const urls: URL[] = []
+    vi.stubGlobal('location', new URL('https://harness.invalid/'))
+    vi.stubGlobal('fetch', async (url: URL) => { urls.push(url); return new Response(null, { status: 403 }) })
+    const api = new PreparedSessionApi(connection(description()), pinned ? { ...target, nodeId: node } : target, 7)
+    const sessionId = 'one-conversation' as Parameters<typeof api.sessions.history>[0]['sessionId']
+    const requestId = RpcId('c2d23812-bcc3-4900-8dc5-8416b533784a')
+    await expect(api.sessions.create({ sessionId })).rejects.toThrow()
+    await expect(api.sessions.history({ sessionId })).rejects.toThrow()
+    await expect(api.sessions.prompt({ sessionId, requestId, mode: 'queue', content: [] })).rejects.toThrow()
+    await expect(api.status({ sessionId, requestId })).rejects.toThrow()
+    expect(urls.map(url => url.pathname)).toEqual(['/api/prepare/v1/session.create', '/api/prepare/v1/session.history',
+      '/api/admit/v1/session.prompt', '/api/admit/v1/session.status'])
+    for (const url of urls) {
+      expect(url.searchParams.getAll('dshNode')).toEqual(pinned ? [node] : [])
+      expect(url.searchParams.getAll('dshRuntime')).toEqual([second])
+      expect(url.searchParams.getAll('dshTarget')).toEqual(['personal'])
+    }
+  })
+
   it.each(['personal', 'project'] as const)('prepares the exact %s allocation without following its destination', async (kind) => {
     const fetcher = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, { status: 204, headers: { location: `/?dshRuntime=${second}` } }))
     vi.stubGlobal('fetch', fetcher)

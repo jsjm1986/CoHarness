@@ -37,6 +37,8 @@ export interface BeginSubmissionInput {
   readonly text: string
   /** Ordered browser previews matching the upcoming image parts. */
   readonly images: readonly PendingSubmissionImage[]
+  /** Ordered document references included in this exact submission. */
+  readonly documentIds?: readonly string[]
   /** Called exactly once when the echo retires. */
   readonly onRetire?: (retirement: PendingSubmissionRetirement) => void
 }
@@ -85,6 +87,8 @@ export interface ISession {
    * @param input - echo content and the optional settlement callback.
    * @returns the minted identity for {@link prompt} plus the pre-prompt abandon path.
    */
+  /** Whether this target acknowledges a prompt only after durable admission. */
+  readonly hasDurableAdmission?: () => boolean
   readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle
   /** Read the complete turn owning a call without changing the visible history window.
    * @param callId - durable root or nested Tool call identity.
