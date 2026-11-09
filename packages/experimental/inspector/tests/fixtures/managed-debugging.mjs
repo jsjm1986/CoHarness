@@ -122,6 +122,7 @@ try {
           status = response.status; await response.body?.cancel()
         }
         await mounted?.fiber?.dispose()
+        mark(`${id} fiber disposed`)
         socket?.terminate(); socket = undefined
         await Promise.all(workers.slice(before).map(worker => worker.completion))
         mark(`${id} workers settled`)
