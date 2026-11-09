@@ -246,6 +246,33 @@ describe('DirectoryBrowser', () => {
     expect(columns()).toHaveLength(1)
   })
 
+  it('keeps the path editor open when the toggling button blurs out on its own unmount', async () => {
+    mount()
+    await waitFor(() => { expect(screen.getByRole('listitem')).toBeTruthy() })
+    const button = screen.getByRole('button', { name: 'browser.editPath' })
+    fireEvent.click(button)
+    expect(screen.getByLabelText('browser.editPath', { selector: 'input' })).toBeTruthy()
+    // Chromium fires focusout on the unmounted button in the toggle commit;
+    // that teardown blur must not read as user escape.
+    fireEvent.blur(button, { relatedTarget: null })
+    expect(screen.getByLabelText('browser.editPath', { selector: 'input' })).toBeTruthy()
+  })
+
+  it('cancels the path editor when focus genuinely leaves the dialog card', async () => {
+    mount()
+    await waitFor(() => { expect(screen.getByRole('listitem')).toBeTruthy() })
+    fireEvent.click(screen.getByRole('button', { name: 'browser.editPath' }))
+    const input = screen.getByLabelText<HTMLInputElement>('browser.editPath')
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      fireEvent.blur(input, { relatedTarget: outside })
+      expect(screen.queryByLabelText('browser.editPath', { selector: 'input' })).toBeNull()
+    } finally {
+      outside.remove()
+    }
+  })
+
   it('lands the target single-pane at the wait bound, aborts a superseded parent leg on the wire, and drops its late resolution', async () => {
     vi.useFakeTimers()
     try {
