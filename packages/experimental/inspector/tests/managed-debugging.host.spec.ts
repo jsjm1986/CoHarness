@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 
 /** Coverage instrumentation slows the fixture composition several-fold on shared runners. */
-const FIXTURE_TIMEOUT_MS = Math.max(60_000, 8 * Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0))
+const FIXTURE_TIMEOUT_MS = Math.max(60_000, 16 * Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0))
 
 it('refuses managed Inspector startup and closes live debugging through the real Web composition', async () => {
   const mode = process.env.DSH_EXAMPLE_MODE ?? 'src'
