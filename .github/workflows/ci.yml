@@ -1220,6 +1220,10 @@ jobs:
       # DSH_SNAPSHOT stays off the step environment: every consumer defaults to
       # replay, and exporting it here would leak the replay config swap
       # (cordis.yml -> cordis.snapshot.yml) into spawned built-bin children.
+      # The full inventory reaches specs that load the host addon (e.g.
+      # translator-billing); build it like the scoped PR consumer lane does.
+      - name: Build the native addon the consumer specs require
+        run: pnpm run build:native-system
       - name: Run the consumer inventory with the browser snapshot
         run: pnpm run check:ci:consumers
 
