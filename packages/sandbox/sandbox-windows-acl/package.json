@@ -42,7 +42,7 @@
     "@deepseek-ai/dsh-skill": "workspace:*",
     "@deepseek-ai/dsh-win32-process": "workspace:*",
     "koffi": "3.1.1",
-    "yaml": "^2.4.2"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

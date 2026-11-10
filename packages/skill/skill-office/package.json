@@ -44,7 +44,7 @@
     "@deepseek-ai/dsh-skill": "workspace:*"
   },
   "dependencies": {
-    "yaml": "^2.4.2",
+    "yaml": "^2.9.1",
     "@deepseek-ai/libreoffice-kit": "^0.1.5",
     "@deepseek-ai/schemastery": "workspace:~"
   }
