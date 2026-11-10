@@ -70,7 +70,7 @@
     "@deepseek-ai/dsh-host-webserver": "workspace:*",
     "@fortune-sheet/core": "1.0.4",
     "@fortune-sheet/react": "1.0.4",
-    "@types/papaparse": "^5.3.16",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "~19.2.7",
     "react": "^19.3.0",
     "@deepseek-ai/dsh-api-remotes": "workspace:*",
