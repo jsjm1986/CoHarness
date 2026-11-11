@@ -737,7 +737,7 @@ describe('InstanceManager', () => {
     manager = local
     const summary = await local.reconcile()
     expect(summary.failed).toBe(1)
-    expect(markStopping.mock.calls[0]?.[2]).toBe('failed')
+    expect((markStopping.mock.calls[0] as unknown[] | undefined)?.[2]).toBe('failed')
   })
 
   it('caps reconcile restarts per boot and leaves the row for manual recovery', async () => {
