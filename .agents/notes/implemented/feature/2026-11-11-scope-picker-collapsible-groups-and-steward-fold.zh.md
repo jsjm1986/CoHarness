@@ -16,7 +16,7 @@ Status: implemented
 
 `ScopeControl` 用两个组件内 `ReadonlySet<string>` 状态持有展开状态——`closedGroups`（按分组 id）与 `openStewards`（按所属分组 id，每组至多一个折叠）。分组头是真 `<button>`，带 `aria-expanded` 与旋转箭头；折叠维护行是 `.pageRow` 按钮，含 steward 盾牌图标、共享基名、本地化的 `{count} 台电脑` 电脑行与 `aria-expanded`；展开后在缩进的 `.stewardChildren` 块内渲染未改动的目的地行。选择、切换中禁用与精确 runtime target 均未改动——折叠不产生任何虚构目的地。使用过的 steward 空间会被提升进「最近使用」（或被搜索平铺命中）成为单行，因此 `stewardChildName` 在所有 steward 行（而非仅折叠子行）剥去 `·<node>` 后缀——电脑名已由副行展示。
 
-行采用两行双槽位语法（`destinationLabel`）：名称行右端是暗色 `scopeAccess` 访问标记（非 steward 授权的 `只读`/`管理`），电脑行（`destinationComputer`）右端是运行状态标签。静息状态——`待启动`（stopped）、`启动中`、`准备中`——渲染为 `Tag` `quiet` 纯文本无填充；只有可达性退化（`离线`、`维护中`、`待确认`）保留 warning/danger 胶囊，静息列表不再呈现成一面警告墙。steward 盾牌头像已承载维护身份，因此 steward 行与折叠行不再渲染 `维护` 标记。
+行采用两行双槽位语法（`destinationLabel`）：名称行右端是暗色 `scopeAccess` 访问标记（非 steward 授权的 `只读`/`管理`），电脑行（`destinationComputer`）右端是运行状态标签。静息状态——`待启动`（stopped）、`启动中`、`准备中`——渲染为 `Tag` `quiet` 纯文本无填充；只有可达性退化（`离线`、`维护中`、`待确认`）保留 warning/danger 胶囊，静息列表不再呈现成一面警告墙。steward 盾牌头像已承载维护身份，因此 steward 行与折叠行不再渲染 `维护` 标记。`.pageRow` 是平铺整宽行，行间用 `.5px` 发丝线分隔；它固定 `appearance: none` 并显式重置 `border`/`border-radius`/`box-shadow`，避免宿主文档的 `<button>` 默认样式或过时打包样式把行渲染成卡片框。
 
 ## Alternatives considered
 
