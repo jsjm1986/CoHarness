@@ -1,5 +1,5 @@
 import { once } from 'node:events'
-import { createServer, get, type IncomingMessage } from 'node:http'
+import { createServer, get, type IncomingMessage, type Server } from 'node:http'
 import { generateKeyPairSync } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -159,50 +159,69 @@ describe('proxy handlers', () => {
       entered: ReturnType<typeof barrier>
       proceed: ReturnType<typeof barrier>
       runtime?: LaunchRuntime
+      server?: Server
       alive: boolean
     }>()
+    const portFiles = new Map<number, string>()
     const launcher: Launcher = {
       instancesOutliveGateway: false,
       async start(runtime) {
         const state = states.get(runtime.ownerId)!
         starts.push(runtime.ownerId)
         state.runtime = runtime
+        // Row ports are per-user relay listeners; the launched child binds an
+        // ephemeral port and publishes it, as a real fixture child does.
+        const server = createServer((req, res) => {
+          if (!state.alive || state.runtime === undefined) { res.writeHead(503).end(); return }
+          if (req.url === RUNTIME_READINESS_PATH) {
+            const credential = JSON.parse(state.runtime.gatewayCredential) as { token: string; runtime: { kind: 'user'; id: number; generation: number } }
+            const nonce = req.headers[RUNTIME_READINESS_NONCE_HEADER]
+            if (typeof nonce !== 'string') { res.writeHead(403).end(); return }
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ version: 1, runtime: credential.runtime, proof: runtimeReadinessResponseProof(credential.token, nonce, credential.runtime) }))
+            return
+          }
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ runtimeUser: runtime.ownerId }))
+        })
+        state.server = server
+        await new Promise<void>((resolve, reject) => {
+          server.once('error', reject)
+          server.listen(0, '127.0.0.1', resolve)
+        })
+        const publication = portFiles.get(runtime.ownerId)!
+        writeFileSync(publication, String((server.address() as AddressInfo).port))
         state.entered.resolve()
         await state.proceed.promise
         state.alive = true
-        return { hasExited: () => !state.alive, terminate: async () => { state.alive = false } }
+        return {
+          hasExited: () => !state.alive,
+          async terminate() {
+            state.alive = false
+            rmSync(publication, { force: true })
+            if (server.listening) {
+              const closed = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+              server.closeAllConnections()
+              await closed
+            }
+          },
+        }
       },
     }
-    const { deps, base, cookie, alice, db } = await setup(false, {
+    const { deps, base, cookie, alice, db, root } = await setup(false, {
       HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '1', HGW_RUNTIME_MAX_QUEUED: '1',
     }, launcher)
     const bob = await deps.users.create({ username: 'queued-bob', password: 'pw-12345678' })
     const cara = await deps.users.create({ username: 'refused-cara', password: 'pw-12345678' })
     const cookies = new Map([[alice.id, cookie]])
     for (const user of [alice, bob, cara]) {
-      const state = { entered: barrier(), proceed: barrier(), alive: false, runtime: undefined as LaunchRuntime | undefined }
-      states.set(user.id, state)
-      const runtime = createServer((req, res) => {
-        if (!state.alive || state.runtime === undefined) { res.writeHead(503).end(); return }
-        if (req.url === RUNTIME_READINESS_PATH) {
-          const credential = JSON.parse(state.runtime.gatewayCredential) as { token: string; runtime: { kind: 'user'; id: number; generation: number } }
-          const nonce = req.headers[RUNTIME_READINESS_NONCE_HEADER]
-          if (typeof nonce !== 'string') { res.writeHead(403).end(); return }
-          res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ version: 1, runtime: credential.runtime, proof: runtimeReadinessResponseProof(credential.token, nonce, credential.runtime) }))
-          return
-        }
-        res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ runtimeUser: user.id }))
-      })
-      cleanup.push(async () => {
-        if (!runtime.listening) return
-        const closed = new Promise<void>((resolve, reject) => runtime.close(error => error ? reject(error) : resolve()))
-        runtime.closeAllConnections()
-        await closed
-      })
-      await new Promise<void>(resolve => runtime.listen(0, '127.0.0.1', resolve))
-      db.prepare('UPDATE instances SET port=? WHERE user_id=?').run((runtime.address() as AddressInfo).port, user.id)
+      states.set(user.id, { entered: barrier(), proceed: barrier(), alive: false })
+      // A per-user relay keeps each row port permanently bound while every
+      // generation's stand-in publishes only through its own file.
+      const file = join(root, `child-port-${String(user.id)}`)
+      portFiles.set(user.id, file)
+      const relayPort = await runtimeRelay(file, dispose => { cleanup.push(dispose) })
+      db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(relayPort, user.id)
       if (user.id !== alice.id) {
         await deps.users.changeOwnPassword(user.id, 'pw-12345678')
         const login = await fetch(base + '/login', {
@@ -214,7 +233,15 @@ describe('proxy handlers', () => {
       }
     }
     cleanup.push(async () => {
-      for (const state of states.values()) state.proceed.resolve()
+      for (const state of states.values()) {
+        state.proceed.resolve()
+        const server = state.server
+        if (server?.listening) {
+          const closed = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+          server.closeAllConnections()
+          await closed
+        }
+      }
       await deps.instances.stopAll()
     })
     const unhandled: unknown[] = []
