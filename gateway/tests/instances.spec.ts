@@ -661,6 +661,39 @@ describe('InstanceManager', () => {
     expect(local.capacitySnapshot().resident).toBe(0)
   })
 
+  it.each(['unread', 'isLive', 'ensureRunning'])('drains adopted survivors after a launch signature change despite %s', async read => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'drained-survivor'); mkdirSync(projectPath)
+    const terminate = vi.fn(async () => {})
+    const attach = vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate }))
+    const local = new InstanceManager(new SurvivorRepository(projectPath, 43250), cfg, {
+      instancesOutliveGateway: false, attach, start: async () => { throw new Error('unexpected replacement') },
+    })
+    const target = { kind: 'project' as const, id: 41 }
+    if (read === 'isLive') expect(await local.isLive(target)).toBe(true)
+    if (read === 'ensureRunning') expect(await local.ensureRunning({ ...target, name: 'Compiler', path: projectPath })).toEqual({ port: 43250, generation: 7 })
+    await local.drainSurvivors('shutdown')
+    expect(attach).toHaveBeenCalledOnce()
+    expect(terminate).toHaveBeenCalledOnce()
+  })
+
+  it('keeps an owned runtime serving across a retaining shutdown', async () => {
+    const { db, cfg, alice, manager } = await setup()
+    const { port } = await manager.ensureRunning(alice)
+    await manager.stopAll(true)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+    await expect(fetch(`http://127.0.0.1:${port}/`).then(response => response.text())).resolves.toBe('ok')
+    const next = new InstanceManager(db, cfg)
+    try {
+      expect(await next.stateOf(alice.id)).toBe('ready')
+      expect(next.capacitySnapshot().resident).toBe(1)
+    } finally { await manager.stopAll() }
+    expect(await manager.stateOf(alice.id)).toBe('stopped')
+    // The next-boot manager keeps the adopted lease counted until termination
+    // is confirmed; the fixture's legacy row carries no recovery credential.
+    await expect(next.stopAll()).rejects.toThrow('Legacy local runtime ownership')
+  })
+
   it('reaps idle instances but keeps active ones', async () => {
     const { db, alice, manager } = await setup({ HGW_IDLE_TIMEOUT_MS: '50' })
     await manager.ensureRunning(alice)
