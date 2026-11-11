@@ -21,12 +21,13 @@ const [{ createPostgresPool, runMigrations }, { resolvePostgresRuntimeContext },
 ].map(load))
 const pool = createPostgresPool(postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL))
 const root = await mkdtemp(join(tmpdir(), 'central-runtime-control-')), carriers = new Map(), transcript = []
-let gateway, supervisor, manager, processOwner, active, stops = 0, starts = 0, budget, organizationId, target, revokeOnStop = false
+let gateway, manager, processOwner, stops = 0, starts = 0, budget, organizationId, target, revokeOnStop = false
 const closeServer = server => new Promise((done, reject) => { server.closeAllConnections(); server.close(error => { if (error) reject(error); else done() }) })
 const stopCarrier = async state => {
   if (state.closed) return
   state.abort.abort(); await state.read; await state.closedSignal.promise
-  state.closed = true; if (active === state) active = undefined
+  state.closed = true
+  await closeServer(state.server)
 }
 try {
   await runMigrations(pool, resolve(import.meta.dirname, '../../deploy/postgres/migrations'))
@@ -48,32 +49,32 @@ try {
   const marker = join(project.path, 'retained.txt'); await writeFile(marker, 'reserved data retained')
   const repository = new PostgresInstanceRepository(context, cfg.instancePortBase)
   target = await repository.resolveTarget({ kind: 'project', id: project.id })
-  supervisor = createServer((req, res) => {
-    if (req.url?.startsWith('/carrier/')) {
-      const state = carriers.get(Number(req.url.slice('/carrier/'.length))); assert.ok(state)
-      state.responded.resolve(); res.once('close', () => { state.closedSignal.resolve() })
-      res.writeHead(200); res.write('owned process response'); return
-    }
-    if (req.url === readiness.RUNTIME_READINESS_PATH && active !== undefined) {
-      const nonce = req.headers[readiness.RUNTIME_READINESS_NONCE_HEADER]
-      const identity = { ...target, generation: active.generation }
-      if (typeof nonce !== 'string' || req.headers[readiness.RUNTIME_READINESS_REQUEST_HEADER] !== readiness.runtimeReadinessRequestProof(active.token, nonce, identity)) {
-        res.writeHead(401); res.end(); return
-      }
-      res.writeHead(200, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ version: 1, runtime: { ...identity, runtimeId: target.runtimeId },
-        proof: readiness.runtimeReadinessResponseProof(active.token, nonce, identity) })); return
-    }
-    res.writeHead(503); res.end()
-  })
-  await new Promise(done => { supervisor.listen(0, '127.0.0.1', done) })
-  const port = supervisor.address().port
-  await pool.query('UPDATE harness.instances SET port=$3 WHERE organization_id=$1 AND runtime_id=$2', [organizationId, target.runtimeId, port])
-  const openCarrier = async (generation, token) => {
+  const openCarrier = async (generation, token, carrierPort = 0) => {
+    // Each generation binds the port the manager assigned, like a real Runtime
+    // process; a port already bound outside this carrier reads as foreign.
     const state = { generation, token, abort: new AbortController(), responded: Promise.withResolvers(), closedSignal: Promise.withResolvers(), closed: false }
-    carriers.set(generation, state); active = state
+    state.server = createServer((req, res) => {
+      if (req.url?.startsWith('/carrier/')) {
+        const owned = carriers.get(Number(req.url.slice('/carrier/'.length))); assert.ok(owned)
+        owned.responded.resolve(); res.once('close', () => { owned.closedSignal.resolve() })
+        res.writeHead(200); res.write('owned process response'); return
+      }
+      if (req.url === readiness.RUNTIME_READINESS_PATH) {
+        const nonce = req.headers[readiness.RUNTIME_READINESS_NONCE_HEADER]
+        const identity = { ...target, generation: state.generation }
+        if (typeof nonce !== 'string' || req.headers[readiness.RUNTIME_READINESS_REQUEST_HEADER] !== readiness.runtimeReadinessRequestProof(state.token, nonce, identity)) {
+          res.writeHead(401); res.end(); return
+        }
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ version: 1, runtime: { ...identity, runtimeId: target.runtimeId },
+          proof: readiness.runtimeReadinessResponseProof(state.token, nonce, identity) })); return
+      }
+      res.writeHead(503); res.end()
+    })
+    await new Promise(done => { state.server.listen(carrierPort, '127.0.0.1', done) })
+    carriers.set(generation, state)
     state.read = (async () => {
-      try { const response = await fetch(`http://127.0.0.1:${port}/carrier/${generation}`, { signal: state.abort.signal }); for await (const bytes of response.body) assert.ok(bytes.length > 0) }
+      try { const response = await fetch(`http://127.0.0.1:${state.server.address().port}/carrier/${generation}`, { signal: state.abort.signal }); for await (const bytes of response.body) assert.ok(bytes.length > 0) }
       catch (error) { if (!state.abort.signal.aborted) throw error }
     })()
     void state.read.catch(() => { /* the owned stop path observes transport failure */ })
@@ -83,7 +84,8 @@ try {
   const initialToken = randomBytes(32).toString('base64url')
   await pool.query("UPDATE harness.instances SET observed_state='ready',desired_state='running',runtime_token_hash=$3 WHERE organization_id=$1 AND runtime_id=$2",
     [organizationId, target.runtimeId, createHash('sha256').update(initialToken).digest()])
-  await openCarrier(1, initialToken)
+  const initial = await openCarrier(1, initialToken)
+  await pool.query('UPDATE harness.instances SET port=$3 WHERE organization_id=$1 AND runtime_id=$2', [organizationId, target.runtimeId, initial.server.address().port])
   budget = new NodeResourceBudget(pool, organizationId, context.nodeId, cfg.resourceBudget)
   const projectInternalId = (await pool.query('SELECT id FROM harness.projects WHERE organization_id=$1 AND public_id=$2', [organizationId, project.id])).rows[0].id
   const register = generation => budget.register({ organizationId, target, generation, projectInternalId })
@@ -99,7 +101,7 @@ try {
     start: async runtime => {
       await budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 4 })
       await runtime.beforeAllocation?.(); starts++
-      const state = await openCarrier(runtime.generation, JSON.parse(runtime.gatewayCredential).token)
+      const state = await openCarrier(runtime.generation, JSON.parse(runtime.gatewayCredential).token, runtime.port)
       await register(runtime.generation); return handle(state)
     },
   }, { principalPublicKey: '' }, budget, processOwner)
@@ -165,6 +167,5 @@ try {
   if (manager !== undefined) await manager.stopAll()
   for (const state of carriers.values()) await stopCarrier(state)
   if (processOwner !== undefined) await processOwner.close()
-  if (supervisor !== undefined) await closeServer(supervisor)
   await pool.end(); await rm(root, { recursive: true, force: true })
 }
