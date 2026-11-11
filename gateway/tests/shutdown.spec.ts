@@ -79,6 +79,7 @@ function fixture(failing: readonly string[]) {
     deps: { instances: { stopAll: asynchronous('instances') } }, pool: { end: asynchronous('pool') },
     contentVolume: { close: asynchronous('volume') },
     performanceObserver: { dispose: operation('performance') },
+    cfg: { drainRuntimesOnShutdown: true },
   }
   return { sandbox, shutdown: loadShutdown(sandbox), calls, causes, exit, report, clearTimeout, timer }
 }
@@ -229,6 +230,7 @@ it('cancels accepted tunnel startup before waiting for its HTTP writer to drain'
     localDrafts: { close }, personalIndex: { close },
     deps: { instances: { stopAll: close } }, pool: { end: close }, contentVolume: { close },
     performanceObserver: { dispose: () => {} },
+    cfg: { drainRuntimesOnShutdown: true },
   }
   const shutdown = loadShutdown(sandbox)
   const draining = shutdown('SIGTERM')

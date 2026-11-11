@@ -43,6 +43,13 @@ describe('loadConfig', () => {
     }
   })
 
+  it('defaults shutdown runtime retention on and accepts an explicit drain opt-in', () => {
+    expect(loadConfig({}).drainRuntimesOnShutdown).toBe(false)
+    expect(loadConfig({ HGW_DRAIN_RUNTIMES_ON_SHUTDOWN: 'true' }).drainRuntimesOnShutdown).toBe(true)
+    expect(loadConfig({ HGW_DRAIN_RUNTIMES_ON_SHUTDOWN: 'false' }).drainRuntimesOnShutdown).toBe(false)
+    expect(() => loadConfig({ HGW_DRAIN_RUNTIMES_ON_SHUTDOWN: 'yes' })).toThrow('HGW_DRAIN_RUNTIMES_ON_SHUTDOWN')
+  })
+
   it('validates bounded private event principal renewal settings', () => {
     expect(loadConfig({}).streamPrincipalRenewal).toEqual({ enabled: true, intervalMs: 10000, requestTimeoutMs: 5000, maxBatchSize: 64 })
     expect(loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'false' }).streamPrincipalRenewal.enabled).toBe(false)
