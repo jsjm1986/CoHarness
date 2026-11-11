@@ -200,6 +200,25 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return port
   }
 
+  async reassignPort(target: RuntimeTarget): Promise<number | undefined> {
+    const ownerFrom = target.kind === 'user'
+      ? 'harness.users owner'
+      : 'harness.projects owner'
+    const ownerColumn = target.kind === 'user' ? 'i.user_id' : 'i.project_id'
+    return await transaction(this.context.pool, async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-port:${this.context.nodeId}`])
+      const [port] = await allocateInstancePorts(client, this.context.nodeId, this.instancePortBase, 1, this.context.nodeName)
+      const result = await client.query<{ port: number }>(`UPDATE harness.instances i SET port=$4
+        FROM ${ownerFrom}
+        WHERE i.organization_id=$1 AND i.assigned_node_id=$2
+          AND owner.id=${ownerColumn} AND owner.organization_id=i.organization_id
+          AND owner.public_id=$3 AND ${runtimeAddress(target, 5)}
+        RETURNING i.port`,
+        [this.context.organizationId, this.context.nodeId, target.id, port, target.runtimeId ?? null])
+      return result.rows[0]?.port
+    })
+  }
+
   async stateOf(target: RuntimeTarget): Promise<string> {
     const owner = ownerJoin(target)
     const result = await this.context.pool.query<{ observed_state: string }>(`SELECT i.observed_state

@@ -2,12 +2,13 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { createServer, type AddressInfo, type Socket } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from '../src/instances.ts'
 import type { InstanceRepository, RuntimeInstanceSnapshot, RuntimeTarget, RuntimeStopReason } from '../src/instances.ts'
-import { LocalLauncher, RuntimeLaunchCleanupError, type InstanceProc } from '../src/launcher.ts'
+import { LocalLauncher, RuntimeLaunchCleanupError, type InstanceProc, type Launcher } from '../src/launcher.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
 import { RUNTIME_PORT_PUBLISHER, runtimeRelay } from './runtime-relay.ts'
 import { UserService } from '../src/users.ts'
@@ -737,7 +738,104 @@ describe('InstanceManager', () => {
     manager = local
     const summary = await local.reconcile()
     expect(summary.failed).toBe(1)
-    expect(markStopping.mock.calls[0]?.[2]).toBe('failed')
+    expect((markStopping.mock.calls[0] as unknown[] | undefined)?.[2]).toBe('failed')
+  })
+
+  it('reassigns an instance port held by a foreign listener instead of looping EADDRINUSE', async () => {
+    const { alice, manager, cfg, db } = await setup()
+    const dshHome = join(cfg.usersRoot, 'alice', 'dsh')
+    mkdirSync(dshHome, { recursive: true })
+    const portFile = join(dshHome, 'child-port')
+    const held = new Set<Socket>()
+    const squatter = createServer(socket => { held.add(socket); socket.on('close', () => held.delete(socket)) })
+    await new Promise<void>(resolve => squatter.listen(0, '127.0.0.1', resolve))
+    try {
+      writeFileSync(portFile, String((squatter.address() as AddressInfo).port))
+      const repository = (manager as unknown as { repository: InstanceRepository }).repository
+      const reassign = vi.spyOn(repository, 'reassignPort').mockImplementation(async () => {
+        const claimed = await claimRuntimePort(dshHome)
+        db.prepare(`UPDATE instances SET port=? WHERE user_id=?`).run(claimed, alice.id)
+        rmSync(portFile, { force: true })
+        return claimed
+      })
+      const endpoint = await manager.ensureRunning(alice)
+      expect(reassign).toHaveBeenCalledTimes(1)
+      const assigned = (db.prepare(`SELECT port FROM instances WHERE user_id=?`).get(alice.id) as { port: number }).port
+      expect(endpoint.port).toBe(assigned)
+      expect(await manager.stateOf(alice.id)).toBe('ready')
+      await expect(fetch(`http://127.0.0.1:${String(endpoint.port)}/`)).resolves.toMatchObject({ status: 200 })
+    } finally {
+      if (squatter.listening) squatter.close()
+      for (const socket of held) socket.destroy()
+    }
+  })
+
+  it('reclaims the assigned port from a stale holder through owner evidence', async () => {
+    const { alice, manager, cfg, db } = await setup()
+    const dshHome = join(cfg.usersRoot, 'alice', 'dsh')
+    mkdirSync(dshHome, { recursive: true })
+    const portFile = join(dshHome, 'child-port')
+    const held = new Set<Socket>()
+    const squatter = createServer(socket => { held.add(socket); socket.on('close', () => held.delete(socket)) })
+    await new Promise<void>(resolve => squatter.listen(0, '127.0.0.1', resolve))
+    const assigned = (db.prepare(`SELECT port FROM instances WHERE user_id=?`).get(alice.id) as { port: number }).port
+    try {
+      writeFileSync(portFile, String((squatter.address() as AddressInfo).port))
+      const repository = (manager as unknown as { repository: InstanceRepository }).repository
+      vi.spyOn(repository, 'credentialHashOf').mockResolvedValue('a'.repeat(64))
+      const reassign = vi.spyOn(repository, 'reassignPort')
+      const terminate = vi.fn(async () => {
+        rmSync(portFile, { force: true })
+        await new Promise<void>(resolve => squatter.close(() => resolve()))
+      })
+      const launcher = (manager as unknown as { launcher: Launcher }).launcher
+      launcher.attach = () => ({ hasExited: () => false, isAlive: async () => true, terminate } satisfies InstanceProc)
+      const endpoint = await manager.ensureRunning(alice)
+      expect(terminate).toHaveBeenCalledTimes(1)
+      expect(reassign).not.toHaveBeenCalled()
+      expect(endpoint.port).toBe(assigned)
+      expect(await manager.stateOf(alice.id)).toBe('ready')
+    } finally {
+      if (squatter.listening) squatter.close()
+      for (const socket of held) socket.destroy()
+    }
+  })
+
+  it('fails the start loudly when an occupied port cannot be reassigned', async () => {
+    const { alice, manager, cfg } = await setup()
+    const dshHome = join(cfg.usersRoot, 'alice', 'dsh')
+    mkdirSync(dshHome, { recursive: true })
+    const portFile = join(dshHome, 'child-port')
+    const squatter = createServer(socket => socket.on('error', () => {}))
+    await new Promise<void>(resolve => squatter.listen(0, '127.0.0.1', resolve))
+    try {
+      writeFileSync(portFile, String((squatter.address() as AddressInfo).port))
+      const repository = (manager as unknown as { repository: InstanceRepository }).repository
+      vi.spyOn(repository, 'reassignPort').mockResolvedValue(undefined)
+      await expect(manager.ensureRunning(alice)).rejects.toThrow('cannot be reassigned')
+      expect(await manager.stateOf(alice.id)).toBe('stopped')
+    } finally { if (squatter.listening) squatter.close() }
+  })
+
+  it('finishes an abandoned stopping row under its recorded reason', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'wedged-stopping'); mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43250)
+    ;(repository as unknown as { state: string }).state = 'stopping'
+    const markStopping = vi.spyOn(repository, 'markStopping')
+    const markStopped = vi.spyOn(repository, 'markStopped')
+    const terminate = vi.fn(async () => {})
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => true, isAlive: async () => false, terminate } satisfies InstanceProc),
+      start: async () => { throw new Error('stop completion attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(1)
+    expect(terminate).toHaveBeenCalled()
+    expect((markStopping.mock.calls[0] as unknown[] | undefined)?.[2]).toBe('failed')
+    expect(markStopped).toHaveBeenCalled()
   })
 
   it('caps reconcile restarts per boot and leaves the row for manual recovery', async () => {
