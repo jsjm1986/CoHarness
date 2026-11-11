@@ -627,7 +627,9 @@
 }
 
 /* Page rows are the leaf grammar: flat full-bleed buttons with hairlines
-   between neighbours — no cards inside the page. */
+   between neighbours — no cards inside the page. appearance:none keeps the
+   host document's <button> defaults (or an outdated bundled stylesheet that
+   still carries card borders) from boxing the rows. */
 .pageRow {
   display: flex;
   align-items: center;
@@ -636,8 +638,12 @@
   width: 100%;
   min-height: 40px;
   padding: 4px var(--dsw-space-3);
+  appearance: none;
   border: 0;
+  border-radius: 0;
   background: transparent;
+  background-image: none;
+  box-shadow: none;
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
   line-height: 20px;

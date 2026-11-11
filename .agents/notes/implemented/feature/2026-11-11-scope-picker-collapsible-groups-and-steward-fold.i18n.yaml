@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-11-scope-picker-collapsible-groups-and-steward-fold.md
 document:
-  en: ae64cde259963a0040d4f408759939cd241cb2eb
-  zh: 91142d08ba5f6e455ba9c96f4c53b4af48781199
+  en: 68c4c139085498ef39a3c1276f983dfa6c2a3966
+  zh: 1bd61fc8e10774e038c131fc2ba6c24d7a10e917
 /agent-note-collapsible-space-picker-groups-and-the-multi-computer-maintenance-fold:
   en: 8a666e0adc594b21
   zh: 68bea82816cce6a9
@@ -12,8 +12,8 @@ document:
   en: c59ad56b2bbd2b83
   zh: c4926dfc88a09562
 /agent-note-collapsible-space-picker-groups-and-the-multi-computer-maintenance-fold/decision:
-  en: 74c25678ff0263b9
-  zh: 9dd3e18b1136ad45
+  en: e7a1cebf0e7edb0d
+  zh: c2f01ba083ee4083
 /agent-note-collapsible-space-picker-groups-and-the-multi-computer-maintenance-fold/alternatives-considered:
   en: 534524064a39fb2d
   zh: f05461ed831d3424
