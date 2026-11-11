@@ -7,7 +7,8 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { InstanceManager, type RuntimeTarget } from '../src/instances.ts'
+import { InstanceManager, INSTANCE_PROFILE, type RuntimeTarget } from '../src/instances.ts'
+import { computeLaunchStamps } from '../src/launch-stamp.ts'
 import type { UserRow } from '../src/auth.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
@@ -17,6 +18,10 @@ import { LocalLauncher } from '../src/launcher.ts'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
+
+/** A launch stamp the fence accepts under this config; variants differ but membership is what `liveEndpoint` checks. */
+const mintedLaunchStamp = (cfg: Parameters<typeof computeLaunchStamps>[0]): string =>
+  [...computeLaunchStamps(cfg, '', INSTANCE_PROFILE).stamps][0]!
 
 describePg('PostgreSQL Runtime capacity restoration', () => {
   let pool: Pool
@@ -116,10 +121,10 @@ describePg('PostgreSQL Runtime capacity restoration', () => {
   it.skipIf(process.platform === 'win32')('recovers a real local runtime from PostgreSQL and reclaims resources only after physical stop', async () => {
     await withAssignment(async (repository, target, root) => {
       const credential = Buffer.alloc(32, 0xaa)
-      const generation = await repository.beginStart(target, Date.now(), credential, 'explicit')
       const cfg = testConfig(root)
       cfg.dshRepoRoot = fileURLToPath(new URL('../../', import.meta.url))
       cfg.dshCommand = [process.execPath, fileURLToPath(new URL('./fixtures/local-runtime-server.mjs', import.meta.url)), join(root, 'ready.json')]
+      const generation = await repository.beginStart(target, Date.now(), credential, 'explicit', undefined, undefined, mintedLaunchStamp(cfg))
       const runtime = { kind: 'user' as const, ownerId: target.id, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice',
         port: await repository.portOf(target), homePath: root, dshHome: join(cfg.usersRoot, 'alice', 'dsh'), generation,
         credentialHash: credential.toString('hex'), gatewayCredential: '{"fixture":true}' }
@@ -189,10 +194,12 @@ describePg('PostgreSQL Runtime capacity restoration', () => {
 
   it('stops the current assignment after cleaning a locally retained predecessor handle', async () => {
     await withAssignment(async (repository, target, root) => {
-      const first = await repository.beginStart(target, Date.now(), Buffer.alloc(32, 1), 'explicit')
+      const cfg = testConfig(root)
+      const stamp = mintedLaunchStamp(cfg)
+      const first = await repository.beginStart(target, Date.now(), Buffer.alloc(32, 1), 'explicit', undefined, undefined, stamp)
       await repository.markReady(target, first)
       const stopped: number[] = []
-      const oldManager = new InstanceManager(repository, testConfig(root), {
+      const oldManager = new InstanceManager(repository, cfg, {
         instancesOutliveGateway: true,
         start: async () => { throw new Error('stop fixture never launches') },
         attach: runtime => ({
@@ -203,7 +210,7 @@ describePg('PostgreSQL Runtime capacity restoration', () => {
       try {
         expect(await oldManager.isLive(target)).toBe(true)
         await repository.markStopped(target, first)
-        const second = await repository.beginStart(target, Date.now(), Buffer.alloc(32, 2), 'explicit')
+        const second = await repository.beginStart(target, Date.now(), Buffer.alloc(32, 2), 'explicit', undefined, undefined, stamp)
         await repository.markReady(target, second)
         await oldManager.stop(target)
         expect(stopped).toEqual([first, second])
@@ -275,6 +282,7 @@ describePg('PostgreSQL Runtime capacity restoration', () => {
       expect((await repository.activeTargets()).map(key).sort()).toEqual(expected.map(key).sort())
 
       const cfg = testConfig(root, { HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '2' })
+      await pool.query('UPDATE harness.instances SET launch_stamp=$1 WHERE organization_id=$2', [mintedLaunchStamp(cfg), organizationId])
       manager = new InstanceManager(repository, cfg, {
         instancesOutliveGateway: true,
         attach: () => ({ hasExited: () => false, isAlive: async () => true, terminate: async () => {} }),

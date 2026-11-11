@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import Database from 'better-sqlite3'
 
-export const SCHEMA_VERSION = 9
+export const SCHEMA_VERSION = 10
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -77,7 +77,8 @@ CREATE TABLE IF NOT EXISTS instances (
   stop_reason TEXT CHECK (stop_reason IN ('manual','idle','shutdown','failed','access-change')),
   pid INTEGER,
   started_at INTEGER,
-  last_activity_at INTEGER
+  last_activity_at INTEGER,
+  launch_stamp TEXT
 );
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY,
@@ -326,6 +327,9 @@ function migrate(db: Database.Database): void {
       db.exec(`ALTER TABLE instances ADD COLUMN stop_reason TEXT
         CHECK (stop_reason IN ('manual','idle','shutdown','failed','access-change'))`)
       db.exec("UPDATE instances SET stop_reason='manual' WHERE state IN ('stopped','stopping')")
+    }
+    if (!columnNames(db, 'instances').has('launch_stamp')) {
+      db.exec('ALTER TABLE instances ADD COLUMN launch_stamp TEXT')
     }
 
     db.exec('DELETE FROM schema_meta')
