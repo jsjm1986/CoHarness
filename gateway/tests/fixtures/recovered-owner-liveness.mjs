@@ -13,11 +13,11 @@ const base = artifactRoot === '-' ? new URL(`../../${mode}/`, import.meta.url) :
 const load = name => import(new URL(`${name}.${mode === 'src' ? 'ts' : 'js'}`, base))
 const [{ createPostgresPool, runMigrations }, { resolvePostgresRuntimeContext }, { PostgresUserService },
   { PostgresProjectService }, { PostgresInstanceRepository }, { PostgresAuthService }, { PostgresAuditService },
-  { InstanceManager }, { LocalLauncher }, { loadConfig }, { createGatewayServer }, { createAdminApiHandler },
-  { GatewayTerminalManagement }, { GatewayPrincipalSigner }] = await Promise.all([
+  { InstanceManager, INSTANCE_PROFILE }, { LocalLauncher }, { loadConfig }, { createGatewayServer }, { createAdminApiHandler },
+  { GatewayTerminalManagement }, { GatewayPrincipalSigner }, { computeLaunchStamps }] = await Promise.all([
   'postgres/database', 'postgres/runtime-context', 'postgres/user-service', 'postgres/project-service',
   'postgres/instance-repository', 'postgres/auth-service', 'postgres/audit-service', 'instances', 'launcher',
-  'config', 'server', 'admin-api', 'terminal-management', 'principal',
+  'config', 'server', 'admin-api', 'terminal-management', 'principal', 'launch-stamp',
 ].map(load))
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL); assert.ok(databaseUrl)
 const administration = createPostgresPool(databaseUrl, { max: 1 }), database = `recovered_owner_${randomUUID().replaceAll('-', '')}_test`
@@ -45,7 +45,9 @@ try {
   await repository.initialize()
   const target = await repository.resolveTarget({ kind: 'user', id: actor.id })
   const tokenHash = createHash('sha256').update(randomUUID()).digest()
-  const generation = await repository.beginStart(target, Date.now(), tokenHash); await repository.markReady(target, generation)
+  const launchStamp = [...computeLaunchStamps(cfg, '', INSTANCE_PROFILE).stamps][0]
+  const generation = await repository.beginStart(target, Date.now(), tokenHash, 'passive', undefined, true, launchStamp)
+  await repository.markReady(target, generation)
   const instances = new InstanceManager(repository, cfg, new LocalLauncher(cfg))
   const signer = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, slug, 60_000)
   const deps = { cfg, users, projects, instances, auth: new PostgresAuthService(context, cfg), audit: new PostgresAuditService(context),
