@@ -12,10 +12,10 @@ Status: implemented
 
 `InstanceManager.reconcile()` 在启动后约 15s 首次运行、之后每 60s 经既有 `fencedTask` 单飞执行，对持久行集执行两项职责：
 
-- **探测**：对每个仍为 `ready` 的收养驻留租约，检查已跟踪进程(`isAlive`/`hasExited`）或经 `liveEndpoint` 重连。确认死亡的进程以 `failed` 原因停止；资源注册缺失(`unregistered`）**不**视为死亡——探测只在有确证时动作。
-- **回温**:`InstanceRepository.warmTargets(cutoff)` 返回本节点 `stopped` 行中 `stop_reason` 为基础设施停止(`shutdown`、`idle`、`failed`）且 `last_activity_at` 落在 `HGW_RECONCILE_WARM_WINDOW_MS`（默认 7 天）内的行，最近活跃优先。每个目标经普通 `ensureRunning(subject, 'passive')` 重启——走完整准入、容量与策略路径——subject 由 `warmSubject()` 依据 `repository.owner` 重建最小集合。
+- **探测**：对每个仍为 `ready` 的收养驻留租约，检查已跟踪进程(`isAlive`/`hasExited`）或经 `liveEndpoint` 重连。确认死亡的进程在按 runtime 串行的车道上、针对**观测到的** generation 以 `failed` 原因停止——竞争中的替代启动不会被取消或终止；资源注册缺失(`unregistered`）**不**视为死亡，探测只在有确证时动作。
+- **回温**:`InstanceRepository.warmTargets(cutoff)` 返回本节点 `stopped` 行中 `stop_reason` 为基础设施停止(`shutdown`、`failed`）且 `last_activity_at` 落在 `HGW_RECONCILE_WARM_WINDOW_MS`（默认 7 天）内的行，最近活跃优先。每个目标经 `startRequest(subject, 'passive', undefined, { recordActivity: false })` 重启——走完整准入、容量与策略路径，subject 由 `warmSubject()` 依据 `repository.owner` 重建最小集合——但 `beginStart` 不触碰 `last_activity_at`，无人值守的回温无法自行续期回温窗口。
 
-`manual` 与 `access-change` 停止永不复活（SQL 层排除 + passive 意图语义双重保证）。每 boot 的 `reconcileRestarts` 映射把回温尝试封顶在 `HGW_RECONCILE_MAX_RESTARTS`（默认 3)；耗尽的目标计入 `budgeted`，等待下次 boot 或用户请求。`HGW_RECONCILE=off` 可整体关闭。
+`manual`、`access-change` 与 `idle` 停止永不复活：前两条是硬语义线，`idle` 是收割器按 on-demand 策略下的裁决——回温它会对抗当初停掉它的策略。`reconcileRecovery` 映射施加连续失败退避：确认死亡与启动失败计数，拒绝（`blocked`、容量 `cancelled`）只顺延一个基础间隔；重试延迟从 `HGW_RECONCILE_BACKOFF_BASE_MS`(60s）起按失败翻倍、封顶 `HGW_RECONCILE_BACKOFF_MAX_MS`(30m)；持续 `HGW_RECONCILE_STABLE_MS`(10m）保持 ready 则清除连败记录。`HGW_RECONCILE=off` 可整体关闭。
 
 ## Alternatives considered
 
@@ -23,12 +23,14 @@ Status: implemented
 
 **回温所有停止行**。否决：长期冷置的 Runtime 会在 boot 时空烧启动槽。活跃窗口把回温集限定在可能被使用的空间；显式 `manual` 作为硬语义线不被触碰。
 
+**每 boot 尝试次数上限**。否决：绝对的每 boot 计数会把一个偶发失败的 Runtime 永久饿到下次部署，且把未消耗 generation 的拒绝也计入。按失败归因的指数退避在无终态的前提下约束重试频率，持续 ready 的观测证明恢复后清除记录。
+
 ## Consequences
 
-部署重启现在自愈：签名排空→`stopped` 行带 `stop_reason='shutdown'`→首轮 reconcile 无用户干预回温至 `ready`。崩溃恢复从"等下次进入"变成 ~60s 内自动完成，崩溃循环按 boot 封顶——历史失控行从无限 generation 增长变为恰好 3 次尝试后 `budgeted`。回温启动与用户请求共用同一准入 FIFO，批量回温可能瞬时占满 `maxStarting` 槽；交互启动不被抢占，但可能排在进行中的回温准入之后。
+部署重启现在自愈：签名排空→`stopped` 行带 `stop_reason='shutdown'`→首轮 reconcile 无用户干预回温至 `ready`。崩溃恢复从"等下次进入"变成 ~60s 内自动完成，崩溃循环进入几何级重试而非无限空转或硬性的每 boot 终止——历史失控行在退避饱和后至多每 30 分钟重试一次。回温后无人使用的 Runtime 保持原 `last_activity_at`，空闲收割只会恰一次把它收为 `idle`，此后直到真实使用前都保持停止。回温启动与用户请求共用同一准入 FIFO，批量回温可能瞬时占满 `maxStarting` 槽；交互启动不被抢占，但可能排在进行中的回温准入之后。
 
 ## Verification
 
-- `instances.spec.ts`(+4):`shutdown` 停止行回温至 `ready` 而 `manual`/`access-change` 保持 `stopped`；真实 `FAKE_DSH` 子进程经 `/exit` 杀死被发布 `failed` 再回温 `ready`；死亡的收养幸存者经探测发布 `failed`;`HGW_RECONCILE_MAX_RESTARTS=1` 产出 `budgeted` 且行保持停止（与 config 套件共 142/142)。
-- `config.spec.ts`：默认 `enabled/7d/3`,`HGW_RECONCILE=off`，非法值拒绝。
-- 生产 mac-mini r56：启动签名排空→首轮 reconcile 记录 `{ failed: 0, warmed: 5, budgeted: 0 }`,6 行（admin 个人、mac-mini steward、项目 Runtime）无人值守到达 `ready`；两个崩溃循环行在第 2–3 轮重试（generation 24→25→26、11229→11230→11231）后记录 `{ budgeted: 2 }` 停止重试。
+- `instances.spec.ts`:`shutdown` 停止行回温至 `ready` 而 `manual`/`access-change`/`idle` 保持 `stopped`；真实 `FAKE_DSH` 子进程经 `/exit` 杀死被发布 `failed` 再回温 `ready`；死亡的收养幸存者经探测发布 `failed`；对已被竞争启动替换 generation 的行探测不终止任何进程；回温启动不触碰 `last_activity_at`；连续启动失败几何退避、持续 ready 观测清除连败。
+- `config.spec.ts`：默认 `enabled/7d/60s/30m/10m`,`HGW_RECONCILE=off`，非法值拒绝。
+- 生产 mac-mini r56（退避改造前的构建）：启动签名排空→首轮 reconcile 记录 `{ failed: 0, warmed: 5, budgeted: 0 }`,6 行（admin 个人、mac-mini steward、项目 Runtime）无人值守到达 `ready`；两个崩溃循环行在第 2–3 轮重试（generation 24→25→26、11229→11230→11231）后停止重试。退避所闸控的排空→回温路径未变。

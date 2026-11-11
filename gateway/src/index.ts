@@ -924,7 +924,7 @@ const reaperTask = fencedTask('idle reaper', async () => {
 })
 const reconcileTask = fencedTask('runtime reconcile', async () => {
   const summary = await deps.instances.reconcile()
-  if (summary.failed + summary.warmed + summary.budgeted > 0) console.log('[gateway] reconcile:', summary)
+  if (summary.failed + summary.warmed + summary.deferred > 0) console.log('[gateway] reconcile:', summary)
 })
 const archiveRetentionTask = fencedTask('archive retention sweep', async () => {
   await archives.purgeDue()

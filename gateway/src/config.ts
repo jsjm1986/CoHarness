@@ -185,8 +185,12 @@ export interface GatewayConfig {
     enabled: boolean
     /** Maximum age of last activity that still qualifies a stopped Runtime for warmup (HGW_RECONCILE_WARM_WINDOW_MS). */
     warmWindowMs: number
-    /** Per-boot cap on reconcile-initiated starts for one target; exhaustion leaves the row failed (HGW_RECONCILE_MAX_RESTARTS). */
-    maxRestarts: number
+    /** Delay after the first consecutive failure before another automatic retry; doubles per failure (HGW_RECONCILE_BACKOFF_BASE_MS). */
+    backoffBaseMs: number
+    /** Longest delay between automatic retries for a consecutively failing target (HGW_RECONCILE_BACKOFF_MAX_MS). */
+    backoffMaxMs: number
+    /** Continuous ready time that clears a target's recorded failure streak (HGW_RECONCILE_STABLE_MS). */
+    stableMs: number
   }
   sessionTtlMs: number
   sessionAbsoluteTtlMs: number
@@ -797,7 +801,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       return value === 'on'
     })(),
     warmWindowMs: positiveSafeInteger(env.HGW_RECONCILE_WARM_WINDOW_MS, 7 * 24 * 3600 * 1000, 'HGW_RECONCILE_WARM_WINDOW_MS'),
-    maxRestarts: positiveSafeInteger(env.HGW_RECONCILE_MAX_RESTARTS, 3, 'HGW_RECONCILE_MAX_RESTARTS'),
+    backoffBaseMs: positiveSafeInteger(env.HGW_RECONCILE_BACKOFF_BASE_MS, 60_000, 'HGW_RECONCILE_BACKOFF_BASE_MS'),
+    backoffMaxMs: positiveSafeInteger(env.HGW_RECONCILE_BACKOFF_MAX_MS, 30 * 60_000, 'HGW_RECONCILE_BACKOFF_MAX_MS'),
+    stableMs: positiveSafeInteger(env.HGW_RECONCILE_STABLE_MS, 10 * 60_000, 'HGW_RECONCILE_STABLE_MS'),
   }
   const systemdCommandTimeoutMs = timerDelay(env.HGW_SYSTEMD_COMMAND_TIMEOUT_MS, 120_000, 'HGW_SYSTEMD_COMMAND_TIMEOUT_MS')
   const sessionTtlMs = positiveSafeInteger(env.HGW_SESSION_TTL_MS, 7 * 24 * 3600 * 1000, 'HGW_SESSION_TTL_MS')
