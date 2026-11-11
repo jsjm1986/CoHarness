@@ -7,6 +7,7 @@ import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerLease, type LocalRuntimeO
 import { localKernelBootId } from './local-runtime-protocol.ts'
 import { localLinuxRuntimeEmpty, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
 import { isDeadlineKilledCommand } from './child-command.ts'
+import { win32ProcessCreationMatches } from './local-runtime-win32-job.ts'
 
 const POLL_MS = 25
 
@@ -78,7 +79,7 @@ export class LocalRuntimeControl implements InstanceProc {
         }
       }
       if (process.platform === 'win32' && record.bootId === bootId && record.groupPid !== undefined
-        && performance.now() >= forceAfter) {
+        && this.recordedGroupAlive(record) && performance.now() >= forceAfter) {
         await runGatewayChildCommand('taskkill.exe', ['/PID', String(record.groupPid), '/T', '/F'], this.timeoutMs).catch(() => {})
       }
       await new Promise(resolve => setTimeout(resolve, Math.min(POLL_MS, Math.max(1, deadline - performance.now()))))
@@ -100,7 +101,7 @@ export class LocalRuntimeControl implements InstanceProc {
         return true
       }
       if (current.groupPid !== undefined && this.groupExists(current.groupPid)) return false
-      if (process.platform === 'win32' && current.groupPid !== undefined) {
+      if (process.platform === 'win32' && current.groupPid !== undefined && this.recordedGroupAlive(current)) {
         // A dead supervisor leaves no process-group handle; sweep its orphaned
         // descendants by parent link before the generation may fence.
         await this.sweepOrphans(current.groupPid)
@@ -124,6 +125,16 @@ export class LocalRuntimeControl implements InstanceProc {
       this.confirmedStopped = true
       return true
     } finally { await lease.close() }
+  }
+
+  /**
+   * Whether the recorded `groupPid` still names the process the supervisor published.
+   * Records written before `groupStartedAt` existed carry no creation evidence, so
+   * the boot fence alone applies; a mismatched creation instant means the PID was
+   * reused by an unrelated process, which must never be signalled.
+   */
+  private recordedGroupAlive(record: LocalRuntimeOwnerRecord): boolean {
+    return record.groupStartedAt === undefined || win32ProcessCreationMatches(record.groupPid!, record.groupStartedAt)
   }
 
   /** Kill every descendant tree rooted at a dead supervisor's children. */

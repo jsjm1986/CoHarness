@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-12-windows-runtime-job-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-12-windows-runtime-job-ownership.md
+document:
+  en: 9a9208cfde500327372a944f7bcf4adb89327d50
+  zh: b25f501171adb772bef2c8fa952d98c3face4cdf
+/agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing:
+  en: 15c38803c295e790
+  zh: 2ad2129684e6fe8a
+/agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing/problem:
+  en: fe1368500cbca672
+  zh: db415a2dd8023e9b
+/agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing/decision:
+  en: 4f35bd9078a4cc23
+  zh: c11e33cd0e047964
+/agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing/alternatives-considered:
+  en: 54c93940bf14787b
+  zh: 8fbaee17861bb57a
+/agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing/consequences:
+  en: 812e64f60cdba899
+  zh: 1759f77028ce8e8a
+/agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing/verification:
+  en: 15f5d39563ed1f33
+  zh: 157e67a2efc4a49f

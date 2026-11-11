@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-04-windows-local-runtime-execution.md
 document:
-  en: 13fc1a9e337bc5c5173dc484d31f2ce344e469ce
-  zh: c1082467c308642af4de9a8571b5b7fc6c06ce67
+  en: 28cebcacea3000733dfdd4de7372e692100028e7
+  zh: 9c27501b95a1dc96351ec5a4c20a5a097c35c93a
 /agent-note-windows-local-runtime-execution:
   en: 3fe16f4a48f3b092
   zh: 3af329dd2505455d
@@ -12,14 +12,14 @@ document:
   en: 9ef4c6d57fc12863
   zh: 5b01e09baf8f8124
 /agent-note-windows-local-runtime-execution/decision:
-  en: d30419d7d5e1c04d
-  zh: 16fd02bff9d68107
+  en: f7cc282f112c6d39
+  zh: ec4db3d1dabbd06b
 /agent-note-windows-local-runtime-execution/alternatives-considered:
   en: 7d1acffae3b33fd0
   zh: 0f6362849819813c
 /agent-note-windows-local-runtime-execution/consequences:
-  en: 88a01e7244bbca67
-  zh: c9f1156c0832a90a
+  en: e0c6f6cb7d4c5d31
+  zh: 2656f98682cf5c71
 /agent-note-windows-local-runtime-execution/verification:
   en: 18004cbdb0cbf999
   zh: 64d0dd5d32eef9ec
