@@ -172,6 +172,8 @@ export interface GatewayConfig {
   databaseMinConnections: number
   idleTimeoutMs: number
   readinessTimeoutMs: number
+  /** Graceful shutdown stops every local Runtime instead of retaining survivors for the next boot (HGW_DRAIN_RUNTIMES_ON_SHUTDOWN). */
+  drainRuntimesOnShutdown: boolean
   sessionTtlMs: number
   sessionAbsoluteTtlMs: number
   secureCookies: boolean
@@ -769,6 +771,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (databaseMinConnections > databaseMaxConnections) throw new Error('HGW_DATABASE_MIN_CONNECTIONS must not exceed HGW_DATABASE_MAX_CONNECTIONS')
   const idleTimeoutMs = positiveSafeInteger(env.HGW_IDLE_TIMEOUT_MS, 30 * 60 * 1000, 'HGW_IDLE_TIMEOUT_MS')
   const readinessTimeoutMs = timerDelay(env.HGW_READINESS_TIMEOUT_MS, 30 * 1000, 'HGW_READINESS_TIMEOUT_MS')
+  const drainRuntimesOnShutdown = (() => {
+    const value = env.HGW_DRAIN_RUNTIMES_ON_SHUTDOWN ?? 'false'
+    if (value !== 'true' && value !== 'false') throw new Error('HGW_DRAIN_RUNTIMES_ON_SHUTDOWN must be true or false')
+    return value === 'true'
+  })()
   const systemdCommandTimeoutMs = timerDelay(env.HGW_SYSTEMD_COMMAND_TIMEOUT_MS, 120_000, 'HGW_SYSTEMD_COMMAND_TIMEOUT_MS')
   const sessionTtlMs = positiveSafeInteger(env.HGW_SESSION_TTL_MS, 7 * 24 * 3600 * 1000, 'HGW_SESSION_TTL_MS')
   const sessionAbsoluteTtlMs = positiveSafeInteger(
@@ -973,6 +980,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     databaseMinConnections,
     idleTimeoutMs,
     readinessTimeoutMs,
+    drainRuntimesOnShutdown,
     sessionTtlMs,
     sessionAbsoluteTtlMs,
     secureCookies: publicOrigins.some(o => o.startsWith('https://')),

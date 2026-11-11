@@ -1818,21 +1818,23 @@ export class InstanceManager {
   }
 
   /**
-   * Drain tracked and recovered local runtimes despite individual failures; retain configured supervisor units.
-   * @returns completion after all workers settle; rejects with the first failed worker's original error
+   * Terminate every adopted or tracked supervisor-owned target on this node.
+   * Boot calls this to retire survivors whose recorded launch signature no
+   * longer matches the running build; their next entry cold-starts current code.
+   * @param reason - durable stop reason published for each drained target.
+   * @returns completion after every target settled; rejects with the first failure.
    */
-  async stopAll(): Promise<void> {
-    this.beginShutdown()
+  async drainSurvivors(reason: RuntimeStopReason = 'shutdown'): Promise<void> {
     await this.initialized
-    await Promise.allSettled([...this.pendingStarts.values()].map(operation => operation.completion))
-    // Graceful shutdown terminates locally owned children; supervisor units
-    // retain their independent lifecycle across a Gateway restart.
-    if (this.launcher.instancesOutliveGateway) return
-    const targets = await Promise.all([...new Set([...this.procs.keys(), ...this.residentLeases.keys()])].map(async (key) => {
-      return targetFromKey(key)
-    }))
+    const targets = [...new Set([...this.procs.keys(), ...this.residentLeases.keys()])].map(key => targetFromKey(key))
+    const failures = await this.drainTargets(targets, reason)
+    if (failures.length > 0) throw failures[0]
+  }
+
+  /** Stop each target with bounded concurrency, collecting per-target failures. */
+  private async drainTargets(targets: RuntimeTarget[], reason: RuntimeStopReason): Promise<unknown[]> {
     let cursor = 0
-    const worker = async (): Promise<void> => {
+    const worker = async (): Promise<unknown[]> => {
       const errors: unknown[] = []
       for (;;) {
         const index = cursor
@@ -1840,18 +1842,35 @@ export class InstanceManager {
         const target = targets[index]
         if (target === undefined) break
         try {
-          await this.stop(target, 'shutdown')
+          await this.stop(target, reason)
         } catch (error) {
           errors.push(error)
         }
       }
-      if (errors.length > 0) throw errors[0]
+      return errors
     }
-    const settled = await Promise.allSettled(Array.from(
+    const results = await Promise.all(Array.from(
       { length: Math.min(STOP_ALL_CONCURRENCY, targets.length) },
       () => worker(),
     ))
-    const failure = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected')
-    if (failure !== undefined) throw failure.reason
+    return results.flat()
+  }
+
+  /**
+   * Drain tracked and recovered local runtimes despite individual failures; retain configured supervisor units.
+   * @param retainLocalSurvivors - skip terminating local-launcher survivors; graceful shutdown retains them for next-boot reattachment.
+   * @returns completion after all workers settle; rejects with the first failed worker's original error
+   */
+  async stopAll(retainLocalSurvivors = false): Promise<void> {
+    this.beginShutdown()
+    await this.initialized
+    await Promise.allSettled([...this.pendingStarts.values()].map(operation => operation.completion))
+    // Graceful shutdown terminates locally owned children unless retention is
+    // configured; supervisor units retain their independent lifecycle across a
+    // Gateway restart regardless.
+    if (this.launcher.instancesOutliveGateway || retainLocalSurvivors) return
+    const targets = [...new Set([...this.procs.keys(), ...this.residentLeases.keys()])].map(key => targetFromKey(key))
+    const failures = await this.drainTargets(targets, 'shutdown')
+    if (failures.length > 0) throw failures[0]
   }
 }

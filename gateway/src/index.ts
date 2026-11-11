@@ -86,6 +86,7 @@ import { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { PostgresAccessMonitor, scopeAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
+import { readBootSignature, runtimeBootSignature, writeBootSignature } from './boot-signature.ts'
 import { PrimaryProjectNames } from './primary-project-names.ts'
 import { NodeContentDocuments } from './node-content-documents.ts'
 import { NodeDocumentAuthority } from './node-content-documents-authority.ts'
@@ -822,6 +823,23 @@ const server = createGatewayServer(deps, {
     sshTargets: deps.sshTargets,
   }),
 })
+// A launch signature change (release, runtime entry, supervisor or toolchain)
+// retires survivors before serving requests; an unchanged signature keeps them
+// reattachable, so same-build restarts cost no cold start. Missing or
+// unreadable records drain — the conservative direction for upgrades.
+{
+  const signature = await runtimeBootSignature(cfg)
+  const prior = await readBootSignature(cfg.stateRoot)
+  if (JSON.stringify(prior) !== JSON.stringify(signature)) {
+    try {
+      await instances.drainSurvivors('shutdown')
+      if (prior !== undefined) console.log('[gateway] drained Runtime survivors after launch signature change')
+    } catch (error) {
+      console.error('[gateway] Runtime survivor drain after launch signature change failed:', error)
+    }
+  }
+  await writeBootSignature(cfg.stateRoot, signature)
+}
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare
 // tunnel / Nginx) that connects to 127.0.0.1, never directly over the LAN.
 server.listen(cfg.port, '127.0.0.1', () => {
@@ -992,7 +1010,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   await settle([() => waitForWriters()])
   await settle([() => localDrafts.close(), () => personalIndex.close()])
   await settle([() => heartbeatInFlight])
-  await settle([() => deps.instances.stopAll()])
+  await settle([() => deps.instances.stopAll(!cfg.drainRuntimesOnShutdown)])
   await settle([() => pool.end(), () => contentVolume.close()])
   await settle([() => performanceObserver.dispose()])
   clearTimeout(forced)
