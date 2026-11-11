@@ -86,7 +86,7 @@ import { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { PostgresAccessMonitor, scopeAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
-import { readBootSignature, runtimeBootSignature, writeBootSignature } from './boot-signature.ts'
+import { reconcileBootSignature, runtimeBootSignature } from './boot-signature.ts'
 import { PrimaryProjectNames } from './primary-project-names.ts'
 import { NodeContentDocuments } from './node-content-documents.ts'
 import { NodeDocumentAuthority } from './node-content-documents-authority.ts'
@@ -826,19 +826,15 @@ const server = createGatewayServer(deps, {
 // A launch signature change (release, runtime entry, supervisor or toolchain)
 // retires survivors before serving requests; an unchanged signature keeps them
 // reattachable, so same-build restarts cost no cold start. Missing or
-// unreadable records drain — the conservative direction for upgrades.
+// unreadable records drain — the conservative direction for upgrades. The new
+// signature is committed only after the drain completes, so a failed drain
+// retries on the next boot instead of reattaching code it could not retire.
 {
   const signature = await runtimeBootSignature(cfg)
-  const prior = await readBootSignature(cfg.stateRoot)
-  if (JSON.stringify(prior) !== JSON.stringify(signature)) {
-    try {
-      await instances.drainSurvivors('shutdown')
-      if (prior !== undefined) console.log('[gateway] drained Runtime survivors after launch signature change')
-    } catch (error) {
-      console.error('[gateway] Runtime survivor drain after launch signature change failed:', error)
-    }
-  }
-  await writeBootSignature(cfg.stateRoot, signature)
+  const outcome = await reconcileBootSignature(cfg.stateRoot, signature, () => instances.drainSurvivors('shutdown'),
+    error => console.error('[gateway] Runtime survivor drain after launch signature change failed:', error))
+  if (outcome === 'drained') console.log('[gateway] drained Runtime survivors after launch signature change')
+  else if (outcome === 'undrained') console.error('[gateway] Runtime survivors from an older launch remain; draining retries on the next boot')
 }
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare
 // tunnel / Nginx) that connects to 127.0.0.1, never directly over the LAN.
@@ -928,7 +924,7 @@ const reaperTask = fencedTask('idle reaper', async () => {
 })
 const reconcileTask = fencedTask('runtime reconcile', async () => {
   const summary = await deps.instances.reconcile()
-  if (summary.failed + summary.warmed + summary.budgeted > 0) console.log('[gateway] reconcile:', summary)
+  if (summary.failed + summary.warmed + summary.deferred > 0) console.log('[gateway] reconcile:', summary)
 })
 const archiveRetentionTask = fencedTask('archive retention sweep', async () => {
   await archives.purgeDue()

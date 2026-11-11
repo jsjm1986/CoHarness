@@ -180,8 +180,11 @@ export class LocalRuntimeControl implements InstanceProc {
    */
   private async reapOrphanedGroup(bootId: string): Promise<boolean> {
     const record = await this.store.read(bootId)
-    if (record?.groupPid === undefined || !this.leaderDead(record.groupPid)
-      || !this.groupExists(record.groupPid)) return false
+    // Fence the kill to this kernel boot: an earlier-boot record can outlive a
+    // machine restart, and its stored pgid may name an unrelated group after
+    // PID reuse.
+    if (record === undefined || record.bootId !== bootId || record.groupPid === undefined
+      || !this.leaderDead(record.groupPid) || !this.groupExists(record.groupPid)) return false
     try { process.kill(-record.groupPid, 'SIGKILL') } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
     }
