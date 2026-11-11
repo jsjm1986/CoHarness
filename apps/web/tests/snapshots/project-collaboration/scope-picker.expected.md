@@ -15,9 +15,13 @@
   - tabpanel "Switch space":
     - text: All spaces · 3
     - searchbox "Search spaces"
-    - text: Personal
+    - button "Personal 1" [expanded]:
+      - img
+      - text: Personal 1
     - button "Personal"
-    - text: Projects
+    - button "Projects 2" [expanded]:
+      - img
+      - text: Projects 2
     - button "Payments migration"
     - button "Audit platform Read only"
     - button "Refresh spaces"

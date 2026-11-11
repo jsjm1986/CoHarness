@@ -13,11 +13,15 @@
     - text: All spaces · 3
     - searchbox "Search spaces or computers"
     - button "Load project names"
-    - text: Recent
+    - button "Recent 1" [expanded]:
+      - img
+      - text: Recent 1
     - button "Personal"
-    - text: Projects
-    - button "#17 Office computer Stopped · starts on entry"
-    - button "Compute project Compute computer Stopped · starts on entry"
+    - button "Projects 2" [expanded]:
+      - img
+      - text: Projects 2
+    - button "#17 Office computer Starts on entry"
+    - button "Compute project Compute computer Starts on entry"
     - button "Refresh spaces"
     - text: Space settings
     - button "Open in a new tab"

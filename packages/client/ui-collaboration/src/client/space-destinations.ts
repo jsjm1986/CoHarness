@@ -71,3 +71,67 @@ export function spaceDestinations(state: CollaborationSnapshot, entryNodeId?: st
     : { id: 'space:personal', target: preferred.target, name: '', current: context.scope.kind === 'personal' }
   return [unified, ...destinations.filter(item => item.target.kind === 'project')]
 }
+
+/** One row inside a rendered space group: a plain destination or the consolidated multi-computer maintenance entry. */
+export type SpaceRowEntry =
+  | { readonly kind: 'destination'; readonly destination: SpaceDestination }
+  | { readonly kind: 'steward'; readonly destinations: readonly SpaceDestination[] }
+
+/**
+ * Fold per-computer maintenance destinations into one expandable row while
+ * keeping the group's original ordering; a single steward stays a plain row.
+ * @param items - destinations inside one visible group.
+ * @param flat - bypass folding while the search query filters identities.
+ * @returns row entries in display order.
+ */
+export function spaceRowEntries(items: readonly SpaceDestination[], flat = false): SpaceRowEntry[] {
+  if (flat) return items.map(destination => ({ kind: 'destination', destination }))
+  const stewards = items.filter(item => item.project?.kind === 'steward')
+  if (stewards.length < 2) return items.map(destination => ({ kind: 'destination', destination }))
+  const entries: SpaceRowEntry[] = []
+  let placed = false
+  for (const destination of items) {
+    if (destination.project?.kind !== 'steward') {
+      entries.push({ kind: 'destination', destination })
+      continue
+    }
+    if (!placed) {
+      entries.push({ kind: 'steward', destinations: stewards })
+      placed = true
+    }
+  }
+  return entries
+}
+
+/**
+ * Display name minus the `·<nodeName>` tail when the name literally carries it.
+ * @param destination - one space destination.
+ * @returns the name's base part, or the name unchanged.
+ */
+const stripNodeSuffix = (destination: SpaceDestination): string => {
+  const tail = destination.nodeName === undefined ? undefined : `·${destination.nodeName}`
+  return tail !== undefined && destination.name.endsWith(tail) ? destination.name.slice(0, -tail.length) : destination.name
+}
+
+/**
+ * Shared display name for consolidated maintenance destinations: the project
+ * name minus its per-computer suffix when every member agrees, otherwise the
+ * first member's name prefix before the separator.
+ * @param destinations - folded steward destinations, non-empty.
+ * @returns the row's display name.
+ */
+export function stewardSpaceBase(destinations: readonly SpaceDestination[]): string {
+  const bases = new Set(destinations.map(stripNodeSuffix))
+  if (bases.size === 1) return [...bases][0] ?? ''
+  return destinations[0]?.name.split('·')[0] ?? ''
+}
+
+/**
+ * A folded child's display name: under the consolidated row the `·<nodeName>`
+ * suffix duplicates the computer line, so the name line keeps only the base.
+ * @param destination - one member of a folded steward entry.
+ * @returns the name without its redundant node suffix.
+ */
+export function stewardChildName(destination: SpaceDestination): string {
+  return stripNodeSuffix(destination)
+}
