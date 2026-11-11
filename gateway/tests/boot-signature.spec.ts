@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { testConfig } from './test-config.ts'
-import { readBootSignature, runtimeBootSignature, writeBootSignature } from '../src/boot-signature.ts'
+import { readBootSignature, reconcileBootSignature, runtimeBootSignature, writeBootSignature } from '../src/boot-signature.ts'
 
 const roots: string[] = []
 afterEach(() => {
@@ -54,5 +54,32 @@ describe('runtime boot signature', () => {
     cfg.releaseRoot = join(root, 'releases', 'r2')
     const second = await runtimeBootSignature(cfg)
     expect(second.releaseRoot).not.toBe(first.releaseRoot)
+  })
+
+  it('keeps the prior signature when the survivor drain fails so the next boot retries', async () => {
+    const root = fixture()
+    const cfg = testConfig(root, { HGW_DSH_REPO_ROOT: root })
+    cfg.releaseRoot = join(root, 'releases', 'r1')
+    const prior = await runtimeBootSignature(cfg)
+    await writeBootSignature(cfg.stateRoot, prior)
+    cfg.releaseRoot = join(root, 'releases', 'r2')
+    const next = await runtimeBootSignature(cfg)
+
+    let drained = 0
+    const error = await reconcileBootSignature(cfg.stateRoot, next, () => {
+      drained += 1
+      return Promise.reject(new Error('database unavailable'))
+    })
+    expect(error).toBe('undrained')
+    expect(drained).toBe(1)
+    // The failed drain must not certify the new launch identity.
+    expect(await readBootSignature(cfg.stateRoot)).toEqual(prior)
+
+    expect(await reconcileBootSignature(cfg.stateRoot, next, () => { drained += 1; return Promise.resolve() }))
+      .toBe('drained')
+    expect(await readBootSignature(cfg.stateRoot)).toEqual(next)
+    expect(await reconcileBootSignature(cfg.stateRoot, next, () => { drained += 1; return Promise.resolve() }))
+      .toBe('retained')
+    expect(drained).toBe(2)
   })
 })
