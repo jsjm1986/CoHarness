@@ -173,6 +173,9 @@ class ProjectRepository implements InstanceRepository {
 }
 
 class SurvivorRepository implements InstanceRepository {
+  state = 'ready'
+  generation = 7
+
   constructor(private readonly projectPath: string, private readonly port: number) {}
 
   initialize(): Promise<void> { return Promise.resolve() }
@@ -183,10 +186,10 @@ class SurvivorRepository implements InstanceRepository {
   markControlStopping(): Promise<boolean> { return Promise.reject(new CollaborationDeniedError('forbidden')) }
   activeTargets(): Promise<RuntimeTarget[]> { return Promise.resolve([{ kind: 'project', id: 41 }]) }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.port) }
-  stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve('ready') }
+  stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve(this.state) }
   stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(null) }
   startEligibility(_target: RuntimeTarget): Promise<{ stopReason: null }> { return Promise.resolve({ stopReason: null }) }
-  generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(7) }
+  generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.generation) }
   credentialHashOf(): Promise<null> { return Promise.resolve(null) }
   touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
   admitLease(target: RuntimeTarget, at: number, generation?: number): Promise<boolean> { return admitFixtureLease(this, target, at, generation) }
@@ -692,6 +695,153 @@ describe('InstanceManager', () => {
     // The next-boot manager keeps the adopted lease counted until termination
     // is confirmed; the fixture's legacy row carries no recovery credential.
     await expect(next.stopAll()).rejects.toThrow('Legacy local runtime ownership')
+  })
+
+  it('warms a shutdown-stopped runtime but never a manual or access-change stop', async () => {
+    const { alice, manager, users } = await setup()
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, 'shutdown')
+    const first = await manager.reconcile()
+    expect(first.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+    const bob = await users.create({ username: 'bob', password: 'pw-123456' })
+    await manager.ensureRunning(bob)
+    await manager.stop(bob.id, 'manual')
+    const cara = await users.create({ username: 'cara', password: 'pw-123456' })
+    await manager.ensureRunning(cara)
+    await manager.stop(cara.id, 'access-change')
+    const second = await manager.reconcile()
+    expect(second.warmed).toBe(0)
+    expect(await manager.stateOf(bob.id)).toBe('stopped')
+    expect(await manager.stateOf(cara.id)).toBe('stopped')
+  })
+
+  it('publishes a crashed runtime failed and warms it back ready', async () => {
+    const { alice, manager } = await setup()
+    const { port } = await manager.ensureRunning(alice)
+    await fetch(`http://127.0.0.1:${port}/exit`)
+    await expect.poll(() => manager.stateOf(alice.id)).toBe('stopped')
+    expect(await manager.stopReasonOf(alice.id)).toBe('failed')
+    const summary = await manager.reconcile()
+    expect(summary.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+  })
+
+  it('publishes failed for a ready survivor whose process no longer answers', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'dead-survivor'); mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43250)
+    const markStopping = vi.spyOn(repository, 'markStopping')
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => true, isAlive: async () => false, terminate: vi.fn(async () => {}) }),
+      start: async () => { throw new Error('probe path attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(1)
+    expect((markStopping.mock.calls[0] as unknown[] | undefined)?.[2]).toBe('failed')
+  })
+
+  it('never warms an idle-stopped runtime — on-demand release stays stopped', async () => {
+    const { alice, manager, db } = await setup()
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, 'shutdown')
+    db.prepare(`UPDATE instances SET stop_reason='idle' WHERE user_id=?`).run(alice.id)
+    const summary = await manager.reconcile()
+    expect(summary.warmed).toBe(0)
+    expect(await manager.stateOf(alice.id)).toBe('stopped')
+  })
+
+  it('does not refresh last activity for a reconcile-warmed start', async () => {
+    const { alice, manager, db } = await setup()
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, 'shutdown')
+    const stale = Date.now() - 60_000
+    db.prepare(`UPDATE instances SET last_activity_at=? WHERE user_id=?`).run(stale, alice.id)
+    const summary = await manager.reconcile()
+    expect(summary.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+    const row = db.prepare(`SELECT last_activity_at FROM instances WHERE user_id=?`).get(alice.id) as { last_activity_at: number }
+    expect(row.last_activity_at).toBe(stale)
+  })
+
+  it('skips the dead-stop when the row moved past the observed generation', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'moving-survivor'); mkdirSync(projectPath)
+    const repository = new class extends SurvivorRepository {
+      override async snapshotOf(target: RuntimeTarget): Promise<RuntimeInstanceSnapshot> {
+        const snapshot = await super.snapshotOf(target)
+        // Every read after the reconcile probe reports the replacement a
+        // racing start already committed.
+        this.state = 'starting'
+        this.generation = 8
+        return snapshot
+      }
+    }(projectPath, 43250)
+    const terminate = vi.fn(async () => {})
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => true, isAlive: async () => false, terminate }),
+      start: async () => { throw new Error('probe path attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(0)
+    expect(terminate).not.toHaveBeenCalled()
+  })
+
+  it('defers warm retries behind consecutive launch failures instead of a boot budget', async () => {
+    const { alice, manager } = await setup({ HGW_RECONCILE_BACKOFF_BASE_MS: '80' })
+    await manager.ensureRunning(alice)
+    manager.beforeStart = () => Promise.reject(new Error('launch always fails'))
+    await manager.stop(alice.id, 'failed')
+    const first = await manager.reconcile()
+    expect(first.warmed).toBe(0)
+    expect(first.deferred).toBe(0)
+    const second = await manager.reconcile()
+    expect(second.warmed).toBe(0)
+    expect(second.deferred).toBe(1)
+    await new Promise(r => setTimeout(r, 110))
+    const third = await manager.reconcile()
+    expect(third.warmed).toBe(0)
+    const fourth = await manager.reconcile()
+    expect(fourth.deferred).toBe(1)
+    // The deferral grows exponentially: after the second failure the row stays
+    // deferred inside the doubled interval.
+    await new Promise(r => setTimeout(r, 110))
+    expect((await manager.reconcile()).deferred).toBe(1)
+    manager.beforeStart = undefined
+    await new Promise(r => setTimeout(r, 120))
+    const recovered = await manager.reconcile()
+    expect(recovered.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+  })
+
+  it('clears a reconcile failure streak after the runtime stays ready', async () => {
+    const { alice, manager } = await setup({ HGW_RECONCILE_BACKOFF_BASE_MS: '80', HGW_RECONCILE_STABLE_MS: '50' })
+    await manager.ensureRunning(alice)
+    manager.beforeStart = () => Promise.reject(new Error('boom'))
+    await manager.stop(alice.id, 'failed')
+    await manager.reconcile()
+    manager.beforeStart = undefined
+    await new Promise(r => setTimeout(r, 110))
+    expect((await manager.reconcile()).warmed).toBe(1)
+    // The streak closes only after ready observations spanning the stable
+    // window: the first probe stamps liveness, a later one clears the entry.
+    await new Promise(r => setTimeout(r, 80))
+    await manager.reconcile()
+    await new Promise(r => setTimeout(r, 80))
+    await manager.reconcile()
+    manager.beforeStart = () => Promise.reject(new Error('boom'))
+    await manager.stop(alice.id, 'failed')
+    await manager.reconcile()
+    manager.beforeStart = undefined
+    // A cleared streak restarts at the base interval — 110ms clears the 80ms
+    // deferral a retained entry would have doubled past.
+    await new Promise(r => setTimeout(r, 110))
+    expect((await manager.reconcile()).warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
   })
 
   it('reaps idle instances but keeps active ones', async () => {

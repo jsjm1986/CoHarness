@@ -480,7 +480,7 @@ export interface GatewayModelGovernanceService {
 /** Instance lifecycle operations; Admin adapters preserve supplied administrator ids, while omission permits trusted maintenance. */
 export type GatewayInstanceService = Pick<
   InstanceManager,
-  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'stopReasonOf' | 'generationOf' | 'isLive' | 'liveEndpoint' | 'touch' | 'wsRef' | 'ensureRunning' | 'startRequest' | 'reapIdle'
+  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'stopReasonOf' | 'generationOf' | 'isLive' | 'liveEndpoint' | 'touch' | 'wsRef' | 'ensureRunning' | 'startRequest' | 'reapIdle' | 'reconcile'
   | 'stop' | 'stopAll' | 'withStopped'
 > & {
   /** Exact Runtime assignment lookup; omitted only by legacy single-assignment adapters. */

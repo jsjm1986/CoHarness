@@ -282,11 +282,12 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return administratorUserId === undefined ? claim(this.context.pool) : this.withAdministrator(administratorUserId, claim)
   }
 
-  async beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive', administratorUserId?: number): Promise<number> {
+  async beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive', administratorUserId?: number, recordActivity = true): Promise<number> {
     const activeOwner = activeOwnerPredicate(target)
     const claim = (database: Queryable) => database.query<{ generation: string }>(`UPDATE harness.instances i
       SET desired_state='running',observed_state='starting',stop_reason=NULL,allocation_state='not-started',
-      generation=generation+1,started_at=to_timestamp($4/1000.0),last_activity_at=to_timestamp($4/1000.0),
+      generation=generation+1,started_at=to_timestamp($4/1000.0),
+      last_activity_at=CASE WHEN $8 THEN to_timestamp($4/1000.0) ELSE i.last_activity_at END,
       runtime_token_hash=$5,runtime_token_issued_at=now(),updated_at=now()
       FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
       WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'}
@@ -298,7 +299,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
           WHERE operation.organization_id=i.organization_id AND operation.runtime_id=i.runtime_id)
         AND ($6='explicit' OR (i.stop_reason IS DISTINCT FROM 'manual' AND ($6<>'webhook' OR i.stop_reason='idle')))
       RETURNING i.generation::text`,
-    [this.context.organizationId, this.context.nodeId, target.id, at, runtimeTokenHash, intent, target.runtimeId ?? null])
+    [this.context.organizationId, this.context.nodeId, target.id, at, runtimeTokenHash, intent, target.runtimeId ?? null, recordActivity])
     const result = await (administratorUserId === undefined ? claim(this.context.pool)
       : this.withAdministrator(administratorUserId, claim)).catch((error: unknown) => {
       if (error instanceof Error && 'code' in error && error.code === '55000'
@@ -365,6 +366,25 @@ export class PostgresInstanceRepository implements InstanceRepository {
         ${target.kind === 'project' ? `AND owner.kind<>'steward'` : ''}
       LIMIT 1`, [this.context.organizationId, this.context.nodeId, target.id, cutoff, target.runtimeId ?? null])
     return result.rows.length > 0
+  }
+
+  /**
+   * Recently active stopped assignments whose stop cause was infrastructure,
+   * not intent; reconciliation warms them while manual and access-change
+   * stops stay stopped.
+   */
+  async warmTargets(activityCutoff: number): Promise<RuntimeTarget[]> {
+    const result = await this.context.pool.query<{ kind: 'user' | 'project'; public_id: string; runtime_id: RuntimeId }>(`SELECT i.runtime_id,
+      CASE WHEN i.user_id IS NOT NULL THEN 'user' ELSE 'project' END kind,
+      COALESCE(u.public_id,p.public_id)::text public_id
+      FROM harness.instances i
+      LEFT JOIN harness.users u ON u.id=i.user_id AND u.organization_id=i.organization_id
+      LEFT JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
+      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND i.observed_state='stopped'
+        AND i.provisioning_state='ready' AND i.stop_reason IN ('shutdown','failed')
+        AND i.last_activity_at > to_timestamp($3/1000.0)
+      ORDER BY i.last_activity_at DESC`, [this.context.organizationId, this.context.nodeId, activityCutoff])
+    return result.rows.map(row => ({ kind: row.kind, id: publicNumber(row.public_id, row.kind), runtimeId: row.runtime_id }))
   }
 
   private async writeStopping(database: Queryable, target: RuntimeTarget, generation: number, reason: RuntimeStopReason, idleCutoff?: number): Promise<boolean> {

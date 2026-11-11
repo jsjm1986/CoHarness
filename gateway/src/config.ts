@@ -174,6 +174,24 @@ export interface GatewayConfig {
   readinessTimeoutMs: number
   /** Graceful shutdown stops every local Runtime instead of retaining survivors for the next boot (HGW_DRAIN_RUNTIMES_ON_SHUTDOWN). */
   drainRuntimesOnShutdown: boolean
+  /**
+   * Periodic desired-state reconciliation on this node (HGW_RECONCILE_*).
+   * Crashed ready runtimes are published failed and recently used stopped
+   * runtimes are warmed through ordinary passive admission; manual and
+   * access-change stops are never reverted.
+   */
+  reconcile: {
+    /** Standing sweep toggle; disabled only for incident containment (HGW_RECONCILE). */
+    enabled: boolean
+    /** Maximum age of last activity that still qualifies a stopped Runtime for warmup (HGW_RECONCILE_WARM_WINDOW_MS). */
+    warmWindowMs: number
+    /** Delay after the first consecutive failure before another automatic retry; doubles per failure (HGW_RECONCILE_BACKOFF_BASE_MS). */
+    backoffBaseMs: number
+    /** Longest delay between automatic retries for a consecutively failing target (HGW_RECONCILE_BACKOFF_MAX_MS). */
+    backoffMaxMs: number
+    /** Continuous ready time that clears a target's recorded failure streak (HGW_RECONCILE_STABLE_MS). */
+    stableMs: number
+  }
   sessionTtlMs: number
   sessionAbsoluteTtlMs: number
   secureCookies: boolean
@@ -776,6 +794,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     if (value !== 'true' && value !== 'false') throw new Error('HGW_DRAIN_RUNTIMES_ON_SHUTDOWN must be true or false')
     return value === 'true'
   })()
+  const reconcile = {
+    enabled: (() => {
+      const value = env.HGW_RECONCILE ?? 'on'
+      if (value !== 'on' && value !== 'off') throw new Error('HGW_RECONCILE must be on or off')
+      return value === 'on'
+    })(),
+    warmWindowMs: positiveSafeInteger(env.HGW_RECONCILE_WARM_WINDOW_MS, 7 * 24 * 3600 * 1000, 'HGW_RECONCILE_WARM_WINDOW_MS'),
+    backoffBaseMs: positiveSafeInteger(env.HGW_RECONCILE_BACKOFF_BASE_MS, 60_000, 'HGW_RECONCILE_BACKOFF_BASE_MS'),
+    backoffMaxMs: positiveSafeInteger(env.HGW_RECONCILE_BACKOFF_MAX_MS, 30 * 60_000, 'HGW_RECONCILE_BACKOFF_MAX_MS'),
+    stableMs: positiveSafeInteger(env.HGW_RECONCILE_STABLE_MS, 10 * 60_000, 'HGW_RECONCILE_STABLE_MS'),
+  }
   const systemdCommandTimeoutMs = timerDelay(env.HGW_SYSTEMD_COMMAND_TIMEOUT_MS, 120_000, 'HGW_SYSTEMD_COMMAND_TIMEOUT_MS')
   const sessionTtlMs = positiveSafeInteger(env.HGW_SESSION_TTL_MS, 7 * 24 * 3600 * 1000, 'HGW_SESSION_TTL_MS')
   const sessionAbsoluteTtlMs = positiveSafeInteger(
@@ -981,6 +1010,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     idleTimeoutMs,
     readinessTimeoutMs,
     drainRuntimesOnShutdown,
+    reconcile,
     sessionTtlMs,
     sessionAbsoluteTtlMs,
     secureCookies: publicOrigins.some(o => o.startsWith('https://')),
