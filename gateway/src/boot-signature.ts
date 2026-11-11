@@ -57,6 +57,40 @@ export async function readBootSignature(stateRoot: string): Promise<RuntimeBootS
   catch { return undefined }
 }
 
+/** How the boot signature gate settled the previous run's survivors. */
+export type BootSignatureOutcome = 'retained' | 'drained' | 'undrained'
+
+/**
+ * Apply the launch-signature gate at boot: an unchanged record keeps
+ * survivors reattachable, a changed or missing record drains them first.
+ * The new signature is persisted only after the drain completes — a failed
+ * drain leaves the prior signature in place so the next boot retries instead
+ * of reattaching code it could not retire.
+ * @param stateRoot - private Gateway state directory holding the record.
+ * @param signature - this run's identity.
+ * @param drain - retires every survivor before the signature is committed.
+ * @param onDrainError - reports a failed drain; the gateway continues booting
+ *   either way since unreachable storage blocks reuse anyway.
+ * @returns how the previous run's survivors were settled.
+ */
+export async function reconcileBootSignature(
+  stateRoot: string,
+  signature: RuntimeBootSignature,
+  drain: () => Promise<void>,
+  onDrainError?: (error: unknown) => void,
+): Promise<BootSignatureOutcome> {
+  const prior = await readBootSignature(stateRoot)
+  if (JSON.stringify(prior) === JSON.stringify(signature)) return 'retained'
+  try {
+    await drain()
+  } catch (error) {
+    onDrainError?.(error)
+    return 'undrained'
+  }
+  await writeBootSignature(stateRoot, signature)
+  return 'drained'
+}
+
 /**
  * Persist this run's launch signature for the next Gateway process.
  * Written only after the drain decision consumed the prior record, so a crash
