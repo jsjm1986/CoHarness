@@ -70,19 +70,19 @@
    (read-only/steward), matching the pushed page's flat row grammar. The
    dot inherits the flag's colour — muted for read-only, warn amber for
    maintenance. */
-.modeFlag {
+.modeFlag,
+.modeFlagWarn {
   display: inline-flex;
   flex: none;
   align-items: center;
   gap: var(--dsw-space-1);
+  white-space: nowrap;
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 18px;
 }
 
-.modeFlag::before,
-.scopeFlagMark::before,
-.scopeFlagWarn::before {
+.modeFlag::before {
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -92,7 +92,6 @@
 }
 
 .modeFlagWarn {
-  composes: modeFlag;
   color: var(--dsw-alias-state-warn-label);
   font-weight: 500;
 }
@@ -314,26 +313,23 @@
 
 
 
-/* Roster mode flag: restricted scopes carry a muted dot (read-only) or a
-   warn dot (steward); the default read-write state stays plain text. */
-.scopeFlag {
-  display: inline-flex;
+/* Two-slot row grammar: the name line ends on the quiet access marker, the
+   computer line ends on the runtime state — name and computer truncate,
+   the right-edge slots never do. */
+.scopeNameLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dsw-space-2);
+  align-self: stretch;
+  min-width: 0;
+}
+
+.scopeAccess {
   flex: none;
-  align-items: center;
-  gap: var(--dsw-space-1);
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-caption);
   font-size: 11px;
-  line-height: 18px;
-}
-
-.scopeFlagMark {
-  composes: scopeFlag;
-}
-
-.scopeFlagWarn {
-  composes: scopeFlag;
-  color: var(--dsw-alias-state-warn-label);
-  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
 }
 
 .badge {
@@ -399,8 +395,8 @@
 .pageRow:active:not(:disabled), .managementRow:active { background: var(--dsw-alias-interactive-bg-active); }
 .pageRow:disabled { cursor: wait; }
 .pageRowName { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.pageValue { flex: none; color: var(--dsw-alias-label-secondary); font-size: 11px; line-height: 18px; }
-.pageValueWarn { composes: pageValue; color: var(--dsw-alias-state-warn-label); }
+.pageValue, .pageValueWarn { flex: none; color: var(--dsw-alias-label-secondary); font-size: 11px; line-height: 18px; }
+.pageValueWarn { color: var(--dsw-alias-state-warn-label); }
 .pageCheck { display: inline-flex; flex: none; color: var(--dsw-alias-state-business-primary); }
 .rosterDivider { margin: var(--dsw-space-2) var(--dsw-space-3) var(--dsw-space-3); border-top: 0.5px solid var(--dsw-alias-border-l2); }
 .emptySearch { padding: var(--dsw-space-6) var(--dsw-space-3); color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; text-align: center; }
@@ -412,6 +408,16 @@
 .currentFacts > span, .currentFacts small { display: block; color: var(--dsw-alias-label-secondary); font-size: 11px; line-height: 18px; }
 .currentFacts strong { display: block; margin: var(--dsw-space-1) 0; color: var(--dsw-alias-label-primary); font-size: 14px; font-weight: 500; line-height: 22px; overflow-wrap: anywhere; }
 .pageGroup { padding: var(--dsw-space-5) var(--dsw-space-3) var(--dsw-space-1); color: var(--dsw-alias-label-secondary); font-size: 11px; line-height: 18px; }
+/* Group headers double as collapse toggles: the label's own type stays, the
+   caret turns to state, and the count parks at the row's end. */
+.pageGroupHead { display: flex; align-items: center; gap: var(--dsw-space-1); box-sizing: border-box; width: 100%; padding: var(--dsw-space-5) var(--dsw-space-3) var(--dsw-space-1); border: 0; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11px; line-height: 18px; text-align: left; cursor: pointer; }
+.groupCaret { flex: none; color: var(--dsw-alias-label-secondary); transition: transform var(--ds-transition-duration) var(--ds-ease-in-out); }
+.groupCaretOpen { transform: rotate(90deg); }
+.groupLabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.groupCount { flex: none; font-variant-numeric: tabular-nums; }
+/* Folded maintenance children indent under the parent row: the left rule is
+   the tree's disclosure edge, not a card accent. */
+.stewardChildren { margin: 0 var(--dsw-space-3) var(--dsw-space-1) var(--dsw-space-5); padding-left: var(--dsw-space-2); border-left: 0.5px solid var(--dsw-alias-border-l2); }
 .managementRow { display: flex; align-items: center; gap: var(--dsw-space-3); width: 100%; min-height: 56px; padding: var(--dsw-space-3); border: 0; border-radius: var(--dsw-radius-md); background: transparent; color: var(--dsw-alias-label-primary); text-align: left; cursor: pointer; }
 .managementRow > svg { flex: none; color: var(--dsw-alias-label-secondary); }
 .managementRow > span:not(.badge) { flex: 1; min-width: 0; }
@@ -431,7 +437,7 @@
 .pageError > button { flex: none; }
 .pageError > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .pageError button { flex: none; }
-.pageBack:focus-visible, .pageRow:focus-visible, .managementRow:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: -1px; }
+.pageBack:focus-visible, .pageRow:focus-visible, .managementRow:focus-visible, .pageGroupHead:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: -1px; }
 
 @media (min-width: 768px) {
   .pageNav { box-sizing: border-box; min-height: 44px; }
@@ -445,6 +451,7 @@
 
 @media (hover: hover) {
   .trigger:hover:not(:disabled), .menuSearchClear:hover, .pageBack:hover, .managementRow:hover, .pageRow:hover:not(:disabled):not(.pageRowCurrent) { background: var(--dsw-alias-interactive-bg-hover); }
+  .pageGroupHead:hover { color: var(--dsw-alias-label-primary); }
 }
 @media (pointer: coarse) { .pageBack, .trigger.rail { width: var(--dsw-touch-target); height: var(--dsw-touch-target); } }
 :global([data-viewport='compact']) .pageNav { min-height: 56px; }
@@ -703,7 +710,8 @@
 
 /* Row-end affordances: mode text appears only for non-default scopes
    (read-only/steward); selection stays on the trailing check. */
-.pageValue {
+.pageValue,
+.pageValueWarn {
   flex: none;
   color: var(--dsw-alias-label-caption);
   font-size: 12px;
@@ -711,7 +719,6 @@
 }
 
 .pageValueWarn {
-  composes: pageValue;
   color: var(--dsw-alias-state-warn-primary);
   font-weight: 600;
 }
@@ -781,13 +788,26 @@
 }
 
 .destinationComputer {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  align-self: stretch;
+  min-width: 0;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 18px;
+}
+
+.computerName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stateTag {
+  flex: none;
 }
 
 .currentComputer > span {

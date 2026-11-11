@@ -16,7 +16,7 @@ import { PendingInvitationsDialog } from './PendingInvitationsDialog.tsx'
 import { ProjectManagerModal, type ProjectManagerMode } from './ProjectManagerModal.tsx'
 import { ProjectSettingsModal } from './ProjectSettingsModal.tsx'
 import { ScopeSwitchStatus } from './ScopeSwitchStatus.tsx'
-import { spaceDestinations, type SpaceDestination } from './space-destinations.ts'
+import { spaceDestinations, spaceRowEntries, stewardChildName, stewardSpaceBase, type SpaceDestination } from './space-destinations.ts'
 import css from './ScopeControl.module.css'
 
 /** Registration-side collaboration state and actions for the sidebar footer. */
@@ -132,6 +132,10 @@ export function ScopeControl({
   // disclosure row. `pageNav` only steers the remount animation direction.
   const [pageView, setPageView] = useState<'root' | 'visibility'>('root')
   const [hubTab, setHubTab] = useState<'list' | 'manage'>('list')
+  // Groups stay expanded until collapsed; folded maintenance rows start closed —
+  // the multi-computer case is exactly the noise the fold exists to hide.
+  const [closedGroups, setClosedGroups] = useState<ReadonlySet<string>>(new Set())
+  const [openStewards, setOpenStewards] = useState<ReadonlySet<string>>(new Set())
   const [pageNav, setPageNav] = useState<'push' | 'pop'>('push')
   const pageId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -354,34 +358,44 @@ export function ScopeControl({
   const destinationState = (destination: SpaceDestination): ReactNode => {
     const status = destination.state
     if (status === undefined) return null
-    const key = status.nodeStatus === 'offline' ? 'computer.state.offline'
-      : status.nodeStatus === 'draining' ? 'computer.state.draining'
-        : status.provisioning === 'preparing' ? 'computer.state.preparing'
-          : status.observedState === 'stopped' ? 'computer.state.stopped'
-            : status.observedState === 'ready' || status.observedState === 'running' ? 'computer.state.ready'
-              : status.observedState === 'starting' ? 'computer.state.starting' : 'computer.state.unavailable'
-    return key === 'computer.state.ready' ? null : <Tag tone="warning">{t(key)}</Tag>
+    // Resting states stay quiet text; only degraded reachability earns a
+    // tinted pill, so a list of stopped spaces does not read as a failure.
+    if (status.nodeStatus === 'offline') return <Tag tone="danger" className={css.stateTag}>{t('computer.state.offline')}</Tag>
+    if (status.nodeStatus === 'draining') return <Tag tone="warning" className={css.stateTag}>{t('computer.state.draining')}</Tag>
+    if (status.provisioning === 'preparing') return <Tag tone="quiet" className={css.stateTag}>{t('computer.state.preparing')}</Tag>
+    if (status.observedState === 'ready' || status.observedState === 'running') return null
+    if (status.observedState === 'stopped') return <Tag tone="quiet" className={css.stateTag}>{t('computer.state.stopped')}</Tag>
+    if (status.observedState === 'starting') return <Tag tone="quiet" className={css.stateTag}>{t('computer.state.starting')}</Tag>
+    return <Tag tone="warning" className={css.stateTag}>{t('computer.state.unavailable')}</Tag>
   }
-  const destinationLabel = (destination: SpaceDestination): ReactNode => (
-    <span className={css.scopeRow}>
-      <span className={`${css.tile} ${destination.target.kind === 'personal' ? `${css.tileRound} ${css.tileBlue}`
-        : destination.project?.kind === 'steward' ? css.tileWarn : tileTone(destination.name)}`} aria-hidden="true">
-        {destination.target.kind === 'personal' ? <IconUserOutline16 size={11} />
-          : destination.project?.kind === 'steward' ? <IconShieldOutline16 size={11} /> : tileGlyph(destination.name)}
-      </span>
-      <span className={css.destinationText}>
-        <span className={css.scopeName}>{destinationName(destination)}</span>
-        {showComputer && destination.nodeName !== undefined && <span className={css.destinationComputer}>{destination.nodeName}</span>}
-        {destinationState(destination)}
-      </span>
-      {destination.project !== undefined && grantText(destination.project) !== '' && (
-        <span className={destination.project.kind === 'steward' ? css.scopeFlagWarn
-          : destination.project.mode === 'ro' && destination.project.canManage !== true ? css.scopeFlagMark : css.scopeFlag}>
-          {grantText(destination.project)}
+  const destinationLabel = (destination: SpaceDestination): ReactNode => {
+    const stateTag = destinationState(destination)
+    const accessText = destination.project !== undefined && destination.project.kind !== 'steward'
+      ? grantText(destination.project) : ''
+    return (
+      <span className={css.scopeRow}>
+        <span className={`${css.tile} ${destination.target.kind === 'personal' ? `${css.tileRound} ${css.tileBlue}`
+          : destination.project?.kind === 'steward' ? css.tileWarn : tileTone(destination.name)}`} aria-hidden="true">
+          {destination.target.kind === 'personal' ? <IconUserOutline16 size={11} />
+            : destination.project?.kind === 'steward' ? <IconShieldOutline16 size={11} /> : tileGlyph(destination.name)}
         </span>
-      )}
-    </span>
-  )
+        <span className={css.destinationText}>
+          <span className={css.scopeNameLine}>
+            <span className={css.scopeName}>{destination.project?.kind === 'steward' ? stewardChildName(destination) : destinationName(destination)}</span>
+            {accessText !== '' && <span className={css.scopeAccess}>{accessText}</span>}
+          </span>
+          {(showComputer && destination.nodeName !== undefined) || stateTag !== null ? (
+            <span className={css.destinationComputer}>
+              {showComputer && destination.nodeName !== undefined && (
+                <span className={css.computerName} title={destination.nodeName}>{destination.nodeName}</span>
+              )}
+              {stateTag}
+            </span>
+          ) : null}
+        </span>
+      </span>
+    )
+  }
   /** The current scope's identity tile, shared by the hub card and the trigger. */
   const currentTile = (size: number, large = false): ReactNode => (
     projectScope === undefined
@@ -599,6 +613,59 @@ export function ScopeControl({
     <span className={css.pageCheck} aria-hidden="true"><IconCheckOutline16 size={16} /></span>
   )
   const pageDisclose = <IconChevronRightOutline14 className={css.pageDisclose} size={14} />
+  const destinationRow = (destination: SpaceDestination): ReactNode => (
+    <button key={destination.id} type="button"
+      className={`${css.pageRow}${destination.current ? ` ${css.pageRowCurrent}` : ''}`}
+      aria-current={destination.current ? 'true' : undefined}
+      disabled={state.scopeBusy || !state.contextVerified}
+      onClick={() => { selectDestination(destination) }}>
+      {destinationLabel(destination)}
+      {destination.current && pageCheck}
+    </button>
+  )
+  const toggleIn = (set: ReadonlySet<string>, key: string): ReadonlySet<string> => {
+    const next = new Set(set)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  }
+  const groupRows = (group: { id: string; label: string; items: readonly SpaceDestination[] }): ReactNode => {
+    const entries = spaceRowEntries(group.items, normalizedProjectQuery !== '')
+    return entries.map((entry) => {
+      if (entry.kind === 'destination') return destinationRow(entry.destination)
+      const openSteward = openStewards.has(group.id)
+      const anyCurrent = entry.destinations.some(destination => destination.current)
+      return (
+        <div key="steward-fold">
+          <button type="button"
+            className={`${css.pageRow}${anyCurrent ? ` ${css.pageRowCurrent}` : ''}`}
+            aria-expanded={openSteward}
+            disabled={state.scopeBusy || !state.contextVerified}
+            onClick={() => { setOpenStewards(previous => toggleIn(previous, group.id)) }}>
+            <span className={css.scopeRow}>
+              <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true"><IconShieldOutline16 size={11} /></span>
+              <span className={css.destinationText}>
+                <span className={css.scopeNameLine}>
+                  <span className={css.scopeName}>{stewardSpaceBase(entry.destinations)}</span>
+                </span>
+                {showComputer && (
+                  <span className={css.destinationComputer}>
+                    <span className={css.computerName}>{t('scope.computerCount', { count: entry.destinations.length })}</span>
+                  </span>
+                )}
+              </span>
+            </span>
+            <IconChevronRightOutline14 className={`${css.groupCaret}${openSteward ? ` ${css.groupCaretOpen}` : ''}`} />
+          </button>
+          {openSteward && (
+            <div className={css.stewardChildren}>
+              {entry.destinations.map(destination => destinationRow(destination))}
+            </div>
+          )}
+        </div>
+      )
+    })
+  }
   return (
     <>
       {/* The rail renders its trigger through the Menu anchor; wide owns the
@@ -699,17 +766,14 @@ export function ScopeControl({
                   {state.spacePreferencesError && <div className={css.pageLabel} role="status">{t('scope.favoriteFailed')}</div>}
                   {spaceGroups.map(group => (
                     <div key={group.id}>
-                      <div className={css.pageGroup}>{group.label}</div>
-                      {group.items.map(destination => (
-                        <button key={destination.id} type="button"
-                          className={`${css.pageRow}${destination.current ? ` ${css.pageRowCurrent}` : ''}`}
-                          aria-current={destination.current ? 'true' : undefined}
-                          disabled={state.scopeBusy || !state.contextVerified}
-                          onClick={() => { selectDestination(destination) }}>
-                          {destinationLabel(destination)}
-                          {destination.current && pageCheck}
-                        </button>
-                      ))}
+                      <button type="button" className={css.pageGroupHead}
+                        aria-expanded={!closedGroups.has(group.id)}
+                        onClick={() => { setClosedGroups(previous => toggleIn(previous, group.id)) }}>
+                        <IconChevronRightOutline14 className={`${css.groupCaret}${closedGroups.has(group.id) ? '' : ` ${css.groupCaretOpen}`}`} />
+                        <span className={css.groupLabel}>{group.label}</span>
+                        <span className={css.groupCount}>{group.items.length}</span>
+                      </button>
+                      {!closedGroups.has(group.id) && groupRows(group)}
                     </div>
                   ))}
                   {visibleDestinations.length === 0 && <div className={css.pageLabel}>{t('scope.searchEmpty')}</div>}

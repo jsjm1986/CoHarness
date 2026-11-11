@@ -13,7 +13,7 @@ import { SessionComputerLabel, type SessionComputerLabelProps } from '../src/cli
 import { StewardChip, type StewardChipProps } from '../src/client/StewardChip.tsx'
 import css from '../src/client/ScopeControl.module.css'
 import type {
-  CollaborationContext, CollaborationSnapshot, ConversationDetail,
+  CollaborationContext, CollaborationEnvironmentPage, CollaborationSnapshot, ConversationDetail,
 } from '../src/client/collaboration-client.ts'
 import { zh, type CollaborationKey } from '../src/client/locales.ts'
 
@@ -297,7 +297,7 @@ describe('ScopeControl', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /个人空间/ }))
+    fireEvent.click(screen.getByRole('button', { name: '个人空间' }))
     expect(switchScope).toHaveBeenCalledWith({ kind: 'personal' })
 
     fireEvent.click(trigger)
@@ -357,7 +357,7 @@ describe('ScopeControl', () => {
     expect(page.className.split(/\s+/)).toContain(css.scopePage)
     const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索空间或电脑' })
     expect(search.placeholder).toBe('搜索空间或电脑')
-    expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '个人空间' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /新建项目空间/ })).toBeTruthy()
 
     fireEvent.change(search, { target: { value: '审计' } })
@@ -422,7 +422,7 @@ describe('ScopeControl', () => {
     }
     render(<ScopeControl {...scopeProps(snapshot({ context: adminHeavy }))} />)
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    expect(screen.getByRole('button', { name: /个人空间/ }).textContent).toContain('个人')
+    expect(screen.getByRole('button', { name: '个人空间' }).textContent).toContain('个人')
     expect(screen.getByRole('button', { name: /支付重构/ }).textContent).not.toContain('管理员')
     expect(screen.getByRole('button', { name: /提示词组合/ }).textContent).not.toContain('管理员')
     expect(screen.getByRole('button', { name: /审计平台/ }).textContent).toContain('只读')
@@ -474,7 +474,7 @@ describe('ScopeControl', () => {
       view.container.querySelector(`.${css.scopePage}`)?.id,
     )
     // Root view: hero, the settings group, the roster, and create.
-    expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '个人空间' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /支付重构/ }).getAttribute('aria-current')).toBe('true')
@@ -549,6 +549,59 @@ describe('ScopeControl', () => {
       context: { ...projectContext, scope: { kind: 'personal' } },
     }))} />)
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).textContent).toContain('个人空间')
+  })
+
+  it('folds per-computer maintenance spaces, expands real destinations, and collapses groups', () => {
+    const switchScope = vi.fn().mockResolvedValue(undefined)
+    const context: CollaborationContext = {
+      ...projectContext,
+      projects: [
+        { projectId: 9, name: '支付重构', path: '/srv/pay', mode: 'rw' },
+        { projectId: 21, name: '维护中枢·windows-vps-47', path: '/srv/s1', mode: 'rw', kind: 'steward' },
+        { projectId: 22, name: '维护中枢·mac-mini', path: '/srv/s2', mode: 'rw', kind: 'steward' },
+        { projectId: 23, name: '维护中枢·ubuntu-101', path: '/srv/s3', mode: 'rw', kind: 'steward' },
+      ],
+    }
+    const environments: CollaborationEnvironmentPage = {
+      items: [
+        { target: { kind: 'project', projectId: 21, runtimeId: '10000000-0000-4000-8000-000000000021' as never }, name: '维护中枢·windows-vps-47', nodeName: 'windows-vps-47', observedState: 'ready' },
+        { target: { kind: 'project', projectId: 22, runtimeId: '10000000-0000-4000-8000-000000000022' as never }, name: '维护中枢·mac-mini', nodeName: 'mac-mini', observedState: 'ready' },
+        { target: { kind: 'project', projectId: 23, runtimeId: '10000000-0000-4000-8000-000000000023' as never }, name: '维护中枢·ubuntu-101', nodeName: 'ubuntu-101', observedState: 'ready' },
+      ],
+      nextCursor: null,
+    }
+    render(<ScopeControl {...scopeProps(snapshot({ context, environments }), { switchScope })} />)
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+
+    // One consolidated row fronts the three per-computer maintenance spaces.
+    const fold = screen.getByRole('button', { name: /维护中枢/ })
+    expect(fold.getAttribute('aria-expanded')).toBe('false')
+    expect(fold.textContent).toContain('3 台电脑')
+    expect(screen.queryByRole('button', { name: /维护中枢·/ })).toBeNull()
+
+    // Expanding surfaces each real destination, named by base plus its own computer line.
+    fireEvent.click(fold)
+    const windows = screen.getByRole('button', { name: /维护中枢.*windows-vps-47/ })
+    expect(screen.getByRole('button', { name: /维护中枢.*mac-mini/ })).toBeTruthy()
+    fireEvent.click(windows)
+    expect(switchScope).toHaveBeenCalledWith({ kind: 'project', projectId: 21, runtimeId: '10000000-0000-4000-8000-000000000021' })
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+
+    // The search query filters identities, so folding never hides a match; the
+    // flat steward row still drops the node suffix its computer line repeats.
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索空间或电脑' }), { target: { value: 'ubuntu' } })
+    expect(screen.getByRole('button', { name: /维护中枢.*ubuntu-101/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /维护中枢·/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '清除空间搜索' }))
+
+    // Group headers collapse and re-open their sections.
+    const head = screen.getByRole('button', { name: /^项目空间/ })
+    expect(head.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(head)
+    expect(head.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('button', { name: /支付重构/ })).toBeNull()
+    fireEvent.click(head)
+    expect(screen.getByRole('button', { name: /支付重构/ })).toBeTruthy()
   })
 })
 

@@ -13,22 +13,29 @@ describe('ScopeControl.module.css', () => {
     expect(css).toMatch(/\.label\s*\{[^}]*flex:\s*1 1 auto/)
     expect(css).toMatch(/\.label\s*\{[^}]*min-width:\s*0/)
     expect(css).toMatch(/\.label\s*\{[^}]*text-overflow:\s*ellipsis/)
-    expect(css).toMatch(/\.modeFlag\s*\{[^}]*flex:\s*none/)
+    expect(css).toMatch(/\.modeFlag[^{]*\{[^}]*flex:\s*none/)
     expect(css).toMatch(/\.chevron\s*\{[^}]*flex:\s*none/)
   })
 
   it('renders mode flags as dot + text, never a filled pill', () => {
     // The flag is a status dot inherited from the flag colour plus text;
-    // a background on either variant resurrects the boxed pill the page
-    // grammar removed.
-    const dots = css.match(/\.modeFlag::before,\s*\.scopeFlagMark::before,\s*\.scopeFlagWarn::before\s*\{([^}]*)\}/)?.[1] ?? ''
+    // a background resurrects the boxed pill the page grammar removed.
+    const dots = css.match(/\.modeFlag::before\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(dots).toContain('border-radius: 50%')
     expect(dots).toContain('currentcolor')
-    for (const flag of ['.modeFlagWarn', '.scopeFlagWarn']) {
-      const rule = css.match(new RegExp(`\\${flag}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
-      expect(rule).toMatch(/var\(--dsw-alias-state-warn-(?:primary|label)\)/)
-      expect(rule).not.toContain('background')
-    }
+    const rule = [...css.matchAll(/\.modeFlagWarn\s*\{([^}]*)\}/g)].map(match => match[1] ?? '').at(-1) ?? ''
+    expect(rule).toMatch(/var\(--dsw-alias-state-warn-(?:primary|label)\)/)
+    expect(rule).not.toContain('background')
+  })
+
+  it('keeps right-edge slots intact while name and computer truncate', () => {
+    expect(css).toMatch(/\.scopeNameLine\s*\{[^}]*display:\s*flex/)
+    expect(css).toMatch(/\.scopeNameLine\s*\{[^}]*align-self:\s*stretch/)
+    expect(css).toMatch(/\.scopeAccess\s*\{[^}]*flex:\s*none/)
+    expect(css).toMatch(/\.destinationComputer\s*\{[^}]*display:\s*flex/)
+    expect(css).toMatch(/\.computerName\s*\{[^}]*text-overflow:\s*ellipsis/)
+    expect(css).toMatch(/\.computerName\s*\{[^}]*min-width:\s*0/)
+    expect(css).toMatch(/\.stateTag\s*\{[^}]*flex:\s*none/)
   })
 
   it('uses a 36px rail circle when the sidebar is collapsed', () => {
@@ -65,5 +72,16 @@ describe('ScopeControl.module.css', () => {
     for (const tone of ['tileBlue', 'tileGreen', 'tileAmber', 'tileRed', 'tileDeep', 'tileWarn']) {
       expect(css).toContain(`.${tone}`)
     }
+  })
+
+  it('keeps collapsible group heads real buttons with a focus ring and a rotating caret', () => {
+    const head = css.match(/\.pageGroupHead\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(head).toContain('width: 100%')
+    expect(head).toContain('cursor: pointer')
+    expect(css).toMatch(/\.groupCaret\s*\{[^}]*transition:\s*transform/)
+    expect(css).toMatch(/\.groupCaretOpen\s*\{[^}]*rotate\(90deg\)/)
+    expect(css).toMatch(/\.pageGroupHead:focus-visible[^}]*outline:/)
+    // Folded maintenance children hang off the fold row, not the group edge.
+    expect(css).toMatch(/\.stewardChildren\s*\{[^}]*border-left:/)
   })
 })

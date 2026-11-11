@@ -12,9 +12,13 @@
   - tabpanel "Switch space":
     - text: All spaces · 2
     - searchbox "Search spaces or computers"
-    - text: Recent
+    - button "Recent 1" [expanded]:
+      - img
+      - text: Recent 1
     - button "Personal"
-    - text: Projects
+    - button "Projects 1" [expanded]:
+      - img
+      - text: Projects 1
     - button "Payments migration Compute computer"
     - button "Refresh spaces"
     - text: Space settings
