@@ -391,6 +391,12 @@ export interface InstanceRepository {
   /** Re-check one idle candidate without rescanning the whole instance table. */
   idleTarget(target: RuntimeTarget, cutoff: number): Promise<boolean>
   /**
+   * Stopped assignments on this node whose stop cause permits unattended warmup.
+   * @param activityCutoff - earliest last-activity timestamp that still qualifies.
+   * @returns recently used targets stopped by shutdown, idle release or failure; manual and access-change stops never appear.
+   */
+  warmTargets?(activityCutoff: number): Promise<RuntimeTarget[]>
+  /**
    * @param target - assignment to stop.
    * @param generation - captured generation; never a replacement.
    * @param reason - durable stop reason, manual by default.
@@ -578,6 +584,14 @@ class SqliteInstanceRepository implements InstanceRepository {
     return row !== undefined
   }
 
+  async warmTargets(activityCutoff: number): Promise<RuntimeTarget[]> {
+    const rows = this.db.prepare(
+      `SELECT user_id FROM instances WHERE state = 'stopped'
+        AND stop_reason IN ('shutdown','idle','failed') AND last_activity_at > ? ORDER BY last_activity_at DESC`,
+    ).all(activityCutoff) as Array<{ user_id: number }>
+    return rows.map(row => ({ kind: 'user' as const, id: row.user_id }))
+  }
+
   async markStopping(target: RuntimeTarget, generation: number, reason: RuntimeStopReason = 'manual', actorUserId?: number): Promise<boolean> {
     return this.db.transaction(() => {
       if (actorUserId !== undefined) requireSqliteAdministrator(this.db, actorUserId)
@@ -651,6 +665,8 @@ export class InstanceManager {
   private readonly operationTotals = new Map<string, number>()
   /** Per-runtime operation chain: serializes start vs stop so a reap cannot orphan a fresh spawn. */
   private readonly ops = new Map<string, Promise<unknown>>()
+  /** Reconcile-initiated starts per target this boot; the budget caps crash loops. */
+  private readonly reconcileRestarts = new Map<string, number>()
   /** Gateway maintenance admission and writer accounting around the complete start operation. */
   startAdmission?: (operation: () => Promise<RuntimeEndpoint>) => Promise<RuntimeEndpoint>
 
@@ -1528,6 +1544,84 @@ export class InstanceManager {
       if (didStop) stopped += 1
     }
     return stopped
+  }
+
+  /**
+   * Reconcile durable rows with observed processes on this node. Ready rows
+   * whose process can no longer be confirmed alive are published `failed`;
+   * recently used stopped runtimes restart through ordinary passive
+   * admission. Manual and access-change stops are never reverted, and
+   * reconcile-initiated starts are budgeted per boot so a crash loop
+   * settles as `failed` instead of burning generations forever.
+   * @returns per-tick counts for operator visibility.
+   */
+  async reconcile(): Promise<{ failed: number; warmed: number; budgeted: number }> {
+    await this.initialized
+    const summary = { failed: 0, warmed: 0, budgeted: 0 }
+    for (const key of [...this.residentLeases.keys()]) {
+      const target = targetFromKey(key)
+      try {
+        const snapshot = await this.repository.snapshotOf(target)
+        if (snapshot === null || snapshot.state !== 'ready') continue
+        const tracked = this.procs.get(key)
+        let dead = false
+        if (tracked !== undefined) {
+          try {
+            dead = tracked.isAlive === undefined ? tracked.hasExited() : !await tracked.isAlive()
+          } catch { /* unavailable supervision is not death evidence */ }
+        } else {
+          let endpoint: Awaited<ReturnType<InstanceManager['liveEndpoint']>> = null
+          try { endpoint = await this.liveEndpoint(snapshot.target) }
+          catch (error) {
+            if (!(error instanceof RuntimeStartBlockedError)) throw error
+            continue
+          }
+          if (endpoint !== null) continue
+          // An unregistered row is a resource-publication gap, not death evidence.
+          dead = this.resources === undefined || await this.resources.registered(snapshot.target, snapshot.generation)
+        }
+        if (!dead) continue
+        await this.stop(snapshot.target, 'failed')
+        summary.failed += 1
+      } catch (error) {
+        console.error(`[gateway] reconcile probe for ${key} failed:`, error)
+      }
+    }
+    const cutoff = Date.now() - this.cfg.reconcile.warmWindowMs
+    for (const target of await this.repository.warmTargets?.(cutoff) ?? []) {
+      const key = targetKey(target)
+      const attempts = this.reconcileRestarts.get(key) ?? 0
+      if (attempts >= this.cfg.reconcile.maxRestarts) { summary.budgeted += 1; continue }
+      try {
+        const subject = await this.warmSubject(target)
+        if (subject === undefined) continue
+        this.reconcileRestarts.set(key, attempts + 1)
+        await this.ensureRunning(subject, 'passive')
+        summary.warmed += 1
+      } catch (error) {
+        // Eligibility, admission pressure and racing operator stops are
+        // legitimate refusals; the next tick re-evaluates the row.
+        if (!(error instanceof RuntimeStartBlockedError) && !(error instanceof RuntimeCapacityError)) {
+          console.error(`[gateway] reconcile warm for ${key} failed:`, error)
+        }
+      }
+    }
+    return summary
+  }
+
+  /**
+   * Build the launch subject for a warmable target from its current owner
+   * row. Personal policy refills account facts at admission, so id and
+   * username suffice to address it.
+   */
+  private async warmSubject(target: RuntimeTarget): Promise<RuntimeSubject | undefined> {
+    const owner = await this.repository.owner(target)
+    if (owner === null) return undefined
+    if (target.kind === 'user') {
+      return { id: owner.id, username: owner.username, homePath: owner.homePath, runtimeId: target.runtimeId } as PersonalRuntime
+    }
+    return { kind: 'project', id: target.id, name: owner.name ?? '', path: owner.homePath,
+      ...(target.runtimeId === undefined ? {} : { runtimeId: target.runtimeId }) }
   }
 
   private async confirmHostIdle(target: RuntimeTarget): Promise<number | undefined> {

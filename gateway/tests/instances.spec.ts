@@ -694,6 +694,65 @@ describe('InstanceManager', () => {
     await expect(next.stopAll()).rejects.toThrow('Legacy local runtime ownership')
   })
 
+  it('warms a shutdown-stopped runtime but never a manual or access-change stop', async () => {
+    const { alice, manager, users } = await setup()
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, 'shutdown')
+    const first = await manager.reconcile()
+    expect(first.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+    const bob = await users.create({ username: 'bob', password: 'pw-123456' })
+    await manager.ensureRunning(bob)
+    await manager.stop(bob.id, 'manual')
+    const cara = await users.create({ username: 'cara', password: 'pw-123456' })
+    await manager.ensureRunning(cara)
+    await manager.stop(cara.id, 'access-change')
+    const second = await manager.reconcile()
+    expect(second.warmed).toBe(0)
+    expect(await manager.stateOf(bob.id)).toBe('stopped')
+    expect(await manager.stateOf(cara.id)).toBe('stopped')
+  })
+
+  it('publishes a crashed runtime failed and warms it back ready', async () => {
+    const { alice, manager } = await setup()
+    const { port } = await manager.ensureRunning(alice)
+    await fetch(`http://127.0.0.1:${port}/exit`)
+    await expect.poll(() => manager.stateOf(alice.id)).toBe('stopped')
+    expect(await manager.stopReasonOf(alice.id)).toBe('failed')
+    const summary = await manager.reconcile()
+    expect(summary.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+  })
+
+  it('publishes failed for a ready survivor whose process no longer answers', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'dead-survivor'); mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43250)
+    const markStopping = vi.spyOn(repository, 'markStopping')
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => true, isAlive: async () => false, terminate: vi.fn(async () => {}) }),
+      start: async () => { throw new Error('probe path attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(1)
+    expect(markStopping.mock.calls[0]?.[2]).toBe('failed')
+  })
+
+  it('caps reconcile restarts per boot and leaves the row for manual recovery', async () => {
+    const { alice, manager } = await setup({ HGW_RECONCILE_MAX_RESTARTS: '1' })
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, 'failed')
+    const first = await manager.reconcile()
+    expect(first.warmed).toBe(1)
+    await manager.stop(alice.id, 'failed')
+    const second = await manager.reconcile()
+    expect(second.warmed).toBe(0)
+    expect(second.budgeted).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('stopped')
+  })
+
   it('reaps idle instances but keeps active ones', async () => {
     const { db, alice, manager } = await setup({ HGW_IDLE_TIMEOUT_MS: '50' })
     await manager.ensureRunning(alice)

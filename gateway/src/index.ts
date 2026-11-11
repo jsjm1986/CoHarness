@@ -926,6 +926,10 @@ stewardEnsure.run()
 const reaperTask = fencedTask('idle reaper', async () => {
   await deps.instances.reapIdle()
 })
+const reconcileTask = fencedTask('runtime reconcile', async () => {
+  const summary = await deps.instances.reconcile()
+  if (summary.failed + summary.warmed + summary.budgeted > 0) console.log('[gateway] reconcile:', summary)
+})
 const archiveRetentionTask = fencedTask('archive retention sweep', async () => {
   await archives.purgeDue()
 })
@@ -939,11 +943,19 @@ const progressSweepTask = fencedTask('project progress digest', async () => {
   await progress.sweep()
 })
 const reaper = setInterval(reaperTask.run, 60_000)
+// The first sweep runs shortly after listeners so post-restart warmups start
+// before the steady-state cadence.
+let reconcileSweep: ReturnType<typeof setInterval> | undefined
+if (cfg.reconcile.enabled) {
+  setTimeout(reconcileTask.run, 15_000).unref()
+  reconcileSweep = setInterval(reconcileTask.run, 60_000)
+}
 const archiveRetentionSweep = setInterval(archiveRetentionTask.run, 60 * 60_000)
 const documentRetentionSweep = setInterval(documentRetentionTask.run, 60 * 60_000)
 const desktopSweep = setInterval(desktopSweepTask.run, Math.max(1_000, cfg.desktop.grantTtlMs / 2))
 const progressSweep = setInterval(progressSweepTask.run, cfg.progress.sweepMs)
 reaper.unref()
+reconcileSweep?.unref()
 archiveRetentionSweep.unref()
 documentRetentionSweep.unref()
 desktopSweep.unref()

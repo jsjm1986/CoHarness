@@ -367,6 +367,25 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return result.rows.length > 0
   }
 
+  /**
+   * Recently active stopped assignments whose stop cause was infrastructure,
+   * not intent; reconciliation warms them while manual and access-change
+   * stops stay stopped.
+   */
+  async warmTargets(activityCutoff: number): Promise<RuntimeTarget[]> {
+    const result = await this.context.pool.query<{ kind: 'user' | 'project'; public_id: string; runtime_id: RuntimeId }>(`SELECT i.runtime_id,
+      CASE WHEN i.user_id IS NOT NULL THEN 'user' ELSE 'project' END kind,
+      COALESCE(u.public_id,p.public_id)::text public_id
+      FROM harness.instances i
+      LEFT JOIN harness.users u ON u.id=i.user_id AND u.organization_id=i.organization_id
+      LEFT JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
+      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND i.observed_state='stopped'
+        AND i.provisioning_state='ready' AND i.stop_reason IN ('shutdown','idle','failed')
+        AND i.last_activity_at > to_timestamp($3/1000.0)
+      ORDER BY i.last_activity_at DESC`, [this.context.organizationId, this.context.nodeId, activityCutoff])
+    return result.rows.map(row => ({ kind: row.kind, id: publicNumber(row.public_id, row.kind), runtimeId: row.runtime_id }))
+  }
+
   private async writeStopping(database: Queryable, target: RuntimeTarget, generation: number, reason: RuntimeStopReason, idleCutoff?: number): Promise<boolean> {
     const idlePredicate = idleCutoff === undefined ? '' : `AND i.observed_state='ready'
       AND i.last_activity_at < to_timestamp($7/1000.0)

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-11-runtime-desired-state-reconcile.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-11-runtime-desired-state-reconcile.md
+document:
+  en: 252d2dce8616cbc6f4a53a9bff63fff2c2085c8d
+  zh: cef69bd49677d53875d53f6c1058ca06f8560666
+/agent-note-desired-state-runtime-reconciler-with-bounded-warmup:
+  en: 25f4829e44feb9fc
+  zh: a4d4a9484325d778
+/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/problem:
+  en: 38a006937e46f99c
+  zh: a6dc5d9bf7325ab9
+/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/decision:
+  en: 76f8ea7fdefe12b5
+  zh: 7ce69449bf8f4ebb
+/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/alternatives-considered:
+  en: d35db23c5b9711d1
+  zh: ad5ab656e13b9ce4
+/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/consequences:
+  en: 4e6b759ce9c832bd
+  zh: 1bf1af223af1452c
+/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/verification:
+  en: 5482d1feea4b3609
+  zh: 04ade5611dd9d9d4

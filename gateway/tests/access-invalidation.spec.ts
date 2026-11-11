@@ -139,6 +139,7 @@ async function fixture(options: {
         touch: async () => {}, wsRef: async () => {},
         operationRef: vi.fn<NonNullable<GatewayDeps['instances']['operationRef']>>(async () => {}),
         ensureRunning: async () => ({ port, generation: 1 }), reapIdle: async () => 0,
+        reconcile: async () => ({ failed: 0, warmed: 0, budgeted: 0 }),
         startRequest: () => ({ admission: Promise.resolve(), completion: Promise.resolve({ port, generation: 1 }) }),
         stop, stopAll: async () => {}, withStopped: async (_target, operation) => operation(),
       },

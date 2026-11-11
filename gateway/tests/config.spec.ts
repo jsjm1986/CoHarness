@@ -50,6 +50,16 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ HGW_DRAIN_RUNTIMES_ON_SHUTDOWN: 'yes' })).toThrow('HGW_DRAIN_RUNTIMES_ON_SHUTDOWN')
   })
 
+  it('defaults runtime reconciliation on with bounded warmup and restart budget', () => {
+    expect(loadConfig({}).reconcile).toEqual({ enabled: true, warmWindowMs: 604800000, maxRestarts: 3 })
+    expect(loadConfig({ HGW_RECONCILE: 'off' }).reconcile.enabled).toBe(false)
+    expect(() => loadConfig({ HGW_RECONCILE: 'never' })).toThrow('HGW_RECONCILE')
+    expect(loadConfig({ HGW_RECONCILE_WARM_WINDOW_MS: '86400000', HGW_RECONCILE_MAX_RESTARTS: '5' }).reconcile)
+      .toEqual({ enabled: true, warmWindowMs: 86400000, maxRestarts: 5 })
+    expect(() => loadConfig({ HGW_RECONCILE_WARM_WINDOW_MS: '0' })).toThrow('HGW_RECONCILE_WARM_WINDOW_MS')
+    expect(() => loadConfig({ HGW_RECONCILE_MAX_RESTARTS: '-1' })).toThrow('HGW_RECONCILE_MAX_RESTARTS')
+  })
+
   it('validates bounded private event principal renewal settings', () => {
     expect(loadConfig({}).streamPrincipalRenewal).toEqual({ enabled: true, intervalMs: 10000, requestTimeoutMs: 5000, maxBatchSize: 64 })
     expect(loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'false' }).streamPrincipalRenewal.enabled).toBe(false)
