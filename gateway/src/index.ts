@@ -86,7 +86,6 @@ import { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { PostgresAccessMonitor, scopeAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
-import { reconcileBootSignature, runtimeBootSignature } from './boot-signature.ts'
 import { PrimaryProjectNames } from './primary-project-names.ts'
 import { NodeContentDocuments } from './node-content-documents.ts'
 import { NodeDocumentAuthority } from './node-content-documents-authority.ts'
@@ -823,18 +822,14 @@ const server = createGatewayServer(deps, {
     sshTargets: deps.sshTargets,
   }),
 })
-// A launch signature change (release, runtime entry, supervisor or toolchain)
-// retires survivors before serving requests; an unchanged signature keeps them
-// reattachable, so same-build restarts cost no cold start. Missing or
-// unreadable records drain — the conservative direction for upgrades. The new
-// signature is committed only after the drain completes, so a failed drain
-// retries on the next boot instead of reattaching code it could not retire.
+// Every started generation records a launch stamp covering its code closure
+// and launch inputs; survivors whose stamp this build no longer mints are
+// retired before serving, so same-content restarts re-attach in place and
+// upgrades never serve stale code. A failed retirement leaves the row fenced
+// — attach checks refuse it per-request — and the next boot retries.
 {
-  const signature = await runtimeBootSignature(cfg)
-  const outcome = await reconcileBootSignature(cfg.stateRoot, signature, () => instances.drainSurvivors('shutdown'),
-    error => console.error('[gateway] Runtime survivor drain after launch signature change failed:', error))
-  if (outcome === 'drained') console.log('[gateway] drained Runtime survivors after launch signature change')
-  else if (outcome === 'undrained') console.error('[gateway] Runtime survivors from an older launch remain; draining retries on the next boot')
+  const { retired, kept } = await instances.retireIncompatibleSurvivors()
+  if (retired > 0) console.log(`[gateway] retired ${retired} incompatible Runtime survivor(s); ${kept} kept`)
 }
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare
 // tunnel / Nginx) that connects to 127.0.0.1, never directly over the LAN.

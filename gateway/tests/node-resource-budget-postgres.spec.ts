@@ -11,7 +11,8 @@ import type { ResourceOperationId } from '@deepseek-ai/dsh-resource-budget/types
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { GatewayModelBudget } from '../src/gateway-model-budget.ts'
 import { loadConfig } from '../src/config.ts'
-import { InstanceManager } from '../src/instances.ts'
+import { InstanceManager, INSTANCE_PROFILE } from '../src/instances.ts'
+import { computeLaunchStamps } from '../src/launch-stamp.ts'
 import type { UserRow } from '../src/auth.ts'
 import { PostgresProgressUsage } from '../src/postgres/progress-usage.ts'
 import { PostgresModelGovernanceService } from '../src/postgres/model-governance-service.ts'
@@ -25,6 +26,10 @@ import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
+
+/** A launch stamp the fence accepts under this config; variants differ but membership is what `liveEndpoint` checks. */
+const mintedLaunchStamp = (cfg: Parameters<typeof computeLaunchStamps>[0]): string =>
+  [...computeLaunchStamps(cfg, '', INSTANCE_PROFILE).stamps][0]!
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
 
@@ -925,12 +930,16 @@ describePg('durable node resource budget', () => {
   it.for(['failed-start', 'dead-ready'] as const)('wakes queued work when %s cleanup publishes the assignment stopped', async kind => {
     const f = await fixture(), target = f.subjects[0]!.target
     const cfg = loadConfig({ HGW_USERS_ROOT: join(f.root, 'users'), HGW_STATE_ROOT: join(f.root, 'state'),
-      HGW_MODEL_GOVERNANCE_PACKAGE: join(f.root, 'absent-governance-package') })
+      ...(kind === 'failed-start' ? { HGW_MODEL_GOVERNANCE_PACKAGE: join(f.root, 'absent-governance-package') } : {}) })
     const actor: UserRow = { id: target.id, username: 'alice', displayName: 'alice', role: 'user', status: 'active',
       homePath: f.root, mustChangePassword: false, autoReviewEligible: false }
     if (kind === 'failed-start') {
       await f.repository.markStopped(target, 1)
       await f.budget.stopped(target, 1)
+    } else {
+      // A stamp the fence accepts keeps this survivor on the dead-process cleanup path under test.
+      await pool.query('UPDATE harness.instances SET launch_stamp=$1 WHERE organization_id=$2 AND user_id=$3',
+        [mintedLaunchStamp(cfg), f.context.organizationId, f.users[0]!.uuid])
     }
     const queued = f.request(1, 1)
     expect(await f.budget.request(f.subjects[1]!, queued)).toEqual({ state: 'queued' })

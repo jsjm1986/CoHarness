@@ -52,6 +52,13 @@ import {
 } from './runtime-readiness.ts'
 import { assertProjectImportPathAllowed } from './project-directories.ts'
 import { readResponseJson } from './response-budget.ts'
+import {
+  ADMIN_GUARD_PATCH_FILENAME,
+  computeLaunchStamps,
+  policyPatchText,
+  type LaunchStampSet,
+  type LaunchVariant,
+} from './launch-stamp.ts'
 
 const POLL_INTERVAL_MS = 300
 const STOP_GRACE_MS = 5000
@@ -61,7 +68,6 @@ const PORT_PROBE_TIMEOUT_MS = 1000
 const PORT_REASSIGN_ATTEMPTS = 3
 const STOP_ALL_CONCURRENCY = 8
 const MANAGED_CREDENTIALS_FILENAME = '.credentials.yaml'
-const ADMIN_GUARD_PATCH_FILENAME = 'cordis.admin.patch.yml'
 /**
  * Profile every managed runtime instance boots (`dsh web` in `dshCommand`).
  * Policy packages materialize inside this profile's own `node_modules`: the
@@ -69,54 +75,7 @@ const ADMIN_GUARD_PATCH_FILENAME = 'cordis.admin.patch.yml'
  * `profiles/node_modules` fallback position, which a runtime-mode generation
  * intentionally never reads.
  */
-const INSTANCE_PROFILE = 'web'
-const PROJECT_RUNTIME_PATCH = `- id: session-persistence-jsonl
-  disabled: true
-- insert:
-    - id: collaboration-gateway
-      name: '@deepseek-ai/dsh-collaboration-gateway'
-    - id: collaboration-context
-      name: '@deepseek-ai/dsh-collaboration-context'
-    - id: session-persistence-gateway
-      name: '@deepseek-ai/dsh-session-persistence-gateway'
-- id: permission
-  config:
-    presets:
-      read-only:
-        sandbox: read-only
-        approval: ask
-      workspace-write:
-        sandbox: workspace-write
-        approval: ask
-      danger-full-access:
-        sandbox: danger-full-access
-        approval: never
-- id: memory
-  config:
-    space: project
-`
-
-/**
- * Managed-desktop patch stanza appended when the node declares an interactive
- * desktop identifier: the runtime mounts the computer-use service and the
- * provisioned Cua Driver provider, and `gateway-execution` starts publishing
- * the managed desktop authorization policy for that identifier.
- */
-function managedDesktopPatch(cfg: GatewayConfig, desktop: string): string {
-  const driverConfig: string[] = []
-  if (cfg.desktopDriverCommand !== undefined) driverConfig.push(`        command: ${JSON.stringify(cfg.desktopDriverCommand)}`)
-  if (cfg.desktopDriverArgs !== undefined) driverConfig.push(`        args: ${JSON.stringify(cfg.desktopDriverArgs)}`)
-  const config = driverConfig.length === 0 ? '' : `\n      config:\n${driverConfig.join('\n')}`
-  return `- id: gateway-execution
-  config:
-    desktop: ${JSON.stringify(desktop)}
-- insert:
-    - id: computer-use
-      name: '@deepseek-ai/dsh-computer-use'
-    - id: computer-use-cua-driver-mcp
-      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'${config}
-`
-}
+export const INSTANCE_PROFILE = 'web'
 
 interface InstanceOwner extends PersonalRuntimeStorage {
   kind: 'user' | 'project'
@@ -186,6 +145,8 @@ export interface RuntimeInstanceSnapshot {
   state: string
   port: number
   generation: number
+  /** Stamp `beginStart` recorded for the live generation; null marks a pre-stamp legacy row. */
+  launchStamp: string | null
 }
 
 /**
@@ -309,6 +270,13 @@ function targetOf(input: RuntimeTargetInput): RuntimeTarget {
   return typeof input === 'number' ? { kind: 'user', id: input } : input
 }
 
+/** Role axes a launch descriptor determines; the recorded stamp follows the same axes. */
+const launchVariantOf = (runtime: Pick<RuntimeLaunchContext, 'kind' | 'user' | 'project'>): LaunchVariant => ({
+  admin: runtime.user?.role === 'admin',
+  kind: runtime.kind,
+  steward: runtime.kind === 'project' && runtime.project?.steward === true,
+})
+
 function targetKey(input: RuntimeTargetInput): string {
   const target = targetOf(input)
   return `${target.kind}:${String(target.id)}${target.runtimeId === undefined ? '' : `:${target.runtimeId}`}`
@@ -363,6 +331,12 @@ export interface InstanceRepository {
    * @returns its bearer digest, or null for a stopped or pre-credential legacy assignment.
    */
   credentialHashOf(target: RuntimeTarget, generation: number): Promise<string | null>
+  /**
+   * @param target - runtime assignment.
+   * @param generation - expected generation; a replacement refuses this read.
+   * @returns the stamp recorded for that generation, or null when none was minted.
+   */
+  launchStampOf(target: RuntimeTarget, generation: number): Promise<string | null>
   touch(target: RuntimeTarget, at: number): Promise<void>
   /**
    * Retain the assignment writer lock before freshly checking owner, node and ready-generation eligibility and committing activity.
@@ -389,9 +363,10 @@ export interface InstanceRepository {
    * @param intent - start policy; passive by default.
    * @param administratorUserId - initiating administrator retained through the claim; omission permits trusted lifecycle maintenance.
    * @param recordActivity - false leaves `last_activity_at` untouched so an unattended warmup cannot renew the warm window; true by default.
+   * @param launchStamp - content-addressed launch identity recorded with the generation; omission stores NULL, fencing the row as a pre-stamp legacy.
    * @returns the claimed generation.
    */
-  beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent?: RuntimeStartIntent, administratorUserId?: number, recordActivity?: boolean): Promise<number>
+  beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent?: RuntimeStartIntent, administratorUserId?: number, recordActivity?: boolean, launchStamp?: string): Promise<number>
   markReady(target: RuntimeTarget, generation: number): Promise<void>
   idleTargets(cutoff: number): Promise<RuntimeTarget[]>
   /** Re-check one idle candidate without rescanning the whole instance table. */
@@ -505,9 +480,11 @@ class SqliteInstanceRepository implements InstanceRepository {
 
   async snapshotOf(target: RuntimeTarget): Promise<RuntimeInstanceSnapshot | null> {
     const userId = this.userId(target)
-    const row = this.db.prepare('SELECT state,port FROM instances WHERE user_id=?').get(userId) as
-      { state: string; port: number } | undefined
-    return row === undefined ? null : { ...row, generation: 1, target: { kind: 'user', id: userId } }
+    const row = this.db.prepare('SELECT state,port,launch_stamp FROM instances WHERE user_id=?').get(userId) as
+      { state: string; port: number; launch_stamp: string | null } | undefined
+    return row === undefined ? null : {
+      target: { kind: 'user', id: userId }, state: row.state, port: row.port, generation: 1, launchStamp: row.launch_stamp,
+    }
   }
 
   async stateOf(target: RuntimeTarget): Promise<string> {
@@ -525,6 +502,12 @@ class SqliteInstanceRepository implements InstanceRepository {
   async credentialHashOf(target: RuntimeTarget, _generation: number): Promise<string | null> {
     this.userId(target)
     return null
+  }
+
+  async launchStampOf(target: RuntimeTarget, _generation: number): Promise<string | null> {
+    const row = this.db.prepare('SELECT launch_stamp FROM instances WHERE user_id = ?').get(this.userId(target)) as
+      { launch_stamp: string | null } | undefined
+    return row?.launch_stamp ?? null
   }
 
   async stopReasonOf(target: RuntimeTarget): Promise<RuntimeStopReason | null> {
@@ -551,15 +534,15 @@ class SqliteInstanceRepository implements InstanceRepository {
     return false
   }
 
-  async beginStart(target: RuntimeTarget, at: number, _runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive', administratorUserId?: number, recordActivity = true): Promise<number> {
+  async beginStart(target: RuntimeTarget, at: number, _runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive', administratorUserId?: number, recordActivity = true, launchStamp?: string): Promise<number> {
     const userId = this.userId(target)
     const claim = () => {
       if (administratorUserId !== undefined) requireSqliteAdministrator(this.db, administratorUserId)
       return this.db.prepare(`UPDATE instances SET state = 'starting', stop_reason = NULL, started_at = ?,
-      last_activity_at = CASE WHEN ? THEN ? ELSE last_activity_at END
+      last_activity_at = CASE WHEN ? THEN ? ELSE last_activity_at END, launch_stamp = ?
       WHERE user_id = ? AND state = 'stopped' AND (? = 'explicit' OR (stop_reason IS NOT 'manual' AND (? <> 'webhook' OR stop_reason = 'idle')))
         AND EXISTS(SELECT 1 FROM users WHERE id = ? AND status = 'active' AND deleted_at IS NULL)`)
-      .run(at, recordActivity ? 1 : 0, at, userId, intent, intent, userId)
+      .run(at, recordActivity ? 1 : 0, at, launchStamp ?? null, userId, intent, intent, userId)
     }
     const updated = administratorUserId === undefined ? claim() : this.db.transaction(claim).immediate()
     if (updated.changes !== 1) {
@@ -704,6 +687,9 @@ export class InstanceManager {
   /** Refresh versioned policy projections before a ready runtime serves work. */
   beforeUse?: (subject: RuntimeSubject) => void | Promise<void>
 
+  /** Stamps this build mints; computed once because the digest walks the code closure. */
+  private launchStamps: LaunchStampSet | undefined
+
   constructor(
     source: Database.Database | InstanceRepository,
     private readonly cfg: GatewayConfig,
@@ -729,6 +715,22 @@ export class InstanceManager {
   private releaseResident(key: string): void {
     this.residentLeases.get(key)?.release()
     this.residentLeases.delete(key)
+  }
+
+  /**
+   * @returns the stamp set minted on first use; a computation failure means
+   * the launch inputs are unreadable and compatibility cannot be decided.
+   */
+  private stamps(): LaunchStampSet {
+    return this.launchStamps ??= computeLaunchStamps(this.cfg, this.security.principalPublicKey, INSTANCE_PROFILE)
+  }
+
+  /**
+   * @param launchStamp - stamp a durable row recorded for its live generation.
+   * @returns whether this build still mints that stamp; a null stamp is never compatible.
+   */
+  private stampCompatible(launchStamp: string | null): boolean {
+    return launchStamp !== null && this.stamps().stamps.has(launchStamp)
   }
 
   private cancelStarts(target: RuntimeTargetInput): void {
@@ -868,6 +870,8 @@ export class InstanceManager {
     await this.initialized
     const snapshot = await this.repository.snapshotOf(targetOf(target))
     if (snapshot === null || snapshot.state !== 'ready') return null
+    // A stamp this build no longer mints retires the row rather than serving it.
+    if (!this.stampCompatible(snapshot.launchStamp)) return null
     const resolved = snapshot.target, generation = snapshot.generation
     const key = targetKey(resolved)
     let proc = this.procs.get(key)
@@ -1127,17 +1131,30 @@ export class InstanceManager {
           if (this.resources !== undefined && !await this.resources.registered(target, generation)) {
             throw new RuntimeStartBlockedError('unavailable', 'Runtime resource admission is unavailable. Restart this Runtime before using it.')
           }
-          const current = 'username' in subject ? await this.personalSubject(subject, administratorUserId) : subject
-          if (administratorUserId !== undefined && !('username' in current)) await this.repository.authorizeAdministrator(administratorUserId)
-          await this.beforeUse?.(current)
-          if (administratorUserId !== undefined) {
-            if ('username' in current) {
-              if (!await this.personalPolicyMatches(current, administratorUserId)) {
-                throw new RuntimeStartBlockedError('unavailable', 'Runtime account policy changed during refresh. Retry with current authority.')
-              }
-            } else await this.repository.authorizeAdministrator(administratorUserId)
+          if (!this.stampCompatible(await this.repository.launchStampOf(target, generation))) {
+            // The survivor boots code or launch inputs this build no longer
+            // mints; retire it under `shutdown` and fall through to a fresh
+            // generation rather than serving stale policy.
+            await live.terminate(STOP_GRACE_MS)
+            await this.publishQuiescence(target, generation, 'shutdown')
+            this.procs.delete(targetKey(target))
+            this.releaseResident(targetKey(target))
+            // The dead-root cleanup below would re-publish `failed`; the row
+            // already settled as `shutdown`, so drop the handle and skip it.
+            live = undefined
+          } else {
+            const current = 'username' in subject ? await this.personalSubject(subject, administratorUserId) : subject
+            if (administratorUserId !== undefined && !('username' in current)) await this.repository.authorizeAdministrator(administratorUserId)
+            await this.beforeUse?.(current)
+            if (administratorUserId !== undefined) {
+              if ('username' in current) {
+                if (!await this.personalPolicyMatches(current, administratorUserId)) {
+                  throw new RuntimeStartBlockedError('unavailable', 'Runtime account policy changed during refresh. Retry with current authority.')
+                }
+              } else await this.repository.authorizeAdministrator(administratorUserId)
+            }
+            return { port, generation, ...(target.runtimeId === undefined ? {} : { runtimeId: target.runtimeId }) }
           }
-          return { port, generation, ...(target.runtimeId === undefined ? {} : { runtimeId: target.runtimeId }) }
         }
         // A dead root can leave descendants running; release only after confirmed termination.
         if (live === undefined && this.residentLeases.has(targetKey(target))) {
@@ -1280,12 +1297,6 @@ export class InstanceManager {
       // themselves — which no manifest declares — need a physical copy here.
       const governancePackage = join(packageParent, 'dsh-model-governance')
       this.materializePolicyPackage(governanceDir, governancePackage, [governancePatch])
-
-      let patchText = readFileSync(governancePatch, 'utf8').trimEnd() + '\n'
-      const readinessPlugins = ['model-governance', 'gateway-execution', 'desktop-availability', ...(this.cfg.guardPatch === '' ? [] : ['directory-guard'])]
-      patchText += `- id: gateway-runtime\n  config:\n    requiredPlugins: ${JSON.stringify(readinessPlugins)}\n`
-      patchText += `- id: gateway-resource-budget\n  config:\n    requestTimeoutMs: ${String(this.cfg.runtimeRequestTimeoutMs)}\n    cleanupTimeoutMs: ${String(this.cfg.runtimeCleanupTimeoutMs)}\n`
-      patchText += `- id: connection\n  config:\n    rpcTimeoutMs: ${String(this.cfg.runtimeBrowserRpcTimeoutMs)}\n    recovery:\n      streamOpenTimeoutMs: ${String(this.cfg.runtimeBrowserStreamTimeoutMs)}\n      generationReadyTimeoutMs: ${String(this.cfg.runtimeBrowserReadyTimeoutMs)}\n`
       const guardPatch = this.cfg.guardPatch
       const guardPackage = join(packageParent, 'dsh-directory-guard')
       this.removeInstalledPolicyPackage(guardPackage)
@@ -1303,13 +1314,7 @@ export class InstanceManager {
           guardPatchFiles.push(adminPatch)
         }
         this.materializePolicyPackage(guardDir, guardPackage, guardPatchFiles)
-        patchText += readFileSync(guardPatch, 'utf8').trimEnd() + '\n'
-        if (runtime.user?.role === 'admin') {
-          const adminPatch = join(guardDir, ADMIN_GUARD_PATCH_FILENAME)
-          patchText += readFileSync(adminPatch, 'utf8').trimEnd() + '\n'
-        }
       }
-      if (runtime.kind === 'project') patchText += PROJECT_RUNTIME_PATCH
       if (runtime.project?.steward === true) {
         // The resident steward mounts its operator tools from a deployment
         // package, exactly like the model-governance mount: the patch file
@@ -1324,24 +1329,7 @@ export class InstanceManager {
           join(packageParent, 'dsh-steward-tools'),
           [stewardPatch],
         )
-        patchText += readFileSync(stewardPatch, 'utf8').trimEnd() + '\n'
       }
-      patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
-      patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
-      patchText += `- id: connection\n  config:\n    serverTiming: ${String(this.cfg.performanceEnabled)}\n`
-      if (this.cfg.officeFontMetadataCacheDirectory !== undefined) {
-        patchText += `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(this.cfg.officeFontMetadataCacheDirectory)}\n`
-      }
-      patchText += "- insert:\n    - id: desktop-availability\n      name: '@deepseek-ai/dsh-gateway-execution/desktop-availability'\n"
-      // Remote-desktop providers share the gateway's administration files so
-      // grants and endpoints managed in /admin take effect in every runtime.
-      patchText += `- id: remote-desktop-vnc
-  config:
-    endpointsFile: ${JSON.stringify(join(this.cfg.remoteDesktopDir, 'endpoints.json'))}
-    grantsFile: ${JSON.stringify(join(this.cfg.remoteDesktopDir, 'grants.jsonl'))}
-    auditFile: ${JSON.stringify(join(this.cfg.remoteDesktopDir, 'audit.jsonl'))}
-    recordingDir: ${JSON.stringify(join(this.cfg.remoteDesktopDir, 'recordings'))}
-`
       if (this.cfg.desktopId !== undefined) {
         // The provisioned driver package is materialized beside the policy
         // plugins so the runtime resolves it from the instance profile's
@@ -1352,9 +1340,8 @@ export class InstanceManager {
           join(packageParent, 'dsh-experimental-computer-use-cua-driver-mcp'),
           [],
         )
-        patchText += managedDesktopPatch(this.cfg, this.cfg.desktopId)
       }
-      writeFileSync(join(dshHome, 'cordis.patch.yml'), patchText)
+      writeFileSync(join(dshHome, 'cordis.patch.yml'), policyPatchText(this.cfg, launchVariantOf(runtime)))
     } catch (error) {
       throw new Error(`policy bundle mount failed for ${runtime.runtimeKey ?? runtime.username}: ${String(error)}`)
     }
@@ -1396,6 +1383,20 @@ export class InstanceManager {
     const runtimeTokenHash = createHash('sha256').update(runtimeToken).digest()
     const verifyPreparedStorage=await this.repository.checkProjectStorage?.(descriptor.target)
     const claimedPort = await this.reclaimInstancePort(descriptor, port, signal)
+    // Minted before the claim so an unmintable variant fails without consuming
+    // a generation. The attempt still publishes quiescence for the existing
+    // generation — the failed-start cleanup downstream of `beginStart` cannot
+    // run, and without the event queued resource work would sleep forever.
+    let launchStamp: string
+    try {
+      launchStamp = this.stamps().stampFor(launchVariantOf(descriptor))
+    } catch (error) {
+      const existing = await this.repository.generationOf(descriptor.target)
+      await this.publishQuiescence(descriptor.target, existing, 'failed').catch((publishError: unknown) => {
+        console.error(`[gateway] failed to publish quiescence after launch-stamp failure for ${targetKey(descriptor.target)}:`, publishError)
+      })
+      throw error
+    }
     const generation = await this.repository.beginStart(
       descriptor.target,
       now,
@@ -1403,6 +1404,7 @@ export class InstanceManager {
       intent,
       administratorUserId,
       recordActivity,
+      launchStamp,
     )
     const runtime: RuntimeLaunchContext = { ...descriptor, port: claimedPort, generation }
     const key = targetKey(runtime.target)
@@ -1642,6 +1644,8 @@ export class InstanceManager {
   async reconcile(): Promise<{ failed: number; warmed: number; deferred: number }> {
     await this.initialized
     const summary = { failed: 0, warmed: 0, deferred: 0 }
+    let launchStamps: LaunchStampSet | undefined
+    try { launchStamps = this.stamps() } catch { /* launch identity unavailable; probes keep liveness-only semantics */ }
     for (const key of [...this.residentLeases.keys()]) {
       const target = targetFromKey(key)
       try {
@@ -1663,6 +1667,17 @@ export class InstanceManager {
           continue
         }
         if (snapshot.state !== 'ready') continue
+        if (launchStamps !== undefined && (snapshot.launchStamp === null || !launchStamps.stamps.has(snapshot.launchStamp))) {
+          // A ready row stamped by a launch this build no longer mints is a
+          // retired survivor; settle it under `shutdown`, fenced to the
+          // observed generation like the dead-probe below.
+          await this.dispatch(target, resolved => this.serialize(resolved, async () => {
+            const current = await this.repository.snapshotOf(resolved)
+            if (current === null || current.state !== 'ready' || current.generation !== snapshot.generation) return false
+            return await this.terminate(resolved, 'shutdown', snapshot.generation) !== undefined
+          }), true)
+          continue
+        }
         const tracked = this.procs.get(key)
         let dead = false
         if (tracked !== undefined) {
@@ -2051,9 +2066,42 @@ export class InstanceManager {
   }
 
   /**
+   * Terminate local survivors whose recorded launch stamp this build no
+   * longer mints — upgraded code, changed launch inputs, or rows written
+   * before stamps existed. Boot calls this before serving; per-request
+   * fences in `liveEndpoint` and `ensureRunningNow` retire stragglers, and a
+   * survivor that could not be stopped is fenced rather than re-attached.
+   * @returns per-sweep counts for operator visibility.
+   */
+  async retireIncompatibleSurvivors(): Promise<{ retired: number; kept: number }> {
+    await this.initialized
+    let stamps: LaunchStampSet
+    try {
+      stamps = this.stamps()
+    } catch (error) {
+      // Without a minted set every stamp is undecidable; keep survivors and
+      // let per-request attach fences surface the launch-input failure.
+      console.error('[gateway] launch stamps unavailable; survivors retained:', error)
+      return { retired: 0, kept: 0 }
+    }
+    const targets = [...new Set([...this.procs.keys(), ...this.residentLeases.keys()])].map(key => targetFromKey(key))
+    const incompatible: RuntimeTarget[] = []
+    for (const target of targets) {
+      try {
+        const snapshot = await this.repository.snapshotOf(target)
+        if (snapshot !== null && snapshot.launchStamp !== null && stamps.stamps.has(snapshot.launchStamp)) continue
+        incompatible.push(target)
+      } catch (error) {
+        console.error(`[gateway] launch stamp read failed for ${targetKey(target)}:`, error)
+      }
+    }
+    const failures = await this.drainTargets(incompatible, 'shutdown')
+    for (const error of failures) console.error('[gateway] incompatible Runtime survivor failed to retire:', error)
+    return { retired: incompatible.length - failures.length, kept: targets.length - incompatible.length }
+  }
+
+  /**
    * Terminate every adopted or tracked supervisor-owned target on this node.
-   * Boot calls this to retire survivors whose recorded launch signature no
-   * longer matches the running build; their next entry cold-starts current code.
    * @param reason - durable stop reason published for each drained target.
    * @returns completion after every target settled; rejects with the first failure.
    */

@@ -43,7 +43,7 @@ describe('SQLite schema migration', () => {
       db.close()
       db = openDb(file)
       expect(db.prepare('SELECT stop_reason FROM instances WHERE user_id=1').get()).toEqual({ stop_reason: 'idle' })
-      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 9 })
+      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 10 })
     } finally {
       if (db.open) db.close()
       rmSync(root, { recursive: true, force: true })
@@ -71,21 +71,21 @@ describe('SQLite schema migration', () => {
       db.close()
       db = openDb(file)
       expect(db.prepare('SELECT auto_review_eligible FROM users WHERE id=1').get()).toEqual({ auto_review_eligible: 1 })
-      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 9 })
+      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 10 })
     } finally {
       if (db?.open) db.close()
       rmSync(root, { recursive: true, force: true })
     }
   })
 
-  it('creates project tables on a fresh database and records schema_version=9', () => {
+  it('creates project tables on a fresh database and records schema_version=10', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')
     const db = openDb(file)
     expect(tables(db)).toEqual(expect.arrayContaining(['projects', 'project_members', 'model_registration_events', 'schema_meta']))
     expect(tables(db)).not.toEqual(expect.arrayContaining(['groups', 'dir_grants']))
     expect((db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>)
       .some(column => column.name === 'model_access_default_allowed')).toBe(true)
-    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(9)
+    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(10)
   })
 
   it('folds dir_grants and group members into projects; rw beats ro; then drops old tables', () => {

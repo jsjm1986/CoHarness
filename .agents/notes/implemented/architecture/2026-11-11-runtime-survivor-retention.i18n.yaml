@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-11-runtime-survivor-retention.md
 document:
-  en: c09597db079d17b1204f3829c66ee160304b74f6
-  zh: d985f725449d51ea59b74f57ca74ab6295ec9fba
-/agent-note-same-version-runtime-survivor-retention-across-gateway-restart:
-  en: 41271071735a45d1
-  zh: cd7b2f40169cbce1
-/agent-note-same-version-runtime-survivor-retention-across-gateway-restart/problem:
+  en: a8590e7be1385fe19b9257e2d4f05ecd819716b1
+  zh: a2d9644299af053aec8c59a4fb8331e4e740cf3d
+/agent-note-runtime-survivor-retention-with-launch-stamps:
+  en: 82feee816709111f
+  zh: 6d20cb8f2823aa46
+/agent-note-runtime-survivor-retention-with-launch-stamps/problem:
   en: 6575ec5aceb51143
-  zh: 7d62bc222bfc229c
-/agent-note-same-version-runtime-survivor-retention-across-gateway-restart/decision:
-  en: 9129cf7ebbca8299
-  zh: 99a07d023cbab5df
-/agent-note-same-version-runtime-survivor-retention-across-gateway-restart/alternatives-considered:
-  en: 58e99272dd754f23
-  zh: 7e176162a0fe0f81
-/agent-note-same-version-runtime-survivor-retention-across-gateway-restart/consequences:
-  en: 07d7af55845a773b
-  zh: dd41db68ac8f7d86
-/agent-note-same-version-runtime-survivor-retention-across-gateway-restart/verification:
-  en: 9805bb2c54010ce6
-  zh: e1906527e73607e6
+  zh: 7757150d7a33000e
+/agent-note-runtime-survivor-retention-with-launch-stamps/decision:
+  en: a1720437674f348e
+  zh: 5d82e9534f76b3d4
+/agent-note-runtime-survivor-retention-with-launch-stamps/alternatives-considered:
+  en: 3d6942995bcfdde7
+  zh: 736b662e7644ef93
+/agent-note-runtime-survivor-retention-with-launch-stamps/consequences:
+  en: 2498440cf5387467
+  zh: 869ef750d9bcc8f4
+/agent-note-runtime-survivor-retention-with-launch-stamps/verification:
+  en: 2fa27d7969061932
+  zh: 7211656b9c89fd87

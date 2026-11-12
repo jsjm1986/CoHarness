@@ -6,7 +6,8 @@ import { join, resolve } from 'node:path'
 import type { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
-import { InstanceManager } from '../src/instances.ts'
+import { InstanceManager, INSTANCE_PROFILE } from '../src/instances.ts'
+import { computeLaunchStamps } from '../src/launch-stamp.ts'
 import { NodeResourceBudget } from '../src/node-resource-budget.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
@@ -266,7 +267,8 @@ describePg('PostgreSQL personal Runtime policy', () => {
     let manager: InstanceManager | undefined
     try {
       const target = { kind: 'user' as const, id: f.waiting.user.id }
-      const generation = await f.repository.beginStart(target, Date.now(), Buffer.alloc(32, 1), 'explicit')
+      const generation = await f.repository.beginStart(target, Date.now(), Buffer.alloc(32, 1), 'explicit', undefined, undefined,
+        [...computeLaunchStamps(f.cfg, '', INSTANCE_PROFILE).stamps][0]!)
       await f.repository.markReady(target, generation)
       manager = new InstanceManager(f.repository, f.cfg, {
         instancesOutliveGateway: false, start: async () => { throw new Error('A live Runtime does not start again') },

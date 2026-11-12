@@ -97,8 +97,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
 
   async snapshotOf(target: RuntimeTarget): Promise<RuntimeInstanceSnapshot> {
     const owner = target.kind === 'user' ? 'users' : 'projects', column = target.kind === 'user' ? 'user_id' : 'project_id'
-    const result = await this.context.pool.query<{ runtime_id: RuntimeId; observed_state: string; port: number; generation: string }>(
-      `SELECT i.runtime_id,i.observed_state,i.port,i.generation::text FROM harness.instances i
+    const result = await this.context.pool.query<{ runtime_id: RuntimeId; observed_state: string; port: number; generation: string; launch_stamp: string | null }>(
+      `SELECT i.runtime_id,i.observed_state,i.port,i.generation::text,i.launch_stamp FROM harness.instances i
       JOIN harness.${owner} owner ON owner.organization_id=i.organization_id AND owner.id=i.${column}
       WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND owner.public_id=$3
         AND ($4::uuid IS NULL OR i.runtime_id=$4) ORDER BY i.runtime_id LIMIT 2`,
@@ -107,7 +107,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
     if (result.rows.length > 1) throw new RuntimeCatalogError(409, 'runtime-catalog/ambiguous-target')
     const row = result.rows[0]
     if (row === undefined) throw new RuntimeStartBlockedError('unavailable', 'Runtime assignment is missing.')
-    return { target: { ...target, runtimeId: row.runtime_id }, state: row.observed_state, port: row.port, generation: Number(row.generation) }
+    return { target: { ...target, runtimeId: row.runtime_id }, state: row.observed_state, port: row.port, generation: Number(row.generation), launchStamp: row.launch_stamp }
   }
 
   async targetsForOwner(target: RuntimeTarget): Promise<RuntimeTarget[]> {
@@ -250,6 +250,17 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return row.credential_hash
   }
 
+  async launchStampOf(target: RuntimeTarget, generation: number): Promise<string | null> {
+    const owner = ownerJoin(target, 5)
+    const result = await this.context.pool.query<{ launch_stamp: string | null }>(`SELECT i.launch_stamp
+      FROM harness.instances i ${owner.join}
+      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND ${owner.predicate} AND i.generation=$4`,
+    [this.context.organizationId, this.context.nodeId, target.id, generation, target.runtimeId ?? null])
+    const row = result.rows[0]
+    if (row === undefined) throw new Error(`stale instance generation for ${target.kind} ${String(target.id)}`)
+    return row.launch_stamp
+  }
+
   async stopReasonOf(target: RuntimeTarget): Promise<RuntimeStopReason | null> {
     const owner = ownerJoin(target)
     const result = await this.context.pool.query<{ stop_reason: RuntimeStopReason | null }>(`SELECT i.stop_reason
@@ -301,13 +312,13 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return administratorUserId === undefined ? claim(this.context.pool) : this.withAdministrator(administratorUserId, claim)
   }
 
-  async beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive', administratorUserId?: number, recordActivity = true): Promise<number> {
+  async beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive', administratorUserId?: number, recordActivity = true, launchStamp?: string): Promise<number> {
     const activeOwner = activeOwnerPredicate(target)
     const claim = (database: Queryable) => database.query<{ generation: string }>(`UPDATE harness.instances i
       SET desired_state='running',observed_state='starting',stop_reason=NULL,allocation_state='not-started',
       generation=generation+1,started_at=to_timestamp($4/1000.0),
       last_activity_at=CASE WHEN $8 THEN to_timestamp($4/1000.0) ELSE i.last_activity_at END,
-      runtime_token_hash=$5,runtime_token_issued_at=now(),updated_at=now()
+      runtime_token_hash=$5,runtime_token_issued_at=now(),updated_at=now(),launch_stamp=$9
       FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
       WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'}
         AND owner.organization_id=i.organization_id AND i.organization_id=$1
@@ -318,7 +329,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
           WHERE operation.organization_id=i.organization_id AND operation.runtime_id=i.runtime_id)
         AND ($6='explicit' OR (i.stop_reason IS DISTINCT FROM 'manual' AND ($6<>'webhook' OR i.stop_reason='idle')))
       RETURNING i.generation::text`,
-    [this.context.organizationId, this.context.nodeId, target.id, at, runtimeTokenHash, intent, target.runtimeId ?? null, recordActivity])
+    [this.context.organizationId, this.context.nodeId, target.id, at, runtimeTokenHash, intent, target.runtimeId ?? null, recordActivity, launchStamp ?? null])
     const result = await (administratorUserId === undefined ? claim(this.context.pool)
       : this.withAdministrator(administratorUserId, claim)).catch((error: unknown) => {
       if (error instanceof Error && 'code' in error && error.code === '55000'

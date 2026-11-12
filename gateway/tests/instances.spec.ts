@@ -6,8 +6,9 @@ import { createServer, type AddressInfo, type Socket } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
-import { InstanceManager, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from '../src/instances.ts'
-import type { InstanceRepository, RuntimeInstanceSnapshot, RuntimeTarget, RuntimeStopReason } from '../src/instances.ts'
+import { InstanceManager, INSTANCE_PROFILE, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from '../src/instances.ts'
+import { computeLaunchStamps } from '../src/launch-stamp.ts'
+import type { InstanceRepository, RuntimeInstanceSnapshot, RuntimeTarget, RuntimeStopReason, RuntimeStartIntent } from '../src/instances.ts'
 import { LocalLauncher, RuntimeLaunchCleanupError, type InstanceProc } from '../src/launcher.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
 import { RUNTIME_PORT_PUBLISHER, runtimeRelay } from './runtime-relay.ts'
@@ -102,6 +103,10 @@ async function setup(extraEnv: Record<string, string> = {}) {
   return { root, db, cfg, users, alice, manager }
 }
 
+/** One stamp the build under test mints; fixtures carrying it stay re-attachable. */
+const mintedLaunchStamp = (cfg: Parameters<typeof computeLaunchStamps>[0]): string =>
+  [...computeLaunchStamps(cfg, '', INSTANCE_PROFILE).stamps][0]!
+
 async function admitFixtureLease(repository: InstanceRepository, target: RuntimeTarget, at: number, generation?: number): Promise<boolean> {
   if (await repository.startEligibility(target) === null || await repository.stateOf(target) !== 'ready'
     || generation !== undefined && await repository.generationOf(target) !== generation) return false
@@ -110,13 +115,18 @@ async function admitFixtureLease(repository: InstanceRepository, target: Runtime
 }
 
 async function fixtureSnapshot(repository: InstanceRepository, target: RuntimeTarget): Promise<RuntimeInstanceSnapshot> {
-  return { target, state: await repository.stateOf(target), port: await repository.portOf(target), generation: await repository.generationOf(target) }
+  const generation = await repository.generationOf(target)
+  return {
+    target, state: await repository.stateOf(target), port: await repository.portOf(target), generation,
+    launchStamp: await repository.launchStampOf(target, generation),
+  }
 }
 
 class ProjectRepository implements InstanceRepository {
   private state = 'stopped'
   private generation = 0
   private reason: RuntimeStopReason | null = null
+  launchStamp: string | null = null
 
   constructor(private readonly projectPath: string, private readonly port: number) {}
 
@@ -133,12 +143,14 @@ class ProjectRepository implements InstanceRepository {
   startEligibility(_target: RuntimeTarget): Promise<{ stopReason: RuntimeStopReason | null }> { return Promise.resolve({ stopReason: this.reason }) }
   generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.generation) }
   credentialHashOf(): Promise<null> { return Promise.resolve(null) }
+  launchStampOf(_target: RuntimeTarget, _generation: number): Promise<string | null> { return Promise.resolve(this.launchStamp) }
   touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
   admitLease(target: RuntimeTarget, at: number, generation?: number): Promise<boolean> { return admitFixtureLease(this, target, at, generation) }
-  beginStart(_target: RuntimeTarget, _at: number, _runtimeTokenHash: Buffer): Promise<number> {
+  beginStart(_target: RuntimeTarget, _at: number, _runtimeTokenHash: Buffer, _intent?: RuntimeStartIntent, _administratorUserId?: number, _recordActivity?: boolean, launchStamp?: string): Promise<number> {
     this.state = 'starting'
     this.reason = null
     this.generation += 1
+    this.launchStamp = launchStamp ?? null
     return Promise.resolve(this.generation)
   }
   markReady(_target: RuntimeTarget, _generation: number): Promise<void> {
@@ -176,8 +188,12 @@ class ProjectRepository implements InstanceRepository {
 class SurvivorRepository implements InstanceRepository {
   state = 'ready'
   generation = 7
+  launchStamp: string | null
+  reason: RuntimeStopReason | null = null
 
-  constructor(private readonly projectPath: string, private readonly port: number) {}
+  constructor(private readonly projectPath: string, private readonly port: number, launchStamp: string | null = null) {
+    this.launchStamp = launchStamp
+  }
 
   initialize(): Promise<void> { return Promise.resolve() }
   snapshotOf(target: RuntimeTarget): Promise<RuntimeInstanceSnapshot> { return fixtureSnapshot(this, target) }
@@ -188,10 +204,11 @@ class SurvivorRepository implements InstanceRepository {
   activeTargets(): Promise<RuntimeTarget[]> { return Promise.resolve([{ kind: 'project', id: 41 }]) }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.port) }
   stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve(this.state) }
-  stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(null) }
+  stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(this.reason) }
   startEligibility(_target: RuntimeTarget): Promise<{ stopReason: null }> { return Promise.resolve({ stopReason: null }) }
   generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.generation) }
   credentialHashOf(): Promise<null> { return Promise.resolve(null) }
+  launchStampOf(_target: RuntimeTarget, _generation: number): Promise<string | null> { return Promise.resolve(this.launchStamp) }
   touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
   admitLease(target: RuntimeTarget, at: number, generation?: number): Promise<boolean> { return admitFixtureLease(this, target, at, generation) }
   beginStart(_target: RuntimeTarget, _at: number, _runtimeTokenHash: Buffer): Promise<number> {
@@ -200,8 +217,14 @@ class SurvivorRepository implements InstanceRepository {
   markReady(_target: RuntimeTarget, _generation: number): Promise<void> { return Promise.resolve() }
   idleTargets(_cutoff: number): Promise<RuntimeTarget[]> { return Promise.resolve([]) }
   idleTarget(_target: RuntimeTarget, _cutoff: number): Promise<boolean> { return Promise.resolve(false) }
-  markStopping(_target: RuntimeTarget, _generation: number, _reason?: RuntimeStopReason): Promise<boolean> { return Promise.resolve(true) }
-  markStopped(_target: RuntimeTarget): Promise<boolean> { return Promise.resolve(true) }
+  markStopping(_target: RuntimeTarget, _generation: number, reason?: RuntimeStopReason): Promise<boolean> {
+    this.reason = reason ?? null
+    return Promise.resolve(true)
+  }
+  markStopped(_target: RuntimeTarget, _generation: number): Promise<boolean> {
+    this.state = 'stopped'
+    return Promise.resolve(true)
+  }
   owner(_target: RuntimeTarget): Promise<{
     kind: 'project'
     id: number
@@ -217,6 +240,7 @@ class SurvivorRepository implements InstanceRepository {
 
 class FailingStopRepository implements InstanceRepository {
   readonly attempts: RuntimeTarget[] = []
+  launchStamp: string | null = null
 
   constructor(private readonly failIds: ReadonlySet<number>) {}
 
@@ -233,6 +257,7 @@ class FailingStopRepository implements InstanceRepository {
   startEligibility(_target: RuntimeTarget): Promise<null> { return Promise.resolve(null) }
   generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(1) }
   credentialHashOf(): Promise<null> { return Promise.resolve(null) }
+  launchStampOf(): Promise<null> { return Promise.resolve(null) }
   touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
   admitLease(target: RuntimeTarget, at: number, generation?: number): Promise<boolean> { return admitFixtureLease(this, target, at, generation) }
   beginStart(): Promise<number> { throw new Error('stopAll regression never starts runtimes') }
@@ -482,7 +507,7 @@ describe('InstanceManager', () => {
     const projectPath = join(root, 'uncertain-project')
     mkdirSync(projectPath)
     const start = vi.fn()
-    const survivor = new InstanceManager(new SurvivorRepository(projectPath, 43100), cfg, {
+    const survivor = new InstanceManager(new SurvivorRepository(projectPath, 43100, mintedLaunchStamp(cfg)), cfg, {
       instancesOutliveGateway: true, start,
       attach: () => { throw new Error('supervisor unavailable') },
     })
@@ -500,7 +525,7 @@ describe('InstanceManager', () => {
     const { root, cfg } = await setup({ HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '1' })
     const projectPath = join(root, `incomplete-${state}`)
     mkdirSync(projectPath)
-    const repository = new SurvivorRepository(projectPath, 43100)
+    const repository = new SurvivorRepository(projectPath, 43100, mintedLaunchStamp(cfg))
     repository.stateOf = async () => state
     const terminate = vi.fn(async () => {})
     const start = vi.fn()
@@ -592,7 +617,7 @@ describe('InstanceManager', () => {
     const projectPath = join(root, 'unregistered-project')
     mkdirSync(projectPath)
     const terminate = vi.fn(async () => {})
-    const survivor = new InstanceManager(new SurvivorRepository(projectPath, 43100), cfg, {
+    const survivor = new InstanceManager(new SurvivorRepository(projectPath, 43100, mintedLaunchStamp(cfg)), cfg, {
       instancesOutliveGateway: true, start: async () => { throw new Error('unexpected start') },
       attach: () => ({ hasExited: () => false, terminate }),
     }, { principalPublicKey: '' }, { stopped: async () => {}, registered: async () => false, admitRuntimeStart: async () => {} })
@@ -619,7 +644,7 @@ describe('InstanceManager', () => {
       attach: () => attached,
     }
     const survivorManager = new InstanceManager(
-      new SurvivorRepository(projectPath, 43250),
+      new SurvivorRepository(projectPath, 43250, mintedLaunchStamp(cfg)),
       cfg,
       launcher,
       { principalPublicKey: '' },
@@ -636,7 +661,7 @@ describe('InstanceManager', () => {
     const { root, cfg } = await setup(), projectPath = join(root, 'unavailable-survivor')
     mkdirSync(projectPath)
     const terminate = vi.fn(async () => {}), start = vi.fn()
-    const local = new InstanceManager(new SurvivorRepository(projectPath, 43250), cfg, {
+    const local = new InstanceManager(new SurvivorRepository(projectPath, 43250, mintedLaunchStamp(cfg)), cfg, {
       instancesOutliveGateway: false, start,
       attach: () => ({ hasExited: () => false, isAlive: async () => { throw new Error('control endpoint unavailable') }, terminate }),
     })
@@ -653,7 +678,7 @@ describe('InstanceManager', () => {
     const projectPath = join(root, 'local-survivor'); mkdirSync(projectPath)
     const terminate = vi.fn(async () => {})
     const attach = vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate }))
-    const local = new InstanceManager(new SurvivorRepository(projectPath, 43250), cfg, {
+    const local = new InstanceManager(new SurvivorRepository(projectPath, 43250, mintedLaunchStamp(cfg)), cfg, {
       instancesOutliveGateway: false, attach, start: async () => { throw new Error('unexpected replacement') },
     })
     const target = { kind: 'project' as const, id: 41 }
@@ -665,20 +690,92 @@ describe('InstanceManager', () => {
     expect(local.capacitySnapshot().resident).toBe(0)
   })
 
-  it.each(['unread', 'isLive', 'ensureRunning'])('drains adopted survivors after a launch signature change despite %s', async read => {
+  it.each(['unread', 'isLive'])('retires adopted survivors whose launch stamp is no longer minted despite %s', async read => {
     const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
     const projectPath = join(root, 'drained-survivor'); mkdirSync(projectPath)
     const terminate = vi.fn(async () => {})
     const attach = vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate }))
-    const local = new InstanceManager(new SurvivorRepository(projectPath, 43250), cfg, {
+    const repository = new SurvivorRepository(projectPath, 43250, 'superseded-stamp')
+    const local = new InstanceManager(repository, cfg, {
       instancesOutliveGateway: false, attach, start: async () => { throw new Error('unexpected replacement') },
     })
     const target = { kind: 'project' as const, id: 41 }
-    if (read === 'isLive') expect(await local.isLive(target)).toBe(true)
-    if (read === 'ensureRunning') expect(await local.ensureRunning({ ...target, name: 'Compiler', path: projectPath })).toEqual({ port: 43250, generation: 7 })
-    await local.drainSurvivors('shutdown')
+    if (read === 'isLive') {
+      // A fenced survivor reads as absent without attaching to it.
+      expect(await local.isLive(target)).toBe(false)
+      expect(attach).not.toHaveBeenCalled()
+    }
+    const { retired, kept } = await local.retireIncompatibleSurvivors()
+    expect(retired).toBe(1)
+    expect(kept).toBe(0)
     expect(attach).toHaveBeenCalledOnce()
     expect(terminate).toHaveBeenCalledOnce()
+    expect(repository.state).toBe('stopped')
+    expect(repository.reason).toBe('shutdown')
+  })
+
+  it('keeps an adopted survivor whose launch stamp this build still mints', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'compatible-survivor'); mkdirSync(projectPath)
+    const terminate = vi.fn(async () => {})
+    const attach = vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate }))
+    const repository = new SurvivorRepository(projectPath, 43250, mintedLaunchStamp(cfg))
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false, attach, start: async () => { throw new Error('unexpected replacement') },
+    })
+    const { retired, kept } = await local.retireIncompatibleSurvivors()
+    expect(retired).toBe(0)
+    expect(kept).toBe(1)
+    expect(terminate).not.toHaveBeenCalled()
+    expect(await local.isLive({ kind: 'project', id: 41 })).toBe(true)
+    expect(await local.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath }))
+      .toEqual({ port: 43250, generation: 7 })
+    await local.stopAll()
+  })
+
+  it('retires a warm survivor with an unminted stamp and falls through to a fresh start', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'stale-survivor'); mkdirSync(projectPath)
+    const terminate = vi.fn(async () => {})
+    const attach = vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate }))
+    const repository = new SurvivorRepository(projectPath, 43250, 'superseded-stamp')
+    const start = vi.fn(async () => { throw new Error('replacement is not exercised') })
+    const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false, attach, start })
+    await expect(local.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath }))
+      .rejects.toThrow('survivor should be reattached')
+    // The retire settled the stale generation under `shutdown` before the
+    // fresh claim ran into the fixture's own start refusal.
+    expect(attach).toHaveBeenCalledOnce()
+    expect(terminate).toHaveBeenCalledOnce()
+    expect(repository.state).toBe('stopped')
+    expect(repository.reason).toBe('shutdown')
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('records the minted launch stamp with the claimed generation', async () => {
+    const { alice, manager, db, cfg } = await setup()
+    await manager.ensureRunning(alice)
+    const row = db.prepare('SELECT launch_stamp FROM instances WHERE user_id=?').get(alice.id) as { launch_stamp: string | null }
+    expect(row.launch_stamp).toBe(mintedLaunchStamp(cfg))
+  })
+
+  it('reconcile retires a ready row whose launch stamp is no longer minted', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'retired-probe'); mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43250, 'superseded-stamp')
+    const terminate = vi.fn(async () => {})
+    const attach = vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate }))
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false, attach, start: async () => { throw new Error('probe path attaches only') },
+    })
+    const summary = await local.reconcile()
+    // The stamp fence runs before any liveness probe: the generation is
+    // fenced, terminated and settled under `shutdown`, never counted failed.
+    expect(summary.failed).toBe(0)
+    expect(attach).toHaveBeenCalledOnce()
+    expect(terminate).toHaveBeenCalledOnce()
+    expect(repository.state).toBe('stopped')
+    expect(repository.reason).toBe('shutdown')
   })
 
   it('keeps an owned runtime serving across a retaining shutdown', async () => {
@@ -731,7 +828,7 @@ describe('InstanceManager', () => {
   it('publishes failed for a ready survivor whose process no longer answers', async () => {
     const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
     const projectPath = join(root, 'dead-survivor'); mkdirSync(projectPath)
-    const repository = new SurvivorRepository(projectPath, 43250)
+    const repository = new SurvivorRepository(projectPath, 43250, mintedLaunchStamp(cfg))
     const markStopping = vi.spyOn(repository, 'markStopping')
     const local = new InstanceManager(repository, cfg, {
       instancesOutliveGateway: false,
@@ -792,7 +889,7 @@ describe('InstanceManager', () => {
   it('finishes an abandoned stopping row under its recorded reason', async () => {
     const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
     const projectPath = join(root, 'wedged-stopping'); mkdirSync(projectPath)
-    const repository = new SurvivorRepository(projectPath, 43250)
+    const repository = new SurvivorRepository(projectPath, 43250, mintedLaunchStamp(cfg))
     repository.state = 'stopping'
     const markStopping = vi.spyOn(repository, 'markStopping')
     const markStopped = vi.spyOn(repository, 'markStopped')
@@ -845,7 +942,7 @@ describe('InstanceManager', () => {
         this.generation = 8
         return snapshot
       }
-    }(projectPath, 43250)
+    }(projectPath, 43250, mintedLaunchStamp(cfg))
     const terminate = vi.fn(async () => {})
     const local = new InstanceManager(repository, cfg, {
       instancesOutliveGateway: false,
@@ -1724,8 +1821,8 @@ describe('InstanceManager', () => {
     const projectPath = join(root, 'coherent-endpoint')
     mkdirSync(projectPath, { recursive: true })
     const target = { kind: 'project' as const, id: 41 }
-    const snapshot = { target, state: 'ready', port: 43267, generation: 7 }
-    const repository = new SurvivorRepository(projectPath, snapshot.port)
+    const snapshot = { target, state: 'ready', port: 43267, generation: 7, launchStamp: mintedLaunchStamp(cfg) }
+    const repository = new SurvivorRepository(projectPath, snapshot.port, snapshot.launchStamp)
     repository.snapshotOf = vi.fn(async () => ({ ...snapshot }))
     const attached = { hasExited: () => false, isAlive: vi.fn(async () => true), terminate: vi.fn(async () => {}) }
     const launcher = { instancesOutliveGateway: true, start: vi.fn(async () => { throw new Error('Observation cannot start') }), attach: vi.fn(() => attached) }
@@ -1757,8 +1854,8 @@ describe('InstanceManager', () => {
     mkdirSync(projectPath, { recursive: true })
     const target = { kind: 'project' as const, id: 41 }
     let generation = 7
-    const repository = new SurvivorRepository(projectPath, 43268)
-    repository.snapshotOf = async () => ({ target, state: 'ready', port: 43268, generation })
+    const repository = new SurvivorRepository(projectPath, 43268, mintedLaunchStamp(cfg))
+    repository.snapshotOf = async () => ({ target, state: 'ready', port: 43268, generation, launchStamp: repository.launchStamp })
     repository.generationOf = async () => generation
     const attached = { hasExited: () => false, isAlive: vi.fn(async () => true), terminate: vi.fn(async () => {}) }
     const launcher = { instancesOutliveGateway: true, start: vi.fn(async () => { throw new Error('Observation cannot start') }), attach: vi.fn(() => attached) }
@@ -1789,7 +1886,7 @@ describe('InstanceManager', () => {
       attach: vi.fn(() => attached),
     }
     const liveManager = new InstanceManager(
-      new SurvivorRepository(projectPath, 43260),
+      new SurvivorRepository(projectPath, 43260, mintedLaunchStamp(cfg)),
       cfg,
       launcher,
       { principalPublicKey: '' },
@@ -1814,7 +1911,7 @@ describe('InstanceManager', () => {
         if (unavailable && phase === 'owner-read') throw new Error('owner storage unavailable')
         return super.owner(target)
       }
-    })(projectPath, 43263)
+    })(projectPath, 43263, mintedLaunchStamp(cfg))
     const attached = {
       hasExited: () => false,
       isAlive: vi.fn(async () => { if (unavailable && phase === 'probe') throw new Error('supervisor unavailable'); return true }),
@@ -1856,7 +1953,7 @@ describe('InstanceManager', () => {
     let state = 'ready'
     const repository = new (class extends SurvivorRepository {
       override stateOf(): Promise<string> { return Promise.resolve(state) }
-    })(projectPath, 43261)
+    })(projectPath, 43261, mintedLaunchStamp(cfg))
     const attached = {
       hasExited: () => false,
       isAlive: vi.fn(async () => true),
@@ -1886,7 +1983,7 @@ describe('InstanceManager', () => {
       attach: vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate: async () => {} })),
     }
     const liveManager = new InstanceManager(
-      new SurvivorRepository(projectPath, 43262),
+      new SurvivorRepository(projectPath, 43262, mintedLaunchStamp(cfg)),
       cfg,
       launcher,
       { principalPublicKey: '' },
