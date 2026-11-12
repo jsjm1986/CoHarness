@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-12-workbench-trace-bounded-evaluate.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-12-workbench-trace-bounded-evaluate.md
+document:
+  en: f61682a395376b11fdf468935a2e02c1e7b76483
+  zh: b3780698c803664e864f746d3758cee4e08fc94a
+/agent-note-workbench-pointer-trace-bounds-its-page-evaluates:
+  en: a0e6aaad6e7a2261
+  zh: 263bb0bf0bb5f48c
+/agent-note-workbench-pointer-trace-bounds-its-page-evaluates/problem:
+  en: 0f0935be23e0fa60
+  zh: 451d93a711c33653
+/agent-note-workbench-pointer-trace-bounds-its-page-evaluates/decision:
+  en: c2882848db97cab6
+  zh: 8d1a564e3deb7af7
+/agent-note-workbench-pointer-trace-bounds-its-page-evaluates/alternatives-considered:
+  en: 1324b2300c39e120
+  zh: 531cd2622d80e69c
+/agent-note-workbench-pointer-trace-bounds-its-page-evaluates/consequences:
+  en: ac93c15ed42ed62f
+  zh: 0a15c3e235c0a780
