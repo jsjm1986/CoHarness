@@ -20,7 +20,7 @@ A systemd-launched Runtime reads its Gateway API bearer token from `LoadCredenti
 
 ## Consequences
 
-Confined shell commands on systemd hosts see an empty credential directory under both Linux runners. Removal of a project conversation through the Runtime API now fails with `forbidden` unless the forwarded member can manage it. Personal Runtime removal keeps the existing creator-scoped check. Bearer-only reads and appends remain scoped by `belongsToRuntime`; hiding the token from confined commands is the control for those routes.
+Confined shell commands on systemd hosts see an empty credential directory under both Linux runners. Landlock grants cannot exclude a subtree, so when the Runtime holds a `$CREDENTIALS_DIRECTORY` its Landlock-confined commands cannot list `/` or `/run`; reads of other paths are unchanged, and processes without a credential directory keep the `/` grant. Removal of a project conversation through the Runtime API now fails with `forbidden` unless the forwarded member can manage it. Personal Runtime removal keeps the existing creator-scoped check. Bearer-only reads and appends remain scoped by `belongsToRuntime`; hiding the token from confined commands is the control for those routes.
 
 ## Verification
 

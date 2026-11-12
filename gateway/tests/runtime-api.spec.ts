@@ -8,7 +8,7 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:
 import type { Pool } from 'pg'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
-import { CollaborationDeniedError } from '../src/collaboration.ts'
+import { CollaborationDeniedError, type ConversationAccess } from '../src/collaboration.ts'
 import {
   type ConversationEvent,
   type ConversationHeader,
@@ -1752,8 +1752,23 @@ describe('runtime session removal authorization', () => {
     createdAt: CREATED_AT,
     cwd: '/tmp/shared',
   }
-  const stored = (): StoredConversation => ({ header, events: [] } as unknown as StoredConversation)
-  const remove = (runtime: ReturnType<typeof fixture>, principal?: string) => request(runtime.handler, '/internal/runtime/session/remove', {
+  const stored = (): StoredConversation => ({ header, events: [], revision: '1' })
+  const access = (canManage: boolean): ConversationAccess => ({
+    sessionId: 'session-remove',
+    rootSessionId: 'session-remove',
+    projectId: PROJECT_ID,
+    visibility: 'private',
+    creatorUserId: CREATOR_ID,
+    mode: 'rw',
+    canRead: true,
+    canWrite: true,
+    canManage,
+  })
+  const managing = (runtime: ReturnType<typeof fixture>, canManage: boolean) => {
+    const check = vi.fn(async (_userId: number, _runtimeId: RuntimeId, _sessionId: string, _action: string) => access(canManage))
+    return { check, handler: createRuntimeApiHandler({ ...runtime.deps, collaboration: { ...runtime.deps.collaboration, access: check } }) }
+  }
+  const remove = (handler: RuntimeHandler, principal?: string) => request(handler, '/internal/runtime/session/remove', {
     body: { sessionId: 'session-remove' },
     ...(principal === undefined ? {} : { principal }),
   })
@@ -1761,24 +1776,24 @@ describe('runtime session removal authorization', () => {
   it('rejects a bearer-only removal without a member assertion', async () => {
     const runtime = fixture()
     runtime.conversations.load.mockResolvedValue(stored())
-    expect(await remove(runtime)).toMatchObject({ handled: true, status: 403 })
+    expect(await remove(runtime.handler)).toMatchObject({ handled: true, status: 403 })
     expect(runtime.conversations.removeTree).not.toHaveBeenCalled()
   })
 
   it('rejects a member who cannot manage the session', async () => {
     const runtime = fixture()
     runtime.conversations.load.mockResolvedValue(stored())
-    runtime.deps.collaboration.access.mockResolvedValueOnce({ canManage: false } as never)
-    expect(await remove(runtime, runtime.issuePrincipal(CREATOR_ID))).toMatchObject({ handled: true, status: 403, body: { error: 'forbidden' } })
-    expect(runtime.deps.collaboration.access).toHaveBeenCalledWith(CREATOR_ID, RUNTIME_ID, 'session-remove', 'manage')
+    const { check, handler } = managing(runtime, false)
+    expect(await remove(handler, runtime.issuePrincipal(CREATOR_ID))).toMatchObject({ handled: true, status: 403, body: { error: 'forbidden' } })
+    expect(check).toHaveBeenCalledWith(CREATOR_ID, RUNTIME_ID, 'session-remove', 'manage')
     expect(runtime.conversations.removeTree).not.toHaveBeenCalled()
   })
 
   it('removes the tree for a member who can manage the session', async () => {
     const runtime = fixture()
     runtime.conversations.load.mockResolvedValue(stored())
-    runtime.deps.collaboration.access.mockResolvedValueOnce({ canManage: true } as never)
-    expect(await remove(runtime, runtime.issuePrincipal(CREATOR_ID))).toMatchObject({ handled: true, status: 200 })
+    const { handler } = managing(runtime, true)
+    expect(await remove(handler, runtime.issuePrincipal(CREATOR_ID))).toMatchObject({ handled: true, status: 200 })
     expect(runtime.conversations.removeTree).toHaveBeenCalledWith(ORGANIZATION_ID, 'session-remove')
   })
 })

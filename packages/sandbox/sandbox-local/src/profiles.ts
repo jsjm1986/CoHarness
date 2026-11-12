@@ -80,10 +80,16 @@ export function bwrapProfileArgs(policy: SandboxPolicy, hidden: readonly string[
 /**
  * Build the Landlock launcher grants for one file-effect policy.
  * @param policy - file-effect policy to express as Landlock allow-list grants.
- * @param hidden - directories excluded from the read allow-list; defaults to {@link hiddenCredentialRoots}.
+ * @param hidden - directories excluded from the read allow-list; defaults to {@link hiddenCredentialRoots}
+ *   when this process holds a systemd credential directory, otherwise none. Excluding a directory replaces
+ *   the `/` grant with grants on its ancestors' other children, so confined commands cannot list `/` or the
+ *   other ancestors.
  * @returns launcher grant arguments before the trailing separator and command argv.
  */
-export function landlockProfileArgs(policy: SandboxPolicy, hidden: readonly string[] = hiddenCredentialRoots()): string[] {
+export function landlockProfileArgs(
+  policy: SandboxPolicy,
+  hidden: readonly string[] = process.env.CREDENTIALS_DIRECTORY === undefined ? [] : hiddenCredentialRoots(),
+): string[] {
   const readWrite = ['/dev/null']
   if (policy.mode === 'workspace-write') {
     readWrite.push('/tmp', policy.workspaceRoot)

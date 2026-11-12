@@ -20,7 +20,7 @@ Status: implemented
 
 ## Consequences
 
-在 systemd 主机上，两种 Linux 运行器下的受限 shell 命令只能看到空的凭据目录。通过 Runtime API 删除项目会话时，若转发的成员不能管理该会话，则返回 `forbidden`。个人 Runtime 的删除保留现有的创建者范围检查。仅凭 bearer 的读取与追加仍受 `belongsToRuntime` 约束；对受限命令隐藏令牌是这些路由的控制措施。
+在 systemd 主机上，两种 Linux 运行器下的受限 shell 命令只能看到空的凭据目录。Landlock 授权无法排除子树，因此当 Runtime 持有 `$CREDENTIALS_DIRECTORY` 时，其 Landlock 受限命令无法列出 `/` 或 `/run`；对其他路径的读取不变，没有凭据目录的进程仍保留 `/` 授权。通过 Runtime API 删除项目会话时，若转发的成员不能管理该会话，则返回 `forbidden`。个人 Runtime 的删除保留现有的创建者范围检查。仅凭 bearer 的读取与追加仍受 `belongsToRuntime` 约束；对受限命令隐藏令牌是这些路由的控制措施。
 
 ## Verification
 
