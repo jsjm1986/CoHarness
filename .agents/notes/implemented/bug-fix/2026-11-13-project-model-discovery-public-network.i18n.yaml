@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-13-project-model-discovery-public-network.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-13-project-model-discovery-public-network.md
+document:
+  en: 10c92231b06dd61b2059ce539d3063d34f5a2043
+  zh: 9594f3d7f35bfcf348a6d979978b925d3dac51a7
+/agent-note-restrict-non-administrator-project-model-discovery-to-public-network-addresses:
+  en: 1611a4e5538cfe78
+  zh: be92439c067b08f2
+/agent-note-restrict-non-administrator-project-model-discovery-to-public-network-addresses/problem:
+  en: b29dbe2ed20f2573
+  zh: cdfd5df2a260fbae
+/agent-note-restrict-non-administrator-project-model-discovery-to-public-network-addresses/decision:
+  en: 1bce2b6557fa0a28
+  zh: 03ae4464e31d0551
+/agent-note-restrict-non-administrator-project-model-discovery-to-public-network-addresses/alternatives-considered:
+  en: 5356cb63748a41cf
+  zh: 1384b9d20b134691
+/agent-note-restrict-non-administrator-project-model-discovery-to-public-network-addresses/consequences:
+  en: d7194f10550f04d8
+  zh: e06217a4c689fa99
+/agent-note-restrict-non-administrator-project-model-discovery-to-public-network-addresses/verification:
+  en: 970985cdbb1e9da2
+  zh: 39865bc91596768d

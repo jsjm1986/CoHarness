@@ -139,6 +139,7 @@ describe('organization model discovery', () => {
       baseURL: 'https://gateway.example.test/openai/v1/',
       api: 'openai-completions',
       apiKey: 'openai-key',
+      allowPrivateNetwork: true,
     })).resolves.toEqual([{ id: 'gpt-acme', name: 'gpt-acme', contextWindow: 32_768 }])
 
     expect(requests).toHaveLength(1)
@@ -161,6 +162,7 @@ describe('organization model discovery', () => {
       baseURL: 'https://gateway.example.test',
       api: 'anthropic-messages',
       apiKey: 'anthropic-key',
+      allowPrivateNetwork: true,
     })).resolves.toEqual([{ id: 'claude-acme', name: 'Claude Acme' }])
 
     expect(requests).toHaveLength(1)
@@ -183,6 +185,7 @@ describe('organization model discovery', () => {
     await discoverOrganizationModels({
       baseURL: 'https://gateway.example.test/v1',
       api: 'anthropic-messages',
+      allowPrivateNetwork: true,
     })
 
     expect(urls).toEqual(['https://gateway.example.test/v1/models?limit=1000'])

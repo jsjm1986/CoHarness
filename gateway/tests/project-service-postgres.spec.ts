@@ -599,7 +599,7 @@ describePg('PostgreSQL project creation and mutations', () => {
           'credential-set': (actor: number) => governance.setProjectCredential(project.id, ref, 'fixture-updated-secret', actor),
           'credential-unset': (actor: number) => governance.unsetProjectCredential(project.id, ref, actor),
           discover: (actor: number) => governance.discoverProjectModels({ projectId: project.id, actorUserId: actor,
-            provider: 'fixture', baseURL: endpoint, api: 'openai-completions' }),
+            provider: 'fixture', baseURL: endpoint, api: 'openai-completions', allowPrivateNetwork: true }),
         }
         await expect(actions[operation](f.member)).rejects.toThrow('forbidden')
         expect(discoveries).toBe(0)

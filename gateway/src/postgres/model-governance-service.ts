@@ -766,7 +766,7 @@ export class PostgresModelGovernanceService {
         : undefined
       return { ...draft, ...draft.apiKey !== undefined || stored === undefined ? {} : { apiKey: stored } }
     })
-    return discoverOrganizationModels(prepared)
+    return discoverOrganizationModels({ ...prepared, allowPrivateNetwork: true })
   }
 
   /** List the active project-owned Provider rows without returning key values. */
@@ -970,6 +970,7 @@ export class PostgresModelGovernanceService {
     baseURL?: string
     api?: string
     apiKey?: string
+    allowPrivateNetwork: boolean
   }): Promise<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>> {
     const prepared = await transaction(this.context.pool, async (client) => {
       const project = await lockProjectManagement(client, this.context, request.projectId, request.actorUserId)
