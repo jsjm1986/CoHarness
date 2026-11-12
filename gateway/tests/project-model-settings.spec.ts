@@ -129,7 +129,7 @@ describe('project model settings API', () => {
         method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
         body: JSON.stringify({ baseURL: 'http://169.254.169.254', api: 'openai-completions' }),
       })
-      return { status: response.status, body: await response.json() as unknown }
+      return { status: response.status, body: await response.json() as { error: string } }
     }
     discover.mockRejectedValueOnce(new Error('could not reach http://169.254.169.254/models', { cause: new NonPublicNetworkTargetError('169.254.169.254') }))
     expect(await post('member', owned.id)).toEqual({ status: 400, body: { error: 'model-discovery-target-not-public' } })
