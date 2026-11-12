@@ -62,7 +62,7 @@ export async function createPerformanceFixture(enabled: boolean, plane: 'source'
       instances: {
         portOf: unreachable, stateOf: unreachable, stopReasonOf: unreachable, generationOf: unreachable,
         isLive: unreachable, liveEndpoint: unreachable, touch: unreachable, wsRef: unreachable, ensureRunning: unreachable, startRequest: unreachable,
-        reapIdle: unreachable, stop: unreachable, stopAll: unreachable, withStopped: unreachable,
+        reapIdle: unreachable, stop: unreachable, stopAll: unreachable, withStopped: unreachable, reconcile: unreachable,
       },
     }
     server = serverModule.createGatewayServer(deps, {

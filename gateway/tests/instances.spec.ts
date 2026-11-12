@@ -2,6 +2,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { createServer, type AddressInfo, type Socket } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
@@ -173,6 +174,9 @@ class ProjectRepository implements InstanceRepository {
 }
 
 class SurvivorRepository implements InstanceRepository {
+  state = 'ready'
+  generation = 7
+
   constructor(private readonly projectPath: string, private readonly port: number) {}
 
   initialize(): Promise<void> { return Promise.resolve() }
@@ -183,10 +187,10 @@ class SurvivorRepository implements InstanceRepository {
   markControlStopping(): Promise<boolean> { return Promise.reject(new CollaborationDeniedError('forbidden')) }
   activeTargets(): Promise<RuntimeTarget[]> { return Promise.resolve([{ kind: 'project', id: 41 }]) }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.port) }
-  stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve('ready') }
+  stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve(this.state) }
   stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(null) }
   startEligibility(_target: RuntimeTarget): Promise<{ stopReason: null }> { return Promise.resolve({ stopReason: null }) }
-  generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(7) }
+  generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.generation) }
   credentialHashOf(): Promise<null> { return Promise.resolve(null) }
   touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
   admitLease(target: RuntimeTarget, at: number, generation?: number): Promise<boolean> { return admitFixtureLease(this, target, at, generation) }
@@ -196,7 +200,7 @@ class SurvivorRepository implements InstanceRepository {
   markReady(_target: RuntimeTarget, _generation: number): Promise<void> { return Promise.resolve() }
   idleTargets(_cutoff: number): Promise<RuntimeTarget[]> { return Promise.resolve([]) }
   idleTarget(_target: RuntimeTarget, _cutoff: number): Promise<boolean> { return Promise.resolve(false) }
-  markStopping(_target: RuntimeTarget): Promise<boolean> { return Promise.resolve(true) }
+  markStopping(_target: RuntimeTarget, _generation: number, _reason?: RuntimeStopReason): Promise<boolean> { return Promise.resolve(true) }
   markStopped(_target: RuntimeTarget): Promise<boolean> { return Promise.resolve(true) }
   owner(_target: RuntimeTarget): Promise<{
     kind: 'project'
@@ -659,6 +663,252 @@ describe('InstanceManager', () => {
     expect(attach).toHaveBeenCalledOnce()
     expect(terminate).toHaveBeenCalledOnce()
     expect(local.capacitySnapshot().resident).toBe(0)
+  })
+
+  it.each(['unread', 'isLive', 'ensureRunning'])('drains adopted survivors after a launch signature change despite %s', async read => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'drained-survivor'); mkdirSync(projectPath)
+    const terminate = vi.fn(async () => {})
+    const attach = vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate }))
+    const local = new InstanceManager(new SurvivorRepository(projectPath, 43250), cfg, {
+      instancesOutliveGateway: false, attach, start: async () => { throw new Error('unexpected replacement') },
+    })
+    const target = { kind: 'project' as const, id: 41 }
+    if (read === 'isLive') expect(await local.isLive(target)).toBe(true)
+    if (read === 'ensureRunning') expect(await local.ensureRunning({ ...target, name: 'Compiler', path: projectPath })).toEqual({ port: 43250, generation: 7 })
+    await local.drainSurvivors('shutdown')
+    expect(attach).toHaveBeenCalledOnce()
+    expect(terminate).toHaveBeenCalledOnce()
+  })
+
+  it('keeps an owned runtime serving across a retaining shutdown', async () => {
+    const { db, cfg, alice, manager } = await setup()
+    const { port } = await manager.ensureRunning(alice)
+    await manager.stopAll(true)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+    await expect(fetch(`http://127.0.0.1:${port}/`).then(response => response.text())).resolves.toBe('ok')
+    const next = new InstanceManager(db, cfg)
+    try {
+      expect(await next.stateOf(alice.id)).toBe('ready')
+      expect(next.capacitySnapshot().resident).toBe(1)
+    } finally { await manager.stopAll() }
+    expect(await manager.stateOf(alice.id)).toBe('stopped')
+    // The next-boot manager keeps the adopted lease counted until termination
+    // is confirmed; the fixture's legacy row carries no recovery credential.
+    await expect(next.stopAll()).rejects.toThrow('Legacy local runtime ownership')
+  })
+
+  it('warms a shutdown-stopped runtime but never a manual or access-change stop', async () => {
+    const { alice, manager, users } = await setup()
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, 'shutdown')
+    const first = await manager.reconcile()
+    expect(first.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+    const bob = await users.create({ username: 'bob', password: 'pw-123456' })
+    await manager.ensureRunning(bob)
+    await manager.stop(bob.id, 'manual')
+    const cara = await users.create({ username: 'cara', password: 'pw-123456' })
+    await manager.ensureRunning(cara)
+    await manager.stop(cara.id, 'access-change')
+    const second = await manager.reconcile()
+    expect(second.warmed).toBe(0)
+    expect(await manager.stateOf(bob.id)).toBe('stopped')
+    expect(await manager.stateOf(cara.id)).toBe('stopped')
+  })
+
+  it('publishes a crashed runtime failed and warms it back ready', async () => {
+    const { alice, manager } = await setup()
+    const { port } = await manager.ensureRunning(alice)
+    await fetch(`http://127.0.0.1:${port}/exit`)
+    await expect.poll(() => manager.stateOf(alice.id)).toBe('stopped')
+    expect(await manager.stopReasonOf(alice.id)).toBe('failed')
+    const summary = await manager.reconcile()
+    expect(summary.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+  })
+
+  it('publishes failed for a ready survivor whose process no longer answers', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'dead-survivor'); mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43250)
+    const markStopping = vi.spyOn(repository, 'markStopping')
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => true, isAlive: async () => false, terminate: vi.fn(async () => {}) }),
+      start: async () => { throw new Error('probe path attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(1)
+    expect(markStopping.mock.calls[0]?.[2]).toBe('failed')
+  })
+
+  it('reassigns an instance port held by a foreign listener instead of looping EADDRINUSE', async () => {
+    const { alice, manager, cfg, db } = await setup()
+    const dshHome = join(cfg.usersRoot, 'alice', 'dsh')
+    mkdirSync(dshHome, { recursive: true })
+    const portFile = join(dshHome, 'child-port')
+    const held = new Set<Socket>()
+    const squatter = createServer(socket => { held.add(socket); socket.on('close', () => held.delete(socket)) })
+    await new Promise<void>(resolve => squatter.listen(0, '127.0.0.1', resolve))
+    try {
+      writeFileSync(portFile, String((squatter.address() as AddressInfo).port))
+      const repository = Reflect.get(manager, 'repository') as InstanceRepository
+      const reassign = vi.spyOn(repository, 'reassignPort').mockImplementation(async () => {
+        const claimed = await claimRuntimePort(dshHome)
+        db.prepare(`UPDATE instances SET port=? WHERE user_id=?`).run(claimed, alice.id)
+        rmSync(portFile, { force: true })
+        return claimed
+      })
+      const endpoint = await manager.ensureRunning(alice)
+      expect(reassign).toHaveBeenCalledTimes(1)
+      const assigned = (db.prepare(`SELECT port FROM instances WHERE user_id=?`).get(alice.id) as { port: number }).port
+      expect(endpoint.port).toBe(assigned)
+      expect(await manager.stateOf(alice.id)).toBe('ready')
+      await expect(fetch(`http://127.0.0.1:${String(endpoint.port)}/`)).resolves.toMatchObject({ status: 200 })
+    } finally {
+      if (squatter.listening) squatter.close()
+      for (const socket of held) socket.destroy()
+    }
+  })
+
+  it('fails the start loudly when an occupied port cannot be reassigned', async () => {
+    const { alice, manager, cfg } = await setup()
+    const dshHome = join(cfg.usersRoot, 'alice', 'dsh')
+    mkdirSync(dshHome, { recursive: true })
+    const portFile = join(dshHome, 'child-port')
+    const squatter = createServer(socket => socket.on('error', () => {}))
+    await new Promise<void>(resolve => squatter.listen(0, '127.0.0.1', resolve))
+    try {
+      writeFileSync(portFile, String((squatter.address() as AddressInfo).port))
+      const repository = Reflect.get(manager, 'repository') as InstanceRepository
+      vi.spyOn(repository, 'reassignPort').mockResolvedValue(undefined)
+      await expect(manager.ensureRunning(alice)).rejects.toThrow('cannot be reassigned')
+      expect(await manager.stateOf(alice.id)).toBe('stopped')
+    } finally { if (squatter.listening) squatter.close() }
+  })
+
+  it('finishes an abandoned stopping row under its recorded reason', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'wedged-stopping'); mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43250)
+    repository.state = 'stopping'
+    const markStopping = vi.spyOn(repository, 'markStopping')
+    const markStopped = vi.spyOn(repository, 'markStopped')
+    const terminate = vi.fn(async () => {})
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => true, isAlive: async () => false, terminate } satisfies InstanceProc),
+      start: async () => { throw new Error('stop completion attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(1)
+    expect(terminate).toHaveBeenCalled()
+    expect(markStopping.mock.calls[0]?.[2]).toBe('failed')
+    expect(markStopped).toHaveBeenCalled()
+  })
+
+  it('never warms an idle-stopped runtime — on-demand release stays stopped', async () => {
+    const { alice, manager, db } = await setup()
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, 'shutdown')
+    db.prepare(`UPDATE instances SET stop_reason='idle' WHERE user_id=?`).run(alice.id)
+    const summary = await manager.reconcile()
+    expect(summary.warmed).toBe(0)
+    expect(await manager.stateOf(alice.id)).toBe('stopped')
+  })
+
+  it('does not refresh last activity for a reconcile-warmed start', async () => {
+    const { alice, manager, db } = await setup()
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, 'shutdown')
+    const stale = Date.now() - 60_000
+    db.prepare(`UPDATE instances SET last_activity_at=? WHERE user_id=?`).run(stale, alice.id)
+    const summary = await manager.reconcile()
+    expect(summary.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+    const row = db.prepare(`SELECT last_activity_at FROM instances WHERE user_id=?`).get(alice.id) as { last_activity_at: number }
+    expect(row.last_activity_at).toBe(stale)
+  })
+
+  it('skips the dead-stop when the row moved past the observed generation', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'moving-survivor'); mkdirSync(projectPath)
+    const repository = new class extends SurvivorRepository {
+      override async snapshotOf(target: RuntimeTarget): Promise<RuntimeInstanceSnapshot> {
+        const snapshot = await super.snapshotOf(target)
+        // Every read after the reconcile probe reports the replacement a
+        // racing start already committed.
+        this.state = 'starting'
+        this.generation = 8
+        return snapshot
+      }
+    }(projectPath, 43250)
+    const terminate = vi.fn(async () => {})
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => true, isAlive: async () => false, terminate }),
+      start: async () => { throw new Error('probe path attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(0)
+    expect(terminate).not.toHaveBeenCalled()
+  })
+
+  it('defers warm retries behind consecutive launch failures instead of a boot budget', async () => {
+    const { alice, manager } = await setup({ HGW_RECONCILE_BACKOFF_BASE_MS: '80' })
+    await manager.ensureRunning(alice)
+    manager.beforeStart = () => Promise.reject(new Error('launch always fails'))
+    await manager.stop(alice.id, 'failed')
+    const first = await manager.reconcile()
+    expect(first.warmed).toBe(0)
+    expect(first.deferred).toBe(0)
+    const second = await manager.reconcile()
+    expect(second.warmed).toBe(0)
+    expect(second.deferred).toBe(1)
+    await new Promise(r => setTimeout(r, 110))
+    const third = await manager.reconcile()
+    expect(third.warmed).toBe(0)
+    const fourth = await manager.reconcile()
+    expect(fourth.deferred).toBe(1)
+    // The deferral grows exponentially: after the second failure the row stays
+    // deferred inside the doubled interval.
+    await new Promise(r => setTimeout(r, 110))
+    expect((await manager.reconcile()).deferred).toBe(1)
+    manager.beforeStart = undefined
+    await new Promise(r => setTimeout(r, 120))
+    const recovered = await manager.reconcile()
+    expect(recovered.warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+  })
+
+  it('clears a reconcile failure streak after the runtime stays ready', async () => {
+    const { alice, manager } = await setup({ HGW_RECONCILE_BACKOFF_BASE_MS: '80', HGW_RECONCILE_STABLE_MS: '50' })
+    await manager.ensureRunning(alice)
+    manager.beforeStart = () => Promise.reject(new Error('boom'))
+    await manager.stop(alice.id, 'failed')
+    await manager.reconcile()
+    manager.beforeStart = undefined
+    await new Promise(r => setTimeout(r, 110))
+    expect((await manager.reconcile()).warmed).toBe(1)
+    // The streak closes only after ready observations spanning the stable
+    // window: the first probe stamps liveness, a later one clears the entry.
+    await new Promise(r => setTimeout(r, 80))
+    await manager.reconcile()
+    await new Promise(r => setTimeout(r, 80))
+    await manager.reconcile()
+    manager.beforeStart = () => Promise.reject(new Error('boom'))
+    await manager.stop(alice.id, 'failed')
+    await manager.reconcile()
+    manager.beforeStart = undefined
+    // A cleared streak restarts at the base interval — 110ms clears the 80ms
+    // deferral a retained entry would have doubled past.
+    await new Promise(r => setTimeout(r, 110))
+    expect((await manager.reconcile()).warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
   })
 
   it('reaps idle instances but keeps active ones', async () => {

@@ -28,6 +28,7 @@ import {
 } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
+import { connect } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import type Database from 'better-sqlite3'
 import type { UserRow } from './auth.ts'
@@ -54,6 +55,10 @@ import { readResponseJson } from './response-budget.ts'
 
 const POLL_INTERVAL_MS = 300
 const STOP_GRACE_MS = 5000
+/** Bound on a single loopback probe; an unanswered port stays conservative-occupied. */
+const PORT_PROBE_TIMEOUT_MS = 1000
+/** Allocation retries when a freshly assigned port is itself foreign-occupied. */
+const PORT_REASSIGN_ATTEMPTS = 3
 const STOP_ALL_CONCURRENCY = 8
 const MANAGED_CREDENTIALS_FILENAME = '.credentials.yaml'
 const ADMIN_GUARD_PATCH_FILENAME = 'cordis.admin.patch.yml'
@@ -383,13 +388,27 @@ export interface InstanceRepository {
    * @param runtimeTokenHash - digest of the fresh generation's bearer.
    * @param intent - start policy; passive by default.
    * @param administratorUserId - initiating administrator retained through the claim; omission permits trusted lifecycle maintenance.
+   * @param recordActivity - false leaves `last_activity_at` untouched so an unattended warmup cannot renew the warm window; true by default.
    * @returns the claimed generation.
    */
-  beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent?: RuntimeStartIntent, administratorUserId?: number): Promise<number>
+  beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent?: RuntimeStartIntent, administratorUserId?: number, recordActivity?: boolean): Promise<number>
   markReady(target: RuntimeTarget, generation: number): Promise<void>
   idleTargets(cutoff: number): Promise<RuntimeTarget[]>
   /** Re-check one idle candidate without rescanning the whole instance table. */
   idleTarget(target: RuntimeTarget, cutoff: number): Promise<boolean>
+  /**
+   * Stopped assignments on this node whose stop cause permits unattended warmup.
+   * @param activityCutoff - earliest last-activity timestamp that still qualifies.
+   * @returns recently used targets stopped by shutdown or failure; manual, access-change and on-demand idle stops never appear.
+   */
+  warmTargets?(activityCutoff: number): Promise<RuntimeTarget[]>
+  /**
+   * Move the assignment to a freshly allocated node-local port when its
+   * assigned port is held by a process that ownership evidence cannot reclaim.
+   * @param target - exact local assignment to re-address.
+   * @returns the new port, or undefined when reassignment is unsupported and the occupied port must fail the start.
+   */
+  reassignPort?(target: RuntimeTarget): Promise<number | undefined>
   /**
    * @param target - assignment to stop.
    * @param generation - captured generation; never a replacement.
@@ -532,14 +551,15 @@ class SqliteInstanceRepository implements InstanceRepository {
     return false
   }
 
-  async beginStart(target: RuntimeTarget, at: number, _runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive', administratorUserId?: number): Promise<number> {
+  async beginStart(target: RuntimeTarget, at: number, _runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive', administratorUserId?: number, recordActivity = true): Promise<number> {
     const userId = this.userId(target)
     const claim = () => {
       if (administratorUserId !== undefined) requireSqliteAdministrator(this.db, administratorUserId)
-      return this.db.prepare(`UPDATE instances SET state = 'starting', stop_reason = NULL, started_at = ?, last_activity_at = ?
+      return this.db.prepare(`UPDATE instances SET state = 'starting', stop_reason = NULL, started_at = ?,
+      last_activity_at = CASE WHEN ? THEN ? ELSE last_activity_at END
       WHERE user_id = ? AND state = 'stopped' AND (? = 'explicit' OR (stop_reason IS NOT 'manual' AND (? <> 'webhook' OR stop_reason = 'idle')))
         AND EXISTS(SELECT 1 FROM users WHERE id = ? AND status = 'active' AND deleted_at IS NULL)`)
-      .run(at, at, userId, intent, intent, userId)
+      .run(at, recordActivity ? 1 : 0, at, userId, intent, intent, userId)
     }
     const updated = administratorUserId === undefined ? claim() : this.db.transaction(claim).immediate()
     if (updated.changes !== 1) {
@@ -576,6 +596,24 @@ class SqliteInstanceRepository implements InstanceRepository {
       `SELECT 1 AS present FROM instances WHERE user_id = ? AND state = 'ready' AND last_activity_at < ? LIMIT 1`,
     ).get(userId, cutoff) as { present: number } | undefined
     return row !== undefined
+  }
+
+  async warmTargets(activityCutoff: number): Promise<RuntimeTarget[]> {
+    const rows = this.db.prepare(
+      `SELECT user_id FROM instances WHERE state = 'stopped'
+        AND stop_reason IN ('shutdown','failed') AND last_activity_at > ? ORDER BY last_activity_at DESC`,
+    ).all(activityCutoff) as Array<{ user_id: number }>
+    return rows.map(row => ({ kind: 'user' as const, id: row.user_id }))
+  }
+
+  async reassignPort(target: RuntimeTarget): Promise<number | undefined> {
+    const userId = this.userId(target)
+    return this.db.transaction(() => {
+      const high = (this.db.prepare(`SELECT MAX(port) AS high FROM instances`).get() as { high: number | null }).high
+      const port = (high ?? 0) + 1
+      const updated = this.db.prepare(`UPDATE instances SET port = ? WHERE user_id = ?`).run(port, userId)
+      return updated.changes === 0 ? undefined : port
+    })()
   }
 
   async markStopping(target: RuntimeTarget, generation: number, reason: RuntimeStopReason = 'manual', actorUserId?: number): Promise<boolean> {
@@ -651,6 +689,8 @@ export class InstanceManager {
   private readonly operationTotals = new Map<string, number>()
   /** Per-runtime operation chain: serializes start vs stop so a reap cannot orphan a fresh spawn. */
   private readonly ops = new Map<string, Promise<unknown>>()
+  /** Consecutive-failure backoff per target; a sustained ready observation clears the streak. */
+  private readonly reconcileRecovery = new Map<string, { failures: number; retryAt: number; readySince?: number }>()
   /** Gateway maintenance admission and writer accounting around the complete start operation. */
   startAdmission?: (operation: () => Promise<RuntimeEndpoint>) => Promise<RuntimeEndpoint>
 
@@ -999,10 +1039,11 @@ export class InstanceManager {
    * @param administratorUserId - initiating administrator for Admin control; omission permits trusted lifecycle maintenance.
    * @returns one shared operation per target, intent and initiating administrator while its start remains unsettled.
    */
-  startRequest(subject: RuntimeSubject, intent: RuntimeStartIntent = 'passive', administratorUserId?: number): RuntimeStartRequest {
+  startRequest(subject: RuntimeSubject, intent: RuntimeStartIntent = 'passive', administratorUserId?: number, options?: { recordActivity?: boolean }): RuntimeStartRequest {
     if (this.closedStartRequest !== undefined) return this.closedStartRequest
     const key = targetKey(runtimeTargetOf(subject))
-    const requestKey = administratorUserId === undefined ? `${key}:${intent}` : `${key}:${intent}:administrator:${String(administratorUserId)}`
+    const recordActivity = options?.recordActivity !== false
+    const requestKey = `${key}:${intent}${administratorUserId === undefined ? '' : `:administrator:${String(administratorUserId)}`}${recordActivity ? '' : ':noactivity'}`
     const pending = this.pendingStarts.get(requestKey)
     if (pending !== undefined) return pending
     const controller = new AbortController()
@@ -1015,7 +1056,7 @@ export class InstanceManager {
     // ensureRunning consumers observe readiness only; keep the optional admission result contained.
     void admission.catch(() => {})
     const run = this.dispatch(runtimeTargetOf(subject), target => this.ensureRunningNow(
-      { ...subject, runtimeId: target.runtimeId }, intent, controller.signal, accept, administratorUserId)).then(result => {
+      { ...subject, runtimeId: target.runtimeId }, intent, controller.signal, accept, administratorUserId, recordActivity)).then(result => {
       accept()
       return result
     }, error => {
@@ -1032,7 +1073,7 @@ export class InstanceManager {
     return operation
   }
 
-  private ensureRunningNow(subject: RuntimeSubject, intent: RuntimeStartIntent, signal: AbortSignal, accept: () => void, administratorUserId?: number): Promise<RuntimeEndpoint> {
+  private ensureRunningNow(subject: RuntimeSubject, intent: RuntimeStartIntent, signal: AbortSignal, accept: () => void, administratorUserId?: number, recordActivity = true): Promise<RuntimeEndpoint> {
     const target = runtimeTargetOf(subject)
     return this.serialize(target, async () => {
       await this.initialized
@@ -1131,7 +1172,7 @@ export class InstanceManager {
         if (signal.aborted) throw new RuntimeCapacityError('cancelled')
         const start = async () => {
           if (administratorUserId !== undefined) await this.repository.authorizeAdministrator(administratorUserId)
-          return this.start(await this.launchContext(subject), port, intent, signal, administratorUserId)
+          return this.start(await this.launchContext(subject), port, intent, signal, administratorUserId, recordActivity)
         }
         const result = await (this.startAdmission === undefined ? start() : this.startAdmission(start))
         lease.ready()
@@ -1348,19 +1389,22 @@ export class InstanceManager {
     intent: RuntimeStartIntent,
     signal: AbortSignal,
     administratorUserId?: number,
+    recordActivity = true,
   ): Promise<RuntimeEndpoint> {
     const now = Date.now()
     const runtimeToken = randomBytes(32).toString('base64url')
     const runtimeTokenHash = createHash('sha256').update(runtimeToken).digest()
     const verifyPreparedStorage=await this.repository.checkProjectStorage?.(descriptor.target)
+    const claimedPort = await this.reclaimInstancePort(descriptor, port, signal)
     const generation = await this.repository.beginStart(
       descriptor.target,
       now,
       runtimeTokenHash,
       intent,
       administratorUserId,
+      recordActivity,
     )
-    const runtime: RuntimeLaunchContext = { ...descriptor, generation }
+    const runtime: RuntimeLaunchContext = { ...descriptor, port: claimedPort, generation }
     const key = targetKey(runtime.target)
     let proc: InstanceProc | undefined
     try {
@@ -1432,7 +1476,7 @@ export class InstanceManager {
           const remaining = deadline - performance.now()
           if (remaining <= 0) break
           const probeTimeoutMs = Math.max(1, Math.floor(Math.min(1000, remaining)))
-          const authority = `127.0.0.1:${String(port)}`
+          const authority = `127.0.0.1:${String(claimedPort)}`
           const response = await fetch(`http://${authority}${RUNTIME_READINESS_PATH}`, {
             method: 'GET',
             headers: {
@@ -1470,7 +1514,7 @@ export class InstanceManager {
           if (registered) {
             await this.repository.markReady(runtime.target, generation)
             if (!withinDeadline()) break
-            return { port, generation, ...(runtime.target.runtimeId === undefined ? {} : { runtimeId: runtime.target.runtimeId }) }
+            return { port: claimedPort, generation, ...(runtime.target.runtimeId === undefined ? {} : { runtimeId: runtime.target.runtimeId }) }
           }
         }
         const remaining = deadline - performance.now()
@@ -1481,7 +1525,7 @@ export class InstanceManager {
           throw error
         }
       }
-      throw new Error(`instance for ${runtime.runtimeKey ?? runtime.username} failed to become ready on port ${port}`)
+      throw new Error(`instance for ${runtime.runtimeKey ?? runtime.username} failed to become ready on port ${claimedPort}`)
     } catch (error) {
       // A failed post-beginStart path must never strand the durable row in
       // `starting`; terminate the child first, then publish the stopped state.
@@ -1501,6 +1545,62 @@ export class InstanceManager {
       }
       throw error
     }
+  }
+
+  /**
+   * Verify the assigned instance port is bindable before spending a generation.
+   * The row being started is already stopped — its credential hash was cleared,
+   * so no owner evidence can attribute a holder; dead-leader orphan groups are
+   * reaped on the control path instead. An occupied port therefore belongs to
+   * a process outside ownership evidence, and the instance moves to a freshly
+   * allocated port instead of looping EADDRINUSE through the readiness deadline.
+   * @param descriptor - launch context whose `port`/`target` identify the row.
+   * @param port - assigned instance port.
+   * @param signal - caller cancellation.
+   * @returns the port the child must bind — unchanged or freshly allocated.
+   */
+  private async reclaimInstancePort(
+    descriptor: Omit<RuntimeLaunchContext, 'generation'>, port: number, signal: AbortSignal,
+  ): Promise<number> {
+    if (await this.instancePortFree(port, signal)) return port
+    const target = descriptor.target
+    for (let attempt = 0; attempt < PORT_REASSIGN_ATTEMPTS; attempt += 1) {
+      const reassigned = await this.repository.reassignPort?.(target)
+      if (reassigned === undefined) {
+        throw new Error(`instance port ${String(port)} for ${targetKey(target)} is occupied and cannot be reassigned`)
+      }
+      if (await this.instancePortFree(reassigned, signal)) {
+        console.error(`[gateway] instance port ${String(port)} for ${targetKey(target)} is held by a foreign process; reassigned to ${String(reassigned)}`)
+        return reassigned
+      }
+    }
+    throw new Error(`instance ports for ${targetKey(target)} remained occupied after ${String(PORT_REASSIGN_ATTEMPTS)} reassignments`)
+  }
+
+  /**
+   * Probe whether a real process serves the instance's loopback port. Refused
+   * or immediately dropped connections mean nothing owns it — including a
+   * forwarding relay with no upstream, which closes the probe untouched. Any
+   * bytes or a connection still held at the deadline count as an occupant so
+   * a spawn never binds blindly over a stale holder.
+   */
+  private async instancePortFree(port: number, signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted) throw new RuntimeCapacityError('cancelled')
+    return await new Promise<boolean>((resolve, reject) => {
+      const socket = connect({ host: '127.0.0.1', port })
+      let bytes = 0
+      const finish = (free: boolean) => { clearTimeout(timer); signal.removeEventListener('abort', aborted); socket.destroy(); resolve(free) }
+      const aborted = () => { clearTimeout(timer); socket.destroy(); reject(new RuntimeCapacityError('cancelled')) }
+      const timer = setTimeout(() => finish(false), PORT_PROBE_TIMEOUT_MS)
+      signal.addEventListener('abort', aborted, { once: true })
+      socket.on('data', (chunk: Buffer) => { bytes += chunk.length; finish(false) })
+      socket.once('error', (error: NodeJS.ErrnoException) => {
+        // A refused connection is the only unconditional 'free' verdict; a
+        // reset after accept still means a listener dropped an empty probe.
+        finish(error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' && bytes === 0)
+      })
+      socket.once('close', () => finish(bytes === 0))
+    })
   }
 
   async reapIdle(): Promise<number> {
@@ -1528,6 +1628,139 @@ export class InstanceManager {
       if (didStop) stopped += 1
     }
     return stopped
+  }
+
+  /**
+   * Reconcile durable rows with observed processes on this node. Ready rows
+   * whose process can no longer be confirmed alive are published `failed`;
+   * recently used stopped runtimes restart through ordinary passive
+   * admission. Manual, access-change and on-demand idle stops are never
+   * reverted, and reconcile retries a consecutive failure streak behind an
+   * exponential backoff instead of stopping permanently or churning every tick.
+   * @returns per-tick counts for operator visibility.
+   */
+  async reconcile(): Promise<{ failed: number; warmed: number; deferred: number }> {
+    await this.initialized
+    const summary = { failed: 0, warmed: 0, deferred: 0 }
+    for (const key of [...this.residentLeases.keys()]) {
+      const target = targetFromKey(key)
+      try {
+        const snapshot = await this.repository.snapshotOf(target)
+        if (snapshot === null) continue
+        if (snapshot.state === 'stopping') {
+          // A gateway restart abandons in-flight terminations; finish the stop
+          // on the serialized lane under the row's recorded reason — fenced to
+          // the observed generation so a racing replacement is never cancelled
+          // or stopped, and a `manual` stop never warms back.
+          const settled = await this.dispatch(target, resolved => this.serialize(resolved, async () => {
+            const current = await this.repository.snapshotOf(resolved)
+            if (current === null || current.state !== 'stopping' || current.generation !== snapshot.generation) return false
+            const reason = await this.repository.stopReasonOf(resolved) ?? 'failed'
+            return await this.terminate(resolved, reason, snapshot.generation) !== undefined
+          }), true)
+          if (!settled) continue
+          summary.failed += 1
+          continue
+        }
+        if (snapshot.state !== 'ready') continue
+        const tracked = this.procs.get(key)
+        let dead = false
+        if (tracked !== undefined) {
+          try {
+            dead = tracked.isAlive === undefined ? tracked.hasExited() : !await tracked.isAlive()
+          } catch { /* unavailable supervision is not death evidence */ }
+        } else {
+          let endpoint: Awaited<ReturnType<InstanceManager['liveEndpoint']>> = null
+          try { endpoint = await this.liveEndpoint(snapshot.target) }
+          catch (error) {
+            if (!(error instanceof RuntimeStartBlockedError)) throw error
+            continue
+          }
+          if (endpoint !== null) { this.noteReconcileAlive(key); continue }
+          // An unregistered row is a resource-publication gap, not death evidence.
+          dead = this.resources === undefined || await this.resources.registered(snapshot.target, snapshot.generation)
+        }
+        if (!dead) { this.noteReconcileAlive(key); continue }
+        const settled = await this.dispatch(target, resolved => this.serialize(resolved, async () => {
+          // The probe ran outside the per-target slot; a racing start may have
+          // replaced the dead generation — act only on the observed one, and
+          // never abort the in-flight starts a `stop()` call would cancel.
+          const current = await this.repository.snapshotOf(resolved)
+          if (current === null || current.state !== 'ready' || current.generation !== snapshot.generation) return false
+          return await this.terminate(resolved, 'failed', snapshot.generation) !== undefined
+        }), true)
+        if (!settled) continue
+        summary.failed += 1
+        this.recordReconcileFailure(key)
+      } catch (error) {
+        console.error(`[gateway] reconcile probe for ${key} failed:`, error)
+      }
+    }
+    const cutoff = Date.now() - this.cfg.reconcile.warmWindowMs
+    for (const target of await this.repository.warmTargets?.(cutoff) ?? []) {
+      const key = targetKey(target)
+      const recovery = this.reconcileRecovery.get(key)
+      if (recovery !== undefined && Date.now() < recovery.retryAt) { summary.deferred += 1; continue }
+      try {
+        const subject = await this.warmSubject(target)
+        if (subject === undefined) continue
+        await this.startRequest(subject, 'passive', undefined, { recordActivity: false }).completion
+        summary.warmed += 1
+      } catch (error) {
+        if (error instanceof RuntimeStartBlockedError || error instanceof RuntimeCapacityError) {
+          // Eligibility and admission-pressure refusals consumed no
+          // generation; defer one base interval without growing the streak.
+          const entry = recovery ?? { failures: 0, retryAt: 0 }
+          entry.retryAt = Date.now() + this.cfg.reconcile.backoffBaseMs
+          this.reconcileRecovery.set(key, entry)
+          summary.deferred += 1
+          continue
+        }
+        console.error(`[gateway] reconcile warm for ${key} failed:`, error)
+        this.recordReconcileFailure(key)
+      }
+    }
+    return summary
+  }
+
+  /**
+   * Track continuous liveness for a target with a recorded failure streak;
+   * staying ready past the stable window closes the streak.
+   */
+  private noteReconcileAlive(key: string): void {
+    const entry = this.reconcileRecovery.get(key)
+    if (entry === undefined) return
+    entry.readySince ??= Date.now()
+    if (Date.now() - entry.readySince >= this.cfg.reconcile.stableMs) this.reconcileRecovery.delete(key)
+  }
+
+  /**
+   * Count a confirmed death or launch failure and delay the next automatic
+   * attempt exponentially — never permanently, so a crash-looping runtime
+   * still recovers instead of waiting for the next Gateway boot.
+   */
+  private recordReconcileFailure(key: string): void {
+    const entry = this.reconcileRecovery.get(key) ?? { failures: 0, retryAt: 0 }
+    entry.failures += 1
+    delete entry.readySince
+    const shift = Math.min(entry.failures - 1, 20)
+    entry.retryAt = Date.now() + Math.min(this.cfg.reconcile.backoffMaxMs, this.cfg.reconcile.backoffBaseMs * 2 ** shift)
+    this.reconcileRecovery.set(key, entry)
+  }
+
+  /**
+   * Build the launch subject for a warmable target from its current owner
+   * row. Personal policy refills account facts at admission, so id and
+   * username suffice to address it.
+   */
+  private async warmSubject(target: RuntimeTarget): Promise<RuntimeSubject | undefined> {
+    const owner = await this.repository.owner(target)
+    if (owner === null) return undefined
+    if (target.kind === 'user') {
+      return { id: owner.id, username: owner.username, homePath: owner.homePath, runtimeId: target.runtimeId } as PersonalRuntime
+    }
+    return { kind: 'project', id: target.id, name: owner.name ?? '', path: owner.homePath,
+      ...(target.runtimeId === undefined ? {} : { runtimeId: target.runtimeId }) }
   }
 
   private async confirmHostIdle(target: RuntimeTarget): Promise<number | undefined> {
@@ -1818,21 +2051,23 @@ export class InstanceManager {
   }
 
   /**
-   * Drain tracked and recovered local runtimes despite individual failures; retain configured supervisor units.
-   * @returns completion after all workers settle; rejects with the first failed worker's original error
+   * Terminate every adopted or tracked supervisor-owned target on this node.
+   * Boot calls this to retire survivors whose recorded launch signature no
+   * longer matches the running build; their next entry cold-starts current code.
+   * @param reason - durable stop reason published for each drained target.
+   * @returns completion after every target settled; rejects with the first failure.
    */
-  async stopAll(): Promise<void> {
-    this.beginShutdown()
+  async drainSurvivors(reason: RuntimeStopReason = 'shutdown'): Promise<void> {
     await this.initialized
-    await Promise.allSettled([...this.pendingStarts.values()].map(operation => operation.completion))
-    // Graceful shutdown terminates locally owned children; supervisor units
-    // retain their independent lifecycle across a Gateway restart.
-    if (this.launcher.instancesOutliveGateway) return
-    const targets = await Promise.all([...new Set([...this.procs.keys(), ...this.residentLeases.keys()])].map(async (key) => {
-      return targetFromKey(key)
-    }))
+    const targets = [...new Set([...this.procs.keys(), ...this.residentLeases.keys()])].map(key => targetFromKey(key))
+    const failures = await this.drainTargets(targets, reason)
+    if (failures.length > 0) throw failures[0]
+  }
+
+  /** Stop each target with bounded concurrency, collecting per-target failures. */
+  private async drainTargets(targets: RuntimeTarget[], reason: RuntimeStopReason): Promise<unknown[]> {
     let cursor = 0
-    const worker = async (): Promise<void> => {
+    const worker = async (): Promise<unknown[]> => {
       const errors: unknown[] = []
       for (;;) {
         const index = cursor
@@ -1840,18 +2075,35 @@ export class InstanceManager {
         const target = targets[index]
         if (target === undefined) break
         try {
-          await this.stop(target, 'shutdown')
+          await this.stop(target, reason)
         } catch (error) {
           errors.push(error)
         }
       }
-      if (errors.length > 0) throw errors[0]
+      return errors
     }
-    const settled = await Promise.allSettled(Array.from(
+    const results = await Promise.all(Array.from(
       { length: Math.min(STOP_ALL_CONCURRENCY, targets.length) },
       () => worker(),
     ))
-    const failure = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected')
-    if (failure !== undefined) throw failure.reason
+    return results.flat()
+  }
+
+  /**
+   * Drain tracked and recovered local runtimes despite individual failures; retain configured supervisor units.
+   * @param retainLocalSurvivors - skip terminating local-launcher survivors; graceful shutdown retains them for next-boot reattachment.
+   * @returns completion after all workers settle; rejects with the first failed worker's original error
+   */
+  async stopAll(retainLocalSurvivors = false): Promise<void> {
+    this.beginShutdown()
+    await this.initialized
+    await Promise.allSettled([...this.pendingStarts.values()].map(operation => operation.completion))
+    // Graceful shutdown terminates locally owned children unless retention is
+    // configured; supervisor units retain their independent lifecycle across a
+    // Gateway restart regardless.
+    if (this.launcher.instancesOutliveGateway || retainLocalSurvivors) return
+    const targets = [...new Set([...this.procs.keys(), ...this.residentLeases.keys()])].map(key => targetFromKey(key))
+    const failures = await this.drainTargets(targets, 'shutdown')
+    if (failures.length > 0) throw failures[0]
   }
 }

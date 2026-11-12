@@ -86,6 +86,7 @@ import { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { PostgresAccessMonitor, scopeAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
+import { reconcileBootSignature, runtimeBootSignature } from './boot-signature.ts'
 import { PrimaryProjectNames } from './primary-project-names.ts'
 import { NodeContentDocuments } from './node-content-documents.ts'
 import { NodeDocumentAuthority } from './node-content-documents-authority.ts'
@@ -822,6 +823,19 @@ const server = createGatewayServer(deps, {
     sshTargets: deps.sshTargets,
   }),
 })
+// A launch signature change (release, runtime entry, supervisor or toolchain)
+// retires survivors before serving requests; an unchanged signature keeps them
+// reattachable, so same-build restarts cost no cold start. Missing or
+// unreadable records drain — the conservative direction for upgrades. The new
+// signature is committed only after the drain completes, so a failed drain
+// retries on the next boot instead of reattaching code it could not retire.
+{
+  const signature = await runtimeBootSignature(cfg)
+  const outcome = await reconcileBootSignature(cfg.stateRoot, signature, () => instances.drainSurvivors('shutdown'),
+    error => console.error('[gateway] Runtime survivor drain after launch signature change failed:', error))
+  if (outcome === 'drained') console.log('[gateway] drained Runtime survivors after launch signature change')
+  else if (outcome === 'undrained') console.error('[gateway] Runtime survivors from an older launch remain; draining retries on the next boot')
+}
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare
 // tunnel / Nginx) that connects to 127.0.0.1, never directly over the LAN.
 server.listen(cfg.port, '127.0.0.1', () => {
@@ -908,6 +922,10 @@ stewardEnsure.run()
 const reaperTask = fencedTask('idle reaper', async () => {
   await deps.instances.reapIdle()
 })
+const reconcileTask = fencedTask('runtime reconcile', async () => {
+  const summary = await deps.instances.reconcile()
+  if (summary.failed + summary.warmed + summary.deferred > 0) console.log('[gateway] reconcile:', summary)
+})
 const archiveRetentionTask = fencedTask('archive retention sweep', async () => {
   await archives.purgeDue()
 })
@@ -921,11 +939,19 @@ const progressSweepTask = fencedTask('project progress digest', async () => {
   await progress.sweep()
 })
 const reaper = setInterval(reaperTask.run, 60_000)
+// The first sweep runs shortly after listeners so post-restart warmups start
+// before the steady-state cadence.
+let reconcileSweep: ReturnType<typeof setInterval> | undefined
+if (cfg.reconcile.enabled) {
+  setTimeout(reconcileTask.run, 15_000).unref()
+  reconcileSweep = setInterval(reconcileTask.run, 60_000)
+}
 const archiveRetentionSweep = setInterval(archiveRetentionTask.run, 60 * 60_000)
 const documentRetentionSweep = setInterval(documentRetentionTask.run, 60 * 60_000)
 const desktopSweep = setInterval(desktopSweepTask.run, Math.max(1_000, cfg.desktop.grantTtlMs / 2))
 const progressSweep = setInterval(progressSweepTask.run, cfg.progress.sweepMs)
 reaper.unref()
+reconcileSweep?.unref()
 archiveRetentionSweep.unref()
 documentRetentionSweep.unref()
 desktopSweep.unref()
@@ -992,7 +1018,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   await settle([() => waitForWriters()])
   await settle([() => localDrafts.close(), () => personalIndex.close()])
   await settle([() => heartbeatInFlight])
-  await settle([() => deps.instances.stopAll()])
+  await settle([() => deps.instances.stopAll(!cfg.drainRuntimesOnShutdown)])
   await settle([() => pool.end(), () => contentVolume.close()])
   await settle([() => performanceObserver.dispose()])
   clearTimeout(forced)
