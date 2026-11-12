@@ -147,6 +147,8 @@ export interface RuntimeInstanceSnapshot {
   generation: number
   /** Stamp `beginStart` recorded for the live generation; null marks a pre-stamp legacy row. */
   launchStamp: string | null
+  /** Wall time `beginStart` wrote for this generation in Unix epoch milliseconds; 0 when unrecorded. */
+  startedAt: number
 }
 
 /**
@@ -480,10 +482,11 @@ class SqliteInstanceRepository implements InstanceRepository {
 
   async snapshotOf(target: RuntimeTarget): Promise<RuntimeInstanceSnapshot | null> {
     const userId = this.userId(target)
-    const row = this.db.prepare('SELECT state,port,launch_stamp FROM instances WHERE user_id=?').get(userId) as
-      { state: string; port: number; launch_stamp: string | null } | undefined
+    const row = this.db.prepare('SELECT state,port,launch_stamp,started_at FROM instances WHERE user_id=?').get(userId) as
+      { state: string; port: number; launch_stamp: string | null; started_at: number | null } | undefined
     return row === undefined ? null : {
       target: { kind: 'user', id: userId }, state: row.state, port: row.port, generation: 1, launchStamp: row.launch_stamp,
+      startedAt: row.started_at ?? 0,
     }
   }
 
@@ -1666,7 +1669,36 @@ export class InstanceManager {
           summary.failed += 1
           continue
         }
-        if (snapshot.state !== 'ready') continue
+        if (snapshot.state !== 'ready') {
+          // A `starting` row outlives its own startup deadline only when the
+          // launch path died mid-start (Gateway restart, lost supervisor);
+          // the deadline is the launch promise's own budget, so past it the
+          // generation can never publish `ready` again and the adopted
+          // resident lease it holds would fence every later start forever.
+          if (snapshot.state !== 'starting' || Date.now() - snapshot.startedAt <= this.cfg.readinessTimeoutMs) continue
+          const settled = await this.dispatch(target, resolved => this.serialize(resolved, async () => {
+            const current = await this.repository.snapshotOf(resolved)
+            if (current === null || current.state !== 'starting' || current.generation !== snapshot.generation) return false
+            if (Date.now() - current.startedAt <= this.cfg.readinessTimeoutMs) return false
+            try {
+              return await this.terminate(resolved, 'failed', snapshot.generation) !== undefined
+            } catch (error) {
+              // Owner evidence was never published: the launch died before
+              // the supervisor claimed the generation, so no supervised
+              // process can exist — settle the row and release the lease.
+              if (!(error instanceof Error) || !error.message.includes('owner evidence is missing')) throw error
+              await this.publishQuiescence(resolved, snapshot.generation, 'failed')
+              this.procs.delete(targetKey(resolved))
+              this.releaseResident(targetKey(resolved))
+              this.forgetReferences(resolved, snapshot.generation, true)
+              return true
+            }
+          }), true)
+          if (!settled) continue
+          summary.failed += 1
+          this.recordReconcileFailure(key)
+          continue
+        }
         if (launchStamps !== undefined && (snapshot.launchStamp === null || !launchStamps.stamps.has(snapshot.launchStamp))) {
           // A ready row stamped by a launch this build no longer mints is a
           // retired survivor; settle it under `shutdown`, fenced to the

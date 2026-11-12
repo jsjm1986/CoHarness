@@ -97,8 +97,9 @@ export class PostgresInstanceRepository implements InstanceRepository {
 
   async snapshotOf(target: RuntimeTarget): Promise<RuntimeInstanceSnapshot> {
     const owner = target.kind === 'user' ? 'users' : 'projects', column = target.kind === 'user' ? 'user_id' : 'project_id'
-    const result = await this.context.pool.query<{ runtime_id: RuntimeId; observed_state: string; port: number; generation: string; launch_stamp: string | null }>(
-      `SELECT i.runtime_id,i.observed_state,i.port,i.generation::text,i.launch_stamp FROM harness.instances i
+    const result = await this.context.pool.query<{ runtime_id: RuntimeId; observed_state: string; port: number; generation: string; launch_stamp: string | null; started_at: number }>(
+      `SELECT i.runtime_id,i.observed_state,i.port,i.generation::text,i.launch_stamp,
+        COALESCE(EXTRACT(EPOCH FROM i.started_at)::float8*1000,0) started_at FROM harness.instances i
       JOIN harness.${owner} owner ON owner.organization_id=i.organization_id AND owner.id=i.${column}
       WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND owner.public_id=$3
         AND ($4::uuid IS NULL OR i.runtime_id=$4) ORDER BY i.runtime_id LIMIT 2`,
@@ -107,7 +108,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
     if (result.rows.length > 1) throw new RuntimeCatalogError(409, 'runtime-catalog/ambiguous-target')
     const row = result.rows[0]
     if (row === undefined) throw new RuntimeStartBlockedError('unavailable', 'Runtime assignment is missing.')
-    return { target: { ...target, runtimeId: row.runtime_id }, state: row.observed_state, port: row.port, generation: Number(row.generation), launchStamp: row.launch_stamp }
+    return { target: { ...target, runtimeId: row.runtime_id }, state: row.observed_state, port: row.port,
+      generation: Number(row.generation), launchStamp: row.launch_stamp, startedAt: row.started_at }
   }
 
   async targetsForOwner(target: RuntimeTarget): Promise<RuntimeTarget[]> {
