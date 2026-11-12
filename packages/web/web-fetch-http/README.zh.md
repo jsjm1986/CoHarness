@@ -45,7 +45,7 @@ kind: "package-reference"
 - 发送显式的产品 `User-Agent`，绝不伪装成浏览器。
 - 不受支持的内容类型（例如二进制）以 `WEB_UNSUPPORTED_CONTENT_TYPE` 拒绝。
 - 每次连接前解析主机名，拒绝 loopback、私有、链路本地、多播和其他非公网地址（`WEB_BLOCKED_URL`）。请求会固定经过校验的地址集合，避免 DNS rebinding 将连接切换到私有目标。
-- 遵循集中式出站代理策略（[`dsh-http-proxy`](../../util/http-proxy/README.zh.md)）：`proxyRouteFor(url)` 先于解析执行；被策略代理的路由经由策略调度器建立隧道，源站 DNS 在代理侧解析，因此跳过本地解析与地址固定。非公网 IP 字面量仍走已校验路径并被拒绝，而不是交给代理。
+- 遵循集中式出站代理策略（[`dsh-http-proxy`](../../util/http-proxy/README.zh.md)）：每一跳无论是否经由代理，都先在本地解析，只要任一结果为非公网地址即被拒绝（`WEB_BLOCKED_URL`），因此代理永远不会收到直连路径会拒绝的目的地。随后被策略代理的路由经由策略调度器建立隧道且不做地址固定，因为代理自行执行源站查询。
 
 <a id="config"></a>
 ## 配置
@@ -74,6 +74,7 @@ kind: "package-reference"
 ## 已知限制与暂缓事项
 
 - **公网策略有意保持严格**：解析到任何非公网地址的目标都会被拒绝，同源重定向的每一跳都会重新解析并校验。需要访问私有服务的部署应提供经过单独安全评审的提供方，不应放宽此策略。
+- **经由代理的一跳会校验但不固定地址**：代理会重复源站查询，因此在本地检查与代理查询之间变化的 DNS 应答仍可能把代理请求引向代理可达的私网地址。只有代理能解析的主机名在本地解析失败，无法抓取。
 - **只解码文本内容**：包括 html/xhtml 与 `text/*` 加 JSON/XML 家族；缺少 `Content-Type` 或任何二进制类型都会抛出 `WEB_UNSUPPORTED_CONTENT_TYPE`，可提取文本的 PDF 解码属于明确的暂缓工作。
 - **charset 只来自 `Content-Type` 标头**（默认为 UTF-8）：HTML `<meta charset>` 声明会被忽略；声明但无法识别的 charset 标签会抛出异常，而非回退。
 

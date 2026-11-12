@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/web/web-fetch-http/README.md
 document:
-  en: 9d55d5c7058107b84aa77475eb56fad069160e85
-  zh: 2b325a280ca43b4f65e4a067af2d35d9f8fb44e1
+  en: 67e902286c2faa85c3b52dba32f3a3a2c062590d
+  zh: 2d73bf12cb47854fa889613f6bb7b4fbad9788bb
 /:
   en: c0727a21226aef6a
   zh: 61495d48365178df
@@ -21,8 +21,8 @@ document:
   en: 6afcc75af147586a
   zh: 561d355bce906d00
 /deepseek-ai-dsh-web-fetch-http/transport-hygiene:
-  en: ac7a92647a9b41c8
-  zh: 0308c0988c53cd05
+  en: 4afe93dd6197d41a
+  zh: 763c1f06e4fd0d23
 /deepseek-ai-dsh-web-fetch-http/config:
   en: 48fe3f624af70a95
   zh: 0effe6dd20b6d9ec
@@ -33,8 +33,8 @@ document:
   en: 40294c1c31b74824
   zh: e7633834bd22a05d
 /deepseek-ai-dsh-web-fetch-http/known-limitations-and-deferred-work:
-  en: 2b5c8be0b1b440d5
-  zh: ecfed2866ca1943a
+  en: 0bacfff72631f3fe
+  zh: 8fb55befb8cd56be
 /deepseek-ai-dsh-web-fetch-http/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98
