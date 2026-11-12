@@ -148,9 +148,9 @@ async function traceWorkbenchTabs(page: Page, scenario: string) {
   const evaluated = async <T>(pending: Promise<T>, label: string): Promise<T> => {
     let timer: ReturnType<typeof setTimeout> | undefined
     const deadline = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error(
-        `Workbench tab trace ${label} exceeded ${String(TRACE_EVALUATE_BUDGET_MS)} ms — the page main thread did not answer`,
-      )), TRACE_EVALUATE_BUDGET_MS)
+      timer = setTimeout(() => {
+        reject(new Error(`Workbench tab trace ${label} exceeded ${String(TRACE_EVALUATE_BUDGET_MS)} ms — the page main thread did not answer`))
+      }, TRACE_EVALUATE_BUDGET_MS)
     })
     try {
       return await Promise.race([pending, deadline])
