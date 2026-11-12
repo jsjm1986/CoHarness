@@ -198,7 +198,7 @@ describe('CI workflow', () => {
     expect(windowsNative.if).toContain("needs.node-24.result != 'failure'")
     expect(windowsNative.if).toContain("needs.node-24.result != 'cancelled'")
     expect(windowsNative.env).toMatchObject({
-      DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
+      DSH_COVERAGE_TEST_TIMEOUT_MS: '90000',
     })
     expectExternalCapacityExpression(windowsNative.env.DSH_COVERAGE_PARTITIONS, '8', '2')
     expectExternalCapacityExpression(windowsNative.env.DSH_GATE_CONCURRENCY, '4', '1')

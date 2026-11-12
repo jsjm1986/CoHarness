@@ -36,6 +36,11 @@ declare module '@deepseek-ai/dsh-llm' {
 
 const temporaryDirectories: string[] = []
 
+// Real SQLite I/O under shared-runner contention can stall far past the
+// budget that fits an uncontended run; scale off the lane timeout (the
+// same knob the inspector specs use) and keep the local floor.
+const CASE_BUDGET_MS = Math.max(20_000, 4 * Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0))
+
 afterEach(async () => {
   for (const directory of temporaryDirectories.splice(0)) {
     await rm(directory, { recursive: true, force: true })
@@ -1192,7 +1197,7 @@ describe('SQLite reconciliation and source lifecycle', () => {
       .rejects.toThrow(expectCode('SESSION_QUERY_SOURCE_CONFLICT'))
   })
 
-  it('preserves unchanged persisted generations while reconciling new, changed, and deleted rows', { timeout: 20_000 }, async () => {
+  it('preserves unchanged persisted generations while reconciling new, changed, and deleted rows', { timeout: CASE_BUDGET_MS }, async () => {
     const path = await temporaryPath()
     const unchanged = header('unchanged')
     const changed = header('changed')
@@ -1378,7 +1383,7 @@ describe('SQLite schema, cancellation, and real persistence integration', () => 
     expect(ctx.sessionQuery).toBeUndefined()
   })
 
-  it('resets a recognized incompatible schema but refuses unknown or foreign tables', { timeout: 20_000 }, async () => {
+  it('resets a recognized incompatible schema but refuses unknown or foreign tables', { timeout: CASE_BUDGET_MS }, async () => {
     const stalePath = await temporaryPath('stale.db')
     const staleOwner = await liveContext({ path: stalePath })
     await (staleOwner.sessionQuery as SqliteSessionQueryEngine).close()

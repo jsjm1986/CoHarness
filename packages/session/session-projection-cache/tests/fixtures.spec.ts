@@ -136,7 +136,7 @@ async function assertRewrite(ctx: Context, root: string, id: SessionId): Promise
       inheritedEventCount: 0,
     })
     expect(doc.record.rows['title']?.val).toBe('重写标题')
-  }, { timeout: 60_000 })
+  }, { timeout: REWRITE_BUDGET_MS })
 }
 
 afterEach(async () => {
@@ -147,8 +147,11 @@ afterEach(async () => {
 // Each case boots the six-plugin storage stack and waits on a durable
 // write; under shared-runner contention that work can stall far past the
 // coverage partition's 30 s budget without anything being wrong, so the
-// suite carries its own headroom above the inner waitFor budget.
-describe('archived version recovery', { timeout: 120_000 }, () => {
+// poll budget scales off the lane timeout and the suite carries its own
+// headroom above it.
+const REWRITE_BUDGET_MS = Math.max(60_000, 4 * Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0))
+
+describe('archived version recovery', { timeout: Math.max(120_000, REWRITE_BUDGET_MS + 60_000) }, () => {
   it('recovers the v3 whole-unit archive through the legacy bootstrap', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-projcache-fx-'))
     await cp(join(FIXTURES, 'v3-single-unit.json'), join(root, `${projectionCacheDomainSpec.name}.json`))

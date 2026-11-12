@@ -1508,7 +1508,9 @@ jobs:
           && '8' || '2' }}
       # Instrumented process and polling fixtures can exceed Vitest's defaults
       # under the complete lane's partition fan-out and build-backed workload.
-      DSH_COVERAGE_TEST_TIMEOUT_MS: '30000'
+      # Hosted Windows runners lose a different spec to the old 30 s floor on
+      # roughly every run; the floor now sits above every measured stall.
+      DSH_COVERAGE_TEST_TIMEOUT_MS: '90000'
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
