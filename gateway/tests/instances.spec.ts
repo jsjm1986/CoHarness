@@ -119,6 +119,9 @@ async function fixtureSnapshot(repository: InstanceRepository, target: RuntimeTa
   return {
     target, state: await repository.stateOf(target), port: await repository.portOf(target), generation,
     launchStamp: await repository.launchStampOf(target, generation),
+    // Fixtures default to a fresh start instant so an unset field never
+    // expires a `starting` row; expiry tests assign `startedAt` explicitly.
+    startedAt: (repository as { startedAt?: number }).startedAt ?? Date.now(),
   }
 }
 
@@ -190,6 +193,7 @@ class SurvivorRepository implements InstanceRepository {
   generation = 7
   launchStamp: string | null
   reason: RuntimeStopReason | null = null
+  startedAt?: number
 
   constructor(private readonly projectPath: string, private readonly port: number, launchStamp: string | null = null) {
     this.launchStamp = launchStamp
@@ -839,6 +843,44 @@ describe('InstanceManager', () => {
     const summary = await local.reconcile()
     expect(summary.failed).toBe(1)
     expect(markStopping.mock.calls[0]?.[2]).toBe('failed')
+  })
+
+  it('settles a starting generation that outlived its startup deadline', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'expired-start'); mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43250, mintedLaunchStamp(cfg))
+    repository.state = 'starting'
+    repository.startedAt = 0
+    const terminate = vi.fn(async () => {})
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => false, isAlive: async () => false, terminate }),
+      start: async () => { throw new Error('probe path attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(1)
+    expect(terminate).toHaveBeenCalledOnce()
+    expect(repository.state).toBe('stopped')
+    expect(repository.reason).toBe('failed')
+  })
+
+  it('leaves a fresh starting generation to its own launch deadline', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'fresh-start'); mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43250, mintedLaunchStamp(cfg))
+    repository.state = 'starting'
+    const terminate = vi.fn(async () => {})
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => false, isAlive: async () => true, terminate }),
+      start: async () => { throw new Error('probe path attaches only') },
+    })
+    manager = local
+    const summary = await local.reconcile()
+    expect(summary.failed).toBe(0)
+    expect(terminate).not.toHaveBeenCalled()
+    expect(repository.state).toBe('starting')
   })
 
   it('reassigns an instance port held by a foreign listener instead of looping EADDRINUSE', async () => {
@@ -1821,7 +1863,7 @@ describe('InstanceManager', () => {
     const projectPath = join(root, 'coherent-endpoint')
     mkdirSync(projectPath, { recursive: true })
     const target = { kind: 'project' as const, id: 41 }
-    const snapshot = { target, state: 'ready', port: 43267, generation: 7, launchStamp: mintedLaunchStamp(cfg) }
+    const snapshot = { target, state: 'ready', port: 43267, generation: 7, launchStamp: mintedLaunchStamp(cfg), startedAt: 0 }
     const repository = new SurvivorRepository(projectPath, snapshot.port, snapshot.launchStamp)
     repository.snapshotOf = vi.fn(async () => ({ ...snapshot }))
     const attached = { hasExited: () => false, isAlive: vi.fn(async () => true), terminate: vi.fn(async () => {}) }
@@ -1855,7 +1897,7 @@ describe('InstanceManager', () => {
     const target = { kind: 'project' as const, id: 41 }
     let generation = 7
     const repository = new SurvivorRepository(projectPath, 43268, mintedLaunchStamp(cfg))
-    repository.snapshotOf = async () => ({ target, state: 'ready', port: 43268, generation, launchStamp: repository.launchStamp })
+    repository.snapshotOf = async () => ({ target, state: 'ready', port: 43268, generation, launchStamp: repository.launchStamp, startedAt: 0 })
     repository.generationOf = async () => generation
     const attached = { hasExited: () => false, isAlive: vi.fn(async () => true), terminate: vi.fn(async () => {}) }
     const launcher = { instancesOutliveGateway: true, start: vi.fn(async () => { throw new Error('Observation cannot start') }), attach: vi.fn(() => attached) }
