@@ -10,9 +10,9 @@ Windows 没有 POSIX 进程组，受监督的运行时进程树一直依赖 `tas
 
 ## 决策
 
-[local-runtime-win32-job.ts](../../../../gateway/src/local-runtime-win32-job.ts) 沿用 [node-windows-security-id.ts](../../../../gateway/src/node-windows-security-id.ts) 的加载模式，在 Gateway 内通过 Koffi 绑定 kernel32。`spawn` 成功后，[监督进程](../../../../gateway/src/local-runtime-supervisor.ts) 打开子进程并将其挂入新建的 Job Object，唯一限制为 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`；监督进程终身持有该 Job 句柄，因此监督进程死亡时内核会收尾整棵进程树，`TerminateJobObject` 也取代 `taskkill /T` 成为强杀路径。挂接失败会使启动失败，并通过挂接前的 `taskkill` 回退路径终止子进程。
+[local-runtime-win32-job.ts](../../../../gateway/src/local-runtime-win32-job.ts) 沿用 [node-windows-security-id.ts](../../../../gateway/src/node-windows-security-id.ts) 的加载模式，在 Gateway 内通过 Koffi 绑定 kernel32。`spawn` 成功后，[监督进程](../../../../gateway/src/local-runtime-supervisor.ts) 打开子进程并将其挂入新建的 Job Object，唯一限制为 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`；监督进程终身持有该 Job 句柄，因此监督进程死亡时内核会收尾整棵进程树，`TerminateJobObject` 也取代 `taskkill /T` 成为强杀路径。Job 挂接是加固层而非前置条件：挂接失败时——例如监督进程已嵌套在任务计划程序的 Job 内——启动继续走挂接前的 `taskkill /T` 与创建时刻围栏清扫，该路径本就负责进程树回收。
 
-监督进程在 `starting` 发布时，把自身 `GetProcessTimes` 进程创建时刻（Unix 毫秒）作为 `groupStartedAt` 与 `groupPid` 一并记录。owner schema 要求该凭证随 `groupPid` 成对出现，`publish` 将已确立的 `groupStartedAt` 与 `groupPid` 一样视为不可变 capability。[local-runtime-control.ts](../../../../gateway/src/local-runtime-control.ts) 中所有 Windows 杀路径——卡死监督进程的 `taskkill` 与孤儿清扫——都先重开记录的 PID，并要求其创建时刻在四毫秒容差内匹配；已死或被复用的 PID 永不被发信号。该字段引入前写入的旧记录仍只受启动 UUID 围栏保护。
+监督进程在 `starting` 发布时，把自身 `GetProcessTimes` 进程创建时刻（Unix 毫秒）作为 `groupStartedAt` 与 `groupPid` 一并记录；FFI 读取不可用时省略该字段，记录退回到启动 UUID 围栏。owner schema 要求该凭证随 `groupPid` 成对出现，`publish` 将已确立的 `groupStartedAt` 与 `groupPid` 一样视为不可变 capability。[local-runtime-control.ts](../../../../gateway/src/local-runtime-control.ts) 中所有 Windows 杀路径——卡死监督进程的 `taskkill` 与孤儿清扫——都先重开记录的 PID，并要求其创建时刻在四毫秒容差内匹配；已死或被复用的 PID 永不被发信号。该字段引入前写入的旧记录仍只受启动 UUID 围栏保护。
 
 `scripts/ci-pr-proofs.ts` 现在把 `gateway/src/local-runtime-{supervisor,control,owner,win32}*.ts` 与 `node-{windows,private}*.ts` 映射到 `proof_native_windows`，使 Windows 归属的运行时控制改动运行在真实 `windows-2025` 完整门禁上，而非仅经 Wine 通道。
 
@@ -30,4 +30,4 @@ Windows 没有 POSIX 进程组，受监督的运行时进程树一直依赖 `tas
 
 ## 验证
 
-[local-runtime-win32-job.spec.ts](../../../../gateway/tests/local-runtime-win32-job.spec.ts) 在非 Windows 上验证「不可用」契约，并在原生 Windows 通道上验证创建时刻读取、复用 PID 拒绝与经 Job 的整树终止。owner 规格在 POSIX 主机上覆盖凭证持久化、与 `groupPid` 的成对要求及 capability 不可变性。
+[local-runtime-win32-job.spec.ts](../../../../gateway/tests/local-runtime-win32-job.spec.ts) 在非 Windows 上验证「不可用」契约，并在 Windows 主机上运行时验证创建时刻读取、复用 PID 拒绝与经 Job 的整树终止。owner 规格在 POSIX 主机上覆盖凭证持久化、与 `groupPid` 的成对要求及 capability 不可变性。Gateway 测试只在 Linux `gateway` CI job 执行——Windows 门控的 spec 主体没有任何 CI 通道——因此 Job/创建时刻路径的首次真实运行发生在生产 Windows 节点上，正是该运行捕获了 FILETIME 解码里从未被执行过的 `readBigUInt64LE` 越界错误。
