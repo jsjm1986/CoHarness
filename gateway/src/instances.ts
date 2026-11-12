@@ -28,6 +28,7 @@ import {
 } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
+import { connect } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import type Database from 'better-sqlite3'
 import type { UserRow } from './auth.ts'
@@ -54,6 +55,10 @@ import { readResponseJson } from './response-budget.ts'
 
 const POLL_INTERVAL_MS = 300
 const STOP_GRACE_MS = 5000
+/** Bound on a single loopback probe; an unanswered port stays conservative-occupied. */
+const PORT_PROBE_TIMEOUT_MS = 1000
+/** Allocation retries when a freshly assigned port is itself foreign-occupied. */
+const PORT_REASSIGN_ATTEMPTS = 3
 const STOP_ALL_CONCURRENCY = 8
 const MANAGED_CREDENTIALS_FILENAME = '.credentials.yaml'
 const ADMIN_GUARD_PATCH_FILENAME = 'cordis.admin.patch.yml'
@@ -398,6 +403,13 @@ export interface InstanceRepository {
    */
   warmTargets?(activityCutoff: number): Promise<RuntimeTarget[]>
   /**
+   * Move the assignment to a freshly allocated node-local port when its
+   * assigned port is held by a process that ownership evidence cannot reclaim.
+   * @param target - exact local assignment to re-address.
+   * @returns the new port, or undefined when reassignment is unsupported and the occupied port must fail the start.
+   */
+  reassignPort?(target: RuntimeTarget): Promise<number | undefined>
+  /**
    * @param target - assignment to stop.
    * @param generation - captured generation; never a replacement.
    * @param reason - durable stop reason, manual by default.
@@ -592,6 +604,16 @@ class SqliteInstanceRepository implements InstanceRepository {
         AND stop_reason IN ('shutdown','failed') AND last_activity_at > ? ORDER BY last_activity_at DESC`,
     ).all(activityCutoff) as Array<{ user_id: number }>
     return rows.map(row => ({ kind: 'user' as const, id: row.user_id }))
+  }
+
+  async reassignPort(target: RuntimeTarget): Promise<number | undefined> {
+    const userId = this.userId(target)
+    return this.db.transaction(() => {
+      const high = (this.db.prepare(`SELECT MAX(port) AS high FROM instances`).get() as { high: number | null }).high
+      const port = (high ?? 0) + 1
+      const updated = this.db.prepare(`UPDATE instances SET port = ? WHERE user_id = ?`).run(port, userId)
+      return updated.changes === 0 ? undefined : port
+    })()
   }
 
   async markStopping(target: RuntimeTarget, generation: number, reason: RuntimeStopReason = 'manual', actorUserId?: number): Promise<boolean> {
@@ -1373,6 +1395,7 @@ export class InstanceManager {
     const runtimeToken = randomBytes(32).toString('base64url')
     const runtimeTokenHash = createHash('sha256').update(runtimeToken).digest()
     const verifyPreparedStorage=await this.repository.checkProjectStorage?.(descriptor.target)
+    const claimedPort = await this.reclaimInstancePort(descriptor, port, signal)
     const generation = await this.repository.beginStart(
       descriptor.target,
       now,
@@ -1381,7 +1404,7 @@ export class InstanceManager {
       administratorUserId,
       recordActivity,
     )
-    const runtime: RuntimeLaunchContext = { ...descriptor, generation }
+    const runtime: RuntimeLaunchContext = { ...descriptor, port: claimedPort, generation }
     const key = targetKey(runtime.target)
     let proc: InstanceProc | undefined
     try {
@@ -1453,7 +1476,7 @@ export class InstanceManager {
           const remaining = deadline - performance.now()
           if (remaining <= 0) break
           const probeTimeoutMs = Math.max(1, Math.floor(Math.min(1000, remaining)))
-          const authority = `127.0.0.1:${String(port)}`
+          const authority = `127.0.0.1:${String(claimedPort)}`
           const response = await fetch(`http://${authority}${RUNTIME_READINESS_PATH}`, {
             method: 'GET',
             headers: {
@@ -1491,7 +1514,7 @@ export class InstanceManager {
           if (registered) {
             await this.repository.markReady(runtime.target, generation)
             if (!withinDeadline()) break
-            return { port, generation, ...(runtime.target.runtimeId === undefined ? {} : { runtimeId: runtime.target.runtimeId }) }
+            return { port: claimedPort, generation, ...(runtime.target.runtimeId === undefined ? {} : { runtimeId: runtime.target.runtimeId }) }
           }
         }
         const remaining = deadline - performance.now()
@@ -1502,7 +1525,7 @@ export class InstanceManager {
           throw error
         }
       }
-      throw new Error(`instance for ${runtime.runtimeKey ?? runtime.username} failed to become ready on port ${port}`)
+      throw new Error(`instance for ${runtime.runtimeKey ?? runtime.username} failed to become ready on port ${claimedPort}`)
     } catch (error) {
       // A failed post-beginStart path must never strand the durable row in
       // `starting`; terminate the child first, then publish the stopped state.
@@ -1522,6 +1545,62 @@ export class InstanceManager {
       }
       throw error
     }
+  }
+
+  /**
+   * Verify the assigned instance port is bindable before spending a generation.
+   * The row being started is already stopped — its credential hash was cleared,
+   * so no owner evidence can attribute a holder; dead-leader orphan groups are
+   * reaped on the control path instead. An occupied port therefore belongs to
+   * a process outside ownership evidence, and the instance moves to a freshly
+   * allocated port instead of looping EADDRINUSE through the readiness deadline.
+   * @param descriptor - launch context whose `port`/`target` identify the row.
+   * @param port - assigned instance port.
+   * @param signal - caller cancellation.
+   * @returns the port the child must bind — unchanged or freshly allocated.
+   */
+  private async reclaimInstancePort(
+    descriptor: Omit<RuntimeLaunchContext, 'generation'>, port: number, signal: AbortSignal,
+  ): Promise<number> {
+    if (await this.instancePortFree(port, signal)) return port
+    const target = descriptor.target
+    for (let attempt = 0; attempt < PORT_REASSIGN_ATTEMPTS; attempt += 1) {
+      const reassigned = await this.repository.reassignPort?.(target)
+      if (reassigned === undefined) {
+        throw new Error(`instance port ${String(port)} for ${targetKey(target)} is occupied and cannot be reassigned`)
+      }
+      if (await this.instancePortFree(reassigned, signal)) {
+        console.error(`[gateway] instance port ${String(port)} for ${targetKey(target)} is held by a foreign process; reassigned to ${String(reassigned)}`)
+        return reassigned
+      }
+    }
+    throw new Error(`instance ports for ${targetKey(target)} remained occupied after ${String(PORT_REASSIGN_ATTEMPTS)} reassignments`)
+  }
+
+  /**
+   * Probe whether a real process serves the instance's loopback port. Refused
+   * or immediately dropped connections mean nothing owns it — including a
+   * forwarding relay with no upstream, which closes the probe untouched. Any
+   * bytes or a connection still held at the deadline count as an occupant so
+   * a spawn never binds blindly over a stale holder.
+   */
+  private async instancePortFree(port: number, signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted) throw new RuntimeCapacityError('cancelled')
+    return await new Promise<boolean>((resolve, reject) => {
+      const socket = connect({ host: '127.0.0.1', port })
+      let bytes = 0
+      const finish = (free: boolean) => { clearTimeout(timer); signal.removeEventListener('abort', aborted); socket.destroy(); resolve(free) }
+      const aborted = () => { clearTimeout(timer); socket.destroy(); reject(new RuntimeCapacityError('cancelled')) }
+      const timer = setTimeout(() => finish(false), PORT_PROBE_TIMEOUT_MS)
+      signal.addEventListener('abort', aborted, { once: true })
+      socket.on('data', (chunk: Buffer) => { bytes += chunk.length; finish(false) })
+      socket.once('error', (error: NodeJS.ErrnoException) => {
+        // A refused connection is the only unconditional 'free' verdict; a
+        // reset after accept still means a listener dropped an empty probe.
+        finish(error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' && bytes === 0)
+      })
+      socket.once('close', () => finish(bytes === 0))
+    })
   }
 
   async reapIdle(): Promise<number> {
@@ -1567,7 +1646,23 @@ export class InstanceManager {
       const target = targetFromKey(key)
       try {
         const snapshot = await this.repository.snapshotOf(target)
-        if (snapshot === null || snapshot.state !== 'ready') continue
+        if (snapshot === null) continue
+        if (snapshot.state === 'stopping') {
+          // A gateway restart abandons in-flight terminations; finish the stop
+          // on the serialized lane under the row's recorded reason — fenced to
+          // the observed generation so a racing replacement is never cancelled
+          // or stopped, and a `manual` stop never warms back.
+          const settled = await this.dispatch(target, resolved => this.serialize(resolved, async () => {
+            const current = await this.repository.snapshotOf(resolved)
+            if (current === null || current.state !== 'stopping' || current.generation !== snapshot.generation) return false
+            const reason = await this.repository.stopReasonOf(resolved) ?? 'failed'
+            return await this.terminate(resolved, reason, snapshot.generation) !== undefined
+          }), true)
+          if (!settled) continue
+          summary.failed += 1
+          continue
+        }
+        if (snapshot.state !== 'ready') continue
         const tracked = this.procs.get(key)
         let dead = false
         if (tracked !== undefined) {

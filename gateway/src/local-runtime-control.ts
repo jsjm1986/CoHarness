@@ -88,7 +88,13 @@ export class LocalRuntimeControl implements InstanceProc {
   private async confirmStopped(bootId: string): Promise<boolean> {
     let lease: LocalRuntimeOwnerLease
     try { lease = await this.store.acquireExisting(bootId) } catch (error) {
-      if (['EAGAIN', 'EWOULDBLOCK', 'EADDRINUSE'].includes((error as NodeJS.ErrnoException).code ?? '')) return false
+      if (['EAGAIN', 'EWOULDBLOCK', 'EADDRINUSE'].includes((error as NodeJS.ErrnoException).code ?? '')) {
+        // The lease may be held by an orphan that inherited the supervisor's
+        // descriptor: reap the record's dead-leader group so the next poll
+        // acquires the lease instead of reporting 'occupied' forever.
+        if (process.platform !== 'win32') await this.reapOrphanedGroup(bootId)
+        return false
+      }
       throw error
     }
     try {
@@ -99,7 +105,21 @@ export class LocalRuntimeControl implements InstanceProc {
         this.confirmedStopped = true
         return true
       }
-      if (current.groupPid !== undefined && this.groupExists(current.groupPid)) return false
+      if (current.groupPid !== undefined && this.groupExists(current.groupPid)) {
+        // POSIX only: a dead supervisor leaves orphaned group members (e.g. a
+        // SIGKILLed supervisor's dsh child still holding the instance port).
+        // A live process group cannot host foreign members and its pgid is the
+        // record-bound spawn allocation, so leader death proves the survivors
+        // belong to this generation — reap them instead of reporting
+        // 'occupied' forever. Windows sweeps orphans by parent link below.
+        if (process.platform !== 'win32' && this.leaderDead(current.groupPid)) {
+          try { process.kill(-current.groupPid, 'SIGKILL') } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+          }
+          await new Promise(resolve => setTimeout(resolve, POLL_MS))
+        }
+        if (this.groupExists(current.groupPid)) return false
+      }
       if (process.platform === 'win32' && current.groupPid !== undefined) {
         // A dead supervisor leaves no process-group handle; sweep its orphaned
         // descendants by parent link before the generation may fence.
@@ -144,6 +164,39 @@ export class LocalRuntimeControl implements InstanceProc {
       const code = (error as NodeJS.ErrnoException).code
       if (code === 'ESRCH') return false
       if (code === 'EPERM') return true
+      throw error
+    }
+  }
+
+  /**
+   * POSIX orphan reap: when the record-bound `groupPid` group is alive but its
+   * leader (the supervisor itself) is dead, surviving members — including one
+   * holding the inherited lease descriptor — are this generation's own
+   * orphans. A live process group cannot host foreign members and the pgid is
+   * the record's spawn allocation, so the group is SIGKILLed and re-probed
+   * instead of reporting 'occupied' forever.
+   * @param bootId - kernel boot identity fencing earlier-boot records.
+   * @returns whether a reap ran; the caller re-polls for the freed lease.
+   */
+  private async reapOrphanedGroup(bootId: string): Promise<boolean> {
+    const record = await this.store.read(bootId)
+    // Fence the kill to this kernel boot: an earlier-boot record can outlive a
+    // machine restart, and its stored pgid may name an unrelated group after
+    // PID reuse.
+    if (record === undefined || record.bootId !== bootId || record.groupPid === undefined
+      || !this.leaderDead(record.groupPid) || !this.groupExists(record.groupPid)) return false
+    try { process.kill(-record.groupPid, 'SIGKILL') } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+    }
+    return true
+  }
+
+  /** Whether the process-group leader itself is gone while members may remain. */
+  private leaderDead(pid: number): boolean {
+    try { process.kill(pid, 0); return false } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === 'ESRCH') return true
+      if (code === 'EPERM') return false
       throw error
     }
   }
