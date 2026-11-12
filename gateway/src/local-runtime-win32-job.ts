@@ -64,7 +64,7 @@ function win32Error(api: Kernel32, operation: string): Error {
 }
 
 function filetimeMs(buffer: Buffer): number {
-  const ticks = buffer.readBigUInt64LE(4) << 32n | buffer.readBigUInt64LE(0)
+  const ticks = buffer.readBigUInt64LE(0)
   return Number((ticks - FILETIME_EPOCH_OFFSET_100NS) / 10_000n)
 }
 

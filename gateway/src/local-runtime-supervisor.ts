@@ -136,8 +136,11 @@ async function supervise(input: unknown): Promise<void> {
     if (address === null || typeof address === 'string') throw new Error('Local runtime owner endpoint is unavailable')
     record = await lease.publish({
       ...record, phase: 'starting', groupPid: process.pid, url: `http://127.0.0.1:${address.port}/`,
-      // The recorded creation instant fences later kill paths against PID reuse.
-      ...(process.platform === 'win32' ? { groupStartedAt: win32CurrentProcessCreationMs() } : {}),
+      // The recorded creation instant fences later kill paths against PID reuse;
+      // records without it keep the documented boot-identity fallback.
+      ...(process.platform === 'win32'
+        ? (() => { try { return { groupStartedAt: win32CurrentProcessCreationMs() } } catch { return {} } })()
+        : {}),
     })
     if (stopping || await store.cancelled()) throw new Error('Local runtime startup is cancelled')
     const command = spec.linuxScopeMode === undefined ? spec.command : localLinuxRuntimeCommand(record, spec.linuxScopeMode, spec.command)
@@ -155,7 +158,10 @@ async function supervise(input: unknown): Promise<void> {
       .then(() => {
         if (process.platform === 'win32') {
           if (spawned.pid === undefined) throw new Error('Local runtime child spawned without a process id')
-          killJob = assignRuntimeKillJob(spawned.pid)
+          // A supervisor running inside an outer Job (Task Scheduler services
+          // run under one) cannot nest the child; the Job then degrades to the
+          // same taskkill /T + creation-fenced sweep that owns the tree anyway.
+          try { killJob = assignRuntimeKillJob(spawned.pid) } catch { killJob = undefined }
         }
       })
     const credential = child.stdio[3] as Writable
