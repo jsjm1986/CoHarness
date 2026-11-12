@@ -7,6 +7,7 @@ import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerLease, type LocalRuntimeO
 import { localKernelBootId } from './local-runtime-protocol.ts'
 import { localLinuxRuntimeEmpty, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
 import { isDeadlineKilledCommand } from './child-command.ts'
+import { win32ProcessCreationMatches, win32ProcessCreationMs } from './local-runtime-win32-job.ts'
 
 const POLL_MS = 25
 
@@ -78,7 +79,7 @@ export class LocalRuntimeControl implements InstanceProc {
         }
       }
       if (process.platform === 'win32' && record.bootId === bootId && record.groupPid !== undefined
-        && performance.now() >= forceAfter) {
+        && this.recordedGroupAlive(record) && performance.now() >= forceAfter) {
         await runGatewayChildCommand('taskkill.exe', ['/PID', String(record.groupPid), '/T', '/F'], this.timeoutMs).catch(() => {})
       }
       await new Promise(resolve => setTimeout(resolve, Math.min(POLL_MS, Math.max(1, deadline - performance.now()))))
@@ -120,9 +121,12 @@ export class LocalRuntimeControl implements InstanceProc {
         }
         if (this.groupExists(current.groupPid)) return false
       }
-      if (process.platform === 'win32' && current.groupPid !== undefined) {
+      if (process.platform === 'win32' && current.groupPid !== undefined
+        && this.recordedGroupAbsent(current)) {
         // A dead supervisor leaves no process-group handle; sweep its orphaned
-        // descendants by parent link before the generation may fence.
+        // descendants by parent link before the generation may fence. The
+        // reuse fence checks the pid's live process: a foreign pid owner means
+        // the orphans' parent link already resolved to another generation.
         await this.sweepOrphans(current.groupPid)
       }
       if (current.nativeRange === 'linux-slice') {
@@ -144,6 +148,34 @@ export class LocalRuntimeControl implements InstanceProc {
       this.confirmedStopped = true
       return true
     } finally { await lease.close() }
+  }
+
+  /**
+   * Whether the recorded `groupPid` still names the process the supervisor published.
+   * Records written before `groupStartedAt` existed carry no creation evidence, so
+   * the boot fence alone applies; a mismatched creation instant means the PID was
+   * reused by an unrelated process, which must never be signalled.
+   */
+  private recordedGroupAlive(record: LocalRuntimeOwnerRecord): boolean {
+    return record.groupStartedAt === undefined || win32ProcessCreationMatches(record.groupPid!, record.groupStartedAt)
+  }
+
+  /**
+   * Whether `groupPid` currently hosts no foreign process — the supervisor is
+   * dead or still itself. Parent-link orphan enumeration is only safe while
+   * this holds: after PID reuse, children of a differently-aged process at the
+   * recorded pid are not this generation's to kill. Legacy records without
+   * `groupStartedAt` cannot prove ownership and fall back to the boot fence.
+   */
+  private recordedGroupAbsent(record: LocalRuntimeOwnerRecord): boolean {
+    return record.groupStartedAt === undefined || !this.recordedGroupForeign(record)
+  }
+
+  /** Whether a live process at `groupPid` fails the recorded creation fence. */
+  private recordedGroupForeign(record: LocalRuntimeOwnerRecord): boolean {
+    const pid = record.groupPid!
+    return win32ProcessCreationMs(pid) !== undefined
+      && !win32ProcessCreationMatches(pid, record.groupStartedAt!)
   }
 
   /** Kill every descendant tree rooted at a dead supervisor's children. */

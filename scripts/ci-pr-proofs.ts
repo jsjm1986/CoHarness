@@ -135,6 +135,9 @@ export function classifyCiPrProofs(
       add('nativeWindows', `native-runtime:${path}`)
       if (!path.startsWith('packages/fs/')) add('sandbox', `confinement-consumer:${path}`)
       known = true
+    } else if (/^gateway\/src\/(?:local-runtime-(?:supervisor|control|owner|win32)[^/]*|node-(?:windows|private)[^/]*)\.ts$/.test(path)) {
+      add('nativeWindows', `native-runtime:${path}`)
+      known = true
     }
     if (/^packages\/(?:llm|credentials|settings|compaction|subagent)\//.test(path)
       || inTree(path, 'plugins/dsh-model-governance')) {
