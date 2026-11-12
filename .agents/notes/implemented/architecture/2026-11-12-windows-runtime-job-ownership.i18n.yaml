@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-12-windows-runtime-job-ownership.md
 document:
-  en: 9a9208cfde500327372a944f7bcf4adb89327d50
-  zh: b25f501171adb772bef2c8fa952d98c3face4cdf
+  en: fd5a61db768a42422970e9730912ef768f4bce5d
+  zh: c623023b6d14949bcb8bc5441dd26faceb1e43dc
 /agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing:
   en: 15c38803c295e790
   zh: 2ad2129684e6fe8a
@@ -12,8 +12,8 @@ document:
   en: fe1368500cbca672
   zh: db415a2dd8023e9b
 /agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing/decision:
-  en: 4f35bd9078a4cc23
-  zh: c11e33cd0e047964
+  en: 61e2f216bc8565e1
+  zh: 05965bb1abc4c86f
 /agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing/alternatives-considered:
   en: 54c93940bf14787b
   zh: 8fbaee17861bb57a
@@ -21,5 +21,5 @@ document:
   en: 812e64f60cdba899
   zh: 1759f77028ce8e8a
 /agent-note-windows-local-runtime-job-ownership-and-pid-reuse-fencing/verification:
-  en: 15f5d39563ed1f33
-  zh: 157e67a2efc4a49f
+  en: f1eb80a3c139a870
+  zh: 8572c02e2bc381ee
