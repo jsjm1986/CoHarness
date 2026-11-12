@@ -1739,3 +1739,46 @@ describe('desktop coordination endpoints', () => {
     expect(response.status).toBe(400)
   })
 })
+
+describe('runtime session removal authorization', () => {
+  const header: ConversationHeader = {
+    id: 'session-remove',
+    organizationId: ORGANIZATION_ID,
+    runtimeId: RUNTIME_ID,
+    creatorUserId: CREATOR_INTERNAL_ID,
+    projectId: PROJECT_INTERNAL_ID,
+    visibility: 'private',
+    sessionFormatVersion: 0,
+    createdAt: CREATED_AT,
+    cwd: '/tmp/shared',
+  }
+  const stored = (): StoredConversation => ({ header, events: [] } as unknown as StoredConversation)
+  const remove = (runtime: ReturnType<typeof fixture>, principal?: string) => request(runtime.handler, '/internal/runtime/session/remove', {
+    body: { sessionId: 'session-remove' },
+    ...(principal === undefined ? {} : { principal }),
+  })
+
+  it('rejects a bearer-only removal without a member assertion', async () => {
+    const runtime = fixture()
+    runtime.conversations.load.mockResolvedValue(stored())
+    expect(await remove(runtime)).toMatchObject({ handled: true, status: 403 })
+    expect(runtime.conversations.removeTree).not.toHaveBeenCalled()
+  })
+
+  it('rejects a member who cannot manage the session', async () => {
+    const runtime = fixture()
+    runtime.conversations.load.mockResolvedValue(stored())
+    runtime.deps.collaboration.access.mockResolvedValueOnce({ canManage: false } as never)
+    expect(await remove(runtime, runtime.issuePrincipal(CREATOR_ID))).toMatchObject({ handled: true, status: 403, body: { error: 'forbidden' } })
+    expect(runtime.deps.collaboration.access).toHaveBeenCalledWith(CREATOR_ID, RUNTIME_ID, 'session-remove', 'manage')
+    expect(runtime.conversations.removeTree).not.toHaveBeenCalled()
+  })
+
+  it('removes the tree for a member who can manage the session', async () => {
+    const runtime = fixture()
+    runtime.conversations.load.mockResolvedValue(stored())
+    runtime.deps.collaboration.access.mockResolvedValueOnce({ canManage: true } as never)
+    expect(await remove(runtime, runtime.issuePrincipal(CREATOR_ID))).toMatchObject({ handled: true, status: 200 })
+    expect(runtime.conversations.removeTree).toHaveBeenCalledWith(ORGANIZATION_ID, 'session-remove')
+  })
+})

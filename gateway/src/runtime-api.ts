@@ -1607,8 +1607,13 @@ export function createRuntimeApiHandler(
           send(res, 409, { error: 'personal-session-removal-is-runtime-local' })
           return true
         }
+        const claims = subject.target.kind === 'project' ? (await currentAssertion(req, subject, true))! : undefined
         if (await storedHeader(sessionId, subject, requestSignal(req, res)) === undefined) {
           throw new CollaborationDeniedError('conversation-not-found')
+        }
+        if (claims !== undefined
+          && !(await collaboration(subject).access(claims.user.id, sessionScope(subject).runtimeId, sessionId, 'manage')).canManage) {
+          throw new CollaborationDeniedError('forbidden')
         }
         await repository.removeTree(subject.organizationId, sessionId)
         send(res, 200, { removed: true })
