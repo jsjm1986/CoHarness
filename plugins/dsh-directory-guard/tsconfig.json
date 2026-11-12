@@ -15,7 +15,9 @@
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-tools": ["../../packages/core/tools/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-fs": ["../../packages/fs/fs/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-host-apiproxy": ["../../packages/host/apiproxy/lib/types/index.d.ts"]
+      "@deepseek-ai/dsh-host-apiproxy": ["../../packages/host/apiproxy/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-working-directory": ["../../packages/session/working-directory/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-fs-local": ["../../packages/fs/fs-local/lib/types/index.d.ts"]
     }
   },
   "include": ["src", "tests"]

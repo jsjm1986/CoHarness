@@ -26,7 +26,8 @@
     "@deepseek-ai/cordis": "*",
     "@deepseek-ai/dsh-tools": "*",
     "@deepseek-ai/dsh-fs": "*",
-    "@deepseek-ai/dsh-host-apiproxy": "*"
+    "@deepseek-ai/dsh-host-apiproxy": "*",
+    "@deepseek-ai/dsh-working-directory": "*"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",

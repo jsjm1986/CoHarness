@@ -18,14 +18,17 @@ Workspace 文件 RPC 通过 Host 的 `workspace-files/authorize` 事件使用同
 
 | 工具 | 路径参数 | 操作 |
 |---|---|---|
-| `read` | `file_path` | 读 |
+| `read`、`read_image` | `file_path` | 读 |
 | `write`、`edit` | `file_path` | 写 |
 | `str_replace_editor` | `path` | `view` = 读；`create`/`str_replace`/`insert` = 写 |
 | `grep`、`glob` | `path`（缺省为会话 cwd；pattern 与 include 过滤仍交给搜索引擎） | 读 |
+| `lsp` | `file_path`，以及作为工作区被索引的会话 cwd | 读 |
+| `present` | 每个 `files[].path` | 读 |
+| 其他任意工具 | `file_path` | 读 |
 
 - **写**目标不在任何 `rw` 授权内 → 拒绝。
 - **读**目标在所有授权之外 → 拒绝。
-- 路径先按会话 cwd 解析（缺省回退进程 cwd），再对最近存在的祖先做 `realpath`，以挫败符号链接逃逸。
+- 相对路径使用会话工作目录（`ctx.workingDirectory`；无 agent 的调用使用进程 cwd）。每个路径按 `ctx.fs.processPath(await ctx.fs.resolve(path, { cwd }))` 分类，即文件系统后端实际打开的 canonical 目标，因此符号链接与 `..` 的处理顺序与后端完全一致。后端无法解析的路径一律拒绝。
 
 ## 边界（诚实声明）
 
@@ -42,7 +45,7 @@ macOS 开发环境（无 systemd）下，本插件是普通用户的主要目录
 
 ## 上游耦合（同步策略）
 
-所有 dsh 内部类型导入（`Context`、`ToolExecution`、`PreToolDecision`）集中在单个文件 [`src/dsh-adapter.ts`](src/dsh-adapter.ts)。上游重命名只触及这一个文件。`src/grants.ts` 与 `src/guard.ts` 是纯 Node 逻辑，无 dsh 依赖，承载完整单元测试。
+所有 dsh 内部导入（`Context`、`ToolExecution`、`PreToolDecision`、`ctx.fs`、`ctx.workingDirectory`）集中在单个文件 [`src/dsh-adapter.ts`](src/dsh-adapter.ts)。上游重命名只触及这一个文件。`src/grants.ts` 与 `src/guard.ts` 无 dsh 依赖；`guard.ts` 以函数形式接收路径解析，其单元测试传入 `dsh-fs-local` 后端的解析。
 
 ## 挂载方式
 
@@ -53,7 +56,7 @@ macOS 开发环境（无 systemd）下，本插件是普通用户的主要目录
 
 ## 测试
 
-`npm test` 运行纯逻辑套件（`grants`、`guard`），外加钉住模型可见拒绝文案的快照（`guard.snapshot.spec.ts`）。`npm run typecheck` 对照构建出的 dsh 声明验证 dsh 类型接线。
+`npm test` 运行 `grants` 与 `guard` 套件，外加钉住模型可见拒绝文案的快照（`guard.snapshot.spec.ts`）。`npm run typecheck` 对照构建出的 dsh 声明验证 dsh 类型接线。
 
 ## 待验证项（手动，需要模型/API key）
 
