@@ -99,6 +99,11 @@ async function traceWorkbenchTabs(page: Page, scenario: string) {
     document.addEventListener('focusin', bubble)
     let previous = JSON.stringify(snapshot())
     const observer = new MutationObserver((mutations) => {
+      // A saturated trace stops observing: each further callback would still
+      // stringify the whole pane snapshot per delivery, which pins the page's
+      // main thread during a layout burst and starves the harness-side
+      // evaluate that stop() depends on.
+      if (rows.length >= 256) { dropped += mutations.length; observer.disconnect(); return }
       const next = JSON.stringify(snapshot())
       const changes: Record<string, unknown>[] = []
       for (const mutation of mutations) {
@@ -136,15 +141,38 @@ async function traceWorkbenchTabs(page: Page, scenario: string) {
       },
     }
   }, scenario)
+  // A page evaluate has no built-in deadline: when the renderer's main thread
+  // stops answering, the suite would otherwise sit silent until the job-level
+  // timeout kills it with no failing-test report.
+  const TRACE_EVALUATE_BUDGET_MS = 15_000
+  const evaluated = async <T>(pending: Promise<T>, label: string): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(
+        `Workbench tab trace ${label} exceeded ${String(TRACE_EVALUATE_BUDGET_MS)} ms — the page main thread did not answer`,
+      )), TRACE_EVALUATE_BUDGET_MS)
+    })
+    try {
+      return await Promise.race([pending, deadline])
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
+      // The losing evaluate may still reject after the race decided.
+      pending.catch(() => {})
+    }
+  }
   return {
-    mark: async (stage: string): Promise<void> => { await trace.evaluate((owned, value) => { owned.mark(value) }, stage) },
+    mark: async (stage: string): Promise<void> => {
+      await evaluated(trace.evaluate((owned, value) => { owned.mark(value) }, stage), 'mark')
+    },
     stop: async (): Promise<void> => {
       try {
-        const result = await trace.evaluate(owned => owned.stop())
+        const result = await evaluated(trace.evaluate(owned => owned.stop()), 'stop')
         console.info('[workbench-tab-trace]', JSON.stringify(result))
         expect(result.dropped, 'Workbench pointer trace exceeded its owned event bound').toBe(0)
       } finally {
-        await trace.dispose()
+        // Best-effort release: a wedged page makes this the same dead channel,
+        // and the browser teardown collects the handle either way.
+        await evaluated(trace.dispose(), 'dispose').catch(() => {})
       }
     },
   }
