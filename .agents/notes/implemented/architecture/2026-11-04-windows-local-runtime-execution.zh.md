@@ -14,7 +14,7 @@
 
 Windows 上的内核租约改用命名管道 `\\.\pipe\dsh-owner-<sha256(lockPath)>` 代替 `flock`：独占式命名管道监听、进程死亡时内核自动释放、无需继承描述符——supervisor 通过 `LocalRuntimeOwnerStore.adopt` 自行认领租约，因此 `win32` 下 `stdio` 不传 fd 槽位。`.lock` 文件保留为持久 inode 见证；NTFS 上 `stat.ino`/`dev` 是真实文件索引，见证相等语义不变。`EADDRINUSE` 映射到与 `flock` `EAGAIN` 相同的竞争路径。`GatewayModelBudget` 获得了相同的 win32 分支。
 
-进程控制：`detached` spawn 仍可用，`process.kill(pid, 0)` 作为活性探测，组终止用 `taskkill.exe /PID <pid> /T /F`——Windows 没有进程组信号。启动标识通过 `localKernelBootId` 取 `Get-CimInstance Win32_OperatingSystem.LastBootUpTime`。
+进程控制：`detached` spawn 仍可用，`process.kill(pid, 0)` 作为活性探测。进程树终止现在经由 kill-on-close Job Object，并以 `GetProcessTimes` 创建时刻凭证围栏 PID 复用——`taskkill.exe /PID <pid> /T /F` 仅保留给该凭证引入前的旧记录与 Job 挂接前的间隙（见 [Windows Job 所有权](2026-11-12-windows-runtime-job-ownership.zh.md)）。启动标识通过 `localKernelBootId` 取 `Get-CimInstance Win32_OperatingSystem.LastBootUpTime`。
 
 `config.ts` 的路径校验从硬编码 `posix.*` 改为平台别名（`isAbsolute`、`relative`、分隔符检查），使 `C:\harness-state` 这类根目录在 Windows 上通过校验，同时 `..` 逃逸检查继续生效。generation 提交改调 `syncStateDirectory`，它在 Windows 上空操作（NTFS 自身记录重命名；目录 `fsync` 返回 EPERM）——即 `node-private-file` 已在用的同一辅助函数。
 
@@ -28,7 +28,7 @@ Windows 上的内核租约改用命名管道 `\\.\pipe\dsh-owner-<sha256(lockPat
 
 ## 影响
 
-配置 `HGW_NODE_LOCAL_GATEWAY_URL` 的 Windows 节点上报 `executionReady: true`，通过节点服务流承接中心转发的 `?dshNode=`/`?dshRuntime=` 流量，分配托管 Runtime，并掌管其生命周期：启动、就绪、`taskkill` 树杀停止、generation 围栏（陈旧 generation 返回 `INSTANCE_GENERATION_CHANGED`）。已在生产中心对 Windows Server 2025 完成端到端验证：分配 → `observedState: "ready"` → 真实 headless 任务输出 → 停止 → generation+1 重启 → 陈旧 generation 拒绝。两个可选插件（`llm-pi-ai`、`session-telemetry-otel`）在载荷缺少其 npm 依赖时降级；`dsh web` 仍正常服务。
+配置 `HGW_NODE_LOCAL_GATEWAY_URL` 的 Windows 节点上报 `executionReady: true`，通过节点服务流承接中心转发的 `?dshNode=`/`?dshRuntime=` 流量，分配托管 Runtime，并掌管其生命周期：启动、就绪、kill-on-close Job 树杀停止、generation 围栏（陈旧 generation 返回 `INSTANCE_GENERATION_CHANGED`）。已在生产中心对 Windows Server 2025 完成端到端验证：分配 → `observedState: "ready"` → 真实 headless 任务输出 → 停止 → generation+1 重启 → 陈旧 generation 拒绝。两个可选插件（`llm-pi-ai`、`session-telemetry-otel`）在载荷缺少其 npm 依赖时降级；`dsh web` 仍正常服务。
 
 ## 验证
 

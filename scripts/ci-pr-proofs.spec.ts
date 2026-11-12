@@ -75,6 +75,12 @@ describe('additional PR proof selection', () => {
     }
     expect(proofs(['packages/llm/llm-deepseek/src/index.ts'])).toMatchObject({ provider: true, piAi: false })
     expect(proofs(['packages/subprocess/subprocess-local/src/index.ts'])).toMatchObject({ sandbox: true, nativeWindows: true })
+    for (const path of ['gateway/src/local-runtime-win32-job.ts', 'gateway/src/local-runtime-supervisor.ts',
+      'gateway/src/local-runtime-control.ts', 'gateway/src/node-windows-security-id.ts']) {
+      const result = proofs([path])
+      expect(result, path).toMatchObject({ nativeWindows: true, sandbox: false })
+      expect(result.reasons.nativeWindows).toContain(`native-runtime:${path}`)
+    }
   })
 
   it('keeps shared API and dynamic composition consumers beyond their packaging owner', () => {

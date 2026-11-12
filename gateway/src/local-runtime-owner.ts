@@ -36,8 +36,11 @@ const recordSchema = z.object({
   bootId: z.string().uuid(), phase: phaseSchema,
   nativeRange: z.literal('linux-slice').optional(),
   url: z.string().optional(), groupPid: z.number().int().positive().safe().optional(),
+  /** Kernel creation instant of `groupPid` in Unix epoch milliseconds; fences PID reuse on kill paths. */
+  groupStartedAt: z.number().int().positive().safe().optional(),
 }).strict().superRefine((record, ctx) => {
   if (record.url === undefined !== (record.groupPid === undefined)
+    || record.groupStartedAt !== undefined && record.groupPid === undefined
     || ['starting', 'running', 'stopping', 'uncertain'].includes(record.phase) && record.url === undefined) {
     ctx.addIssue({ code: 'custom', message: 'Allocated local runtime ownership requires its endpoint and process group' })
   }
@@ -393,7 +396,10 @@ export class LocalRuntimeOwnerLease {
         || current.bootId !== next.bootId || JSON.stringify(next.identity) !== JSON.stringify(this.store.identity)
         || next.lock.device !== this.witness.device || next.lock.inode !== this.witness.inode
         || current.url !== undefined && next.url !== current.url
-        || current.groupPid !== undefined && next.groupPid !== current.groupPid) throw new Error('Local runtime owner capability changed')
+        || current.groupPid !== undefined && next.groupPid !== current.groupPid
+        || current.groupStartedAt !== undefined && next.groupStartedAt !== current.groupStartedAt) {
+      throw new Error('Local runtime owner capability changed')
+    }
       if (!transitions[current.phase].includes(next.phase)) throw new Error('Local runtime owner transition is fenced')
       await this.write(next)
       return next

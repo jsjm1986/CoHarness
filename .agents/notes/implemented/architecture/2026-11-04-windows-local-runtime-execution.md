@@ -14,7 +14,7 @@ English | [中文](2026-11-04-windows-local-runtime-execution.zh.md)
 
 The kernel lease on Windows is a named pipe `\\.\pipe\dsh-owner-<sha256(lockPath)>` instead of `flock`: exclusive `createNamedPipe`-equivalent listen, automatic kernel release on process death, and no descriptor to inherit — the supervisor claims the lease itself via `LocalRuntimeOwnerStore.adopt`, so `stdio` passes no fd slot on `win32`. The `.lock` file stays as the durable inode witness; `stat.ino`/`dev` are real file indexes on NTFS, so witness equality is unchanged. `EADDRINUSE` maps to the same contention path as `flock` `EAGAIN`. `GatewayModelBudget` gained the same win32 branch.
 
-Process control: `detached` spawn still works, `process.kill(pid, 0)` is the liveness probe, and group termination uses `taskkill.exe /PID <pid> /T /F` — there is no process-group signal on Windows. Boot identity comes from `Get-CimInstance Win32_OperatingSystem.LastBootUpTime` via `localKernelBootId`.
+Process control: `detached` spawn still works and `process.kill(pid, 0)` is the liveness probe. Tree termination now runs through a kill-on-close Job Object with a `GetProcessTimes` creation-instant witness fencing PID reuse — `taskkill.exe /PID <pid> /T /F` remains only for records predating the witness and the pre-Job assignment gap ([Windows Job ownership](2026-11-12-windows-runtime-job-ownership.md)). Boot identity comes from `Get-CimInstance Win32_OperatingSystem.LastBootUpTime` via `localKernelBootId`.
 
 Path validation in `config.ts` switched from hardcoded `posix.*` to a platform alias (`isAbsolute`, `relative`, separator checks), so `C:\harness-state` roots validate on Windows while `..` escape checks keep working. The generation commit now calls `syncStateDirectory`, which no-ops on Windows (NTFS journals the rename; directory `fsync` returns EPERM) — the same helper `node-private-file` already used.
 
@@ -28,7 +28,7 @@ Path validation in `config.ts` switched from hardcoded `posix.*` to a platform a
 
 ## Consequences
 
-A Windows node with `HGW_NODE_LOCAL_GATEWAY_URL` reports `executionReady: true`, serves the center's forwarded `?dshNode=`/`?dshRuntime=` traffic through the node service stream, allocates managed Runtimes, and owns their lifecycle: start, readiness, stop via `taskkill` tree-kill, and generation fencing (`INSTANCE_GENERATION_CHANGED` on stale generations). Verified end-to-end against the production center on Windows Server 2025: allocation → `observedState: "ready"` → real headless task output → stop → restart at generation+1 → stale-generation rejection. Two optional plugins (`llm-pi-ai`, `session-telemetry-otel`) degrade when their npm deps are absent from the payload; `dsh web` still serves.
+A Windows node with `HGW_NODE_LOCAL_GATEWAY_URL` reports `executionReady: true`, serves the center's forwarded `?dshNode=`/`?dshRuntime=` traffic through the node service stream, allocates managed Runtimes, and owns their lifecycle: start, readiness, stop via kill-on-close Job tree termination, and generation fencing (`INSTANCE_GENERATION_CHANGED` on stale generations). Verified end-to-end against the production center on Windows Server 2025: allocation → `observedState: "ready"` → real headless task output → stop → restart at generation+1 → stale-generation rejection. Two optional plugins (`llm-pi-ai`, `session-telemetry-otel`) degrade when their npm deps are absent from the payload; `dsh web` still serves.
 
 ## Verification
 

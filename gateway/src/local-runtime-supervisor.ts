@@ -9,6 +9,7 @@ import { LocalRuntimeOwnerLease, LocalRuntimeOwnerStore } from './local-runtime-
 import { LOCAL_BOOTSTRAP_BYTES, localBootstrapSchema, localKernelBootId } from './local-runtime-protocol.ts'
 import { RuntimeLog } from './runtime-log.ts'
 import { localLinuxRuntimeCommand, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
+import { assignRuntimeKillJob, win32CurrentProcessCreationMs, type Win32RuntimeJob } from './local-runtime-win32-job.ts'
 
 const CONTROL_BYTES = 4096
 let started = false
@@ -55,12 +56,15 @@ async function supervise(input: unknown): Promise<void> {
   server.maxConnections = 16
 
   let forceWork: Promise<void> | undefined
+  let killJob: Win32RuntimeJob | undefined
   function killOwnedGroup(): void {
     forceWork ??= (async () => {
       if (record.nativeRange === 'linux-slice') await stopLocalLinuxRuntime(record, spec.controlTimeoutMs)
       if (process.platform === 'win32') {
-        // Windows has no process-group signal; taskkill /T ends the runtime tree.
-        if (child?.pid !== undefined) {
+        // The kill-on-close Job ends the whole tree atomically; taskkill /T
+        // remains only for a child spawned before Job assignment finished.
+        if (killJob !== undefined) killJob.terminate(1)
+        else if (child?.pid !== undefined) {
           await runGatewayChildCommand('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], spec.controlTimeoutMs).catch(() => {})
         }
         process.exit(0)
@@ -130,7 +134,11 @@ async function supervise(input: unknown): Promise<void> {
     })
     const address = server.address()
     if (address === null || typeof address === 'string') throw new Error('Local runtime owner endpoint is unavailable')
-    record = await lease.publish({ ...record, phase: 'starting', groupPid: process.pid, url: `http://127.0.0.1:${address.port}/` })
+    record = await lease.publish({
+      ...record, phase: 'starting', groupPid: process.pid, url: `http://127.0.0.1:${address.port}/`,
+      // The recorded creation instant fences later kill paths against PID reuse.
+      ...(process.platform === 'win32' ? { groupStartedAt: win32CurrentProcessCreationMs() } : {}),
+    })
     if (stopping || await store.cancelled()) throw new Error('Local runtime startup is cancelled')
     const command = spec.linuxScopeMode === undefined ? spec.command : localLinuxRuntimeCommand(record, spec.linuxScopeMode, spec.command)
     child = spawn(command[0]!, command.slice(1), {
@@ -142,7 +150,14 @@ async function supervise(input: unknown): Promise<void> {
     child.stdout!.pipe(log, { end: false }); child.stderr!.pipe(log, { end: false })
     child.once('exit', () => { runtimeAlive = false; stop(0) })
     child.once('close', () => { void log.close().then(killOwnedGroup, killOwnedGroup) })
-    const spawnReady = new Promise<void>((resolve, reject) => { child!.once('spawn', resolve); child!.once('error', reject) })
+    const spawned = child
+    const spawnReady = new Promise<void>((resolve, reject) => { spawned.once('spawn', resolve); spawned.once('error', reject) })
+      .then(() => {
+        if (process.platform === 'win32') {
+          if (spawned.pid === undefined) throw new Error('Local runtime child spawned without a process id')
+          killJob = assignRuntimeKillJob(spawned.pid)
+        }
+      })
     const credential = child.stdio[3] as Writable
     const delivered = new Promise<void>((resolve, reject) => {
       credential.once('error', reject); credential.end(spec.credential, resolve)
