@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-[Index 渲染器](../../../../packages/host/webserver/README.zh.md) 将可选的当前 HTTP 请求传给结构化注入监听器，不提供认证裁决或请求上下文。[GatewayRuntime](../../../../packages/context/gateway-runtime/README.zh.md) 验证该请求的签名 principal，包括用途、组织、作用域和 Runtime generation，然后仅输出版本 1、账号 ID 与 Runtime 目标。非请求专属收集不输出身份。注册归插件 fiber 所有，随卸载撤回。[Frontend-static](../../../../packages/host/frontend-static/README.zh.md) 先认证、后渲染，并为 index 响应设置 `no-store`；带内容哈希的资源保留独立的 immutable 缓存策略。
+[Index 渲染器](../../../../packages/host/webserver/README.zh.md) 将可选的当前 HTTP 请求传给结构化注入监听器，不提供认证裁决或请求上下文。[GatewayRuntime](../../../../packages/context/gateway-runtime/README.zh.md) 验证该请求的签名 principal，包括用途、组织、作用域和 Runtime generation，然后仅输出版本 1、账号 ID 与 Runtime 目标；当已验证断言命名了精确分配时，目标携带其 `runtimeId`，使多节点舰队把后续每个请求钉到同一 Runtime（[精确分配修复](../bug-fix/2026-11-13-document-identity-exact-runtime.zh.md)）。非请求专属收集不输出身份。注册归插件 fiber 所有，随卸载撤回。[Frontend-static](../../../../packages/host/frontend-static/README.zh.md) 先认证、后渲染，并为 index 响应设置 `no-store`；带内容哈希的资源保留独立的 immutable 缓存策略。
 
 [Connection](../../../../packages/client/connection/README.zh.md) 校验 HTML 输入，并复制到页面所有的身份围栏。存在但畸形的输入使加载失败；输入缺省时保留先描述、后初始化的顺序，fixture 与显式载体忽略这份 HTTP 输入。序列化的启动值是页面输入，不是共享响应缓存，不包含凭据、断言、权限或 Host 描述。
 

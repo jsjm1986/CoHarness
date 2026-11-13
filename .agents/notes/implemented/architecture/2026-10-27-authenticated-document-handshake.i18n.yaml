@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-27-authenticated-document-handshake.md
 document:
-  en: 0a0451b6190b2e41d475dc2ac50867540db8c803
-  zh: 0e656aeb7d61024e77db59488567a9381d11cc87
+  en: 1ba2033295e5125b67a6cab317ace8b9d0a664cf
+  zh: 460b82bb32aed5f1b5e62ef89c6b40d21420aae9
 /agent-note-authenticated-document-identity-permits-parallel-connection-opening:
   en: b61d8acbae71ed80
   zh: cc1ffbf41345d45d
@@ -12,8 +12,8 @@ document:
   en: 97a29f1924d76c4b
   zh: a855695f60489376
 /agent-note-authenticated-document-identity-permits-parallel-connection-opening/decision:
-  en: 5f751445b6ad328d
-  zh: 4a904ef4765818b3
+  en: 94661f54b89dd49f
+  zh: bcc40a7235a15049
 /agent-note-authenticated-document-identity-permits-parallel-connection-opening/alternatives-considered:
   en: 2bb0ef59e7bc6ea7
   zh: a24423ed49ab14c5

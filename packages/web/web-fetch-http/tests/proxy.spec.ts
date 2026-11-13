@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
 import { HttpFetchProvider } from '@deepseek-ai/dsh-web-fetch-http'
 import type { HttpFetchLimits } from '@deepseek-ai/dsh-web-fetch-http'
-import { isNonPublicIpLiteral, publicHttpNetwork } from '../src/network.ts'
+import { publicHttpNetwork, resolvePublicAddresses } from '../src/network.ts'
 
 const limits: HttpFetchLimits = {
   maxUrlLength: 2048,
@@ -24,10 +24,11 @@ let originUrl: string
 
 /**
  * The target for every assertion about a tunnelled hop. Loopback cannot serve: no policy routes
- * this machine through a proxy. The host never resolves — the proxy answers the absolute-form
- * request — which is also what makes the skipped resolver observable.
+ * this machine through a proxy. The proxy answers the absolute-form request, so the host needs only
+ * a stubbed public answer from the local resolver.
  */
 const proxyTarget = 'http://origin.test/page'
+const publicAnswer = [{ address: '93.184.216.34', family: 4 as const }]
 let disposeProxy: (() => Promise<void>) | undefined
 
 function listen(server: Server): Promise<AddressInfo> {
@@ -73,17 +74,44 @@ async function installProxy(): Promise<() => Promise<void>> {
 }
 
 describe('fetching through a proxy', () => {
-  it('tunnels the request and never resolves a public address for it', async () => {
-    const resolve = vi.spyOn(publicHttpNetwork, 'resolve')
+  it('validates the hostname locally, then tunnels the request without pinning', async () => {
+    const resolve = vi.spyOn(publicHttpNetwork, 'resolve').mockResolvedValue(publicAnswer)
+    const pinned = vi.spyOn(publicHttpNetwork, 'request')
     disposeProxy = await installProxy()
 
     const result = await new HttpFetchProvider(limits).fetch({ url: proxyTarget })
 
     expect(result.body.content).toBe('via-proxy')
     expect(proxied).toEqual([proxyTarget])
-    // Through a proxy the origin's DNS happens proxy-side, so the resolver that rejects non-public
-    // destinations is not consulted at all.
-    expect(resolve).not.toHaveBeenCalled()
+    expect(resolve).toHaveBeenCalledOnce()
+    expect(resolve.mock.calls[0]?.[0]).toBe('origin.test')
+    expect(pinned).not.toHaveBeenCalled()
+  })
+
+  it.each(['10.0.0.1', '169.254.169.254', '127.0.0.1'])(
+    'refuses a hostname that resolves to %s before the proxy receives it',
+    async (address) => {
+      // The real resolver checks the stubbed lookup answer, so the refusal is the production one.
+      const lookup = vi.fn().mockResolvedValue([{ address, family: 4 }])
+      vi.spyOn(publicHttpNetwork, 'resolve').mockImplementation(async (hostname, signal) =>
+        await resolvePublicAddresses(hostname, signal, lookup))
+      disposeProxy = await installProxy()
+
+      await expect(new HttpFetchProvider(limits).fetch({ url: 'http://metadata.internal.test/latest' }))
+        .rejects.toThrow(expect.objectContaining({ code: 'WEB_BLOCKED_URL' }))
+      expect(lookup).toHaveBeenCalledOnce()
+      expect(proxied).toEqual([])
+    },
+  )
+
+  it('refuses a hostname the local resolver cannot answer instead of letting the proxy resolve it', async () => {
+    vi.spyOn(publicHttpNetwork, 'resolve').mockImplementation(async (hostname, signal) =>
+      await resolvePublicAddresses(hostname, signal, () => Promise.resolve([])))
+    disposeProxy = await installProxy()
+
+    await expect(new HttpFetchProvider(limits).fetch({ url: 'http://jenkins.corp.test/' }))
+      .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR' }))
+    expect(proxied).toEqual([])
   })
 
   it('keeps resolving and pinning a hop the policy does not proxy', async () => {
@@ -116,26 +144,13 @@ describe('fetching through a proxy', () => {
       const resolve = vi.spyOn(publicHttpNetwork, 'resolve')
       disposeProxy = await installProxy()
 
-      // The proxied path exists because a proxy resolves the origin; a literal needs no resolution,
-      // so taking it would spend the address checks for nothing and hand a proxy on this machine
-      // the private or loopback destination those checks exist to refuse. The hop therefore takes
-      // the validated path instead, where the existing refusal already covers it.
+      // A literal reaches the same resolver as a hostname, which refuses it without a DNS query.
       await expect(new HttpFetchProvider(limits).fetch({ url: `http://${host}:8080/` }))
         .rejects.toThrow(expect.objectContaining({ code: 'WEB_BLOCKED_URL' }))
       expect(proxied).toEqual([])
       expect(resolve).toHaveBeenCalledOnce()
     },
   )
-
-  it('reads an IPv4-mapped literal as non-public without asking the network', () => {
-    // Driven through the predicate rather than a fetch: an IPv6 literal sends `resolvePublicAddresses`
-    // looking for a NAT64 prefix before it refuses anything, and that is a real DNS query. The three
-    // IPv4 cases above already prove the branch end to end without one.
-    expect(isNonPublicIpLiteral('[::ffff:7f00:1]')).toBe(true)
-    expect(isNonPublicIpLiteral('[::1]')).toBe(true)
-    expect(isNonPublicIpLiteral('[::ffff:808:808]')).toBe(false)
-    expect(isNonPublicIpLiteral('example.com')).toBe(false)
-  })
 
   it('still refuses a cross-origin redirect on the proxied path', async () => {
     proxy.removeAllListeners('request')
@@ -144,6 +159,7 @@ describe('fetching through a proxy', () => {
       response.writeHead(302, { location: 'http://elsewhere.example/next' })
       response.end()
     })
+    vi.spyOn(publicHttpNetwork, 'resolve').mockResolvedValue(publicAnswer)
     disposeProxy = await installProxy()
 
     await expect(new HttpFetchProvider(limits).fetch({ url: proxyTarget }))

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-13-document-identity-exact-runtime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-13-document-identity-exact-runtime.md
+document:
+  en: 096c4f2fb02c89832802438a0c31b89b78583a28
+  zh: a2ea443d5baf16ad0bc434ca40eda82aca575061
+/agent-note-document-identity-carries-the-exact-runtime-allocation:
+  en: d20dbf3ecf0b57b1
+  zh: adc2aa6292f7c87c
+/agent-note-document-identity-carries-the-exact-runtime-allocation/problem:
+  en: ecdaf7f0f5f9b616
+  zh: c8a0e5ab84ddd20a
+/agent-note-document-identity-carries-the-exact-runtime-allocation/decision:
+  en: 30693c68adb86688
+  zh: f6321094f9cc8603
+/agent-note-document-identity-carries-the-exact-runtime-allocation/alternatives-considered:
+  en: 3f950a6464a4a14f
+  zh: a3a125cb50f2e787
+/agent-note-document-identity-carries-the-exact-runtime-allocation/consequences:
+  en: 671ae986aebc18aa
+  zh: b9e7e5067df8f4bd
+/agent-note-document-identity-carries-the-exact-runtime-allocation/verification:
+  en: 45443622722377c6
+  zh: 85fe96e2de7ec20e
