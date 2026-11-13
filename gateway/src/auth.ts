@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import type { GatewayConfig } from './config.ts'
 import { verifyPassword } from './password.ts'
+import { LOGIN_LOCK_WINDOW_MS, LOGIN_SOURCE_THRESHOLD, LOGIN_SOURCE_USERNAME_THRESHOLD, loginSource } from './login-source.ts'
 
 export interface UserRow {
   id: number
@@ -23,9 +24,6 @@ export interface StreamSessionQualification {
   user: UserRow
   expiresAt: number
 }
-
-const LOCK_WINDOW_MS = 10 * 60 * 1000
-const LOCK_THRESHOLD = 5
 
 interface DbUser {
   id: number
@@ -85,13 +83,23 @@ export class AuthService {
       const row = this.db.prepare(`SELECT * FROM users WHERE username = ?`).get(username) as DbUser | undefined
       const passwordOk = row !== undefined && row.status === 'active' && row.deleted_at === null
         && await verifyPassword(row.password_hash, password)
+      // Failures lock one username only for the source that produced them, so
+      // an anonymous client cannot lock the account for its real owner.
+      const source = loginSource(ip)
+      const bucket = source.bucket ?? ''
       return this.db.transaction(() => {
         const now = Date.now()
-        this.db.prepare(`DELETE FROM login_attempts WHERE ts <= ?`).run(now - LOCK_WINDOW_MS)
+        this.db.prepare(`DELETE FROM login_attempts WHERE ts <= ?`).run(now - LOGIN_LOCK_WINDOW_MS)
         const failures = this.db.prepare(
-          `SELECT COUNT(*) AS n FROM login_attempts WHERE username = ? AND ts > ?`,
-        ).get(username, now - LOCK_WINDOW_MS) as { n: number }
-        if (failures.n >= LOCK_THRESHOLD) return 'locked' as const
+          `SELECT COUNT(*) AS n FROM login_attempts WHERE username = ? AND ip = ? AND ts > ?`,
+        ).get(username, bucket, now - LOGIN_LOCK_WINDOW_MS) as { n: number }
+        if (failures.n >= LOGIN_SOURCE_USERNAME_THRESHOLD) return 'locked' as const
+        if (source.distinguishable) {
+          const sourceFailures = this.db.prepare(
+            `SELECT COUNT(*) AS n FROM login_attempts WHERE ip = ? AND ts > ?`,
+          ).get(bucket, now - LOGIN_LOCK_WINDOW_MS) as { n: number }
+          if (sourceFailures.n >= LOGIN_SOURCE_THRESHOLD) return 'locked' as const
+        }
 
         // Password hashing is asynchronous, so the row checked before the
         // await may have been disabled or replaced in the meantime. Re-read
@@ -101,11 +109,11 @@ export class AuthService {
           && current.id === row.id && current.password_hash === row.password_hash
           && current.status === 'active' && current.deleted_at === null
         if (!accepted || current === undefined) {
-          this.db.prepare(`INSERT INTO login_attempts(username, ip, ts) VALUES(?, ?, ?)`).run(username, ip, now)
+          this.db.prepare(`INSERT INTO login_attempts(username, ip, ts) VALUES(?, ?, ?)`).run(username, bucket, now)
           return 'invalid' as const
         }
 
-        this.db.prepare(`DELETE FROM login_attempts WHERE username = ?`).run(username)
+        this.db.prepare(`DELETE FROM login_attempts WHERE username = ? AND ip = ?`).run(username, bucket)
         const token = randomBytes(32).toString('base64url')
         this.db.prepare(
           `INSERT INTO auth_sessions(user_id, token_hash, created_at, expires_at, absolute_expires_at, last_seen_at, ip, user_agent)

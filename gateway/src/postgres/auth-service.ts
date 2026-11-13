@@ -1,13 +1,13 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { isIP } from 'node:net'
 import type { GatewayConfig } from '../config.ts'
 import type { StreamSessionQualification, UserRow } from '../auth.ts'
 import { verifyPassword } from '../password.ts'
+import { LOGIN_LOCK_WINDOW_MS, LOGIN_SOURCE_THRESHOLD, LOGIN_SOURCE_USERNAME_THRESHOLD, loginSource } from '../login-source.ts'
 import { transaction } from './database.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
-const LOCK_WINDOW_MS = 10 * 60 * 1000
-const LOCK_THRESHOLD = 5
+/** Matches attempts in source bucket `$3` (a CIDR), or attempts without an address when `$3` is null. */
+const SAME_SOURCE = '(source_ip <<= $3::inet OR ($3::inet IS NULL AND source_ip IS NULL))'
 /** Valid argon2id encoding at the production parameters; verifies (and costs) like a real hash, always rejects. */
 const DUMMY_PASSWORD_HASH = '$argon2id$v=19$m=19456,t=2,p=1$jXVYi2qhgjpSj3RGmuYeVg$boG4Z6yJ9CoKKvdNf2rURS5weuV0ctWo01r8ITOdopM'
 
@@ -32,11 +32,6 @@ interface PostgresAuthIdentity extends PostgresAuthUser {
 
 function tokenHash(token: string): Buffer {
   return createHash('sha256').update(token).digest()
-}
-
-function sourceIp(ip: string): string | null {
-  const normalized = ip.replace(/^::ffff:/, '')
-  return isIP(normalized) === 0 ? null : normalized
 }
 
 /** Use one advisory-lock bucket for case-insensitive PostgreSQL usernames. */
@@ -87,7 +82,10 @@ export class PostgresAuthService {
     )
     const canonicalUsername = canonical.rows[0]!.username
     return this.serializeLogin(canonicalUsername, async () => {
-      const address = sourceIp(ip)
+      // Failures lock one username only for the source that produced them, so
+      // an anonymous client cannot lock the account for its real owner.
+      const source = loginSource(ip)
+      const address = source.address
       const result = await this.context.pool.query<PostgresAuthUser>(`SELECT u.public_id::text,u.username::text,
         u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
         c.must_change_password,c.password_hash,u.auto_review_eligible
@@ -108,6 +106,10 @@ export class PostgresAuthService {
         // Serialize the check-and-record transition across Gateway processes,
         // not just within this Node instance.
         await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-login:${this.context.organizationId}:${canonicalUsername}`])
+        // Every login takes the username lock first, so this second lock cannot form a cycle.
+        if (source.distinguishable) {
+          await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-login-source:${this.context.organizationId}:${source.bucket}`])
+        }
         // Lock the identity rows before touching login_attempts: a user
         // mutation holds FOR UPDATE on u,m and then deletes attempts, so
         // taking attempt-row locks first here would let a two-table cycle form.
@@ -126,13 +128,21 @@ export class PostgresAuthService {
         const current = user.rows[0]
         await client.query(`DELETE FROM harness.login_attempts
           WHERE organization_id=$1 AND occurred_at <= clock_timestamp()-($2::double precision * interval '1 millisecond')`,
-        [this.context.organizationId, LOCK_WINDOW_MS])
+        [this.context.organizationId, LOGIN_LOCK_WINDOW_MS])
         const failures = await client.query<{ n: string }>(`SELECT COUNT(*)::text n
           FROM harness.login_attempts
-          WHERE organization_id=$1 AND username=$2
-            AND occurred_at > clock_timestamp()-($3::double precision * interval '1 millisecond') AND succeeded=false`,
-        [this.context.organizationId, username, LOCK_WINDOW_MS])
-        if (Number(failures.rows[0]?.n ?? 0) >= LOCK_THRESHOLD) return 'locked' as const
+          WHERE organization_id=$1 AND username=$2 AND ${SAME_SOURCE}
+            AND occurred_at > clock_timestamp()-($4::double precision * interval '1 millisecond') AND succeeded=false`,
+        [this.context.organizationId, username, source.bucket, LOGIN_LOCK_WINDOW_MS])
+        if (Number(failures.rows[0]?.n ?? 0) >= LOGIN_SOURCE_USERNAME_THRESHOLD) return 'locked' as const
+        if (source.distinguishable) {
+          const sourceFailures = await client.query<{ n: string }>(`SELECT COUNT(*)::text n
+            FROM harness.login_attempts
+            WHERE organization_id=$1 AND source_ip <<= $2::inet
+              AND occurred_at > clock_timestamp()-($3::double precision * interval '1 millisecond') AND succeeded=false`,
+          [this.context.organizationId, source.bucket, LOGIN_LOCK_WINDOW_MS])
+          if (Number(sourceFailures.rows[0]?.n ?? 0) >= LOGIN_SOURCE_THRESHOLD) return 'locked' as const
+        }
         if (!accepted || row === undefined || token === undefined) {
           await client.query(`INSERT INTO harness.login_attempts(
             organization_id,username,source_ip,occurred_at,succeeded
@@ -141,8 +151,8 @@ export class PostgresAuthService {
           return 'invalid' as const
         }
         await client.query(`DELETE FROM harness.login_attempts
-          WHERE organization_id=$1 AND username=$2 AND succeeded=false`,
-        [this.context.organizationId, username])
+          WHERE organization_id=$1 AND username=$2 AND ${SAME_SOURCE} AND succeeded=false`,
+        [this.context.organizationId, username, source.bucket])
         // The identity was re-read under the transaction lock above. Password
         // verification happened before the lock; a concurrent role, display
         // name, membership, or credential change must not be reflected by the
