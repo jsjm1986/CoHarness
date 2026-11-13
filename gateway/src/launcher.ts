@@ -157,6 +157,7 @@ export class LocalLauncher implements Launcher {
           ...(process.platform === 'win32' ? { USERPROFILE: runtime.homePath } : {}),
           DSH_DIRECTORY_GRANTS: join(runtime.dshHome, 'directory-grants.json'),
           DSH_MANAGED_DATA_MANIFEST: join(runtime.dshHome, 'managed-data.jsonl'), DSH_GATEWAY_CREDENTIAL_FD: '3',
+          NODE_COMPILE_CACHE: join(this.cfg.stateRoot, 'compile-cache'),
           TSX_TSCONFIG_PATH: join(this.cfg.dshRepoRoot, 'tsconfig.base.json'),
         },
       })
@@ -173,7 +174,11 @@ export class LocalLauncher implements Launcher {
       if (process.platform !== 'win32') stdio.push(lease.fd)
       const child = supervisor = spawn(process.execPath, [...(source ? ['--import', import.meta.resolve('tsx/esm')] : []), entry, String(this.cfg.readinessTimeoutMs)], {
         cwd: this.cfg.dshRepoRoot, detached: true, stdio,
-        env: { ...scrubbedGatewayChildEnv(), TSX_TSCONFIG_PATH: fileURLToPath(new URL('../tsconfig.run.json', import.meta.url)) },
+        env: {
+          ...scrubbedGatewayChildEnv(),
+          NODE_COMPILE_CACHE: join(this.cfg.stateRoot, 'compile-cache'),
+          TSX_TSCONFIG_PATH: fileURLToPath(new URL('../tsconfig.run.json', import.meta.url)),
+        },
       })
       const exited = new Promise<void>(resolve => child.once('exit', () => resolve()))
       await new Promise<void>((resolve, reject) => {

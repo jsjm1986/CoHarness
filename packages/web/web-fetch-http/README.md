@@ -45,7 +45,7 @@ A shipping web-tool deployment sets the provider backstop above the tool budget,
 - Sends an explicit product `User-Agent`, never a browser disguise.
 - Rejects unsupported (e.g. binary) content types with `WEB_UNSUPPORTED_CONTENT_TYPE`.
 - Resolves every hostname before connecting and rejects loopback, private, link-local, multicast, and other non-public addresses (`WEB_BLOCKED_URL`). The validated address set is pinned for the request so a DNS rebinding response cannot switch the connection to a private destination.
-- Honors the centralized outbound proxy policy ([`dsh-http-proxy`](../../util/http-proxy/README.md)): `proxyRouteFor(url)` runs before resolution, and a proxied route tunnels through the policy dispatcher with origin DNS resolving proxy-side, so local resolution and pinning are skipped. A non-public IP literal still takes the validated path and is refused rather than handed to the proxy.
+- Honors the centralized outbound proxy policy ([`dsh-http-proxy`](../../util/http-proxy/README.md)): every hop, proxied or direct, first resolves locally and is refused (`WEB_BLOCKED_URL`) when any answer is non-public, so a proxy never receives a destination the direct path would refuse. A proxied route then tunnels through the policy dispatcher without pinning, because the proxy performs its own origin lookup.
 
 <a id="config"></a>
 ## Config
@@ -73,6 +73,7 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 - **Public-network policy is deliberately strict** — destinations that resolve to any non-public address are rejected, and all same-origin redirect hops are resolved and checked again. Deployments that need private services must provide a separate, explicitly reviewed provider rather than weakening this policy.
+- **A proxied hop is validated but not pinned** — the proxy repeats the origin lookup, so a DNS answer that changes between the local check and the proxy's lookup can still steer a proxied request to a private address the proxy can reach. A hostname only the proxy can resolve fails locally and cannot be fetched.
 - **Only textual content decodes** — html/xhtml and `text/*`-plus-JSON/XML families; a missing `Content-Type` or any binary type throws `WEB_UNSUPPORTED_CONTENT_TYPE`, and text-extractable PDF decoding is named deferred work.
 - **Charset comes only from the `Content-Type` header** (UTF-8 default) — an HTML `<meta charset>` declaration is ignored, and a declared-but-unrecognized charset label throws rather than falling back.
 
