@@ -10,7 +10,7 @@ import { createHmac, randomBytes } from 'node:crypto'
 import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import type { GatewayPrincipalClaims } from '../src/index.ts'
+import type { GatewayPrincipalClaims, GatewayRuntimeIdentity } from '../src/index.ts'
 import {
   GATEWAY_PRINCIPAL_HEADER,
   GATEWAY_READINESS_PATH,
@@ -155,6 +155,19 @@ describe('gateway runtime admission', () => {
       await gateway.ctx.loader.update(entry.id, { disabled: true })
       expect(gateway.ctx.webServer.collectIndexInjections(lastRequest).some(row => row.kind === 'global'
         && row.name === '__DSH_DOCUMENT_IDENTITY__')).toBe(false)
+    } finally { await gateway.dispose() }
+  })
+
+  it('renders the exact runtime allocation in the document identity when the claim carries a runtimeId', async () => {
+    const runtimeId = 'd441ed6a-1643-4405-a29b-71d1e8be3eb0' as NonNullable<GatewayRuntimeIdentity['runtimeId']>
+    const gateway = await loadGatewayComposition({ runtime: { kind: 'user', id: 9, generation: 7, runtimeId } })
+    try {
+      const reply = await call(gateway.origin, '/', principalHeaders(gateway.origin, gateway.issue()))
+      expect(reply.status).toBe(200)
+      const value = /globalThis\["__DSH_DOCUMENT_IDENTITY__"\] = ([^<]+)<\/script>/.exec(reply.body)?.[1]
+      expect(JSON.parse(value!)).toEqual({
+        version: 1, principalId: 9, runtimeTarget: { kind: 'personal', runtimeId },
+      })
     } finally { await gateway.dispose() }
   })
 
