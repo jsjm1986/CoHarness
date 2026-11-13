@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-13-windows-event-principal-expiry-anchor.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-13-windows-event-principal-expiry-anchor.md
+document:
+  en: 893c3d5731e3187bf0efd94fe3589fba64882dd2
+  zh: 178b3874053f817962002f8af8c728324a98f1ad
+/agent-note-anchor-signed-principal-expiry-to-the-backdated-issue-time:
+  en: 2cba7edd20ab57c1
+  zh: 062fc88b95c52523
+/agent-note-anchor-signed-principal-expiry-to-the-backdated-issue-time/problem:
+  en: b120cd90ec310c6a
+  zh: c7218d8c9bdbb94e
+/agent-note-anchor-signed-principal-expiry-to-the-backdated-issue-time/decision:
+  en: 3c6dca2a799b7b00
+  zh: b84e7c3fd7cfaca2
+/agent-note-anchor-signed-principal-expiry-to-the-backdated-issue-time/alternatives-considered:
+  en: 4bd60a74a1635112
+  zh: 40d994dddfda2b46
+/agent-note-anchor-signed-principal-expiry-to-the-backdated-issue-time/consequences:
+  en: a592bd2aeeba2ddd
+  zh: 752c474e75ae5d00
+/agent-note-anchor-signed-principal-expiry-to-the-backdated-issue-time/verification:
+  en: 7e4bbf0dc8212d04
+  zh: aff7ae547e4a68c7

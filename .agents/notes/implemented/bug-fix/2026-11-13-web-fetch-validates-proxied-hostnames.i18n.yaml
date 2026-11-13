@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-13-web-fetch-validates-proxied-hostnames.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-13-web-fetch-validates-proxied-hostnames.md
+document:
+  en: b4071e9bbdff48a3c6be41aee3d61d19be53aef3
+  zh: dd10c84f25ca30a17407551b38ec24b149378124
+/agent-note-validate-proxied-web-fetch-hostnames-locally:
+  en: 80047ecb62d86c9a
+  zh: 09d18e90e54e5592
+/agent-note-validate-proxied-web-fetch-hostnames-locally/problem:
+  en: 78d6edddfee09185
+  zh: d9b0ba71c54e88c2
+/agent-note-validate-proxied-web-fetch-hostnames-locally/decision:
+  en: 5a14b0a5a1f60ead
+  zh: 1adef2982f06c43c
+/agent-note-validate-proxied-web-fetch-hostnames-locally/alternatives-considered:
+  en: fa67b7b25aa57b76
+  zh: f06ec591f22f25fd
+/agent-note-validate-proxied-web-fetch-hostnames-locally/consequences:
+  en: 2e4e77e79c9f7478
+  zh: 70bd31d5dfdd7c62
+/agent-note-validate-proxied-web-fetch-hostnames-locally/verification:
+  en: c3c86792ff598261
+  zh: 344223c6ed50c53e
