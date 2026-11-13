@@ -10,6 +10,7 @@ import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
+import { NonPublicNetworkTargetError } from '../src/public-network-fetch.ts'
 import type { GatewayCollaborationService, GatewayModelGovernanceService } from '../src/services.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
@@ -83,7 +84,7 @@ async function setup() {
     const response = await fetch(`${base}/login`, { method: 'POST', redirect: 'manual', headers: { origin: base, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username, password: 'pw-12345678' }) })
     return (response.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
   }
-  return { base, project, login, governance, admin }
+  return { base, project, projects, login, governance, admin, member }
 }
 
 describe('project model settings API', () => {
@@ -116,6 +117,29 @@ describe('project model settings API', () => {
     expect(await discover.json()).toEqual({ error: 'forbidden' })
     expect(qualify).toHaveBeenCalledTimes(3)
     for (const call of qualify.mock.calls) expect(call).toEqual([project.id, admin.id])
+  })
+
+  it('restricts non-administrator discovery to public endpoints and withholds upstream diagnostics', async () => {
+    const { base, projects, login, governance, member } = await setup()
+    const owned = projects.createManaged({ name: 'Member models', ownerUserId: member.id })
+    const discover = vi.mocked(governance.discoverProjectModels!)
+    const post = async (username: string, projectId: number) => {
+      const cookie = await login(username)
+      const response = await fetch(`${base}/account/api/projects/${String(projectId)}/model-settings/discover`, {
+        method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+        body: JSON.stringify({ baseURL: 'http://169.254.169.254', api: 'openai-completions' }),
+      })
+      return { status: response.status, body: await response.json() as { error: string } }
+    }
+    discover.mockRejectedValueOnce(new Error('could not reach http://169.254.169.254/models', { cause: new NonPublicNetworkTargetError('169.254.169.254') }))
+    expect(await post('member', owned.id)).toEqual({ status: 400, body: { error: 'model-discovery-target-not-public' } })
+    expect(discover).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: owned.id, allowPrivateNetwork: false }))
+    const upstream = 'http://10.0.0.5/v1/models answered 403: internal-service-secret'
+    discover.mockRejectedValueOnce(new Error(upstream))
+    expect(await post('member', owned.id)).toEqual({ status: 400, body: { error: 'model-discovery-failed' } })
+    discover.mockRejectedValueOnce(new Error(upstream))
+    expect(await post('admin', owned.id)).toEqual({ status: 400, body: { error: upstream } })
+    expect(discover).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: owned.id, allowPrivateNetwork: true }))
   })
 
   it('withholds prepared model and credential data when current reading authority is withdrawn', async () => {

@@ -345,6 +345,20 @@ describe('discoverModelsAtEndpoint', () => {
     expect(cache.get('openai-completions', 'https://gateway.example')).toBe('https://gateway.example/')
   })
 
+  it('sends every listing request, including redirects, through a supplied fetch', async () => {
+    const global = vi.fn(async () => jsonResponse({ data: [] }))
+    vi.stubGlobal('fetch', global)
+    const supplied = vi.fn(async (url: URL) => url.pathname === '/v1/models'
+      ? new Response(null, { status: 302, headers: { location: '/final/models' } })
+      : jsonResponse({ data: [{ id: 'supplied-model' }] }))
+
+    await expect(discoverModelsAtEndpoint({ baseURL: 'https://gateway.example/v1', fetch: supplied }))
+      .resolves.toEqual([{ id: 'supplied-model', name: 'supplied-model' }])
+    expect(supplied.mock.calls.map(([url]) => url.href))
+      .toEqual(['https://gateway.example/v1/models', 'https://gateway.example/final/models'])
+    expect(global).not.toHaveBeenCalled()
+  })
+
   it('does not publish a stale discovery result after cache invalidation', async () => {
     const cache = new LlmEndpointResolutionCache()
     const fetch = vi.fn(async () => {
