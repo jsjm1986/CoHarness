@@ -56,6 +56,7 @@ function memberConfig(dir: string): ClaudeMemberConfig {
   return {
     cwd: dir,
     permissionMode: 'bypassPermissions',
+    settingSources: ['user'],
     env: { ANTHROPIC_API_KEY: 'fake-key' },
     disposeGraceMs: 50,
   }

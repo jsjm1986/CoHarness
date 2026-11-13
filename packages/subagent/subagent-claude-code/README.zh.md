@@ -11,7 +11,7 @@ kind: "package-bundle"
 
 ## 概述
 
-当委派任务应在父工作区中以全新、无人值守的 Claude Code 会话运行时，安装这个 Profile Bundle。每次运行接受一个自包含文本任务，并返回最终答案或安全的失败诊断；推理、工具通信、stderr、用量信息和工作区差异不会进入父 Session。Claude 原生设置与身份验证继续是权威来源，而 Profile 配置选择模型、环境和 `permissionMode`。针对平台锁定的运行时仅在需要时启动，并且绝不会回退到宿主 `claude` 可执行文件。当隔离和真实 Claude Code 行为比续接或提示更重要时，选择本包。
+当委派任务应在父工作区中以全新、无人值守的 Claude Code 会话运行时，安装这个 Profile Bundle。每次运行接受一个自包含文本任务，并返回最终答案或安全的失败诊断；推理、工具通信、stderr、用量信息和工作区差异不会进入父 Session。Claude 原生用户设置与身份验证继续是权威来源，而 Profile 配置选择模型、环境、`settingSources` 和 `permissionMode`。针对平台锁定的运行时仅在需要时启动，并且绝不会回退到宿主 `claude` 可执行文件。当隔离和真实 Claude Code 行为比续接或提示更重要时，选择本包。
 
 ## 目录
 
@@ -41,7 +41,7 @@ SDK 接收由文本块原样拼接成的任务。提供方会完整迭代 SDK �
 <a id="native-settings-and-interaction"></a>
 ## 原生设置与交互
 
-提供方故意省略 SDK 的 `settingSources` 选项。因此，官方 SDK 会相对于父会话 cwd 读取宿主机常规的用户、项目和本地 Claude 设置，包括原生账户状态与产品配置。提供方既不复制也不过滤这些文件，也不会创建或修改登录状态。Profile 选择的 `permissionMode` 是唯一的 query 级覆盖：Claude Code 仍拥有其设置与沙箱，而所选原生模式决定这个无人值守 query 如何处理权限检查。
+每次 query 都传入 Profile 选择的 `settingSources`，默认值为 `['user']`。因此，Claude Code 会读取用户的 Claude 设置，包括原生账户状态与产品配置，但忽略父会话工作区中的 `.claude/settings.json` 和 `.claude/settings.local.json`。工作区设置可以注册 hooks、MCP 服务器和权限放行规则，而 Claude Code 进程运行在 dsh 沙箱之外；克隆或共享的工作区不得提供这些设置。只有当该实例服务的所有工作区都可信时，才加入 `project` 或 `local`。提供方既不复制也不过滤所选文件，也不会创建或修改登录状态。`settingSources` 与 `permissionMode` 是 query 级覆盖：Claude Code 仍拥有所选设置与其沙箱，而所选原生模式决定这个无人值守 query 如何处理权限检查。
 
 每次 query 都设置 `persistSession: false` 并禁用 `AskUserQuestion`。除 bypass 模式外，`canUseTool` 会立即拒绝仍需人工审批的请求。Plan 模式还会把 `ExitPlanMode` 放入 SDK 的 `disallowedTools`，因此原生 settings 无法预先放行回到执行模式的转换，模型必须把完整计划作为最终答案返回。MCP elicitation 会被拒绝，已知的拒绝回退对话会被取消，未声明的对话类型则使用 SDK 的无对话失败行为。这些决定都不会等待用户界面。当两类事实共同参与一次失败运行时，`SubagentResult.diagnostic` 会先写入结构化失败行，再写入最新的安全权限决定；共享结果边界会把完整文本限制在 4096 个 UTF-8 字节以内。成功运行与本地取消都不会公开已捕获的事实。
 
@@ -58,6 +58,7 @@ SDK 接收由文本块原样拼接成的任务。提供方会完整迭代 SDK �
 | `providerName` | `claude-code` | `ctx.subagents` 中的非空注册名称；每个已挂载实例都需要唯一值。 |
 | `env` | `{}` | 显式指定的 SDK/CLI 环境，叠加在由共享机制清除凭证后的父环境之上。 |
 | `permissionMode` | `dontAsk` | 为该提供方实例的每次运行固定原生非交互权限策略。 |
+| `settingSources` | `['user']` | 每次运行加载的 Claude 原生设置范围（`user`、`project`、`local`）；`project` 与 `local` 会接纳工作区 hooks 和放行规则，要求工作区可信。 |
 | `disposeGraceMs` | `3000` | 共享进程树责任方各终止层级之间的宽限期，单位为毫秒且须为正有限值，并不得大于仓库共享的 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)；随后资源释放会等待整棵进程树退出。 |
 | `stateDir` | `~/.dsh/external-members` | 实例独立绑定存储的目录；`claude-code.jsonl` 属于默认实例。仅由持续成员使用。 |
 | `memberCwd` | 成员 Session cwd | 持续成员的工作区覆盖值，在其执行目标上验证。 |
@@ -66,7 +67,7 @@ SDK 接收由文本块原样拼接成的任务。提供方会完整迭代 SDK �
 <a id="persistent-members"></a>
 ## 持续成员
 
-SSH 使用目标机器预装的 `remoteCommand`。子进程只接收显式配置的环境变量，不携带 Host 的 HOME、PATH 或 SDK 进程环境；目标程序自行读取远端用户及项目配置。
+SSH 使用目标机器预装的 `remoteCommand`。子进程只接收显式配置的环境变量，不携带 Host 的 HOME、PATH 或 SDK 进程环境；目标程序按所配置的 `settingSources` 自行读取远端配置。
 
 每次调用通过实际成员 Session 解析工作区及子进程提供方，SSH 会话必须使用同一 standing realm 的文件系统和子进程，缺失时拒绝而不回退到 Host。绑定存储在首次启动前固定规范路径及执行目标，重启后拒绝目标变化。损坏或不可读的记录不能被视为新成员；缺少目标证明的旧绑定保留原记录，须新建成员后才能执行。
 
@@ -84,7 +85,7 @@ SSH 使用目标机器预装的 `remoteCommand`。子进程只接收显式配置
 | `plan` | 使用原生规划模式，拒绝执行审批，并把完整计划作为最终答案返回。 |
 | `bypassPermissions` | 显式设置 SDK 的危险确认并跳过权限检查。 |
 
-生产环境会省略 `pathToClaudeCodeExecutable`，因此 Agent SDK 0.3.263 会从自己的平台包中选择匹配的原生 `claude` 或 `claude.exe`，再通过 custom-spawn 钩子把该绝对命令交给 `dsh-subprocess`。提供方不会检查 `PATH`、重复实现平台选择，也不会回退到宿主 `claude`。原生设置与身份验证继续是权威来源，而 `permissionMode` 是唯一的 query 级策略覆盖。本插件不选择模型、不创建产品主目录、不执行登录，也不探测账户。具有凭证特征的环境变量会在显式 `env` 覆盖生效前被清除，因此供子进程使用的 API 密钥或 token 必须在该配置中显式提供。除非被覆盖，`ANTHROPIC_BASE_URL` 等非凭证端点变量以及 `PATH` 和 `HOME` 等普通环境变量仍会被继承；`PATH` 不参与选择 Claude 可执行文件。
+生产环境会省略 `pathToClaudeCodeExecutable`，因此 Agent SDK 0.3.263 会从自己的平台包中选择匹配的原生 `claude` 或 `claude.exe`，再通过 custom-spawn 钩子把该绝对命令交给 `dsh-subprocess`。提供方不会检查 `PATH`、重复实现平台选择，也不会回退到宿主 `claude`。原生用户设置与身份验证继续是权威来源，而 `settingSources` 与 `permissionMode` 是仅有的 query 级策略覆盖。本插件不选择模型、不创建产品主目录、不执行登录，也不探测账户。具有凭证特征的环境变量会在显式 `env` 覆盖生效前被清除，因此供子进程使用的 API 密钥或 token 必须在该配置中显式提供。除非被覆盖，`ANTHROPIC_BASE_URL` 等非凭证端点变量以及 `PATH` 和 `HOME` 等普通环境变量仍会被继承；`PATH` 不参与选择 Claude 可执行文件。
 
 本包是可选的 Profile Bundle。将它安装进目标 Profile 后重启该 Profile；安装会把锁定的 Agent SDK 与一个兼容的平台 CLI 载荷带入该 Profile，而包所声明的 `cordis.patch.yml` 层只注册休眠的 `claude-code` Host provider，不会启动 Claude 进程。移除该包后，下一次 Profile 启动会撤回这一 provider 及其私有运行时闭包。
 
@@ -159,7 +160,7 @@ Loader 组合证明 Bundle 默认实例、两个额外命名 Claude 实例与现
 
 #### 模型看到什么
 
-Claude Code 子级会在一个全新的 SDK query 中接收独立文本任务。它的工作区是父会话 cwd；所选提供方实例会固定已配置的模型、环境与非交互权限模式，而省略的模型及其余产品设置来自 Claude 原生配置。可执行版本来自 Bundle 锁定的 SDK 平台载荷。
+Claude Code 子级会在一个全新的 SDK query 中接收独立文本任务。它的工作区是父会话 cwd；所选提供方实例会固定已配置的模型、环境与非交互权限模式，而省略的模型及其余产品设置来自 `settingSources` 所选的 Claude 原生设置范围。可执行版本来自 Bundle 锁定的 SDK 平台载荷。
 
 #### Token 影响
 
@@ -190,7 +191,7 @@ Claude Code 子级会在一个全新的 SDK query 中接收独立文本任务。
 
 - **每次运行均新建一个 query 和一个进程**：不支持续接、恢复、池化、进度流或产品会话持久化。
 - **静态选择实例**：Profile 配置项固定提供方名称与工具绑定；调用无法动态选择提供方，而且每个公开工具都需要唯一的 `toolName`。
-- **宿主设置有意保持权威**：项目和用户设置可以改变模型、工具与行为；本提供方不提供经过筛选或与宿主环境隔离的生产模式。
+- **用户设置保持权威，工作区设置需显式启用**：用户设置可以改变模型、工具、hooks 与行为；项目和本地设置只能通过 `settingSources` 加载，除此之外本提供方不筛选设置，也不提供与宿主环境隔离的生产模式。
 - **身份验证与账户状态仍由原生机制管理**：Bundle 会提供 CLI，但不会创建账户、登录或改写 Claude 设置；配置与身份验证失败会公开其生命周期阶段与安全的 `unknown` 回退，而不会增加单独的公开分类。
 - **委派时必须存在 SDK 平台载荷**：省略 optional dependencies 的安装、不受支持的平台以及缺失或损坏的载荷都会在第一次 query 时失败；不会回退到宿主 CLI。
 - **没有人工交互路径**：`AskUserQuestion` 被禁用，权限提示会被拒绝，MCP elicitation 会被拒绝，阻塞对话会快速失败而不会挂起。

@@ -28,12 +28,15 @@ import {
 import { ExternalBindingStore, externalMemberIdentity } from '@deepseek-ai/dsh-subagent/external'
 import {
   CLAUDE_CODE_PERMISSION_MODES,
+  CLAUDE_CODE_SETTING_SOURCES,
   DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
+  DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
   DEFAULT_DISPOSE_GRACE_MS,
   claudeCodeStartupFailure,
   startClaudeCodeRun,
   type ClaudeCodePermissionMode,
   type ClaudeCodeRunSpec,
+  type ClaudeCodeSettingSource,
 } from './run.ts'
 import {
   CLAUDE_MEMBER_MODEL,
@@ -68,6 +71,13 @@ export interface Config {
    * `bypassPermissions` explicitly skips permission checks.
    */
   permissionMode?: ClaudeCodePermissionMode
+  /**
+   * Native Claude setting scopes loaded by every run. Defaults to `['user']`.
+   * Adding `project` or `local` lets workspace `.claude` settings register
+   * hooks, MCP servers, and allow rules that run outside the dsh sandbox, so
+   * include them only when every workspace this instance serves is trusted.
+   */
+  settingSources?: ClaudeCodeSettingSource[]
   /** Grace in milliseconds between Claude Code managed-range termination tiers. */
   disposeGraceMs?: number
   /**
@@ -90,6 +100,8 @@ export const Config: z<Config> = z.object({
   env: z.dict(z.string()).default({}),
   permissionMode: z.union([...CLAUDE_CODE_PERMISSION_MODES])
     .default(DEFAULT_CLAUDE_CODE_PERMISSION_MODE),
+  settingSources: z.array(z.union([...CLAUDE_CODE_SETTING_SOURCES]))
+    .default([...DEFAULT_CLAUDE_CODE_SETTING_SOURCES]),
   disposeGraceMs: z.number().default(DEFAULT_DISPOSE_GRACE_MS),
   stateDir: z.string().min(1),
   memberCwd: z.string().min(1),
@@ -162,6 +174,7 @@ class ClaudeCodeProvider implements SubagentProvider {
       } : {},
       ...this.config.model === undefined ? {} : { model: this.config.model },
       permissionMode: this.config.permissionMode,
+      settingSources: this.config.settingSources,
       env: this.config.env,
       disposeGraceMs: this.config.disposeGraceMs,
       spawn: spawnSpec => execution.subprocess.spawn({ ...spawnSpec, sessionId: request.parent.id, resourceOrigin: 'execution' }),
@@ -179,7 +192,7 @@ class ClaudeCodeProvider implements SubagentProvider {
 /**
  * Register one Profile-named Claude Code provider.
  * @param ctx - context carrying shared subagent and subprocess services.
- * @param config - registry name, optional model, permission mode, child environment, and disposal grace.
+ * @param config - registry name, optional model, permission mode, setting scopes, child environment, and disposal grace.
  */
 export function apply(ctx: Context, config: Config): void {
   const resolved: ResolvedConfig = {
@@ -187,6 +200,7 @@ export function apply(ctx: Context, config: Config): void {
     ...config.model === undefined ? {} : { model: config.model },
     env: config.env as Record<string, string>,
     permissionMode: config.permissionMode ?? DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
+    settingSources: config.settingSources ?? [...DEFAULT_CLAUDE_CODE_SETTING_SOURCES],
     disposeGraceMs: config.disposeGraceMs as number,
     ...config.stateDir === undefined ? {} : { stateDir: config.stateDir },
     ...config.memberCwd === undefined ? {} : { memberCwd: config.memberCwd },
@@ -224,7 +238,8 @@ export function apply(ctx: Context, config: Config): void {
           executable: await execution.subprocess.resolveExecutable(resolved.remoteCommand, resolved.env, signal),
         } : {},
         ...resolved.model === undefined ? {} : { model: resolved.model },
-        permissionMode: resolved.permissionMode, env: resolved.env, disposeGraceMs: resolved.disposeGraceMs,
+        permissionMode: resolved.permissionMode, settingSources: resolved.settingSources,
+        env: resolved.env, disposeGraceMs: resolved.disposeGraceMs,
       }
       return new ClaudeMemberTransport(memberConfig, spec => execution.subprocess.spawn({ ...spec, sessionId: child, resourceOrigin: 'execution' }))
     }

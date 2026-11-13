@@ -47,6 +47,7 @@ export interface ClaudeMemberConfig {
   readonly cwd: string
   readonly model?: string
   readonly permissionMode: NonNullable<Parameters<typeof claudeQueryOptions>[0]['permissionMode']>
+  readonly settingSources: ClaudeCodeRunSpec['settingSources']
   readonly env: Record<string, string>
   readonly disposeGraceMs: number
 }
@@ -78,6 +79,7 @@ class ClaudeMemberSession implements ExternalMemberSession {
       ...this.config.remote === undefined ? {} : { remote: this.config.remote },
       ...this.config.model === undefined ? {} : { model: this.config.model },
       permissionMode: this.config.permissionMode,
+      settingSources: this.config.settingSources,
       env: this.config.env,
       disposeGraceMs: this.config.disposeGraceMs,
       spawn: this.spawn,
