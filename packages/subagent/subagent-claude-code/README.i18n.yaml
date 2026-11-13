@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-claude-code/README.md
 document:
-  en: e0b0208be2c50b41217a88da7268cee8f56ce8e6
-  zh: a6dd43b6516938db4a7de7f74da4953a02711406
+  en: 9f4afc889895264cf3f9885aa92ff257d27230c1
+  zh: 8e3a6c4bb14b91b6002509f7f29876bcdb250f38
 /:
   en: 106a80259eef465a
   zh: 07bde2df0c861ceb
@@ -12,8 +12,8 @@ document:
   en: f9712f7479666558
   zh: 9781e87e0594ea14
 /deepseek-ai-dsh-subagent-claude-code/summary:
-  en: 498d97a8dd913e53
-  zh: d76f0cd25940c540
+  en: 0700b025afcb716a
+  zh: 4cbc438de65fecd3
 /deepseek-ai-dsh-subagent-claude-code/table-of-contents:
   en: b0da2a7b0d6ecfe6
   zh: d4de4894f8ec25ce
@@ -21,17 +21,17 @@ document:
   en: 098d1d05ac32a4f5
   zh: 835af36a50528148
 /deepseek-ai-dsh-subagent-claude-code/native-settings-and-interaction:
-  en: 90b68f691b4bf801
-  zh: 5f833d31e8426e5a
+  en: 10ceb766ca4af334
+  zh: 91f2dc8fc6b5fb74
 /deepseek-ai-dsh-subagent-claude-code/capabilities-and-context:
   en: 3c2d3347888ece98
   zh: 9c8f8eab9faa27ac
 /deepseek-ai-dsh-subagent-claude-code/configuration:
-  en: ad20edfab4dd511d
-  zh: 4465bb5c26db8678
+  en: dcb85d9a60cb3472
+  zh: f81bd5a258a6abf3
 /deepseek-ai-dsh-subagent-claude-code/persistent-members:
-  en: fea643616f003b42
-  zh: 7c386919dec2e08c
+  en: ebd33436c7cb3752
+  zh: 34eb085600ede579
 /deepseek-ai-dsh-subagent-claude-code/product-compatibility-and-evidence:
   en: d5b832a5ae316139
   zh: cba475777857c7af
@@ -42,8 +42,8 @@ document:
   en: 1796fa78833bfc2b
   zh: d925d4c0d6c46552
 /deepseek-ai-dsh-subagent-claude-code/model-experience/child-request/what-the-model-sees:
-  en: 35de120a073a2b78
-  zh: 74ca577fb19027a8
+  en: d2c4ca58b66e7cb5
+  zh: 01fb526730e51831
 /deepseek-ai-dsh-subagent-claude-code/model-experience/child-request/token-effect:
   en: 631f762d31c31a3d
   zh: f32ad086756bf33d
@@ -63,8 +63,8 @@ document:
   en: fdbb7dcbf8b37f2b
   zh: 9accaada9f21e36a
 /deepseek-ai-dsh-subagent-claude-code/known-limitations-and-deferred-work:
-  en: d1bb6b9dd10b9044
-  zh: f34d77b825019593
+  en: 633238591b4e381a
+  zh: 5f3ddc286cbdcd1d
 /deepseek-ai-dsh-subagent-claude-code/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98
