@@ -150,6 +150,7 @@ describe('loadConfig', () => {
     expect(cfg.instancePortBase).toBe(42000)
     expect(cfg.publicOrigins).toEqual(['http://127.0.0.1:8899'])
     expect(cfg.secureCookies).toBe(false)
+    expect(cfg.trustedProxies).toEqual(['127.0.0.1', '::1'])
     expect(cfg.dshCommand).toContain('{port}')
     expect(cfg.dshCommand).toContain('--no-open')
     expect(cfg.runtimeApiBodyLimitBytes).toBe(DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES)
@@ -165,6 +166,12 @@ describe('loadConfig', () => {
     const bin = cfg.dshCommand.find(arg => arg.endsWith('apps/cli/src/bin.ts'))
     expect(bin).toBeDefined()
     expect(isAbsolute(bin as string)).toBe(true)
+  })
+
+  it('validates trusted reverse-proxy addresses and accepts an empty list', () => {
+    expect(loadConfig({ HGW_TRUSTED_PROXIES: ' 10.0.0.0/8 , ::1 ' }).trustedProxies).toEqual(['10.0.0.0/8', '::1'])
+    expect(loadConfig({ HGW_TRUSTED_PROXIES: '' }).trustedProxies).toEqual([])
+    expect(() => loadConfig({ HGW_TRUSTED_PROXIES: 'localhost' })).toThrow('HGW_TRUSTED_PROXIES')
   })
 
   it('resolves the default CLI entry against HGW_DSH_REPO_ROOT', () => {

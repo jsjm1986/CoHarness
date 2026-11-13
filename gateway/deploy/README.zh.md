@@ -64,12 +64,15 @@ server {
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header Origin $http_origin;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_read_timeout 300s;
   }
 }
 ```
+
+登录失败只会让该用户名在产生失败的客户端来源上被锁定；同一来源跨用户名累计 20 次失败会锁定该来源；IPv6 来源按 /64 归组。Gateway 从 `X-Forwarded-For` 中最右侧且不在 `HGW_TRUSTED_PROXIES`（默认 `127.0.0.1,::1`）内的一跳读取客户端地址，因此入口必须像上面那样追加该请求头；Cloudflare Tunnel 已自带该请求头。缺少该请求头时，所有请求共用回环来源，只有按用户名的锁定生效。
 
 切流清单：设置 `HGW_PUBLIC_ORIGINS=https://harness.maycran.com`（Secure Cookie 随之开启），把入口上游改为 `127.0.0.1:8899`，然后**停掉此前直接暴露的单个 dsh 实例**（或改绑回环）——切流后除 TLS 入口外任何来源都不得触达主机端口。
 
