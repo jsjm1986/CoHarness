@@ -31,6 +31,13 @@ async function reservePort(reservations: Server[]): Promise<number> {
   return (server.address() as AddressInfo).port
 }
 
+function command(value: string | undefined, executable: string): string[] {
+  if (value === undefined) return [executable]
+  const parsed: unknown = JSON.parse(value)
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some(part => typeof part !== 'string')) throw new Error('invalid PostgreSQL test command')
+  return parsed as string[]
+}
+
 it.skipIf(databaseUrl === undefined)('rejects a startup whose cached files predate its completed database restore', async () => {
   const root = await mkdtemp(join(tmpdir(), 'hgw-startup-generation-'))
   const pool = createPostgresPool(databaseUrl!, { max: 5 })
@@ -47,6 +54,8 @@ it.skipIf(databaseUrl === undefined)('rejects a startup whose cached files preda
     await pool.query('INSERT INTO harness.cluster_control(organization_id) VALUES($1)', [organization])
     // Startup must reject before binding either configured listener.
     const port = await reservePort(reservations)
+    const pgDump = command(process.env.HGW_TEST_PG_DUMP_COMMAND, 'pg_dump')
+    const pgRestore = command(process.env.HGW_TEST_PG_RESTORE_COMMAND, 'pg_restore')
     const env: NodeJS.ProcessEnv = testEnvironment(root, {
       PATH: process.env.PATH, LANG: 'C.UTF-8', HGW_DATABASE_URL: databaseUrl,
       HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE_NAME: name,
@@ -54,6 +63,8 @@ it.skipIf(databaseUrl === undefined)('rejects a startup whose cached files preda
       HGW_PROJECT_RUNTIMES_ROOT: join(root, 'project-runtimes'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),
       HGW_PORT: String(port), HGW_INTAKE_PORT: String(await reservePort(reservations)), HGW_PUBLIC_ORIGINS: `http://127.0.0.1:${port}`,
       HGW_DEFAULT_ENV_FILE: '', HGW_LAUNCHER: 'local', HGW_NODE_HEARTBEAT_MS: '100',
+      HGW_PGDUMP_COMMAND: pgDump.map(arg => JSON.stringify(arg)).join(' '),
+      HGW_PGRESTORE_COMMAND: pgRestore.map(arg => JSON.stringify(arg)).join(' '),
       TSX_TSCONFIG_PATH: join(gateway, 'tsconfig.run.json'),
     })
     const cfg = testConfig(root, env), context = await resolvePostgresRuntimeContext(pool, slug, name)
