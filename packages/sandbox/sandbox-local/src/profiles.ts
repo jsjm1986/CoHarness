@@ -18,10 +18,11 @@ const SYSTEMD_CREDENTIALS_ROOT = '/run/credentials'
  * systemd credential root and the process's own `$CREDENTIALS_DIRECTORY`. A Gateway-launched
  * Runtime receives its loopback API token there, and the confined command runs as the same account.
  * @param env - environment naming the process's credential directory.
+ * @param systemRoot - system-manager credential root; injectable so tests replay on hosts without one.
  * @returns normalized absolute directories that exist on this host, without nested duplicates.
  */
-export function hiddenCredentialRoots(env: NodeJS.ProcessEnv = process.env): string[] {
-  const candidates = [SYSTEMD_CREDENTIALS_ROOT, env.CREDENTIALS_DIRECTORY]
+export function hiddenCredentialRoots(env: NodeJS.ProcessEnv = process.env, systemRoot: string = SYSTEMD_CREDENTIALS_ROOT): string[] {
+  const candidates = [systemRoot, env.CREDENTIALS_DIRECTORY]
     .filter((path): path is string => path !== undefined && isAbsolute(path))
     .map(path => normalize(path))
     .filter(path => path !== '/' && existsSync(path))

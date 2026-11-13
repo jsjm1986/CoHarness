@@ -8,7 +8,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -118,13 +118,38 @@ describe('profile dialects', () => {
     onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
     const unit = join(root, 'unit')
     mkdirSync(unit)
-    const roots = hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: unit })
-    expect(roots).toContain(unit)
-    expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: join(root, 'missing') })).not.toContain(join(root, 'missing'))
-    expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: 'relative' })).not.toContain('relative')
-    if (existsSync('/run/credentials')) {
-      expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: '/run/credentials/unit.service' })).toEqual(['/run/credentials'])
+    const roots = hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: unit }, join(root, 'absent-system-root'))
+    expect(roots).toEqual([unit])
+    expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: join(root, 'missing') }, join(root, 'absent-system-root'))).toEqual([])
+    expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: 'relative' }, join(root, 'absent-system-root'))).toEqual([])
+    expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: unit }, root)).toEqual([root])
+  })
+
+  it('landlock keeps unrelated roots while expanding every hidden sibling', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-landlock-multi-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    for (const name of ['a', 'b', 'c']) mkdirSync(join(root, name))
+    const hidden = [join(root, 'a'), join(root, 'b')]
+    const reads = landlockProfileArgs(RO, hidden)
+      .flatMap((arg, index, all) => arg === '--ro' ? [all[index + 1]!] : [])
+    expect(reads).toContain(join(root, 'c'))
+    for (const dir of hidden) {
+      expect(reads.some(path => path === dir || path.startsWith(dir + '/'))).toBe(false)
     }
+  })
+
+  it('landlock defaults to hiding the process credential directory when systemd provides one', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-landlock-env-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const unit = join(root, 'unit')
+    mkdirSync(unit)
+    mkdirSync(join(root, 'other'))
+    vi.stubEnv('CREDENTIALS_DIRECTORY', unit)
+    onTestFinished(() => { vi.unstubAllEnvs() })
+    const reads = landlockProfileArgs(RO)
+      .flatMap((arg, index, all) => arg === '--ro' ? [all[index + 1]!] : [])
+    expect(reads).not.toContain(unit)
+    expect(reads).toContain(join(root, 'other'))
   })
 
   it('seatbelt read-only: allow-default with every file write denied except the /dev/null literal', () => {
