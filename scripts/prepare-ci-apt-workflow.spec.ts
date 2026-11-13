@@ -65,7 +65,7 @@ afterEach(() => {
 describe('prepare-ci-apt workflow wiring', () => {
   it('prepares every ci.yml APT or hosted provisioning consumer under its own condition', () => {
     const workflow = load('.github/workflows/ci.yml')
-    verifyConsumers(workflow, 7)
+    verifyConsumers(workflow, 8)
     const consumers = aptConsumers(workflow)
     const playwright = consumers.filter(({ step }) => typeof step.run === 'string' && step.run.includes('install --with-deps'))
     expect(playwright.length).toBe(4)
