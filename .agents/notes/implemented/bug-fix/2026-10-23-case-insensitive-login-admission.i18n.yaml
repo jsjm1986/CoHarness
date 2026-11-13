@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-case-insensitive-login-admission.md
 document:
-  en: c7a53c39a7ded6985e6dbf23eb5d5f0edbd0f8c8
-  zh: dfb5552809e2cde6e44ee0229d8131ba867a4085
+  en: d54d43eeb23f2a427438d4ffcdf42a97d1589088
+  zh: d3c291dd6606f3883c7fc18f93e426f4bf26ef46
 /agent-note-case-insensitive-postgresql-login-admission:
   en: 47433b568183b590
   zh: 814ce44f82404ce0
@@ -18,5 +18,5 @@ document:
   en: 60ea5611a3891e82
   zh: 52ff39d2c1258108
 /agent-note-case-insensitive-postgresql-login-admission/consequences:
-  en: 7cb3881c9d11c350
-  zh: 5e5c2ec4f1385443
+  en: f0b566123afc4f59
+  zh: 0dc956942baffda3

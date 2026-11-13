@@ -44,14 +44,31 @@ describe('AuthService', () => {
     expect(auth.validate(result.token)).toBeNull()
   })
 
-  it('rejects wrong password and locks after 5 failures', async () => {
+  it('locks a username after 5 failures only for the failing source', async () => {
     const { auth } = await setup()
     for (let i = 0; i < 5; i++) {
       expect(await auth.login('alice', 'nope', '9.9.9.9', 'ua')).toBe('invalid')
     }
     expect(await auth.login('alice', 'secret-1', '9.9.9.9', 'ua')).toBe('locked')
-    const elsewhere = await auth.login('alice', 'secret-1', '8.8.8.8', 'ua')
-    expect(elsewhere).toBe('locked')
+    expect(await auth.login('alice', 'secret-1', '8.8.8.8', 'ua')).toMatchObject({ user: { username: 'alice' } })
+    expect(await auth.login('alice', 'secret-1', '9.9.9.9', 'ua')).toBe('locked')
+  })
+
+  it('locks one source after 20 failures across usernames, sharing an IPv6 /64', async () => {
+    const { auth } = await setup()
+    for (let i = 0; i < 20; i++) {
+      expect(await auth.login(`user-${String(i)}`, 'nope-nope', `2001:db8:1:2::${(i + 1).toString(16)}`, 'ua')).toBe('invalid')
+    }
+    expect(await auth.login('alice', 'secret-1', '2001:db8:1:2:ffff::1', 'ua')).toBe('locked')
+    expect(await auth.login('alice', 'secret-1', '2001:db8:1:3::1', 'ua')).toMatchObject({ user: { username: 'alice' } })
+  })
+
+  it('never applies the source-wide lock to an undistinguishable loopback source', async () => {
+    const { auth } = await setup()
+    for (let i = 0; i < 20; i++) {
+      expect(await auth.login(`user-${String(i)}`, 'nope-nope', '127.0.0.1', 'ua')).toBe('invalid')
+    }
+    expect(await auth.login('alice', 'secret-1', '127.0.0.1', 'ua')).toMatchObject({ user: { username: 'alice' } })
   })
 
   it('rejects disabled users and unknown tokens', async () => {

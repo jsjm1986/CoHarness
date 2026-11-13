@@ -375,9 +375,38 @@ describePg('PostgreSQL login admission', () => {
     expect(failures.rows[0]!.n).toBe('5')
     const afterLockout = await first.login(alias, 'correct-password', '127.0.0.1', 'fixture')
     expect(afterLockout).toBe('locked')
+    const otherSource = await second.login(alias, 'correct-password', '203.0.113.7', 'fixture')
+    expect(otherSource).toMatchObject({ user: { username: identity } })
+    expect(await first.login(identity, 'correct-password', '127.0.0.1', 'fixture')).toBe('locked')
     await expect(['# Shared PostgreSQL login admission', '',
       `identity=${identity}`, `alias=${alias}`, `concurrentOutcomes=${outcomes.join(',')}`,
-      `failedAttempts=${failures.rows[0]!.n}`, `validPasswordAfterLockout=${afterLockout}`, '',
+      `failedAttempts=${failures.rows[0]!.n}`, `validPasswordAfterLockout=${afterLockout}`,
+      `validPasswordFromOtherSource=${otherSource === 'invalid' || otherSource === 'locked' ? otherSource : 'accepted'}`, '',
     ].join('\n')).toMatchFileSnapshot(join(import.meta.dirname, `snapshots/auth/lockout-${identity}.expected.md`))
+  })
+
+  it('locks one source bucket after 20 failures across usernames across Gateway instances', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hgw-login-source-'))
+    onTestFinished(() => rm(root, { recursive: true, force: true }))
+    const slug = `login-source-${randomUUID()}`
+    const organization = await pool.query<{ id: string }>(`INSERT INTO harness.organizations(slug,display_name)
+      VALUES($1,'Login source') RETURNING id`, [slug])
+    await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'login-node')`,
+      [organization.rows[0]!.id])
+    const context = await resolvePostgresRuntimeContext(pool, slug, 'login-node')
+    const cfg = testConfig(root)
+    await new PostgresUserService(context, cfg).create({ username: 'owner', password: 'correct-password' })
+    const first = new PostgresAuthService(context, cfg)
+    const second = new PostgresAuthService(context, cfg)
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const service = attempt % 2 === 0 ? first : second
+      expect(await service.login(`guess-${String(attempt)}`, 'wrong-password', `2001:db8:1:2::${(attempt + 1).toString(16)}`, 'fixture')).toBe('invalid')
+    }
+    expect(await first.login('owner', 'correct-password', '2001:db8:1:2:ffff::1', 'fixture')).toBe('locked')
+    expect(await second.login('owner', 'correct-password', '2001:db8:1:3::1', 'fixture')).toMatchObject({ user: { username: 'owner' } })
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      expect(await first.login(`loopback-${String(attempt)}`, 'wrong-password', '127.0.0.1', 'fixture')).toBe('invalid')
+    }
+    expect(await second.login('owner', 'correct-password', '127.0.0.1', 'fixture')).toMatchObject({ user: { username: 'owner' } })
   })
 })
