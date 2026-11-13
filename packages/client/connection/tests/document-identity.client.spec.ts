@@ -7,7 +7,12 @@ describe('authenticated document identity input', () => {
     expect(parseDocumentIdentity(undefined)).toBeUndefined()
   })
 
-  it.each([{ kind: 'personal' }, { kind: 'project', projectId: 42 }])('detaches a valid $kind identity from the HTML value', (runtimeTarget) => {
+  it.each([
+    { kind: 'personal' },
+    { kind: 'project', projectId: 42 },
+    { kind: 'personal', runtimeId: 'd441ed6a-1643-4405-a29b-71d1e8be3eb0' },
+    { kind: 'project', projectId: 42, runtimeId: 'd441ed6a-1643-4405-a29b-71d1e8be3eb0' },
+  ])('detaches a valid $kind identity from the HTML value', (runtimeTarget) => {
     const input = { version: 1, principalId: 7, runtimeTarget }
     const parsed = parseDocumentIdentity(input)
     expect(parsed).toEqual({ principalId: 7, runtimeTarget })
@@ -30,6 +35,10 @@ describe('authenticated document identity input', () => {
     { version: 1, principalId: 7, runtimeTarget: { kind: 'project', projectId: -1 } },
     { version: 1, principalId: 7, runtimeTarget: { kind: 'project', projectId: '42' } },
     { version: 1, principalId: 7, runtimeTarget: { kind: 'project', projectId: 42, canManage: true } },
+    { version: 1, principalId: 7, runtimeTarget: { kind: 'personal', runtimeId: '' } },
+    { version: 1, principalId: 7, runtimeTarget: { kind: 'personal', runtimeId: 42 } },
+    { version: 1, principalId: 7, runtimeTarget: { kind: 'personal', nodeId: 'not-an-input' } },
+    { version: 1, principalId: 7, runtimeTarget: { kind: 'project', projectId: 42, nodeId: 'not-an-input' } },
     { version: 1, principalId: 7, runtimeTarget: { kind: 'personal' }, credential: 'not-an-input' },
   ])('rejects malformed or authority-bearing HTML input %#', (value) => {
     expect(() => parseDocumentIdentity(value)).toThrow(/Connection document/)
