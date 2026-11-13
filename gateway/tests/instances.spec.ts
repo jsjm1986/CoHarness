@@ -1513,6 +1513,7 @@ describe('InstanceManager', () => {
     expect(patch).toContain("- id: computer-use\n      name: '@deepseek-ai/dsh-computer-use'\n")
     expect(patch).toContain(
       "- id: computer-use-cua-driver-mcp\n      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'"
+      + '\n      inject: [resourceBudget]'
       + '\n      config:\n        command: "/opt/cua/bin/cua-driver"\n        args: ["mcp","--direct"]\n',
     )
     const installed = join(dshHome, 'profiles', 'web', 'node_modules', '@deepseek-ai', 'dsh-experimental-computer-use-cua-driver-mcp')
