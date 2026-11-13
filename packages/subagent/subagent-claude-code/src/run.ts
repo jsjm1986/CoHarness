@@ -13,6 +13,7 @@ import {
   type Query,
   type SDKMessage,
   type SDKResultMessage,
+  type SettingSource,
   type SpawnOptions,
 } from '@anthropic-ai/claude-agent-sdk'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -53,6 +54,23 @@ export type ClaudeCodePermissionMode = typeof CLAUDE_CODE_PERMISSION_MODES[numbe
 
 /** Safe default for unattended Claude Code runs. */
 export const DEFAULT_CLAUDE_CODE_PERMISSION_MODE: ClaudeCodePermissionMode = 'dontAsk'
+
+/** Native Claude setting scopes a Provider instance may load. */
+export const CLAUDE_CODE_SETTING_SOURCES = [
+  'user',
+  'project',
+  'local',
+] as const satisfies readonly SettingSource[]
+
+/** Profile-selectable native Claude setting scope. */
+export type ClaudeCodeSettingSource = typeof CLAUDE_CODE_SETTING_SOURCES[number]
+
+/**
+ * Default setting scopes: user settings only. Workspace `.claude` project and
+ * local settings can register hooks and allow rules that run outside the dsh
+ * sandbox, so an untrusted workspace must not supply them by default.
+ */
+export const DEFAULT_CLAUDE_CODE_SETTING_SOURCES: readonly ClaudeCodeSettingSource[] = ['user']
 
 const SUPPORTED_UNATTENDED_DIALOG_KINDS = [
   'refusal_fallback_prompt',
@@ -157,6 +175,8 @@ export interface ClaudeCodeRunSpec {
   readonly model?: string
   /** Profile-selected native non-interactive permission mode. */
   readonly permissionMode: ClaudeCodePermissionMode
+  /** Profile-selected native setting scopes passed as the SDK `settingSources`. */
+  readonly settingSources: readonly ClaudeCodeSettingSource[]
   /** Explicit deployment/test environment layered after shared scrubbing. */
   readonly env: Record<string, string>
   /** Subprocess termination grace passed to the shared process-tree owner. */
@@ -309,7 +329,7 @@ export async function disposeClaudeCodeChild(
  * @param controller - per-run cancellation owner.
  * @param capture - receives the SDK adapter synchronously; its ready promise owns allocation.
  * @param captureDiagnostic - receives safe facts from unattended interaction callbacks.
- * @returns options that inherit native settings while disabling persistence and user questions.
+ * @returns options that load only the selected native setting scopes while disabling persistence and user questions.
  */
 export function claudeQueryOptions(
   spec: ClaudeCodeRunSpec,
@@ -324,6 +344,7 @@ export function claudeQueryOptions(
     ...spec.executable === undefined ? {} : { pathToClaudeCodeExecutable: spec.executable },
     ...spec.model === undefined ? {} : { model: spec.model },
     env: { ...scrubbedParentEnv(), ...spec.env },
+    settingSources: [...spec.settingSources],
     persistSession: false,
     disallowedTools: spec.permissionMode === 'plan'
       ? ['AskUserQuestion', 'ExitPlanMode']

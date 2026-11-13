@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/claude-code-workspace-settings/guide.md
+document:
+  en: 6efd31f3d56e87e0091b148ff0f0f3b0ad0deec0
+  zh: 4cc7f2458a3333d0cd8bd5f0f30bb6643dc2b5a2
+/:
+  en: 4e716d170af047ec
+  zh: 057beff5eeeeca89
+/claude-code-subagents-load-only-user-settings-by-default:
+  en: fd659d2fbdfe414f
+  zh: b596bd452ee7d507
+/claude-code-subagents-load-only-user-settings-by-default/change:
+  en: 26f5cf328df1d1b9
+  zh: 866e2e028c1a6568
+/claude-code-subagents-load-only-user-settings-by-default/migration:
+  en: a3d3afc0b4e7c72e
+  zh: c4a107d0791cfda1

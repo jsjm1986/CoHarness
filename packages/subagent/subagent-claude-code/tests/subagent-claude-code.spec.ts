@@ -44,7 +44,9 @@ import {
 } from '../src/process.ts'
 import {
   CLAUDE_CODE_PERMISSION_MODES,
+  CLAUDE_CODE_SETTING_SOURCES,
   DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
+  DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
   claudeQueryOptions,
   consumeClaudeQuery,
   disposeClaudeCodeChild,
@@ -308,6 +310,7 @@ function fakeRun(
   const spec: ClaudeCodeRunSpec = {
     cwd: '/workspace',
     permissionMode: DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
+    settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
     env: { ANTHROPIC_API_KEY: 'fake-key' },
     disposeGraceMs: 5,
     spawn: (spawnSpec) => {
@@ -670,6 +673,7 @@ describe('task admission and package contracts', () => {
       model: 'claude-bypass-model',
       env: { DSH_CLAUDE_INSTANCE: 'bypass' },
       permissionMode: 'bypassPermissions',
+      settingSources: ['user', 'project', 'local'],
       disposeGraceMs: 29,
     })
     expect(ctx.subagents.list()).toEqual(['claude-safe', 'claude-bypass'])
@@ -699,9 +703,15 @@ describe('task admission and package contracts', () => {
       instance: options.env?.DSH_CLAUDE_INSTANCE,
       model: options.model,
       permissionMode: options.permissionMode,
+      settingSources: options.settingSources,
     }))).toEqual([
-      { instance: 'safe', model: 'claude-safe-model', permissionMode: 'dontAsk' },
-      { instance: 'bypass', model: 'claude-bypass-model', permissionMode: 'bypassPermissions' },
+      { instance: 'safe', model: 'claude-safe-model', permissionMode: 'dontAsk', settingSources: ['user'] },
+      {
+        instance: 'bypass',
+        model: 'claude-bypass-model',
+        permissionMode: 'bypassPermissions',
+        settingSources: ['user', 'project', 'local'],
+      },
     ])
     expect(spawnSpecs.map(spec => ({
       instance: spec.env?.DSH_CLAUDE_INSTANCE,
@@ -756,6 +766,18 @@ describe('task admission and package contracts', () => {
     }
     for (const permissionMode of ['default', 'interactive', 'future-mode']) {
       expect(() => claudeCode.Config({ permissionMode } as never)).toThrow()
+    }
+
+  })
+
+  it('loads only user settings unless the Profile opts into workspace setting scopes', () => {
+    expect(DEFAULT_CLAUDE_CODE_SETTING_SOURCES).toEqual(['user'])
+    expect(claudeCode.Config({}).settingSources).toEqual(['user'])
+    expect(claudeCode.Config({ settingSources: [] }).settingSources).toEqual([])
+    expect(claudeCode.Config({ settingSources: [...CLAUDE_CODE_SETTING_SOURCES] }).settingSources)
+      .toEqual(['user', 'project', 'local'])
+    for (const source of ['policy', 'flag', '']) {
+      expect(() => claudeCode.Config({ settingSources: [source] } as never)).toThrow()
     }
   })
 
@@ -1035,6 +1057,7 @@ describe('query options and result mapping', () => {
       cwd: '/workspace',
       model: 'claude-explicit-model',
       permissionMode: 'acceptEdits',
+      settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
       env: {
         HOST_VISIBLE: 'overridden',
         ANTHROPIC_API_KEY: 'explicit-fake-key',
@@ -1069,7 +1092,7 @@ describe('query options and result mapping', () => {
     })
     expect(options.env).not.toHaveProperty('HOST_SECRET_TOKEN')
     expect(options.env).not.toHaveProperty('DSH_INTERNAL')
-    expect(options).not.toHaveProperty('settingSources')
+    expect(options.settingSources).toEqual(['user'])
 
     const callbackSignal = new AbortController().signal
     await expect(options.canUseTool!(
@@ -1126,6 +1149,7 @@ describe('query options and result mapping', () => {
       const options = claudeQueryOptions({
         cwd: '/workspace',
         permissionMode,
+        settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
         env: {},
         disposeGraceMs: 17,
         spawn: () => child.handle,
@@ -1150,6 +1174,7 @@ describe('query options and result mapping', () => {
     const options = claudeQueryOptions({
       cwd: '/workspace',
       permissionMode: 'plan',
+      settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
       env: {},
       disposeGraceMs: 17,
       spawn: () => child.handle,
@@ -1293,6 +1318,7 @@ describe('run publication, cancellation, and settlement', () => {
     const spec: ClaudeCodeRunSpec = {
       cwd: '/workspace',
       permissionMode: 'dontAsk',
+      settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
       env: {},
       disposeGraceMs: 5,
       spawn: () => children[childIndex++]!.handle,
@@ -1345,6 +1371,7 @@ describe('run publication, cancellation, and settlement', () => {
     const run = await startClaudeCodeRun(request(), {
       cwd: '/workspace',
       permissionMode: DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
+      settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
       env: {},
       disposeGraceMs: 5,
       spawn: () => child.handle,
@@ -1394,6 +1421,7 @@ describe('run publication, cancellation, and settlement', () => {
       const run = await startClaudeCodeRun(request(), {
         cwd: '/workspace',
         permissionMode: DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
+        settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
         env: {},
         disposeGraceMs: 5,
         spawn: () => child.handle,
@@ -1422,6 +1450,7 @@ describe('run publication, cancellation, and settlement', () => {
     const spec: ClaudeCodeRunSpec = {
       cwd: '/workspace',
       permissionMode: 'dontAsk',
+      settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
       env: {},
       disposeGraceMs: 5,
       spawn: () => children[index++]!.handle,
@@ -1473,6 +1502,7 @@ describe('run publication, cancellation, and settlement', () => {
       {
         cwd: '/workspace',
         permissionMode: DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
+        settingSources: DEFAULT_CLAUDE_CODE_SETTING_SOURCES,
         env: {},
         disposeGraceMs: 5,
         spawn: () => child.handle,
