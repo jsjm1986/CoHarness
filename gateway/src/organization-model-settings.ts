@@ -1,6 +1,7 @@
 import { discoverModelsAtEndpoint } from '@deepseek-ai/dsh-llm/discovery'
 import { ORGANIZATION_PROVIDER_PATTERN, type ModelProviderProtocol } from './model-governance.ts'
 import { ORGANIZATION_MODEL_SETTINGS_SCHEMA } from './organization-model-settings-schema.ts'
+import { publicNetworkFetch } from './public-network-fetch.ts'
 
 /** Protocols accepted by the organization pi-ai profile. */
 export const ORGANIZATION_PROVIDER_PROTOCOLS: readonly ModelProviderProtocol[] = [
@@ -336,11 +337,18 @@ export function organizationModelSettingsSchema(): unknown {
   return schema
 }
 
-/** Discover models through the shared protocol HTTP interrogation layer. */
+/**
+ * Discover models through the shared protocol HTTP interrogation layer.
+ * @param request - draft endpoint, protocol, credential, and whether the endpoint may be a non-public address.
+ * @returns advertised models in endpoint order.
+ * @throws Error wrapping NonPublicNetworkTargetError when `allowPrivateNetwork` is false and any connection targets a non-public address.
+ */
 export async function discoverOrganizationModels(request: {
   baseURL?: string
   api?: string
   apiKey?: string
+  /** `false` restricts every connection, including redirects, to public unicast addresses. */
+  allowPrivateNetwork: boolean
 }): Promise<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>> {
   if (request.baseURL === undefined || request.baseURL.trim() === '') {
     throw new Error('set a baseURL before discovering models')
@@ -349,5 +357,6 @@ export async function discoverOrganizationModels(request: {
     baseURL: request.baseURL,
     ...(request.api === undefined ? {} : { api: request.api }),
     ...(request.apiKey === undefined ? {} : { apiKey: request.apiKey }),
+    ...(request.allowPrivateNetwork ? {} : { fetch: publicNetworkFetch }),
   })]
 }

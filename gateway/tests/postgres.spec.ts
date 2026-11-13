@@ -926,6 +926,7 @@ describePg('PostgreSQL baseline', () => {
         provider: projectProvider,
         baseURL: relay.base,
         api: 'openai-completions',
+        allowPrivateNetwork: true,
       })).resolves.toEqual([{ id: 'discovered-chat', name: 'Discovered Chat' }])
       expect(seenKeys).toEqual(['organization-discovery-key', 'project-discovery-key'])
     } finally {

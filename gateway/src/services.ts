@@ -421,6 +421,12 @@ export interface GatewayModelGovernanceService {
     baseURL?: string
     api?: string
     apiKey?: string
+    /**
+     * `false` refuses every connection, including redirects, whose dialed
+     * address is loopback, private, link-local, or reserved; only Gateway
+     * administrators may reach such endpoints.
+     */
+    allowPrivateNetwork: boolean
   }): Awaitable<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>>
   /** Resolve either an organization or project-owned reference for a runtime. */
   resolveManagedCredential?(subject: ModelUsageSubject, ref: string): Awaitable<string | null>

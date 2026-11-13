@@ -84,7 +84,12 @@ try{
    pending=fetch(`${base}/account/api/projects/${project.id}/model-settings${suffix}`,{method:operation.endsWith('discover')?'POST':'GET',
     headers:{cookie,origin:base,'content-type':'application/json'},...(operation.endsWith('discover')?{body:JSON.stringify({provider:'fixture',api:'openai-completions',baseURL:endpoint,actorUserId:administrator.id,...(operation==='explicit-discover'?{apiKey:'fixture-explicit-secret'}:{})})}:{})})
     .then(async response=>({status:response.status,body:await response.json()}))
-   await entered.promise
+   const discovery=operation.endsWith('discover')
+   const adminAtRequest=change.startsWith('steward-')||change==='administrator-current'||change==='administrator-demoted'
+   // Non-administrator discovery refuses the private endpoint before the probe or
+   // any authorization check runs, so no probe request exists to gate the change behind.
+   if(!discovery||adminAtRequest)await entered.promise
+   const early=discovery&&!adminAtRequest?await pending:undefined
    if(change==='owner-transfer')await pool.query(`UPDATE harness.projects SET owner_user_id=(SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$3) WHERE organization_id=$1 AND public_id=$2`,[organizationId,project.id,administrator.id])
    if(change==='removed-member')await pool.query(`DELETE FROM harness.project_members WHERE organization_id=$1 AND project_id=(SELECT id FROM harness.projects WHERE organization_id=$1 AND public_id=$2) AND user_id=(SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$3)`,[organizationId,project.id,owner.id])
    if(change==='disabled-account')await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1",[actor])
@@ -105,16 +110,17 @@ try{
    if(change==='steward-withdrawn')await pool.query('UPDATE harness.steward_access_policies SET enabled=false WHERE organization_id=$1 AND node_id=$2 AND user_id=$3',[organizationId,context.nodeId,actor])
    if(change==='steward-demoted'||change==='administrator-demoted')await users.setRole(owner.id,'user')
    if(change==='administrator-promoted')await users.setRole(owner.id,'admin')
-   release();const result=await pending
+   release();const result=early??await pending
    const writable=operation==='settings'?result.body.writable:operation==='credentials'?result.body.credentials?.[ref]?.writable:null
    const readOnly=['owner-transfer','administrator-demoted','readonly-member','contributor-member'].includes(change)
    const readable=['current','owner-transfer','administrator-current','administrator-demoted','steward-current','readonly-member','contributor-member','administrator-promoted'].includes(change)
-   const discovery=operation.endsWith('discover'),expected=readable&&(!discovery||!readOnly)?200:403
+   const expected=discovery&&!adminAtRequest?400:readable&&(!discovery||!readOnly)?200:403
    const expectedWritable=!readOnly
    const event={operation,change,status:result.status,writable:writable??null,discoveryRequests:discoveries,metadataPublished:result.status===200}
    process.stdout.write(JSON.stringify(event)+'\n')
    if(result.status!==expected||(!discovery&&expected===200&&writable!==expectedWritable))failures.push(`${operation}:${change}`)
-   if(discovery)assert.equal(discoveries,1)
+   if(discovery)assert.equal(discoveries,adminAtRequest?1:0)
+   if(discovery&&!adminAtRequest)assert.equal(result.body?.error,'model-discovery-target-not-public')
    if(expected===403)assert.equal(JSON.stringify(result.body).includes('fixture-private-model'),false)
   }finally{
    release?.();await pending?.catch(()=>{})
