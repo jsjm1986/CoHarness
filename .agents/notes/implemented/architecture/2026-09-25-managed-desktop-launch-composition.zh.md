@@ -16,7 +16,7 @@ Gateway 通过节点配置管理驱动准入。`HGW_DESKTOP_ID` 声明本节点�
 
 驱动包与 model-governance、directory-guard 包走同一套原子暂存物化机制：`HGW_DESKTOP_DRIVER_PACKAGE` 指向绝对包目录，只复制其中的 `package.json`、`lib/` 和 `cordis.patch.yml`，绝不符号链接到源码检出。发布部署把默认路径钉在 `HGW_RELEASE_ROOT` 下；包缺失或不完整时运行时挂载大声失败。`HGW_DESKTOP_DRIVER_COMMAND` 与 `HGW_DESKTOP_DRIVER_ARGS` 用字面量命令和 JSON 参数列表替换提供者的 `cua-driver` 可执行文件查找与 `mcp` 参数向量，不经过 shell。
 
-`dsh-computer-use` 通过安装模块回退解析，因为 `gateway-execution` 已把它声明为 peer；只有驱动包需要物化。补丁只发出一行驱动条目，保持服务的单提供者不变量。`HGW_DESKTOP_ID` 接受 1 到 256 个字符，与运行时 `desktop` schema 的上界一致。
+`dsh-computer-use` 通过安装模块回退解析，因为 `gateway-execution` 已把它声明为 peer；只有驱动包需要物化。补丁只发出一行驱动条目，保持服务的单提供者不变量，并声明 `inject: [resourceBudget]`，使驱动只在准入就绪后才激活——见[顺序修复记录](2026-11-13-cua-driver-resource-budget-inject.zh.md)。`HGW_DESKTOP_ID` 接受 1 到 256 个字符，与运行时 `desktop` schema 的上界一致。
 
 ## 已考虑的替代方案
 
