@@ -195,7 +195,7 @@ export class GatewayPrincipalSigner {
       scope: input.scope,
       runtime: input.runtime,
       issuedAt,
-      expiresAt: now + lifetimeMs,
+      expiresAt: issuedAt + lifetimeMs,
       nonce: randomUUID(),
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     }
@@ -231,7 +231,7 @@ export class GatewayPrincipalSigner {
       ...(input.selection === undefined ? {} : { selection: input.selection }),
       ...(input.context === undefined ? {} : { context: input.context }),
       ...(input.request === undefined ? {} : { request: input.request }),
-      issuedAt, expiresAt: now + this.ttlMs, nonce: randomUUID(),
+      issuedAt, expiresAt: issuedAt + this.ttlMs, nonce: randomUUID(),
     }
     return signedPayload(claims, this.privateKey)
   }

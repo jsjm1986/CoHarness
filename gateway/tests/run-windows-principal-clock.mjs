@@ -11,8 +11,11 @@ const signerModule = process.env.HGW_TEST_CLOCK_SIGNER
   ? pathToFileURL(process.env.HGW_TEST_CLOCK_SIGNER) : new URL('../lib/principal.js', import.meta.url)
 const runtimeModule = process.env.HGW_TEST_CLOCK_VERIFIER
   ? pathToFileURL(process.env.HGW_TEST_CLOCK_VERIFIER) : new URL('../../packages/context/gateway-runtime/lib/index.js', import.meta.url)
+const leasesModule = process.env.HGW_TEST_CLOCK_LEASES
+  ? pathToFileURL(process.env.HGW_TEST_CLOCK_LEASES) : new URL('../lib/stream-principal-leases.js', import.meta.url)
 const { GatewayPrincipalSigner } = await import(signerModule)
 const { verifyGatewayPrincipal } = await import(runtimeModule)
+const { StreamPrincipalLeases } = await import(leasesModule)
 const organization = 'synthetic-clock-control'
 const runtime = { kind: 'user', id: 7, generation: 52, runtimeId: '11111111-1111-4111-8111-111111111111' }
 const credential = { organization, runtime }
@@ -30,12 +33,12 @@ if (process.argv.includes('--verify')) {
     const verify = (assertion, time, target = credential) => verifyGatewayPrincipal(assertion, target, key, time)
     const actual = verify(request.candidate, now)
     assert.equal(actual.issuedAt, request.at - 16)
-    assert.equal(actual.expiresAt, request.at + ttlMs)
+    assert.equal(actual.expiresAt, request.at - 16 + ttlMs)
     assert.doesNotThrow(() => verify(request.candidate, request.at - 16))
-    assert.doesNotThrow(() => verify(request.candidate, request.at + ttlMs - 1))
+    assert.doesNotThrow(() => verify(request.candidate, request.at - 16 + ttlMs - 1))
     assert.throws(() => verify(request.candidate, request.at - 17))
-    assert.throws(() => verify(request.candidate, request.at + ttlMs))
-    assert.throws(() => verify(request.candidate, request.at + ttlMs + 1))
+    assert.throws(() => verify(request.candidate, request.at - 16 + ttlMs))
+    assert.throws(() => verify(request.candidate, request.at - 16 + ttlMs + 1))
     assert.throws(() => verify(request.forged, now))
     assert.throws(() => verify(request.candidate, now, { organization: 'another-organization', runtime }))
     assert.throws(() => verify(request.candidate, now, { organization, runtime: { ...runtime, generation: 51 } }))
@@ -48,9 +51,28 @@ if (process.argv.includes('--verify')) {
   const key = generateKeyPairSync('ed25519')
   const valid = new GatewayPrincipalSigner(key.privateKey, organization, ttlMs)
   const forged = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, organization, ttlMs)
-  const caller = { user: { id: 7, username: 'qa-clock', displayName: 'QA', role: 'user' }, scope: { kind: 'personal' }, runtime }
+  const caller = { user: { id: 7, username: 'qa-clock', displayName: 'QA', role: 'user', status: 'active', homePath: 'C:\\qa\\home', mustChangePassword: false, autoReviewEligible: false }, scope: { kind: 'personal' }, runtime }
   const started = new Date().toISOString()
   const end = performance.now() + soakMs
+  // The event-connection register rejects assertions whose declared lifetime
+  // exceeds 30 s; the Windows clock-tick backdate must not inflate it.
+  const streamContext = { user: caller.user, scope: caller.scope, runtime }
+  const stream = new StreamPrincipalLeases({
+    signer: valid, maxBatchSize: 2,
+    synchronize: async () => {},
+    qualify: async (token, context) => context === streamContext
+      ? { user: caller.user, expiresAt: Date.now() + 60_000, scope: caller.scope }
+      : null,
+  })
+  {
+    const assertion = valid.issueStream(caller, Date.now() + 60_000)
+    const claims = valid.verify(assertion)
+    assert(claims.expiresAt - claims.issuedAt <= 30_000, 'stream principal document must stay inside the 30 s register window')
+    const signal = new AbortController()
+    stream.register({ assertion, token: 'synthetic-login', context: streamContext, signal: signal.signal, cancel: () => {} })
+    signal.abort()
+  }
+  stream.close()
   async function check(offset) {
     await delay(offset)
     const child = fork(fileURLToPath(import.meta.url), ['--verify'], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] })
