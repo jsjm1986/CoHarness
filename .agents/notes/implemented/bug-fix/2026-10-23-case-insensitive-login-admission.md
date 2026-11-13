@@ -22,4 +22,4 @@ Both the process-local login queue and the PostgreSQL transaction lock use Postg
 
 ## Consequences
 
-Case variants share one lockout decision across Gateways, including aliases recognized by PostgreSQL's locale. Each login adds one database query before password verification; database failure refuses admission. The attempt threshold and lockout window are unchanged. Real PostgreSQL regressions cover ASCII and locale-dependent aliases against the same shared lock and failure counter.
+Case variants share one lockout decision across Gateways, including aliases recognized by PostgreSQL's locale. Each login adds one database query before password verification; database failure refuses admission. [Per-source Gateway login lockout](2026-11-13-per-source-login-lockout.md) scopes that counter to each client source. Real PostgreSQL regressions cover ASCII and locale-dependent aliases against the same shared lock and failure counter.

@@ -71,6 +71,7 @@ import { NODE_CHANNEL_PATH, NodeChannelError } from './node-channel-protocol.ts'
 import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_STREAM_PATH, NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
 import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
 import { PostgresCheckoutQueueFullError, type PostgresPoolAdmissionSnapshot } from './postgres/database.ts'
+import { forwardedClientAddress, trustedProxyList } from './login-source.ts'
 
 export interface GatewayDeps {
   /** Verify the originating database and independently held historical copies after project cutover. */
@@ -274,10 +275,6 @@ export function sessionCookie(token: string, cfg: GatewayConfig, clear = false):
 export function scopeCookie(scope: 'personal' | `project:${number}`, cfg: GatewayConfig): string {
   return `${SCOPE_COOKIE}=${scope}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.ceil(cfg.sessionAbsoluteTtlMs / 1000)}`
     + (cfg.secureCookies ? '; Secure' : '')
-}
-
-function clientIp(req: IncomingMessage): string {
-  return req.socket.remoteAddress ?? ''
 }
 
 function wantsHtml(req: IncomingMessage): boolean {
@@ -720,6 +717,9 @@ export interface GatewayHandlers {
 
 export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers = {}): Server {
   const { cfg, auth, users, audit } = deps
+  const trustedProxies = trustedProxyList(cfg.trustedProxies)
+  const clientIp = (req: IncomingMessage): string =>
+    forwardedClientAddress(req.socket.remoteAddress ?? '', req.headers['x-forwarded-for'], trustedProxies)
   const runtimeRouter = deps.runtimeRouter ?? new GatewayRuntimeRouter(new LocalRuntimeAdapter(deps))
   const runtimeStartForms = new WeakMap<IncomingMessage, RuntimeStartRetry | null>()
 

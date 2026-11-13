@@ -64,12 +64,15 @@ server {
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header Origin $http_origin;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_read_timeout 300s;
   }
 }
 ```
+
+Login failures lock a username only for the client source that produced them, and 20 failures from one source across usernames lock that source; IPv6 sources are grouped per /64. The Gateway reads the client address from the rightmost `X-Forwarded-For` hop not listed in `HGW_TRUSTED_PROXIES` (default `127.0.0.1,::1`), so the entry must append that header as above; Cloudflare Tunnel supplies it already. Without it, every request shares the loopback source and only the per-username lock applies.
 
 Cutover checklist: set `HGW_PUBLIC_ORIGINS=https://harness.maycran.com` (Secure cookies switch on it), reload the entry to upstream `127.0.0.1:8899`, then **stop the previously exposed single dsh instance** (or rebind it to loopback) — after cutover nothing but the TLS entry may reach the host ports.
 

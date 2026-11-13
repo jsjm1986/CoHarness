@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-13-per-source-login-lockout.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-13-per-source-login-lockout.md
+document:
+  en: 601b603449a0b33648b3f298f3a802993f7ab9b7
+  zh: ffde080d6dd5a146b8df448089c858bf586883d9
+/agent-note-per-source-gateway-login-lockout:
+  en: ac3f0f1af9765809
+  zh: 8e2b304bff6e58bb
+/agent-note-per-source-gateway-login-lockout/problem:
+  en: 8976b0c391359504
+  zh: 21b3ee243485f843
+/agent-note-per-source-gateway-login-lockout/decision:
+  en: 8f1f43770625281f
+  zh: 7a5bf52c001a6680
+/agent-note-per-source-gateway-login-lockout/alternatives-considered:
+  en: 79976be18a94401c
+  zh: d84aa5f19812b2f3
+/agent-note-per-source-gateway-login-lockout/consequences:
+  en: 6b8e22bb095fe19d
+  zh: 41f97000ace520ce
