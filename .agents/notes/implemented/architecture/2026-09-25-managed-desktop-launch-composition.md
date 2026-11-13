@@ -16,7 +16,7 @@ Every managed composition independently mounts the read-only desktop availabilit
 
 The driver package materializes through the same atomic staging mechanism as the model-governance and directory-guard packages: `HGW_DESKTOP_DRIVER_PACKAGE` names an absolute package directory whose `package.json`, `lib/`, and `cordis.patch.yml` are copied, never symlinked to a source checkout. Release deployments pin the default under `HGW_RELEASE_ROOT`; a missing or incomplete package fails the runtime mount loudly. `HGW_DESKTOP_DRIVER_COMMAND` and `HGW_DESKTOP_DRIVER_ARGS` replace the provider's `cua-driver` executable lookup and `mcp` argument vector with a literal command and JSON argument list, never a shell string.
 
-`dsh-computer-use` resolves through the installation module fallback because `gateway-execution` declares it as a peer; only the driver package needs materialization. Exactly one driver row is emitted, preserving the service's single-provider invariant. `HGW_DESKTOP_ID` accepts one to 256 characters, mirroring the runtime `desktop` schema bound.
+`dsh-computer-use` resolves through the installation module fallback because `gateway-execution` declares it as a peer; only the driver package needs materialization. Exactly one driver row is emitted, preserving the service's single-provider invariant, and it declares `inject: [resourceBudget]` so the driver activates only after admission is live — see [the ordering fix note](2026-11-13-cua-driver-resource-budget-inject.md). `HGW_DESKTOP_ID` accepts one to 256 characters, mirroring the runtime `desktop` schema bound.
 
 ## Alternatives considered
 

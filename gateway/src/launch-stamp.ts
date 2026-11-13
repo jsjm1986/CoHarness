@@ -64,7 +64,8 @@ function managedDesktopPatch(cfg: GatewayConfig, desktop: string): string {
     - id: computer-use
       name: '@deepseek-ai/dsh-computer-use'
     - id: computer-use-cua-driver-mcp
-      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'${config}
+      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'
+      inject: [resourceBudget]${config}
 `
 }
 

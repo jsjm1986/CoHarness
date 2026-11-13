@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-25-managed-desktop-launch-composition.md
 document:
-  en: 00240b4cf3cb77f591d03a384228c37e134c9d7a
-  zh: c16999d44163d07d6aacf6adb54a51bbb929c805
+  en: ca6a4fcb1c68a9886dd2d669e37f1d4ea1fce0d5
+  zh: e97d6431e64c0e44c631532c6c096dcf60a44fde
 /agent-note-compose-the-managed-desktop-driver-from-node-configuration:
   en: 5c11c87c9409c51d
   zh: 87f3f73c96006a32
@@ -12,8 +12,8 @@ document:
   en: faaa6d5e51d4f166
   zh: e0e5b8d3cb8d0190
 /agent-note-compose-the-managed-desktop-driver-from-node-configuration/decision:
-  en: 7e0d25367090ec39
-  zh: a7ec0271bae84aa6
+  en: 06b2b89673992143
+  zh: cf1c749e776b9718
 /agent-note-compose-the-managed-desktop-driver-from-node-configuration/alternatives-considered:
   en: 9bc6bd81fa955fac
   zh: bbf0ec0eae87e9a5
