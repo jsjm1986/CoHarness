@@ -47,6 +47,7 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_INTAKE_PORT` | `HGW_PORT + 1` | 仅回环监听、Bearer 鉴权的用量 intake 端口 |
 | `HGW_USAGE_TIME_ZONE` | `Asia/Shanghai` | 定义自然月边界的 IANA 时区 |
 | `HGW_PUBLIC_ORIGINS` | `http://127.0.0.1:8899` | 逗号分隔的公网 Origin 白名单（CSRF 校验；https 时 Cookie 标记 Secure） |
+| `HGW_TRUSTED_PROXIES` | `127.0.0.1,::1` | 逗号分隔的反向代理地址或 CIDR 网段；只有来自这些地址的 `X-Forwarded-For` 跳才会被用作登录限制和审计的客户端 IP；为空时不信任任何代理 |
 | `HGW_SESSION_TTL_MS` | 7 天 | 服务端滑动空闲期限 |
 | `HGW_SESSION_ABS_TTL_MS` | 30 天 | 服务端绝对期限及浏览器 Cookie 保留期限；不短于空闲期限 |
 | `HGW_USERS_ROOT` | `~/harness-users` | 用户目录根（生产 `/srv/harness/users`） |

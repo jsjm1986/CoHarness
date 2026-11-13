@@ -14,6 +14,7 @@ import { DEFAULT_RUNTIME_LOG_CAP_BYTES } from './runtime-log.ts'
 import { loadNodeChannelConfig } from './node-channel-protocol.ts'
 import { loadNodeServiceConfig } from './node-service.ts'
 import { defaultPgConnectionCommand } from './pg-client-protocol.ts'
+import { validTrustedProxy } from './login-source.ts'
 
 export interface GatewayConfig {
   /** Primary-only organization project-name key ring file. */
@@ -36,6 +37,8 @@ export interface GatewayConfig {
   /** IANA time zone used for natural-month usage accounting. */
   usageTimeZone: string
   publicOrigins: string[]
+  /** Reverse-proxy peers (IP addresses or CIDR ranges) whose `X-Forwarded-For` hop is trusted (HGW_TRUSTED_PROXIES). */
+  trustedProxies: string[]
   usersRoot: string
   /** Host-owned runtime homes for project-scoped Harness processes. */
   projectRuntimesRoot: string
@@ -493,6 +496,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const port = portNumber(env.HGW_PORT, 8899, 'HGW_PORT')
   const publicOrigins = (env.HGW_PUBLIC_ORIGINS ?? `http://127.0.0.1:${port}`)
     .split(',').map(s => s.trim()).filter(Boolean)
+  const trustedProxies = (env.HGW_TRUSTED_PROXIES ?? '127.0.0.1,::1').split(',').map(s => s.trim()).filter(Boolean)
+  for (const entry of trustedProxies) {
+    if (!validTrustedProxy(entry)) throw new Error(`HGW_TRUSTED_PROXIES entry is not an IP address or CIDR range: ${entry}`)
+  }
   const configuredReleaseRoot = env.HGW_RELEASE_ROOT?.trim()
   const releaseRoot = configuredReleaseRoot === undefined || configuredReleaseRoot === ''
     ? undefined
@@ -931,6 +938,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     intakePort,
     usageTimeZone: env.HGW_USAGE_TIME_ZONE ?? 'Asia/Shanghai',
     publicOrigins,
+    trustedProxies,
     usersRoot,
     projectRuntimesRoot,
     // The steward root joins the masked project path roots so ordinary

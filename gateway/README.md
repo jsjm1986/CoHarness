@@ -47,6 +47,7 @@ API requests can select an authorized environment with `dshRuntime=<environment 
 | `HGW_INTAKE_PORT` | `HGW_PORT + 1` | Loopback-only, bearer-authenticated usage intake port |
 | `HGW_USAGE_TIME_ZONE` | `Asia/Shanghai` | IANA time zone defining natural-month usage boundaries |
 | `HGW_PUBLIC_ORIGINS` | `http://127.0.0.1:8899` | Comma-separated public Origin allowlist (CSRF check; https marks cookies Secure) |
+| `HGW_TRUSTED_PROXIES` | `127.0.0.1,::1` | Comma-separated reverse-proxy addresses or CIDR ranges whose `X-Forwarded-For` hop supplies the client IP for login limits and audit; empty trusts none |
 | `HGW_SESSION_TTL_MS` | 7 days | Sliding server idle lifetime |
 | `HGW_SESSION_ABS_TTL_MS` | 30 days | Absolute server lifetime and browser Cookie retention; at least the idle lifetime |
 | `HGW_USERS_ROOT` | `~/harness-users` | Users root (production `/srv/harness/users`) |
