@@ -1,5 +1,5 @@
 /** Decode the authenticated HTML input used only to pin one browser document's requests. */
-import type { ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
+import type { ClientRuntimeId, ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
 
 /** Account and initial Runtime authenticated by the current HTML response. */
 export interface ConnectionDocumentIdentity {
@@ -30,12 +30,19 @@ export function parseDocumentIdentity(value: unknown): ConnectionDocumentIdentit
     throw new Error('Connection document identity requires version 1, a positive principalId and a runtimeTarget')
   }
   const target = value.runtimeTarget
-  if (record(target) && target.kind === 'personal' && Object.keys(target).length === 1) {
-    return { principalId: value.principalId, runtimeTarget: { kind: 'personal' } }
+  if (!record(target)) {
+    throw new Error('Connection document runtimeTarget requires personal or project with a positive projectId')
   }
-  if (record(target) && target.kind === 'project' && positiveId(target.projectId)
-    && Object.keys(target).length === 2) {
-    return { principalId: value.principalId, runtimeTarget: { kind: 'project', projectId: target.projectId } }
+  if (target.runtimeId !== undefined && (typeof target.runtimeId !== 'string' || target.runtimeId === '')) {
+    throw new Error('Connection document runtimeTarget requires personal or project with a positive projectId')
+  }
+  const location = target.runtimeId === undefined ? {} : { runtimeId: target.runtimeId as ClientRuntimeId }
+  if (target.kind === 'personal' && Object.keys(target).every(key => key === 'kind' || key === 'runtimeId')) {
+    return { principalId: value.principalId, runtimeTarget: { kind: 'personal', ...location } }
+  }
+  if (target.kind === 'project' && positiveId(target.projectId)
+    && Object.keys(target).every(key => ['kind', 'projectId', 'runtimeId'].includes(key))) {
+    return { principalId: value.principalId, runtimeTarget: { kind: 'project', projectId: target.projectId, ...location } }
   }
   throw new Error('Connection document runtimeTarget requires personal or project with a positive projectId')
 }

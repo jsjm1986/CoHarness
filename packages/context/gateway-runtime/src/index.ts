@@ -616,8 +616,11 @@ export class GatewayRuntime extends Service {
         rows.push({ kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: {
           version: 1,
           principalId: claims.user.id,
-          runtimeTarget: claims.scope.kind === 'personal' ? { kind: 'personal' }
-            : { kind: 'project', projectId: claims.scope.projectId },
+          runtimeTarget: {
+            ...(claims.scope.kind === 'personal' ? { kind: 'personal' as const }
+              : { kind: 'project' as const, projectId: claims.scope.projectId }),
+            ...(claims.runtime.runtimeId === undefined ? {} : { runtimeId: claims.runtime.runtimeId }),
+          },
         } })
       })
     })
