@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-product-subagent-noninteractive-permissions.md
 document:
-  en: 8788fba3492e08090dd038fc3e7377f6bd1e29cd
-  zh: cbf3c3cd14fcecd2c24e335a8b71cc3b5370e247
+  en: ffefbd943e3bbf7bbc1e8d0f7b879e41fe775c1c
+  zh: d5ab5a25a3ee6c89f6c7c2dad5c80e8fbe46ae4a
 /agent-note-product-subagents-use-profile-selected-non-interactive-permissions:
   en: feb20636c72ade23
   zh: fd2e9f192a3fa527
@@ -15,8 +15,8 @@ document:
   en: a4635e16af21d478
   zh: 6cd59ad7e2bb9885
 /agent-note-product-subagents-use-profile-selected-non-interactive-permissions/decision/claude-code:
-  en: fde584f95a81f036
-  zh: e308a891fa1946b2
+  en: feecca1ab61d55f2
+  zh: 36513b2587f97c7d
 /agent-note-product-subagents-use-profile-selected-non-interactive-permissions/decision/codex:
   en: 9d7f28afc6193926
   zh: 8ab9340d3b9208c6

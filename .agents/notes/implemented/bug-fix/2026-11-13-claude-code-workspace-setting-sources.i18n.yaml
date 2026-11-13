@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-13-claude-code-workspace-setting-sources.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-13-claude-code-workspace-setting-sources.md
+document:
+  en: 938d1c7edf6e51d6355ea54affd88494f82f10ce
+  zh: 79496332ff198cce36cbdb7c9fdb8315f4f31ae0
+/agent-note-claude-code-runs-load-workspace-settings-only-by-profile-opt-in:
+  en: 18f685b4cdba6a0b
+  zh: c98d00157da8fb34
+/agent-note-claude-code-runs-load-workspace-settings-only-by-profile-opt-in/problem:
+  en: 813b1ae183c66992
+  zh: cfc3433f8c8bdf08
+/agent-note-claude-code-runs-load-workspace-settings-only-by-profile-opt-in/decision:
+  en: b07e7305b3b0cd1e
+  zh: a9c908a7e934ca18
+/agent-note-claude-code-runs-load-workspace-settings-only-by-profile-opt-in/alternatives-considered:
+  en: 0c419da2ab8d441f
+  zh: f91b56a3e3d28e3b
+/agent-note-claude-code-runs-load-workspace-settings-only-by-profile-opt-in/consequences:
+  en: c7ab264bb4cdb54d
+  zh: d0af27a5249e2b9f

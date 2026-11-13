@@ -3720,7 +3720,7 @@ export type PermissionPolicy = 'allow' | 'reject'
 ## `@deepseek-ai/dsh-subagent-claude-code`
 
 - `inject`: `subagents` · `subprocess`
-- `source`: [`packages/subagent/subagent-claude-code/src/index.ts:54`](../packages/subagent/subagent-claude-code/src/index.ts)
+- `source`: [`packages/subagent/subagent-claude-code/src/index.ts:57`](../packages/subagent/subagent-claude-code/src/index.ts)
 
 ```ts config-catalog
 /** Deployment-owned model, permission, environment, and process-release settings. */
@@ -3741,6 +3741,13 @@ export interface Config {
    * `bypassPermissions` explicitly skips permission checks.
    */
   permissionMode?: ClaudeCodePermissionMode
+  /**
+   * Native Claude setting scopes loaded by every run. Defaults to `['user']`.
+   * Adding `project` or `local` lets workspace `.claude` settings register
+   * hooks, MCP servers, and allow rules that run outside the dsh sandbox, so
+   * include them only when every workspace this instance serves is trusted.
+   */
+  settingSources?: ClaudeCodeSettingSource[]
   /** Grace in milliseconds between Claude Code managed-range termination tiers. */
   disposeGraceMs?: number
   /**
@@ -3759,6 +3766,9 @@ export interface Config {
 
 /** Profile-selectable non-interactive Claude Code permission mode. */
 export type ClaudeCodePermissionMode = typeof CLAUDE_CODE_PERMISSION_MODES[number]
+
+/** Profile-selectable native Claude setting scope. */
+export type ClaudeCodeSettingSource = typeof CLAUDE_CODE_SETTING_SOURCES[number]
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-subagent-claude-code -->
 

@@ -28,7 +28,7 @@ import type {
 } from '@deepseek-ai/dsh-subprocess'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as claudeCode from '../src/index.ts'
-import type { ClaudeCodePermissionMode } from '../src/run.ts'
+import type { ClaudeCodePermissionMode, ClaudeCodeSettingSource } from '../src/run.ts'
 import {
   startMessagesFixture,
   type MessagesBehavior,
@@ -343,6 +343,41 @@ describe('real Claude Agent SDK 0.3.263 and its distributed Claude Code 2.1.263 
       .map(block => block.text)
     expect(messageTexts.filter(text => text.includes(task))).toEqual([task])
     await expectQuiescent(harness.handles)
+  })
+
+  it.each([
+    { settingSources: undefined, hookRuns: false },
+    { settingSources: ['user', 'project', 'local'] as ClaudeCodeSettingSource[], hookRuns: true },
+  ])('runs workspace .claude hooks only when settingSources opts in ($settingSources)', async ({ settingSources, hookRuns }) => {
+    const instance = await realInstanceFixture({ kind: 'complete', text: 'done' })
+    const marker = join(dirname(instance.workspace), 'workspace-hook-ran')
+    const hookScript = join(dirname(instance.workspace), 'workspace-hook.mjs')
+    writeFileSync(hookScript, `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(marker)}, 'ran')\n`)
+    const quoted = (path: string): string => JSON.stringify(path.replaceAll('\\', '/'))
+    mkdirSync(join(instance.workspace, '.claude'))
+    writeFileSync(join(instance.workspace, '.claude', 'settings.json'), `${JSON.stringify({
+      hooks: {
+        SessionStart: [{ hooks: [{ type: 'command', command: `${quoted(process.execPath)} ${quoted(hookScript)}` }] }],
+      },
+    }, null, 2)}\n`)
+    const { ctx, handles } = await realRuntime()
+    await ctx.plugin(claudeCode, {
+      env: instance.env,
+      ...settingSources === undefined ? {} : { settingSources },
+      disposeGraceMs: 3_000,
+    })
+    const run = await ctx.subagents.start('claude-code', {
+      prompt: [{ type: 'text', text: 'Reply done.' }],
+      parent: parentAgent(instance.workspace, 'hook-parent', ctx),
+      signal: new AbortController().signal,
+    })
+    await expect(run.result).resolves.toEqual({
+      output: [{ type: 'text', text: 'done' }],
+      stopReason: 'completed',
+    })
+    await run.dispose()
+    await expectQuiescent(handles)
+    expect(existsSync(marker)).toBe(hookRuns)
   })
 
   it('maps a real SDK max-turns result to safe query-run facts', async () => {
