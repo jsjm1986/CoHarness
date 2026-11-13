@@ -26,7 +26,7 @@ Claude Code defaults to `dontAsk` and accepts only the native non-interactive mo
 | `plan` | Use planning mode, deny execution approval, and return the completed plan as the final answer. |
 | `bypassPermissions` | Set the SDK's explicit dangerous confirmation and bypass permission checks. |
 
-The Provider continues to omit `settingSources`: Claude Code remains the owner of user, project, and local settings, authentication, tools, and sandbox behavior outside the selected mode.
+The Provider passes the Profile-selected `settingSources` owned by the [workspace setting-scope decision](../bug-fix/2026-11-13-claude-code-workspace-setting-sources.md): Claude Code remains the owner of the selected settings, authentication, tools, and sandbox behavior outside the selected mode.
 
 Every query disables `AskUserQuestion`. Non-bypass permission callbacks deny instead of returning the SDK's indefinitely blocking `null`; plan mode also places `ExitPlanMode` in `disallowedTools`, so native allow rules cannot switch the unattended query back to execution. MCP elicitation is declined; the supported refusal dialog is cancelled; undeclared dialog kinds use the SDK's no-dialog failure behavior. A native `permission_denied` message records the same operation-local fact. These paths do not create an approval session, queue, cache, or retry loop.
 
