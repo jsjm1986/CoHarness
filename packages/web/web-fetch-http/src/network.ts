@@ -159,21 +159,6 @@ function embeddedIpv4Address(bytes: readonly number[], prefixLength: Nat64Prefix
 }
 
 /**
- * Whether a hostname is an IP literal that {@link resolvePublicAddresses} would refuse.
- *
- * A proxied hop skips those checks because the proxy resolves the origin, but a literal needs no
- * resolution: the address is already stated, and handing it to a proxy running on this machine
- * would reach exactly the loopback or private service the checks exist to keep out of reach.
- *
- * @param hostname - a URL's hostname, bracketed or not.
- * @returns true when the host is a literal address no request may be sent to.
- */
-export function isNonPublicIpLiteral(hostname: string): boolean {
-  const unbracketed = stripIpv6Brackets(hostname)
-  return isIP(unbracketed) !== 0 && !isPublicIpAddress(unbracketed)
-}
-
-/**
  * Fetch through an agent whose lookup callback returns only the already validated address set. The
  * URL hostname remains intact for HTTP Host and TLS SNI.
  *
@@ -215,10 +200,10 @@ export async function requestPinned(
  * Fetch through the dispatcher the proxy policy already installed, letting the proxy resolve the
  * origin.
  *
- * No address set is pinned because none exists to pin: the proxy performs the lookup, and a
- * connection pinned to a locally resolved address would reach the origin directly and defeat the
- * proxy. The dispatcher is the process-wide one, so hops share its connection pool and no caller
- * closes it.
+ * The caller has already validated the hostname with {@link resolvePublicAddresses}. No address
+ * set is pinned: the proxy performs its own origin lookup, and a connection pinned to the locally
+ * resolved address would reach the origin directly and defeat the proxy. The dispatcher is the
+ * process-wide one, so hops share its connection pool and no caller closes it.
  *
  * @param dispatcher - the route's dispatcher, from `proxyRouteFor`.
  * @param url - validated HTTP(S) URL the policy routes through a proxy.

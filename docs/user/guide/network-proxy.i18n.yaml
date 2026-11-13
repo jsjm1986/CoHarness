@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/network-proxy.md
 document:
-  en: ee7b7b9dffc7520996ec858ebcaafab807aefd54
-  zh: 3243bd52b3c175c2ab51a5b01bc8adf66bf283fe
+  en: 43d603094db31ac744dd364db32d0c4b18419249
+  zh: 39d0dccb1746fe7ed628015dd6db425c7743652e
 /run-dsh-behind-a-network-proxy:
   en: 7659888fbb3e2e0d
   zh: 96c019583f5bf7ab
@@ -21,8 +21,8 @@ document:
   en: d0defd7e52100d1f
   zh: 50f38176e16f55e4
 /run-dsh-behind-a-network-proxy/what-stays-direct:
-  en: 3a11916bdf6e9626
-  zh: 6751c375e3b9b62f
+  en: d18ecd51492b920f
+  zh: 9d4aa729ed032f8e
 /run-dsh-behind-a-network-proxy/check-that-it-worked:
   en: d7455972489f79a8
   zh: 1e7295e10a211769
