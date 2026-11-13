@@ -25,10 +25,10 @@ describe('GatewayPrincipalSigner', () => {
       user: USER, scope: { kind: 'personal' }, runtime: { kind: 'user', id: USER.id, generation: 52 }, now,
     })
     const first = process.platform === 'win32' ? now - 16 : now
-    expect(signer.verify(assertion, first)).toMatchObject({ issuedAt: first, expiresAt: now + lifetimeMs })
+    expect(signer.verify(assertion, first)).toMatchObject({ issuedAt: first, expiresAt: first + lifetimeMs })
     expect(() => signer.verify(assertion, first - 1)).toThrow('expired')
-    expect(signer.verify(assertion, now + lifetimeMs - 1).runtime.generation).toBe(52)
-    expect(() => signer.verify(assertion, now + lifetimeMs)).toThrow('expired')
+    expect(signer.verify(assertion, first + lifetimeMs - 1).runtime.generation).toBe(52)
+    expect(() => signer.verify(assertion, first + lifetimeMs)).toThrow('expired')
   })
 
   it('issues generation-bound assertions and rejects tampering, expiry, and foreign organizations', () => {
@@ -109,8 +109,9 @@ it('limits profile assertions to the configured operation deadline without exten
   const signer = new GatewayPrincipalSigner(privateKey, 'acme', 1000)
   const input = { user: { ...USER, role: 'admin' as const }, scope: { kind: 'personal' as const }, runtime: { kind: 'user' as const, id: USER.id, generation: 1 }, now: 1000 }
   const managed = signer.issuePluginManagement(input, 60_000)
-  expect(signer.verify(managed, 60_999)).toMatchObject({ purpose: 'plugin-admin', expiresAt: 61_000 })
-  expect(() => signer.verify(managed, 61_000)).toThrow('expired')
+  const managedFirst = process.platform === 'win32' ? 984 : 1000
+  expect(signer.verify(managed, managedFirst + 59_999)).toMatchObject({ purpose: 'plugin-admin', expiresAt: managedFirst + 60_000 })
+  expect(() => signer.verify(managed, managedFirst + 60_000)).toThrow('expired')
   expect(() => signer.verify(signer.issue(input), 2000)).toThrow('expired')
   expect(() => signer.issuePluginManagement(input, 0)).toThrow('positive safe integer')
 })
