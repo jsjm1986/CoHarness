@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-13-cua-driver-resource-budget-inject.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-13-cua-driver-resource-budget-inject.md
+document:
+  en: 6281287c593938491d984e9599f723a6bb94a217
+  zh: 69eb6f2feb4b278f62b73633ecbde1fc84dc6f4b
+/agent-note-order-the-managed-cua-driver-behind-resource-admission:
+  en: 53b96024255f0f22
+  zh: 9d854ddb3945333e
+/agent-note-order-the-managed-cua-driver-behind-resource-admission/problem:
+  en: eb99ca11701ad1ea
+  zh: bc94f29834df3128
+/agent-note-order-the-managed-cua-driver-behind-resource-admission/decision:
+  en: a6576a1b25ff8a47
+  zh: b70868f963278c7f
+/agent-note-order-the-managed-cua-driver-behind-resource-admission/alternatives-considered:
+  en: c591dc9e92af36ba
+  zh: c4a716445a64bcc2
+/agent-note-order-the-managed-cua-driver-behind-resource-admission/consequences:
+  en: 51854de46f0ec565
+  zh: acfe189d010418ac
+/agent-note-order-the-managed-cua-driver-behind-resource-admission/verification:
+  en: 7be68ada4da6eed4
+  zh: 78202b5377f52135
