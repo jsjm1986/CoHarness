@@ -199,6 +199,12 @@ export interface LlmEndpointModelDiscoveryRequest {
   headers?: Readonly<Record<string, string>>
   /** Caller cancellation signal. */
   signal?: AbortSignal
+  /**
+   * Fetch implementation for every listing request, including redirects;
+   * omitted means the global `fetch`. Callers that must constrain the
+   * network destination supply a connection-checking implementation.
+   */
+  fetch?: (url: URL, init: RequestInit) => Promise<Response>
 }
 
 /**
@@ -456,11 +462,16 @@ async function cancelCandidate(response: Response): Promise<void> {
 }
 
 /** Follow bounded same-origin redirects, cancelling each discarded response before another request. */
-async function fetchListingResponse(url: string, headers: Headers, signal?: AbortSignal): Promise<Response> {
+async function fetchListingResponse(
+  url: string,
+  headers: Headers,
+  signal: AbortSignal | undefined,
+  request: (url: URL, init: RequestInit) => Promise<Response>,
+): Promise<Response> {
   let current = new URL(url)
   const origin = current.origin
   for (let redirects = 0; ; redirects += 1) {
-    const response = await fetch(current, {
+    const response = await request(current, {
       method: 'GET',
       headers,
       redirect: 'manual',
@@ -511,7 +522,7 @@ async function fetchListingCandidate(
     headers.set('accept', 'application/json')
     for (const [name, value] of Object.entries(listingHeaders(api, apiKey))) headers.set(name, value)
     for (const [name, value] of Object.entries(attributionHeaders())) headers.set(name, value)
-    response = await fetchListingResponse(url, headers, request.signal)
+    response = await fetchListingResponse(url, headers, request.signal, request.fetch ?? fetch)
   } catch (error: unknown) {
     if (request.signal?.aborted) {
       throw new LlmError('model discovery aborted by caller', 'ABORTED', { cause: error })

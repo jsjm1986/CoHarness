@@ -46,6 +46,7 @@ import type {
 } from './services.ts'
 import type { ConversationArchiveService } from './postgres/conversation-archive-service.ts'
 import { SshTargetError } from './postgres/ssh-target-service.ts'
+import { NonPublicNetworkTargetError } from './public-network-fetch.ts'
 import { isAdminPath, serveAdmin } from './static.ts'
 import { ResponseBodyTooLargeError } from './response-budget.ts'
 import { removeBootstrapAdminPassword } from './bootstrap-admin.ts'
@@ -604,6 +605,19 @@ async function readPublicationAuthority<T>(kind: 'project' | 'invitation' | 'usa
     if (cause instanceof CollaborationDeniedError) throw cause
     throw new ReadPublicationUnavailableError(kind, cause)
   }
+}
+
+/**
+ * Replace a project model-discovery failure with a fixed code for callers that
+ * are not Gateway administrators, so upstream URLs, status lines, and response
+ * bodies are never echoed to them. Authorization failures keep their mapping.
+ */
+function withheldDiscoveryError(error: unknown): string | undefined {
+  if (error instanceof CollaborationDeniedError || error instanceof ReadPublicationUnavailableError) return undefined
+  for (let cause: unknown = error; cause instanceof Error; cause = cause.cause) {
+    if (cause instanceof NonPublicNetworkTargetError) return 'model-discovery-target-not-public'
+  }
+  return 'model-discovery-failed'
 }
 
 function accountProjectError(error: unknown): { status: number; error: string } {
@@ -2249,14 +2263,23 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             return
           }
           const input = jsonObject(await readBody(req))
-          const models = await deps.governance.discoverProjectModels({
-            projectId,
-            actorUserId: user.id,
-            ...stringField(input?.provider) === undefined ? {} : { provider: stringField(input?.provider) },
-            ...stringField(input?.baseURL) === undefined ? {} : { baseURL: stringField(input?.baseURL) },
-            ...stringField(input?.api) === undefined ? {} : { api: stringField(input?.api) },
-            ...stringField(input?.apiKey) === undefined ? {} : { apiKey: stringField(input?.apiKey) },
-          })
+          let models: Awaited<ReturnType<typeof deps.governance.discoverProjectModels>>
+          try {
+            models = await deps.governance.discoverProjectModels({
+              projectId,
+              actorUserId: user.id,
+              ...stringField(input?.provider) === undefined ? {} : { provider: stringField(input?.provider) },
+              ...stringField(input?.baseURL) === undefined ? {} : { baseURL: stringField(input?.baseURL) },
+              ...stringField(input?.api) === undefined ? {} : { api: stringField(input?.api) },
+              ...stringField(input?.apiKey) === undefined ? {} : { apiKey: stringField(input?.apiKey) },
+              allowPrivateNetwork: user.role === 'admin',
+            })
+          } catch (error: unknown) {
+            const withheld = user.role === 'admin' ? undefined : withheldDiscoveryError(error)
+            if (withheld === undefined) throw error
+            send(res, 400, JSON.stringify({ error: withheld }), 'application/json')
+            return
+          }
           if (!await deps.governance.authorizeProjectModelRead(projectId, user.id)) {
             throw new CollaborationDeniedError('forbidden')
           }
