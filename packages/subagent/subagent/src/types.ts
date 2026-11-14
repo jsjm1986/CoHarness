@@ -23,6 +23,12 @@ export interface ContinuableStartSpec {
   /** The initial delegation's short `description`, persisted as the child's creation label. */
   readonly label: string
   /**
+   * Requested name, unique among the parent's children: 1–32 lower-case
+   * letters, digits, or hyphens starting with a letter, other than `lead`.
+   * Omission selects the first free `agent-N`.
+   */
+  readonly name?: string
+  /**
    * Optional caller-reserved child identity. Omission preserves the manager's
    * UUID allocation; supplying one lets a durable parent record provisioning
    * before child materialization without a second identity handshake.
@@ -43,6 +49,19 @@ export interface ContinuableStart {
   readonly childId: SessionId
   /** The accepted initial prompt's inbox message id. */
   readonly messageId: MessageId
+  /**
+   * Model-facing name: the slash-separated path from the subagent tree root
+   * when every creator below the root is named, otherwise the child Session id.
+   */
+  readonly name: string
+}
+
+/** Model-facing names of one live tree member and its direct creator. */
+export interface SubagentMemberNames {
+  /** `lead` for the root, the slash-separated path for a named descendant, otherwise the Session id. */
+  readonly self: string
+  /** The direct creator's name by the same rule; absent for the root. */
+  readonly parent?: string
 }
 
 /**
@@ -54,7 +73,7 @@ export type SubagentInterruptAuthority =
   | { readonly kind: 'user'; readonly parentSessionId: SessionId }
   | { readonly kind: 'ancestor'; readonly agent: Agent }
 
-/** Options for one model-authored message between adjacent Agents. */
+/** Options for one model-authored message within a subagent tree. */
 export interface SubagentSendMessageOptions {
   /** Caller cancellation, owning the operation only until inbox acceptance. */
   readonly signal: AbortSignal
@@ -87,6 +106,8 @@ export interface SubagentRunInfo {
    * registration.
    */
   readonly provider: string
+  /** Durable direct creator, independent of the live subagent tree root. */
+  readonly parentSessionId: SessionId
   /** The child agent's id. */
   readonly id: SessionId
   /** Snapshot of whether `SubagentRun.localAgent` was present when start fulfilled. */
@@ -102,6 +123,8 @@ export interface SubagentRunEndInfo {
   readonly runId: SubagentRunId
   /** The same provider name carried by the paired start event. */
   readonly provider: string
+  /** Durable direct creator, independent of the live subagent tree root. */
+  readonly parentSessionId: SessionId
   /** The child agent's id. */
   readonly id: SessionId
   /** Snapshot of whether `SubagentRun.localAgent` was present when start fulfilled. */

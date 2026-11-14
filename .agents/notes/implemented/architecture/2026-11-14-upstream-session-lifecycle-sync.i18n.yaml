@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-session-lifecycle-sync.md
 document:
-  en: d0ff21663db4ca6da931aaa4431f93dfb8fa7c34
-  zh: db91d3eee680b52bca5e51988539c711ee3a9205
+  en: a62475ef67cb6d1ee797903d6a6cabc28ec799fc
+  zh: 5a4fb34daab9234469910d64f929a31b9cc0b3b4
 /agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3:
   en: 5cc08674223115e2
   zh: 13d059a7a86ef34d
@@ -12,14 +12,14 @@ document:
   en: 6a9d12f511b095a7
   zh: 6339b6ae04273215
 /agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/decision:
-  en: 715aa7ce97d4a5cf
-  zh: 07d601b329f32a95
+  en: 3fe580b7fa725230
+  zh: 58942ffde34e0789
 /agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/consequences:
-  en: 97e6d026b2969c05
-  zh: d3086f430aeddf6d
+  en: 1e9d14cc95cc29b5
+  zh: 607055ee7d63dbf0
 /agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/alternatives-considered:
   en: f3baa43eac191365
   zh: aff99baf7bceecfe
 /agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/verification:
-  en: 925e46e0743bccbf
-  zh: 9895d0f3bb39d6fd
+  en: a790490d0091685d
+  zh: f5f860a159bd7e5e

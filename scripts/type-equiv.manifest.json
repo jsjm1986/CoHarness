@@ -2003,6 +2003,11 @@
     },
     {
       "doc": "docs/subsystems/subagent.md",
+      "symbol": "SubagentMemberNames",
+      "source": "packages/subagent/subagent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/subagent.md",
       "symbol": "SubagentProvider",
       "source": "packages/subagent/subagent/src/types.ts"
     },

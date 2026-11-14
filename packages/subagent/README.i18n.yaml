@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/README.md
 document:
-  en: a495859c3e9c0d4c63823ca2dda11b94db8951d1
-  zh: 3ca45aeda0bdef68b9066be1576119aff3b18625
+  en: e39aa8a29bf435e5caaf44bf83bcd88fb3407d5a
+  zh: b410e8c62f765a0734d17501430400ad43a42c1a
 /:
   en: 614967a71d5b401f
   zh: 5bd6fa8ddf4daed3
 /subagent-subagent-capability-family:
-  en: 2485c257deadca56
-  zh: a0fcab74ad4a1745
+  en: 8cec3c984bfa678a
+  zh: 72e40b3bd86be83e
 /subagent-subagent-capability-family/summary:
-  en: 4cb71f430f89dd03
-  zh: 9cd59de2a92d0711
+  en: a54f734311fdf5ad
+  zh: 0416fa52056a4a32

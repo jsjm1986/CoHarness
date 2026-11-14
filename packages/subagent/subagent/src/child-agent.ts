@@ -184,6 +184,8 @@ export const SUBAGENT_DELEGATION_CONTEXT
  * Compose a child before publication and restore historical descriptor overrides.
  * Explicit selection mounts the named preset; omission synchronously joins the
  * parent's current generation. Registrations belong to the child's scope.
+ * A member resumed without its live creator keeps its recorded composition and
+ * joins no preset generation.
  * @param childCtx - the child agent's scoped creation context.
  * @param parent - the delegating parent used when no preset is selected.
  * @param composition - independent preset and any overrides read from a historical descriptor.
@@ -191,7 +193,7 @@ export const SUBAGENT_DELEGATION_CONTEXT
  */
 export function applyChildComposition(
   childCtx: Context,
-  parent: Agent,
+  parent: Agent | undefined,
   composition: ChildComposition,
 ): void | Promise<void> {
   if (composition.agentPreset !== undefined) {
@@ -203,7 +205,7 @@ export function applyChildComposition(
       applyChildOverrides(childCtx, composition)
     })
   }
-  childCtx.get('agentPresets')?.composeFrom(childCtx, parent.ctx)
+  if (parent !== undefined) childCtx.get('agentPresets')?.composeFrom(childCtx, parent.ctx)
   applyChildOverrides(childCtx, composition)
 }
 

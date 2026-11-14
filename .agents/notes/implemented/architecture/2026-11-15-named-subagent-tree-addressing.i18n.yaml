@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-15-named-subagent-tree-addressing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-15-named-subagent-tree-addressing.md
+document:
+  en: 4720541c65257fc2c3461a65b5bef57cd63ea88f
+  zh: 87b48b1f93f5402b2b2d3c177f32dccd11a65938
+/agent-note-named-subagent-tree-addressing:
+  en: b6aabdf5f73fb186
+  zh: dac30e9280252fd1
+/agent-note-named-subagent-tree-addressing/problem:
+  en: 4a246b27c588b486
+  zh: 03193c8563a1f423
+/agent-note-named-subagent-tree-addressing/decision:
+  en: 33fe38d5f05b4b80
+  zh: 93a145befc269218
+/agent-note-named-subagent-tree-addressing/consequences:
+  en: abfbbb0a83835a5e
+  zh: 6f6a1b0e4eafbca4
+/agent-note-named-subagent-tree-addressing/alternatives-considered:
+  en: 86fc25e3f6f7e86b
+  zh: 2c998cf60384d514
+/agent-note-named-subagent-tree-addressing/verification:
+  en: 4e60f7d39c5eb784
+  zh: 69a3f4c722896346

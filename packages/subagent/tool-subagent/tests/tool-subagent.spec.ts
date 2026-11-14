@@ -1175,7 +1175,7 @@ describe('dsh-tool-subagent continuable background mode', () => {
     })).toEqual({ kind: 'parallel' })
   })
 
-  it('defaults continuable delegation to background and returns only its durable id', async () => {
+  it('defaults continuable delegation to background and returns only its durable name', async () => {
     const { ctx, parent } = await continuableSetup()
     const schema = ctx.tools.schemas().find(s => s.name === 'subagent')!
     // Continuable delegation has no Task, so the schema promises no collection.
@@ -1201,17 +1201,17 @@ describe('dsh-tool-subagent continuable background mode', () => {
       { agent: parent },
     )
     expect(started.isError).toBe(false)
-    const match = /^started subagent (\S+)$/.exec(text(started))
-    expect(match).not.toBeNull()
-    const [, childId] = match!
+    expect(text(started)).toBe('started subagent agent-1')
+    // The receipt names the child; its durable session id resolves through the tree.
+    const childId = await ctx.subagents.resolveName(parent, 'agent-1')
     // No Task was created for the continuable child.
     expect(ctx.jobs.list(parent.id)).toEqual([])
 
     await vi.waitFor(() => {
-      expect(ctx.agents.get(SessionId(childId!))).toBeUndefined()
+      expect(ctx.agents.get(childId)).toBeUndefined()
     }, { timeout: 5_000 })
     // The child id names a durable session carrying its continuation descriptor.
-    const loaded = await ctx.sessionPersistence.load(SessionId(childId!))
+    const loaded = await ctx.sessionPersistence.load(childId)
     expect(loaded.events.some(event => event.type === 'subagent/descriptor')).toBe(true)
     expect(loaded.events.some(event => event.type === 'assistant/message')).toBe(true)
   })
@@ -1297,7 +1297,7 @@ describe('dsh-tool-subagent continuable background mode', () => {
 
     expect(succeeded.isError ? undefined : succeeded.value).toEqual({
       kind: 'continuable',
-      subagentId: survivingChildId,
+      name: 'agent-2',
     })
     await vi.waitFor(() => {
       expect(ctx.agents.get(survivingChildId!)).toBeUndefined()

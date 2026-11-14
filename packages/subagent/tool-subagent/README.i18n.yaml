@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/tool-subagent/README.md
 document:
-  en: b3e242286706623f29c34cad3bee500e91f6c7fa
-  zh: 9505ee42bf2f634dcb761f7690946ab9831ac7ac
+  en: f442528afbe99a295be25c2eadf9d3b3a76aed76
+  zh: 95ee73288d5473a58e88e0e3e9a86a4fd04d9f3a
 /:
   en: 3dc0ccef49097361
   zh: 61495d48365178df
@@ -12,17 +12,17 @@ document:
   en: cad290290c1e115c
   zh: 9486441b9d263bc5
 /deepseek-ai-dsh-tool-subagent/summary:
-  en: 79913f4c31286b6f
-  zh: 4f24e07b47e5bb64
+  en: 0da6bbe542760c8e
+  zh: df834faa781db14b
 /deepseek-ai-dsh-tool-subagent/table-of-contents:
   en: 8a77278a6b294e9a
   zh: 76ab3cc83669d193
 /deepseek-ai-dsh-tool-subagent/provider-selection-and-lifecycle:
-  en: d3a70cb6c1fdf48c
-  zh: 5308dad73a08fa35
+  en: 4ea8b4dabc5026db
+  zh: ccf4aca74e1ba825
 /deepseek-ai-dsh-tool-subagent/config:
-  en: 9cd8d8c1ccf4f9d4
-  zh: 3028eec3b0600082
+  en: 51b839ba1c0bf219
+  zh: 4430b609a98c419e
 /deepseek-ai-dsh-tool-subagent/concurrency:
   en: bcebe73eabc87a4b
   zh: 494e6e05e2800d27
@@ -33,11 +33,11 @@ document:
   en: e4c7376d4f29dbd5
   zh: 6b7a9eaf69c9ea53
 /deepseek-ai-dsh-tool-subagent/model-experience/tool-schema/what-the-model-sees:
-  en: 2fa4cd5d2cc233de
-  zh: d5563bd8e827399f
+  en: 22e0b3bb4e87c256
+  zh: e2d542dea96ec194
 /deepseek-ai-dsh-tool-subagent/model-experience/tool-schema/token-effect:
-  en: 84552359f40ee2fe
-  zh: 23ed219919fcc5a2
+  en: a1ba3e906a428ada
+  zh: aae87394db9a0041
 /deepseek-ai-dsh-tool-subagent/model-experience/tool-schema/kv-cache-effect:
   en: 46f736c6c389052a
   zh: a7765541030e9104
@@ -99,8 +99,8 @@ document:
   en: 3f23f9211197b0b9
   zh: 8cff3c78249b66ff
 /deepseek-ai-dsh-tool-subagent/model-experience/background-result/what-the-model-sees:
-  en: d2ba2d8a3e88478d
-  zh: dee910d1d271f75c
+  en: de477a30646b50b6
+  zh: 8cc76a2d67c9c9f3
 /deepseek-ai-dsh-tool-subagent/model-experience/background-result/token-effect:
   en: 3c67cdb1cbf53647
   zh: bfed5f2945a79c9d
@@ -108,8 +108,8 @@ document:
   en: f5d5f97a153f7c70
   zh: afc7da8783b348c6
 /deepseek-ai-dsh-tool-subagent/known-limitations-and-deferred-work:
-  en: 09cdbff533db37e1
-  zh: bee9cb718fe18fa8
+  en: 88ec34ac749b2a02
+  zh: ee597ce92c5ceeb2
 /deepseek-ai-dsh-tool-subagent/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

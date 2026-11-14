@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-ptc-runtime-sync.md
 document:
-  en: 26923df9f17fd387a557e7a61f4d2c453473bea6
-  zh: 696ac9ece79f3ddbd8024853412f2d41159bd60b
+  en: 98ca135cba18c7b07ad5507718e772d91da8cad3
+  zh: 65f59babba0017f5e3e156d97fed2cb20ce0978a
 /agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3:
   en: 30d01c4161bb477b
   zh: fede8e0f2bc3ffd9
@@ -12,14 +12,14 @@ document:
   en: c59dfb0ce19cb0db
   zh: bda6117e1724bace
 /agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3/decision:
-  en: 4d057a956df9d9c9
-  zh: 2c6655d67d0a722a
+  en: 0d3bc3802598d229
+  zh: 46f0a233cb4637ac
 /agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3/consequences:
-  en: 6b89aed12deaa36b
-  zh: ae645dbe4f7b1d8a
+  en: 8df23f1a1cf764a3
+  zh: ffc86d38ee292e9d
 /agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3/alternatives-considered:
   en: 73b504176c5dacab
   zh: bf8ce57712f96141
 /agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3/verification:
-  en: 15f5d4a7bc0193dc
-  zh: 0dfab010d60115b1
+  en: e2ec6af10c928c0d
+  zh: c93bee788b5ae224

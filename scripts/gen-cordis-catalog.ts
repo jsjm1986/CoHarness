@@ -64,6 +64,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   profileContext: 'boot.md',
   hmr: 'boot.md',
   mcpResources: 'mcp.md',
+  mcpManager: 'mcp.md',
   agentLoop: 'core.md',
   agentDefaultModel: 'core.md',
   agentPresets: 'core.md',
@@ -236,6 +237,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
 export const EVENT_SCOPE_PAGE: Record<string, string> = {
   connection: 'collaboration.md',
   mcp: 'mcp.md',
+  'mcp-manager': 'mcp.md',
   'app-boot': 'boot.md',
   'agent': 'core.md',
   'agent-loop': 'core.md',
@@ -273,6 +275,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'workspace': 'workspace.md',
   'workspace-files': 'collaboration.md',
   'remote-desktop': 'remote-desktop.md',
+  'worktree': 'worktrees.md',
 }
 
 /**
@@ -715,6 +718,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   SubagentInterruptAuthority: 'subagent.md',
   SubagentInterruptReceipt: 'subagent.md',
   SubagentListEntry: 'subagent.md',
+  SubagentMemberNames: 'subagent.md',
   SubagentPromptContentPart: 'subagent.md',
   SubagentPromptReceipt: 'subagent.md',
   SubagentPromptRequest: 'subagent.md',
@@ -978,6 +982,12 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   PatchOptions: 'Include patch entries are owned by vendor/include (vendored upstream)',
   McpResourceProvider: 'scoped resource provider is owned by packages/mcp/mcp-resources/README.md',
   'z.ZodType': 'Zod response validation API is owned by https://zod.dev/packages/zod',
+  McpManagedServerStatus: 'managed server status union is owned by packages/mcp/mcp-manager/src/types.ts',
+  McpManagedServerView: 'managed server list row is owned by packages/mcp/mcp-manager/src/types.ts',
+  McpServerRegistration: 'plugin-registered server entry is owned by packages/mcp/mcp-manager/src/index.ts',
+  McpProbeOptions: 'probe input contract is owned by packages/mcp/mcp-client/README.md',
+  McpProbeResult: 'probe result contract is owned by packages/mcp/mcp-client/README.md',
+  WorktreeCleanup: 'process-local checkout cleanup record is owned by packages/experimental/worktree/src/types.ts',
   Socket: 'Node.js byte stream API is owned by https://nodejs.org/api/net.html#class-netsocket',
   Duplex: 'Node.js duplex stream API is owned by https://nodejs.org/api/stream.html#class-streamduplex',
   RemoteDesktopLevelView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',

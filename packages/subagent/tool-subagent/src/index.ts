@@ -407,7 +407,7 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
           // a separately installed capability, so this promise holds whenever the
           // continuable background path is reachable at all.
           ? continuable
-            ? ' This tool runs in the background by default, immediately returns a durable subagent id, and keeps the child conversation available for later turns. When that run settles, the runtime sends the parent a notice containing its outcome and any final assistant message; `send_message` steers the child\'s nearest step while it is running and starts or resumes a turn while it is inactive. Set `run_in_background: false` only when your next action depends on receiving the result.'
+            ? ' This tool runs in the background by default and immediately returns the subagent\'s name. When that run settles, the runtime sends you a notice containing its outcome and any final answer, unless the child sent you a message just before finishing; `send_message` steers the child\'s nearest step while it is running and starts or resumes a turn while it is inactive. Set `run_in_background: false` only when your next action depends on receiving the result.'
             : ' This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.'
           : ' This call waits for the subagent and returns its result.') + choiceDescription,
         parameters: {
@@ -420,6 +420,13 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
             required: true,
             description: 'A short (3-5 word) description of the delegated task, for display.',
           },
+          ...continuable ? {
+            name: {
+              type: 'string' as const,
+              description: 'Optional short name for the subagent, unique among the subagents you create: lower-case letters, '
+                + 'digits, and hyphens, starting with a letter, at most 32 characters; lead is reserved for the root agent. Omitted names default to agent-1, agent-2, and so on.',
+            },
+          } : {},
           prompt: {
             type: 'string',
             required: true,
@@ -456,7 +463,7 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
             run_in_background: {
               type: 'boolean' as const,
               description: continuable
-                ? 'Whether to run in the background and return a durable subagent id immediately. Defaults to true. Set false to wait for the result when your next action depends on it.'
+                ? 'Whether to run in the background and return a durable subagent name immediately. Defaults to true. Set false to wait for the result when your next action depends on it.'
                 : 'Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill.',
             },
           } : {},
@@ -477,7 +484,7 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
                 additionalProperties: false,
                 properties: {
                   kind: { type: 'string', required: true, const: 'continuable' },
-                  subagentId: { type: 'string', required: true },
+                  name: { type: 'string', required: true },
                 },
               },
               {
@@ -496,7 +503,7 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
             text: value.kind === 'background'
               ? `started background subagent job ${value.jobId}`
               : value.kind === 'continuable'
-                ? `started subagent ${value.subagentId}`
+                ? `started subagent ${value.name}`
                 : outputValueText(value.output),
           }],
         },
@@ -568,10 +575,11 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
                 const started = await subagents.startContinuable({
                   provider: config.provider,
                   label: args.description,
+                  ...typeof args.name === 'string' ? { name: args.name } : {},
                   request,
                   signal: signal,
                 })
-                return { kind: 'continuable' as const, subagentId: started.childId }
+                return { kind: 'continuable' as const, name: started.name }
               }
               const jobs = runtimeCtx.get('jobs')
               if (jobs === undefined) {
@@ -688,7 +696,6 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
   const selectForSession = (target: Session): ModelSelectionPolicy | undefined => {
     if (!modelSelectionCapable || settings === undefined) return undefined
     const freshSession = target.firstLiveSeq === 0
-      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       && target.eventAt(SessionSeq(0))?.type !== 'session/end-seed'
     let allowedModels = subagentModelSelectionPolicy(ctx.sessionProjections, target)
     if (allowedModels === undefined) {

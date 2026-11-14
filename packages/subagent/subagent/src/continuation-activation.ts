@@ -10,7 +10,7 @@
  */
 
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
-import type { Context } from '@deepseek-ai/cordis'
+import { FiberState, type Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import type {
   Agent,
@@ -37,6 +37,7 @@ import type { ChildComposition, DelegatedPolicyOverrides } from './child-agent.t
 import { createSettlementMessage } from './continuation-messages.ts'
 import type { SubagentDescriptorData } from './descriptor.ts'
 import { SubagentError } from './error.ts'
+import { agentAddress } from './names.ts'
 import { SubagentInbox } from './inbox.ts'
 import type { SubagentDelivery } from './inbox.ts'
 import type { ActivationObserver, ActivationTerminal } from './lifecycle.ts'
@@ -72,6 +73,12 @@ export interface Activation {
   readonly releaseSlot: () => void
   /** The durable child this Activation is an epoch of. */
   readonly childId: SessionId
+  /** Exact live subagent tree root owning this epoch and its shared capacity. */
+  readonly root: Agent
+  /** Verified durable creation ancestors, from subagent tree root to direct creator. */
+  readonly ancestors: readonly SessionId[]
+  /** Slash-separated names from the root; undefined when this child or a creator below the root has no name. */
+  readonly path: string | undefined
   /**
    * The durable direct parent, stored because settlement delivery must resolve
    * that parent after the child handle is gone. {@link ancestry} cannot answer
@@ -85,6 +92,11 @@ export interface Activation {
   readonly handle: AgentHandle
   /** The Activation-local admission and close wrapper around the handle's Agent inbox. */
   readonly inbox: SubagentInbox
+  /**
+   * Whether this member's settlement notice omits its closing text: set when
+   * the child's last accepted action was a message to its direct parent.
+   */
+  omitClosingText: boolean
   /**
    * Exact live Agent ancestry observed when this Activation materialized.
    * Weak membership preserves host-scope identity across an intermediate
@@ -120,7 +132,18 @@ export interface Activation {
 export interface MaterializeInputs {
   childId: SessionId
   provider: string
-  parent: Agent
+  /**
+   * The exact live direct parent, present only for a fresh creation or a
+   * delivery that holds live direct-parent authority; a member resumed under
+   * its tree root has none.
+   */
+  parent?: Agent
+  /** Exact live subagent tree root owning this residency epoch and its pool. */
+  root: Agent
+  /** Verified durable creation ancestors, from subagent tree root to direct creator. */
+  ancestors: readonly SessionId[]
+  /** Slash-separated names from the root; undefined when any link is unnamed. */
+  path: string | undefined
   /**
    * Creation inputs; absent for a cold resume, which loads the persisted
    * session — including the delegation policy events a fresh creation seeded,
@@ -234,7 +257,8 @@ export class ContinuableActivationRegistry {
     private readonly observeActivation: (
       provider: string,
       childId: SessionId,
-      parent: Agent,
+      carrier: Agent,
+      parentSessionId: SessionId,
     ) => ActivationObserver,
     private readonly limits: () => { maxActivations: number; maxActivationsPerParent: number },
     private readonly maxActiveSubagents: () => number,
@@ -388,12 +412,7 @@ export class ContinuableActivationRegistry {
   async drain(): Promise<void> {
     this.draining = true
     await Promise.all([...this.materializations].map(materialization => materialization.settled))
-    const owned = new Set<SessionId>()
-    for (const activation of this.resident.values()) {
-      for (const child of activation.ownedChildren) owned.add(child)
-    }
-    const roots = [...this.resident.values()].filter(activation => !owned.has(activation.childId))
-    await this.disposeRoots(roots, 'activation(s)')
+    await this.disposeRoots([...this.resident.values()], 'activation(s)')
   }
 
   /**
@@ -430,19 +449,13 @@ export class ContinuableActivationRegistry {
       return owners.length > 0
     })
 
-    const ownedTargets = new Set<SessionId>()
-    for (const activation of targets) {
-      for (const child of activation.ownedChildren) ownedTargets.add(child)
-    }
-    const targetRoots = targets.filter(activation => !ownedTargets.has(activation.childId))
-
     for (const activation of targets) {
       const disposal = this.dispose(activation)
       void disposal.catch(() => undefined)
     }
 
     await Promise.all(materializations.map(materialization => materialization.settled))
-    await this.disposeRoots(targetRoots, 'scoped activation(s)')
+    await this.disposeRoots(targets, 'scoped activation(s)')
   }
 
   /**
@@ -577,14 +590,23 @@ export class ContinuableActivationRegistry {
    * @returns the published process-local Activation.
    */
   materialize(inputs: MaterializeInputs): Promise<Activation> {
-    this.assertAdmitting(inputs.parent)
+    this.assertAdmitting(inputs.parent ?? inputs.root)
     inputs.signal.throwIfAborted()
-    const lineage = this.liveLineage(inputs.parent)
-    const pool = this.resident.get(inputs.parent.id)?.pool ?? this.rootPool(inputs.parent)
+    const lineage = inputs.parent === undefined
+      ? this.liveLineage(inputs.root)
+      : this.liveLineage(inputs.parent)
+    // The tree root is never itself a resident Activation, so its identity
+    // keys one shared capacity pool for the whole subagent tree.
+    const pool = this.rootPool(inputs.root)
     const releaseSlot = pool.reserve(this.maxActiveSubagents())
+    const parentSession = inputs.parent?.id ?? inputs.ancestors.at(-1)
+    if (parentSession === undefined) {
+      releaseSlot()
+      throw new SubagentError(`subagent "${inputs.childId}" has no direct parent session`, 'UNAUTHORIZED')
+    }
     let quota: ActivationQuotaReservation
     try {
-      quota = this.reserveActivation(inputs.parent.id)
+      quota = this.reserveActivation(parentSession)
     } catch (error: unknown) {
       releaseSlot()
       throw error
@@ -595,7 +617,7 @@ export class ContinuableActivationRegistry {
       settled: settled.promise,
     }
     this.materializations.add(materialization)
-    return this.materializeTracked(inputs, lineage, quota, pool, releaseSlot).catch((error: unknown) => {
+    return this.materializeTracked(inputs, parentSession, lineage, quota, pool, releaseSlot).catch((error: unknown) => {
       releaseSlot()
       throw error
     }).finally(() => {
@@ -629,6 +651,34 @@ export class ContinuableActivationRegistry {
       activation.handle.agent.session.header.parentSession,
     )
     this.acquireOwnership(parent, activation.childId)
+    try {
+      activation.inbox.deliver(message, delivery)
+    } finally {
+      this.wake(activation)
+    }
+    return message.id
+  }
+
+  /**
+   * Cross the final admission cutoff for a tree-member delivery: the caller's
+   * authority is its membership in the activation's own tree, checked by the
+   * manager before this synchronous submit, so no direct-parent lineage runs here.
+   * @param activation - the exact resident member receiving the message.
+   * @param message - the already-built durable user message.
+   * @param delivery - the Agent inbox destination.
+   * @param root - exact live tree root whose admission owns the cutoff.
+   * @param signal - caller cancellation before inbox acceptance.
+   * @returns the accepted durable message id.
+   */
+  submitMember(
+    activation: Activation,
+    message: UserMessage,
+    delivery: SubagentDelivery,
+    root: Agent,
+    signal: AbortSignal,
+  ): MessageId {
+    signal.throwIfAborted()
+    this.assertAdmitting(root)
     try {
       activation.inbox.deliver(message, delivery)
     } finally {
@@ -766,11 +816,17 @@ export class ContinuableActivationRegistry {
     this.resident.delete(activation.childId)
     activation.releaseSlot()
     this.decrementCount(this.activationsByParent, activation.parentSession)
+    // Creation descendants keep their residency under the tree root, so this
+    // epoch's ownership edges retire with it.
+    for (const [child, owner] of this.childOwners) {
+      if (owner === activation) this.childOwners.delete(child)
+    }
   }
 
   /** Perform one tracked materialization through publication or rollback. */
   private async materializeTracked(
     inputs: MaterializeInputs,
+    parentSession: SessionId,
     parentLineage: readonly Agent[],
     quota: ActivationQuotaReservation,
     pool: ActivationPool,
@@ -809,18 +865,21 @@ export class ContinuableActivationRegistry {
         )
       }
     }
-    const observer = this.observeActivation(provider, childId, parent)
+    // The durable parent keys lifecycle payloads; the live tree owner keys
+    // scoped dispatch — the direct parent for a fresh child, the root for a
+    // member resumed without its live creator.
+    const observer = this.observeActivation(provider, childId, parent ?? inputs.root, parentSession)
     const handle: AgentHandle = create === undefined
       ? await this.ownerCtx.agents.resume({
         resumeSessionId: childId,
-        parentAgent: parent,
+        ...parent === undefined ? {} : { parentAgent: parent },
         agentOptions: inputs.agentOptions,
         signal: inputs.signal,
         setup,
       })
       : await this.ownerCtx.agents.create({
         sessionId: childId,
-        parentAgent: parent,
+        ...parent === undefined ? {} : { parentAgent: parent },
         meta: create.meta,
         ...(create.seed === undefined ? {} : { seed: create.seed }),
         inheritedEventCount: create.inheritedEventCount,
@@ -833,11 +892,17 @@ export class ContinuableActivationRegistry {
       pool,
       releaseSlot,
       childId,
-      parentSession: parent.id,
+      root: inputs.root,
+      ancestors: inputs.ancestors,
+      path: inputs.path,
+      parentSession,
       provider,
       handle,
       inbox: new SubagentInbox(handle.agent, structured),
-      ancestry: new WeakSet([handle.agent, ...parentLineage]),
+      omitClosingText: false,
+      // The lineage span plus every live durable ancestor the resumed child can
+      // still reach through its own parent chain.
+      ancestry: new WeakSet([handle.agent, ...parentLineage, ...this.liveLineage(handle.agent)]),
       ownedChildren: new Set(),
       observer,
       structured,
@@ -850,8 +915,11 @@ export class ContinuableActivationRegistry {
     this.resident.set(childId, activation)
     try {
       inputs.signal.throwIfAborted()
-      this.assertAdmitting(parent)
-      this.acquireOwnership(parent, childId)
+      this.assertAdmitting(parent ?? inputs.root)
+      // A member resumed under its tree root re-joins its durable creator's
+      // owned set only while that exact creator is still live.
+      const owner = parent ?? this.ctx.agents.get(parentSession)
+      if (owner !== undefined) this.acquireOwnership(owner, childId)
       const wakeOnInboxRemoval = (): void => { this.wake(activation) }
       handle.agent.ctx.on('agent/inbox/claimed', wakeOnInboxRemoval)
       handle.agent.ctx.on('agent/inbox/discarded', wakeOnInboxRemoval)
@@ -999,29 +1067,11 @@ export class ContinuableActivationRegistry {
         ))
       }
     } else {
+      // Descendants keep their residency under the tree root; only this
+      // epoch's ownership edges retire with the disposed member.
       activation.handle.agent.cancel({ kind: 'parent' })
-      const idle = activation.handle.agent.whenIdle()
-      const children = [...activation.ownedChildren]
-        .map(child => this.resident.get(child))
-        .filter((child): child is Activation => child !== undefined)
-      const childDisposals = children.map(child => this.dispose(child))
       try {
-        const childFailures = await Promise.all(childDisposals.map(async (disposal) => {
-          try {
-            await disposal
-            return undefined
-          } catch (error: unknown) {
-            return error
-          }
-        }))
-        const reasons = childFailures.filter(reason => reason !== undefined)
-        if (reasons.length > 0) {
-          failures.push(new SubagentError(
-            `subagent "${childId}" child teardown failed: ${reasons.map(reason => errorChain(reason)).join('; ')}`,
-            'ACTIVATION_TEARDOWN_FAILED',
-          ))
-        }
-        await idle
+        await activation.handle.agent.whenIdle()
         await this.flushFinalState(activation)
         activation.observer.capture(activation.handle.agent, activation.structured)
       } catch (error: unknown) {
@@ -1032,6 +1082,15 @@ export class ContinuableActivationRegistry {
         ))
       }
     }
+    // Child-first completion: await resident descendants whose close already
+    // opened, so each settlement notice reaches a still-live parent. A resident
+    // descendant that is not closing keeps its epoch under the tree root, and
+    // closing descendants report their own failures through disposeRoots.
+    const closing = [...this.resident.values()].flatMap((member) => {
+      if (member === activation || !member.ancestors.includes(childId)) return []
+      return member.inbox.closing === undefined ? [] : [member.inbox.closing]
+    })
+    await Promise.allSettled(closing)
     let executionScope: ExecutionInheritance | undefined
     try {
       executionScope = executionAuthorityOf(this.ctx)?.capture(activation.handle.agent)
@@ -1071,8 +1130,14 @@ export class ContinuableActivationRegistry {
     if (!activation.announced) return
     try {
       const parent = this.ctx.agents.get(activation.parentSession)
-      if (parent === undefined) return
-      const message = createSettlementMessage(activation.childId, terminal, executionScope)
+      if (parent === undefined || parent.ctx.fiber.state !== FiberState.ACTIVE) return
+      const message = createSettlementMessage(
+        activation.childId,
+        agentAddress(activation.path, activation.childId),
+        terminal,
+        activation.omitClosingText,
+        executionScope,
+      )
       if (this.closingTeardownFor(parent) !== undefined) {
         parent.inject(message)
         return

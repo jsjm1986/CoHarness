@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-15-subagent-oar-absorption.md
 document:
-  en: 0eeb1f45dc7cfc5f06055d4116f79291d47aa206
-  zh: e8f7d8dd94e8a127027519bb9b2cd2d9ffd97899
+  en: 929565b6c1fa0408c63a0cc7c5160f6e48a50272
+  zh: 53c57221b591983f1e70d6cb6dd24fa4bfe04142
 /agent-note-oar-one-shot-subagent-lane-absorption:
   en: c2118650b0652446
   zh: a1b80fac30678757
 /agent-note-oar-one-shot-subagent-lane-absorption/problem:
-  en: bc71d7ff32dea7c2
-  zh: e14c3eb41c3f8e31
+  en: fa47144b56ae5fab
+  zh: fd629d5c4fdbe77d
 /agent-note-oar-one-shot-subagent-lane-absorption/decision:
-  en: e54a5681cd561c16
-  zh: 273992cd763dc497
+  en: 0b0bda4393f2a654
+  zh: 1c8c9874e7f1bb9f
 /agent-note-oar-one-shot-subagent-lane-absorption/consequences:
-  en: 983bb5ee10f591fd
-  zh: c77e9a19f7958ce1
+  en: 3cfd360a59b1b349
+  zh: 1804d8835dc88075
 /agent-note-oar-one-shot-subagent-lane-absorption/alternatives-considered:
-  en: 44dd057ecf6e307b
-  zh: 64d49f15c1506580
+  en: 61dffc13d1face09
+  zh: 1b9ae86e4a6f99ab
 /agent-note-oar-one-shot-subagent-lane-absorption/verification:
   en: 48570de32caf9d5c
   zh: 725267d45bc8ca80

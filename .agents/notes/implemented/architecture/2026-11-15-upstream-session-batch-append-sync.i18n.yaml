@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-15-upstream-session-batch-append-sync.md
 document:
-  en: 028b92528a05acf8c1e71e96d8e41b0ed64659be
-  zh: 0a6258e6755072a02d9322e8a95cc6ec40386705
+  en: 06718d8c2ea4643d8464910a59b2aeeb1ace5fd0
+  zh: 0df6f2ad1ef096538e29b872de795c3c43072fa5
 /agent-note-upstream-session-batch-append-sync:
   en: 6febf0d6ce9f507d
   zh: ed483a2731ca89f6
 /agent-note-upstream-session-batch-append-sync/problem:
-  en: 8194c95c8fb6df53
-  zh: ef871efb314c1ca1
+  en: 620a0c2b073a024e
+  zh: 8b3c464828f218ee
 /agent-note-upstream-session-batch-append-sync/decision:
-  en: 30ae7a3f630d3bbe
-  zh: 7a1cbc3120f078d9
+  en: f051d3d5f005efa4
+  zh: 856fb0861cd0d0e7
 /agent-note-upstream-session-batch-append-sync/consequences:
-  en: d7de86789f6d1734
-  zh: 66d149dd20afe48d
+  en: 01f52ede4d250c73
+  zh: 5eb94ad3465aae98
 /agent-note-upstream-session-batch-append-sync/alternatives-considered:
-  en: 4d07676f4af01e3c
-  zh: 33df0f94f9053aec
+  en: d75c34aec678a158
+  zh: e4cbe483276b9163
 /agent-note-upstream-session-batch-append-sync/verification:
-  en: b89fcec1ba4266c4
-  zh: f0a1f623a24f5080
+  en: e4e5d4acce5f88bb
+  zh: f154c21a0d9048b1
