@@ -580,7 +580,7 @@ describe('ask_user_question tool', () => {
 
     expect(result).toMatchObject({
       isError: true,
-      content: [{ type: 'text', text: 'Error: question id "scope" must be unique within this call' }],
+      content: [{ type: 'text', text: 'Error: invalid arguments: question id "scope" must be unique within this call' }],
     })
     expect(answerer).not.toHaveBeenCalled()
   })

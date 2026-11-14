@@ -14,7 +14,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, ToolArgsError } from '@deepseek-ai/dsh-tools'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -455,7 +455,7 @@ export function apply(ctx: Context, config: Config): void {
       }
       if (args.run_in_background === true) {
         if (!enableRunInBackground) {
-          throw new Error('run_in_background is disabled for this tool')
+          throw new ToolArgsError(['run_in_background is disabled for this tool'])
         }
         // No pre-abort check here, unlike bash/pwsh: ToolRuntime re-reads the
         // caller signal right before execute(), and this branch reaches
