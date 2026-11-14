@@ -20,7 +20,7 @@ describe('truncateJsonStringBytes', () => {
   })
 
   it('bounds hostile strings without materializing their complete escaped form', () => {
-    const stringify = vi.spyOn(JSON, 'stringify').mockImplementation(() => { throw new Error('must not stringify') })
+    const stringify = vi.spyOn(JSON, 'stringify').mockImplementation(async () => { throw new Error('must not stringify') })
     try {
       expect(jsonStringBytesUpTo('"'.repeat(10_000), 32)).toBeUndefined()
       expect(truncateJsonStringBytes('"'.repeat(10_000), 32)).toBe('"'.repeat(15))

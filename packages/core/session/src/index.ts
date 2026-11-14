@@ -494,15 +494,14 @@ interface SessionEntry {
   readonly carrier: Scoped<Session>
   readonly emitCtx: Context
   readonly appendAdmissions: ReadonlySet<SessionAppendAdmission>
-  announced: boolean
-  announcing: boolean
+  announcement: 'pending' | 'dispatching' | 'complete' | 'failed'
   appending: boolean
   detachRequested: boolean
   detach(): void
 }
 
 /** Store attachment for the append path; module-private to keep Session store-agnostic publicly. */
-const attachments = new WeakMap<Session, SessionEntry>()
+const attachments = new WeakMap<Session, SessionEntry | null>()
 
 /**
  * Reserve resources for one frozen candidate before its attached Session commits.
@@ -963,6 +962,12 @@ export class Session {
    */
   private publicationEntry(): SessionEntry | undefined {
     const entry = attachments.get(this)
+    if (entry === null) {
+      throw new Error(`session "${this.id}" cannot append outside a SessionStore`)
+    }
+    if (entry !== undefined && entry.announcement !== 'complete') {
+      throw new Error(`session "${this.id}" cannot append before session/created completes`)
+    }
     if (entry?.appending) {
       throw new Error('session append cannot reenter while another append is being published')
     }
@@ -1010,7 +1015,7 @@ export class Session {
     } finally {
       if (entry !== undefined) {
         entry.appending = false
-        if (entry.detachRequested && !entry.announcing) entry.detach()
+        if (entry.detachRequested && entry.announcement !== 'dispatching') entry.detach()
       }
     }
   }
@@ -1353,15 +1358,14 @@ export class SessionStore extends Service {
     // This is the authoritative collision boundary after arbitrary unpublished
     // preparation. Only one exact same-id transaction can publish.
     if (this.store.has(id)) throw new Error(`session "${id}" already exists`)
-    if (attachments.has(session)) throw new Error(`session "${id}" is already attached to a store`)
+    if (attachments.get(session) != null) throw new Error(`session "${id}" is already attached to a store`)
     const entry: SessionEntry = {
       id,
       session,
       carrier,
       emitCtx: this.ctx,
       appendAdmissions: this.appendAdmissions,
-      announced: false,
-      announcing: false,
+      announcement: 'pending',
       appending: false,
       detachRequested: false,
       detach: () => { this.detachEntered(entry) },
@@ -1375,7 +1379,7 @@ export class SessionStore extends Service {
       // A lifecycle listener may own the advanced detach capability. Keep the
       // entry and its publication hooks live until synchronous creation or append
       // publication unwinds, then publish the paired disposal edge.
-      if (entry.announcing || entry.appending) {
+      if (entry.announcement === 'dispatching' || entry.appending) {
         entry.detachRequested = true
         return
       }
@@ -1392,8 +1396,8 @@ export class SessionStore extends Service {
     /* v8 ignore next -- enter() rejects replacement while this single-shot detach capability is live. */
     if (this.store.get(entry.id) !== entry) return
     this.store.delete(entry.id)
-    attachments.delete(entry.session)
-    if (entry.announced) this.emitDisposed(entry)
+    attachments.set(entry.session, null)
+    if (entry.announcement !== 'pending') this.emitDisposed(entry)
   }
 
   /** Emit `session/created` exactly once for an {@link enter}ed session (with
@@ -1405,15 +1409,14 @@ export class SessionStore extends Service {
    *   including a reentrant call from a creation listener. */
   announce(session: Session): void {
     const entry = this.liveEntryFor(session)
-    if (entry.announced || entry.announcing) {
+    if (entry.announcement !== 'pending') {
       throw new Error(`session "${entry.id}" was already announced`)
     }
     // Mark before emit: Cordis emit may deliver to earlier listeners and then
     // throw. Rollback must still pair that partial creation with disposal, and
     // a listener cannot recursively create a second lifecycle edge.
-    entry.announced = true
     const callbackArgs: unknown[] = [session]
-    entry.announcing = true
+    entry.announcement = 'dispatching'
     try {
       const callbacks = collectSessionCallbacks(this.ctx, [entry.carrier, 'session/created', session])
       for (const callback of callbacks) {
@@ -1427,9 +1430,12 @@ export class SessionStore extends Service {
           this.ctx.logger.warn(`session "${entry.id}": session/created listener rejected: ${formatThrownValue(error)}`)
         })
       }
+      entry.announcement = 'complete'
+    } catch (error: unknown) {
+      entry.announcement = 'failed'
+      throw error
     } finally {
-      entry.announcing = false
-      if (entry.detachRequested && !entry.appending) entry.detach()
+      if (entry.detachRequested) entry.detach()
     }
   }
 
@@ -1479,7 +1485,7 @@ export class SessionStore extends Service {
   /** Return the exact live entry; detached/prepared objects reject. */
   private liveEntryFor(session: Session): SessionEntry {
     const entry = attachments.get(session)
-    if (entry === undefined || this.store.get(entry.id) !== entry) {
+    if (entry == null || this.store.get(entry.id) !== entry) {
       throw new Error(`session "${session.id}" is not live in this store`)
     }
     return entry

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-14-upstream-ptc-runtime-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-ptc-runtime-sync.md
+document:
+  en: 26f60339f6dfe447aad77b63202276a357b18c4a
+  zh: b45dad6bea17fc5668e80ba8b6b5849b3ff8fc18
+/agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3:
+  en: baffa9f26ca4f41c
+  zh: 6edb027a6c595f7c
+/agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3/local-adaptations-kept:
+  en: 45f91dd9f846c63a
+  zh: 86a91a2f78950d28
+/agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3/sessionstore-lifecycle-guards-carried-along:
+  en: 3d82319aba8be3e6
+  zh: fca1c66030f585b9
+/agent-note-upstream-ptc-runtime-refactor-absorbed-from-dsh-v0-2-2-rc-3/verification:
+  en: 15f5d4a7bc0193dc
+  zh: 0dfab010d60115b1

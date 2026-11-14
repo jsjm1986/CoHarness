@@ -93,6 +93,7 @@ const processBoundTests = [
   'packages/llm/llm-pi-ai/tests/adapter.spec.ts',
   'packages/boot/app-boot/tests/app-boot.spec.ts',
   'packages/workflow/workflow-ptc/tests/session.spec.ts',
+  'packages/ptc-runtime/ptc-runtime-node/tests/imports.spec.ts',
 ]
 
 // Claude Code's test-kit module names, served by the mods bridge's test
@@ -147,7 +148,8 @@ export default defineConfig({
         resolve: { alias: [...sourcePlaneAliases, ...claudeCodeTestingAliases] },
         test: {
           name: 'process-bound',
-          execArgv: vitestExecArgv,
+          // Runner import tests require VM modules; the missing-flag test stays in thread-safe.
+          execArgv: [...vitestExecArgv, '--experimental-vm-modules'],
           pool: 'forks',
           ...laneTestBudget,
           setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-dom-environment.ts'],
