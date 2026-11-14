@@ -20,6 +20,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { assertNever, type JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { ServerContext } from './server-context.ts'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+import { describeError } from './diagnostic.ts'
 import { createTransport } from './transport.ts'
 import { McpProcessOwner } from './managed-stdio.ts'
 import { syncTools } from './tools.ts'
@@ -166,10 +167,12 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
    * generation and leak another).
    */
   let syncChain: Promise<void> = Promise.resolve()
-  function enqueueSync(generation: Client, syncOpts: ToolBridgeOptions = opts): Promise<void> {
+  function enqueueSync(generation: Client, syncOpts: ToolBridgeOptions = opts, eligible: () => boolean = () => true): Promise<void> {
     const run = syncChain.then(async () => {
       if (!isCurrent(generation)) return
-      disposers = await syncTools(generation, ctx, syncOpts, disposers)
+      // Commit eligibility re-includes currency: the listing inside syncTools
+      // is where a close or an abandoned startup can overtake this sync.
+      disposers = await syncTools(generation, ctx, syncOpts, disposers, () => isCurrent(generation) && eligible())
     })
     // The chain tail must survive a failed sync; the enqueuing caller owns reporting.
     syncChain = run.catch(() => {})
@@ -220,7 +223,14 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       // Enqueue the give-up disposal so it cannot race an in-flight sync's
       // phase-2 swap (which checks isCurrent inside the queue).
       syncChain = syncChain.then(() => {
-        for (const dispose of disposers.values()) dispose()
+        for (const dispose of disposers.values()) {
+          try {
+            dispose()
+          } catch (error) {
+            /* v8 ignore next -- registry disposers do not throw today; containment only keeps the sync chain alive if one ever does */
+            ctx.logger.error(`${label}: unregistering a tool after giving up failed: ${describeError(error)}`)
+          }
+        }
         disposers = new Map()
         serverInstructions = ''
       })
@@ -265,6 +275,10 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
     )
     const closed: PromiseWithResolvers<undefined> = Promise.withResolvers()
     let attemptSettled = false
+    // Set synchronously the moment this attempt is given up, so a listing
+    // completing later cannot commit tools for it (the close that would clear
+    // currency only lands after awaits).
+    let abandoned = false
     let closeObserved = false
     let closingGeneration: Promise<boolean> | undefined
     let transport: Transport | undefined
@@ -301,7 +315,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       try {
         await enqueueSync(generation)
       } catch (error) {
-        if (!disposed) ctx.logger.error(`${label}: tool re-sync failed: ${String(error)}`)
+        if (!disposed) ctx.logger.error(`${label}: tool re-sync failed: ${describeError(error)}`)
       }
     }
     let instructions: string
@@ -323,12 +337,13 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       if (Buffer.byteLength(instructions) > maxInstructionBytes) {
         throw new Error(`${label}: server instructions exceed maxInstructionBytes (${maxInstructionBytes})`)
       }
-      await enqueueSync(generation, startup ? startupOpts : opts)
+      await enqueueSync(generation, startup ? startupOpts : opts, () => !abandoned)
     } catch (error) {
+      abandoned = true
       if (firstAttemptError === undefined) firstAttemptError = error
       // Disposal clears current ownership before it closes the generation, so
       // only a live supervisor reports an attempt failure.
-      if (isCurrent(generation)) ctx.logger.warn(`${label}: connection attempt failed: ${String(error)}`)
+      if (isCurrent(generation)) ctx.logger.warn(`${label}: connection attempt failed: ${describeError(error)}`)
       const quiesced = await closeGeneration()
       attemptSettled = true
       settleFailedGeneration(generation, quiesced)

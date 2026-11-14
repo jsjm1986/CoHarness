@@ -125,6 +125,10 @@ export function publicToolName(serverName: string, rawName: string): string {
  * @param opts - Bridge options: server namespace and per-call timeout.
  * @param previous - Disposer map from the prior sync generation; disposed
  *   during the swap phase (only after the fetch phase succeeded).
+ * @param eligible - Judged again at the commit point, after the listing
+ *   settled: a sync whose generation was abandoned meanwhile (startup budget
+ *   elapsed, connection closed) publishes nothing and leaves `previous`
+ *   untouched.
  * @returns A map of registered public tool names to their unregister
  *   disposers — the exact set of live registrations owned by this server.
  */
@@ -133,6 +137,7 @@ export async function syncTools(
   ctx: Context,
   opts: ToolBridgeOptions,
   previous: ToolDisposers,
+  eligible: () => boolean = () => true,
 ): Promise<ToolDisposers> {
   // Phase 1: fetch and build the next generation without touching the registry.
   const definitions = new Map<string, ToolDefinition>()
@@ -163,7 +168,10 @@ export async function syncTools(
     }))
   }
 
-  // Phase 2: swap generations.
+  // Phase 2: swap generations — but only for a generation still entitled to
+  // publish. The listing above is the slow await an abandonment can overtake;
+  // state is published at its commit point or not at all.
+  if (!eligible()) return previous
   for (const dispose of previous.values()) dispose()
   const disposers: ToolDisposers = new Map()
   try {

@@ -1456,6 +1456,7 @@ describe('immutable current execution', () => {
     f.owners.set(child.id, parent)
     const detach = f.ctx.sessions.enter(session)
     cleanups.push(async () => { detach() })
+    f.ctx.sessions.announce(session)
     await f.ctx.serial('agent/created', { agent: parent } as never)
     await f.ctx.serial('agent/created', { agent: child } as never)
     const childFixture = { ...f, agent: child }

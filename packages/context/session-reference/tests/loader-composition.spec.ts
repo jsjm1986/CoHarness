@@ -135,6 +135,7 @@ describe('session-reference real Loader composition', () => {
     expect(await readdir(spillRoot)).toEqual([dirname(notice.fullSnapshot.locator).split(/[\\/]/).at(-1)])
 
     const captured = target.deriveMessages()
+    ctx.sessions.announce(ctx.sessions.get(SessionId('reference-source'))!)
     ctx.sessions.get(SessionId('reference-source'))!.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'LATER_SOURCE_MUTATION' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })

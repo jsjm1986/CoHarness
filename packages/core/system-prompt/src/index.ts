@@ -303,7 +303,9 @@ export function renderPrompt(assembly: PromptAssembly): string {
  * @returns the current full snapshot, or `''` when no context is active.
  */
 export function renderContextSnapshot(assembly: PromptAssembly): string {
-  return joinContextSections(renderContextSections(assembly))
+  const body = joinContextSections(renderContextSections(assembly))
+  if (body.length === 0) return ''
+  return `The following information describes your current session:\n\n${body}`
 }
 
 /**
@@ -315,9 +317,7 @@ export function renderContextSnapshot(assembly: PromptAssembly): string {
  * @returns the current full snapshot, or `''` when no context is active.
  */
 export function joinContextSections(sections: readonly ContextSnapshotSection[]): string {
-  const body = sections.map(section => section.text).join('\n\n')
-  if (body.length === 0) return ''
-  return `Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\n${body}`
+  return sections.map(section => section.text).join('\n\n')
 }
 
 /**

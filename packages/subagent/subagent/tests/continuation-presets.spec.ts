@@ -157,7 +157,9 @@ describe('child preset start validation', () => {
     expect(ctx.agents.list().map(agent => agent.id)).toEqual([parent.id])
     expect(ctx.sessions.list()).toHaveLength(beforeSessions)
     expect(parent.session.snapshotEvents()).toEqual(beforeEvents)
-    expect(published).toEqual([])
+    // Session publication precedes setup under the revised lifecycle; the failed
+    // spawn still must not reach agent/created or subagent/start.
+    expect(published).toEqual(['session/created'])
     expect(adapter.requests).toEqual([])
   })
 })

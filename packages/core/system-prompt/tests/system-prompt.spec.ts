@@ -142,7 +142,7 @@ describe('SystemPrompt', () => {
         { name: 'default', text: 'expanded' },
       ])
       expect(renderContextSnapshot(assembly))
-        .toBe(`Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\n${literal}\n\nexpanded\n\nexpanded`)
+        .toBe(`The following information describes your current session:\n\n${literal}\n\nexpanded\n\nexpanded`)
     } finally {
       await ctx.fiber.dispose()
     }
@@ -299,7 +299,7 @@ describe('SystemPrompt', () => {
     expect(assembly.tools).toEqual([{ name: 'echo', description: 'echo back', parameters: {} }])
     expect(assembly.variables).toEqual({})
     expect(renderPrompt(assembly)).toBe(`${IDENTITY}\n\nYou are DeepSeek Harness.\n\nBe precise.\n\ncwd: /tmp`)
-    expect(renderContextSnapshot(assembly)).toBe('Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\ncontext 1\n\ncontext 2')
+    expect(renderContextSnapshot(assembly)).toBe('The following information describes your current session:\n\ncontext 1\n\ncontext 2')
   })
 
   it('breaks equal section orders by code-unit name regardless of registration order', async () => {
@@ -564,7 +564,7 @@ describe('SystemPrompt', () => {
     ctx.systemPrompt.variable('mode', () => 'read-only')
     ctx.systemPrompt.context({ name: 'policy', order: 1, text: 'Mode: {{mode}}.' })
     expect(renderContextSnapshot(await ctx.systemPrompt.assemble()))
-      .toBe('Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nMode: read-only.')
+      .toBe('The following information describes your current session:\n\nMode: read-only.')
   })
 
   it('attributes context interpolation failures to the contributing context', () => {
