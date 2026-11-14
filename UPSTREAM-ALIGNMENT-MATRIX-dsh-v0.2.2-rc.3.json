@@ -282,5 +282,47 @@
     "session batch append API",
     "apply_patch tool + ctx.fs move/delete/patch",
     "sdk-run-commands"
+  ],
+  "feature_blocked": [
+    {
+      "feature": "mcp-manager",
+      "blocker": "requires upstream mcp-client generation (probe.ts/status.ts/templates.ts/credentials.ts/generation.ts surface absent; local mcp-client is prior generation with managed-stdio divergence)"
+    },
+    {
+      "feature": "subagent-oar",
+      "blocker": "experimental bridge; new third-party runtime deps (@earendil-works/pi-ai, pi-coding-agent, agentclientprotocol/sdk) — supply-chain cost vs optional capability"
+    },
+    {
+      "feature": "session batch append API",
+      "blocker": "5-commit series rewiring session append paths already modified by local lifecycle reorder — needs dedicated port session"
+    }
+  ],
+  "feature_skipped": [
+    {
+      "feature": "terminal-controller",
+      "reason": "zero src changes rc.2→rc.3 (version bump only); local creator-ownership authorization layer is deliberate divergence — upstream duplex-attach rewrite needs dedicated merge strategy if ever adopted"
+    }
+  ],
+  "feature_assessment": [
+    {
+      "feature": "tool-executor (native/ptc)",
+      "verdict": "refactor-port",
+      "note": "upstream extracted inline PTC executor (SDK_RENDERERS/ts-types/py-types) into tool-executor-ptc + tool-executor-native; local core/tools still inline — absorption means restructuring tools package, not adding a leaf"
+    },
+    {
+      "feature": "office-kit + tool-office",
+      "verdict": "feature-batch port",
+      "note": "replaces local office-to-pdf; requires libreoffice-kit 0.1.x→0.2.x bump (patch/notices/packaging cascade) + ctx.workspaceFiles seam decision (ctx.get optional but renderImages needs it; local uses host-apiproxy workspace-files RPC instead)"
+    },
+    {
+      "feature": "agent-team",
+      "verdict": "needs drift assessment",
+      "note": "129 upstream files vs local experimental/agent-team — divergent lineage, dedicated session"
+    },
+    {
+      "feature": "forge",
+      "verdict": "deferred",
+      "note": "355 files — largest batch, dedicated session"
+    }
   ]
 }
