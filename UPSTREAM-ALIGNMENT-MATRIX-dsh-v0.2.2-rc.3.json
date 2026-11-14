@@ -322,8 +322,8 @@
     },
     {
       "feature": "agent-team",
-      "verdict": "needs drift assessment",
-      "note": "129 upstream files vs local experimental/agent-team — divergent lineage, dedicated session"
+      "verdict": "same-lineage merge candidate",
+      "note": "upstream team/agent-team shares file lineage (client/error/journal/task-board/task-graph/types/validation) with local experimental/agent-team; local adds mailbox/lifecycle/roster/activity/fold + ui-agent-team client. A real merge, not absorption — dedicated session."
     },
     {
       "feature": "forge",
