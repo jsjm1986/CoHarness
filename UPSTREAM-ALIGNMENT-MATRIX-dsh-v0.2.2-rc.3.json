@@ -212,6 +212,12 @@
         "office-kit package (document group, rc.3)"
       ],
       "scope": "office-kit replaces office-to-pdf; libreoffice-kit 0.2.3; render Remote endpoints dropped (apiproxy owns file auth); fontMetadataCacheDirectory kept; tool-office deferred to tool-executor batch"
+    },
+    {
+      "batch": "apply_patch tool + ctx.fs move/delete/patch",
+      "commit": "220621287c0",
+      "notes": "FileSystem +patchText/deleteFile/moveFile; fs-local/fs-sandbox/fs-ssh providers; helper protocol 3; apply_patch opt-in tool + TOOL_APPLY_PATCH section; fsErrorFromErrno/FS_ERROR_CODES exports; fs/delete-intent event; local divergences (realpath targetKey, readByteRange, watch, expandHomePrefix, guarded reads) preserved",
+      "tests": "fs 930, ssh 314, tool-fs 474 green; verify-cordis-catalog, translation-pairing, export-jsdoc clean"
     }
   ],
   "deferred_design": [
@@ -284,7 +290,6 @@
     "terminal-controller",
     "agent-team",
     "forge",
-    "apply_patch tool + ctx.fs move/delete/patch",
     "sdk-run-commands"
   ],
   "feature_blocked": [
