@@ -45,6 +45,12 @@
       "path": "../../util/code-language"
     },
     {
+      "path": "../fs-patch"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
       "path": "../fs"
     },
     {

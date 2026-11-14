@@ -1176,7 +1176,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'fs',
     summary: 'Abstract filesystem provider.',
-    description: 'Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and mutations are atomic. Optional guards add stale protection without changing the unguarded provider contract.',
+    description: 'Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and single-file publication is atomic. Moves can retain their source after publishing the destination. Optional guards add stale protection without changing the unguarded provider contract.',
     methods: [
       {
         signature: 'watch(target: FsTarget, changed: (error?: Error) => void, signal: AbortSignal): Promise<() => Promise<void>>',
@@ -1268,6 +1268,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Atomically edit literal text. When supplied, the version guard is checked before matching so stale content reports `FS_STALE_VERSION`; omission edits the current content without a freshness precondition.',
         parameters: [{ name: 'target', description: 'the resolved target to edit.' }, { name: 'edit', description: 'the literal search/replace request.' }, { name: 'expected', description: 'the version guard; omit for an unconditional edit.' }, { name: 'signal', description: 'aborts before atomic publication takes effect.' }, { name: 'sandboxPolicy', description: 'the per-call mode and workspace root this edit runs under; a sandboxing backend fences the edit by it, the bare backend ignores it. Omit to leave the backend its own default.' }],
         returns: 'the outcome, including the version the edit produced.',
+      },
+      {
+        signature: 'abstract patchText( target: FsTarget, hunks: readonly PatchHunk[], expected?: { version: FsVersion }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy, ): Promise<FsEditOutcome>',
+        description: 'Atomically apply parsed hunks to the LF-normalized text and restore the stored line-ending style. A missing or stale target reports `FS_STALE_VERSION`; an unmatched hunk reports `FS_PATCH_MISMATCH`.',
+        parameters: [{ name: 'target', description: 'the resolved regular file to patch.' }, { name: 'hunks', description: 'ordered hunks from `parsePatch`.' }, { name: 'expected', description: 'the version guard; omit for an unconditional patch.' }, { name: 'signal', description: 'aborts before atomic publication takes effect.' }, { name: 'sandboxPolicy', description: 'the per-call mode and workspace root this patch runs under; a sandboxing backend fences the patch by it, the bare backend ignores it. Omit to leave the backend its own default.' }],
+        returns: 'the outcome, including the version the patch produced.',
+      },
+      {
+        signature: 'abstract deleteFile( target: FsTarget, expected?: { version: FsVersion }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy, ): Promise<FsDeleteOutcome>',
+        description: 'Remove a regular file. A missing or stale target reports `FS_STALE_VERSION`; a directory or other non-file reports `FS_NOT_REGULAR_FILE`. Resolution has already followed symlinks, so the target is the real file.',
+        parameters: [{ name: 'target', description: 'the resolved file to remove.' }, { name: 'expected', description: 'the version guard; omit for an unconditional removal.' }, { name: 'signal', description: 'aborts before removal.' }, { name: 'sandboxPolicy', description: 'the per-call mode and workspace root this removal runs under; a sandboxing backend fences it, the bare backend ignores it. Omit to leave the backend its own default.' }],
+        returns: 'the bounded LF-normalized removed text, or null when no basis is available.',
+      },
+      {
+        signature: 'abstract moveFile( source: FsTarget, destination: FsTarget, options: { hunks?: readonly PatchHunk[] expectedSource?: { version: FsVersion } expectedDestination?: FsWriteIntent }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy, ): Promise<FsMoveOutcome>',
+        description: 'Publish the source text, optionally patched, at the destination, then remove the source. Both targets stay locked in canonical order. Identical targets report `FS_SAME_TARGET`; the source guard follows `patchText` and the destination guard follows `writeText`. The two effects are separate: a published destination with a retained source is a final outcome reported through `sourceDeleted: false`.',
+        parameters: [{ name: 'source', description: 'the resolved regular source; its line-ending style and mode carry over.' }, { name: 'destination', description: 'the resolved destination within the same provider.' }, { name: 'options', description: 'optional hunks and the source/destination guards; an omitted guard is unconditional.' }, { name: 'signal', description: 'checked before destination staging; the commit then completes both effects.' }, { name: 'sandboxPolicy', description: 'the per-call mode and workspace root both paths run under; a sandboxing backend fences them, the bare backend ignores it. Omit to leave the backend its own default.' }],
+        returns: 'the bounded LF source basis, the destination outcome, and the source-removal status.',
       },
     ],
   },
@@ -4905,6 +4923,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'change', description: 'domain, table (`\'\'` for global), key (`\'\'` for global), operation discriminant, and on `put` the new snapshot.' }],
   },
   {
+    name: 'fs/delete-intent',
+    mode: 'waterfall',
+    signature: '\'fs/delete-intent\'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>',
+    summary: 'Single-slot decision for FileSystem.deleteFile; the first returned guard wins.',
+    description: 'Single-slot decision for FileSystem.deleteFile; the first returned guard wins. Calling next() delegates to an unconditional deletion.',
+    parameters: [{ name: 'target', description: 'the resolved source about to be removed.' }, { name: 'actor', description: 'the opaque tool-execution context used to select observed state.' }],
+  },
+  {
     name: 'fs/edit-intent',
     mode: 'waterfall',
     signature: '\'fs/edit-intent\'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>',
@@ -6309,6 +6335,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface FrequencyTooHighError {\n    readonly code: \'frequency_too_high\';\n    readonly message: string;\n}',
   },
   {
+    name: 'FsDeleteOutcome',
+    declaration: 'export interface FsDeleteOutcome {\n    before: string | null;\n}',
+  },
+  {
     name: 'FsDirEntry',
     declaration: 'export interface FsDirEntry {\n    name: string;\n    type: \'file\' | \'directory\' | \'other\';\n    target: FsTarget;\n    version?: FsVersion;\n    size?: number;\n}',
   },
@@ -6321,8 +6351,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface FsEditRequest {\n    oldString: string;\n    newString: string;\n    replaceAll: boolean;\n}',
   },
   {
+    name: 'FsErrorCode',
+    declaration: 'export type FsErrorCode = typeof FS_ERROR_CODES[number];',
+  },
+  {
     name: 'FsInfo',
     declaration: 'export interface FsInfo {\n    version: FsVersion;\n    type: \'file\' | \'directory\' | \'other\';\n    size?: number;\n}',
+  },
+  {
+    name: 'FsMoveOutcome',
+    declaration: 'export type FsMoveOutcome = {\n    sourceBefore: string | null;\n    destination: FsWriteOutcome;\n    sourceDeleted: true;\n} | {\n    sourceBefore: string | null;\n    destination: FsWriteOutcome;\n    sourceDeleted: false;\n    sourceFailure: FsMoveSourceFailure;\n};',
+  },
+  {
+    name: 'FsMoveSourceFailure',
+    declaration: 'export interface FsMoveSourceFailure {\n    code: FsErrorCode;\n    message: string;\n}',
   },
   {
     name: 'FsObservation',
@@ -7231,6 +7273,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ParsedInstallSpec',
     declaration: 'export type ParsedInstallSpec = {\n    readonly kind: \'registry\';\n    readonly spec: string;\n    readonly name: string;\n    readonly range?: string;\n} | {\n    readonly kind: \'path\';\n    readonly spec: string;\n    readonly path: string;\n} | {\n    readonly kind: \'tarball\';\n    readonly spec: string;\n    readonly path?: string;\n    readonly host?: string;\n} | {\n    readonly kind: \'git\';\n    readonly spec: string;\n    readonly host: string;\n};',
+  },
+  {
+    name: 'PatchHunk',
+    declaration: 'export interface PatchHunk {\n    lineNumber: number;\n    context?: string;\n    oldLines: string[];\n    newLines: string[];\n    isEndOfFile: boolean;\n}',
   },
   {
     name: 'PendingModule',

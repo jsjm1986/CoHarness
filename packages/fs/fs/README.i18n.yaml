@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs/README.md
 document:
-  en: 8d6af28189a5d0fc3ce7d2ed4d2c087dab249b87
-  zh: dfb28e303a93cf6cb6234842a5815e06ed9edf8b
+  en: 454cc28e673338a646a4499c90dce2f7eac12c34
+  zh: 9813c8e324862dae6f6d1a7181cc2dc2d1cc03be
 /:
   en: ead98d44e725922f
   zh: 61495d48365178df
@@ -12,17 +12,17 @@ document:
   en: 4bb2c3b5de40dbb1
   zh: a9cc829ebfd9da5e
 /deepseek-ai-dsh-fs/summary:
-  en: d6a0a9f9d8879ad2
-  zh: ccf9358c681fee47
+  en: fe5f8e7d9afd5529
+  zh: ab293ab3a841dbfc
 /deepseek-ai-dsh-fs/table-of-contents:
   en: d0fd0941f84d106c
   zh: 12d995558cce8a21
 /deepseek-ai-dsh-fs/service-api-ctx-fs:
-  en: 2893537d8c19832e
-  zh: a64edae02a4ffa27
+  en: 95e953374950c607
+  zh: 34217d2d961bc35b
 /deepseek-ai-dsh-fs/the-fs-policy-events:
-  en: 56bd9c696b546c5b
-  zh: 1dd10dfab3714698
+  en: 99885f4bd6e84317
+  zh: 2ff43826ffc372da
 /deepseek-ai-dsh-fs/a-provider-contract-not-the-policy-layer:
   en: 4657f78ad0f0c5f0
   zh: bdcf63f1239ff278
@@ -36,8 +36,8 @@ document:
   en: 40294c1c31b74824
   zh: 1084a6dc8b5f411d
 /deepseek-ai-dsh-fs/known-limitations-and-deferred-work:
-  en: 9d8d0cd8581be791
-  zh: d47f30ba9d557142
+  en: 41187e703048abe2
+  zh: 494740d547f11ae2
 /deepseek-ai-dsh-fs/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

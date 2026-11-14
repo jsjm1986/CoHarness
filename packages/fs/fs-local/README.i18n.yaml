@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-local/README.md
 document:
-  en: 9bfdcb9ed68553522bec70b6c19aa13683bac965
-  zh: c9566e34960f7a29c99e5a962a8e5b25b7c276df
+  en: b682664ad90dae4663e660bc2349948e2c34156c
+  zh: c2e1da6e51b26d684eaaada69741ff9e55b88125
 /:
   en: e14a66f6cc045983
   zh: 61495d48365178df
@@ -12,14 +12,14 @@ document:
   en: 79d9abaac3d5c589
   zh: 7b0dfda5aaeecd47
 /deepseek-ai-dsh-fs-local/summary:
-  en: eef5edc2e04c80df
-  zh: 960f5e3e81949d45
+  en: 97f9898c4094f4d0
+  zh: c9654c611e50564e
 /deepseek-ai-dsh-fs-local/table-of-contents:
   en: 7b877235f36beffb
   zh: f68ae109dd0fb784
 /deepseek-ai-dsh-fs-local/behavior:
-  en: 17abb48331708229
-  zh: 496b0908ce67f800
+  en: 997f061fbe3484a2
+  zh: 037c2e1fc7678705
 /deepseek-ai-dsh-fs-local/model-experience:
   en: 72536bc0452cccaa
   zh: 298f94b78e8364f4

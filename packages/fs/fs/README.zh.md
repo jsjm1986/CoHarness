@@ -22,7 +22,7 @@ kind: "package-reference"
 
 ## 概述
 
-应用需要在宿主、受限或远程执行环境中使用一致的文件系统操作时，选择 `dsh-fs`。消费方可以解析稳定的文件身份、在受支持时映射共享宿主文件、执行有界的文本与字节读取、列出目录，并原子地写入文本及执行字面量编辑。版本防护是可选的，因此后端无需策略强制也能工作；调用方可以提供防护，在文件变化后拒绝变更。在宿主执行时选择 `fs-local` 或 `fs-sandbox`。面向模型的文件系统工具由 `dsh-tool-fs` 单独提供。
+应用需要在宿主、受限或远程执行环境中使用一致的文件系统操作时，选择 `dsh-fs`。消费方可以解析稳定的文件身份、在受支持时映射共享宿主文件、执行有界的文本与字节读取、列出目录、监听目标，并原子地写入、字面量编辑、应用补丁 hunk、删除及移动文件。移动会分别报告目标发布与源删除。版本防护是可选的，因此后端无需策略强制也能工作；调用方可以提供防护，在文件变化后拒绝变更。在宿主执行时选择 `fs-local` 或 `fs-sandbox`。面向模型的文件系统工具由 `dsh-tool-fs` 单独提供。
 
 ## 目录
 
@@ -39,7 +39,7 @@ kind: "package-reference"
 <a id="service-api-ctxfs"></a>
 ## 服务 API（`ctx.fs`）
 
-后端继承 `FileSystem` 并实现十三个原语。
+后端继承 `FileSystem` 并实现十六个原语。
 
 | 成员 | 语义 |
 |---|---|
@@ -56,13 +56,19 @@ kind: "package-reference"
 | `listDir(target, signal?, maxEntries?)` | 按稳定名称顺序列出直接子项。返回条目名称、条目类型、解析后的子目标和低成本元数据（若可用则包括 `version`/文件 `size`）；绝不读取文件内容。`maxEntries` 允许有界消费方在有限前缀后停止处理。缺失目标抛出 `FS_NOT_FOUND`，非目录抛出 `FS_NOT_DIRECTORY`，权限失败抛出 `FS_PERMISSION_DENIED`，其他后端 I/O 失败抛出 `FS_IO_ERROR`。损坏/消失的子项可以作为无元数据的 `other` 返回；子项权限/I/O 失败会使用相同结构化代码使整个列表失败。 |
 | `writeText(target, content, expected?, signal?)` | 原子创建/替换。`expected` 是可选的：省略 ⇒ 无条件创建或覆盖；提供 `FsWriteIntent`（`createIfAbsent`/`replaceIfVersion`）⇒ 添加防护。`createIfAbsent` 必须以不替换的方式发布，使初始探测后抢先创建的文件得到保留。 |
 | `editText(target, edit, expected?, signal?)` | 字面量编辑。`expected` 是可选的：省略 ⇒ 无条件编辑当前内容；提供 `{ version }` ⇒ 添加防护，并在匹配之前校验。无论哪种情况，目标缺失都报告 `FS_STALE_VERSION`。应用和写入以原子方式完成，使用同一个变更临界区。 |
+| `watch(target, changed, signal)` | 报告单个文件或目录直接子项的失效通知；观察就绪后返回调用方必须等待完成的异步关闭函数。不支持的提供方直接拒绝，不轮询。 |
+| `patchText(target, hunks, expected?, signal?)` | 在版本检查的同一把锁内应用解析后的 `PatchHunk`；上下文不匹配以 `FS_PATCH_MISMATCH` 拒绝。 |
+| `deleteFile(target, expected?, signal?)` | 经可选版本防护后删除普通文件；返回有界的 `before` 基准（二进制内容为 `null`）。 |
+| `moveFile(source, destination, options, signal?)` | 按字典序锁定两端目标，按需修改源文本，发布目标后再删除源。是两个效果而非事务：`sourceDeleted: false` 表示目标已发布而源保留，`sourceFailure` 描述删除失败。同目标以 `FS_SAME_TARGET` 拒绝。 |
 
 无论是否有版本防护，变更都在后端的每目标锁内运行，因此无条件写入/编辑仍是原子的；「无条件」只移除*版本*前置条件，不移除原子性。
+
+基于宿主文件系统的提供方用 `fsErrorFromErrno`（`src/errno.ts`）分类 Node errno 失败：`ENOENT`/`ENOTDIR` → `FS_NOT_FOUND`，`EACCES`/`EPERM` → `FS_PERMISSION_DENIED`，需要文件却遇到目录的 `EISDIR` → `FS_NOT_REGULAR_FILE`，其他 errno → `FS_IO_ERROR`，原错误作为 `cause`。运行时 `FS_ERROR_CODES` 列表已导出供传输校验器复用。
 
 <a id="the-fs-policy-events"></a>
 ## `fs/*` 政策事件
 
-本包声明三个事件（见 [filesystem.md](../../../docs/subsystems/filesystem.zh.md#cordis-surface) 的生成区块），使发出方（`@deepseek-ai/dsh-tool-fs`）和政策监听器（`@deepseek-ai/dsh-fs-observation-policy`）共享词汇，而无需让发出方依赖政策插件。`fs/write-intent` 和 `fs/edit-intent` 是单槽决策 waterfall（瀑布式事件）（监听器完整决策，绝不调用 `next()`）；`fs/observed` 是发后即忘的记录事件，携带 `FsObservation` 可辨识联合：存在并带有版本，或确认缺失。它们只携带 `dsh-fs` 词汇和一个不透明 `object` 参与者，不含面向模型的概念或 agent（智能体）/会话所有者结构。
+本包声明四个事件（见 [filesystem.md](../../../docs/subsystems/filesystem.zh.md#cordis-surface) 的生成区块），使发出方（`@deepseek-ai/dsh-tool-fs`）和政策监听器（`@deepseek-ai/dsh-fs-observation-policy`）共享词汇，而无需让发出方依赖政策插件。`fs/write-intent`、`fs/edit-intent` 与 `fs/delete-intent` 是单槽决策 waterfall（瀑布式事件）（监听器完整决策，绝不调用 `next()`）；`fs/observed` 是发后即忘的记录事件，携带 `FsObservation` 可辨识联合：存在并带有版本，或确认缺失。写入与移动目标防护走 `fs/write-intent`；字面量编辑、补丁与移动源防护走 `fs/edit-intent`；删除走 `fs/delete-intent`。它们只携带 `dsh-fs` 词汇和一个不透明 `object` 参与者，不含面向模型的概念或 agent（智能体）/会话所有者结构。
 
 <a id="a-provider-contract-not-the-policy-layer"></a>
 ## 提供方约定，不是政策层
@@ -88,8 +94,9 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
-- **变更操作约定只支持文本**：文本读取和两个变更操作都以 `FS_NOT_TEXT` 拒绝二进制/非 UTF-8 内容；`readBytes` 和 `readByteRange` 是原始字节原语，二进制安全的变更操作仍是[工具 schema Agent Note](../../../.agents/notes/implemented/feature/2026-06-17-filesystem-tool-schemas.zh.md)有意延期的工作。
-- **只有十二个原语**：没有删除、重命名/移动、复制或监视；`listDir` 只支持一层，递归、glob、分页和搜索不在范围内，见[目录列出 Agent Note](../../../.agents/notes/archived/architecture/2026-07-03-filesystem-directory-listing-seam.md)。
+- **变更操作约定只支持文本**：文本读取、编辑、补丁与移动都以 `FS_NOT_TEXT` 拒绝二进制/非 UTF-8 内容；`readBytes` 和 `readByteRange` 是原始字节原语，删除也接受二进制普通文件并返回 `before: null`。二进制安全的编辑仍是[工具 schema Agent Note](../../../.agents/notes/implemented/feature/2026-06-17-filesystem-tool-schemas.zh.md)有意延期的工作。
+- **移动是两个效果而非一个事务**：`sourceDeleted: false` 表示目标已发布、源仍存在；复制和递归目录操作不在此 API 范围内。
+- **`listDir` 只支持一层**：递归、glob、分页和搜索不在范围内，见[目录列出 Agent Note](../../../.agents/notes/archived/architecture/2026-07-03-filesystem-directory-listing-seam.md)。
 - **没有 I/O deadline**：该 seam 不启动超时；取消只是每个原语上尽力而为的可选 `AbortSignal`（见有意采用的 [fs 能力族立场](../README.zh.md)）。
 - **先解析后操作使远程后端每次工具调用需要两次往返**：折叠或缓存解析由这种后端自行决定。
 

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-fs-patch-absorption.md
 document:
-  en: 42cf39e4a816c6821c61dbbab65acc86e628e143
-  zh: 6077fff79436b90c20fc00755240debc9c6d8269
+  en: 1ab40156544f94de44f8a8bf78f2893ce0176402
+  zh: bc64a51f13918c5d2c5784a789e4a43eb1d10e78
 /agent-note-upstream-fs-patch-absorption:
   en: ecc8e5e22edfc679
   zh: 3db1b36d06f8e502
@@ -18,5 +18,5 @@ document:
   en: 0ead61d1365c6efa
   zh: b86263fe72a5867c
 /agent-note-upstream-fs-patch-absorption/deferred:
-  en: ca999c5489cdeb15
-  zh: 618a9eed6754b801
+  en: 3bfdca28882e62db
+  zh: 932b01c01baaf00d

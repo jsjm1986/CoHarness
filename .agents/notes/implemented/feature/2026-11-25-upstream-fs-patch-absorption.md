@@ -19,4 +19,4 @@ The library is self-contained — no `ctx.fs`, cordis runtime, or provider coupl
 
 ## Deferred
 
-- apply_patch tool and `ctx.fs` move/delete/patch operations: remain in the fs feature batch pending Service Definition changes.
+- Consumed by [the fs mutation vocabulary and apply_patch Agent Note](2026-11-25-upstream-fs-mutations-and-apply-patch.md): `ctx.fs` `patchText`/`deleteFile`/`moveFile` and the `apply_patch` tool build on this library.

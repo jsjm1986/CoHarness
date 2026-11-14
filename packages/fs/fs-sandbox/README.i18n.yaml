@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-sandbox/README.md
 document:
-  en: 2eadf698e32523e2efe120a11bad9ccdde92153c
-  zh: 345cc1917e917509ecf8fb8135081f0285f18237
+  en: b5c89fb6e1e0f1a6c584978de84ef9dd880204c6
+  zh: 705905f70fe882273b0cb6041733ea9cf04b6062
 /:
-  en: b6a3a9697c7d7b0c
+  en: 0cf4426e6bc1ff89
   zh: 61495d48365178df
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend:
-  en: 495db0c703fd8ec5
-  zh: 9f10c7fd693b19f3
+  en: 99469386a47e3ff4
+  zh: f883f090e943b5a8
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/summary:
-  en: ae186a7675a9332b
-  zh: 323e9043c1d90a83
+  en: 3fa6d9a13393ed2d
+  zh: d91675872102ae2a
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/table-of-contents:
   en: 009aaba4f905e49d
   zh: 9ecfc625703a8dc8
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/the-fence:
-  en: 874a8f3d89ce0050
-  zh: 0534642931826037
+  en: b5a2282e9ce07bfa
+  zh: 8ac8dc98fff423ed
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/threat-model-a-policy-fence-not-a-kernel-boundary:
   en: 57b08a7880ee93a6
   zh: 9974d8767e0c0662

@@ -12,6 +12,9 @@
       "path": "../fs"
     },
     {
+      "path": "../fs-patch"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

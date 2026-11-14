@@ -46,4 +46,7 @@ export default class ProviderCwdFileSystem extends FileSystem {
   override async readByteRange(): Promise<never> { throw new FsError('No such provider file', 'FS_NOT_FOUND') }
   override async writeText(): Promise<never> { throw new FsError('Read-only provider fixture', 'FS_SANDBOX_DENIED') }
   override async editText(): Promise<never> { throw new FsError('Read-only provider fixture', 'FS_SANDBOX_DENIED') }
+  override async patchText(): Promise<never> { throw new FsError('Read-only provider fixture', 'FS_SANDBOX_DENIED') }
+  override async deleteFile(): Promise<never> { throw new FsError('Read-only provider fixture', 'FS_SANDBOX_DENIED') }
+  override async moveFile(): Promise<never> { throw new FsError('Read-only provider fixture', 'FS_SANDBOX_DENIED') }
 }

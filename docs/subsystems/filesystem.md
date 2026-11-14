@@ -289,7 +289,7 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.fs` — `FileSystem` (abstract seam)
 
-Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and mutations are atomic. Optional guards add stale protection without changing the unguarded provider contract.
+Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and single-file publication is atomic. Moves can retain their source after publishing the destination. Optional guards add stale protection without changing the unguarded provider contract.
 
 ```ts cordis-catalog
 /**
@@ -455,6 +455,53 @@ abstract writeText( target: FsTarget, content: string, expected?: FsWriteIntent,
  * @returns the outcome, including the version the edit produced.
  */
 abstract editText( target: FsTarget, edit: FsEditRequest, expected?: { version: FsVersion }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy, ): Promise<FsEditOutcome>
+
+/**
+ * Atomically apply parsed hunks to the LF-normalized text and restore the
+ * stored line-ending style. A missing or stale target reports
+ * `FS_STALE_VERSION`; an unmatched hunk reports `FS_PATCH_MISMATCH`.
+ * @param target - the resolved regular file to patch.
+ * @param hunks - ordered hunks from `parsePatch`.
+ * @param expected - the version guard; omit for an unconditional patch.
+ * @param signal - aborts before atomic publication takes effect.
+ * @param sandboxPolicy - the per-call mode and workspace root this patch runs
+ *   under; a sandboxing backend fences the patch by it, the bare backend
+ *   ignores it. Omit to leave the backend its own default.
+ * @returns the outcome, including the version the patch produced.
+ */
+abstract patchText( target: FsTarget, hunks: readonly PatchHunk[], expected?: { version: FsVersion }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy, ): Promise<FsEditOutcome>
+
+/**
+ * Remove a regular file. A missing or stale target reports `FS_STALE_VERSION`;
+ * a directory or other non-file reports `FS_NOT_REGULAR_FILE`. Resolution has
+ * already followed symlinks, so the target is the real file.
+ * @param target - the resolved file to remove.
+ * @param expected - the version guard; omit for an unconditional removal.
+ * @param signal - aborts before removal.
+ * @param sandboxPolicy - the per-call mode and workspace root this removal
+ *   runs under; a sandboxing backend fences it, the bare backend ignores it.
+ *   Omit to leave the backend its own default.
+ * @returns the bounded LF-normalized removed text, or null when no basis is available.
+ */
+abstract deleteFile( target: FsTarget, expected?: { version: FsVersion }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy, ): Promise<FsDeleteOutcome>
+
+/**
+ * Publish the source text, optionally patched, at the destination, then remove
+ * the source. Both targets stay locked in canonical order. Identical targets
+ * report `FS_SAME_TARGET`; the source guard follows `patchText` and the
+ * destination guard follows `writeText`. The two effects are separate: a
+ * published destination with a retained source is a final outcome reported
+ * through `sourceDeleted: false`.
+ * @param source - the resolved regular source; its line-ending style and mode carry over.
+ * @param destination - the resolved destination within the same provider.
+ * @param options - optional hunks and the source/destination guards; an omitted guard is unconditional.
+ * @param signal - checked before destination staging; the commit then completes both effects.
+ * @param sandboxPolicy - the per-call mode and workspace root both paths run
+ *   under; a sandboxing backend fences them, the bare backend ignores it.
+ *   Omit to leave the backend its own default.
+ * @returns the bounded LF source basis, the destination outcome, and the source-removal status.
+ */
+abstract moveFile( source: FsTarget, destination: FsTarget, options: { hunks?: readonly PatchHunk[] expectedSource?: { version: FsVersion } expectedDestination?: FsWriteIntent }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy, ): Promise<FsMoveOutcome>
 ```
 
 Types: [SandboxExecutionPolicy](sandbox.md)
@@ -464,6 +511,25 @@ Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 <a id="fs-events"></a>
 
 ### `fs/*` events
+
+<a id="fsdelete-intent--waterfall"></a>
+
+#### `fs/delete-intent` — waterfall
+
+Single-slot decision for FileSystem.deleteFile; the first returned guard wins. Calling next() delegates to an unconditional deletion.
+
+```ts cordis-catalog
+/**
+ * Single-slot decision for FileSystem.deleteFile; the first returned guard wins.
+ * Calling next() delegates to an unconditional deletion.
+ * @param target - the resolved source about to be removed.
+ * @param actor - the opaque tool-execution context used to select observed state.
+ * @mode waterfall
+ */
+'fs/delete-intent'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>
+```
+
+Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 
 <a id="fsedit-intent--waterfall"></a>
 

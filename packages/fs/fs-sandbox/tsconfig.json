@@ -15,6 +15,9 @@
       "path": "../fs-local"
     },
     {
+      "path": "../../core/session"
+    },
+    {
       "path": "../../sandbox/sandbox"
     },
     {

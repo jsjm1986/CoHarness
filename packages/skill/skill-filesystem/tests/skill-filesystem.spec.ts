@@ -141,6 +141,10 @@ class TestFileSystem extends FileSystem {
   override async editText(_target: FsTarget, _request: FsEditRequest): Promise<FsEditOutcome> {
     throw new Error('not needed in skill tests')
   }
+
+  override async patchText(): Promise<never> { throw new FsError('patch unsupported by test provider', 'FS_IO_ERROR') }
+  override async deleteFile(): Promise<never> { throw new FsError('delete unsupported by test provider', 'FS_IO_ERROR') }
+  override async moveFile(): Promise<never> { throw new FsError('move unsupported by test provider', 'FS_IO_ERROR') }
 }
 
 async function setupLocal(home: string, config: Partial<SkillFileSystem.Config> = {}): Promise<Context> {

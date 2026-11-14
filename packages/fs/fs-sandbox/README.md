@@ -1,5 +1,5 @@
 ---
-description: "Sandbox-enforcing implementation of the DeepSeek Harness filesystem seam: fences write/edit by the per-call sandbox mode (read-only denies mutation, workspace-write contains it to the workspace + temp roots) while reads pass through"
+description: "Sandbox-enforcing implementation of the DeepSeek Harness filesystem seam: fences write/edit/patch/delete/move by the per-call sandbox mode (read-only denies mutation, workspace-write contains it to the workspace + temp roots) while reads pass through"
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-`SandboxedFileSystem` extends [`LocalFileSystem`](../fs-local/README.md) and registers as `ctx.fs`. It inherits every text-storage mechanic verbatim (resolve, stat, read/stream, list, the atomic write, the read-match-write edit critical section) and adds only a per-call MODE fence on `writeText`/`editText`. Reads always pass through — every mode permits reading.
+`SandboxedFileSystem` extends [`LocalFileSystem`](../fs-local/README.md) and registers as `ctx.fs`. It inherits every text-storage mechanic verbatim (resolve, stat, read/stream, list, the atomic write, the read-match-write edit critical section) and adds only a per-call MODE fence on `writeText`, `editText`, `patchText`, `deleteFile`, and `moveFile`. Reads always pass through — every mode permits reading.
 
 Its plugin config is the local backend config unchanged: `cwd` remains the relative-path resolution default, and `diffBasisMaxBytes` bounds the optional overwrite contextual-diff basis.
 
@@ -15,7 +15,7 @@ Loading it INSTEAD OF `dsh-fs-local`, together with a [`ctx.sandboxPolicy`](../.
 
 ## Summary
 
-`dsh-fs-sandbox` confines model file writes and edits according to each session's sandbox mode while preserving the local filesystem's read behavior. In `read-only`, it rejects every mutation; in `workspace-write`, it permits targets only inside the session workspace or a platform temporary root; in `danger-full-access`, it does not restrict mutations. Use it instead of `fs-local` with `ctx.sandboxPolicy` when sessions need workspace-confined file changes. Denied operations return `FS_SANDBOX_DENIED`, which filesystem tools present with the active mode and a same-turn escalation hint.
+`dsh-fs-sandbox` confines model file writes, edits, patches, deletions, and moves according to each session's sandbox mode while preserving the local filesystem's read behavior. In `read-only`, it rejects every mutation; in `workspace-write`, it permits targets only inside the session workspace or a platform temporary root; in `danger-full-access`, it does not restrict mutations. Use it instead of `fs-local` with `ctx.sandboxPolicy` when sessions need workspace-confined file changes. Denied operations return `FS_SANDBOX_DENIED`, which filesystem tools present with the active mode and a same-turn escalation hint.
 
 ## Table of Contents
 
@@ -29,6 +29,8 @@ Loading it INSTEAD OF `dsh-fs-local`, together with a [`ctx.sandboxPolicy`](../.
 
 <a id="the-fence"></a>
 ## The fence
+
+The fence covers `writeText`, `editText`, `patchText`, `deleteFile`, and `moveFile`; reads, listings, metadata, and read-only watches pass through exactly as with `fs-local`. A move checks both source and destination before either effect, so a denied path leaves both files untouched.
 
 The per-call policy carries the effective mode (session override or escalation grant) together with the calling session's immutable cwd root, falling back to deployment policy only for calls without one:
 

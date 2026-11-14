@@ -622,6 +622,18 @@ class FakeRemoteFs extends FileSystem {
   editText(): Promise<never> {
     return Promise.reject(new Error('FakeRemoteFs: editText is not implemented'))
   }
+
+  patchText(): Promise<never> {
+    return Promise.reject(new Error('FakeRemoteFs: patchText is not implemented'))
+  }
+
+  deleteFile(): Promise<never> {
+    return Promise.reject(new Error('FakeRemoteFs: deleteFile is not implemented'))
+  }
+
+  moveFile(): Promise<never> {
+    return Promise.reject(new Error('FakeRemoteFs: moveFile is not implemented'))
+  }
 }
 
 const SSH_FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))

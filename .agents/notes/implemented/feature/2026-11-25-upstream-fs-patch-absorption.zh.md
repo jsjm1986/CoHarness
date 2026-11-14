@@ -19,4 +19,4 @@ Status: implemented
 
 ## 遗留
 
-- apply_patch 工具与 `ctx.fs` move/delete/patch 操作：仍属 fs 功能批，待 Service Definition 变更。
+- 已由 [fs 变更词汇与 apply_patch Agent Note](2026-11-25-upstream-fs-mutations-and-apply-patch.zh.md) 消费：`ctx.fs` 的 `patchText`/`deleteFile`/`moveFile` 与 `apply_patch` 工具建立在本库之上。

@@ -9512,6 +9512,10 @@ importers:
         version: 19.3.0
 
   packages/fs/fs:
+    dependencies:
+      '@deepseek-ai/dsh-fs-patch':
+        specifier: workspace:*
+        version: link:../fs-patch
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~
@@ -9528,6 +9532,9 @@ importers:
 
   packages/fs/fs-local:
     dependencies:
+      '@deepseek-ai/dsh-fs-patch':
+        specifier: workspace:*
+        version: link:../fs-patch
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -9583,12 +9590,21 @@ importers:
       '@deepseek-ai/dsh-sandbox-policy':
         specifier: workspace:*
         version: link:../../sandbox/sandbox-policy
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
 
   packages/fs/tool-fs:
     dependencies:
+      '@deepseek-ai/dsh-fs-patch':
+        specifier: workspace:*
+        version: link:../fs-patch
       '@deepseek-ai/dsh-util-code-language':
         specifier: workspace:*
         version: link:../../util/code-language
+      '@deepseek-ai/dsh-util-values':
+        specifier: workspace:*
+        version: link:../../util/values
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -9623,6 +9639,9 @@ importers:
       '@deepseek-ai/dsh-fs-observation-policy':
         specifier: workspace:*
         version: link:../fs-observation-policy
+      '@deepseek-ai/dsh-fs-sandbox':
+        specifier: workspace:*
+        version: link:../fs-sandbox
       '@deepseek-ai/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm
@@ -9650,15 +9669,21 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:*
         version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
+      '@deepseek-ai/dsh-tool-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/tool-testkit
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
       '@deepseek-ai/dsh-user-approval':
         specifier: workspace:*
         version: link:../../interaction/user-approval
-      '@deepseek-ai/dsh-util-values':
-        specifier: workspace:*
-        version: link:../../util/values
 
   packages/fs/tool-fs-search:
     dependencies:

@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-`SandboxedFileSystem` 扩展 [`LocalFileSystem`](../fs-local/README.zh.md) 并注册为 `ctx.fs`。它逐字继承全部文本存储机制（解析、stat、读取／流式读取、列出、原子写入、按读取、匹配、写入顺序执行的编辑临界区），只为 `writeText`/`editText` 增加按调用的模式围栏。读取始终直接通过：所有模式都允许读取。
+`SandboxedFileSystem` 扩展 [`LocalFileSystem`](../fs-local/README.zh.md) 并注册为 `ctx.fs`。它逐字继承全部文本存储机制（解析、stat、读取／流式读取、列出、原子写入、按读取、匹配、写入顺序执行的编辑临界区），只为 `writeText`、`editText`、`patchText`、`deleteFile` 与 `moveFile` 增加按调用的模式围栏。读取始终直接通过：所有模式都允许读取。
 
 它原样复用本地后端配置：`cwd` 仍是相对路径的解析默认值，`diffBasisMaxBytes` 则限制可选的覆写上下文 diff 基础。
 
@@ -15,7 +15,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-fs-sandbox` 按各会话的沙箱模式限制模型对文件的写入与编辑，同时保留本地文件系统的读取行为。`read-only` 拒绝所有变更；`workspace-write` 只允许目标位于会话工作区或平台临时根目录内；`danger-full-access` 不限制变更。当会话需要将文件变更限制在工作区内时，使用它代替 `fs-local`，并加载 `ctx.sandboxPolicy`。被拒绝的操作返回 `FS_SANDBOX_DENIED`，文件系统工具会显示当前模式和同轮次升级提示。
+`dsh-fs-sandbox` 按各会话的沙箱模式限制模型对文件的写入、编辑、打补丁、删除与移动，同时保留本地文件系统的读取行为。`read-only` 拒绝所有变更；`workspace-write` 只允许目标位于会话工作区或平台临时根目录内；`danger-full-access` 不限制变更。当会话需要将文件变更限制在工作区内时，使用它代替 `fs-local`，并加载 `ctx.sandboxPolicy`。被拒绝的操作返回 `FS_SANDBOX_DENIED`，文件系统工具会显示当前模式和同轮次升级提示。
 
 ## 目录
 
@@ -29,6 +29,8 @@ kind: "package-reference"
 
 <a id="the-fence"></a>
 ## 围栏
+
+围栏覆盖 `writeText`、`editText`、`patchText`、`deleteFile` 和 `moveFile`；读取、列出、元数据操作与只读监听与 `fs-local` 完全一致。移动在任何效果发生前检查源与目标，因此任一路径被拒都会使两端文件保持不变。
 
 按调用策略携带有效模式（会话覆盖值或升级授权）和调用会话不可变的 cwd 根目录；只有没有会话的调用才回退到部署策略：
 

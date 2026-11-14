@@ -31,6 +31,8 @@
   "dependencies": {
     "diff": "^9.0.0",
     "@deepseek-ai/dsh-util-code-language": "workspace:*",
+    "@deepseek-ai/dsh-fs-patch": "workspace:*",
+    "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~"
   },
   "peerDependencies": {
@@ -65,6 +67,10 @@
     "@deepseek-ai/dsh-session-projection": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-native": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
+    "@deepseek-ai/dsh-tool-testkit": "workspace:*",
+    "@deepseek-ai/dsh-fs-sandbox": "workspace:*",
     "@deepseek-ai/dsh-user-approval": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*"
   }
