@@ -150,23 +150,23 @@
     },
     "office": {
       "commit": null,
-      "pending": "skill/office lineage differs from upstream office-kit; evaluate with feature batch"
+      "pending": "resolved — tool-office absorbed in 541b73282f6; skill/office activation wired"
     },
     "sdk": {
       "commit": null,
-      "pending": "20 fixes incl. live-runtime approval routing — needs dedicated pass, several feature-coupled"
+      "pending": "20 fixes incl. live-runtime approval routing — feature-coupled to upstream sdk generation; dedicated pass deferred"
     },
     "subagent": {
       "commit": null,
-      "pending": "30 fixes mostly upstream named/multi-level subagent line; generic candidates: authorized-catalog discovery intersect, caller-inbox wait, closing message"
+      "pending": "evaluated against rc.5..rc.3 diff — catalog v3 naming, manager.ts lifecycle (closing/inbox waits) and discovery intersect all belong to upstream named/multi-level subagent generation; local is prior-generation layout, no generic hunks portable — stays deferred to architecture decision"
     },
     "cua": {
       "commit": null,
-      "na": "89 fixes mostly upstream macOS helper packaging/signing — different lineage; generic candidates (0-999 coords, click-hold cap, cancel balance) deferred"
+      "na": "89 fixes upstream macOS packaging/signing line — different lineage; generic candidates (0-999 coords, click-hold cap, cancel balance) remain deferred pending evidence local cua shares the defect"
     },
     "schedule": {
       "commit": null,
-      "pending": "10 fixes mostly upstream schedule UI; timezone diagnostics candidates"
+      "pending": "10 fixes mostly upstream schedule UI generation; timezone diagnostics candidates unverified — low-value, deferred"
     }
   },
   "skipped_per_policy": [
