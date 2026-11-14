@@ -14,7 +14,7 @@ const { SessionId } = await import(entry('core/session'))
 const { planProjectionDefinition } = await import(entry('plan/plan-mode'))
 const { ExecutionAuthority } = await import(entry('context/execution-authority'))
 const plugins = [
-  ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
+  ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/tool-executor-native'], ['core/system-prompt'],
   ['session/session-projection'], ['core/agent-loop', { agents: [] }],
   ['interaction/commands'], ['plan/plan-mode', { section: 'Explore before implementing.' }],
 ]

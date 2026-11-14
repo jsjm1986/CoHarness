@@ -11,7 +11,7 @@ const { boot } = await import(entry('boot/app-boot'))
 const { SessionId } = await import(entry('core/session'))
 const plugins = [
   ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
-  ['session/session-projection'], ['core/agent-loop', { agents: [] }], ['interaction/commands'],
+  ['core/tool-executor-native'], ['session/session-projection'], ['core/agent-loop', { agents: [] }], ['interaction/commands'],
   ['attachment/attachment-local', { dshHome: join(process.cwd(), '.dsh') }],
 ]
 const config = join(process.cwd(), 'cordis.yml')

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-instructions'
 import { compactCheckpointSource, CompactionId } from '@deepseek-ai/dsh-compaction'
 import LlmRuntime, {
@@ -140,6 +140,7 @@ async function harness(
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(AgentRegistry)
   ctx.provide('shell', {
     sandboxMode: 'workspace-write',
     resolve() { throw new Error('auto-review tests do not execute shell requests') },
@@ -246,7 +247,7 @@ function requestSections(request: GenerateOptions): Record<string, unknown> {
   return sections
 }
 
-function expectReviewFailure(result: Awaited<ReturnType<Context['tools']['execute']>>, cause?: string): void {
+function expectReviewFailure(result: ToolExecutionResult, cause?: string): void {
   if (!result.isError) throw new Error('the reviewed call executed')
   expect(result.error.info).toBeUndefined()
   const prefix = 'Auto review of tool "probe" failed; its body was not executed: auto-review: '
@@ -1581,6 +1582,7 @@ describe('cancellation and integration teardown', () => {
       run() { throw new Error('unused') },
       start() { throw new Error('unused') },
     })
+    await invalid.plugin(AgentRegistry)
     invalid.provide('approval', { config: { policy: 'ask' } })
     await invalid.plugin(PermissionPresetService, {})
     const auto = await invalid.plugin(AutoReview)

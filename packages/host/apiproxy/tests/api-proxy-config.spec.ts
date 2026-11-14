@@ -13,6 +13,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { GoalId } from '@deepseek-ai/dsh-goal'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import LlmRuntime, { LlmAdapter } from '@deepseek-ai/dsh-llm'
@@ -232,6 +233,7 @@ async function harness(options?: {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(UserQuestionService)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(LlmRuntime)

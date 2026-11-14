@@ -1,3 +1,4 @@
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, posix } from 'node:path'
@@ -387,7 +388,7 @@ describe('Session working directories', () => {
     await mkdir(join(f.root, 'child'))
     const fiber = f.ctx.plugin(WorkingDirectoryTool)
     await fiber
-    const execute = (arguments_: { cd?: string }, withAgent = true) => f.ctx.tools.execute({
+    const execute = (arguments_: { cd?: string }, withAgent = true) => executeToolFixture(f.ctx, {
       name: 'working_directory', callId: ToolCallId('directory-call'), arguments: arguments_,
       signal: new AbortController().signal, ...withAgent ? { agent: f.agent } : {},
     })
@@ -698,6 +699,7 @@ describe('real Loader composition', () => {
         '  config:',
         '    includeRuntimeContext: true',
         "- name: '@deepseek-ai/dsh-tools'",
+        "- name: '@deepseek-ai/dsh-tool-executor-native'",
         "- name: '@deepseek-ai/dsh-agent'",
         "- name: '@deepseek-ai/dsh-fs-local'",
         '  config:',
@@ -715,6 +717,7 @@ describe('real Loader composition', () => {
       const { default: SessionProjectionRegistry } = await import('@deepseek-ai/dsh-session-projection')
       const { default: SystemPrompt } = await import('@deepseek-ai/dsh-system-prompt')
       const { default: ToolRuntime } = await import('@deepseek-ai/dsh-tools')
+      const NativeToolExecutor = await import('@deepseek-ai/dsh-tool-executor-native')
       const { default: AgentRegistry } = await import('@deepseek-ai/dsh-agent')
       const { default: AgentLoop } = await import('@deepseek-ai/dsh-agent-loop')
       const modules = new Map<string, unknown>([
@@ -723,6 +726,7 @@ describe('real Loader composition', () => {
         ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
         ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
         ['@deepseek-ai/dsh-tools', ToolRuntime],
+        ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
         ['@deepseek-ai/dsh-agent', AgentRegistry],
         ['@deepseek-ai/dsh-fs-local', LocalFileSystem],
         ['@deepseek-ai/dsh-working-directory', WorkingDirectory],

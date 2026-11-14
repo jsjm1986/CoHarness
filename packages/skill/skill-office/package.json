@@ -42,7 +42,8 @@
     "@deepseek-ai/dsh-loader-smoke": "workspace:*",
     "@deepseek-ai/dsh-ptc-runtime": "workspace:*",
     "@deepseek-ai/dsh-skill": "workspace:*",
-    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*"
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-native": "workspace:*"
   },
   "dependencies": {
     "yaml": "^2.9.1",

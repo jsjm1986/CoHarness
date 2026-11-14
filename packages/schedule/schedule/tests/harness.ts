@@ -1,4 +1,5 @@
 /** Host Schedule tests use real domain storage and an explicit Session resolver. */
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { Context, Service } from '@deepseek-ai/cordis'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -76,6 +77,7 @@ export async function harness(options: {
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(Storage)
   const pool = options.pool ?? new MemoryMediaPool()
   const backend = options.backend ?? new MemoryStorageBackend(pool)

@@ -9,7 +9,7 @@ import SubagentRuntime, {
   type ResolvedSubagentStartRequest,
   type SubagentStartRequest,
 } from '@deepseek-ai/dsh-subagent'
-import type { Config as ToolConfig, ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
+import type { ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
 import { defineContentToolFixture, RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
 import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
@@ -28,7 +28,7 @@ interface PtcRunRequestLike {
 }
 
 interface SetupOptions {
-  toolMode?: ToolConfig['mode']
+  toolMode?: 'native' | 'ptc'
   codeRun?: (request: PtcRunRequestLike) => Promise<{ logs: never[]; value?: unknown }>
 }
 

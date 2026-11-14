@@ -14,6 +14,7 @@ import * as JsonlPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import LlmRuntime, { LlmAdapter, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import Tools from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import Subagents from '@deepseek-ai/dsh-subagent'
 import TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import GoalService from '@deepseek-ai/dsh-goal'
@@ -37,7 +38,7 @@ async function fixture(goals = false) {
   const modules = new Map<string, unknown>([
     ['@deepseek-ai/dsh-session', SessionStore], ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
     ['@deepseek-ai/dsh-session-persistence-jsonl', JsonlPersistence], ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
-    ['@deepseek-ai/dsh-llm', LlmRuntime], ['@deepseek-ai/dsh-tools', Tools], ['@deepseek-ai/dsh-agent', AgentRegistry],
+    ['@deepseek-ai/dsh-llm', LlmRuntime], ['@deepseek-ai/dsh-tools', Tools], ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor], ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-agent-loop', AgentLoop], ['@deepseek-ai/dsh-subagent', Subagents],
     ['@deepseek-ai/dsh-experimental-agent-team', TeamService],
   ])

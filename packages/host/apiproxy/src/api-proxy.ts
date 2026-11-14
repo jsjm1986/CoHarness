@@ -5058,6 +5058,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             seed: events.slice(0, cut),
             meta: {
               ...source.header.cwd === undefined ? {} : { cwd: source.header.cwd },
+              parentSession: source.id,
               isSeeded: true,
               ...forkComposition.agentPreset === undefined
                 ? {}

@@ -492,26 +492,24 @@ describe('the soft layer', () => {
     expect(assembly.sections.find(section => section.name === 'plan:policy')?.text).toBe(TEST_PLAN_SECTION)
   })
 
-  it('leaves foreign assemble additions alone (no assemble-layer filtering)', async () => {
-    // Plan guidance does not filter the registry or later assembly additions.
+  it('leaves foreign tool-provider additions alone (no assembly filtering)', async () => {
+    // Plan guidance does not filter the registry or other providers' tool
+    // contributions: the assembly waterfall no longer carries tools, so a
+    // foreign provider is the path a later plugin would take.
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(NativeToolExecutor)
     await mountProjectionSeam(ctx)
-    ctx.on('system-prompt/assemble', async (_assembly, _context, next) => {
-      const final = await next()
-      final.tools = [...final.tools, { name: 'added-later', description: 'added after next()', parameters: {} }]
-      return final
-    })
+    ctx.systemPrompt.tools(() => ({ schemas: [{ name: 'added-later', description: 'added by a foreign provider', parameters: {} }] }))
     await ctx.plugin(PlanModeController, PLAN_CONFIG)
     registerNamedTools(ctx, ['read'])
     const planning = await agentWithSession(ctx, 'planning', { active: true })
     expect((await assembleFor(ctx, planning)).tools.map(tool => tool.name))
-      .toEqual(['exit_plan_mode', 'read', 'added-later'])
+      .toEqual(['added-later', 'exit_plan_mode', 'read'])
     const defaulted = await agentWithSession(ctx, 'defaulted')
     expect((await assembleFor(ctx, defaulted)).tools.map(tool => tool.name))
-      .toEqual(['exit_plan_mode', 'read', 'added-later'])
+      .toEqual(['added-later', 'exit_plan_mode', 'read'])
   })
 
   it('keeps run_code the only wire tool in plan mode under the registry PTC mode; the SDK gains the exit binding', async () => {

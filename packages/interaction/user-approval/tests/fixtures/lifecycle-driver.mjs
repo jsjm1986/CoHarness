@@ -16,6 +16,7 @@ const { default: ApprovalService } = await import(entry('interaction/user-approv
 const sources = new Map([
   ['@deepseek-ai/dsh-session', 'core/session'], ['@deepseek-ai/dsh-agent', 'core/agent'],
   ['@deepseek-ai/dsh-llm', 'llm/llm'], ['@deepseek-ai/dsh-tools', 'core/tools'],
+  ['@deepseek-ai/dsh-tool-executor-native', 'core/tool-executor-native'],
   ['@deepseek-ai/dsh-system-prompt', 'core/system-prompt'], ['@deepseek-ai/dsh-session-projection', 'session/session-projection'],
   ['@deepseek-ai/dsh-agent-loop', 'core/agent-loop'], ['@deepseek-ai/dsh-user-approval', 'interaction/user-approval'],
 ])
@@ -48,13 +49,22 @@ try {
     assert.equal(await decision, 'cancelled')
     assert.equal(answererRuns, 0)
     process.stdout.write(`${JSON.stringify({ operation: 'cancelled-before-dispatch', answererRuns, outcome: 'cancelled' })}\n`)
-    const accepted = await ctx.tools.execute({ agent, name: 'sensitive', arguments: {}, callId: ToolCallId('accepted'), signal: new AbortController().signal })
+    const acceptedBatch = await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId('accepted'), name: 'sensitive', arguments: '{}' }],
+      signal: new AbortController().signal,
+      agent,
+    })
+    const accepted = acceptedBatch.results[0].result
     assert.equal(accepted.isError, false)
     assert.equal(toolRuns, 1)
   } finally { initial() }
   const entered = Promise.withResolvers(), late = Promise.withResolvers()
   const waiting = ctx.on('approval/request', () => { entered.resolve(); return late.promise })
-  const pending = ctx.tools.execute({ agent, name: 'sensitive', arguments: {}, callId: ToolCallId('withdrawn'), signal: new AbortController().signal })
+  const pending = ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: ToolCallId('withdrawn'), name: 'sensitive', arguments: '{}' }],
+    signal: new AbortController().signal,
+    agent,
+  })
   let unloading
   try {
     await entered.promise
@@ -62,7 +72,7 @@ try {
     assert.ok(owner?.fiber)
     unloading = owner.fiber.dispose()
     await unloading
-    const result = await pending
+    const result = (await pending).results[0].result
     assert.equal(result.isError, true)
     assert.equal(toolRuns, 1)
     assert.equal(agent.session.snapshotEvents().filter(event => event.type === 'approval/decided').at(-1).data.outcome, 'cancelled')
@@ -73,7 +83,12 @@ try {
   await assert.rejects(service.request({ agent, toolName: 'sensitive' }), /withdrawn/)
   assert.throws(() => service.setPolicy(agent, 'ask'), /withdrawn/)
   assert.equal(agent.session.seq, before)
-  const denied = await ctx.tools.execute({ agent, name: 'sensitive', arguments: {}, callId: ToolCallId('replacement'), signal: new AbortController().signal })
+  const deniedBatch = await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: ToolCallId('replacement'), name: 'sensitive', arguments: '{}' }],
+    signal: new AbortController().signal,
+    agent,
+  })
+  const denied = deniedBatch.results[0].result
   assert.equal(denied.isError, true)
   assert.equal(toolRuns, 1)
   process.stdout.write(`${JSON.stringify({ operation: 'replacement-never-policy', retiredReference: 'refused', retiredAuditWrites: 0, result: denied.content })}\n`)

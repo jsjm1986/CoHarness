@@ -556,7 +556,10 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       // Never the derived harness-home root: a developer's own presets must not
       // be able to change a golden, whatever roots a scenario asks for.
       : [{ id: 'agent-preset-registry', config: { ...options.agentPresets, includeUserRoot: false } }],
-    ...options.toolsMode === undefined ? [] : [{ id: 'tools', config: { mode: options.toolsMode } }],
+    ...options.toolsMode === undefined ? [] : [
+      { id: 'tool-executor-native', disabled: options.toolsMode === 'ptc' },
+      { id: 'tool-executor-ptc', disabled: options.toolsMode !== 'ptc' },
+    ],
     // The shipped Web bundle already owns both runners and the Cordis UI. This
     // scenario adds only the model-facing tools that exercise those services.
     ...options.cordisTools === true

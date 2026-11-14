@@ -182,16 +182,16 @@ describe('SubagentModelSelectionConfig', () => {
     await ctx.fiber.dispose()
   })
 
-  it('installs a direct Agent setup before Session publication', async () => {
+  it('installs a direct Agent setup before Agent publication', async () => {
     const ctx = await boot(false)
     await ctx.settings.update(SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE, {
       enabled: true,
       allowedModels: ALLOWED_MODELS,
     })
     let prepared: Awaited<ReturnType<Context['agents']['create']>>['agent'] | undefined
-    let visibleAtSessionCreated = false
-    ctx.on('session/created', () => {
-      visibleAtSessionCreated = prepared !== undefined && selectable(ctx, prepared)
+    let visibleAtAgentCreated = false
+    ctx.on('agent/created', () => {
+      visibleAtAgentCreated = prepared !== undefined && selectable(ctx, prepared)
     })
 
     const handle = await ctx.agents.create({
@@ -209,7 +209,7 @@ describe('SubagentModelSelectionConfig', () => {
       },
     })
 
-    expect(visibleAtSessionCreated).toBe(true)
+    expect(visibleAtAgentCreated).toBe(true)
     expect(selectable(ctx, handle.agent)).toBe(true)
     await handle.dispose()
     await ctx.fiber.dispose()

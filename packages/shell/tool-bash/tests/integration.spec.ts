@@ -1,3 +1,4 @@
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -125,12 +126,10 @@ describe('bash tool through the agent loop', () => {
       }
       await ctx.plugin(BashBindingRuntime)
       await agent.ctx.plugin(PtcToolExecutor)
-      const batch = await ctx.tools.execute({
-        calls: [{ type: 'tool-call', id: ToolCallId('nested-shell-root'), name: 'run_code',
-          arguments: JSON.stringify({ code: 'return await tools.bash({ command: "pwd", description: "Print launch directory" })', description: 'Inspect current directory' }) }],
-        agent, signal: new AbortController().signal,
+      const result = await executeModelToolFixture(ctx, {
+        callId: ToolCallId('nested-shell-root'), agent, signal: new AbortController().signal, name: 'run_code',
+        arguments: { code: 'return await tools.bash({ command: "pwd", description: "Print launch directory" })', description: 'Inspect current directory' },
       })
-      const result = batch.results[0]!.result
       expect(result.error).toBeUndefined()
       expect(result.isError).toBe(false)
       await ctx.workingDirectory.set(agent, root)

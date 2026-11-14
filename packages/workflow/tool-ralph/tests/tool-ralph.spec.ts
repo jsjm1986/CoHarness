@@ -304,6 +304,7 @@ describe('dsh-tool-ralph', () => {
     expect((firstResult.content[0] as { text: string }).text).toContain('No previous handoff was available.')
 
     const later = execute(ctx, { objective: 'Ship it.', maxRounds: 2 }, { agent: parent })
+    await vi.waitFor(() => { expect(engine.requests).toHaveLength(2) })
     const laterResult = await settleCompleted(engine, later, {
       status: 'round-failed',
       roundsStarted: 2,

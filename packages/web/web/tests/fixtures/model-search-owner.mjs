@@ -47,7 +47,7 @@ try {
   }
   const config = join(process.cwd(), 'cordis.yml')
   await writeFile(config, JSON.stringify([
-    ...['core/session', 'core/agent', 'llm/llm', 'core/tools', 'core/system-prompt', 'session/session-projection', 'web/web']
+    ...['core/session', 'core/agent', 'llm/llm', 'core/tools', 'core/tool-executor-native', 'core/system-prompt', 'session/session-projection', 'web/web']
       .map(path => ({ name: entry(path) })),
     { name: entry('core/agent-loop'), config: { agents: [] } },
   ]))

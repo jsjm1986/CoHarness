@@ -1021,19 +1021,18 @@ describe('same-session goal driving', () => {
     expect(test.adapter.requests).toHaveLength(0)
   })
 
-  it('disarms a published goal before later creation listeners and queued work run', async () => {
-    const test = await harness([])
+  it('drives a goal published during the agent/created announce', async () => {
+    const test = await harness([textResponse('after explicit resume')])
     const id = SessionId('goal-created-initialization')
-    test.ctx.on('session/created', (session) => {
-      if (session.id !== id) return
-      const agent = test.ctx.agents.get(id)!
-      test.ctx.goals.create(agent, { objective: 'wait for explicit resume', maxGoalRounds: 1 })
+    test.ctx.on('agent/created', ({ agent }) => {
+      if (agent.id !== id) return
+      test.ctx.goals.create(agent, { objective: 'run after announce', maxGoalRounds: 1 })
     })
     let observed = false
     test.ctx.on('agent/created', ({ agent }) => {
       if (agent.id !== id) return
       observed = true
-      expect(test.ctx.goals.get(agent)).toMatchObject({ activation: 'disarmed', roundsStarted: 0 })
+      expect(test.ctx.goals.get(agent)).toMatchObject({ activation: 'armed', roundsStarted: 0 })
     })
 
     const handle = await test.ctx.agents.create({
@@ -1043,8 +1042,11 @@ describe('same-session goal driving', () => {
     try {
       await handle.agent.whenIdle()
       expect(observed).toBe(true)
-      expect(test.adapter.requests).toHaveLength(0)
-      expect(test.ctx.goals.get(handle.agent)).toMatchObject({ activation: 'disarmed', roundsStarted: 0 })
+      // `session/created` announces before the agent enters the registry, so
+      // creation-window seeding happens in `agent/created` listeners; a goal
+      // created there commits armed and the driver claims it once announce
+      // settles.
+      await vi.waitFor(() => { expect(test.adapter.requests).toHaveLength(1) })
     } finally {
       await handle.dispose()
     }

@@ -78,10 +78,11 @@ export async function apply(ctx) {
       assert.ok(parent)
       let jobId
       try {
-        const accepted = await ctx.tools.execute({
-          name: 'subagent', callId: ToolCallId('subagent-cleanup'), signal: new AbortController().signal,
-          arguments: { description: 'retained child', prompt: 'work', run_in_background: true }, agent: parent,
-        })
+        const accepted = (await ctx.tools.execute({
+          calls: [{ type: 'tool-call', id: ToolCallId('subagent-cleanup'), name: 'subagent',
+            arguments: JSON.stringify({ description: 'retained child', prompt: 'work', run_in_background: true }) }],
+          signal: new AbortController().signal, agent: parent,
+        })).results[0].result
         assert.equal(accepted.isError, false)
         jobId = accepted.value.jobId
         if (pendingCleanup) await cleanupEntered.promise

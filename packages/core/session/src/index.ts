@@ -1538,6 +1538,7 @@ export class SessionStore extends Service {
       inheritedEventCount: SessionLogOffset(resolved === undefined ? 0 : resolved + 1),
       meta: {
         ...liveSource.header.cwd !== undefined ? { cwd: liveSource.header.cwd } : {},
+        parentSession: liveSource.id,
         isSeeded: true,
       },
     })

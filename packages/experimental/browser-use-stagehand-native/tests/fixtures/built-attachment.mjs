@@ -48,7 +48,10 @@ try {
   const harness = await mountAgentLoopTestHarness(ctx)
   const agent = await harness.create(SessionId('built-stagehand'))
   const call = async (method, args) => {
-    const result = await ctx.tools.execute({ agent, name: `stagehand_${method}`, arguments: args, callId: ToolCallId(`built-${method}`), signal: new AbortController().signal })
+    const result = (await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId(`built-${method}`), name: `stagehand_${method}`, arguments: JSON.stringify(args) }],
+      signal: new AbortController().signal, agent,
+    })).results[0].result
     if (result.isError) throw new Error(JSON.stringify(result.content))
     return result
   }

@@ -66,7 +66,7 @@ try {
   const { default: ResourceBudget } = await import(entry('context/resource-budget'))
   const config = join(process.cwd(), 'cordis.yml')
   await fs.writeFile(config, JSON.stringify([
-    ...['core/session', 'core/agent', 'llm/llm', 'core/tools', 'core/system-prompt', 'session/session-projection', 'browser-use/browser-use']
+    ...['core/session', 'core/agent', 'llm/llm', 'core/tools', 'core/tool-executor-native', 'core/system-prompt', 'session/session-projection', 'browser-use/browser-use']
       .map(path => ({ name: entry(path) })),
     { name: entry('attachment/attachment-local'), config: { dshHome: process.cwd() } },
     { name: entry('core/agent-loop'), config: { agents: [] } },
@@ -91,8 +91,11 @@ try {
   }
   ctx.effect(() => ctx.llm.registerAdapter(['fixture'], new BrowserModel()))
   const provider = await import(entry(browserPath))
-  const execute = (agent, name = 'tabs', args = { action: 'list' }, signal = new AbortController().signal) =>
-    ctx.tools.execute({ agent, name: `stagehand_${name}`, arguments: args, callId: ToolCallId(`browser-${name}`), signal })
+  const execute = async (agent, name = 'tabs', args = { action: 'list' }, signal = new AbortController().signal) =>
+    (await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId(`browser-${name}`), name: `stagehand_${name}`, arguments: JSON.stringify(args) }],
+      signal, agent,
+    })).results[0].result
   const cancelConnection = async (agent, update = async () => {}) => {
     const gate = { entered: Promise.withResolvers(), proceed: Promise.withResolvers() }
     const controller = new AbortController()

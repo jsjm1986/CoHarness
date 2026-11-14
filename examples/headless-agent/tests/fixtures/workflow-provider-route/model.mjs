@@ -65,9 +65,11 @@ export async function apply(ctx) {
           run = ctx.workflowEngine.start({ parent, script: "return await agent('independent child')",
             meta: { name: 'provider-route', description: 'Keep the admitted provider instance.' } })
         } else {
-          pending = ctx.tools.execute({ name: 'ralph', callId: ToolCallId('ralph-route'),
+          pending = ctx.tools.execute({
+            calls: [{ type: 'tool-call', id: ToolCallId('ralph-route'), name: 'ralph',
+              arguments: JSON.stringify({ objective: 'Verify independent round context.', maxRounds: 2 }) }],
             signal: new AbortController().signal, agent: parent,
-            arguments: { objective: 'Verify independent round context.', maxRounds: 2 } })
+          }).then(batch => batch.results[0].result)
           await disposeEntered.promise
         }
         remove()

@@ -517,7 +517,8 @@ export class GoalService extends TypertRemoteService {
     const projections = this.ctx.get('sessionProjections')
     if (projections === undefined) return undefined
     // The projection registration is owned by this live service instance.
-    const state = projections.stateOf(session, 'goal') as GoalProjectionState
+    const state = projections.stateOf(session, 'goal')
+    if (state === undefined) throw new Error('goal projection is not registered')
     if (state.failure !== null) throw new Error(state.failure)
     return state
   }

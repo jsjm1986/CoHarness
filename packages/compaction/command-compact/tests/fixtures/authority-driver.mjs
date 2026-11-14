@@ -14,7 +14,7 @@ const { SessionId } = await import(entry('core/session'))
 const { ExecutionAuthority } = await import(entry('context/execution-authority'))
 const plugins = [
   ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
-  ['session/session-projection'], ['core/agent-loop', { agents: [] }],
+  ['core/tool-executor-native'], ['session/session-projection'], ['core/agent-loop', { agents: [] }],
   ['interaction/commands'], ['llm/token-meter'], ['compaction/compaction-basic', { auto: false }],
   ['compaction/command-compact'],
 ]

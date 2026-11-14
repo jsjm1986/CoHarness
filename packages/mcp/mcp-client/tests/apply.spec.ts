@@ -7,6 +7,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Config } from '@deepseek-ai/dsh-mcp-client'
 
@@ -54,6 +55,7 @@ async function mountRegistry(): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   return ctx
 }
 
@@ -264,6 +266,7 @@ describe('apply (plugin lifecycle)', () => {
     const first = new Context()
     await first.plugin(SystemPrompt)
     await first.plugin(ToolRuntime)
+    await first.plugin(NativeToolExecutor)
     await apply(first, stdioConfig)
 
     await first.fiber.dispose()
@@ -274,6 +277,7 @@ describe('apply (plugin lifecycle)', () => {
     const second = new Context()
     await second.plugin(SystemPrompt)
     await second.plugin(ToolRuntime)
+    await second.plugin(NativeToolExecutor)
     await expect(apply(second, stdioConfig)).resolves.toBeUndefined()
     await second.fiber.dispose()
   })

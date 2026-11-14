@@ -11,6 +11,7 @@ import { StreamableHTTPClientTransport, type Transport } from '@modelcontextprot
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { startConnection, resolveReconnectPolicy } from '../src/connection.ts'
 import type { Config } from '../src/index.ts'
 
@@ -28,6 +29,7 @@ async function connection(factory: () => Transport, retry: boolean) {
   onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   const errors: string[] = []
   const warns: string[] = []
   ctx.logger.error = (message: unknown) => { errors.push(String(message)) }
