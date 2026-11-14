@@ -16,10 +16,12 @@
 - id: hmr
   disabled: true
 
-- id: tools
-  config:
-    # Keep the same temporary process-wide PTC opt-in as the Web surface.
-    mode: !!js process.env.DSH_TOOLS_MODE
+# Keep the same temporary process-wide PTC opt-in as the Web surface.
+- id: tool-executor-native
+  disabled: !!js "process.env.DSH_TOOLS_MODE === 'ptc'"
+
+- id: tool-executor-ptc
+  disabled: !!js "process.env.DSH_TOOLS_MODE !== 'ptc'"
 
 # Headless uses the structured read/write/edit file tools. The legacy editor
 # remains available to the base/TUI composition and presets that opt into it.

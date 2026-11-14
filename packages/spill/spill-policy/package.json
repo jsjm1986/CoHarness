@@ -45,7 +45,8 @@
     "@deepseek-ai/dsh-token-meter": "workspace:*"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:~"
+    "@deepseek-ai/schemastery": "workspace:~",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

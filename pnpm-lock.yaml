@@ -1281,6 +1281,12 @@ importers:
       '@deepseek-ai/dsh-tool-cordis':
         specifier: workspace:*
         version: link:../packages/extensions/tool-cordis
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../packages/core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../packages/core/tool-executor-ptc
       '@deepseek-ai/dsh-tool-fs':
         specifier: workspace:*
         version: link:../packages/fs/tool-fs
@@ -2399,6 +2405,12 @@ importers:
       '@deepseek-ai/dsh-tool-call-timeout-policy':
         specifier: workspace:*
         version: link:../../guard/timeout-policy
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tool-fs':
         specifier: workspace:*
         version: link:../../fs/tool-fs
@@ -2487,6 +2499,12 @@ importers:
       '@deepseek-ai/dsh-cmdline':
         specifier: workspace:*
         version: link:../../boot/cmdline
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -2645,6 +2663,12 @@ importers:
       '@deepseek-ai/dsh-tool-bash-persistent':
         specifier: workspace:*
         version: link:../../shell/tool-bash-persistent
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tool-fs':
         specifier: workspace:*
         version: link:../../fs/tool-fs
@@ -2934,6 +2958,12 @@ importers:
       '@deepseek-ai/dsh-tool-cordis':
         specifier: workspace:*
         version: link:../../extensions/tool-cordis
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tool-subagent':
         specifier: workspace:*
         version: link:../../subagent/tool-subagent
@@ -3214,6 +3244,9 @@ importers:
       '@deepseek-ai/dsh-timeout':
         specifier: workspace:*
         version: link:../../util/timeout
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
@@ -3575,6 +3608,9 @@ importers:
       '@deepseek-ai/dsh-token-meter':
         specifier: workspace:*
         version: link:../../llm/token-meter
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tool-todo':
         specifier: workspace:*
         version: link:../../todo/tool-todo
@@ -4189,6 +4225,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
@@ -5484,6 +5523,9 @@ importers:
       '@deepseek-ai/dsh-token-meter':
         specifier: workspace:*
         version: link:../../llm/token-meter
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tool-jobs':
         specifier: workspace:*
         version: link:../../jobs/tool-jobs
@@ -5554,6 +5596,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
@@ -6189,6 +6234,9 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:*
         version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
       '@deepseek-ai/dsh-tool-fs':
         specifier: workspace:*
         version: link:../../fs/tool-fs
@@ -6939,6 +6987,12 @@ importers:
 
   packages/core/agent-tool-presentation:
     dependencies:
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../tool-executor-ptc
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -7014,6 +7068,70 @@ importers:
       '@deepseek-ai/dsh-scope':
         specifier: workspace:*
         version: link:../scope
+
+  packages/core/tool-executor-native:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../tools
+
+  packages/core/tool-executor-ptc:
+    dependencies:
+      '@deepseek-ai/dsh-brand':
+        specifier: workspace:*
+        version: link:../../util/brand
+      '@deepseek-ai/dsh-util-values':
+        specifier: workspace:*
+        version: link:../../util/values
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@deepseek-ai/dsh-agent-loop-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/agent-loop-testkit
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-ptc-runtime':
+        specifier: workspace:*
+        version: link:../../ptc-runtime/ptc-runtime
+      '@deepseek-ai/dsh-sandbox':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox
+      '@deepseek-ai/dsh-sandbox-policy':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-policy
+      '@deepseek-ai/dsh-scope':
+        specifier: workspace:*
+        version: link:../scope
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../session
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../tool-executor-native
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../tools
+      '@deepseek-ai/dsh-user-approval':
+        specifier: workspace:*
+        version: link:../../interaction/user-approval
+      '@deepseek-ai/dsh-working-directory':
+        specifier: workspace:*
+        version: link:../../session/working-directory
 
   packages/core/tools:
     dependencies:
@@ -7338,6 +7456,12 @@ importers:
 
   packages/examples/agent-spine-demo:
     dependencies:
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -7574,6 +7698,9 @@ importers:
 
   packages/experimental/auto-review:
     dependencies:
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-util-values':
         specifier: workspace:*
         version: link:../../util/values
@@ -9871,6 +9998,9 @@ importers:
       '@deepseek-ai/dsh-subprocess-ssh':
         specifier: workspace:*
         version: link:../../ssh/subprocess-ssh
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
@@ -10419,6 +10549,9 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:*
         version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
@@ -13395,6 +13528,9 @@ importers:
       '@deepseek-ai/dsh-skill':
         specifier: workspace:*
         version: link:../skill
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
 
   packages/skill/tool-skill:
     dependencies:
@@ -13500,6 +13636,9 @@ importers:
 
   packages/spill/spill-policy:
     dependencies:
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -14751,6 +14890,12 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:*
         version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools

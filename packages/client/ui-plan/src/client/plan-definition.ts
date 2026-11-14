@@ -5,7 +5,7 @@
  */
 import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the dsh-tools SessionEventMap merge (`tool/ptc-dispatch*`).
-import type {} from '@deepseek-ai/dsh-tools/types'
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc/client'
 import type {
   ChatSnapshot, ConversationNodeDefinition, ConversationSnapshot, ObservableSnapshot,
 } from '@deepseek-ai/dsh-client-runtime/client'

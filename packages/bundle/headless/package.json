@@ -44,6 +44,8 @@
   "dependencies": {
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-cmdline": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-native": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
     "commander": "^15.0.0"
   },

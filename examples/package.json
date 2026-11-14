@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "description": "Workspace umbrella for runnable demos and example-owned test compositions: declares their cordis.yml packages so plain Node resolves real exports→lib. Not a build target.",
+  "description": "Workspace umbrella for runnable demos and example-owned test compositions: declares their cordis.yml packages so plain Node resolves real exports\u2192lib. Not a build target.",
   "dependencies": {
     "@deepseek-ai/cordis-plugin-hmr": "workspace:~",
     "@deepseek-ai/cordis-plugin-include": "workspace:~",
@@ -117,6 +117,8 @@
     "@deepseek-ai/dsh-tool-bash-persistent": "workspace:*",
     "@deepseek-ai/dsh-tool-call-timeout-policy": "workspace:*",
     "@deepseek-ai/dsh-tool-cordis": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-native": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
     "@deepseek-ai/dsh-tool-fs": "workspace:*",
     "@deepseek-ai/dsh-tool-fs-search": "workspace:*",
     "@deepseek-ai/dsh-tool-goal": "workspace:*",

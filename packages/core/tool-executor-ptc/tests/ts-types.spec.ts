@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { jsonSchemaToTs, renderToolsSdk } from '@deepseek-ai/dsh-tools/src/ts-types.ts'
-import type { ToolSdkSchema } from '@deepseek-ai/dsh-tools/src/ts-types.ts'
+import { jsonSchemaToTs, renderToolsSdk } from '@deepseek-ai/dsh-tool-executor-ptc/src/ts-types.ts'
+import type { ToolSdkSchema } from '@deepseek-ai/dsh-tool-executor-ptc/src/ts-types.ts'
 import type { JsonSchemaNode } from '@deepseek-ai/dsh-tools/src/json-schema.ts'
 import { parameterSchemaSpecToJsonSchema } from '@deepseek-ai/dsh-tools'
 

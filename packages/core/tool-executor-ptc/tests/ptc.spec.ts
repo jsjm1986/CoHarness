@@ -1,3 +1,8 @@
+import type { ScopeKey } from '@deepseek-ai/dsh-scope'
+import type { ToolExecutionInput } from '@deepseek-ai/dsh-tools'
+import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
+import { PtcExecutor, CodeRunFailedError, CodeResetFailedError } from '../src/index.ts'
+import { NativeToolExecutor } from '@deepseek-ai/dsh-tool-executor-native'
 import { setSandboxMode } from '@deepseek-ai/dsh-sandbox-policy'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -9,11 +14,12 @@ import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
-import type { PtcRunRequest, PtcRunResult } from '@deepseek-ai/dsh-ptc-runtime'
-import ToolRuntime, { CodeRunFailedError, RUN_CODE_NAME, TOOL_ABORTED_BEFORE_DISPATCH, defineContentToolFixture, defineTool } from '@deepseek-ai/dsh-tools'
-import type { Config, JsonSchemaNode, PostToolDecision, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
+import type { PtcRunFailure, PtcRunRequest, PtcRunResult } from '@deepseek-ai/dsh-ptc-runtime'
+import ToolRuntime, { RUN_CODE_NAME, TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH, defineTool } from '@deepseek-ai/dsh-tools'
+import { defineContentToolFixture } from '@deepseek-ai/dsh-tool-testkit'
+import type { JsonSchemaNode, PostToolDecision, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import type { Agent, AgentCancelCause } from '@deepseek-ai/dsh-agent'
+import SessionStore, { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import ApprovalService, { type ApprovalOutcome, type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import type { SessionEventMap } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -58,7 +64,8 @@ class FakeRuntime extends PtcRuntime {
 }
 
 interface SetupOptions {
-  mode?: Config['mode']
+  mode?: 'native' | 'ptc'
+  maxSubCallsPerMinute?: number
   maxParallelSubCalls?: number
   runtime?: false | { language?: string }
   toolOrder?: string[]
@@ -68,13 +75,21 @@ async function setup(options: SetupOptions = {}) {
   const ctx = new Context()
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt, { ...options.toolOrder ? { toolOrder: options.toolOrder } : {} })
-  await ctx.plugin(ToolRuntime, { mode: options.mode ?? 'ptc', ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {} })
+  await ctx.plugin(ToolRuntime)
+  const executor = options.mode === 'native' ? new NativeToolExecutor(ctx) : new PtcExecutor(ctx, {
+    ...options.maxSubCallsPerMinute !== undefined ? { maxSubCallsPerMinute: options.maxSubCallsPerMinute } : {},
+    ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {},
+  })
+  ctx.tools.setExecutor(executor)
   let runtime: FakeRuntime | undefined
   if (options.runtime !== false) {
     await ctx.plugin(FakeRuntime, options.runtime ?? {})
     runtime = ctx.ptcRuntime as FakeRuntime
   }
-  return { ctx, tools: ctx.tools, systemPrompt: ctx.systemPrompt, runtime: runtime! }
+  return { ctx, executor, tools: {
+    get: (name: string, scope?: ScopeKey) => executor instanceof PtcExecutor && name === RUN_CODE_NAME ? executor['requirePtcTransport']() : ctx.tools.get(name, scope),
+    execute: (input: ToolExecutionInput) => executeCall(ctx, input),
+  }, systemPrompt: ctx.systemPrompt, runtime: runtime! }
 }
 
 /** Mint an agent scope configured like production that can register scoped tool policy. */
@@ -110,27 +125,45 @@ function fakeAgent(): { agent: Agent; events: { type: string; data: unknown }[] 
   const events: { type: string; data: unknown }[] = []
   const ctx = new Context()
   onTestFinished(async () => { await ctx.fiber.dispose() })
+  let seq = 0
   const agent = {
     ctx,
     session: {
       header: { cwd: '/workspace' },
-      append: (type: string, data: unknown) => { events.push({ type, data }) },
+      append: (type: string, data: unknown) => {
+        if (type.startsWith('tool/ptc-')) events.push({ type, data })
+        return { seq: SessionSeq(++seq) }
+      },
     },
   } as Agent
   return { agent, events }
 }
 
-/** Dispatch run_code through the registry pipeline, as the loop would. */
+/** Invoke one raw call through the selected model executor. */
+async function executeCall(ctx: Context, input: ToolExecutionInput): Promise<ToolExecutionResult> {
+  const batch = await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: input.callId, name: input.name, arguments: JSON.stringify(input.arguments) }],
+    signal: input.signal,
+    ...input.agent === undefined ? {} : { agent: input.agent },
+    ...input.toolSet === undefined ? {} : { toolSet: input.toolSet },
+  })
+  return batch.results[0]!.result
+}
+
+/** Dispatch run_code through a single-call batch. */
 async function runCode(
   ctx: Context,
   code: string,
-  extras: { agent?: Agent; signal?: AbortSignal; description?: string } = {},
+  extras: { agent?: Agent; signal?: AbortSignal; description?: string; timeoutMs?: number } = {},
 ): Promise<ToolExecutionResult> {
-  return ctx.tools.execute({
+  return executeCall(ctx, {
     signal: testToolSignal,
     callId: ToolCallId('call-1'),
     name: RUN_CODE_NAME,
-    arguments: { code, description: extras.description ?? 'Run the test program' },
+    arguments: {
+      code, description: extras.description ?? 'Run the test program',
+      ...extras.timeoutMs !== undefined ? { timeoutMs: extras.timeoutMs } : {},
+    },
     ...extras.agent ? { agent: extras.agent } : {},
     ...extras.signal ? { signal: extras.signal } : {},
   })
@@ -173,8 +206,78 @@ it('logs detached frozen nested metadata without changing the binding value or l
 })
 
 describe('mode-aware wire contribution', () => {
-  it('rejects an unsupported presentation mode in configuration', () => {
-    expect(() => ToolRuntime.Config({ mode: 'both' } as never)).toThrow()
+  it('shares conditional admission with SDK bindings and rejects a replaced cached binding', async () => {
+    const { ctx, runtime, systemPrompt } = await setup({ mode: 'ptc' })
+    try {
+      const agent = { ctx, session: Session.create(SessionId('conditional-ptc')) } as Agent
+      let active = false
+      const execute = vi.fn(async () => 'done')
+      const definition = defineTool({
+        name: 'conditional', description: 'Available on selected requests.', parameters: {},
+        output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+        execute,
+      })
+      const unregister = ctx.tools.register(definition, { when: () => active })
+      for (const enabled of [false, true]) {
+        active = enabled
+        const toolSet = await ctx.tools.resolve({ agent, modelSelection: { provider: 'test', model: 'test' }, signal: testToolSignal })
+        try {
+          const assembly = await systemPrompt.assemble({ scope: agent, agent, toolSet })
+          const sdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text ?? ''
+          expect(sdk.includes('conditional:')).toBe(enabled)
+          runtime.behavior = async (request) => {
+            const functions = request.bindings[0]!.functions
+            expect(Object.keys(functions)).toEqual(enabled ? ['conditional'] : [])
+            if (enabled) {
+              expect(await functions.conditional!({})).toBe('done')
+              unregister()
+              ctx.tools.register(definition, { when: () => true })
+              await expect(functions.conditional!({})).rejects.toThrow('unknown tool "conditional"')
+            }
+            return { logs: [] }
+          }
+          const result = await executeCall(ctx, {
+            agent, toolSet, signal: testToolSignal, callId: ToolCallId('conditional-program'),
+            name: RUN_CODE_NAME, arguments: { code: 'program', description: 'Check conditional bindings' },
+          })
+          expect(result).toMatchObject({ isError: false })
+        } finally {
+          toolSet.dispose()
+        }
+      }
+      expect(execute).toHaveBeenCalledTimes(1)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('waits for its runtime and follows runtime withdrawal and replacement', async () => {
+    const ctx = new Context()
+    onTestFinished(async () => { await ctx.fiber.dispose() })
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    const executor = await ctx.plugin(PtcToolExecutor)
+
+    await expect(runCode(ctx, 'return 1')).rejects.toThrow('selected tool executor is unavailable')
+
+    const runtime = await ctx.plugin(FakeRuntime)
+    await executor.await()
+    const first = await ctx.systemPrompt.assemble()
+    expect(first.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
+    expect(first.tools[0]?.description).toContain('TypeScript')
+
+    await runtime.dispose()
+    await expect(runCode(ctx, 'return 1')).rejects.toThrow('selected tool executor is unavailable')
+
+    await ctx.plugin(FakeRuntime, { language: 'python' })
+    await executor.await()
+    const replacement = await ctx.systemPrompt.assemble()
+    expect(replacement.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
+    expect(replacement.tools[0]?.description).toContain('Python')
+  })
+
+  it('rejects a non-positive PTC concurrency limit in configuration', () => {
+    expect(() => PtcToolExecutor.Config({ maxParallelSubCalls: 0 })).toThrow()
   })
 
   it.each([
@@ -271,7 +374,7 @@ describe('mode-aware wire contribution', () => {
     expect(sdk).toContain('deep_output: string | null')
   })
 
-  it('treats expert assembly output as authoritative in mode ptc', async () => {
+  it('keeps PTC declarations owned by the registry during presentation transforms', async () => {
     const mode = 'ptc'
     const { ctx, systemPrompt } = await setup({ mode })
     registerEcho(ctx)
@@ -280,13 +383,13 @@ describe('mode-aware wire contribution', () => {
       return {
         ...assembly,
         sections: assembly.sections.filter(section => section.name !== 'tools:sdk'),
-        tools: assembly.tools.filter(tool => tool.name !== RUN_CODE_NAME),
+        tools: [],
       }
     }, { prepend: true })
 
     const assembly = await systemPrompt.assemble()
     expect(assembly.sections.some(section => section.name === 'tools:sdk')).toBe(false)
-    expect(assembly.tools.some(tool => tool.name === RUN_CODE_NAME)).toBe(false)
+    expect(assembly.tools.some(tool => tool.name === RUN_CODE_NAME)).toBe(true)
   })
 
   it('lets one scope shadow the default SDK section in mode ptc', async () => {
@@ -389,7 +492,7 @@ describe('mode-aware wire contribution', () => {
     expect(transports[0]?.description).toContain('Execute a TypeScript program')
     expect(assembly.sections.find(section => section.name === 'scoped-note')?.text).toBe('safe note')
     expect(assembly.sections.find(section => section.name === 'tools:sdk')?.text).toContain('scoped_safe:')
-    expect(ctx.tools.get(RUN_CODE_NAME, agent)).toBe(ctx.tools.get(RUN_CODE_NAME))
+    expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
     const result = await runCode(ctx, 'return 1', { agent })
     expect(result.content).toEqual([{ type: 'text', text: '(run_code completed with no output)' }])
   })
@@ -465,7 +568,7 @@ describe('mode-aware wire contribution', () => {
   it.each(['typescript', 'python'])('lists code before description for a %s runtime', async (language) => {
     const { ctx, systemPrompt } = await setup({ mode: 'ptc', runtime: { language } })
     try {
-      const parameters = ctx.tools.get(RUN_CODE_NAME)!.parameters
+      const parameters = new PtcExecutor(ctx)['requirePtcTransport']().parameters
       expect(Object.keys(parameters.properties as Record<string, unknown>).slice(0, 2))
         .toEqual(['code', 'description'])
       expect(parameters).toHaveProperty('required', ['code', 'description'])
@@ -477,7 +580,7 @@ describe('mode-aware wire contribution', () => {
         .toContain('arguments: `code`')
 
       // defineTool validates its captured static schema, independently of the runtime parameters getter.
-      const rejected = await ctx.tools.execute({
+      const rejected = await executeCall(ctx, {
         signal: testToolSignal, callId: ToolCallId('argument-order'), name: RUN_CODE_NAME, arguments: {},
       })
       expect(rejected).toHaveProperty('error.message',
@@ -531,35 +634,19 @@ describe('mode-aware wire contribution', () => {
     expect(codeParam.description).toBe("The Python program to execute, following this tool's execution instructions.")
   })
 
-  it('resolves the run_code schema flavor lazily and fails loud on a language absent from the flavor table', async () => {
-    // The flavor getter reads the runtime directly (peekRuntime), so it — not
-    // requirePtcRuntime — owns the flavor-table guard. Keeping
-    // RUN_CODE_FLAVORS in step with SDK_RENDERERS is the compiler's job (both
-    // are `satisfies`-checked against PtcSdkLanguage), so what the guard
-    // covers is a mounted runtime naming a language absent from both tables,
-    // which throws when the schema is projected. Assembly's
-    // requirePtcRuntime rejects such a language earlier; this reaches the
-    // guard on its own.
-    const { ctx } = await setup({ mode: 'ptc', runtime: { language: 'ruby' } })
-    const definition = ctx.tools.get(RUN_CODE_NAME)
-    // Names the known languages, symmetric with the SDK_RENDERERS guard: this
-    // is the reachable rejection, so it must be at least as diagnosable.
-    expect(() => definition?.description)
-      .toThrow(/no run_code schema flavor registered for runtime language "ruby" \(known: "typescript", "python"\)/)
+  it.each(['ruby', 'constructor'])('rejects transport schema reads for unsupported runtime language %s', async (language) => {
+    const { ctx } = await setup({ mode: 'ptc', runtime: { language } })
+    const definition = new PtcExecutor(ctx)['requirePtcTransport']()
+    const message = `no SDK renderer registered for runtime language "${language}" (known: "typescript", "python")`
+    expect(() => definition.description).toThrow(message)
+    expect(() => definition.parameters).toThrow(message)
   })
 
-  it('degrades the run_code flavor to TypeScript when no runtime is mounted', async () => {
-    // Any reader of the definition without a mounted runtime uses this fallback; the
-    // shipped one is the tool-catalog generator, which boots the registry under
-    // `mode: ptc` and reads run_code's schema WITHOUT a runtime. peekRuntime
-    // returns undefined there, so the flavor getter degrades to the TS default
-    // rather than throwing. None of those readers feeds a model: assembly goes
-    // through wireSchemas, which requires a runtime first.
+  it('rejects transport schema reads when no runtime is mounted', async () => {
     const { ctx } = await setup({ mode: 'ptc', runtime: false })
-    const definition = ctx.tools.get(RUN_CODE_NAME)
-    expect(definition?.description).toContain('Execute a TypeScript program')
-    const params = definition?.parameters as { properties: { code: { description: string } } }
-    expect(params.properties.code.description).toBe("The TypeScript program to execute, following this tool's execution instructions.")
+    const definition = new PtcExecutor(ctx)['requirePtcTransport']()
+    expect(() => definition.description).toThrow('requires a PTC runtime')
+    expect(() => definition.parameters).toThrow('requires a PTC runtime')
   })
 
   it("rejects the assembly when toolOrder names a native tool that mode 'ptc' no longer contributes", async () => {
@@ -573,12 +660,178 @@ describe('mode-aware wire contribution', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
     await ctx.plugin(FakeRuntime, {})
-    const fiber = await ctx.plugin(ToolRuntime, { mode: 'ptc' })
-    expect(ctx.tools.get(RUN_CODE_NAME)).toBeDefined()
+    const fiber = await ctx.plugin(ToolRuntime)
+    await ctx.plugin(PtcToolExecutor)
+    expect(new PtcExecutor(ctx)['requirePtcTransport']()).toBeDefined()
     await fiber.dispose()
     const assembly = await ctx.systemPrompt.assemble()
     expect(assembly.tools).toEqual([])
     expect(assembly.sections.some(section => section.name === 'tools:sdk')).toBe(false)
+  })
+})
+
+describe('the per-program tool-call limit', () => {
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])('rejects maxSubCallsPerMinute=%s in configuration', (maxSubCallsPerMinute) => {
+    expect(() => PtcToolExecutor.Config({ maxSubCallsPerMinute })).toThrow('maxSubCallsPerMinute')
+  })
+
+  it('allows 2048 calls with the default two-minute timeout, rejects later attempts, and resets for the next program', async () => {
+    const { ctx, runtime } = await setup()
+    onTestFinished(() => ctx.fiber.dispose())
+    const calls = registerEcho(ctx)
+    const { agent, events } = fakeAgent()
+    runtime.behavior = async (request) => {
+      const echo = request.bindings[0]!.functions.echo!
+      for (let n = 1; n <= 2048; n++) await echo({ value: String(n) })
+      const message = 'run_code exceeded its limit of 2048 tool calls (1024 per minute of its timeout); call 2049 was not dispatched. '
+        + 'The run_code program may contain an infinite loop. Check loop termination or split the work into smaller run_code calls.'
+      await expect(echo({ value: 'rejected' })).rejects.toThrow(message)
+      expect(request.signal?.aborted).toBe(true)
+      await expect(echo({ value: 'caught the error' })).rejects.toThrow('run_code run is over')
+      return { logs: [], error: { kind: 'abort', message } }
+    }
+    const result = await runCode(ctx, 'program', { agent })
+    expect(result.error).toMatchObject({ info: { code: 'CODE_RUN_FAILED' } })
+    expect(result.error?.message).toContain('call 2049 was not dispatched')
+    expect(calls).toHaveLength(2048)
+    expect(events.filter(event => event.type === 'tool/ptc-dispatch-start')).toHaveLength(2048)
+    expect(events.filter(event => event.type === 'tool/ptc-dispatch')).toHaveLength(2048)
+
+    runtime.behavior = async request => ({ logs: [], value: await request.bindings[0]!.functions.echo!({ value: 'next run' }) })
+    expect((await runCode(ctx, 'next program', { agent })).isError).toBe(false)
+    expect(calls).toHaveLength(2049)
+  })
+
+  it.each([
+    { requestedMs: 30_000, resolvedMs: 30_000, limit: 2 },
+    { requestedMs: 90_000, resolvedMs: 90_000, limit: 6 },
+    { requestedMs: 10_000, resolvedMs: 10_000, limit: 0 },
+    { requestedMs: 600_000, resolvedMs: 90_000, limit: 6 },
+  ])('uses the resolved timeout $resolvedMs ms for an override of $requestedMs ms', async ({ requestedMs, resolvedMs, limit }) => {
+    const { ctx, runtime } = await setup({ maxSubCallsPerMinute: 4 })
+    onTestFinished(() => ctx.fiber.dispose())
+    vi.spyOn(runtime, 'timeout', 'get').mockReturnValue({ defaultMs: 120_000, maxMs: 600_000 })
+    const resolver = vi.spyOn(runtime, 'resolve').mockImplementation(request => ({
+      ...request, cwd: process.cwd(), timeoutMs: resolvedMs,
+    }))
+    const calls = registerEcho(ctx)
+    runtime.behavior = async (request) => {
+      expect(request.timeoutMs).toBe(resolvedMs)
+      const echo = request.bindings[0]!.functions.echo!
+      for (let n = 0; n < limit; n++) await echo({ value: String(n) })
+      await expect(echo({ value: 'rejected' })).rejects.toThrow(`limit of ${limit} tool calls (4 per minute of its timeout); call ${limit + 1} was not dispatched`)
+      expect(request.signal?.aborted).toBe(true)
+      return { logs: [], error: { kind: 'abort', message: String(request.signal?.reason) } }
+    }
+    expect((await runCode(ctx, 'program', { timeoutMs: requestedMs })).isError).toBe(true)
+    expect(calls).toHaveLength(limit)
+    expect(resolver).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ timeoutMs: requestedMs }))
+  })
+
+  it('does not impose a finite call allowance when the runtime resolves no deadline', async () => {
+    const { ctx, runtime } = await setup({ maxSubCallsPerMinute: 1 })
+    onTestFinished(() => ctx.fiber.dispose())
+    vi.spyOn(runtime, 'resolve').mockImplementation(request => ({
+      ...request, cwd: process.cwd(), timeoutMs: null,
+    }))
+    const calls = registerEcho(ctx)
+    runtime.behavior = async (request) => {
+      for (let n = 0; n < 3; n++) await request.bindings[0]!.functions.echo!({ value: String(n) })
+      return { logs: [] }
+    }
+    expect((await runCode(ctx, 'program')).isError).toBe(false)
+    expect(calls).toHaveLength(3)
+  })
+
+  it('aborts active calls across tool names, abandons queued calls, and drains their logs before returning', async () => {
+    const { ctx, runtime } = await setup({ maxSubCallsPerMinute: 1, maxParallelSubCalls: 1 })
+    onTestFinished(() => ctx.fiber.dispose())
+    const { agent, events } = fakeAgent()
+    const entered = Promise.withResolvers<undefined>()
+    const aborted = Promise.withResolvers<undefined>()
+    const queued = registerEcho(ctx, 'queued')
+    let cleaned = false
+    ctx.tools.register(defineContentToolFixture({
+      name: 'active', description: 'Wait for cancellation.', parameters: {},
+      async execute(_args, exec) {
+        exec.signal.addEventListener('abort', () => { aborted.resolve(undefined) }, { once: true })
+        entered.resolve(undefined)
+        await aborted.promise
+        cleaned = true
+        return []
+      },
+    }))
+    const outcomes: string[] = []
+    runtime.behavior = async (request) => {
+      const functions = request.bindings[0]!.functions
+      void functions.active!({}).catch(() => { outcomes.push('active canceled') })
+      await entered.promise
+      void functions.queued!({ value: 'queued' }).catch(() => { outcomes.push('queued abandoned') })
+      await expect(functions.queued!({ value: 'excess' })).rejects.toThrow('limit of 2 tool calls (1 per minute of its timeout); call 3 was not dispatched')
+      expect(request.signal?.aborted).toBe(true)
+      return { logs: [], error: { kind: 'abort', message: 'execution canceled' } }
+    }
+    const result = await runCode(ctx, 'program', { agent })
+    expect(result.error).toMatchObject({ info: { code: 'CODE_RUN_FAILED' } })
+    expect(cleaned).toBe(true)
+    expect(outcomes.sort()).toEqual(['active canceled', 'queued abandoned'])
+    expect(queued).toEqual([])
+    expect(events.filter(event => event.type === 'tool/ptc-dispatch-start').map(event => event.data))
+      .toMatchObject([{ name: 'active', subCallId: 'call-1:ptc:1' }])
+    expect(events.filter(event => event.type === 'tool/ptc-dispatch').map(event => event.data))
+      .toMatchObject([{ name: 'active', subCallId: 'call-1:ptc:1', isError: true }])
+  })
+
+  it.each([
+    { failure: { kind: 'abort', message: 'execution canceled; retained variables were cleared' }, cancelCaller: false },
+    { failure: { kind: 'worker-exit', message: 'managed process cleanup failed: fixture failure' }, cancelCaller: false },
+    { failure: { kind: 'abort', message: 'execution canceled' }, cancelCaller: true },
+  ] as const)('preserves the call limit and runtime $failure.kind diagnostics with caller cancellation $cancelCaller', async ({ failure, cancelCaller }) => {
+    const { ctx, runtime } = await setup({ maxSubCallsPerMinute: 1 })
+    onTestFinished(() => ctx.fiber.dispose())
+    const controller = new AbortController()
+    registerEcho(ctx)
+    runtime.behavior = async (request) => {
+      const echo = request.bindings[0]!.functions.echo!
+      await echo({ value: 'one' })
+      await echo({ value: 'two' })
+      await expect(echo({ value: 'excess' })).rejects.toThrow('limit of 2 tool calls')
+      expect(request.signal?.aborted).toBe(true)
+      if (cancelCaller) controller.abort('later caller cancellation')
+      return { logs: ['before termination'], error: failure }
+    }
+    const result = await runCode(ctx, 'program', { signal: controller.signal })
+    expect(result.error).toMatchObject({ info: { code: 'CODE_RUN_FAILED' } })
+    expect(result.error?.message).toContain(`code run failed (${failure.kind}): run_code exceeded its limit of 2 tool calls`)
+    expect(result.error?.message).toContain(failure.message)
+    expect(result.error?.message).toContain('before termination')
+  })
+
+  it('counts failed argument validation and failed tool executions', async () => {
+    const { ctx, runtime } = await setup({ maxSubCallsPerMinute: 3 })
+    onTestFinished(() => ctx.fiber.dispose())
+    vi.spyOn(runtime, 'resolve').mockImplementation(request => ({
+      ...request, cwd: process.cwd(), timeoutMs: 60_000,
+    }))
+    const calls = registerEcho(ctx)
+    const failure = vi.fn(async () => { throw new Error('tool failed') })
+    ctx.tools.register(defineTool({
+      name: 'fail', description: 'Fail a tool call.', parameters: {},
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      execute: failure,
+    }))
+    runtime.behavior = async (request) => {
+      const functions = request.bindings[0]!.functions
+      await expect(functions.echo!(undefined)).rejects.toThrow('lossless JSON')
+      await expect(functions.echo!({})).rejects.toThrow()
+      await expect(functions.fail!({})).rejects.toThrow('tool failed')
+      await expect(functions.echo!({ value: 'rejected' })).rejects.toThrow('limit of 3 tool calls (3 per minute of its timeout); call 4 was not dispatched')
+      expect(request.signal?.aborted).toBe(true)
+      return { logs: [], error: { kind: 'abort', message: String(request.signal?.reason) } }
+    }
+    expect((await runCode(ctx, 'program')).isError).toBe(true)
+    expect(calls).toEqual([])
+    expect(failure).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -708,14 +961,8 @@ describe('the sub-dispatch scheduler (native concurrency contract)', () => {
     const gated = registerGated(ctx, 'safe_read', true)
     runtime.behavior = async (request) => {
       const tools = request.bindings[0]!.functions
-      const all = Promise.all([
-        tools.safe_read!({ id: 'a' }),
-        tools.safe_read!({ id: 'b' }),
-        tools.safe_read!({ id: 'c' }),
-      ])
+      const all = Promise.all(Array.from({ length: 3 }, (_, i) => tools.safe_read!({ id: String(i) })))
       await expect.poll(() => gated.pending()).toBe(2)
-      // The third call waits for a slot.
-      expect(gated.pending()).toBe(2)
       gated.release()
       await expect.poll(() => gated.pending()).toBe(2)
       gated.releaseAll()
@@ -723,7 +970,6 @@ describe('the sub-dispatch scheduler (native concurrency contract)', () => {
       return { logs: [], value: 'capped' }
     }
     const result = await runCode(ctx, 'program')
-    if (result.isError) console.error('CAP-FAIL:', (result.content[0] as { text: string }).text)
     expect(result.isError).toBe(false)
     expect(gated.peakLive()).toBe(2)
   })
@@ -1505,19 +1751,20 @@ describe('the run_code dispatch bridge', () => {
     }])
   })
 
-  it('converts a failed run into a structured isError result carrying kind, message, and captured logs', async () => {
+  it.each([
+    ['before code started', []],
+    ['during execution', ['got this far']],
+  ] as const)('reports a timeout %s with its captured output', async (phase, logs) => {
     const { ctx, runtime } = await setup({ mode: 'ptc' })
     runtime.behavior = () => Promise.resolve({
-      logs: ['got this far'],
-      error: { kind: 'timeout', message: 'compute budget exhausted (300ms busy)' },
+      logs: [...logs],
+      error: { kind: 'timeout', message: `execution timed out ${phase} (300ms); retained variables were cleared` },
     })
     const result = await runCode(ctx, 'program')
     expect(result.isError).toBe(true)
     expect(result.error).toMatchObject({ info: { name: 'CodeRunFailedError', code: 'CODE_RUN_FAILED' } })
     const text = (result.content[0] as { text: string }).text
-    expect(text).toContain('code run failed (timeout)')
-    expect(text).toContain('compute budget exhausted')
-    expect(text).toContain('got this far')
+    expect(text).toBe(`Error: code run failed (timeout): execution timed out ${phase} (300ms); retained variables were cleared${logs.length > 0 ? '\nCaptured output:\ngot this far' : ''}`)
   })
 
   it('CodeRunFailedError is a HarnessError with the CODE_RUN_FAILED code', () => {
@@ -1528,7 +1775,9 @@ describe('the run_code dispatch bridge', () => {
 
   it('aborting the outer signal aborts the in-flight sub-dispatch and abandons queued ones', async () => {
     const { ctx, runtime } = await setup({ mode: 'ptc' })
+    onTestFinished(async () => { await ctx.fiber.dispose() })
     const seen: string[] = []
+    const entered = Promise.withResolvers<undefined>()
     let sawAbort = false
     ctx.tools.register(defineContentToolFixture({
       name: 'slow',
@@ -1537,8 +1786,8 @@ describe('the run_code dispatch bridge', () => {
       async execute(args, exec) {
         seen.push(args.id)
         await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, 500)
-          exec.signal.addEventListener('abort', () => { sawAbort = true; clearTimeout(timer); resolve() }, { once: true })
+          exec.signal.addEventListener('abort', () => { sawAbort = true; resolve() }, { once: true })
+          entered.resolve(undefined)
         })
         return [{ type: 'text' as const, text: args.id }]
       },
@@ -1547,7 +1796,8 @@ describe('the run_code dispatch bridge', () => {
     runtime.behavior = async (request) => {
       const tools = request.bindings[0]!.functions
       const calls = [tools.slow!({ id: 'first' }).catch(() => 'rejected'), tools.slow!({ id: 'second' }).catch(() => 'rejected')]
-      setTimeout(() => { controller.abort('user-cancel') }, 50)
+      await entered.promise
+      controller.abort('user-cancel')
       await Promise.all(calls)
       // A real runtime would be terminated by the abort; the fake honors the
       // contract by reporting the abort as the run failure.
@@ -1555,7 +1805,7 @@ describe('the run_code dispatch bridge', () => {
     }
     const result = await runCode(ctx, 'program', { signal: controller.signal })
     expect(result.isError).toBe(true)
-    expect((result.content[0] as { text: string }).text).toContain('code run failed (abort)')
+    expect(result.error).toEqual({ message: 'tool call aborted', info: { name: 'AbortError', code: TOOL_ABORTED } })
     expect(seen).toEqual(['first'])
     expect(sawAbort).toBe(true)
   })
@@ -1611,7 +1861,8 @@ describe('the run_code dispatch bridge', () => {
     const ctx = new Context()
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
-    await ctx.plugin(ToolRuntime, { mode: 'ptc' })
+    await ctx.plugin(ToolRuntime)
+    ctx.tools.setExecutor(new PtcExecutor(ctx))
     const result = await runCode(ctx, 'program')
     expect(result.isError).toBe(true)
     expect((result.content[0] as { text: string }).text).toContain('requires a PTC runtime')
@@ -1621,7 +1872,8 @@ describe('the run_code dispatch bridge', () => {
     const ctx = new Context()
     try {
       await ctx.plugin(SystemPrompt)
-      await ctx.plugin(ToolRuntime, { mode: 'ptc' })
+      await ctx.plugin(ToolRuntime)
+      ctx.tools.setExecutor(new PtcExecutor(ctx))
       await ctx.plugin(FakeRuntime)
       const runtime = ctx.ptcRuntime as FakeRuntime
       const calls = registerEcho(ctx)
@@ -1647,7 +1899,7 @@ describe('the run_code dispatch bridge', () => {
 
   it('presents the model-authored description as the execute-card title over the program input', async () => {
     const { ctx } = await setup({ mode: 'ptc' })
-    const tool = ctx.tools.get(RUN_CODE_NAME)!
+    const tool = new PtcExecutor(ctx)['requirePtcTransport']()
     // The description labels the card (the bash description precedent); the
     // program itself remains the expanded raw input.
     expect(tool.presentCall?.({ code: 'return 1', description: 'Return the constant one' })).toEqual({
@@ -1675,7 +1927,7 @@ describe('the run_code dispatch bridge', () => {
     runtime.behavior = () => Promise.resolve(output)
 
     const result = await runCode(ctx, 'return 1')
-    const tool = ctx.tools.get(RUN_CODE_NAME)!
+    const tool = new PtcExecutor(ctx)['requirePtcTransport']()
 
     expect(result.content).toEqual([{ type: 'text', text }])
     // Presenters keep the pending program title and render this durable content
@@ -1694,7 +1946,7 @@ describe('the run_code dispatch bridge', () => {
     })
 
     const result = await runCode(ctx, 'return 1')
-    const tool = ctx.tools.get(RUN_CODE_NAME)!
+    const tool = new PtcExecutor(ctx)['requirePtcTransport']()
 
     expect(result.content).toEqual([{ type: 'text', text: preview }])
     expect('presentResult' in tool).toBe(false)
@@ -1708,7 +1960,7 @@ describe('the run_code dispatch bridge', () => {
     })
 
     const result = await runCode(ctx, 'return 1')
-    const tool = ctx.tools.get(RUN_CODE_NAME)!
+    const tool = new PtcExecutor(ctx)['requirePtcTransport']()
 
     expect(result.isError).toBe(true)
     expect(result.content).toEqual([{
@@ -1969,6 +2221,76 @@ describe('the run_code dispatch bridge', () => {
     expect(calls).toEqual([])
   })
 
+  it.each(['preserved', 'cleared'])('reports retained variables were %s after caller cancellation', async (state) => {
+    const { ctx, runtime } = await setup({ mode: 'ptc' })
+    vi.spyOn(runtime, 'retainsState', 'get').mockReturnValue(true)
+    const controller = new AbortController()
+    const message = `execution canceled; retained variables were ${state}`
+    runtime.behavior = async () => {
+      controller.abort({ kind: 'user' })
+      return { logs: [], error: { kind: 'abort', message } }
+    }
+    const result = await runCode(ctx, 'program', { signal: controller.signal })
+    expect(result.error).toEqual({
+      message: `tool call aborted: ${message}`,
+      info: { name: 'AbortError', code: TOOL_ABORTED },
+    })
+  })
+
+  describe.each(['typescript', 'python'])('%s caller cancellation', (language) => {
+    it.each<AgentCancelCause | undefined>([
+      { kind: 'user' },
+      { kind: 'parent' },
+      { kind: 'hook', reason: 'policy stopped the turn' },
+      { kind: 'disposed' },
+      undefined,
+    ])('maps reason %j to the native tool abort result', async (cause) => {
+      const { ctx, runtime } = await setup({ mode: 'ptc', runtime: { language } })
+      onTestFinished(async () => { await ctx.fiber.dispose() })
+      const controller = new AbortController()
+      runtime.behavior = async (request) => {
+        if (cause === undefined) controller.abort()
+        else controller.abort(cause)
+        expect(request.signal?.reason).toBe(controller.signal.reason)
+        const reason: unknown = request.signal?.reason
+        const message = reason instanceof Error ? reason.message : String(reason)
+        return { logs: [], error: { kind: 'abort', message } }
+      }
+
+      const result = await runCode(ctx, 'program', { signal: controller.signal })
+
+      expect(result).toEqual({
+        content: [{ type: 'text', text: 'Error: tool call aborted' }],
+        isError: true,
+        error: {
+          message: 'tool call aborted',
+          info: { name: 'AbortError', code: TOOL_ABORTED },
+        },
+      })
+    })
+  })
+
+  it.each<[boolean, PtcRunFailure]>([
+    [false, { kind: 'abort', message: 'sandbox mode changed' }],
+    [true, { kind: 'worker-exit', message: 'managed process cleanup failed' }],
+    [true, { kind: 'timeout', message: 'execution deadline reached' }],
+  ])('keeps runtime failure details with caller cancellation %s: %j', async (cancelled, failure) => {
+    const { ctx, runtime } = await setup({ mode: 'ptc' })
+    onTestFinished(async () => { await ctx.fiber.dispose() })
+    const controller = new AbortController()
+    runtime.behavior = async () => {
+      if (cancelled) controller.abort({ kind: 'user' })
+      return { logs: ['got this far'], error: failure }
+    }
+
+    const result = await runCode(ctx, 'program', { signal: controller.signal })
+
+    expect(result.error).toEqual({
+      message: `code run failed (${failure.kind}): ${failure.message}\nCaptured output:\ngot this far`,
+      info: { name: 'CodeRunFailedError', code: 'CODE_RUN_FAILED' },
+    })
+  })
+
   it('a tool/ptc-dispatch event never derives a model message', () => {
     const session = Session.create(SessionId('ptc-derive'))
     session.append('user/message', createUserMessage({
@@ -1988,28 +2310,31 @@ describe('the run_code dispatch bridge', () => {
     expect(derived[0]?.role).toBe('user')
   })
 
-  it('direct construction rejects a non-positive parallel sub-call cap at load', async () => {
+  it('direct construction rejects a non-positive parallel subcall limit', async () => {
     const ctx = new Context()
-    provideWorkingDirectoryFixture(ctx)
-    await ctx.plugin(SystemPrompt, {})
-    expect(() => new ToolRuntime(ctx, { mode: 'ptc', maxParallelSubCalls: 0 }))
-      .toThrow('maxParallelSubCalls must be a positive integer')
+    try {
+      await ctx.plugin(SystemPrompt)
+      expect(() => new PtcExecutor(ctx, { maxParallelSubCalls: 0 })).toThrow('maxParallelSubCalls')
+    } finally { await ctx.fiber.dispose() }
   })
 
-  it('direct construction in PTC mode defaults the parallel sub-call cap', async () => {
+  it('direct construction exposes the PTC transport without configuration', async () => {
     const ctx = new Context()
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
-    const registry = new ToolRuntime(ctx, { mode: 'ptc' })
-    expect(registry.get(RUN_CODE_NAME)).toBeDefined()
+    await ctx.plugin(ToolRuntime)
+    const registry = new PtcExecutor(ctx)
+    expect(registry['requirePtcTransport']()).toBeDefined()
   })
 
   it('defaults to native mode under direct construction with no config', async () => {
     const ctx = new Context()
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
-    const registry = new ToolRuntime(ctx)
-    expect(registry.get(RUN_CODE_NAME)).toBeUndefined()
+    await ctx.plugin(ToolRuntime)
+    const registry = new NativeToolExecutor(ctx)
+    ctx.tools.setExecutor(registry)
+    expect(registry.describe(ctx.tools.definitions()).schemas.some(tool => tool.name === RUN_CODE_NAME)).toBe(false)
     const assembly = await ctx.systemPrompt.assemble()
     expect(assembly.sections.some(section => section.name === 'tools:sdk')).toBe(false)
   })
@@ -2017,9 +2342,11 @@ describe('the run_code dispatch bridge', () => {
     const ctx = new Context()
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
-    const registry = new ToolRuntime(ctx, { mode: 'ptc' })
+    await ctx.plugin(ToolRuntime)
+    const registry = new PtcExecutor(ctx)
     registerEcho(ctx, 'write')
-    const result = await registry.execute({
+    ctx.tools.setExecutor(registry)
+    const result = await executeCall(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('call-1'),
       name: 'write',
@@ -2038,11 +2365,13 @@ describe('the run_code dispatch bridge', () => {
     const ctx = new Context()
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
-    const registry = new ToolRuntime(ctx, { mode: 'ptc' })
+    await ctx.plugin(ToolRuntime)
+    const registry = new PtcExecutor(ctx)
     registerEcho(ctx, 'write')
     const aborted = new AbortController()
     aborted.abort()
-    const result = await registry.execute({
+    ctx.tools.setExecutor(registry)
+    const result = await executeCall(ctx, {
       signal: aborted.signal,
       callId: ToolCallId('call-1'),
       name: 'write',
@@ -2066,7 +2395,7 @@ describe('per-agent presentation', () => {
     const calls = registerEcho(ctx)
     const { scope, agent } = await mintAgentScope(ctx)
 
-    scope.ctx.tools.presentAs('ptc')
+    scope.ctx.tools.setExecutor(new PtcExecutor(scope.ctx))
 
     const coded = await systemPrompt.assemble({ scope: agent })
     expect(coded.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
@@ -2074,7 +2403,7 @@ describe('per-agent presentation', () => {
       .toContain('echo')
     // Announced surface and callable surface must agree for THIS agent, whose
     // mode is its own rather than the deployment's.
-    const denied = await ctx.tools.execute({
+    const denied = await executeCall(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('coded-direct'),
       name: 'echo',
@@ -2097,12 +2426,12 @@ describe('per-agent presentation', () => {
     // The preset's standing scope declares once; the agent only PARENTS to it
     // (the per-preset standing mount configuration has no per-agent declaration).
     const standing = await mintAgentScope(ctx, 'preset:ptc-like')
-    standing.scope.ctx.tools.presentAs('ptc')
+    standing.scope.ctx.tools.setExecutor(new PtcExecutor(standing.scope.ctx))
     const joined = await mintAgentScope(ctx, 'joined-agent')
     bindScopeParent(joined.agent, standing.agent)
     const loner = await mintAgentScope(ctx, 'loner-agent')
 
-    expect(ctx.tools.get(RUN_CODE_NAME, joined.agent)).toBeDefined()
+    expect((await ctx.systemPrompt.assemble({ scope: joined.agent })).tools.find(tool => tool.name === RUN_CODE_NAME)).toBeDefined()
     const coded = await systemPrompt.assemble({ scope: joined.agent })
     expect(coded.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
     // Through the EXECUTOR, not just the wire: the deployment default is
@@ -2110,14 +2439,14 @@ describe('per-agent presentation', () => {
     // scope's effective mode would announce [run_code] and still execute the
     // native call — the bypass, reopened for exactly the preset composition
     // `dsh-agent-tool-presentation` produces.
-    expect(ctx.tools.executionMode({
+    expect(new PtcExecutor(ctx)['pipeline'].executionMode({
       signal: testToolSignal,
       callId: ToolCallId('preset-coded-schedule'),
       name: 'echo',
       arguments: { value: 'joined' },
       agent: joined.agent,
     })).toEqual({ kind: 'exclusive' })
-    const denied = await ctx.tools.execute({
+    const denied = await executeCall(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('preset-coded-direct'),
       name: 'echo',
@@ -2127,10 +2456,10 @@ describe('per-agent presentation', () => {
     expect(denied.error?.info).toEqual({ name: 'ToolNotFoundError', code: 'UNKNOWN_TOOL' })
     expect(calls).toEqual([])
     // A sibling that never parented stays native, as does the global view.
-    expect(ctx.tools.get(RUN_CODE_NAME, loner.agent)).toBeUndefined()
+    expect((await ctx.systemPrompt.assemble({ scope: loner.agent })).tools.find(tool => tool.name === RUN_CODE_NAME)).toBeUndefined()
     const native = await systemPrompt.assemble({ scope: loner.agent })
     expect(native.tools.map(tool => tool.name)).toEqual(['echo'])
-    const allowed = await ctx.tools.execute({
+    const allowed = await executeCall(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('native-sibling-direct'),
       name: 'echo',
@@ -2146,13 +2475,13 @@ describe('per-agent presentation', () => {
     registerEcho(ctx)
     const coded = await mintAgentScope(ctx, 'coded')
     const plain = await mintAgentScope(ctx, 'plain')
-    coded.scope.ctx.tools.presentAs('ptc')
+    coded.scope.ctx.tools.setExecutor(new PtcExecutor(coded.scope.ctx))
 
     // Not merely hidden from the prompt: the transport one agent presents must
     // not be dispatchable by another that never presented it.
-    expect(ctx.tools.get(RUN_CODE_NAME, coded.agent)).toBeDefined()
-    expect(ctx.tools.get(RUN_CODE_NAME, plain.agent)).toBeUndefined()
-    expect(ctx.tools.get(RUN_CODE_NAME)).toBeUndefined()
+    expect((await ctx.systemPrompt.assemble({ scope: coded.agent })).tools.find(tool => tool.name === RUN_CODE_NAME)).toBeDefined()
+    expect((await ctx.systemPrompt.assemble({ scope: plain.agent })).tools.find(tool => tool.name === RUN_CODE_NAME)).toBeUndefined()
+    expect((await ctx.systemPrompt.assemble()).tools.find(tool => tool.name === RUN_CODE_NAME)).toBeUndefined()
   })
 
   it('lets an agent opt out of a PTC mode deployment', async () => {
@@ -2160,44 +2489,41 @@ describe('per-agent presentation', () => {
     registerEcho(ctx)
     const { scope, agent } = await mintAgentScope(ctx)
 
-    scope.ctx.tools.presentAs('native')
+    scope.ctx.tools.setExecutor(new NativeToolExecutor(scope.ctx))
 
     const assembly = await systemPrompt.assemble({ scope: agent })
     expect(assembly.tools.map(tool => tool.name)).toEqual(['echo'])
-    // The deployment's global section still reaches this scope; rendering it
-    // empty is what keeps the opted-out agent's prompt free of an SDK.
     expect(assembly.sections.find(section => section.name === 'tools:sdk')?.text).toBe('')
+    expect(assembly.sections.find(section => section.name === 'tools:ptc-only')?.text).toBe('')
   })
 
-  it('restores the deployment default when the agent unloads', async () => {
+  it('rejects an unloaded executor without falling back to the deployment default', async () => {
     const { ctx, systemPrompt } = await setup({ mode: 'native' })
     registerEcho(ctx)
     const { scope, agent } = await mintAgentScope(ctx)
-    const dispose = scope.ctx.tools.presentAs('ptc')
+    const dispose = scope.ctx.tools.setExecutor(new PtcExecutor(scope.ctx))
 
     dispose()
 
-    const assembly = await systemPrompt.assemble({ scope: agent })
-    expect(assembly.tools.map(tool => tool.name)).toEqual(['echo'])
-    expect(assembly.sections.some(section => section.name === 'tools:sdk')).toBe(false)
+    await expect(systemPrompt.assemble({ scope: agent })).rejects.toThrow('selected tool executor is unavailable')
   })
 
   it('refuses a second declaration for the same agent', async () => {
     const { ctx } = await setup({ mode: 'native' })
     const { scope } = await mintAgentScope(ctx)
-    scope.ctx.tools.presentAs('ptc')
+    scope.ctx.tools.setExecutor(new PtcExecutor(scope.ctx))
 
     // Two answers to "which form does the model see" is a contradiction, and
     // silently keeping either one would make the composition unreadable.
-    expect(() => scope.ctx.tools.presentAs('native'))
-      .toThrow('conflicts with "ptc" already declared')
+    expect(() => scope.ctx.tools.setExecutor(new NativeToolExecutor(scope.ctx)))
+      .toThrow('Only one tool executor may be registered in each scope')
   })
 
-  it('refuses an unscoped declaration', async () => {
+  it('refuses a second deployment default', async () => {
     const { ctx } = await setup({ mode: 'native' })
 
-    expect(() => ctx.tools.presentAs('ptc'))
-      .toThrow('requires a scoped context')
+    expect(() => ctx.tools.setExecutor(new PtcExecutor(ctx)))
+      .toThrow('Only one tool executor may be registered in each scope')
   })
 
   it('reserves run_code even where no agent presents it', async () => {
@@ -2212,13 +2538,99 @@ describe('per-agent presentation', () => {
     const { ctx, systemPrompt } = await setup({ mode: 'native', runtime: false })
     registerEcho(ctx)
     const { scope, agent } = await mintAgentScope(ctx)
-    scope.ctx.tools.presentAs('ptc')
+    scope.ctx.tools.setExecutor(new PtcExecutor(scope.ctx))
 
     await expect(systemPrompt.assemble({ scope: agent }))
       .rejects.toThrow('mode "ptc" requires a PTC runtime')
   })
 })
 
+
+describe('host environment reset', () => {
+  async function retainedSetup() {
+    const result = await setup()
+    onTestFinished(async () => { await result.ctx.fiber.dispose() })
+    vi.spyOn(result.runtime, 'retainsState', 'get').mockReturnValue(true)
+    const { agent, scope } = await mintAgentScope(result.ctx)
+    const inject = vi.fn<Agent['inject']>()
+    agent.inject = inject
+    const executor = result.executor as PtcExecutor
+    return { ...result, agent, scope, inject, reset: () => executor.reset(agent) }
+  }
+
+  it('keeps reset outside the model schema, prompt, and SDK', async () => {
+    const { ctx, systemPrompt, agent, scope } = await retainedSetup()
+    registerEcho(ctx)
+    const direct = await executeCall(ctx, { name: 'reset_code', callId: ToolCallId('direct-reset'), signal: testToolSignal, agent, arguments: {} })
+    expect(direct.error?.info?.code).toBe('UNKNOWN_TOOL')
+    scope.ctx.tools.restrict({ allow: [] })
+    const assembly = await systemPrompt.assemble({ scope: agent })
+    expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
+    expect(assembly.sections.map(section => section.text).join('\n')).not.toContain('reset_code')
+  })
+
+  it('clears the exact Agent owner and queues a model-visible state-loss notice', async () => {
+    const { runtime, agent, reset, inject } = await retainedSetup()
+    const release = vi.spyOn(runtime, 'release').mockResolvedValue(undefined)
+    await reset()
+    expect(release).toHaveBeenCalledExactlyOnceWith(agent)
+    expect(inject).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      content: [{ type: 'text', text: 'Program environment reset; retained variables cleared. Completed tool effects remain.' }],
+      source: { kind: 'ptc-mode' },
+    }))
+    vi.spyOn(runtime, 'retainsState', 'get').mockReturnValue(false)
+    await expect(reset()).rejects.toThrow('does not retain an environment')
+    expect(release).toHaveBeenCalledOnce()
+    expect(inject).toHaveBeenCalledOnce()
+  })
+
+  it('releases a nonresponsive program independently and waits for started nested-tool cleanup', async () => {
+    const { ctx, runtime, agent, reset } = await retainedSetup()
+    const toolStarted = Promise.withResolvers<undefined>()
+    const cleanup = Promise.withResolvers<undefined>()
+    const program = Promise.withResolvers<PtcRunResult>()
+    let nestedSignal: AbortSignal | undefined
+    ctx.tools.register(defineTool({
+      name: 'blocked', description: 'Wait for controlled cleanup.', parameters: {},
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      execute: async (_args, exec) => { nestedSignal = exec.signal; toolStarted.resolve(undefined); await cleanup.promise; return 'cleaned' },
+    }))
+    runtime.behavior = (request) => {
+      void request.bindings[0]!.functions.blocked!({}).catch(() => {})
+      return program.promise
+    }
+    const release = vi.spyOn(runtime, 'release').mockImplementation(async () => { program.resolve({ logs: [], error: { kind: 'abort', message: 'environment disposed' } }) })
+    const running = runCode(ctx, 'await tools.blocked({}); while (true) {}', { agent })
+    await toolStarted.promise
+    let settled = false
+    const resetting = reset().then((result) => { settled = true; return result })
+    try {
+      await vi.waitFor(() => { expect(release).toHaveBeenCalledWith(agent) })
+      expect(nestedSignal?.aborted).toBe(true)
+      expect(settled).toBe(false)
+      cleanup.resolve(undefined)
+      await resetting
+      expect((await running).isError).toBe(true)
+    } finally { cleanup.resolve(undefined); program.resolve({ logs: [] }); await Promise.all([running, resetting]) }
+  })
+
+  it('reports failed cleanup, refuses further code, and allows explicit reset retry', async () => {
+    const { ctx, runtime, agent, reset, inject } = await retainedSetup()
+    const release = vi.spyOn(runtime, 'release').mockResolvedValue(undefined).mockRejectedValueOnce(new Error('process cleanup failed'))
+    const run = vi.spyOn(runtime, 'run')
+    await expect(reset()).rejects.toThrow(CodeResetFailedError)
+    expect(inject).not.toHaveBeenCalled()
+    const blocked = await runCode(ctx, '1', { agent })
+    expect(blocked.isError).toBe(true)
+    expect(blocked.error?.info?.code).toBe('CODE_RUN_FAILED')
+    expect(blocked.content.find(block => block.type === 'text')?.text).toContain('Ask the host to reset it before running more code')
+    expect(run).not.toHaveBeenCalled()
+    await reset()
+    expect(inject).toHaveBeenCalledOnce()
+    expect(release).toHaveBeenCalledTimes(2)
+    expect((await runCode(ctx, '1', { agent })).isError).toBe(false)
+  })
+})
 
 class ConfinedFakeRuntime extends FakeRuntime {
   override get sandboxMode() { return 'read-only' as const }
@@ -2318,9 +2730,9 @@ describe('per-program execution controls', () => {
   })
 
   it('advertises configured timeout values and one-execution scope only when supported', async () => {
-    const { ctx, tools } = await controlledSetup()
+    const { ctx, systemPrompt } = await controlledSetup()
     try {
-      const schema = tools.schemas().find(tool => tool.name === RUN_CODE_NAME)!
+      const schema = (await systemPrompt.assemble()).tools.find(tool => tool.name === RUN_CODE_NAME)!
       expect(JSON.stringify(schema.parameters)).toContain('Default 120000; capped at 600000')
       expect(JSON.stringify(schema.parameters)).toContain('sandbox_permissions')
       expect(schema.description).toContain('Nested tools retain their own policies')
@@ -2329,7 +2741,7 @@ describe('per-program execution controls', () => {
     } finally { await ctx.fiber.dispose() }
     const python = await setup({ runtime: { language: 'python' } })
     try {
-      const schema = python.tools.schemas().find(tool => tool.name === RUN_CODE_NAME)!
+      const schema = (await python.systemPrompt.assemble()).tools.find(tool => tool.name === RUN_CODE_NAME)!
       expect(JSON.stringify(schema.parameters)).not.toContain('timeoutMs')
       expect(JSON.stringify(schema.parameters)).not.toContain('sandbox_permissions')
       expect(schema.description).not.toContain('Programs start with an empty environment.')
@@ -2503,7 +2915,7 @@ describe('PTC state ownership', () => {
     const format = vi.spyOn(runtime, 'programFormat', 'get').mockReturnValue(programFormat)
     const release = vi.spyOn(runtime, 'release')
     try {
-      expect(ctx.tools.schemas().find(tool => tool.name === 'run_code')?.description).not.toContain('persistent-in-memory')
+      expect(new PtcExecutor(ctx).describe([]).schemas.find(tool => tool.name === 'run_code')?.description).not.toContain('persistent-in-memory')
       expect((await runCode(ctx, 'let value = 1', { agent })).isError).toBe(false)
       expect((await runCode(ctx, 'value', { agent })).isError).toBe(false)
       expect(runtime.lastRequest?.stateOwner).toBe(agent)
@@ -2519,10 +2931,59 @@ describe('PTC state ownership', () => {
     const format = vi.spyOn(runtime, 'programFormat', 'get').mockReturnValue('repl')
     const instructions = vi.spyOn(runtime, 'executionInstructions', 'get').mockReturnValue('Each call evaluates Python expressions in a fresh environment.')
     try {
-      const description = ctx.tools.schemas().find(tool => tool.name === 'run_code')?.description
+      const description = new PtcExecutor(ctx).describe([]).schemas.find(tool => tool.name === 'run_code')?.description
       expect(description).toContain('Each call evaluates Python expressions in a fresh environment.')
       expect(description).not.toContain('persistent-in-memory')
       expect(description).not.toContain('TypeScript')
     } finally { format.mockRestore(); instructions.mockRestore(); await ctx.fiber.dispose() }
   })
+})
+
+it.each([
+  { owned: false, unload: 'executor' },
+  { owned: true, unload: 'executor' },
+  { owned: false, unload: 'runtime' },
+  { owned: true, unload: 'runtime' },
+] as const)('settles nested calls after the PTC $unload fiber unloads (Agent: $owned)', async ({ owned, unload }) => {
+  const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
+  await ctx.plugin(SystemPrompt)
+  await ctx.plugin(ToolRuntime)
+  const runtimeProvider = await ctx.plugin(FakeRuntime)
+  const provider = ctx.plugin(PtcToolExecutor)
+  await provider
+  ctx.tools.register(defineTool({
+    name: 'echo', description: 'Retained capability.', parameters: {},
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+    execute: async () => 'settled',
+  }))
+  const entered = Promise.withResolvers<undefined>()
+  const release = Promise.withResolvers<undefined>()
+  const runtime = ctx.ptcRuntime as FakeRuntime
+  runtime.behavior = async (request) => {
+    entered.resolve(undefined)
+    await release.promise
+    return { logs: [], value: await request.bindings[0]!.functions.echo!({}) }
+  }
+  const agent = { ctx, id: SessionId('unloading-ptc'), session: Session.create(SessionId('unloading-ptc')) } as Agent
+  const input = {
+    calls: [{ type: 'tool-call' as const, id: ToolCallId('unloading-program'), name: RUN_CODE_NAME,
+      arguments: JSON.stringify({ code: 'return await tools.echo({})', description: 'Invoke retained tool after unload' }) }],
+    signal: new AbortController().signal,
+    ...owned ? { agent } : {},
+  }
+  const pending = ctx.tools.execute(input)
+  try {
+    await entered.promise
+    await (unload === 'runtime' ? runtimeProvider : provider).dispose()
+    await expect(ctx.tools.execute(input)).rejects.toThrow('selected tool executor is unavailable')
+    release.resolve(undefined)
+    expect((await pending).results[0]?.result).toMatchObject({ isError: false, value: { logs: [], result: 'settled' } })
+    if (owned) expect(agent.session.snapshotEvents().filter(event => event.type === 'tool/ptc-dispatch'))
+      .toMatchObject([{ data: { name: 'echo', isError: false, content: [{ type: 'text', text: 'settled' }] } }])
+  } finally {
+    release.resolve(undefined)
+    await Promise.allSettled([pending])
+    await ctx.fiber.dispose()
+  }
 })

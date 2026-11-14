@@ -18,17 +18,17 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./types": {
-      "types": "./lib/types/types.d.ts",
-      "default": "./lib/types/types.js"
-    },
     "./presentation": {
       "types": "./lib/types/presentation.d.ts",
       "default": "./lib/types/presentation.js"
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json",
-    "./locale/*.json": "./locale/*.json"
+    "./locale/*.json": "./locale/*.json",
+    "./pipeline": {
+      "types": "./lib/types/pipeline.d.ts",
+      "default": "./lib/pipeline.js"
+    }
   },
   "files": [
     "locale/*.json",
@@ -41,14 +41,10 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-agent": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
-    "@deepseek-ai/dsh-ptc-runtime": "workspace:*",
-    "@deepseek-ai/dsh-sandbox": "workspace:*",
-    "@deepseek-ai/dsh-sandbox-policy": "workspace:*",
     "@deepseek-ai/dsh-scope": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
-    "@deepseek-ai/dsh-user-approval": "workspace:*",
-    "@deepseek-ai/dsh-working-directory": "workspace:*"
+    "@deepseek-ai/dsh-user-approval": "workspace:*"
   },
   "dependencies": {
     "@deepseek-ai/dsh-brand": "workspace:*",

@@ -162,7 +162,12 @@ function presentBashResult(args: unknown, result: ToolResult): ToolResultView | 
   }
   // The exit marker becomes the card's exit pill, so it leaves the output body.
   const { body, ...exit } = parseExitStatus(raw)
-  return { card: 'terminal', output: body, ...exit }
+  return {
+    card: 'terminal',
+    output: body,
+    ...'signal' in exit ? { signal: exit.signal } : {},
+    ...'exitCode' in exit && exit.exitCode !== null ? { exitCode: exit.exitCode } : {},
+  }
 }
 
 /** Resolve a relative per-call override against the Session's current directory. */

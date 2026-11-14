@@ -617,7 +617,12 @@ export function apply(ctx: Context, config: Config = {}): void {
         }
         // The exit marker becomes the card's exit pill, so it leaves the output body.
         const { body, ...exit } = parseExitStatus(raw)
-        return { card: 'terminal', output: body, ...exit }
+        return {
+          card: 'terminal',
+          output: body,
+          ...'signal' in exit ? { signal: exit.signal } : {},
+          ...'exitCode' in exit && exit.exitCode !== null ? { exitCode: exit.exitCode } : {},
+        }
       },
       /* jscpd:ignore-end */
     })

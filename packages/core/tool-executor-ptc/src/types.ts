@@ -1,7 +1,7 @@
 /**
- * Durable Tool event vocabulary shared with type-only consumers.
+ * Client-safe PTC dispatch events and message-source declarations.
  *
- * @module @deepseek-ai/dsh-tools/types
+ * @module @deepseek-ai/dsh-tool-executor-ptc/types
  */
 
 import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
@@ -59,5 +59,12 @@ declare module '@deepseek-ai/dsh-session/types' {
      * construction.
      */
     'tool/ptc-dispatch': PtcDispatchEventData
+  }
+}
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** PTC context, including deferred subcall images and host environment-reset notices. */
+    'ptc-mode': { kind: 'ptc-mode' }
   }
 }

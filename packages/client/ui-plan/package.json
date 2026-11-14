@@ -74,7 +74,8 @@
     "@deepseek-ai/dsh-util-crypto": "workspace:*",
     "@types/react": "~19.2.7",
     "@deepseek-ai/cordis": "workspace:~",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*"
   },
   "files": [
     "locale/*.json",

@@ -5,16 +5,16 @@
  * store, keyed by the loaded {@link @deepseek-ai/dsh-ptc-runtime#PtcRuntime.language | PTC
  * runtime's language}.
  *
- * Under `mode: 'ptc'` the native tool schemas are omitted from the request, so this generated
- * SDK is the model's ONLY source for each tool's argument names, required fields, types,
+ * With the PTC executor selected, native tool schemas are omitted from the request. This generated
+ * SDK is the model's only source for each tool's argument names, required fields, types,
  * descriptions, and canonical output types. Object-shaped arguments and outputs render as one
  * named `TypedDict` per tool (and per nested object), not an opaque `dict[str, Any]`, so the
  * shape survives into the program under the mode that has nothing else to carry it.
- * @module @deepseek-ai/dsh-tools/src/py-types
+ * @module
  */
 
-import { assertSupportedJsonSchema } from './json-schema.ts'
-import type { JsonSchemaNode, JsonSchemaScalar } from './json-schema.ts'
+import { assertSupportedJsonSchema } from '@deepseek-ai/dsh-tools'
+import type { JsonSchemaNode, JsonSchemaScalar } from '@deepseek-ai/dsh-tools'
 import type { ToolSdkSchema } from './ts-types.ts'
 
 /**
@@ -31,7 +31,7 @@ const IDENTIFIER = /^[\p{XID_Start}_]\p{XID_Continue}*$/u
  * Python identifiers are not ASCII: `路径` is as legal a field name as `path`,
  * and rejecting it would degrade the whole enclosing object, dropping every
  * field's name, requiredness, and type — information whose only source under
- * `mode: 'ptc'` is this generated text.
+ * PTC execution is this generated text.
  *
  * NFKC stability is a second and separate condition, because CPython
  * normalizes identifiers at compile time while JSON keys are compared as
@@ -162,7 +162,7 @@ interface RenderState {
  * (`SyntaxError: source code string cannot contain null bytes`), whether it
  * sits in a docstring or in a comment, so one such byte anywhere in a schema
  * description would make the whole generated SDK unparseable — under
- * `mode: 'ptc'`, the model's only declaration of the tools. The rest are
+ * PTC execution, the model's only declaration of the tools. The rest are
  * legal but invisible; escaping them with the same rule keeps the emitted text
  * readable and the treatment uniform.
  *
@@ -578,7 +578,7 @@ function renderType(schema: unknown, className: string, state: RenderState): str
           }
         }
         // TypedDict syntax cannot express openness, so an open object states it
-        // in-band: the annotation is advisory either way, and `mode: 'ptc'`
+        // in-band: the annotation is advisory either way, and PTC execution
         // omits the native schemas, making this line the model's only signal
         // that extra keys are accepted.
         if (node.additionalProperties !== false) {
@@ -759,7 +759,7 @@ The available tools:`
  *   (the caller excludes `run_code` itself).
  * @returns the complete section text.
  */
-export function renderToolsSdkPy(schemas: ToolSdkSchema[]): string {
+export function renderToolsSdkPy(schemas: readonly ToolSdkSchema[]): string {
   const sorted = [...schemas].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
   const state: RenderState = { classes: [], usedClassNames: new Set(), nextClassCounter: new Map(), typing: new Set(['Protocol']) }
   // ONE ordered member stream, matching the documented lexicographic contract
@@ -777,8 +777,8 @@ export function renderToolsSdkPy(schemas: ToolSdkSchema[]): string {
       // of that method's body. Emitted before the `async def` it would instead
       // become the `Tools` class docstring (for the first tool) or a dead
       // expression (for every later one), leaving every method undocumented —
-      // and under `mode: 'ptc'` this SDK is the model's only description of
-      // what a tool does. A docstring is a complete body, so the `...` stub is
+      // and with PTC selected, this SDK is the model's only description of what
+      // a tool does. A docstring is a complete body, so the `...` stub is
       // only for the description-less case.
       const doc = docLines(schema.description, 2)
       members.push(doc.length > 0

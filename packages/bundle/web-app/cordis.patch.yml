@@ -29,13 +29,15 @@
     path: ':memory:'
     openAt: never
 
-- id: tools
-  config:
-    # TEMPORARY workaround: DSH_TOOLS_MODE (native|ptc) opts a whole dsh
-    # process into PTC mode while per-session tool-presentation selection is being
-    # designed; unset keeps the schema default (native). Remove the env seam
-    # once the web UI owns the choice per session.
-    mode: !!js process.env.DSH_TOOLS_MODE
+# TEMPORARY workaround: DSH_TOOLS_MODE (native|ptc) opts a whole dsh
+# process into PTC mode while per-session tool-executor selection is being
+# designed; unset keeps the base default (native). Remove the env seam
+# once the web UI owns the choice per session.
+- id: tool-executor-native
+  disabled: !!js "process.env.DSH_TOOLS_MODE === 'ptc'"
+
+- id: tool-executor-ptc
+  disabled: !!js "process.env.DSH_TOOLS_MODE !== 'ptc'"
 
 # ── web-only host rows, the transport layer, and the browser roster ─────────
 

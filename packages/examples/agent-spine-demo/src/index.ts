@@ -15,7 +15,9 @@ import LlmRuntime from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import SessionTitleService, { type Config as SessionTitleConfig } from '@deepseek-ai/dsh-session-title'
 import SystemPrompt, { type Config as SystemPromptConfig } from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { type Config as ToolsConfig } from '@deepseek-ai/dsh-tools'
+import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
 import SkillRegistry, { type Config as SkillRegistryConfig } from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -103,8 +105,8 @@ export interface Config {
   personaSuffix?: SystemPromptConfig['personaSuffix']
   /** The explicit model-facing tool order (see dsh-system-prompt's `Config`). */
   toolOrder?: SystemPromptConfig['toolOrder']
-  /** The tool registry's config — its presentation `mode` (see dsh-tools' `Config`). */
-  tools?: ToolsConfig
+  /** The tool executor selection — `native` schemas or `ptc` run_code plus a generated SDK. */
+  tools?: { mode?: 'native' | 'ptc'; maxParallelSubCalls?: number }
   /** DeepSeek Harness home directory shared by shell context and local skill discovery. */
   dshHome?: string
   /** Deterministic fallback and accepted-title limits; omission uses the bundle's example policy. */
@@ -160,7 +162,7 @@ export const Config = z.intersect([
   AgentLoop.Config,
   SystemPrompt.Config,
   z.object({
-    tools: ToolRuntime.Config,
+    tools: z.object({ mode: z.union(['native', 'ptc'] as const), maxParallelSubCalls: z.natural().min(1) }),
     dshHome: z.string(),
     sessionTitle: SessionTitleConfigSchema,
     skills: SkillConfigSchema,
@@ -230,7 +232,9 @@ export function apply(ctx: Context, config: Config): void {
     personaSuffix: config.personaSuffix ?? '',
     ...config.toolOrder !== undefined ? { toolOrder: config.toolOrder } : {},
   })
-  ctx.plugin(ToolRuntime, config.tools ?? {})
+  ctx.plugin(ToolRuntime)
+  if (config.tools?.mode === 'ptc') ctx.plugin(PtcToolExecutor, { ...config.tools.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: config.tools.maxParallelSubCalls } : {} })
+  else ctx.plugin(NativeToolExecutor)
   const skillsEnabled = config.skills?.enabled ?? true
   if (skillsEnabled) {
     ctx.plugin(SkillRegistry, config.skills?.registry ?? {})

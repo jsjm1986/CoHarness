@@ -1,7 +1,7 @@
 /** Exact Tool-call lookup over one immutable Session observation. */
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
-import type {} from '@deepseek-ai/dsh-tools/types'
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc/client'
 
 /** Select the whole turn owning a root or nested Tool call.
  * @param events - one contiguous immutable Session cut.
