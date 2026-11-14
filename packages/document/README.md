@@ -27,6 +27,7 @@ Each package owns its configuration and lifetime rules; the subsystem reference 
 | Package | Role | ctx key |
 |---|---|---|
 | [office-kit](office-kit/README.md) | Shared Office rendering, conversion, and recalculation with bounded queues and caching | `ctx.officeKit` |
+| [tool-office](tool-office/README.md) | Model-facing Office tools for rendering, converting, and recalculating documents | — |
 
 -----
 

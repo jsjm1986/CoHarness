@@ -8,6 +8,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolCallBlock } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
+import type { ResolvedToolSet } from '@deepseek-ai/dsh-tools'
 import { ToolBatchExecutionError } from '@deepseek-ai/dsh-tools'
 
 /**
@@ -31,6 +32,7 @@ export async function executeToolCalls(
   toolCalls: ToolCallBlock[],
   signal: AbortSignal,
   acceptContext: (context: UserMessage) => void,
+  toolSet?: ResolvedToolSet,
 ): Promise<{ concluded: boolean }> {
   const agent = ctx.agents.requireInitiator()
   try {
@@ -40,6 +42,7 @@ export async function executeToolCalls(
       agent,
       log: { turn, step },
       maxParallelToolCalls: ctx.agentLoop.config.maxParallelToolCalls,
+      ...toolSet === undefined ? {} : { toolSet },
     })
     for (const context of result.additionalContexts) acceptContext(context)
     return { concluded: result.concluded }

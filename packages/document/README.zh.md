@@ -27,6 +27,7 @@ kind: "package-group"
 | 包 | 职责 | ctx 键 |
 |---|---|---|
 | [office-kit](office-kit/README.zh.md) | 共享 Office 渲染、转换与重算，并提供有界队列和缓存 | `ctx.officeKit` |
+| [tool-office](tool-office/README.zh.md) | 面向模型的 Office 渲染、转换与重算工具 | — |
 
 -----
 

@@ -155,7 +155,7 @@ describe('tool-call scheduler: grouping and barriers', () => {
     expect(order).toEqual(['r-start-A1', 'r-end-A1', 'w-A2', 'r-start-A3', 'r-end-A3'])
   })
 
-  it('reclassifies pending calls after an exclusive barrier replaces their tool', async () => {
+  it('fails pending calls as unknown after an exclusive barrier replaces their tool', async () => {
     const adapter = new MockAdapter([
       multiCall([
         { id: 'c1', name: 'replace', args: { id: '0' } },
@@ -186,17 +186,24 @@ describe('tool-call scheduler: grouping and barriers', () => {
     const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
 
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
-    await until(() => replacement.started.length === 1)
-    await new Promise(r => setTimeout(r, 5))
-    expect(replacement.started).toEqual(['1'])
-    replacement.release('1')
-    await until(() => replacement.started.length === 2)
-    expect(replacement.started).toEqual(['1', '2'])
-    replacement.release('2')
+    // Step admission pins calls to the registration resolved at pre-step: a
+    // replaced registration drops out of the admitted set, so pending calls
+    // issued against the removed definition fail as unknown rather than
+    // dispatching through a registration the step never admitted.
     await waitForIdle(ctx, agent)
+    expect(replacement.started).toEqual([])
+    expect(events(agent).filter(e => e.type === 'tool/result').map(e => ({
+      callId: e.data.message.source.callId,
+      isError: e.data.message.isError,
+      error: e.data.error,
+    }))).toEqual([
+      { callId: ToolCallId('c1'), isError: false, error: undefined },
+      { callId: ToolCallId('c2'), isError: true, error: { name: 'ToolNotFoundError', code: 'UNKNOWN_TOOL' } },
+      { callId: ToolCallId('c3'), isError: true, error: { name: 'ToolNotFoundError', code: 'UNKNOWN_TOOL' } },
+    ])
   })
 
-  it('stops replenishing when a result observer makes the next call exclusive', async () => {
+  it('fails unstarted calls as unknown after a result observer replaces their tool', async () => {
     const adapter = new MockAdapter([
       multiCall([
         { id: 'c1', name: 'x', args: { id: '1' } },
@@ -219,15 +226,23 @@ describe('tool-call scheduler: grouping and barriers', () => {
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
     await until(() => initial.started.length === 2)
     initial.release('1')
-    await until(() => events(agent).some(event =>
-      event.type === 'tool/result' && event.data.message.source.callId === ToolCallId('c1')))
-    await new Promise(r => setTimeout(r, 5))
-    expect(replacement.started).toEqual([])
+    // Calls started before the replacement settle normally; c3 was admitted
+    // against the removed registration and fails as unknown instead of
+    // dispatching through the exclusive replacement the step never admitted.
+    // Results commit in model order, so c3's error lands after c2 settles.
     initial.release('2')
-    await until(() => replacement.started.length === 1)
-    expect(replacement.started).toEqual(['3'])
-    replacement.release('3')
     await waitForIdle(ctx, agent)
+    expect(initial.started).toEqual(['1', '2'])
+    expect(replacement.started).toEqual([])
+    expect(events(agent).filter(e => e.type === 'tool/result').map(e => ({
+      callId: e.data.message.source.callId,
+      isError: e.data.message.isError,
+      error: e.data.error,
+    }))).toEqual([
+      { callId: ToolCallId('c1'), isError: false, error: undefined },
+      { callId: ToolCallId('c2'), isError: false, error: undefined },
+      { callId: ToolCallId('c3'), isError: true, error: { name: 'ToolNotFoundError', code: 'UNKNOWN_TOOL' } },
+    ])
   })
 })
 

@@ -24,7 +24,7 @@
 | `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`、`stagehand_extract`、`stagehand_navigate`、`stagehand_observe`、`stagehand_screenshot`、`stagehand_tabs` | `ctx.browserUse`、`ctx.agents`、`ctx.tools`、`ctx.systemPrompt`、`ctx.llm`、`ctx.attachments` | `tool/call`、`tool/result`、`browser-use/stagehand-llm-request` | - | - |
 | `@deepseek-ai/dsh-tool-ask-user` | `ask_user_question` | `ctx.tools`、`ctx.userQuestions` | `tool/call`、`tool/result after an answer or timeout`、`late user/message` | - | ask_user_question 默认保持原有阻塞行为；设置 `mode: timed` 后才启用前台超时与 pending 结果，同时问题仍可回答；timed 模式内 `timeout: -1` 让本次调用无限期阻塞。 |
-| `@deepseek-ai/dsh-tools` | `run_code` | `ctx.workingDirectory (Agent executions)`、`ctx.tools`、`ctx.ptcRuntime (execution time)`、`ctx.systemPrompt` | `tool/call`、`one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call`、`tool/result` | - | 在 `mode: ptc` 下，它由工具注册表所有，作为可过滤能力层之外的保留传输机制（参见 PTC mode Agent Note）。在 `ptc` 下，它是注册表对协议格式（wire format）的唯一贡献；其他可见能力在使用已加载运行时语言生成的 SDK 章节中声明。程序通过 binding 调用这些能力，调用按照原生并发约定调度：启动顺序和策略遵循提交顺序，并发安全的函数体最多重叠执行 `maxParallelSubCalls` 个。调用会重新进入完整且受守卫保护的工具流水线，并将每个嵌套执行关联到此外层结果。 |
+| `@deepseek-ai/dsh-tool-executor-ptc` | `run_code` | `ctx.workingDirectory (Agent executions)`、`ctx.tools`、`ctx.ptcRuntime`、`ctx.systemPrompt` | `tool/call`、`one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call`、`tool/result` | - | PTC 执行器只向模型暴露 run_code，其他可见能力在运行时语言生成的 SDK 中声明。程序 binding 按提交顺序进入共享的受守卫工具流水线；并发安全的函数体最多重叠执行 `maxParallelSubCalls` 个，嵌套结果与外层程序保持关联。解析后的超时与 `maxSubCallsPerMinute` 共同决定总调用额度；超限即终止程序。 |
 | `@deepseek-ai/dsh-plan-mode` | `exit_plan_mode` | `ctx.tools`、`ctx.systemPrompt`、`ctx.userQuestions (execution time, opportunistic)` | `tool/call`、`plan/mode inactive on an approved review`、`tool/result` | - | 规划未激活时，exit_plan_mode 仍保留在面向模型的 schema 中，这样状态转换不会在规划策略变更之外额外造成工具目录变动。其执行路径会拒绝规划模式之外的调用；在规划模式下，它通过用户交互 seam 提交计划（批准／根据反馈继续规划），批准后会在步骤边界记录规划模式已停用。 |
 | `@deepseek-ai/dsh-tool-bash` | `bash` | `ctx.workingDirectory`、`ctx.tools`、`ctx.shell`、`ctx.systemPrompt`、`ctx.shellEnv`、`ctx.jobs for run_in_background and the job-backed foreground path` | `tool/call`、`tool/result` | - | bash 工具是 bash 执行器 seam 面向模型的消费方。组合中有 job 注册表时，每次调用一启动就注册到通用 `ctx.jobs` 运行时，并通过 `job_*` 工具（来自 `@deepseek-ai/dsh-tool-jobs`）收集／停止；没有注册表或 `enableRunInBackground: false` 时，工具注册不带 `run_in_background` 参数的纯前台 schema。 |
 | `@deepseek-ai/dsh-tool-present` | `present` | `ctx.workingDirectory`, `ctx.tools`, `ctx.fs`, `ctx.sessionProjections` | `tool/call`, `deliverables/presented 在成功的最终结果之后`, `tool/result` | - | 交付归调用方 Session 所有；Web ui-deliverables 提供源文件打开与卡片。 |
@@ -41,6 +41,7 @@
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`、`schedule_delete`、`schedule_list`、`schedule_update` | `ctx.tools`、`ctx.schedule` | `tool/call`、Schedule storage domain 创建、更新或删除、`tool/result` | - | preset 或 Agent scope 挂载本包；由 preset 决定哪些 agent 获得这四个管理工具。每次调用都作用于调用方 Agent 的 Session。接受 after_seconds、显式绝对 at、有界固定速率 every_seconds、带显式 IANA 时区的每日与每周本地时间，以及作为五字段表达式的 cron。管理使用宿主 storage domain；到期消息会恢复原 Session。 |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`、`ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
 | `@deepseek-ai/dsh-tool-memory` | `memory_delete`、`memory_read`、`memory_save`、`memory_search` | `ctx.memory`、`ctx.tools`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`memory/changed` | - | 在项目空间（space）运行时（Gateway 托管会话）中，每个 schema 都省略 scope 参数，各工具寻址共享的 project 作用域；上面的目录展示的是 CLI 预设发布的 personal 空间变体。 |
+| `@deepseek-ai/dsh-tool-office` | `office_convert`、`office_recalculate`、`office_render` | `ctx.workingDirectory`、`ctx.tools`、`ctx.fs`、`ctx.agents`、`ctx.officeKit`、`ctx.attachments and ctx.llm for office_render` | `tool/call`、`tool/result with rendered image attachments`、`temporary converted files in the Office kit output store` | - | 自 agent 成功加载 Office skill 的下一个 step 起向其声明，并在上一个请求头已声明 Office 工具期间保持声明；获准的调用在未安装 LibreOffice Kit 时返回 Office 服务的不可用错误。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.workingDirectory`、`ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_handoff`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 6 个只读工具会隐藏提供方游标，根据不可变的调用 agent 会话为每个结果授权，并在协作服务挂载时于工作区相等规则之上叠加项目可读性。standard 预设会挂载该包；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
@@ -576,13 +577,13 @@
 
 ask_user_question 默认保持原有阻塞行为；设置 `mode: timed` 后才启用前台超时与 pending 结果，同时问题仍可回答；timed 模式内 `timeout: -1` 让本次调用无限期阻塞。
 
-<a id="deepseek-aidsh-tools"></a>
+<a id="deepseek-aidsh-tool-executor-ptc"></a>
 
-## `@deepseek-ai/dsh-tools`
+## `@deepseek-ai/dsh-tool-executor-ptc`
 
 ### `run_code`
 
-针对可用工具执行 TypeScript 程序。接受两个必填参数：`code`，要执行的程序；以及 `description`，简要说明该程序做什么。请根据系统提示词中的声明，以 `await tools.name(args)` 形式调用工具。请筛选程序输出。含图片的子工具结果会在运行结束后附加。
+针对可用工具执行 TypeScript 程序。接受两个必填参数：`code`——异步函数体（仅可擦除语法；支持顶层 `await` 与 `return`）；以及 `description`——该程序用途的简要说明。请根据系统提示词中的声明，以 `await tools.name(args)` 形式调用工具。只有打印或返回的内容才是程序输出——请筛选输出。含图片的子工具结果会在运行结束后附加。程序是异步 TypeScript 函数体；仅接受可擦除语法，不支持 enum 或命名空间，类型标注仅为提示。支持顶层 await 与 return。用 console.log(...) 输出或返回一个无损 JSON 值。只有打印值与返回值成为程序输出。每次调用在全新的 Node 进程中运行，Node API 通过 await import(...) 使用；相对路径基于提供的工作目录，process.env 初始为空。直接文件系统访问遵循本次执行的沙箱策略。每个程序从会话当前目录启动，运行中的程序保持其初始目录。沙箱提权仅批准这一个完整程序的一次执行。嵌套工具保留各自策略与审批。先取得拒绝证据再请求更宽权限。先前的副作用可能已经完成：显式重试前先检查。程序从不自动重放。
 
 ```json
 {
@@ -590,7 +591,7 @@ ask_user_question 默认保持原有阻塞行为；设置 `mode: timed` 后才�
   "properties": {
     "code": {
       "type": "string",
-      "description": "The TypeScript program to execute, following this tool's execution instructions."
+      "description": "The program: the body of an async TypeScript function."
     },
     "description": {
       "type": "string",
@@ -598,7 +599,7 @@ ask_user_question 默认保持原有阻塞行为；设置 `mode: timed` 后才�
     },
     "timeoutMs": {
       "type": "number",
-      "description": "Positive elapsed-time budget in milliseconds, capped by the deployment maximum."
+      "description": "Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default 120000; capped at 600000. Zero does not disable the deadline."
     },
     "sandbox_permissions": {
       "type": "string",
@@ -620,9 +621,9 @@ ask_user_question 默认保持原有阻塞行为；设置 `mode: timed` 后才�
 }
 ```
 
-来源：[`packages/core/tools/src/ptc.ts`](../packages/core/tools/src/ptc.ts)
+来源：[`packages/core/tool-executor-ptc/src/ptc.ts`](../packages/core/tool-executor-ptc/src/ptc.ts)
 
-在 `mode: ptc` 下，它由工具注册表所有，作为可过滤能力层之外的保留传输机制（参见 PTC mode Agent Note）。在 `ptc` 下，它是注册表对协议格式的唯一贡献；其他可见能力在使用已加载运行时语言生成的 SDK 章节中声明。程序通过 binding 调用这些能力，调用按照原生并发约定调度：启动顺序和策略遵循提交顺序，并发安全的函数体最多重叠执行 `maxParallelSubCalls` 个。调用会重新进入完整且受守卫保护的工具流水线，并将每个嵌套执行关联到此外层结果。
+PTC 执行器只向模型暴露 run_code，其他可见能力在运行时语言生成的 SDK 中声明。程序 binding 按提交顺序进入共享的受守卫工具流水线；并发安全的函数体最多重叠执行 `maxParallelSubCalls` 个，嵌套结果与外层程序保持关联。解析后的超时与 `maxSubCallsPerMinute` 共同决定总调用额度；超限即终止程序。
 
 <a id="deepseek-aidsh-plan-mode"></a>
 
@@ -1502,15 +1503,15 @@ userdoc_list 和 userdoc_read 是只读的个人作用域工具。它们消费�
     },
     "objective": {
       "type": "string",
-      "description": "Replacement objective; valid only with action edit."
+      "description": "Replacement objective for action edit; ignored otherwise."
     },
     "max_goal_rounds": {
       "type": "number",
-      "description": "Replacement cap; valid only with action edit."
+      "description": "Replacement cap for action edit; ignored otherwise."
     },
     "blocked_reason": {
       "type": "string",
-      "description": "Required only with action blocked: the concrete condition that persisted across rounds and blocks progress."
+      "description": "Required for action blocked: the concrete condition that persisted across rounds and blocks progress; ignored otherwise."
     }
   },
   "required": [
@@ -2019,6 +2020,123 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
 
 在项目空间（space）运行时（Gateway 托管会话）中，每个 schema 都省略 scope 参数，各工具寻址共享的 project 作用域；上面的目录展示的是 CLI 预设发布的 personal 空间变体。
+
+<a id="deepseek-aidsh-tool-office"></a>
+
+## `@deepseek-ai/dsh-tool-office`
+
+### `office_convert`
+
+将文档转换为另一种格式。返回一个临时文件，需要用 shell 复制到目标位置。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "string",
+      "description": "Path to doc, docx, odt, xls, xlsx, ods, ppt, pptx, or odp; not modified."
+    },
+    "format": {
+      "type": "string",
+      "description": "Word: pdf, docx, odt, txt. Excel: pdf, xlsx, ods, csv. PowerPoint: pdf, pptx, odp.",
+      "enum": [
+        "pdf",
+        "docx",
+        "odt",
+        "txt",
+        "xlsx",
+        "ods",
+        "csv",
+        "pptx",
+        "odp"
+      ]
+    },
+    "sheet": {
+      "type": "string",
+      "description": "Exact worksheet name for CSV only; required when the workbook has several sheets."
+    }
+  },
+  "required": [
+    "input",
+    "format"
+  ]
+}
+```
+
+来源：[`packages/document/tool-office/src/index.ts`](../packages/document/tool-office/src/index.ts)
+
+### `office_recalculate`
+
+重新计算电子表格公式。返回一个临时工作簿，需要用 shell 复制到目标位置。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "string",
+      "description": "Path to an xls, xlsx, or ods workbook; not modified."
+    },
+    "format": {
+      "type": "string",
+      "description": "Output workbook format.",
+      "enum": [
+        "xlsx",
+        "ods"
+      ]
+    }
+  },
+  "required": [
+    "input",
+    "format"
+  ]
+}
+```
+
+来源：[`packages/document/tool-office/src/index.ts`](../packages/document/tool-office/src/index.ts)
+
+### `office_render`
+
+将文档页、幻灯片或工作表区域渲染为可查看的图片。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "string",
+      "description": "Path to doc, docx, odt, xls, xlsx, ods, ppt, pptx, odp, or pdf; not modified."
+    },
+    "pages": {
+      "type": "array",
+      "description": "Distinct one-based pages or slides; omit for all. Spreadsheets use sheet and range instead.",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "sheet": {
+      "type": "string",
+      "description": "Exact worksheet name; omit to render every visible sheet."
+    },
+    "range": {
+      "type": "string",
+      "description": "A1 range, such as A1:H40; requires sheet. Omit for the used area."
+    },
+    "dpi": {
+      "type": "integer",
+      "description": "Resolution from 24 to 600; default 144."
+    }
+  },
+  "required": [
+    "input"
+  ]
+}
+```
+
+来源：[`packages/document/tool-office/src/index.ts`](../packages/document/tool-office/src/index.ts)
+
+自 agent 成功加载 Office skill 的下一个 step 起向其声明，并在上一个请求头已声明 Office 工具期间保持声明；获准的调用在未安装 LibreOffice Kit 时返回 Office 服务的不可用错误。
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

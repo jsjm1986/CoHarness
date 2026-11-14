@@ -56,6 +56,8 @@ import * as ToolPwshPersistent from '@deepseek-ai/dsh-tool-pwsh-persistent'
 import CordisHostRunner from '@deepseek-ai/dsh-cordis-host-runner'
 import * as ToolCordis from '@deepseek-ai/dsh-tool-cordis'
 import * as ToolPresent from '@deepseek-ai/dsh-tool-present'
+import * as ToolOffice from '@deepseek-ai/dsh-tool-office'
+import type { OfficeKit } from '@deepseek-ai/dsh-office-kit'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import * as ToolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
 import * as ToolUserDoc from '@deepseek-ai/dsh-tool-userdoc'
@@ -526,6 +528,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'In a project-space runtime (Gateway-managed sessions) the scope parameter is omitted from every schema and each tool addresses the shared project scope; the catalog above shows the personal-space variant shipped by the CLI presets.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-office',
+    dir: 'tool-office',
+    source: 'packages/document/tool-office/src/index.ts',
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.fs', 'ctx.agents', 'ctx.officeKit', 'ctx.attachments and ctx.llm for office_render'],
+    writes: ['tool/call', 'tool/result with rendered image attachments', 'temporary converted files in the Office kit output store'],
+    async mount(ctx) {
+      // Schema harvest never renders or converts a document.
+      ctx.provide('officeKit', {} as OfficeKit)
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(ToolOffice)
+    },
+    note: 'Declared to an Agent from the step after it successfully loads an Office skill, and kept while the previous request header declares an Office tool. Admitted calls fail with the Office service\'s unavailable error when LibreOffice Kit is not installed.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',

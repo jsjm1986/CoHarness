@@ -20,7 +20,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`, `stagehand_extract`, `stagehand_navigate`, `stagehand_observe`, `stagehand_screenshot`, `stagehand_tabs` | `ctx.browserUse`, `ctx.agents`, `ctx.tools`, `ctx.systemPrompt`, `ctx.llm`, `ctx.attachments` | `tool/call`, `tool/result`, `browser-use/stagehand-llm-request` | - | - |
 | `@deepseek-ai/dsh-tool-ask-user` | `ask_user_question` | `ctx.tools`, `ctx.userQuestions` | `tool/call`, `tool/result after an answer or timeout`, `late user/message` | - | ask_user_question keeps the original blocking behavior by default; set `mode: timed` to opt into a foreground timeout and pending result while the question remains answerable. In timed mode, `timeout: -1` keeps that call blocking indefinitely. |
-| `@deepseek-ai/dsh-tools` | `run_code` | `ctx.workingDirectory (Agent executions)`, `ctx.tools`, `ctx.ptcRuntime (execution time)`, `ctx.systemPrompt` | `tool/call`, `one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call`, `tool/result` | - | Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` (see the PTC mode Agent Note). Under `ptc` it is the registry's only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime's language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result. |
+| `@deepseek-ai/dsh-tool-executor-ptc` | `run_code` | `ctx.workingDirectory (Agent executions)`, `ctx.tools`, `ctx.ptcRuntime`, `ctx.systemPrompt` | `tool/call`, `one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call`, `tool/result` | - | The PTC executor exposes only run_code to the model and declares other visible capabilities in a generated SDK in the runtime's language. Program bindings enter the shared guarded tool pipeline in submission order; concurrency-safe bodies overlap up to maxParallelSubCalls, and nested results remain linked to the outer program. The resolved timeout and maxSubCallsPerMinute set the total call allowance; exceeding it terminates the program. |
 | `@deepseek-ai/dsh-plan-mode` | `exit_plan_mode` | `ctx.tools`, `ctx.systemPrompt`, `ctx.userQuestions (execution time, opportunistic)` | `tool/call`, `plan/mode inactive on an approved review`, `tool/result` | - | exit_plan_mode stays in the model-facing schema while planning is inactive so transitions add no tool-catalog churn on top of the plan-policy change. Its execute path rejects calls outside plan mode; in plan mode it presents the plan over the user-questions seam (approve / keep planning with feedback), and approval logs plan mode inactive at the step boundary. |
 | `@deepseek-ai/dsh-tool-bash` | `bash` | `ctx.workingDirectory`, `ctx.tools`, `ctx.shell`, `ctx.systemPrompt`, `ctx.shellEnv`, `ctx.jobs for run_in_background and the job-backed foreground path` | `tool/call`, `tool/result` | - | The bash tool is the model-facing consumer of the bash executor seam. With a job registry composed every call registers with the generic `ctx.jobs` runtime as it starts, collected/stopped through the `job_*` tools from `@deepseek-ai/dsh-tool-jobs`; without one, or with `enableRunInBackground: false`, the tool registers a foreground-only schema without the `run_in_background` parameter. |
 | `@deepseek-ai/dsh-tool-present` | `present` | `ctx.workingDirectory`, `ctx.tools`, `ctx.fs`, `ctx.sessionProjections` | `tool/call`, `deliverables/presented after a successful final result`, `tool/result` | - | Deliveries belong to the calling Session; Web ui-deliverables supplies source-file opening and cards. |
@@ -37,6 +37,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`, `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@deepseek-ai/dsh-tool-memory` | `memory_delete`, `memory_read`, `memory_save`, `memory_search` | `ctx.memory`, `ctx.tools`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `memory/changed` | - | In a project-space runtime (Gateway-managed sessions) the scope parameter is omitted from every schema and each tool addresses the shared project scope; the catalog above shows the personal-space variant shipped by the CLI presets. |
+| `@deepseek-ai/dsh-tool-office` | `office_convert`, `office_recalculate`, `office_render` | `ctx.workingDirectory`, `ctx.tools`, `ctx.fs`, `ctx.agents`, `ctx.officeKit`, `ctx.attachments and ctx.llm for office_render` | `tool/call`, `tool/result with rendered image attachments`, `temporary converted files in the Office kit output store` | - | Declared to an Agent from the step after it successfully loads an Office skill, and kept while the previous request header declares an Office tool. Admitted calls fail with the Office service's unavailable error when LibreOffice Kit is not installed. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.workingDirectory`, `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_handoff`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The six read-only tools hide provider cursors, authorize every result from the immutable calling agent session, and layer project readability over workspace equality when collaboration is mounted. The standard preset mounts the package; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
@@ -572,13 +573,13 @@ Source: [`packages/interaction/tool-ask-user/src/index.ts`](../packages/interact
 
 ask_user_question keeps the original blocking behavior by default; set `mode: timed` to opt into a foreground timeout and pending result while the question remains answerable. In timed mode, `timeout: -1` keeps that call blocking indefinitely.
 
-<a id="deepseek-aidsh-tools"></a>
+<a id="deepseek-aidsh-tool-executor-ptc"></a>
 
-## `@deepseek-ai/dsh-tools`
+## `@deepseek-ai/dsh-tool-executor-ptc`
 
 ### `run_code`
 
-Execute a TypeScript program against the available tools. Takes two required arguments: `code`, the program to execute, and `description`, a short summary of what the program does. Call tools as `await tools.name(args)` per the declarations in the system prompt. Curate the program output. Image-bearing subtool results are attached after the run.
+Execute a TypeScript program against the available tools. Takes two required arguments: `code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work), and `description`, a short summary of what the program does. Call tools as `await tools.name(args)` per the declarations in the system prompt. Only what you print or return is program output — curate it. Image-bearing subtool results are attached after the run. The program is the body of an async TypeScript function; only erasable syntax is accepted, with no enum or namespaces. Type annotations are advisory. Top-level await and return are supported. Emit output with console.log(...) or return a lossless JSON value. Only printed values and the returned value become program output. Each call runs in a fresh Node process. Node APIs are available through await import(...). Relative paths use the supplied working directory; process.env starts empty. Direct filesystem access follows this execution's sandbox policy. Each program starts in the Session's current directory. Running programs keep their initial directory. A sandbox escalation approves this complete program for one execution only. Nested tools retain their own policies and approvals. Request wider access only after evidence of a denial. Earlier effects may already have completed: inspect them before explicitly retrying. Programs are never replayed automatically.
 
 ```json
 {
@@ -586,7 +587,7 @@ Execute a TypeScript program against the available tools. Takes two required arg
   "properties": {
     "code": {
       "type": "string",
-      "description": "The TypeScript program to execute, following this tool's execution instructions."
+      "description": "The program: the body of an async TypeScript function."
     },
     "description": {
       "type": "string",
@@ -594,7 +595,7 @@ Execute a TypeScript program against the available tools. Takes two required arg
     },
     "timeoutMs": {
       "type": "number",
-      "description": "Positive elapsed-time budget in milliseconds, capped by the deployment maximum."
+      "description": "Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default 120000; capped at 600000. Zero does not disable the deadline."
     },
     "sandbox_permissions": {
       "type": "string",
@@ -616,9 +617,9 @@ Execute a TypeScript program against the available tools. Takes two required arg
 }
 ```
 
-Source: [`packages/core/tools/src/ptc.ts`](../packages/core/tools/src/ptc.ts)
+Source: [`packages/core/tool-executor-ptc/src/ptc.ts`](../packages/core/tool-executor-ptc/src/ptc.ts)
 
-Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` (see the PTC mode Agent Note). Under `ptc` it is the registry's only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime's language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result.
+The PTC executor exposes only run_code to the model and declares other visible capabilities in a generated SDK in the runtime's language. Program bindings enter the shared guarded tool pipeline in submission order; concurrency-safe bodies overlap up to maxParallelSubCalls, and nested results remain linked to the outer program. The resolved timeout and maxSubCallsPerMinute set the total call allowance; exceeding it terminates the program.
 
 <a id="deepseek-aidsh-plan-mode"></a>
 
@@ -1496,15 +1497,15 @@ Update the current goal.
     },
     "objective": {
       "type": "string",
-      "description": "Replacement objective; valid only with action edit."
+      "description": "Replacement objective for action edit; ignored otherwise."
     },
     "max_goal_rounds": {
       "type": "number",
-      "description": "Replacement cap; valid only with action edit."
+      "description": "Replacement cap for action edit; ignored otherwise."
     },
     "blocked_reason": {
       "type": "string",
-      "description": "Required only with action blocked: the concrete condition that persisted across rounds and blocks progress."
+      "description": "Required for action blocked: the concrete condition that persisted across rounds and blocks progress; ignored otherwise."
     }
   },
   "required": [
@@ -2013,6 +2014,123 @@ Search saved memories by words in their key, summary, or content. Returns matchi
 Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
 
 In a project-space runtime (Gateway-managed sessions) the scope parameter is omitted from every schema and each tool addresses the shared project scope; the catalog above shows the personal-space variant shipped by the CLI presets.
+
+<a id="deepseek-aidsh-tool-office"></a>
+
+## `@deepseek-ai/dsh-tool-office`
+
+### `office_convert`
+
+Convert a document to another format. Return a temporary file to copy to its destination with the shell.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "string",
+      "description": "Path to doc, docx, odt, xls, xlsx, ods, ppt, pptx, or odp; not modified."
+    },
+    "format": {
+      "type": "string",
+      "description": "Word: pdf, docx, odt, txt. Excel: pdf, xlsx, ods, csv. PowerPoint: pdf, pptx, odp.",
+      "enum": [
+        "pdf",
+        "docx",
+        "odt",
+        "txt",
+        "xlsx",
+        "ods",
+        "csv",
+        "pptx",
+        "odp"
+      ]
+    },
+    "sheet": {
+      "type": "string",
+      "description": "Exact worksheet name for CSV only; required when the workbook has several sheets."
+    }
+  },
+  "required": [
+    "input",
+    "format"
+  ]
+}
+```
+
+Source: [`packages/document/tool-office/src/index.ts`](../packages/document/tool-office/src/index.ts)
+
+### `office_recalculate`
+
+Recalculate spreadsheet formulas. Return a temporary workbook to copy to its destination with the shell.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "string",
+      "description": "Path to an xls, xlsx, or ods workbook; not modified."
+    },
+    "format": {
+      "type": "string",
+      "description": "Output workbook format.",
+      "enum": [
+        "xlsx",
+        "ods"
+      ]
+    }
+  },
+  "required": [
+    "input",
+    "format"
+  ]
+}
+```
+
+Source: [`packages/document/tool-office/src/index.ts`](../packages/document/tool-office/src/index.ts)
+
+### `office_render`
+
+Render document pages, slides, or worksheet areas as images you can view.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "string",
+      "description": "Path to doc, docx, odt, xls, xlsx, ods, ppt, pptx, odp, or pdf; not modified."
+    },
+    "pages": {
+      "type": "array",
+      "description": "Distinct one-based pages or slides; omit for all. Spreadsheets use sheet and range instead.",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "sheet": {
+      "type": "string",
+      "description": "Exact worksheet name; omit to render every visible sheet."
+    },
+    "range": {
+      "type": "string",
+      "description": "A1 range, such as A1:H40; requires sheet. Omit for the used area."
+    },
+    "dpi": {
+      "type": "integer",
+      "description": "Resolution from 24 to 600; default 144."
+    }
+  },
+  "required": [
+    "input"
+  ]
+}
+```
+
+Source: [`packages/document/tool-office/src/index.ts`](../packages/document/tool-office/src/index.ts)
+
+Declared to an Agent from the step after it successfully loads an Office skill, and kept while the previous request header declares an Office tool. Admitted calls fail with the Office service's unavailable error when LibreOffice Kit is not installed.
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

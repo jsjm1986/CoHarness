@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/tool-catalog.md
 document:
-  en: f45310ea6707b618aac9cc15074eeb9fbb10fcee
-  zh: 35854fe3d41a4288d89978af9a69f9a214922e67
+  en: 09fd75169aefcdab90321baa64b410cdf89d0003
+  zh: be5ab4d6bc74b835c22ebe23f3aab9e15058dbb4
 /:
   en: 0be8ffbf23193557
   zh: ce2c69aa86875171
@@ -12,8 +12,8 @@ document:
   en: ddbe8316ec6b1363
   zh: b2d705c03641df84
 /tool-schema-catalog/tool-package-map:
-  en: 8b08e4a1e83b4d81
-  zh: 2a3763d9e9cf5cb5
+  en: be9e8774311daa4f
+  zh: 7ee61c1d563e7721
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -63,14 +63,14 @@ document:
   en: e713a4a11a15d13c
   zh: e713a4a11a15d13c
 /tool-schema-catalog/deepseek-ai-dsh-tool-ask-user/ask-user-question:
-  en: 055268ba4dcd32f9
-  zh: a1a3c4bfcbf698ed
-/tool-schema-catalog/deepseek-ai-dsh-tools:
-  en: 76fbbf0fe38aef10
-  zh: 76fbbf0fe38aef10
-/tool-schema-catalog/deepseek-ai-dsh-tools/run-code:
-  en: a2368a9d8136276e
-  zh: d1a4918fc45a7c87
+  en: 2f86adf8ae823afb
+  zh: a5dad3d821e75e55
+/tool-schema-catalog/deepseek-ai-dsh-tool-executor-ptc:
+  en: 8c8643ef46fd075f
+  zh: 8c8643ef46fd075f
+/tool-schema-catalog/deepseek-ai-dsh-tool-executor-ptc/run-code:
+  en: 9c6691443b5472da
+  zh: e8e0f71a23495620
 /tool-schema-catalog/deepseek-ai-dsh-plan-mode:
   en: b500b530845e26a9
   zh: b500b530845e26a9
@@ -225,8 +225,20 @@ document:
   en: 9bd3dd4c02b5c8b1
   zh: aeb2e9e69618060d
 /tool-schema-catalog/deepseek-ai-dsh-tool-memory/memory-search:
-  en: d500d83ec054428b
-  zh: 10820cab2b1b670d
+  en: dcbbeef359afb491
+  zh: bf2fb0a197afe1c1
+/tool-schema-catalog/deepseek-ai-dsh-tool-office:
+  en: 8b0373f31520efe7
+  zh: 8b0373f31520efe7
+/tool-schema-catalog/deepseek-ai-dsh-tool-office/office-convert:
+  en: e63dea0f631fbb15
+  zh: dbe7902cd77ea71a
+/tool-schema-catalog/deepseek-ai-dsh-tool-office/office-recalculate:
+  en: 27a0ac973b1b9387
+  zh: 6d9ae04d814db209
+/tool-schema-catalog/deepseek-ai-dsh-tool-office/office-render:
+  en: 3f08fa859bc35c71
+  zh: 13e259d3621b97d5
 /tool-schema-catalog/deepseek-ai-dsh-tool-ralph:
   en: 45bd083870e2c92d
   zh: 45bd083870e2c92d

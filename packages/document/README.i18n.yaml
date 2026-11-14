@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/document/README.md
 document:
-  en: ad86baa2c40dea1e10a0fd546512754eafa20562
-  zh: d9df702932fc77bd40ba6571ea990ddeb128dd27
+  en: f5fce688dcbe3efc55d9f8eb04107d6ffdbdbeae
+  zh: 9d182bfdd252c1e71d9a24ff4fd29aa590191041
 /:
   en: a1540c1a1a7faf3e
   zh: 7642847c581f1165
@@ -18,8 +18,8 @@ document:
   en: 1eb35b015a6c423f
   zh: a8a3dceee2c9e943
 /document-office-conversion/packages:
-  en: d5110eedbe64a09a
-  zh: 8b29f89426ccf259
+  en: 72067da2c55589e4
+  zh: f4b7674cf17566ef
 /document-office-conversion/related-documentation:
   en: 13b1a8ed6c84527f
   zh: 782f53d23f5e85b6
