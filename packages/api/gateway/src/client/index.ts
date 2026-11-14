@@ -8,6 +8,7 @@ import { ConnectionRpcStreamInterrupted, interactionsUnavailableError } from '@d
 import { RemoteStreamCarrierError } from './stream-error.ts'
 import { RemoteStream, type RemoteStreamOptions } from './remote-stream.ts'
 export { RemoteStream, type RemoteStreamOptions, type RemoteStreamItem } from './remote-stream.ts'
+export { RemoteSnapshotStream, type RemoteSnapshotStreamOptions } from './snapshot-stream.ts'
 export { RemoteStreamCarrierError } from './stream-error.ts'
 
 import { Service } from '@deepseek-ai/cordis'

@@ -5,9 +5,9 @@
  * rather than an upstream-style managed activation, so this tool awaits
  * `subagents.start()` for the upstream publication boundary and hands the run
  * to `ctx.jobs`, whose settlement notice is the parent's completion delivery.
- * Sibling names are reserved tool-locally (the fork's catalog records no
- * model-facing name), matching the upstream `agent-N` defaulting the model
- * sees.
+ * Sibling names are reserved tool-locally (this lane passes no name into
+ * the catalog's version-3 committed-name field), matching the upstream
+ * `agent-N` defaulting the model sees.
  *
  * @module @deepseek-ai/dsh-experimental-tool-subagent-oar
  */
@@ -58,9 +58,9 @@ function isAgentName(value: string): boolean {
 
 /**
  * Claim a sibling name against the names this tool already gave one parent.
- * The fork's parent catalog has no committed-name field, so claims cover only
- * this plugin's own allocations; upstream additionally deduplicates names the
- * catalog committed for other creators' children.
+ * This lane publishes no name into the catalog's version-3 committed-name
+ * field, so claims cover only this plugin's own allocations; names the
+ * catalog committed for other creators' children are not checked.
  * @param parent - exact live creator whose children share the namespace.
  * @param requested - requested name; omission selects the first free `agent-N`.
  * @returns the claimed name and its release for a failed startup.

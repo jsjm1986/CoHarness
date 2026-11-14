@@ -317,6 +317,19 @@ flowchart LR
   pkg_experimental_speech_to_text["experimental-speech-to-text"]
   svc_speechToText["ctx.speechToText<br/>Experimental speech recognition providers"]
   pkg_experimental_speech_to_text_sensevoice["experimental-speech-to-text-sensevoice"]
+  pkg_config_editor["config-editor"]
+  svc_configEditor["ctx.configEditor<br/>Persisted plugin configuration inspection and editing"]
+  pkg_mcp_manager["mcp-manager"]
+  svc_mcpManager["ctx.mcpManager<br/>Managed MCP server registry"]
+  pkg_api_remote_access["api-remote-access"]
+  svc_remoteAccess["ctx.remoteAccess<br/>Method-level remote access policy registry"]
+  pkg_experimental_client_ui_forge["experimental-client-ui-forge"]
+  pkg_experimental_forge["experimental-forge"]
+  svc_forge["ctx.forge<br/>Change-request provider registry"]
+  pkg_experimental_forge_github["experimental-forge-github"]
+  pkg_experimental_forge_session["experimental-forge-session"]
+  svc_forgeSession["ctx.forgeSession<br/>Session-bound change-request bindings"]
+  svc_forgePanel["ctx.forgePanel<br/>Forge panel Remote"]
   pkg_acp --> svc_approval
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
@@ -324,6 +337,7 @@ flowchart LR
   pkg_agent_preset_registry --> svc_agentPresets
   pkg_agent_team --> svc_agentTeams
   pkg_api_gateway --> svc_typertGateway
+  pkg_api_remote_access --> svc_remoteAccess
   pkg_api_remotes --> svc_sessionController
   pkg_api_terminal_controller --> svc_terminalController
   pkg_api_terminal_controller --> svc_userTerminalAdministration
@@ -348,6 +362,7 @@ flowchart LR
   pkg_computer_use --> svc_computerUse
   pkg_computer_use --> svc_computerUseAuthorization
   pkg_computer_use --> svc_computerUseEnvironment
+  pkg_config_editor --> svc_configEditor
   pkg_cordis_host_runner --> svc_cordisInspect
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
@@ -363,8 +378,12 @@ flowchart LR
   pkg_experimental_browser_use_stagehand_native --> svc_browserUse
   pkg_experimental_claude_code_mods --> svc_claudeCodeMods
   pkg_experimental_client_ui_cot_translation --> svc_cotTranslation
+  pkg_experimental_client_ui_forge --> svc_forgePanel
   pkg_experimental_computer_use_cua_driver_mcp --> svc_computerUse
   pkg_experimental_computer_use_cua_driver_native --> svc_computerUse
+  pkg_experimental_forge --> svc_forge
+  pkg_experimental_forge_github --> svc_forge
+  pkg_experimental_forge_session --> svc_forgeSession
   pkg_experimental_inspector --> svc_inspector
   pkg_experimental_ptc_runtime_python --> svc_ptcRuntime
   pkg_experimental_speech_to_text --> svc_speechToText
@@ -395,6 +414,7 @@ flowchart LR
   pkg_lsp --> svc_lsp
   pkg_lsp_local --> svc_lsp
   pkg_mcp_client --> svc_mcpResources
+  pkg_mcp_manager --> svc_mcpManager
   pkg_mcp_resources --> svc_mcpResources
   pkg_memory --> svc_memory
   pkg_model_access --> svc_modelAccess
@@ -528,6 +548,9 @@ flowchart LR
   svc_executionAuthority --> pkg_subagent
   svc_executionAuthority --> pkg_subagent_in_process_driver
   svc_fileUploads --> pkg_commands
+  svc_forge --> pkg_experimental_client_ui_forge
+  svc_forge --> pkg_experimental_forge_session
+  svc_forgeSession --> pkg_experimental_client_ui_forge
   svc_fs --> pkg_tool_fs
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
@@ -560,6 +583,7 @@ flowchart LR
   svc_pluginRegistryProbe --> pkg_ui_plugin_manager
   svc_profileContext --> pkg_plugin_manager
   svc_ptcRuntime --> pkg_tools
+  svc_remoteAccess --> pkg_experimental_client_ui_forge
   svc_remoteDesktop --> pkg_remote_desktop_controller
   svc_remoteDesktop --> pkg_remote_desktop_stream
   svc_sandbox --> pkg_bash_sandbox
@@ -784,5 +808,11 @@ flowchart LR
 | `ctx.remoteDesktop` | `seam` | [`remote-desktop`](../packages/remote-desktop/remote-desktop) | [`remote-desktop-vnc`](../packages/remote-desktop/remote-desktop-vnc) | [`remote-desktop-stream`](../packages/remote-desktop/remote-desktop-stream), `remote-desktop-controller` | - | resolve maps an authenticated actor to a grant-bounded spec; attach returns a live session and serveStream pumps its channel. |
 | `ctx.remoteDesktopController` | `core` | `remote-desktop-controller` | - | - | - | Maps authenticated request principals to service actors and enforces administrator checks for grant, attach, status, and audit operations. |
 | `ctx.speechToText` | `seam` | [`experimental-speech-to-text`](../packages/experimental/speech-to-text) | [`experimental-speech-to-text-sensevoice`](../packages/experimental/speech-to-text-sensevoice) | [`experimental-api-speech-to-text`](../packages/experimental/api-speech-to-text) | - | Routes explicit recognizers; the browser uses the authenticated Remote and keeps transcripts in the draft until submission. |
+| `ctx.configEditor` | `service` | [`config-editor`](../packages/boot/config-editor) | - | - | - | Reads the profile loader entries, separates inherited from override values, and writes validated edits back to the profile configuration. |
+| `ctx.mcpManager` | `service` | [`mcp-manager`](../packages/mcp/mcp-manager) | - | - | - | Owns deployment-managed MCP server definitions and their lifecycle state shared with the client and management surfaces. |
+| `ctx.remoteAccess` | `service` | [`api-remote-access`](../packages/api/remote-access) | - | [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | Registers per-resource non-owner policies, publishes per-Peer access snapshots, and filters lists; the Typert gateway does not dispatch through it because authorize requests carry no principal. |
+| `ctx.forge` | `seam` | [`experimental-forge`](../packages/experimental/forge) | [`experimental-forge-github`](../packages/experimental/forge-github) | [`experimental-forge-session`](../packages/experimental/forge-session), [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | Provider seam for hosted change-request operations: readiness, snapshots, diffs, reviews, merges, and check reruns route through registered provider records. |
+| `ctx.forgeSession` | `service` | [`experimental-forge-session`](../packages/experimental/forge-session) | - | [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | Binds each Session to its provider repository coordinates and change-request rows so panel queries stay Session-scoped. |
+| `ctx.forgePanel` | `service` | [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | - | - | Host Remote behind the experimental forge panel; the browser client consumes it over the authenticated Remote transport and no shipped preset mounts it. |
 
 Maintenance mode: hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard.

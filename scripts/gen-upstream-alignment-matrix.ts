@@ -184,9 +184,14 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
     localDisposition: 'Absorbed against the local projection registry: `ProjectionHandle` replaced by `sessionProjections.register()` disposer plus `stateOf(session, \'forgeChangeRequests\')`, with `forgeChangeRequests` declared in both SessionProjectionStateMap and SessionProjectionMap; 135/135 tests.',
   },
   'packages/experimental/client-ui-forge': {
-    status: 'reject',
-    targetAssessment: 'deferred-this-release',
-    rejectReason: 'Browser face of the forge lane; the Host half needs only the usual adaptations, but the client half is a different generation: missing dsh-api-remote-access package, upstream *OutlineRegular icon set vs local *16 names, missing locales module, a forgeWorktree projection key with no local registration, and Promise<SubprocessHandle> semantics. A correct port rewrites the React half against local primitives — separate milestone, not an incremental sync.',
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Browser face of the forge lane ported with the React half rewritten onto local primitives: *16 icon names, client/runtime store and session APIs, a package-private settings-form/, local Menu/Tooltip contracts, and the panel-owned forgeWorktree projection under sessionProjections.register()/stateOf. Its dsh-api-remote-access dependency lands with it; forge-bundle stays unported because no shipped composition may mount an experimental panel. 1038/1038 tests.',
+  },
+  'packages/api/remote-access': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Upstream non-owner Remote RBAC carried for the forge panel: policy registry, per-Peer access snapshot (REMOTE_ACCESS_SNAPSHOT_KEY on webserver/index-inject), allows() filtering, and the /client mount that publishes useRemoteAccess through slots.provideRoot keyedHooks. decide() ships uncalled — typert-gateway/authorize carries no principal, so authorizeTypertRemote with the collaboration authority stays the single dispatch path (see .agents/notes/implemented/feature/2026-11-15-forge-panel-remote-access-port.md). 40/40 tests.',
   },
   'packages/experimental/worktree': {
     status: 'adapt',

@@ -954,6 +954,52 @@ const SERVICE_ROLES: ServiceRole[] = [
     consumers: ['experimental-api-speech-to-text'],
     note: 'Routes explicit recognizers; the browser uses the authenticated Remote and keeps transcripts in the draft until submission.',
   },
+  {
+    key: 'configEditor',
+    pkg: 'config-editor',
+    title: 'Persisted plugin configuration inspection and editing',
+    mode: 'service',
+    note: 'Reads the profile loader entries, separates inherited from override values, and writes validated edits back to the profile configuration.',
+  },
+  {
+    key: 'mcpManager',
+    pkg: 'mcp-manager',
+    title: 'Managed MCP server registry',
+    mode: 'service',
+    note: 'Owns deployment-managed MCP server definitions and their lifecycle state shared with the client and management surfaces.',
+  },
+  {
+    key: 'remoteAccess',
+    pkg: 'api-remote-access',
+    title: 'Method-level remote access policy registry',
+    mode: 'service',
+    consumers: ['experimental-client-ui-forge'],
+    note: 'Registers per-resource non-owner policies, publishes per-Peer access snapshots, and filters lists; the Typert gateway does not dispatch through it because authorize requests carry no principal.',
+  },
+  {
+    key: 'forge',
+    pkg: 'experimental-forge',
+    title: 'Change-request provider registry',
+    mode: 'seam',
+    implementations: ['experimental-forge-github'],
+    consumers: ['experimental-forge-session', 'experimental-client-ui-forge'],
+    note: 'Provider seam for hosted change-request operations: readiness, snapshots, diffs, reviews, merges, and check reruns route through registered provider records.',
+  },
+  {
+    key: 'forgeSession',
+    pkg: 'experimental-forge-session',
+    title: 'Session-bound change-request bindings',
+    mode: 'service',
+    consumers: ['experimental-client-ui-forge'],
+    note: 'Binds each Session to its provider repository coordinates and change-request rows so panel queries stay Session-scoped.',
+  },
+  {
+    key: 'forgePanel',
+    pkg: 'experimental-client-ui-forge',
+    title: 'Forge panel Remote',
+    mode: 'service',
+    note: 'Host Remote behind the experimental forge panel; the browser client consumes it over the authenticated Remote transport and no shipped preset mounts it.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {
