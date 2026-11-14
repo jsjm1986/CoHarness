@@ -74,7 +74,7 @@ kind: "package-reference"
 
 ### 平台 profile
 
-bwrap profile 组合只读宿主根目录、全新 `/dev` 与私有 PID 命名空间中的 `/proc`——命令可管理其后代，但看不到宿主进程，因此 procfs 魔法链接无法绕过挂载；`workspace-write` 另加临时的 `/tmp` 与可写工作区绑定挂载。私有 PID 笔记记录该边界。
+bwrap profile 组合只读宿主根目录、全新 `/dev` 与私有 PID 命名空间中的 `/proc`——命令可管理其后代，但看不到宿主进程，因此 procfs 魔法链接无法绕过挂载；`workspace-write` 另加临时的 `/tmp` 与可写工作区绑定挂载。服务凭据目录——`/run/credentials` 与进程的 `$CREDENTIALS_DIRECTORY`——在两种 Linux 运行器下均被隐藏：bwrap 始终在每个目录上挂载空 tmpfs；当进程持有 `$CREDENTIALS_DIRECTORY` 时，Landlock 只读允许列表授予除这些目录之外的所有同级路径，此时 Landlock 受限命令无法列出 `/` 或 `/run`。网关启动的 Runtime 在该处接收其网关 API 令牌，而受限命令以同一账户运行。私有 PID 笔记记录该边界。
 
 
 `@deepseek-ai/node-addon-system/landlock-run` API 提供平台 launcher、功能探测与授权词汇；此提供方只做模式到授权的映射，把路径解析与探测解析保留在带版本的 binary 中。

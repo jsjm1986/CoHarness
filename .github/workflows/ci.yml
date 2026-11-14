@@ -321,6 +321,16 @@ jobs:
           if (( install_status != 0 )); then exit "$install_status"; fi
           exit "$sandbox_status"
 
+      # pdf-resource-smoke paints a non-embedded CID font through @napi-rs/canvas's
+      # fontconfig fallback; ubuntu-26.04 runner images dropped the CJK faces the
+      # fallback resolved on 24.04.
+      - uses: ./.github/actions/prepare-ci-apt
+      - name: Install CJK font faces
+        timeout-minutes: 5
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+
       - name: Resolve coverage timing identity
         if: needs.pr-scope.outputs.coverage_mode == 'full'
         id: coverage-timing
