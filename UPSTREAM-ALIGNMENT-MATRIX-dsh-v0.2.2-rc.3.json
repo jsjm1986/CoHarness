@@ -205,6 +205,13 @@
         "fs-patch package (new in rc.3)"
       ],
       "scope": "wholesale absorption: pure patch parser + LF text updater, 147 tests pass"
+    },
+    {
+      "commit": "3d61bf9802d",
+      "upstream": [
+        "office-kit package (document group, rc.3)"
+      ],
+      "scope": "office-kit replaces office-to-pdf; libreoffice-kit 0.2.3; render Remote endpoints dropped (apiproxy owns file auth); fontMetadataCacheDirectory kept; tool-office deferred to tool-executor batch"
     }
   ],
   "deferred_design": [
@@ -305,8 +312,8 @@
   "feature_assessment": [
     {
       "feature": "tool-executor (native/ptc)",
-      "verdict": "refactor-port",
-      "note": "upstream extracted inline PTC executor (SDK_RENDERERS/ts-types/py-types) into tool-executor-ptc + tool-executor-native; local core/tools still inline — absorption means restructuring tools package, not adding a leaf"
+      "verdict": "deferred — architecture divergence",
+      "note": "upstream core/tools rebuilt around executor.ts/pipeline.ts seam (batch/contracts/error-codes/events); local tools is a 2007-line monolith with PTC inline. Absorbing executor packages requires re-architecting tools first — dedicated refactor project, not a sync batch."
     },
     {
       "feature": "office-kit + tool-office",
