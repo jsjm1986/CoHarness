@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../../vendor/timer"
+    },
+    {
       "path": "../../context/agent-instructions"
     },
     {
@@ -25,6 +34,12 @@
     },
     {
       "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../core/tool-executor-native"
+    },
+    {
+      "path": "../../core/tool-executor-ptc"
     },
     {
       "path": "../../core/tools"
@@ -76,15 +91,6 @@
     },
     {
       "path": "../../util/home-paths"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../../vendor/timer"
     }
   ]
 }

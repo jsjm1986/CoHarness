@@ -1036,14 +1036,22 @@ describe('web: Cordis Workspace workbench', () => {
       const agent = runtime.ctx.agents.get(hostIds[3]!)
       if (agent === undefined) throw new Error('The header fixture Session has no live Agent')
       await runtime.ctx.tools.execute({
-        signal: new AbortController().signal, callId: ToolCallId('workbench-header-job'), name: 'bash',
-        arguments: { command: 'sleep 300', description: 'Verify workbench job controls', run_in_background: true }, agent,
+        signal: new AbortController().signal,
+        calls: [{
+          type: 'tool-call', id: ToolCallId('workbench-header-job'), name: 'bash',
+          arguments: JSON.stringify({ command: 'sleep 300', description: 'Verify workbench job controls', run_in_background: true }),
+        }],
+        agent,
       })
       const otherAgent = runtime.ctx.agents.get(hostIds[0]!)
       if (otherAgent === undefined) throw new Error('The first fixture Session has no live Agent')
       await runtime.ctx.tools.execute({
-        signal: new AbortController().signal, callId: ToolCallId('workbench-other-job'), name: 'bash',
-        arguments: { command: 'sleep 301', description: 'Verify separate Session ownership', run_in_background: true }, agent: otherAgent,
+        signal: new AbortController().signal,
+        calls: [{
+          type: 'tool-call', id: ToolCallId('workbench-other-job'), name: 'bash',
+          arguments: JSON.stringify({ command: 'sleep 301', description: 'Verify separate Session ownership', run_in_background: true }),
+        }],
+        agent: otherAgent,
       })
       const trigger = tools.getByRole('button', { name: '1 background job running', exact: true })
       await trigger.waitFor({ timeout: 15_000 })

@@ -10,6 +10,7 @@ import * as mock from './scripted-provider.ts'
 import * as tool from '../src/index.ts'
 import SubagentModelSelectionConfig from '../src/model-selection-settings.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 
 const contexts = new Set<Context>()
 afterEach(async () => {
@@ -115,7 +116,7 @@ export async function callSubagent(
     ? { id: SessionId('call-parent'), options: {}, session: Session.create(SessionId('call-parent')) } as Agent
     : (await ctx.agents.create({ sessionId: SessionId(`tool-call-parent-${++setupAgentCounter}`) })).agent
   const agent = 'agent' in over ? over.agent : setupAgents.get(ctx) ?? fallback
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: testToolSignal,
     callId: ToolCallId(`call-${++callCounter}`),
     name: 'subagent',

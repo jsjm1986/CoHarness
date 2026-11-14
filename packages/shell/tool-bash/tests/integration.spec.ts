@@ -9,6 +9,7 @@ import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-j
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { PtcRuntime, type PtcRunRequest, type PtcRunResult, type PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
+import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
@@ -123,11 +124,13 @@ describe('bash tool through the agent loop', () => {
         }
       }
       await ctx.plugin(BashBindingRuntime)
-      agent.ctx.tools.presentAs('ptc')
-      const result = await ctx.tools.execute({
-        callId: ToolCallId('nested-shell-root'), agent, signal: new AbortController().signal, name: 'run_code',
-        arguments: { code: 'return await tools.bash({ command: "pwd", description: "Print launch directory" })', description: 'Inspect current directory' },
+      await agent.ctx.plugin(PtcToolExecutor)
+      const batch = await ctx.tools.execute({
+        calls: [{ type: 'tool-call', id: ToolCallId('nested-shell-root'), name: 'run_code',
+          arguments: JSON.stringify({ code: 'return await tools.bash({ command: "pwd", description: "Print launch directory" })', description: 'Inspect current directory' }) }],
+        agent, signal: new AbortController().signal,
       })
+      const result = batch.results[0]!.result
       expect(result.error).toBeUndefined()
       expect(result.isError).toBe(false)
       await ctx.workingDirectory.set(agent, root)

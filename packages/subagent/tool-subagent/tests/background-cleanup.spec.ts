@@ -13,6 +13,8 @@ import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as tool from '../src/index.ts'
 
 const contexts = new Set<Context>()
@@ -29,6 +31,7 @@ it.each(['completed', 'rejected', 'unrenderable'] as const)(
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(AgentRegistry)
@@ -63,7 +66,7 @@ it.each(['completed', 'rejected', 'unrenderable'] as const)(
     ctx.jobs.events.subscribe({ owner: parent.id }, (event) => {
       if (event.type === 'settled') observed.resolve(undefined)
     })
-    const accepted = await ctx.tools.execute({
+    const accepted = await executeToolFixture(ctx, {
       signal: new AbortController().signal, callId: ToolCallId('child-cleanup'), name: 'subagent',
       arguments: { description: 'retained child', prompt: 'work', run_in_background: true }, agent: parent,
     })
@@ -104,6 +107,7 @@ it.each(['job kill', 'parent exit', 'service exit', 'repeat cleanup failure', 'r
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(AgentRegistry)
@@ -133,7 +137,7 @@ it.each(['job kill', 'parent exit', 'service exit', 'repeat cleanup failure', 'r
       session: Session.create(SessionId('pending-cleanup-owner')) } as unknown as Agent
     ctx.agents.register(parent)
     vi.spyOn(ctx.logger, 'warn').mockImplementation(() => { cleanupObserved.resolve(undefined); if (attempts === 2) repeatObserved.resolve(undefined) })
-    const accepted = await ctx.tools.execute({ signal: new AbortController().signal, callId: ToolCallId('pending-child-cleanup'),
+    const accepted = await executeToolFixture(ctx, { signal: new AbortController().signal, callId: ToolCallId('pending-child-cleanup'),
       name: 'subagent', arguments: { description: 'pending child', prompt: 'work', run_in_background: true }, agent: parent })
     expect(accepted.isError, JSON.stringify(accepted)).toBe(false)
     const { jobId } = accepted.value as { jobId: JobId }

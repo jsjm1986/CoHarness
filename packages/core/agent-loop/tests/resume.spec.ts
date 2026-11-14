@@ -9,7 +9,8 @@ import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionLogOffset, SessionSeq, Session, SessionId, TOOL_NOT_STARTED, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { defineContentToolFixture, TOOL_RUNTIME_SCHEDULER } from '@deepseek-ai/dsh-tools'
+import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import { SessionAlreadyExistsError, type SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 
@@ -17,6 +18,7 @@ import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-j
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
+import { mountPatchableExecutor } from './patchable-executor.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -27,19 +29,21 @@ declare module '@deepseek-ai/dsh-llm' {
 const dirs: string[] = []
 afterEach(async () => { for (const d of dirs.splice(0)) await rm(d, { recursive: true, force: true }) })
 
-async function persistentHarness(adapter: MockAdapter): Promise<{ ctx: Context; root: string }> {
+async function persistentHarness(adapter: MockAdapter, executor?: (ctx: Context) => void): Promise<{ ctx: Context; root: string }> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-resume-'))
   dirs.push(root)
-  return { ctx: await mountPersistentHarness(root, adapter), root }
+  return { ctx: await mountPersistentHarness(root, adapter, undefined, executor), root }
 }
 
-async function mountPersistentHarness(root: string, adapter: MockAdapter, compression?: 'none'): Promise<Context> {
+async function mountPersistentHarness(root: string, adapter: MockAdapter, compression?: 'none', executor?: (ctx: Context) => void): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  if (executor === undefined) await ctx.plugin(NativeToolExecutor)
+  else executor(ctx)
   await ctx.plugin(AgentRegistry)
   // The backend mounts BEFORE the loop so root teardown unwinds the loop
   // first: live agents drain their writers into still-open handles.
@@ -979,6 +983,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     const loopFiber = await ctx.plugin(AgentLoop, { agents: [] })
     await ctx.plugin(JsonlSessionPersistence, { root })
@@ -1091,14 +1096,15 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
       { type: 'block-end', index: 1, block: { type: 'tool-call', id: ToolCallId('pending'), name: 'probe', arguments: '{}' } },
       { type: 'finish', reason: { kind: 'tool-calls' } },
     ]])
-    const { ctx: first, root } = await persistentHarness(firstAdapter)
+    let pipeline!: ReturnType<typeof mountPatchableExecutor>
+    const { ctx: first, root } = await persistentHarness(firstAdapter, (ctx) => { pipeline = mountPatchableExecutor(ctx) })
     let next: Context | undefined
     try {
       first.tools.register(defineContentToolFixture({
         name: 'probe', description: 'probe', parameters: {},
         async execute() { return [{ type: 'text', text: 'unexpected execution' }] },
       }))
-      first.tools[TOOL_RUNTIME_SCHEDULER].prepare = () => { throw new Error('scheduler prepare failed') }
+      pipeline.prepare = () => { throw new Error('scheduler prepare failed') }
       const sessionId = SessionId('failed-tool-history')
       const initial = await first.agents.create({ sessionId, agentOptions: { provider: 'mock', model: 'mock' } })
       const failed = waitForIdle(first, initial.agent)
@@ -1194,6 +1200,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(AgentLoop, { agents: [] })
     ctx.llm.registerAdapter(['mock'], adapter)
@@ -1462,6 +1469,7 @@ describe('configured-start failure edges', () => {
     await configured.plugin(SessionProjectionRegistry)
     await configured.plugin(SystemPrompt)
     await configured.plugin(ToolRuntime)
+    await configured.plugin(NativeToolExecutor)
     await configured.plugin(AgentRegistry)
     await configured.plugin(JsonlSessionPersistence, { root })
     configured.llm.registerAdapter(['mock'], new MockAdapter([]))
@@ -1496,6 +1504,7 @@ describe('configured-start failure edges', () => {
     await configured.plugin(SessionProjectionRegistry)
     await configured.plugin(SystemPrompt)
     await configured.plugin(ToolRuntime)
+    await configured.plugin(NativeToolExecutor)
     await configured.plugin(AgentRegistry)
     await configured.plugin(JsonlSessionPersistence, { root })
     configured.llm.registerAdapter(['mock'], new MockAdapter([]))

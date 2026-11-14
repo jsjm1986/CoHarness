@@ -183,7 +183,8 @@ export function testProfileResolution(mode: ExampleMode): void {
         'probe.mjs': [
           "import { createRequire } from 'node:module'",
           "import { getEnvironmentData } from 'node:worker_threads'",
-          "import Tools, { TOOL_RUNTIME_SCHEDULER } from '@deepseek-ai/dsh-tools'",
+          "import Tools from '@deepseek-ai/dsh-tools'",
+          "import { ToolExecutionPipeline } from '@deepseek-ai/dsh-tools/pipeline'",
           `import { leaf } from '${leafName}'`,
           `import { leaf as bridgeLeaf } from '${bridgeName}'`,
           `import { external } from '${externalName}'`,
@@ -214,7 +215,7 @@ export function testProfileResolution(mode: ExampleMode): void {
           '      sourceToolsInstance: ctx.tools instanceof SourceTools,',
           `      profileToolsCjs: ${toolsCjsExpression},`,
           '      sourceToolsCjs, sourceLeafCjs, sourceLeafExplicitCjs,',
-          "      scheduler: typeof ctx.tools[TOOL_RUNTIME_SCHEDULER]?.prepare === 'function',",
+          "      scheduler: typeof new ToolExecutionPipeline(ctx).prepare === 'function',",
           '      modules: [...ctx.loader.internal.loadCache.keys()]',
           '        .filter(url => /\\/packages\\/core\\/(?:tools|agent-loop)\\//.test(url)),',
           '    }',

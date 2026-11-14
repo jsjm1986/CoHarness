@@ -7,6 +7,7 @@ import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
@@ -24,6 +25,7 @@ async function harness(adapter: LlmAdapter): Promise<Harness> {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   const agentsFiber = await ctx.plugin(AgentRegistry)
   await ctx.plugin(SessionProjectionRegistry)
   const loopFiber = await ctx.plugin(AgentLoop, { agents: [] })
@@ -125,6 +127,7 @@ describe('AgentLoop initiator scope', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentLoop, { agents: [] })
@@ -312,12 +315,15 @@ describe('AgentLoop initiator scope', () => {
     }))
 
     const direct = await ctx.tools.execute({
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('direct'),
+        name: 'agentless-probe',
+        arguments: '{}',
+      }],
       signal: testToolSignal,
-      callId: ToolCallId('direct'),
-      name: 'agentless-probe',
-      arguments: {},
     })
-    expect(direct.isError).toBe(false)
+    expect(direct.results[0]?.result.isError).toBe(false)
     expect(directAmbient).toBeUndefined()
 
     const handle = await ctx.agents.create({
@@ -385,6 +391,7 @@ describe('AgentLoop initiator scope', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentLoop, { agents: [] })

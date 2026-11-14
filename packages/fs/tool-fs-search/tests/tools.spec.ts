@@ -1,6 +1,6 @@
 /**
  * Consumer-surface tests for the search tools over a FAKE subprocess service
- * and a FAKE spill backend, exercised through `ctx.tools.execute()` so nothing
+ * and a FAKE spill backend, exercised through `executeToolFixture(ctx, )` so nothing
  * bypasses the tool registry. The fake service makes every seam outcome
  * scriptable — spawn failure, truncated stdout with/without a raw spill path,
  * abort/timeout kills, signal kills, ripgrep exit codes — so these tests
@@ -18,6 +18,8 @@ import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH, type ToolExecution, type ToolExecutionToken } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { SubprocessCollectedOutputs, SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessOutputReader, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -205,6 +207,7 @@ async function setup(options: SetupOptions = {}) {
   ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(FakeSubprocess)
   const subprocess = ctx.subprocess as FakeSubprocess
   if (options.spill === true) await ctx.plugin(FakeSpill)
@@ -223,7 +226,7 @@ function call(
   args: unknown,
   options: { agent?: object; signal?: AbortSignal; parent?: ToolExecutionToken } = {},
 ) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: testToolSignal,
     callId: ToolCallId(`call-${++callCounter}`),
     name,
@@ -262,6 +265,7 @@ describe('registration', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(ToolFsSearch, DEFAULT_CONFIG) // no subprocess service
     expect(ctx.tools.schemas()).toHaveLength(0)
   })
@@ -318,6 +322,7 @@ describe('config validation', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(FakeSubprocess)
     await expect(ctx.plugin(ToolFsSearch, { ...DEFAULT_CONFIG, ...config })).rejects.toThrow(new RegExp(`tool-fs-search: ${name} must be a positive integer`))
   })
@@ -327,6 +332,7 @@ describe('config validation', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(FakeSubprocess)
     await expect(ctx.plugin(ToolFsSearch, {
       ...DEFAULT_CONFIG,

@@ -7,6 +7,9 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
+import { ToolExecutionPipeline } from '@deepseek-ai/dsh-tools/pipeline'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { assembleContextFor, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -51,6 +54,7 @@ async function setup(toolConfig: tool.Config, mockConfig: Partial<mock.Config> =
   const ctx = await projectedContext()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await mock.mountScriptedProvider(ctx, { name: 'mock', ...mockConfig })
@@ -64,7 +68,7 @@ function callSubagent(ctx: Context, args: unknown, over: { agent?: Agent | undef
   // `{ agent: undefined }` (test the no-agent path). Under
   // exactOptionalPropertyTypes the key is omitted rather than set to undefined.
   const agent = 'agent' in over ? over.agent : fakeAgent(ctx)
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: testToolSignal,
     callId: ToolCallId(`call-${++callCounter}`),
     name: 'subagent',
@@ -154,13 +158,13 @@ describe('dsh-tool-subagent', () => {
 
   it('classifies foreground and background calls concurrency-safe (sibling delegations overlap)', async () => {
     const ctx = await setup({ provider: 'mock' })
-    expect(ctx.tools.executionMode({
+    expect(new ToolExecutionPipeline(ctx).executionMode({
       signal: testToolSignal,
       callId: ToolCallId('subagent-foreground'),
       name: 'subagent',
       arguments: { description: 'do work', prompt: 'Reply OK' },
     })).toEqual({ kind: 'parallel' })
-    expect(ctx.tools.executionMode({
+    expect(new ToolExecutionPipeline(ctx).executionMode({
       signal: testToolSignal,
       callId: ToolCallId('subagent-background'),
       name: 'subagent',
@@ -228,6 +232,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await mock.mountScriptedProvider(ctx, { name: 'spawn', reply: 'from spawn' })
@@ -238,8 +243,8 @@ describe('dsh-tool-subagent', () => {
     const names = ctx.tools.schemas().map(s => s.name).filter(n => n.startsWith('subagent')).sort()
     expect(names).toEqual(['subagent', 'subagent_acp'])
 
-    const viaSpawn = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('c-spawn'), name: 'subagent', arguments: { description: 'd', prompt: 'p' }, agent: fakeAgent(ctx) })
-    const viaAcp = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('c-acp'), name: 'subagent_acp', arguments: { description: 'd', prompt: 'p' }, agent: fakeAgent(ctx) })
+    const viaSpawn = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('c-spawn'), name: 'subagent', arguments: { description: 'd', prompt: 'p' }, agent: fakeAgent(ctx) })
+    const viaAcp = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('c-acp'), name: 'subagent_acp', arguments: { description: 'd', prompt: 'p' }, agent: fakeAgent(ctx) })
     expect(text(viaSpawn)).toBe('from spawn')
     expect(text(viaAcp)).toBe('from acp')
   })
@@ -250,6 +255,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -279,6 +285,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -310,6 +317,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -346,6 +354,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     // Tool first: no provider yet — the tool must be absent, not broken.
@@ -364,6 +373,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await tool.apply(ctx, {
@@ -381,6 +391,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     const backend = await mock.mountScriptedProvider(ctx, { name: 'mock' }) // fresh conversation (descriptor: false)
@@ -401,6 +412,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
 
@@ -438,6 +450,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await mock.mountScriptedProvider(ctx, { name: 'mock' })
@@ -475,6 +488,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -499,6 +513,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -524,6 +539,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -553,6 +569,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     let allowCleanup = false
@@ -580,6 +597,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -609,6 +627,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -648,6 +667,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -676,6 +696,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     // No SubagentRuntime mounted. The tool injects its three required services so its
     // apply never runs; the tool is absent rather than half-registered.
     let booted = true
@@ -713,6 +734,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -778,6 +800,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -855,7 +878,7 @@ describe('dsh-tool-subagent background mode', () => {
       maxDepth: 'provider-managed',
     })
 
-    const started = await ctx.tools.execute({
+    const started = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('resumable-one-shot'),
       name: 'subagent_resumable',
@@ -878,7 +901,7 @@ describe('dsh-tool-subagent background mode', () => {
     expect(start.value).toEqual({ kind: 'background', jobId })
     expect(text(start)).toBe(`started background subagent job ${jobId}`)
 
-    const collected = await ctx.tools.execute({
+    const collected = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('collect-1'),
       name: 'job_output',
@@ -888,7 +911,7 @@ describe('dsh-tool-subagent background mode', () => {
     expect(text(collected)).toBe('background answer\n[status: completed]')
 
     // Final-output reads are idempotent (not consumed).
-    const again = await ctx.tools.execute({
+    const again = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('collect-2'),
       name: 'job_output',
@@ -906,7 +929,7 @@ describe('dsh-tool-subagent background mode', () => {
     })
     const parent = ownerAgent(ctx, 'sess-parent')
 
-    const started = await ctx.tools.execute({
+    const started = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('diagnostic-background-start'),
       name: 'subagent',
@@ -916,7 +939,7 @@ describe('dsh-tool-subagent background mode', () => {
     const jobId = backgroundJobId(started)
     expect(text(started)).toBe(`started background subagent job ${jobId}`)
 
-    const output = await ctx.tools.execute({
+    const output = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('diagnostic-background-output'),
       name: 'job_output',
@@ -964,7 +987,7 @@ describe('dsh-tool-subagent background mode', () => {
     })
     await tool.apply(ctx, { maxDepth: 'provider-managed', provider: 'broken-start', toolName: 'subagent_broken' })
 
-    const started = await ctx.tools.execute({
+    const started = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('broken-start'),
       name: 'subagent_broken',
@@ -973,7 +996,7 @@ describe('dsh-tool-subagent background mode', () => {
     })
     const jobId = backgroundJobId(started)
     expect(text(started)).toBe(`started background subagent job ${jobId}`)
-    const output = await ctx.tools.execute({
+    const output = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('broken-output'),
       name: 'job_output',
@@ -998,7 +1021,7 @@ describe('dsh-tool-subagent background mode', () => {
     })
     await tool.apply(ctx, { maxDepth: 'provider-managed', provider: 'pending-start', toolName: 'subagent_pending' })
 
-    const started = await ctx.tools.execute({
+    const started = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('pending-start'),
       name: 'subagent_pending',
@@ -1006,14 +1029,14 @@ describe('dsh-tool-subagent background mode', () => {
       agent: parent,
     })
     const jobId = backgroundJobId(started)
-    await ctx.tools.execute({
+    await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('pending-kill'),
       name: 'job_kill',
       arguments: { job_id: jobId, reason: 'no longer needed' },
       agent: parent,
     })
-    const output = await ctx.tools.execute({
+    const output = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('pending-output'),
       name: 'job_output',
@@ -1041,7 +1064,7 @@ describe('dsh-tool-subagent background mode', () => {
     })
     await tool.apply(ctx, { maxDepth: 'provider-managed', provider: 'broken-start-rollback', toolName: 'subagent_broken_rollback' })
 
-    const started = await ctx.tools.execute({
+    const started = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('broken-rollback-start'),
       name: 'subagent_broken_rollback',
@@ -1049,14 +1072,14 @@ describe('dsh-tool-subagent background mode', () => {
       agent: parent,
     })
     const jobId = backgroundJobId(started)
-    await ctx.tools.execute({
+    await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('broken-rollback-kill'),
       name: 'job_kill',
       arguments: { job_id: jobId },
       agent: parent,
     })
-    const output = await ctx.tools.execute({
+    const output = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('broken-rollback-output'),
       name: 'job_output',
@@ -1095,21 +1118,21 @@ describe('dsh-tool-subagent background mode', () => {
     // Direct apply preserves omitted agentOptions instead of applying schema defaults.
     await tool.apply(ctx, { maxDepth: 'provider-managed', provider: 'hanging', toolName: 'subagent_hang' })
 
-    const startOne = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('h1'), name: 'subagent_hang', arguments: { description: 'one', prompt: 'p', run_in_background: true }, agent: parent })
-    const startTwo = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('h2'), name: 'subagent_hang', arguments: { description: 'two', prompt: 'p', run_in_background: true }, agent: parent })
+    const startOne = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('h1'), name: 'subagent_hang', arguments: { description: 'one', prompt: 'p', run_in_background: true }, agent: parent })
+    const startTwo = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('h2'), name: 'subagent_hang', arguments: { description: 'two', prompt: 'p', run_in_background: true }, agent: parent })
     const firstId = backgroundJobId(startOne)
     const secondId = backgroundJobId(startTwo)
     expect(text(startOne)).toBe(`started background subagent job ${firstId}`)
     expect(text(startTwo)).toBe(`started background subagent job ${secondId}`)
 
-    const withReason = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('k1'), name: 'job_kill', arguments: { job_id: firstId, reason: 'superseded' }, agent: parent })
-    const withoutReason = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('k2'), name: 'job_kill', arguments: { job_id: secondId }, agent: parent })
+    const withReason = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('k1'), name: 'job_kill', arguments: { job_id: firstId, reason: 'superseded' }, agent: parent })
+    const withoutReason = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('k2'), name: 'job_kill', arguments: { job_id: secondId }, agent: parent })
     expect(text(withReason)).toBe(`requested cancellation of job ${firstId}`)
     expect(text(withoutReason)).toBe(`requested cancellation of job ${secondId}`)
     expect(cancels).toEqual(['superseded', 'background subagent task killed'])
 
     // The aborted children settle as killed tasks.
-    const killed = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('w1'), name: 'job_output', arguments: { job_id: firstId, wait: true }, agent: parent })
+    const killed = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('w1'), name: 'job_output', arguments: { job_id: firstId, wait: true }, agent: parent })
     expect(text(killed)).toBe('(no new output)\n[status: killed, superseded]')
   })
 
@@ -1144,7 +1167,7 @@ describe('dsh-tool-subagent continuable background mode', () => {
 
   it('classifies continuable background calls concurrency-safe', async () => {
     const { ctx } = await continuableSetup()
-    expect(ctx.tools.executionMode({
+    expect(new ToolExecutionPipeline(ctx).executionMode({
       signal: testToolSignal,
       callId: ToolCallId('subagent-continuable'),
       name: 'subagent',
@@ -1248,7 +1271,7 @@ describe('dsh-tool-subagent continuable background mode', () => {
       maxDepth: 3,
     })
 
-    const execute = (callId: string, description: string, signal: AbortSignal) => ctx.tools.execute({
+    const execute = (callId: string, description: string, signal: AbortSignal) => executeToolFixture(ctx, {
       signal,
       callId: ToolCallId(callId),
       name: 'subagent_gated',
@@ -1320,7 +1343,7 @@ describe('background preflight failure (no orphaned child, by construction)', ()
     })
     await tool.apply(ctx, { maxDepth: 'provider-managed', provider: 'probe', toolName: 'subagent_probe' })
 
-    const result = await ctx.tools.execute({
+    const result = await executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('probe-1'),
       name: 'subagent_probe',
@@ -1341,6 +1364,7 @@ describe('depth budget configuration', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -1372,6 +1396,7 @@ describe('depth budget configuration', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
@@ -1389,6 +1414,7 @@ describe('depth budget configuration', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({

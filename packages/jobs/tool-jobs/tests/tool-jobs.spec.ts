@@ -4,6 +4,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import AgentRegistry, { emitAgentEvent } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -46,6 +48,7 @@ async function setup(config: ToolJobs.Config = {}, registry: RegistryConfig = {}
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   const agentsFiber = await ctx.plugin(AgentRegistry)
   await ctx.plugin(LocalJobRegistry, registry)
   const toolsFiber = await ctx.plugin(ToolJobs, config)
@@ -137,7 +140,7 @@ function producer(overrides: Partial<Omit<JobSpec, 'run' | 'output'> & JobHooks>
 
 let callCounter = 0
 function call(ctx: Context, name: string, args: unknown, agent?: Agent) {
-  return ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId(`call-${++callCounter}`), name, arguments: args, ...agent ? { agent } : {} })
+  return executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId(`call-${++callCounter}`), name, arguments: args, ...agent ? { agent } : {} })
 }
 
 function text(result: { content: { type: string; text?: string }[] }): string {
@@ -168,6 +171,7 @@ describe('tool-jobs setup', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(LocalJobRegistry)
     await ctx.plugin(ToolJobs)
     const p = producer()
@@ -183,6 +187,7 @@ describe('tool-jobs setup', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(LocalJobRegistry)
     await expect(ctx.plugin(ToolJobs, { waitTimeoutMs: 100, maxWaitTimeoutMs: 50 }))
@@ -202,6 +207,7 @@ describe('tool-jobs setup', () => {
       const ctx = new Context()
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
+      await ctx.plugin(NativeToolExecutor)
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(LocalJobRegistry)
       try {
@@ -300,6 +306,7 @@ describe('tool-jobs setup', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(LocalJobRegistry)
     ToolJobs.apply(ctx, {})
@@ -736,6 +743,7 @@ describe('completion notices across scoped mounts', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(LocalJobRegistry)
 
@@ -1133,7 +1141,7 @@ describe('completion notices', () => {
     ctx.jobs.start(p.spec)
 
     const aborter = new AbortController()
-    const pending = ctx.tools.execute({
+    const pending = executeToolFixture(ctx, {
       signal: aborter.signal,
       callId: ToolCallId('call-aborted-wait'),
       name: 'job_output',
@@ -1159,7 +1167,7 @@ describe('completion notices', () => {
     ctx.jobs.start(p.spec)
 
     const aborter = new AbortController()
-    const pending = ctx.tools.execute({
+    const pending = executeToolFixture(ctx, {
       signal: aborter.signal,
       callId: ToolCallId('call-abort-then-settle'),
       name: 'job_output',

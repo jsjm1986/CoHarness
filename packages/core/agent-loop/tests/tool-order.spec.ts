@@ -14,6 +14,7 @@ import SessionStore, { SessionId, foldRequestHeader } from '@deepseek-ai/dsh-ses
 import SystemPrompt, { TOOL_ORDER_REST } from '@deepseek-ai/dsh-system-prompt'
 import type { Config as SystemPromptConfig } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -26,6 +27,7 @@ async function harness(adapter: MockAdapter, toolOrder?: SystemPromptConfig['too
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, { personaPrefix: 'stable base', ...toolOrder !== undefined ? { toolOrder } : {} })
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })

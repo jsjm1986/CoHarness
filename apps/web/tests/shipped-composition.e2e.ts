@@ -221,17 +221,20 @@ it('lets a preset producer reach the background-job registry', async () => {
     // `tool-bash` is a preset row and `tasks` is a host registry; the producer
     // resolves it with `ctx.get`, so a registry hidden behind a preset realm
     // fails here — with every task control still listed in the catalog above.
-    const started = await ctx.tools.execute({
+    const started = (await ctx.tools.execute({
       signal,
-      callId: ToolCallId('shipped-bash-background'),
-      name: 'bash',
-      arguments: {
-        command: 'printf SHIPPED_BACKGROUND_OK',
-        description: 'shipped background probe',
-        run_in_background: true,
-      },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('shipped-bash-background'),
+        name: 'bash',
+        arguments: JSON.stringify({
+          command: 'printf SHIPPED_BACKGROUND_OK',
+          description: 'shipped background probe',
+          run_in_background: true,
+        }),
+      }],
       agent: handle.agent,
-    })
+    })).results[0]!.result
     // The registry mints `<kind>-<16 lowercase hex>` job ids; capture the one
     // this start produced so the controls below address it, not a guess.
     const ack = started.content.map(block => block.type === 'text' ? block.text : '').join('')
@@ -244,13 +247,16 @@ it('lets a preset producer reach the background-job registry', async () => {
 
     // The controller reads what the producer started: same registry, one
     // owner. A per-preset registry would list nothing here even on success.
-    const listed = await ctx.tools.execute({
+    const listed = (await ctx.tools.execute({
       signal,
-      callId: ToolCallId('shipped-task-list'),
-      name: 'job_list',
-      arguments: {},
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('shipped-task-list'),
+        name: 'job_list',
+        arguments: '{}',
+      }],
       agent: handle.agent,
-    })
+    })).results[0]!.result
     expect(listed.isError).toBe(false)
     expect(listed.content).toEqual([
       { type: 'text', text: expect.stringContaining(`${jobId} [bash]`) as string },
@@ -258,13 +264,16 @@ it('lets a preset producer reach the background-job registry', async () => {
 
     // The full round trip: the output a host-plane producer wrote is collected
     // through a preset-plane control, which is the linkage the realm severed.
-    const collected = await ctx.tools.execute({
+    const collected = (await ctx.tools.execute({
       signal,
-      callId: ToolCallId('shipped-task-output'),
-      name: 'job_output',
-      arguments: { job_id: jobId, wait: true },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('shipped-task-output'),
+        name: 'job_output',
+        arguments: JSON.stringify({ job_id: jobId, wait: true }),
+      }],
       agent: handle.agent,
-    })
+    })).results[0]!.result
     expect(collected.isError).toBe(false)
     expect(collected.content).toEqual([
       { type: 'text', text: expect.stringContaining('SHIPPED_BACKGROUND_OK') as unknown as string },

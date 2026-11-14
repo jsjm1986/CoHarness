@@ -30,6 +30,7 @@ import SessionQuery from '@deepseek-ai/dsh-session-query-sqlite'
 import Shell from '@deepseek-ai/dsh-shell'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import Approval from '@deepseek-ai/dsh-user-approval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import GatewayExecution from '../src/index.ts'
@@ -267,6 +268,7 @@ async function composition(
     ['@deepseek-ai/dsh-goal', GoalService], ['@deepseek-ai/dsh-goal-round-driver', GoalRoundDriver],
     ['@deepseek-ai/dsh-session', SessionStore], ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt], ['@deepseek-ai/dsh-llm', LlmRuntime], ['@deepseek-ai/dsh-tools', ToolRuntime],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-agent', AgentRegistry], ['@deepseek-ai/dsh-agent-loop', AgentLoop], ['@deepseek-ai/dsh-session-query-sqlite', SessionQuery],
     ['fixture:unused-shell', UnusedShell], ['@deepseek-ai/dsh-user-approval', Approval],
     ['@deepseek-ai/dsh-permission-presets', PermissionPresets], ['@deepseek-ai/dsh-sandbox-policy', SandboxPolicy],

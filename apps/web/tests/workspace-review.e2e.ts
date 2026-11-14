@@ -55,10 +55,13 @@ describe('web e2e: delivered files and historical review', () => {
     }) }, { surfaceOp: 'append' })
     const call = session.append('tool/call', { turn: 1, step: 1, callId, name: 'write', arguments: JSON.stringify(args) })
     session.append('tool/result', { turn: 1, step: 1, message: createToolResultMessage({ callId, content: [{ type: 'text', text: 'Updated review.txt' }], isError: false }) }, { surfaceOp: 'append', sourceEventSeqs: [call.seq] })
-    const delivery = await ctx.tools.execute({
-      agent, signal: new AbortController().signal, name: 'present', callId: ToolCallId('review-present'),
-      arguments: { files: [{ path: 'review.txt', description: 'Reviewed text file' }] },
-    })
+    const delivery = (await ctx.tools.execute({
+      agent, signal: new AbortController().signal,
+      calls: [{
+        type: 'tool-call', id: ToolCallId('review-present'), name: 'present',
+        arguments: JSON.stringify({ files: [{ path: 'review.txt', description: 'Reviewed text file' }] }),
+      }],
+    })).results[0]!.result
     expect(delivery.isError).toBe(false)
     expect(session.snapshotEvents().find(event => event.type === 'deliverables/presented'))
       .toMatchObject({ data: { files: [{ path: join(workspaceCwd, 'review.txt'), description: 'Reviewed text file' }] } })

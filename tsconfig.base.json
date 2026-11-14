@@ -537,6 +537,7 @@
       "@deepseek-ai/dsh-tool-subagent": ["./packages/subagent/tool-subagent/src"],
       "@deepseek-ai/dsh-tool-subagent-control": ["./packages/subagent/tool-subagent-control/src"],
       "@deepseek-ai/dsh-tool-terminal": ["./packages/terminal/tool-terminal/src"],
+      "@deepseek-ai/dsh-tool-testkit": ["./packages/test-support/tool-testkit/src"],
       "@deepseek-ai/dsh-tool-todo": ["./packages/todo/tool-todo/src"],
       "@deepseek-ai/dsh-tool-userdoc": ["./packages/attachment/tool-userdoc/src"],
       "@deepseek-ai/dsh-tool-web": ["./packages/web/tool-web/src"],

@@ -17,6 +17,9 @@ import { createMcpToolDefinition } from '@deepseek-ai/dsh-mcp-client'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeModelToolFixture, executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import LocalSpillStore from '@deepseek-ai/dsh-spill-local'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcRunRequest, PtcRunSpec, PtcRunResult } from '@deepseek-ai/dsh-ptc-runtime'
@@ -70,7 +73,9 @@ async function setup(content: JsonValue[], maxInlineTokens: number, mode: 'nativ
     try { await ctx.fiber.dispose() } finally { await rm(root, { recursive: true, force: true }) }
   })
   await ctx.plugin(SystemPrompt)
-  await ctx.plugin(ToolRuntime, { mode })
+  await ctx.plugin(ToolRuntime)
+  if (mode === 'ptc') ctx.tools.setExecutor(new PtcExecutor(ctx))
+  else await ctx.plugin(NativeToolExecutor)
   const fsFiber = await ctx.plugin(FileSystem, { cwd: root })
   await ctx.plugin(TestAttachments, root)
   await ctx.plugin(LocalSpillStore, { root: join(root, 'spill'), cleanupPeriodDays: 0 })
@@ -83,7 +88,7 @@ async function setup(content: JsonValue[], maxInlineTokens: number, mode: 'nativ
   }))
   const session = Session.create(SessionId('mixed-spill'))
   const agent = { ctx, session, options: { provider: 'vision', model: 'vision' } } as Agent
-  const execute = (name = 'inspect') => ctx.tools.execute({
+  const execute = (name = 'inspect') => executeModelToolFixture(ctx, {
     signal: new AbortController().signal, callId: ToolCallId('mixed-call'), name,
     arguments: name === 'run_code' ? { code: 'return await tools.inspect({})', description: 'Inspect a window' } : {}, agent,
   })
@@ -163,7 +168,7 @@ describe('multimodal spill', () => {
       async execute() { return [{ type: 'image', attachment }] },
     }))
     const warning = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
-    const result = await ctx.tools.execute({ signal: new AbortController().signal,
+    const result = await executeToolFixture(ctx, { signal: new AbortController().signal,
       callId: ToolCallId('offline'), name: 'offline_image', arguments: {} })
     expect(result.content).toEqual([{ type: 'image', attachment }])
     expect(warning).toHaveBeenCalledWith(expect.stringContaining('no image token calculator'))

@@ -9,40 +9,49 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../../vendor/cosmokit"
     },
     {
       "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../llm/llm"
+      "path": "../../compaction/compaction"
     },
     {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../../core/system-prompt"
-    },
-    {
-      "path": "../../session-query/session-query"
-    },
-    {
-      "path": "../../util/timeout"
-    },
-    {
-      "path": "../../session/session-projection"
+      "path": "../../context/collaboration"
     },
     {
       "path": "../../core/agent"
     },
     {
-      "path": "../../context/collaboration"
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session-query/session-query"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../util/timeout"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

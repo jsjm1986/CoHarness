@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -18,25 +27,19 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../subagent"
-    },
-    {
       "path": "../../subprocess/subprocess"
     },
     {
       "path": "../../test-support/loader-smoke"
     },
     {
+      "path": "../../util/brand"
+    },
+    {
       "path": "../../util/timeout"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../subagent"
     }
   ]
 }

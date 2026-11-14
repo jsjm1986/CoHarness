@@ -15,6 +15,8 @@ import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as ToolStrReplaceEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
 import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
@@ -55,7 +57,7 @@ function text(result: { content: { type: string; text?: string }[] }): string {
 }
 
 function call(ctx: Context, owner: Agent | undefined, args: unknown) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: new AbortController().signal,
     callId: ToolCallId(`str-replace-editor-${++callNumber}`),
     name: 'str_replace_editor',
@@ -74,6 +76,7 @@ async function setup(
   contexts.push(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   if (options.sandboxMode === undefined) {
     await ctx.plugin(LocalFileSystem, { cwd: root })
@@ -622,6 +625,7 @@ describe('tool-str-replace-editor', () => {
     contexts.push(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(LocalFileSystem, { cwd: root })
     Object.defineProperty(ctx.fs, 'sandboxMode', { value: 'read-only' })

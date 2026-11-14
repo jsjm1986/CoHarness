@@ -19,6 +19,9 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { FsVersion } from '@deepseek-ai/dsh-fs'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
+import { executeModelToolFixture, executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
 import * as FsPolicy from '@deepseek-ai/dsh-fs-observation-policy'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
@@ -33,7 +36,7 @@ const session = { header: { get cwd() { return dir } } }
 
 let callCounter = 0
 function call(name: string, args: unknown) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: testToolSignal,
     callId: ToolCallId(`call-${++callCounter}`),
     name,
@@ -65,6 +68,7 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(LocalFileSystem, { cwd: dir })
     await ctx.plugin(FsPolicy)
     fiber = await ctx.plugin(ToolFs)
@@ -339,6 +343,7 @@ describe('bare provider (no dsh-fs-observation-policy)', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(LocalFileSystem, { cwd: dir })
     fiber = await ctx.plugin(ToolFs)
   })
@@ -408,6 +413,7 @@ describe('per-session cwd', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(LocalFileSystem, { cwd: dir }) // config.cwd = dir, NOT sessionDir
     await ctx.plugin(FsPolicy)
     fiber = await ctx.plugin(ToolFs)
@@ -415,7 +421,7 @@ describe('per-session cwd', () => {
   afterEach(async () => { await rm(sessionDir, { recursive: true, force: true }) })
 
   const callIn = (sessionObj: object, name: string, args: unknown) =>
-    ctx.tools.execute({
+    executeToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId(`call-${++callCounter}`),
       name,
@@ -445,7 +451,7 @@ describe('per-session cwd', () => {
 
 // --------------------------------------------------------------------------
 // Abort-through-the-tool, tool-tier concurrency, and the fs/observed contract —
-// all through ctx.tools.execute() against the REAL backend + policy.
+// all through executeToolFixture(ctx, ) against the REAL backend + policy.
 // --------------------------------------------------------------------------
 describe('signal, concurrency, and the fs/observed contract', () => {
   beforeEach(async () => {
@@ -454,6 +460,7 @@ describe('signal, concurrency, and the fs/observed contract', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(LocalFileSystem, { cwd: dir })
     await ctx.plugin(FsPolicy)
     fiber = await ctx.plugin(ToolFs)
@@ -461,9 +468,9 @@ describe('signal, concurrency, and the fs/observed contract', () => {
 
   const session = { header: { get cwd() { return dir } } }
   const callSig = (signal: AbortSignal, name: string, args: unknown) =>
-    ctx.tools.execute({ callId: ToolCallId(`c-${++callCounter}`), name, arguments: args, agent: { session } as never, signal })
+    executeToolFixture(ctx, { callId: ToolCallId(`c-${++callCounter}`), name, arguments: args, agent: { session } as never, signal })
   const callOwned = (name: string, args: unknown) =>
-    ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId(`c-${++callCounter}`), name, arguments: args, agent: { session } as never })
+    executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId(`c-${++callCounter}`), name, arguments: args, agent: { session } as never })
 
   it('a pre-aborted registry call skips read/write/edit with ABORTED_BEFORE_DISPATCH', async () => {
     await writeFile(join(dir, 'a.txt'), 'hello')
@@ -582,20 +589,20 @@ describe('current working directory', () => {
       const policy = ctx.sandboxPolicy.resolve({ session })
       await ctx.workingDirectory.set(agent, next)
       const current = ctx.workingDirectory.get(session)
-      const read = await ctx.tools.execute({
+      const read = await executeToolFixture(ctx, {
         signal: testToolSignal, callId: ToolCallId('read-current'), name: 'read',
         arguments: { file_path: 'note.txt' }, agent,
       })
       expect(read.isError).toBe(false)
       expect(text(read)).toContain('current')
       expect(read.meta).toMatchObject({ path: join(current, 'note.txt') })
-      const write = await ctx.tools.execute({
+      const write = await executeToolFixture(ctx, {
         signal: testToolSignal, callId: ToolCallId('write-current'), name: 'write',
         arguments: { file_path: 'created.txt', content: 'new' }, agent,
       })
       expect(write.isError).toBe(false)
       expect(write.meta).toEqual({ operation: 'create', path: join(current, 'created.txt'), diffs: [] })
-      const edit = await ctx.tools.execute({
+      const edit = await executeToolFixture(ctx, {
         signal: testToolSignal, callId: ToolCallId('edit-current'), name: 'edit',
         arguments: { file_path: 'created.txt', old_string: 'new', new_string: 'edited' }, agent,
       })
@@ -616,8 +623,8 @@ describe('current working directory', () => {
         }
       }
       await ctx.plugin(ReadBindingRuntime)
-      agent.ctx.tools.presentAs('ptc')
-      const nested = await ctx.tools.execute({
+      await agent.ctx.plugin(PtcToolExecutor)
+      const nested = await executeModelToolFixture(ctx, {
         signal: testToolSignal, callId: ToolCallId('ptc-read-current'), name: 'run_code',
         arguments: { code: 'return await tools.read({file_path: "note.txt"})', description: 'Read the current note' }, agent,
       })

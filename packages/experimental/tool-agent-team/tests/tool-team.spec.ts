@@ -7,6 +7,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -72,7 +73,7 @@ function execute(
   args: unknown,
   signal: AbortSignal = SIGNAL,
 ) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     callId: ToolCallId(`team-call-${++callNumber}`),
     name,
     arguments: args,

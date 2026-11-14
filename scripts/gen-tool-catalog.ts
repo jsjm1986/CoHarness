@@ -7,7 +7,7 @@
  */
 
 import { globSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -768,6 +768,7 @@ export type ToolCatalog = CatalogPackage[]
 export function assertManifestComplete(packages: ToolPackage[] = TOOL_PACKAGES, scanRoot: string = root): void {
   // Native execution owns no tool definitions; PTC contributes run_code.
   const onDisk = globSync('packages/*/tool-*', { cwd: scanRoot })
+    .filter(path => basename(dirname(path)) !== 'test-support')
     .map(p => basename(p))
     .filter(dir => dir !== 'tool-executor-native').sort()
   const listed = new Set(packages.map(p => p.dir))

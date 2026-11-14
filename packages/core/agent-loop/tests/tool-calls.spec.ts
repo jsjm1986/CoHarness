@@ -10,11 +10,14 @@ import SessionStore, { SessionEvent, SessionId, TOOL_NOT_STARTED, TOOL_OUTCOME_U
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED_BEFORE_DISPATCH, TOOL_RUNTIME_SCHEDULER, type PostToolDecision, type PreToolDecision } from '@deepseek-ai/dsh-tools'
+import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED_BEFORE_DISPATCH, type PostToolDecision, type PreToolDecision } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
+import { mountPatchableExecutor } from './patchable-executor.ts'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcRunRequest, PtcRunResult } from '@deepseek-ai/dsh-ptc-runtime'
 
@@ -24,13 +27,15 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 
-async function harness(adapter: MockAdapter, maxParallelToolCalls?: number) {
+async function harness(adapter: MockAdapter, maxParallelToolCalls?: number, executor?: (ctx: Context) => void) {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(ToolRuntime)
+  if (executor === undefined) await ctx.plugin(NativeToolExecutor)
+  else executor(ctx)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, {
     agents: [],
@@ -338,6 +343,7 @@ describe('tool-call scheduler: rolling pool honors maxParallelToolCalls', () => 
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt, { personaPrefix: '' })
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(AgentLoop, { agents: [], maxParallelToolCalls: 1 })
     ctx.llm.registerAdapter(['mock'], adapter)
@@ -631,7 +637,7 @@ describe('tool-call scheduler: abort handling', () => {
 })
 
 describe('tool-call scheduler: failure quiescence', () => {
-  it.each(['execution-mode', 'prepare', 'finalize'] as const)('pairs outstanding requests after %s fails and preserves committed results', async (phase) => {
+  it.each(['execution-mode', 'prepare', 'complete'] as const)('pairs outstanding requests after %s fails and preserves committed results', async (phase) => {
     const adapter = new MockAdapter([
       multiCall([
         { id: 'c1', name: 'p', args: { id: '1' } },
@@ -640,7 +646,8 @@ describe('tool-call scheduler: failure quiescence', () => {
       ]),
       textResponse('continued'),
     ])
-    const ctx = await harness(adapter)
+    let pipeline!: ReturnType<typeof mountPatchableExecutor>
+    const ctx = await harness(adapter, undefined, (mounted) => { pipeline = mountPatchableExecutor(mounted) })
     onTestFinished(() => ctx.fiber.dispose())
     const executed: string[] = []
     ctx.tools.register(defineContentToolFixture({
@@ -650,25 +657,24 @@ describe('tool-call scheduler: failure quiescence', () => {
         return [{ type: 'text', text: `done-${args.id}` }]
       },
     }))
-    const scheduler = ctx.tools[TOOL_RUNTIME_SCHEDULER]
-    const executionMode = ctx.tools.executionMode.bind(ctx.tools)
-    const prepare = scheduler.prepare.bind(scheduler)
-    const finalize = scheduler.finalize.bind(scheduler)
+    const executionMode = pipeline.executionMode.bind(pipeline)
+    const prepare = pipeline.prepare.bind(pipeline)
+    const complete = pipeline.complete.bind(pipeline)
     const failure = new Error(`${phase} failed`)
     if (phase === 'execution-mode') {
-      ctx.tools.executionMode = (exec) => {
+      pipeline.executionMode = (exec) => {
         if (exec.callId === ToolCallId('c2')) throw failure
         return executionMode(exec)
       }
     } else if (phase === 'prepare') {
-      scheduler.prepare = (exec) => {
+      pipeline.prepare = (exec) => {
         if (exec.callId === ToolCallId('c2')) throw failure
         return prepare(exec)
       }
     } else {
-      scheduler.finalize = (exec, result) => {
+      pipeline.complete = (exec, outcome) => {
         if (exec.callId === ToolCallId('c2')) throw failure
-        return finalize(exec, result)
+        return complete(exec, outcome)
       }
     }
     const agent = await ctx.agentLoop.create(SessionId(`failure-${phase}`), { provider: 'mock', model: 'mock' })
@@ -681,7 +687,7 @@ describe('tool-call scheduler: failure quiescence', () => {
     const failedEvents = events(agent)
     const calls = failedEvents.filter(event => event.type === 'tool/call')
     const results = failedEvents.filter(event => event.type === 'tool/result')
-    expect(executed).toEqual(phase === 'finalize' ? ['1', '2'] : ['1'])
+    expect(executed).toEqual(phase === 'complete' ? ['1', '2'] : ['1'])
     expect(results.map(event => [event.data.message.toolCallId, event.data.error?.code])).toEqual([
       [ToolCallId('c1'), undefined],
       [ToolCallId('c2'), phase === 'execution-mode' ? TOOL_NOT_STARTED : TOOL_OUTCOME_UNKNOWN],
@@ -702,9 +708,9 @@ describe('tool-call scheduler: failure quiescence', () => {
     })
     expect(listenerCount()).toBe(idleListenerCount)
 
-    ctx.tools.executionMode = executionMode
-    scheduler.prepare = prepare
-    scheduler.finalize = finalize
+    pipeline.executionMode = executionMode
+    pipeline.prepare = prepare
+    pipeline.complete = complete
     const nextTurn = waitForIdle(ctx, agent)
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'continue' }], source: { kind: 'user' } }))
     await nextTurn
@@ -724,11 +730,12 @@ describe('tool-call scheduler: failure quiescence', () => {
 
   it('preserves the scheduler error when recording recovery results also fails', async () => {
     const adapter = new MockAdapter([multiCall([{ id: 'c1', name: 'p', args: {} }])])
-    const ctx = await harness(adapter)
+    let pipeline!: ReturnType<typeof mountPatchableExecutor>
+    const ctx = await harness(adapter, undefined, (mounted) => { pipeline = mountPatchableExecutor(mounted) })
     onTestFinished(() => ctx.fiber.dispose())
     const failure = new Error('prepare failed')
     const recoveryFailure = new Error('recovery result rejected')
-    ctx.tools[TOOL_RUNTIME_SCHEDULER].prepare = () => { throw failure }
+    pipeline.prepare = () => { throw failure }
     ctx.on('internal/dispatch', (_mode, name, args) => {
       if (name === 'session/event' && (args[1] as SessionEvent).type === 'tool/result') throw recoveryFailure
     })
@@ -752,7 +759,8 @@ describe('tool-call scheduler: failure quiescence', () => {
       multiCall([{ id: 'shared', name: 'p', args: {} }]),
       textResponse('second agent done'),
     ])
-    const ctx = await harness(adapter)
+    let pipeline!: ReturnType<typeof mountPatchableExecutor>
+    const ctx = await harness(adapter, undefined, (mounted) => { pipeline = mountPatchableExecutor(mounted) })
     const enteredDispatch = Promise.withResolvers<undefined>()
     const releaseDispatch = Promise.withResolvers<undefined>()
     onTestFinished(async () => {
@@ -763,9 +771,8 @@ describe('tool-call scheduler: failure quiescence', () => {
       name: 'p', description: 'probe', parameters: {},
       async execute() { return [{ type: 'text', text: 'completed' }] },
     }))
-    const scheduler = ctx.tools[TOOL_RUNTIME_SCHEDULER]
-    const dispatch = scheduler.dispatch.bind(scheduler)
-    scheduler.dispatch = async (exec) => {
+    const dispatch = pipeline.dispatch.bind(pipeline)
+    pipeline.dispatch = async (exec) => {
       if (exec.agent?.id === SessionId('first-agent')) {
         enteredDispatch.resolve(undefined)
         await releaseDispatch.promise
@@ -813,17 +820,17 @@ describe('tool-call scheduler: failure quiescence', () => {
         { id: 'c3', name: 'p', args: { id: '3' } },
       ]),
     ])
-    const ctx = await harness(adapter, 3)
+    let pipeline!: ReturnType<typeof mountPatchableExecutor>
+    const ctx = await harness(adapter, 3, (mounted) => { pipeline = mountPatchableExecutor(mounted) })
     const gated = gatedParallelTool('p')
     ctx.tools.register(gated.tool)
-    // The registry contains expected failures as results; replace its internal
-    // view only to inject the invariant violation this boundary must contain.
-    const scheduler = ctx.tools[TOOL_RUNTIME_SCHEDULER]
-    const prepare = scheduler.prepare.bind(scheduler)
-    const dispatch = scheduler.dispatch.bind(scheduler)
+    // The executor contains expected failures as results; replace its pipeline
+    // stages only to inject the invariant violation this boundary must contain.
+    const prepare = pipeline.prepare.bind(pipeline)
+    const dispatch = pipeline.dispatch.bind(pipeline)
     const prepareGate = Promise.withResolvers<undefined>()
     let thirdPrepareEntered = false
-    scheduler.prepare = async (exec) => {
+    pipeline.prepare = async (exec) => {
       const prepared = await prepare(exec)
       if (exec.callId === ToolCallId('c3')) {
         thirdPrepareEntered = true
@@ -840,8 +847,8 @@ describe('tool-call scheduler: failure quiescence', () => {
       for (const id of gated.pending()) gated.release(id)
       await ctx.fiber.dispose()
     })
-    scheduler.dispatch = exec => exec.callId === ToolCallId('c1')
-      ? new Promise((_resolve, reject) => { rejectFirst = reject })
+    pipeline.dispatch = exec => exec.callId === ToolCallId('c1')
+      ? new Promise<never>((_resolve, reject) => { rejectFirst = reject })
       : dispatch(exec).then(() => { throw drainedError })
     const agent = await ctx.agentLoop.create(SessionId('scheduler-failure'), { provider: 'mock', model: 'mock' })
     let idle = false
@@ -897,9 +904,10 @@ describe('PTC mode native-tool denial through the agent loop', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt, { personaPrefix: '' })
-    await ctx.plugin(ToolRuntime, { mode: 'ptc' })
+    await ctx.plugin(ToolRuntime)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FakePtcRuntime is an internal test helper with an opaque type shape
     await ctx.plugin(FakePtcRuntime as any)
+    await ctx.plugin(PtcToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(AgentLoop, { agents: [] })
     ctx.llm.registerAdapter(['mock'], adapter)

@@ -24,6 +24,7 @@ import {
 } from '../src/model-selection-state.ts'
 import { callSubagent, text } from './harness.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 
 const ALLOWED_MODELS = [{ provider: 'alpha', model: 'fast-model' }]
 
@@ -222,7 +223,7 @@ describe('SubagentModelSelectionConfig', () => {
     })
     const agent = await createAgent(ctx, 'enforced')
 
-    const result = await ctx.tools.execute({
+    const result = await executeToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('disallowed-session-route'),
       name: 'subagent',

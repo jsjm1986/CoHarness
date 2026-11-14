@@ -383,6 +383,7 @@
     { "path": "./packages/spill/spill-policy" },
     { "path": "./packages/guard/timeout-policy" },
     { "path": "./packages/test-support/agent-loop-testkit" },
+    { "path": "./packages/test-support/tool-testkit" },
     { "path": "./packages/acp/acp" },
     { "path": "./packages/examples/acp-demo" },
     { "path": "./packages/bundle/acp-app" },

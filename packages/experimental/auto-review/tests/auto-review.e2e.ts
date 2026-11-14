@@ -24,6 +24,7 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as ToolBash from '@deepseek-ai/dsh-tool-bash'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import { RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
+import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
 import ApprovalService, { setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
 import { expect, it, vi } from 'vitest'
 import * as AutoReview from '@deepseek-ai/dsh-experimental-auto-review'
@@ -314,7 +315,7 @@ it('certifies eight Auto risk/authorization cases with zero retries and zero ski
         sessionId: SessionId(randomUUID()), meta: { cwd: workspace }, agentOptions: { provider: PROVIDER, model },
       })
       try {
-        if (path === 'ptc-inner') handle.agent.ctx.tools.presentAs('ptc')
+        if (path === 'ptc-inner') await handle.agent.ctx.plugin(PtcToolExecutor)
         selectFinalAuto(ctx, handle.agent.session)
         const command = `rm -- ${quote(target)}`
         await runCase(handle.agent, 'M01-unauthorized', path, command,
@@ -375,7 +376,7 @@ it.each(['native', 'ptc-inner'] as const)('feeds denial back, re-reviews a new c
       sessionId: SessionId(randomUUID()), meta: { cwd: root }, agentOptions: { provider: PROVIDER, model: FLASH },
     })
     try {
-      if (path === 'ptc-inner') handle.agent.ctx.tools.presentAs('ptc')
+      if (path === 'ptc-inner') await handle.agent.ctx.plugin(PtcToolExecutor)
       selectFinalAuto(ctx, handle.agent.session)
       const rawReason = `  TEST_ONLY_SECRET_${'x'.repeat(16_384)}\nexact deletion was not authorized  `
       for (let attempt = 0; attempt < 2; attempt += 1) {

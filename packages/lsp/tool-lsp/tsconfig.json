@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../core/system-prompt"
     },
     {
@@ -18,19 +27,13 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../lsp"
+      "path": "../../session/working-directory"
     },
     {
       "path": "../../util/timeout"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../lsp"
     }
   ]
 }

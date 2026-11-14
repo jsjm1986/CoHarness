@@ -15,7 +15,7 @@ const { SessionId } = await import(entry('core/session'))
 const { LlmAdapter, ToolCallId, createUserMessage, freezeMessage } = await import(entry('llm/llm'))
 const { provideWorkingDirectoryFixture } = await import(entry('test-support/agent-loop-testkit'))
 const plugins = [
-  ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
+  ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/tool-executor-native'], ['core/system-prompt'],
   ['session/session-projection'], ['core/agent-loop', { agents: [] }],
   ['interaction/user-questions'], ['interaction/tool-ask-user', { mode: 'timed', timeout: 1 }],
   ...(project ? [['context/collaboration-context']] : []),

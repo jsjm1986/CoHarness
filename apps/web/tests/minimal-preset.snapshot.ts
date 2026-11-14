@@ -85,18 +85,24 @@ describe('minimal agent preset', () => {
     const signal = new AbortController().signal
     await scaffold.ctx.tools.execute({
       signal,
-      callId: ToolCallId('minimal-bash-state-setup'),
-      name: 'bash',
-      arguments: { command: `cd ${JSON.stringify(stateDir)} && export DSH_MINIMAL_STATE=PERSISTED` },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('minimal-bash-state-setup'),
+        name: 'bash',
+        arguments: JSON.stringify({ command: `cd ${JSON.stringify(stateDir)} && export DSH_MINIMAL_STATE=PERSISTED` }),
+      }],
       agent: agentHandle.agent,
     })
-    const bash = await scaffold.ctx.tools.execute({
+    const bash = (await scaffold.ctx.tools.execute({
       signal,
-      callId: ToolCallId('minimal-bash-state-read'),
-      name: 'bash',
-      arguments: { command: 'printf \'%s:%s\n\' "$DSH_MINIMAL_STATE" "$PWD"' },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('minimal-bash-state-read'),
+        name: 'bash',
+        arguments: JSON.stringify({ command: 'printf \'%s:%s\n\' "$DSH_MINIMAL_STATE" "$PWD"' }),
+      }],
       agent: agentHandle.agent,
-    })
+    })).results[0]!.result
 
     const text = (result: typeof bash): string => result.content
       .filter(block => block.type === 'text')

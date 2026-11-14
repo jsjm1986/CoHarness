@@ -20,6 +20,7 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as toolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
 
@@ -41,6 +42,7 @@ describe('dsh-tool-fs-search real-load-path guard', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(LocalSubprocessRuntime)
 
     const loader = Object.create(Loader.prototype) as Loader

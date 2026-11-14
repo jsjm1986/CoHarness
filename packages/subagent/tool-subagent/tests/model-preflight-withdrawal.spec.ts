@@ -13,6 +13,8 @@ import type { SubagentResult } from '@deepseek-ai/dsh-subagent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { afterEach, expect, it, vi } from 'vitest'
 import { MockAdapter } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as tool from '../src/index.ts'
@@ -27,6 +29,7 @@ async function contextWithCore() {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(LlmRuntime)
   provideWorkingDirectoryFixture(ctx)
   const runtime = ctx.plugin(SubagentRuntime)
@@ -62,7 +65,7 @@ it.each(['foreground', 'background', 'continuable'] as const)('cancels pending %
   const parent = { id: SessionId('preflight-owner'), ctx: ctx.plugin(() => {}).ctx, options: {},
     session: Session.create(SessionId('preflight-owner')) } as unknown as Agent
   ctx.agents.register(parent)
-  const execution = ctx.tools.execute({ signal: new AbortController().signal, callId: ToolCallId('pending-preflight'), name: 'subagent',
+  const execution = executeToolFixture(ctx, { signal: new AbortController().signal, callId: ToolCallId('pending-preflight'), name: 'subagent',
     arguments: { description: 'preflight', prompt: 'work', run_in_background: mode !== 'foreground' }, agent: parent })
   let withdrawal: Promise<void> | undefined
   try {
@@ -101,7 +104,7 @@ it('keeps a published background child independently cancellable after original 
   const parent = { id: SessionId('published-background-owner'), ctx: ctx.plugin(() => {}).ctx, options: {},
     session: Session.create(SessionId('published-background-owner')) } as unknown as Agent
   ctx.agents.register(parent)
-  const accepted = await ctx.tools.execute({ signal: new AbortController().signal, callId: ToolCallId('published-background'), name: 'subagent',
+  const accepted = await executeToolFixture(ctx, { signal: new AbortController().signal, callId: ToolCallId('published-background'), name: 'subagent',
     arguments: { description: 'owned background', prompt: 'work', run_in_background: true }, agent: parent })
   expect(accepted.isError).toBe(false)
   const { jobId } = accepted.value as { jobId: JobId }

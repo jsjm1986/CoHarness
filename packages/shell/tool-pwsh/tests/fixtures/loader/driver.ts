@@ -9,6 +9,7 @@
 import { writeFile } from 'node:fs/promises'
 import { boot, resolveConfigPath } from '@deepseek-ai/dsh-app-boot'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 
 const configPath = process.argv[2]
 if (configPath === undefined) throw new Error('tool-pwsh driver requires a config path')
@@ -19,7 +20,7 @@ try {
   if (schema === undefined) throw new Error('pwsh tool not registered by the composition')
   const prompt = (await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'tool:pwsh')
 
-  const foreground = await ctx.tools.execute({
+  const foreground = await executeToolFixture(ctx, {
     signal: new AbortController().signal,
     callId: ToolCallId('loader-fg'),
     name: 'pwsh',
@@ -27,7 +28,7 @@ try {
   })
   const foregroundText = foreground.content.filter(block => block.type === 'text').map(block => block.text).join('')
 
-  const background = await ctx.tools.execute({
+  const background = await executeToolFixture(ctx, {
     signal: new AbortController().signal,
     callId: ToolCallId('loader-bg'),
     name: 'pwsh',
@@ -44,7 +45,7 @@ try {
   let backgroundText = ''
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
-    const read = await ctx.tools.execute({
+    const read = await executeToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('loader-bg-read'),
       name: 'job_output',

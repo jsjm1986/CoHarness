@@ -1,7 +1,7 @@
 /**
  * Integration: the real fetch backend (`dsh-web-fetch-http`) + a real search provider
  * (`dsh-web-search-exa`) + the real seam (`dsh-web`) + the model tool (`dsh-tool-web`) + the
- * tool-call timeout policy (`dsh-tool-call-timeout-policy`), exercised through `ctx.tools.execute()` —
+ * tool-call timeout policy (`dsh-tool-call-timeout-policy`), exercised through `executeToolFixture(ctx, )` —
  * nothing bypasses the tool registry. Fetch verifies world effects against loopback HTTP with
  * public-address resolution replaced by the fixture address; search uses the real Exa provider
  * with only its network boundary stubbed.
@@ -14,6 +14,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import WebRuntime from '@deepseek-ai/dsh-web'
 import * as WebFetchLocal from '@deepseek-ai/dsh-web-fetch-http'
 import * as WebSearchExa from '@deepseek-ai/dsh-web-search-exa'
@@ -41,6 +43,7 @@ beforeEach(async () => {
   ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(WebRuntime, { searchProvider: WebSearchExa.EXA_PROVIDER_ID, fetchProvider: WebFetchLocal.LOCAL_FETCH_PROVIDER_ID })
   await ctx.plugin(WebFetchLocal, {})
   await ctx.plugin(WebSearchExa, { apiKey: 'exa-key', baseURL: 'https://api.exa.test' })
@@ -61,7 +64,7 @@ afterEach(async () => {
 
 let counter = 0
 function call(name: string, args: unknown): Promise<ToolExecutionResult> {
-  return ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId(`call-${++counter}`), name, arguments: args })
+  return executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId(`call-${++counter}`), name, arguments: args })
 }
 
 describe('web_fetch integration over the real backend', () => {
@@ -138,6 +141,7 @@ describe('tool-call timeout returns TOOL_TIMEOUT (deadline wins over a slow fetc
     tctx = new Context()
     await tctx.plugin(SystemPrompt)
     await tctx.plugin(ToolRuntime)
+    await tctx.plugin(NativeToolExecutor)
     await tctx.plugin(WebRuntime, { fetchProvider: WebFetchLocal.LOCAL_FETCH_PROVIDER_ID })
     // Provider backstop well ABOVE the tool-call budget, so the policy wins.
     await tctx.plugin(WebFetchLocal, { timeoutMs: 30_000 })
@@ -153,7 +157,7 @@ describe('tool-call timeout returns TOOL_TIMEOUT (deadline wins over a slow fetc
   })
 
   it('returns a structured TOOL_TIMEOUT (not the provider WEB_FETCH_TIMEOUT) when the tool-call budget wins', async () => {
-    const out = await tctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('slow-1'), name: 'web_fetch', arguments: { url: slowBase } })
+    const out = await executeToolFixture(tctx, { signal: testToolSignal, callId: ToolCallId('slow-1'), name: 'web_fetch', arguments: { url: slowBase } })
     expect(out.isError).toBe(true)
     // The outer tool-call deadline won: TOOL_TIMEOUT, owned by dsh-tool-call-timeout-policy,
     // NOT the provider's own WEB_FETCH_TIMEOUT (its 30s backstop never fired).

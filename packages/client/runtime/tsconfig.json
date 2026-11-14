@@ -9,16 +9,13 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
       "path": "../../attachment/attachment"
-    },
-    {
-      "path": "../connection/tsconfig.client.json"
-    },
-    {
-      "path": "../ui-slots"
     },
     {
       "path": "../../compaction/compaction"
@@ -28,6 +25,9 @@
     },
     {
       "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tool-executor-ptc"
     },
     {
       "path": "../../core/tools"
@@ -66,7 +66,10 @@
       "path": "../../util/workspace-path"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../connection/tsconfig.client.json"
+    },
+    {
+      "path": "../ui-slots"
     }
   ],
   "exclude": [
