@@ -123,10 +123,10 @@ describe('terminalCardModel', () => {
     expect(terminalFailed(terminalCardModel(running())!)).toBe(false)
   })
 
-  it('preserves an explicitly unknown exit and supplies its localized status label', () => {
-    const model = terminalCardModel(settled({ resultView: resultTerminal({ exitCode: null }) }))
+  it('preserves an omitted exit as unknown and supplies its localized status label', () => {
+    const model = terminalCardModel(settled({ resultView: resultTerminal({}) }))
     if (model === null) throw new Error('terminal result lost its card')
-    expect(model.card.exitCode).toBeNull()
+    expect(model.card.exitCode).toBeUndefined()
     expect(terminalFailed(model)).toBe(true)
     expect(terminalBlockLabels(t).noExitCode).toBe('无退出码')
   })
@@ -462,13 +462,13 @@ describe('BashRow terminal card', () => {
   })
 
   it.each([
-    { exitCode: null, signal: undefined, status: '无退出码' },
+    { exitCode: undefined, signal: undefined, status: '无退出码' },
     { exitCode: 2, signal: undefined, status: '退出码 2' },
-    { exitCode: null, signal: 'SIGTERM', status: '信号 SIGTERM' },
+    { exitCode: undefined, signal: 'SIGTERM', status: '信号 SIGTERM' },
   ])('keeps the collapsed failure and expanded $status consistent', ({ exitCode, signal, status }) => {
     const resultView: ToolResultView = {
       card: 'terminal', output: 'partial output',
-      ...(signal === undefined ? { exitCode } : { signal }),
+      ...(signal === undefined ? (exitCode === undefined ? {} : { exitCode }) : { signal }),
     }
     const view = render(<BashRow {...rowProps(settled({ resultView }))} />)
     expect(view.container.querySelector('[data-variant="bash"]')?.getAttribute('data-state')).toBe('error')
@@ -593,6 +593,7 @@ describe('DetailsPanel Output section', () => {
         useSessions={bindSnapshotSelector(sessions)}
         useWorkspaces={bindSnapshotSelector(workspaces)}
         usePanelInfo={(() => { throw new Error('unused') })}
+        useRemoteAccess={() => true}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
           setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {},
@@ -786,6 +787,7 @@ describe('DetailsPanel Output section', () => {
           baselinesReady: true, recentWorkspaceId: undefined,
         }))}
         usePanelInfo={(() => { throw new Error('unused') })}
+        useRemoteAccess={() => true}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
           setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {},

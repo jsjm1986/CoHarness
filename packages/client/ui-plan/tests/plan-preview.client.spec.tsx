@@ -55,6 +55,7 @@ function sessionStandard() {
     useSessions: staticHook as never,
     useWorkspaces: staticHook as never,
     usePanelInfo: (() => ({})) as never,
+    useRemoteAccess: () => true,
   }
 }
 

@@ -16,7 +16,9 @@ afterEach(() => { cleanup(); vi.useRealTimers() })
 const id = 'local' as SpeechProviderId, t = makeTranslate(zh, commonZh)
 /** The global seat a `plugins.item` entry receives; these tests never read it. */
 const unusedGlobalHook = (): never => { throw new Error('fixture provides no global state') }
-const globalStandard = { useSessions: unusedGlobalHook, useWorkspaces: unusedGlobalHook, usePanelInfo: unusedGlobalHook }
+const globalStandard = {
+  useSessions: unusedGlobalHook, useWorkspaces: unusedGlobalHook, usePanelInfo: unusedGlobalHook, useRemoteAccess: unusedGlobalHook,
+}
 const steps: SpeechPreparationStep[] = [
   { kind: 'check', status: 'complete' }, { kind: 'model', status: 'complete' },
   { kind: 'vad', status: 'complete' }, { kind: 'verify', status: 'running', startedAt: 0 }, { kind: 'load', status: 'pending' },

@@ -47,6 +47,7 @@ function props() {
     useProjectPolicy: bindSnapshotSelector(policy),
     useDeployment: bindSnapshotSelector(deployment),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
+    useRemoteAccess: () => true,
   }
 }
 

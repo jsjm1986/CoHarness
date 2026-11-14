@@ -67,6 +67,7 @@ function mount({
     useSessions,
     useWorkspaces: unusedHook,
     usePanelInfo: unusedHook,
+    useRemoteAccess: () => true,
     useStore: bindSnapshotSelector(shell),
     actions: shell.actions,
     reconnect,

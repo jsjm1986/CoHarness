@@ -50,6 +50,7 @@ function mount() {
   const props: FontSettingsGroupProps = {
     useSessions: emptySessions(),
     usePanelInfo: emptyPanelInfo(),
+    useRemoteAccess: () => true,
     useWorkspaces: emptyWorkspaces(),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,

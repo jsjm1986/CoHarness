@@ -132,6 +132,7 @@ function mountRoot(booted: Awaited<ReturnType<typeof boot>>, targetSessionId: Se
     useSessions: bindSnapshotSelector(booted.sessions.list) as never,
     useWorkspaces: vi.fn() as never,
     usePanelInfo: vi.fn() as never,
+    useRemoteAccess: () => true,
     useViews: bindSnapshotSelector(root.hooks.views),
     useViewport: bindSnapshotSelector(root.hooks.viewport),
     mountView: root.mountView,

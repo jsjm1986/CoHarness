@@ -4603,7 +4603,7 @@
         "reviewState": "implemented-local-tests-passing"
       },
       "localPlan": "P5 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
-      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 3/44 target files byte-identical locally; 16 carry fork diffs; 25 not carried; 0 removed upstream this round."
+      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-15: 4/44 target files byte-identical locally; 16 carry fork diffs; 24 not carried; 0 removed upstream this round."
     },
     {
       "area": "packages/api/job-controller",
@@ -4643,15 +4643,15 @@
     },
     {
       "area": "packages/api/remote-access",
-      "status": "reject",
+      "status": "adapt",
       "localOwner": "packages/api/remote-access",
       "commitScope": [
         "packages/api/remote-access/"
       ],
-      "reviewState": "implemented-local-tests-passing",
+      "reviewState": "pending-cumulative-source-review",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "increment-review-required",
       "cumulativeFiles": [
         "packages/api/remote-access/README.i18n.yaml",
         "packages/api/remote-access/README.md",
@@ -4673,17 +4673,15 @@
         "packages/api/remote-access/tests/remote-access.host.spec.ts",
         "packages/api/remote-access/tsconfig.client.json"
       ],
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "upstream generalized Remote RBAC; the fork ports the access-snapshot concepts onto the collaboration authorize seam and keeps the controller-decomposition rejection"
-      },
-      "rejectReason": "upstream generalized Remote RBAC; the fork ports the access-snapshot concepts onto the collaboration authorize seam and keeps the controller-decomposition rejection",
+      "localSovereignty": "adapted",
+      "localDisposition": "Upstream non-owner Remote RBAC carried for the forge panel: policy registry, per-Peer access snapshot (REMOTE_ACCESS_SNAPSHOT_KEY on webserver/index-inject), allows() filtering, and the /client mount that publishes useRemoteAccess through slots.provideRoot keyedHooks. decide() ships uncalled — typert-gateway/authorize carries no principal, so authorizeTypertRemote with the collaboration authority stays the single dispatch path (see .agents/notes/implemented/feature/2026-11-15-forge-panel-remote-access-port.md). 40/40 tests.",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json",
         "area": "packages/api/remote-access",
         "reviewState": "implemented-local-tests-passing"
       },
-      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 0/25 target files byte-identical locally; 0 carry fork diffs; 25 not carried; 0 removed upstream this round."
+      "localPlan": "P5 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
+      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-15: 12/25 target files byte-identical locally; 7 carry fork diffs; 6 not carried; 0 removed upstream this round."
     },
     {
       "area": "packages/api/remotes",
@@ -10908,15 +10906,15 @@
     },
     {
       "area": "packages/experimental/client-ui-forge",
-      "status": "reject",
+      "status": "adapt",
       "localOwner": "packages/experimental/client-ui-forge",
       "commitScope": [
         "packages/experimental/client-ui-forge/"
       ],
-      "reviewState": "implemented-local-tests-passing",
+      "reviewState": "pending-cumulative-source-review",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "deferred-this-release",
+      "targetAssessment": "increment-review-required",
       "cumulativeFiles": [
         "packages/experimental/client-ui-forge/README.i18n.yaml",
         "packages/experimental/client-ui-forge/README.md",
@@ -11068,12 +11066,10 @@
         "packages/experimental/client-ui-forge/tsconfig.json",
         "packages/experimental/client-ui-forge/tsdown.config.ts"
       ],
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "forge lane deferred: no local consumer (see alignment matrix)"
-      },
-      "rejectReason": "Browser face of the forge lane; the Host half needs only the usual adaptations, but the client half is a different generation: missing dsh-api-remote-access package, upstream *OutlineRegular icon set vs local *16 names, missing locales module, a forgeWorktree projection key with no local registration, and Promise<SubprocessHandle> semantics. A correct port rewrites the React half against local primitives — separate milestone, not an incremental sync.",
-      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 0/149 target files byte-identical locally; 0 carry fork diffs; 149 not carried; 0 removed upstream this round."
+      "localSovereignty": "adapted",
+      "localDisposition": "Browser face of the forge lane ported with the React half rewritten onto local primitives: *16 icon names, client/runtime store and session APIs, a package-private settings-form/, local Menu/Tooltip contracts, and the panel-owned forgeWorktree projection under sessionProjections.register()/stateOf. Its dsh-api-remote-access dependency lands with it; forge-bundle stays unported because no shipped composition may mount an experimental panel. 1038/1038 tests.",
+      "localPlan": "P8 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
+      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-15: 93/149 target files byte-identical locally; 50 carry fork diffs; 6 not carried; 0 removed upstream this round."
     },
     {
       "area": "packages/experimental/client-ui-plugin-recommendations",
@@ -11778,10 +11774,10 @@
       ],
       "localSovereignty": "upstreamOnly",
       "upstreamOnly": {
-        "reason": "deferred with experimental/forge"
+        "reason": "upstream patch layer composing the forge lane; release bundles cannot depend on experimental packages and no preset composes the lane, so the bundle has no consumer"
       },
-      "rejectReason": "Bundle composition of the forge lane; the forge packages landed but no preset composes them yet, so the bundle still has no consumer.",
-      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 0/27 target files byte-identical locally; 0 carry fork diffs; 27 not carried; 0 removed upstream this round."
+      "rejectReason": "upstream patch layer composing the forge lane; release bundles cannot depend on experimental packages and no preset composes the lane, so the bundle has no consumer",
+      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-15: 0/27 target files byte-identical locally; 0 carry fork diffs; 27 not carried; 0 removed upstream this round."
     },
     {
       "area": "packages/experimental/forge-github",

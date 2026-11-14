@@ -191,6 +191,7 @@ function bench(over?: BenchOptions) {
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
+    useRemoteAccess: () => true,
     useProjection: ((key: string, selector?: (v: unknown) => unknown) =>
       (selector ?? (v => v))(key === 'permissions'
         ? (over?.permissions === undefined ? undefined : { currentValue: over.permissions.currentValue })

@@ -41,6 +41,7 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
       collapsed={current.collapsed} width={current.width}
       useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })}
       usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
+      useRemoteAccess={() => true}
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
         key: string,
@@ -115,6 +116,7 @@ describe('SidebarRoot shell', () => {
       useSessions={neverHook} useWorkspaces={neverHook}
       useViewport={selector => selector({ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] })}
       usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
+      useRemoteAccess={() => true}
       exitWorkbench={exitWorkbench}
       startSession={startSession} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
@@ -133,6 +135,7 @@ describe('SidebarRoot shell', () => {
       useSessions={neverHook} useWorkspaces={neverHook}
       useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })}
       usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
+      useRemoteAccess={() => true}
       startSession={startSession} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
         <div data-testid="region" data-wide={owner.wide} />) as SidebarRootComponentProps['renderSlot']}
@@ -148,6 +151,7 @@ describe('SidebarRoot shell', () => {
       collapsed={false} width={300}
       useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })}
       usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
+      useRemoteAccess={() => true}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}

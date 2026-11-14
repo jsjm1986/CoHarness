@@ -58,6 +58,7 @@ function mount(
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
     usePanelInfo: emptyPanelInfo(),
+    useRemoteAccess: () => true,
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     t: (key: string) => COPY[key] ?? key,

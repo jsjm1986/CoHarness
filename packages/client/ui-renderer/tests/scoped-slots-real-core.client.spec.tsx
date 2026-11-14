@@ -51,7 +51,7 @@ function hostOver(core: SlotCore): SlotRendererHost {
     },
     getRootRevision: () => 0,
     subscribeRootRevision: () => () => {},
-    rootSources: () => ({}),
+    rootSources: () => ({ hooks: {}, keyedHooks: {}, props: {} }),
     workspaces: {
       list: { getSnapshot: () => ({}), subscribe: () => () => {} },
     },

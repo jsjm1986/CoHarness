@@ -62,6 +62,7 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     useWorkspaces={bindSnapshotSelector(createSnapshotStore<WorkspaceListState>(
       { items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined }))}
     usePanelInfo={bindSnapshotSelector(createSnapshotStore({ activePanelId: null }))}
+    useRemoteAccess={() => true}
     onViewportFocus={calls.focus}
     onViewportRemove={calls.remove}
     onViewportRatios={calls.ratios}

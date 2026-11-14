@@ -311,6 +311,7 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
     useSessions: selector => selector(sessions),
     useSession: (() => undefined) as WorkflowRunPanelProps['useSession'],
     usePanelInfo: selector => selector({ activePanelId: null }),
+    useRemoteAccess: () => true,
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: { setDraft: () => {}, submit: () => {} } as unknown as WorkflowRunPanelProps['inputActions'],

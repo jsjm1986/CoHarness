@@ -93,6 +93,7 @@ function mountFrame() {
       // AppFrame reads panel selection from the layout store; the standard
       // hook seat only satisfies GlobalStandardProps.
       usePanelInfo={() => { throw new Error('AppFrame reads panelInfo through the layout store') }}
+      useRemoteAccess={() => true}
       SessionProvider={SessionProviderStub}
       t={t}
       dismissRightbar={() => { instance.actions.closeRightbar() }}

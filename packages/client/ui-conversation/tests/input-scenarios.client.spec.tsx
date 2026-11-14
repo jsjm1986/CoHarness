@@ -150,6 +150,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
+    useRemoteAccess: () => true,
     useProjection: (() => undefined),
     useInput: bindSnapshotSelector(shell.state),
     inputActions: shell.actions,

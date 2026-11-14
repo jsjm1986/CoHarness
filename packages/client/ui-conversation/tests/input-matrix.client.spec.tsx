@@ -49,6 +49,7 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
+    useRemoteAccess: () => true,
     useProjection: (() => undefined),
     useInput: bindSnapshotSelector(shell.state),
     inputActions: shell.actions,

@@ -17,10 +17,10 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
-import { SlotCore, StaleAuthorizationError } from '@deepseek-ai/dsh-client-ui-slots'
+import { SlotCore, StaleAuthorizationError, standardHookPropName } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
-  HostObservable, LiveCompositionNode, LocaleFace, OwnerOf, RegisterFactory,
-  RootStandardSourceContribution, SlotEntryDef, SlotMap, SlotRenderer, SlotRendererHost, SlotScope, SlotSpec,
+  HostObservable, KeyedStandardSource, LiveCompositionNode, LocaleFace, OwnerOf, RegisterFactory,
+  RootStandardSourceContribution, RootStandardSourceSnapshot, SlotEntryDef, SlotMap, SlotRenderer, SlotRendererHost, SlotScope, SlotSpec,
   StoreDecl, StoreFactory, StoredEntry, StoredFactory, StoreInstanceLike,
 } from '@deepseek-ai/dsh-client-ui-slots'
 
@@ -49,6 +49,37 @@ export interface RootOwnerProps { children?: never }
 
 /** Instance key for root-scoped store records (session records key by session id, so the literal cannot collide). */
 const ROOT_INSTANCE_KEY = 'root'
+
+/** Root roster before any contribution installs. */
+const EMPTY_ROOT_SNAPSHOT: RootStandardSourceSnapshot = Object.freeze({ hooks: {}, keyedHooks: {}, props: {} })
+
+/**
+ * Copy one contribution compartment into the merged roster, rejecting a bare
+ * name another contribution already claimed or one whose rendered prop name
+ * collides with an earlier contribution's rendered prop.
+ * @param kind - compartment label used in the collision diagnostic.
+ * @param target - merged compartment receiving this contribution's members.
+ * @param values - the contribution's compartment members, when present.
+ * @param finalProps - rendered prop names already claimed across compartments.
+ * @param propNameOf - bare name → rendered prop name (identity for plain props).
+ */
+function copyUniqueRoot<T>(
+  kind: string,
+  target: Record<string, T>,
+  values: Readonly<Record<string, T>> | undefined,
+  finalProps: Set<string>,
+  propNameOf: (name: string) => string,
+): void {
+  if (values === undefined) return
+  for (const [name, value] of Object.entries(values)) {
+    const propName = propNameOf(name)
+    if (finalProps.has(propName)) {
+      throw new Error(`slots.provideRoot: duplicate root standard ${kind} '${name}' at prop '${propName}'`)
+    }
+    finalProps.add(propName)
+    target[name] = value
+  }
+}
 
 /** Canonical type-erased store handle used by the runtime lifecycle map. */
 type EngineStoreHandle = Exclude<StoreDecl, StoreFactory>
@@ -125,8 +156,10 @@ export class SlotRegistry extends Service {
   private _renderer: SlotRenderer | undefined
   private _locale: LocaleFace | undefined
   private _host: SlotRendererHost | undefined
-  /** Contributed root hook sources by bare name; each provideRoot owns its keys. */
-  private readonly _rootSources = new Map<string, HostObservable<unknown>>()
+  /** Live provideRoot contributions; the merged snapshot republishes atomically. */
+  private readonly _rootContributions: RootStandardSourceContribution[] = []
+  /** Merged roster published to the renderer host each revision. */
+  private _rootSnapshot: RootStandardSourceSnapshot = EMPTY_ROOT_SNAPSHOT
   private _rootRevision = 0
   private readonly _rootListeners = new Set<() => void>()
 
@@ -295,34 +328,51 @@ export class SlotRegistry extends Service {
 
   /**
    * Contribute domain-owned root-scope data. Hook names are global: the
-   * rendered prop is `use<Name>` under every scope, so a second contributor
-   * of the same name fails loud at registration. Installation and disposal
-   * each bump the roster revision once; the renderer rebuilds the root
-   * standard kit on that tick.
-   * @param contribution - bare hook sources keyed by bare name.
+   * rendered prop is `use<Name>` under every scope (fixed sources render a
+   * selector hook, keyed families a `use<Name>(key)` hook), and a plain prop
+   * lands verbatim — so a rendered-name collision across compartments fails
+   * loud before the roster publishes. Installation and disposal each bump the
+   * roster revision once; the renderer rebuilds the root standard kit on that
+   * tick.
+   * @param contribution - bare hook sources, keyed families, and plain props keyed by bare name.
    * @returns disposer owned by the caller's Cordis fiber.
    */
   provideRoot(contribution: RootStandardSourceContribution): () => void {
-    const hooks = contribution.hooks ?? {}
-    const names = Object.keys(hooks)
-    for (const name of names) {
-      if (this._rootSources.has(name)) throw new Error(`slots.provideRoot: root hook '${name}' is already contributed`)
-    }
     const dispose = this.ctx.effect(() => {
-      for (const name of names) this._rootSources.set(name, hooks[name] as HostObservable<unknown>)
-      this._publishRootRevision()
+      this._rootContributions.push(contribution)
+      try {
+        this._rebuildRootSnapshot()
+      } catch (error) {
+        this._rootContributions.pop()
+        throw error
+      }
       return () => {
-        let removed = false
-        for (const name of names) {
-          if (this._rootSources.get(name) === hooks[name]) {
-            this._rootSources.delete(name)
-            removed = true
-          }
-        }
-        if (removed) this._publishRootRevision()
+        const index = this._rootContributions.indexOf(contribution)
+        if (index === -1) return
+        this._rootContributions.splice(index, 1)
+        this._rebuildRootSnapshot()
       }
     }, 'slots.provideRoot()')
     return () => { void dispose() }
+  }
+
+  /**
+   * Merge the live contribution roster into one immutable snapshot and bump
+   * the revision once. Rendered prop names must not collide across hooks,
+   * keyed hooks, and plain props; an invalid roster throws before any publish.
+   */
+  private _rebuildRootSnapshot(): void {
+    const hooks: Record<string, HostObservable<unknown>> = {}
+    const keyedHooks: Record<string, KeyedStandardSource> = {}
+    const props: Record<string, unknown> = {}
+    const finalProps = new Set<string>()
+    for (const contribution of this._rootContributions) {
+      copyUniqueRoot('hook', hooks, contribution.hooks, finalProps, standardHookPropName)
+      copyUniqueRoot('keyed hook', keyedHooks, contribution.keyedHooks, finalProps, standardHookPropName)
+      copyUniqueRoot('prop', props, contribution.props, finalProps, name => name)
+    }
+    this._rootSnapshot = { hooks, keyedHooks, props }
+    this._publishRootRevision()
   }
 
   /**
@@ -571,11 +621,7 @@ export class SlotRegistry extends Service {
         this._rootListeners.add(fn)
         return () => { this._rootListeners.delete(fn) }
       },
-      rootSources: () => {
-        const record: Record<string, HostObservable<unknown>> = {}
-        for (const [name, source] of this._rootSources) record[name] = source
-        return record
-      },
+      rootSources: () => this._rootSnapshot,
       get locale() { return service._locale },
     }
     return this._host
