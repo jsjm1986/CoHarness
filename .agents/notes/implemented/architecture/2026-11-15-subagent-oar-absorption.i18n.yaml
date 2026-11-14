@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-15-subagent-oar-absorption.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-15-subagent-oar-absorption.md
+document:
+  en: 0eeb1f45dc7cfc5f06055d4116f79291d47aa206
+  zh: e8f7d8dd94e8a127027519bb9b2cd2d9ffd97899
+/agent-note-oar-one-shot-subagent-lane-absorption:
+  en: c2118650b0652446
+  zh: a1b80fac30678757
+/agent-note-oar-one-shot-subagent-lane-absorption/problem:
+  en: bc71d7ff32dea7c2
+  zh: e14c3eb41c3f8e31
+/agent-note-oar-one-shot-subagent-lane-absorption/decision:
+  en: e54a5681cd561c16
+  zh: 273992cd763dc497
+/agent-note-oar-one-shot-subagent-lane-absorption/consequences:
+  en: 983bb5ee10f591fd
+  zh: c77e9a19f7958ce1
+/agent-note-oar-one-shot-subagent-lane-absorption/alternatives-considered:
+  en: 44dd057ecf6e307b
+  zh: 64d49f15c1506580
+/agent-note-oar-one-shot-subagent-lane-absorption/verification:
+  en: 48570de32caf9d5c
+  zh: 725267d45bc8ca80

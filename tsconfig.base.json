@@ -313,6 +313,8 @@
       "@deepseek-ai/dsh-experimental-forge-session": ["./packages/experimental/forge-session/src"],
       "@deepseek-ai/dsh-experimental-forge-session/types": ["./packages/experimental/forge-session/src/types.ts"],
       "@deepseek-ai/dsh-experimental-forge/types": ["./packages/experimental/forge/src/types.ts"],
+      "@deepseek-ai/dsh-experimental-subagent-oar": ["./packages/experimental/subagent-oar/src"],
+      "@deepseek-ai/dsh-experimental-tool-subagent-oar": ["./packages/experimental/tool-subagent-oar/src"],
       "@deepseek-ai/dsh-experimental-tool-worktree": ["./packages/experimental/tool-worktree/src"],
       "@deepseek-ai/dsh-experimental-worktree": ["./packages/experimental/worktree/src"],
       "@deepseek-ai/dsh-host-apiproxy": ["./packages/host/apiproxy/src"],

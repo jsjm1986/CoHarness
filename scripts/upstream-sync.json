@@ -639,12 +639,20 @@
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
+    "experimental/subagent-oar": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-subagent-oar-absorption.md"
+    },
     "experimental/terminal-bundle": {
       "sovereignty": "tracked",
       "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
     },
     "experimental/tool-agent-team": {
       "sovereignty": "owned"
+    },
+    "experimental/tool-subagent-oar": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-subagent-oar-absorption.md"
     },
     "experimental/tool-worktree": {
       "sovereignty": "adapted"
@@ -1578,16 +1586,8 @@
       "reason": "upstream recommendations lane not carried"
     },
     {
-      "package": "experimental/subagent-oar",
-      "reason": "OAR one-shot subagent lane deferred: experimental, no local consumer (see alignment matrix)"
-    },
-    {
       "package": "experimental/terminal-panel",
       "reason": "upstream terminal-panel not carried"
-    },
-    {
-      "package": "experimental/tool-subagent-oar",
-      "reason": "deferred with experimental/subagent-oar"
     },
     {
       "package": "session/message-quotes",

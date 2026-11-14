@@ -141,7 +141,27 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
   'packages/sdk/server': {
     status: 'adapt',
     targetAssessment: 'increment-review-required',
-    localDisposition: 'sdk-run-commands re-evaluation at rc.3: upstream adds the session/query native-command pipeline (query-activity/query-content/query-input/user-questions, ~340 lines) plus protocol host-request types and client run() routing. Deferred — the local server is a different generation (Scoped<SubagentRuntime> carrier vs upstream AsyncLocalStorage; 395-line diff on 520 lines), and a correct port needs the protocol vocabulary, Python SDK mirror, and upgrade guide in one milestone. Re-enter through dsh-create-upgrade-guide.',
+    localDisposition: 'sdk-run-commands ported at rc.3 as a transcreation, not a cherry-pick: session/query native-command pipeline (query-activity/query-content/query-input/user-questions) reimplemented on the fork carrier — Scoped<SubagentRuntime> plus durable session lineage (origin:subagent/parentSession) replaces upstream AsyncLocalStorage and bindSubagentActivation; ownsAgent resolves direct SDK sessions then ctx.subagents.rootOf managed descendants; command attribution uses an interval model rather than upstream active-query bookkeeping. Approval bridge (approvalRequests handshake) and user-question bridge (directly-owned agents only) retained; shutdown keeps `initialized` so post-shutdown errors stay `SDK server is shutting down`. 263 server tests pass including ported approval/commands/query/user-question suites and the parity specs. Deferred upstream-only seams: bindSubagentActivation/manager-resident fixtures, waitForTreeWork (fork waitForChildren), nested startActivation parent shape, and scheduled-reminder schedule/resolve-agent changes (unrelated lane).',
+  },
+  'packages/sdk/client': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'sdk-run-commands client half ported at rc.3: run() routes through internal session/query (normalizeInput canonical in client.ts), command lifecycle/run-done/completion validation, onRequest() for server-to-client approval requests, onUserQuestion bridge with initialize capability negotiation, subscribeSessionTree with descendant lineage. Fork-local divergences kept by design: serializeSessionRun serializes same-session high-level runs (upstream tests expecting concurrent admission adapted to assert queuing); the client releases completed ancestry edges, so a child→grandchild finished frame leaves the root tree (upstream retains edges); start() after close() stays forbidden; initialize() now calls start() first so the userQuestion handler is captured before capability advertisement. 195 client tests pass.',
+  },
+  'packages/sdk/protocol': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Protocol vocabulary carried at rc.3: session/query request/result kinds, command/run/done payloads, session.query.completed, approval/request + outcome union, user-question/ask + user-question.cancelled, capabilities.userQuestions, and peer request AbortSignal support in transport.',
+  },
+  'packages/interaction/commands': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'rc.3 carries the ./builtin export and builtin.ts surface used by the SDK server\'s native-command routing (commands.list/execute on a live Agent); registered through the package exports map.',
+  },
+  'non-package:python': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Python SDK mirror of sdk-run-commands: models gains CommandExecution/CommandResult, ApprovalRequestParams/Result, UserQuestionRequest/Answer; client gains _query routing, session/query wiring, user-question task map with cancellation, next_request/respond for server-to-client requests; api exposes run() on DeepSeekHarness and Session through _serialize_session. Ported upstream suites test_run/test_user_questions/test_approval (70 tests) with two local adaptations: same-session runs serialize behind the Session lock (concurrency test asserts queuing), and a closed client cannot restart — the late-callback scenario verifies cancellation on close plus a fresh client instead. Real-runtime lanes (test_commands_runtime, test_approval_runtime, test_command_attachments_runtime) run against the shipped profile/wheel and remain CI-side evidence.',
   },
   'packages/experimental/forge': {
     status: 'adapt',
@@ -174,14 +194,14 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
     localDisposition: 'Upgraded to the rc.3 generation: worktree projection (`plugin:worktree/created` fold), generated names, restore lifecycle, and archive-triggered reclamation (`working-directory/access` coordination plus `workspace/session-archived`/`session-unarchiving`). Local adaptations: register() returns a disposer not a ProjectionHandle; projectionState threaded through ReclamationHost; settings `configure` presentation call dropped (no local settings-page generation); cachedSnapshot takes an explicit inheritedEventCount (seeded sessions fall through to log reads); directory containment keeps cross-repository borrowers nested; tests drop the upstream-only `model` Agent field and await the volatile-config restart; 101/101 tests.',
   },
   'packages/experimental/subagent-oar': {
-    status: 'reject',
-    targetAssessment: 'not-carried',
-    rejectReason: 'Upstream experimental one-shot subagent OAR runtime; the fork subagent driver family covers the delegation space and OAR adds a second one-shot model without a consumer. Re-evaluate if a consumer requests upstream OAR semantics.',
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Carried with src byte-identical to rc.3: the local out-of-process helpers share upstream lineage, so only tests adapt — ResolvedSubagentStartRequest gains the local descriptor via snapshotSubagentDescriptor, and the ported external-activation-helpers drive ctx.subagents.start instead of startActivation. pi-ai/pi-coding-agent pin 1.3.0 plus a scoped override so OAR\'s transitive pi deps keep the carried 1.3.0 patch; @botiverse/oar stays a devDependency bundled by tsdown. Both upstream patches registered; 31 spec + 5 e2e pass.',
   },
   'packages/experimental/tool-subagent-oar': {
-    status: 'reject',
-    targetAssessment: 'not-carried',
-    rejectReason: 'Tool face of the OAR lane; deferred with packages/experimental/subagent-oar.',
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Carried onto the local one-shot seam: the tool reserves sibling names tool-locally (the fork catalog records no committed name), awaits ctx.subagents.start as the publication boundary, then registers the run as a subagent job — jobs owns termination and the terminal record, dsh-tool-jobs delivers the completion notice, job_output returns the answer, and failed cleanup is handed back via retainFailedCleanup. Agent.model stubs dropped; 7/7 tests.',
   },
   'packages/api/session-controller': {
     status: 'reject',
@@ -336,7 +356,7 @@ const REPLAY_UPDATES: Record<string, string> = {
   'scripts/prepare-ci-bubblewrap.sh': 'Preserve pinned-payload SHA-256 verification and the functional confinement probe; rc.3 extracts the verified download into ci-verified-download.sh and caches the archive under ~/.cache/dsh-ci — upstream-runner infrastructure, reviewed without porting.',
   'scripts/run-web-snapshots.ts': 'Retain the serial-owner list and the bounded worker pool; rc.3 serializes present-svg.e2e.ts (an upstream-only spec the fork does not carry) — no local impact.',
   'scripts/gen-third-party-notices.ts': 'Retain Ruff MIT metadata, vendor/AGENTS coverage, and generated-artifact assertions; rc.3 adds a HOST_BUNDLED_DEPENDENCIES row for subagent-oar (not carried — skipped) and a scp-style git@host:path repository normalization the fork adopted.',
-  '.github/workflows/build-exe-for-python-sdk.yml': 'Preserve the plan → sdk-wheel → matrix build shape and artifact retention; rc.3 installs pytest and runs installed-wheel native-command tests — that lane tracks the deferred sdk-run-commands milestone.',
+  '.github/workflows/build-exe-for-python-sdk.yml': 'Preserve the plan → sdk-wheel → matrix build shape and artifact retention; rc.3 installs pytest and runs installed-wheel native-command tests — that lane now exercises the ported sdk-run-commands surface against the built wheel.',
   '.github/workflows/ci.yml': 'Keep aggregate gate ordering and fork lanes; rc.3 restructures upstream lanes (split node-24-lint job, bubblewrap archive cache, ci-windows.yml split, blacksmith failover) — upstream-runner infrastructure, reviewed without porting.',
   '.github/workflows/e2e.yml': 'Keep canonical-repo and secret preflight, dispatch gating, JSON results, and real-provider assertions; rc.3 adds the bubblewrap archive cache and raises DSH_E2E_MAX_WORKERS to 6 — upstream-runner infrastructure.',
   '.github/workflows/release.yml': 'Keep independent flow; rc.3 adds a blacksmith failover to the runner selector and parallelizes the dependency-policy/npm-layout verifications — upstream-runner infrastructure.',
