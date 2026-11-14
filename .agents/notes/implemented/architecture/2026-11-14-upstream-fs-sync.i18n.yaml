@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-14-upstream-fs-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-fs-sync.md
+document:
+  en: 573f60575dd45a0b161c013e8528405982a5addc
+  zh: f1bb0fc734084864434f62865d98ce5f3d9b2bb2
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3:
+  en: 726e683678454b5b
+  zh: d9a88a0665f1b5e0
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/applied:
+  en: 5ff5e32b214e13e1
+  zh: 71e52559cc0321f1
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/deferred-to-the-feature-batch:
+  en: 27ab65896d5d735b
+  zh: 2775769a7a36f8ac
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/verification:
+  en: 655ab7e579b0a127
+  zh: 58b848f8a387f6e3

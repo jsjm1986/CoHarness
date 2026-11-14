@@ -352,6 +352,44 @@ describe('command construction (plain argv)', () => {
     ])
   })
 
+  it('glob: literal directory prefixes prune traversal through a brace directory glob', () => {
+    expect(buildGlobCommand({ pattern: 'packages/core/src/*.ts' }).slice(0, 4)).toEqual([
+      '--files', '--glob=!**', '--glob={packages,core,src}/', '--glob=packages/core/src/*.ts',
+    ])
+    expect(buildGlobCommand({ pattern: 'a/b/c/d.md' }).slice(0, 4)).toEqual([
+      '--files', '--glob=!**', '--glob={a,b,c}/', '--glob=a/b/c/d.md',
+    ])
+    // A single directory name prunes the same way.
+    expect(buildGlobCommand({ pattern: 'src/*.ts' }).slice(0, 4)).toEqual([
+      '--files', '--glob=!**', '--glob={src}/', '--glob=src/*.ts',
+    ])
+  })
+
+  it.each([
+    'src-*/x.ts',
+    './x.ts',
+    '../x.ts',
+    '.git/x.ts',
+    'a b(c)/x.ts',
+  ])('glob: no pruning for %s', (pattern) => {
+    expect(buildGlobCommand({ pattern })[1]).toBe(`--glob=${pattern}`)
+  })
+
+  it('glob: no pruning when a search root is given', () => {
+    expect(buildGlobCommand({ pattern: 'packages/core/src/*.ts', path: 'sub' })[1])
+      .toBe('--glob=packages/core/src/*.ts')
+  })
+
+  it('glob: the 8 KiB argv budget keeps oversized pruning off', () => {
+    // Distinct segments: duplicates collapse in the brace set and stay under budget.
+    const deep = `${Array.from({ length: 16 }, (_, i) => `${i}${'a'.repeat(512)}`).join('/')}/*.ts`
+    const argv = buildGlobCommand({ pattern: deep })
+    expect(argv).not.toContain('--glob=!**')
+    expect(argv[1]).toBe(`--glob=${deep}`)
+    const fits = `${Array.from({ length: 16 }, (_, i) => `${i}${'a'.repeat(240)}`).join('/')}/*.ts`
+    expect(buildGlobCommand({ pattern: fits })).toContain('--glob=!**')
+  })
+
   it('glob: the search root rides behind -- as a plain element', () => {
     expect(buildGlobCommand({ pattern: '*.md', path: 'docs dir' })).toEqual(['--files', '--glob=*.md', '--sort=modified', '--no-ignore', '--hidden',
       '--glob=!**/.git', '--glob=!**/.git/**',

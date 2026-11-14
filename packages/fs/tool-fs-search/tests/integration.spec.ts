@@ -9,7 +9,7 @@
  * fake-service suite (tools.spec.ts) carries the coverage gate.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -83,6 +83,21 @@ describe('search tools over the real subprocess service + the packaged rg', () =
       expect(paths).toContain(join('spaced dir', "wei'rd name.ts"))
       expect(paths).not.toContain(join('.git', 'config.ts'))
       expect(paths).not.toContain('notes.md')
+    })
+
+    it('prunes literal directory prefixes without admitting sibling subtrees', async () => {
+      await mkdir(join(dir, 'packages', 'core', 'src'), { recursive: true })
+      await writeFile(join(dir, 'packages', 'core', 'src', 'old.ts'), '')
+      await mkdir(join(dir, 'packages', 'src', 'core'), { recursive: true })
+      await writeFile(join(dir, 'packages', 'src', 'core', 'other.ts'), '')
+      const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+      const result = await call('glob', { pattern: 'packages/core/src/*.ts' }, agent())
+      expect(result.isError).toBe(false)
+      expect(text(result).split('\n').sort()).toEqual([join('packages', 'core', 'src', 'old.ts')])
+      expect(spawn.mock.calls[0]?.[0].argv.slice(3, 6)).toEqual([
+        '--glob=!**', '--glob={packages,core,src}/', '--glob=packages/core/src/*.ts',
+      ])
+      expect(spawn.mock.calls[0]?.[0].argv).not.toContain('--')
     })
 
     it('scopes to a directory search root (path arg)', async () => {
