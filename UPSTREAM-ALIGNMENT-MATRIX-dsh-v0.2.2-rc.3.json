@@ -217,5 +217,51 @@
       ],
       "reason": "agent/subagent lifecycle-hardening series targets upstream newer architecture (lifetimeSignal, named catalog, joins); local ReactLoopAgent is prior generation — needs design port as a unit, not individual guards"
     }
+  ],
+  "not_applicable": [
+    {
+      "upstream": "999f30aae9",
+      "reason": "ownsAgent/rootOf ownership routing absent in local sdk server generation"
+    },
+    {
+      "upstream": "917cf6c267",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "0c78c4c710",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "1950259ce1",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "ae334bd17e",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "f7379ef366",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "a2bf1d8c4d",
+      "reason": "baseline-only change"
+    },
+    {
+      "upstream": "5771a93f2e",
+      "feature": "sdk-run-commands + python wheel packaging"
+    },
+    {
+      "upstream": "1c9490b410",
+      "reason": "resource-cache bootstrap branch absent in local runtime-bootstrap generation"
+    },
+    {
+      "upstream": "9557a247a8",
+      "reason": "local tool-schedule already checks delegation depth before try"
+    },
+    {
+      "upstream": "3c7cfb8cf8",
+      "reason": "storage-domain package absent locally"
+    }
   ]
 }
