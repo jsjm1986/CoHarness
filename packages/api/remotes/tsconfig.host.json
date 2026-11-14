@@ -16,6 +16,9 @@
       "path": "./tsconfig.session-controller.json"
     },
     {
+      "path": "../../mcp/mcp-manager"
+    },
+    {
       "path": "../../boot/plugin-market"
     },
     {

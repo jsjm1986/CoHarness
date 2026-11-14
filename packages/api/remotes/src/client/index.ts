@@ -12,6 +12,7 @@ import memoryRemote from '@deepseek-ai/dsh-memory/remote'
 import fileReferencesRemote from '@deepseek-ai/dsh-file-reference/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import pluginManagerRemote from '@deepseek-ai/dsh-plugin-manager/remote'
+import mcpManagerRemote from '@deepseek-ai/dsh-mcp-manager/remote'
 import pluginMarketRemote from '@deepseek-ai/dsh-plugin-market/remote'
 import pluginRegistryProbeRemote from '@deepseek-ai/dsh-client-ui-plugin-manager/remote'
 import permissionPresetsRemote from '@deepseek-ai/dsh-permission-presets/remote'
@@ -26,7 +27,9 @@ export type {
   PluginInstallLogChunk, PluginInstallProgress, PluginInstallRequestId, PluginManagementCatalog, PluginRegistries, PluginSpecInspection,
   ReadOnlyReason, Registry, RestartReason,
 } from '@deepseek-ai/dsh-plugin-manager/types'
+export type { McpManagedServerStatus, McpManagedServerView } from '@deepseek-ai/dsh-mcp-manager/types'
 export type {} from '@deepseek-ai/dsh-plugin-manager/remote'
+export type {} from '@deepseek-ai/dsh-mcp-manager/remote'
 export type {} from '@deepseek-ai/dsh-plugin-market/remote'
 export type {
   MarketCompatibility, MarketIndexSummary, MarketInstallation, MarketInstallationStatus, MarketListingEntry, MarketListingVersion,
@@ -163,7 +166,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
-      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote,
+      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, mcpManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote,
       memoryRemote,
       permissionPresetsRemote,
       sessionReferencesRemote, subagentsRemote, scheduleRemote, userQuestionsRemote,

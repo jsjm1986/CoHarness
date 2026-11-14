@@ -176,9 +176,14 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
     localDisposition: 'Fork-owned test-support package previously unmanifested; registered at rc.1 and reconciled with upstream test-support changes.',
   },
   'packages/boot/config-editor': {
-    status: 'reject',
-    targetAssessment: 'not-carried',
-    rejectReason: 'Upstream atomic profile-patch editor surface; the fork settings pipeline owns configuration writes. Re-evaluate only if the settings projection port in P5 needs its atomic edit primitive.',
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Restored as the mcp-manager settings-write dependency: local Cordis internal/config listener signature (config, next) with this-bound Fiber, waterfall + resolveConfig flow, and js-yaml namespace import. The settings projection port it was deferred for is now realized via the manager.',
+  },
+  'packages/mcp/mcp-manager': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Absorbed rc.3 new package onto the fork mcp-client generation model: ConfigEditor-based settings adapter replaces upstream SettingsForms in tests, internal/config listener uses the local (config, next) signature, credential fixtures implement the local CredentialProvider *Owned API, and shallow profile merge restores inherited servers on unset. English/Chinese locales only.',
   },
   'packages/experimental/schedule-bundle': {
     status: 'reject',
