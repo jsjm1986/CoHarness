@@ -279,13 +279,11 @@
     }
   ],
   "feature_batch_remaining": [
-    "tool-executor",
     "mcp-manager",
     "subagent-oar",
     "terminal-controller",
     "agent-team",
     "forge",
-    "session batch append API",
     "apply_patch tool + ctx.fs move/delete/patch",
     "sdk-run-commands"
   ],
@@ -300,7 +298,7 @@
     },
     {
       "feature": "session batch append API",
-      "blocker": "5-commit series rewiring session append paths already modified by local lifecycle reorder — needs dedicated port session"
+      "resolved": "absorbed in e8d5f3786bd — Session.append(SessionEventInput[]) with validate-all-then-commit-all, prepareBatch isolated fold, read() spanning log+candidates; appendAdmissions per-member with full rollback and announcement guards kept; 3618 session tests green"
     }
   ],
   "feature_skipped": [
