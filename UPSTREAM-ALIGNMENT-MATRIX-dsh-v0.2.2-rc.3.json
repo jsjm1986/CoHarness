@@ -327,6 +327,11 @@
       "feature": "forge",
       "verdict": "deferred",
       "note": "355 files — largest batch, dedicated session"
+    },
+    {
+      "feature": "apply_patch tool + ctx.fs move/delete/patch",
+      "verdict": "feature-batch port",
+      "note": "upstream tool-fs ships apply-patch.ts/-output/-presentation + patch/ dir + enableApplyPatch config flag; fs service gains move/delete outcome types (FsDeleteOutcome, move outcome, errno.ts) absent locally; fs-patch library already absorbed in 76782c30c7e — remaining: service ops + tool + presentation + tests; dedicated session"
     }
   ],
   "tools_refactor_plan": {
