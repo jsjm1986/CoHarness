@@ -198,6 +198,13 @@
         "b096659245"
       ],
       "scope": "session: ordinary forks drop parentSession lineage; ACP resume/list treat seeded forks as resumable"
+    },
+    {
+      "commit": "76782c30c7e",
+      "upstream": [
+        "fs-patch package (new in rc.3)"
+      ],
+      "scope": "wholesale absorption: pure patch parser + LF text updater, 147 tests pass"
     }
   ],
   "deferred_design": [
@@ -263,5 +270,17 @@
       "upstream": "3c7cfb8cf8",
       "reason": "storage-domain package absent locally"
     }
+  ],
+  "feature_batch_remaining": [
+    "office-kit",
+    "tool-executor",
+    "mcp-manager",
+    "subagent-oar",
+    "terminal-controller",
+    "agent-team",
+    "forge",
+    "session batch append API",
+    "apply_patch tool + ctx.fs move/delete/patch",
+    "sdk-run-commands"
   ]
 }
