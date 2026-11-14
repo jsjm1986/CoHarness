@@ -316,34 +316,35 @@ const CARRY_IN = new Set([
 
 /** Gate-replay contract updates where upstream changed the reviewed input at rc.1. */
 const REPLAY_UPDATES: Record<string, string> = {
-  '.github/workflows/build-exe-for-python-sdk.yml': 'Preserve the plan → sdk-wheel → matrix build shape and artifact retention; rc.2 routes release macOS targets to macos-15-large/-xlarge runners while ordinary CI and direct dispatches keep the standard matrix, and pins checkout/upload-artifact to v7.0.1.',
   '.github/workflows/python-release.yml': 'Keep independent publish flow; rc.2 is a mechanical action-pin roll (checkout v7.0.1, download/upload-artifact v7.0.1) with no semantic change to the wheel matrix or SHA256SUMS publication.',
   '.github/workflows/release-vendor.yml': 'Keep independent flow; rc.2 builds PR legs through compile-referenced-projects.ts host-libraries instead of the full build:lib:host (rehearsal-only fast path), and rolls pnpm action-setup/setup-node/cache pins to v5/v7/v6.1.0.',
-  '.github/workflows/release.yml': 'Keep independent flow; rc.2 rolls the same action pins (checkout v7.0.1, pnpm action-setup v5.0.0, setup-node v7.0.0, cache/restore v6.1.0) without changing publish order or credential handling.',
   '.github/workflows/pi-ai-provider-e2e.yml': 'rc.2 rolls action pins only; the provider e2e lane remains upstream-infrastructure specific.',
-  '.github/workflows/e2e.yml': 'Keep canonical-repo and secret preflight, dispatch gating, JSON results, and real-provider assertions; rc.2 narrows PR legs to build:artifacts --profile official in place of the full build:official.',
-  '.github/workflows/ci.yml': 'Keep aggregate gate ordering and fork lanes; rc.2 adds the .coverage-times.json restore/save pair feeding the merged-report partitioner, raises the bench timeout to 20 minutes, uploads the scaled benchmark report after global teardown, and rolls action pins.',
   '.github/workflows/sandbox.yml': 'Preserve real-kernel confinement assertions, the anti-self-skip guard, and exit-status propagation; rc.2 routes the unit lane through check:ci:unit with DSH_COVERAGE_TEST_TIMEOUT_MS=90000 on shared 3-vCPU runners.',
   'scripts/run-oxlint.ts': 'Preserve the DSH_OXLINT_THREADS positive-integer contract; rc.2 lets a caller --threads pass through when the env var is unset, falls back to the local worker budget outside CI, and keeps CI on Oxlint defaults.',
   'scripts/run-oxlint.spec.ts': 'Preserve invocation assertions; rc.2 covers the new default-parallelism fallback and --threads pass-through branches.',
   'scripts/coverage-partitions.ts': 'Preserve single-worker partition coordination and merged-report thresholds; rc.2 splits the lane budget into parseCoverageTestTimeout plus coverageTestTimeoutOptions consumed by vitest.config.ts inline projects, and adds the file-times reporter feeding .coverage-times.json.',
-  'scripts/gen-third-party-notices.ts': 'Retain Ruff MIT metadata, vendor/AGENTS coverage, and generated-artifact assertions; rc.2 adds the chrome-devtools-frontend row for the experimental Inspector lane (fork does not carry inspector — prune the import and section at carry) and corrects the kit repository URL.',
-  'scripts/publish-npm-baseline.ts': 'Preserve tarball manifest inspection and publish baseline assertions; rc.2 drops the verify-built-package-invariants run alongside the runtime-invariant removal the fork already landed.',
-  'scripts/release/publish.ts': 'Before any registry call preserve the family ordering; rc.2 adds dist-tag validation (non-empty, no leading hyphen, no URI-encoded characters, no ranges) and verifyDistTag so a partial publication cannot rebind an existing version to a new channel.',
-  'scripts/run-gates.ts': 'Preserve three-state gates and needs/after semantics; rc.2 adds the ci-unit aggregate, extracts runAggregate with explicit ConcurrencyDefault, swaps package-invariant gates for plugin-record-callers/no-top-level-await/product-use/official-bundle-catalog/provider-data leaves, and points bench at run-ci-bench.ts.',
-  'scripts/run-gates.spec.ts': 'Preserve gate-graph assertions; rc.2 grows coverage for ci-unit composition, runAggregate concurrency defaults, and the new leaf gates.',
-  'package.json': 'Keep upstream command names wired to existing executor modes; rc.2 bumps version/pnpm, adds build:artifacts/build:check plus check:ci:unit and desktop package/upload shortcuts, replaces invariant and scoped-events gates with upgrade-guides/no-top-level-await/plugin-record-callers/cli-help/bundle-registry/official-bundle-catalog/provider-data/product-use, and adds dev-bundle-registry plus experimental workspace deps — prune desktop lanes at carry.',
+  'scripts/run-gates.ts': 'Preserve three-state gates and needs/after semantics; rc.2 adds the ci-unit aggregate, extracts runAggregate with explicit ConcurrencyDefault, swaps package-invariant gates for plugin-record-callers/no-top-level-await/product-use/official-bundle-catalog/provider-data leaves, and points bench at run-ci-bench.ts. rc.3 reviewed: the i18n aggregate tracks upstream\'s locale-dictionary lane the fork does not ship, runGateWithRetry and the 24.9 compat pin are upstream-runner couplings, and ciArtifactBuildGate mirrors the fork\'s own artifact aggregate — none ported.',
+  'scripts/run-gates.spec.ts': 'Preserve gate-graph assertions; rc.2 grows coverage for ci-unit composition, runAggregate concurrency defaults, and the new leaf gates. rc.3 reviewed with run-gates.ts: spec additions cover the upstream-only i18n/retry/artifact-build surface — none ported.',
+  'scripts/release/verify.ts': 'Preserve candidate identity derivation and verifyConfiguredReadiness before any registry access; rc.3 adds a --skip-tag-check escape hatch — not adopted: local tag verification stays a mandatory publish gate and RELEASE_VERIFY_TAG already covers verify-without-publish.',
+  'scripts/release/publish.ts': 'Preserve family ordering before any registry call; rc.2 adds dist-tag validation. rc.3 adds the cua-macos helper-tarball digest check (upstreamOnly package — not applicable) and strengthens the already-published-mismatch guidance, which the fork mirrors in its own publish lane.',
+  'scripts/publish-npm-baseline.ts': 'Preserve tarball manifest inspection and publish baseline assertions; rc.2 drops the verify-built-package-invariants run. rc.3 removes the upstream validateTarballPayload calls — the fork keeps its publication-payload validation, a deliberate stronger check.',
+  'scripts/prepare-ci-bubblewrap.sh': 'Preserve pinned-payload SHA-256 verification and the functional confinement probe; rc.3 extracts the verified download into ci-verified-download.sh and caches the archive under ~/.cache/dsh-ci — upstream-runner infrastructure, reviewed without porting.',
+  'scripts/run-web-snapshots.ts': 'Retain the serial-owner list and the bounded worker pool; rc.3 serializes present-svg.e2e.ts (an upstream-only spec the fork does not carry) — no local impact.',
+  'scripts/gen-third-party-notices.ts': 'Retain Ruff MIT metadata, vendor/AGENTS coverage, and generated-artifact assertions; rc.3 adds a HOST_BUNDLED_DEPENDENCIES row for subagent-oar (not carried — skipped) and a scp-style git@host:path repository normalization the fork adopted.',
+  '.github/workflows/build-exe-for-python-sdk.yml': 'Preserve the plan → sdk-wheel → matrix build shape and artifact retention; rc.3 installs pytest and runs installed-wheel native-command tests — that lane tracks the deferred sdk-run-commands milestone.',
+  '.github/workflows/ci.yml': 'Keep aggregate gate ordering and fork lanes; rc.3 restructures upstream lanes (split node-24-lint job, bubblewrap archive cache, ci-windows.yml split, blacksmith failover) — upstream-runner infrastructure, reviewed without porting.',
+  '.github/workflows/e2e.yml': 'Keep canonical-repo and secret preflight, dispatch gating, JSON results, and real-provider assertions; rc.3 adds the bubblewrap archive cache and raises DSH_E2E_MAX_WORKERS to 6 — upstream-runner infrastructure.',
+  '.github/workflows/release.yml': 'Keep independent flow; rc.3 adds a blacksmith failover to the runner selector and parallelizes the dependency-policy/npm-layout verifications — upstream-runner infrastructure.',
+  'apps/web/tests/scaffold.ts': 'Keep real Loader and storage lifecycle; rc.3 drops the toolsMode native/ptc patch (executor seam shipped), imports PresetDefinition, and splits the search/fetch credential env — the fork scaffold asserts fork preset/registry shapes; reviewed without porting.',
+  'apps/web/tests/queue-actions.e2e.ts': 'Queue row action coverage; rc.3 retargets assertions to the keep-message-read-only composer until Host accept — upstream composer semantics the fork UI does not share; reviewed without porting.',
+  'apps/web/tests/markdown-cjk-strong.e2e.ts': 'CJK strong-emphasis golden; rc.3 adds a viewport/font-size matrix for -webkit-text-size-adjust and --dsh-content-font-size — upstream-only spec, reviewed.',
+  'apps/web/tests/workspace-management.e2e.ts': 'Scope archive assertions to owned surfaces; rc.3 asserts context menus persist across pointer departure and New Session returns to the startup blank — upstream UI semantics, reviewed without porting.',
+  'package.json': 'Keep upstream command names wired to existing executor modes; rc.3 bumps version to 0.2.2-rc.3, raises the Node floor to >=24.9 (the fork keeps ^22.19 compat), adds check:i18n and verify-plugin-entry-exports scripts, and wires upstream-only workspace deps — selectively mirrored through the fork manifest.',
+  'tsconfig.base.json': 'Preserve single-source path aliases per package/vendor boundary; rc.3 adds aliases for upstream-only packages (forge, subagent-oar, recommendations, action-cards) — the fork adds aliases only for carried packages (mcp-client/manager types landed this round).',
+  'vitest.config.ts': 'Preserve lane budgets and alias seams; rc.3 adds forge coverage exclusions, liveshare/chat-import generated-remote stub aliases, and a test-official-listing-guard setup file — all upstream-only surfaces, reviewed without porting.',
   'python/sdk/pyproject.toml': 'Preserve SDK build/test extras; rc.2 raises hatchling to 1.32.0, adds Pillow==12.3.0 to the test extra, and sets core-metadata-version 2.4 for Twine 6.2.0.',
   'python/sdk/uv.lock': 'Preserve SDK lock; rc.2 regenerates for the hatchling and Pillow bumps — recheck after the fork SDK delta relocks.',
-  'tsconfig.base.json': 'Preserve single-source path aliases per package/vendor boundary; rc.2 adds aliases for remote-access, typert-protocol/remote-info, plugin-market, client-ui-secret-mask/plugin-market/file-upload, cua, and the experimental lanes, drops every /invariant alias, and adds claude-code-mods examples subpaths — prune excluded-lane rows at carry.',
-  'vitest.config.ts': 'rc.2 wires laneTestBudget (DSH_COVERAGE_TEST_TIMEOUT_MS) into inline projects, caps non-CI forks via defaultParallelism with LOCAL_TEST_PARALLELISM_CAP, adds the claude-code/testing aliases and cua-macos Windows exclusion, and narrows the Windows hooks glob to the three experimental hook packages — prune excluded-lane rows when carrying.',
-  'apps/web/tests/scaffold.ts': 'Keep real Loader and storage lifecycle; rc.2 adds workspacePathLength for fixed-length compaction cwd text, makes baseURL optional on search config, adds the deepSeekWebApi provider/select patch, and switches the JSONL persistence import to a namespace form — the fork keeps its default-export class shape.',
-  'apps/web/tests/queue-actions.e2e.ts': 'Queue row action coverage; rc.2 adds the goal-stop replay-override scenario (hang → round → human) asserting a queued /goal prompt runs after Stop — port onto the local session runtime API at carry.',
-  'apps/web/tests/workspace-management.e2e.ts': 'Scope archive assertions to owned surfaces; rc.2 renames the Settings menu to Account menu, retargets seededSessionRow onto a page parameter for the multi-page tooltip test, and adds the session-details tooltip ordering assertion.',
-  'scripts/prepare-ci-bubblewrap.sh': 'Preserve pinned-payload SHA-256 verification and the functional confinement probe; rc.1 moves the pin to bubblewrap 0.12.0-1 with a Launchpad build URL that survives Ubuntu pool pruning (glibc 2.38+/Linux 5.10+, satisfied by the 24.04 image).',
-  'scripts/run-web-snapshots.ts': 'Retain the serial-owner list (rc.1 adds client-plugin-live.e2e.ts) and the bounded worker pool; rc.1 relaxes DSH_WEB_SNAPSHOT_WORKERS to a positive integer so a single worker is legal.',
   'apps/web/tests/scaffold-hermetic.e2e.ts': 'Hermetic scaffold assertions; rc.1 tracks the agent-presets→agent-preset-registry rename.',
-  'apps/web/tests/markdown-cjk-strong.e2e.ts': 'CJK strong-emphasis golden; rc.1 switches to shared WEB_FIXTURE_TIME determinism with clock.setFixedTime and seedSession createdAt.',
 }
 
 /** Area key for a changed path: packages keep two segments; other dirs keep one; files keep the full name. */
@@ -503,8 +504,10 @@ function main(args: string[]): number {
 
   // Carry gate replays forward; re-review changed blobs at the new target.
   const priorReplays: Record<string, unknown>[] = []
+  const baselineRows = new Map<string, Record<string, unknown>>()
   if (Array.isArray((baselineRecord.parsed as { rows?: unknown[] }).rows)) {
     for (const row of (baselineRecord.parsed as { rows: Record<string, unknown>[] }).rows) {
+      if (typeof row.area === 'string') baselineRows.set(row.area, row)
       if (Array.isArray(row.gateReplays)) priorReplays.push(...(row.gateReplays as Record<string, unknown>[]))
     }
   }
@@ -528,8 +531,15 @@ function main(args: string[]): number {
       if (!existsSync(resolve(root, ref))) fail(`gate replay ${path} references missing local path ${ref}`)
     }
     const { area } = areaOf(path)
-    const owner = rows.find(r => r.area === area)
-    if (owner === undefined) fail(`gate replay ${path} has no owning area row`)
+    let owner = rows.find(r => r.area === area)
+    if (owner === undefined) {
+      // The replay's owning area saw no cumulative change and no ghost row —
+      // carry the baseline row forward so the replay has a home.
+      const carried = baselineRows.get(area)
+      if (carried === undefined) fail(`gate replay ${path} has no owning area row`)
+      owner = { ...carried, gateReplays: [] }
+      rows.push(owner)
+    }
     const list = (owner.gateReplays ??= []) as unknown[]
     list.push(next)
     replayAttached += 1
