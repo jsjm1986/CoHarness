@@ -40,6 +40,9 @@
     "attachment/userdoc": {
       "sovereignty": "owned"
     },
+    "attachment/userdoc-gateway": {
+      "sovereignty": "owned"
+    },
     "attachment/userdoc-local": {
       "sovereignty": "owned"
     },
@@ -49,6 +52,9 @@
     },
     "boot/cmdline": {
       "sovereignty": "tracked"
+    },
+    "boot/config-editor": {
+      "sovereignty": "adapted"
     },
     "boot/hmr": {
       "sovereignty": "adapted"
@@ -479,6 +485,12 @@
     "core/system-prompt": {
       "sovereignty": "adapted"
     },
+    "core/tool-executor-native": {
+      "sovereignty": "tracked"
+    },
+    "core/tool-executor-ptc": {
+      "sovereignty": "tracked"
+    },
     "core/tools": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/bug-fix/2026-09-18-tool-scheduler-process-stable-symbol.md"
@@ -499,6 +511,9 @@
       "sovereignty": "adapted"
     },
     "document/office-kit": {
+      "sovereignty": "adapted"
+    },
+    "document/tool-office": {
       "sovereignty": "adapted"
     },
     "examples/acp-demo": {
@@ -570,6 +585,16 @@
     "experimental/cot-translation-bundle": {
       "sovereignty": "tracked",
       "note": ".agents/notes/implemented/feature/2026-10-18-cot-translation-port.md"
+    },
+    "experimental/forge": {
+      "sovereignty": "tracked"
+    },
+    "experimental/forge-github": {
+      "sovereignty": "tracked"
+    },
+    "experimental/forge-session": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-forge-lane-absorption.md"
     },
     "experimental/inspector": {
       "sovereignty": "adapted",
@@ -656,6 +681,9 @@
     },
     "fs/fs-observation-policy": {
       "sovereignty": "adapted"
+    },
+    "fs/fs-patch": {
+      "sovereignty": "tracked"
     },
     "fs/fs-sandbox": {
       "sovereignty": "adapted"
@@ -800,6 +828,9 @@
       "sovereignty": "adapted"
     },
     "mcp/mcp-client": {
+      "sovereignty": "adapted"
+    },
+    "mcp/mcp-manager": {
       "sovereignty": "adapted"
     },
     "mcp/mcp-resources": {
@@ -1143,6 +1174,9 @@
     "test-support/session-snapshot": {
       "sovereignty": "adapted"
     },
+    "test-support/tool-testkit": {
+      "sovereignty": "tracked"
+    },
     "todo/tool-todo": {
       "sovereignty": "adapted"
     },
@@ -1259,30 +1293,6 @@
       "sovereignty": "adapted"
     },
     "workspace/workspace": {
-      "sovereignty": "adapted"
-    },
-    "attachment/userdoc-gateway": {
-      "sovereignty": "owned"
-    },
-    "core/tool-executor-native": {
-      "sovereignty": "tracked"
-    },
-    "core/tool-executor-ptc": {
-      "sovereignty": "tracked"
-    },
-    "fs/fs-patch": {
-      "sovereignty": "tracked"
-    },
-    "test-support/tool-testkit": {
-      "sovereignty": "tracked"
-    },
-    "boot/config-editor": {
-      "sovereignty": "adapted"
-    },
-    "document/tool-office": {
-      "sovereignty": "adapted"
-    },
-    "mcp/mcp-manager": {
       "sovereignty": "adapted"
     }
   },
@@ -1548,19 +1558,7 @@
       "reason": "upstream chat-import lane is account/history coupled; not carried"
     },
     {
-      "package": "experimental/forge",
-      "reason": "forge change-request registry deferred: experimental, no local consumer, forge-github platform-coupled (see alignment matrix)"
-    },
-    {
       "package": "experimental/forge-bundle",
-      "reason": "deferred with experimental/forge"
-    },
-    {
-      "package": "experimental/forge-github",
-      "reason": "deferred with experimental/forge"
-    },
-    {
-      "package": "experimental/forge-session",
       "reason": "deferred with experimental/forge"
     },
     {

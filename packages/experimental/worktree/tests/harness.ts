@@ -31,7 +31,7 @@ export async function git(cwd: string, ...args: string[]): Promise<string> {
 }
 
 /** Unconfined fixtures must never accidentally exercise the confined branch. */
-class UnusedSandbox extends SandboxProvider {
+export class UnusedSandbox extends SandboxProvider {
   async confine(_argv: readonly string[], _policy: SandboxPolicy): Promise<ConfinedArgv> {
     throw new Error('unexpected confinement in a danger-full-access fixture')
   }
@@ -42,7 +42,8 @@ export function testAgent(ctx: Context, cwd: string, name = 'worktree-test'): Ag
   const id = SessionId(name)
   const session = Session.create(id, [], { version: SESSION_FORMAT_VERSION, id, createdAt: 0, isSeeded: false, cwd })
   const agent: Agent = {
-    id, session, options: {}, status: 'idle', ctx: scope.ctx, inbox: unsupportedInbox(),
+    id, session, options: {}, status: 'idle', ctx: scope.ctx,
+    inbox: unsupportedInbox(),
     send() {}, followup() {}, steer() {}, inject() {}, cancel() {},
     whenIdle: async () => {}, runMaintenance: task => task(new AbortController().signal),
   }
@@ -68,11 +69,14 @@ export async function repository(parent = tmpdir()): Promise<string> {
   }
 }
 
-export async function harness(root: string, config: Config = {}, mode: SandboxMode = 'danger-full-access'): Promise<Context> {
+/** Plugin config as the schema accepts it: the volatile `retainOnArchive` is given as its plain value. */
+export type HarnessConfig = Omit<Config, 'retainOnArchive'> & { retainOnArchive?: boolean }
+
+export async function harness(root: string, config: HarnessConfig = {}, mode: SandboxMode = 'danger-full-access'): Promise<Context> {
   const ctx = new Context()
   try {
-    await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(AgentRegistry)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(LocalFileSystem, { cwd: root })
     await ctx.plugin(LocalSubprocessRuntime)

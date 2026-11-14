@@ -10915,7 +10915,7 @@
       "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "deferred-this-release",
       "cumulativeFiles": [
         "packages/experimental/client-ui-forge/README.i18n.yaml",
         "packages/experimental/client-ui-forge/README.md",
@@ -11071,7 +11071,7 @@
       "upstreamOnly": {
         "reason": "forge lane deferred: no local consumer (see alignment matrix)"
       },
-      "rejectReason": "Browser face of the forge lane; deferred with packages/experimental/forge.",
+      "rejectReason": "Browser face of the forge lane; the Host half needs only the usual adaptations, but the client half is a different generation: missing dsh-api-remote-access package, upstream *OutlineRegular icon set vs local *16 names, missing locales module, a forgeWorktree projection key with no local registration, and Promise<SubprocessHandle> semantics. A correct port rewrites the React half against local primitives — separate milestone, not an incremental sync.",
       "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 0/149 target files byte-identical locally; 0 carry fork diffs; 149 not carried; 0 removed upstream this round."
     },
     {
@@ -11698,15 +11698,15 @@
     },
     {
       "area": "packages/experimental/forge",
-      "status": "reject",
+      "status": "adapt",
       "localOwner": "packages/experimental/forge",
       "commitScope": [
         "packages/experimental/forge/"
       ],
-      "reviewState": "implemented-local-tests-passing",
+      "reviewState": "pending-cumulative-source-review",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "increment-review-required",
       "cumulativeFiles": [
         "packages/experimental/forge/README.i18n.yaml",
         "packages/experimental/forge/README.md",
@@ -11734,7 +11734,8 @@
       "upstreamOnly": {
         "reason": "forge change-request registry deferred: experimental, no local consumer, forge-github platform-coupled (see alignment matrix)"
       },
-      "rejectReason": "Upstream experimental change-request registry with shared status polling; no local consumer and the forge-github provider is platform-coupled. Re-evaluate only if a local change-request workflow gains a provider-neutral owner.",
+      "localDisposition": "Absorbed as the experimental change-request registry at rc.3: core state, shared status polling, and provider seam land unmodified (73/73 tests). A local change-request workflow now has its provider-neutral owner.",
+      "localPlan": "P8 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
       "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 0/21 target files byte-identical locally; 0 carry fork diffs; 21 not carried; 0 removed upstream this round."
     },
     {
@@ -11781,20 +11782,20 @@
       "upstreamOnly": {
         "reason": "deferred with experimental/forge"
       },
-      "rejectReason": "Bundle composition of the forge lane; deferred with packages/experimental/forge.",
+      "rejectReason": "Bundle composition of the forge lane; the forge packages landed but no preset composes them yet, so the bundle still has no consumer.",
       "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 0/27 target files byte-identical locally; 0 carry fork diffs; 27 not carried; 0 removed upstream this round."
     },
     {
       "area": "packages/experimental/forge-github",
-      "status": "reject",
+      "status": "adapt",
       "localOwner": "packages/experimental/forge-github",
       "commitScope": [
         "packages/experimental/forge-github/"
       ],
-      "reviewState": "implemented-local-tests-passing",
+      "reviewState": "pending-cumulative-source-review",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "increment-review-required",
       "cumulativeFiles": [
         "packages/experimental/forge-github/README.i18n.yaml",
         "packages/experimental/forge-github/README.md",
@@ -11840,20 +11841,21 @@
       "upstreamOnly": {
         "reason": "deferred with experimental/forge"
       },
-      "rejectReason": "GitHub provider for the forge registry; platform-coupled and deferred with packages/experimental/forge.",
+      "localDisposition": "Absorbed with the forge lane (417/417 tests): GitHub provider with its own auth and polling seams.",
+      "localPlan": "P8 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
       "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 0/39 target files byte-identical locally; 0 carry fork diffs; 39 not carried; 0 removed upstream this round."
     },
     {
       "area": "packages/experimental/forge-session",
-      "status": "reject",
+      "status": "adapt",
       "localOwner": "packages/experimental/forge-session",
       "commitScope": [
         "packages/experimental/forge-session/"
       ],
-      "reviewState": "implemented-local-tests-passing",
+      "reviewState": "pending-cumulative-source-review",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "increment-review-required",
       "cumulativeFiles": [
         "packages/experimental/forge-session/README.i18n.yaml",
         "packages/experimental/forge-session/README.md",
@@ -11886,7 +11888,8 @@
       "upstreamOnly": {
         "reason": "deferred with experimental/forge"
       },
-      "rejectReason": "Session projection of the forge lane; deferred with packages/experimental/forge.",
+      "localDisposition": "Absorbed against the local projection registry: `ProjectionHandle` replaced by `sessionProjections.register()` disposer plus `stateOf(session, 'forgeChangeRequests')`, with `forgeChangeRequests` declared in both SessionProjectionStateMap and SessionProjectionMap; 135/135 tests.",
+      "localPlan": "P8 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
       "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-14: 0/26 target files byte-identical locally; 0 carry fork diffs; 26 not carried; 0 removed upstream this round."
     },
     {
@@ -13492,6 +13495,7 @@
         "packages/experimental/worktree/tsconfig.json"
       ],
       "localSovereignty": "adapted",
+      "localDisposition": "Upgraded to the rc.3 generation: worktree projection (`plugin:worktree/created` fold), generated names, restore lifecycle, and archive-triggered reclamation (`working-directory/access` coordination plus `workspace/session-archived`/`session-unarchiving`). Local adaptations: register() returns a disposer not a ProjectionHandle; projectionState threaded through ReclamationHost; settings `configure` presentation call dropped (no local settings-page generation); cachedSnapshot takes an explicit inheritedEventCount (seeded sessions fall through to log reads); directory containment keeps cross-repository borrowers nested; tests drop the upstream-only `model` Agent field and await the volatile-config restart; 101/101 tests.",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json",
         "area": "packages/experimental/worktree",
