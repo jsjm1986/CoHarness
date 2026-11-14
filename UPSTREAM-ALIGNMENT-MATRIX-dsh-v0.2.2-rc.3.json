@@ -330,5 +330,23 @@
       "verdict": "deferred",
       "note": "355 files — largest batch, dedicated session"
     }
-  ]
+  ],
+  "tools_refactor_plan": {
+    "decision": "path A — follow upstream executor-seam rebuild (user approved)",
+    "stages": [
+      "1. land upstream tools wholesale (batch/contracts/events/error-codes/executor/pipeline + rebuilt index/schema/json-schema/presentation)",
+      "2. add tool-executor-native + tool-executor-ptc packages",
+      "3. reapply local deltas: PtcProgramFormat script, tools/ptc-dispatch-log waterfall (spill-policy dep), isUnclassifiedCancellation, knownNames",
+      "4. rewire agent-loop: tool-calls.ts scheduler → ctx.tools.execute(ToolBatchInput), remove append helpers, consume ToolBatchResult",
+      "5. config migration: tools Config{mode,maxParallelSubCalls} → toolCallErrorDetail; ~25 cordis.yml remounts",
+      "6. error-class rewire: ToolNotFoundError/ToolOutputError → result-based; tests + api-catalog regen"
+    ],
+    "local_deltas": [
+      "PtcProgramFormat script",
+      "tools/ptc-dispatch-log (spill-policy, apiproxy, browser-use)",
+      "knownNames",
+      "agent-tool-presentation ptcRuntime keying"
+    ],
+    "unchanged": "4 waterfall events identical names+payloads; defineTool/ToolArgsError/schema/json-schema/presentation identical"
+  }
 }
