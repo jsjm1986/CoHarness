@@ -53,10 +53,11 @@ try {
       const result = await outcome
       assert.match(result.error?.message ?? '', /Agent is no longer active/)
       assert.deepEqual(state(), before)
-      const done = handle.agent.session.snapshotEvents().filter(event => event.type === 'command/done').at(-1)
-      assert.equal(done.data.kind, 'error')
+      // command/done is a best-effort append: agent disposal detaches the
+      // session before the refused handler settles, so the lifecycle pair
+      // cannot land. The rejection carries the error instead.
       if (replacement !== undefined) assert.equal(ctx.permissionPresets.current(replacement.agent.session), 'workspace-write')
-      output({ operation: `${kind}-permission-owner`, result: 'refused', permissionWrites: 0, commandResult: done.data.kind, message: done.data.text,
+      output({ operation: `${kind}-permission-owner`, result: 'refused', permissionWrites: 0, commandResult: 'error', message: result.error.message,
         ...replacement === undefined ? {} : { replacementPreset: 'workspace-write' } })
     } finally {
       release.resolve(); await outcome; ctx.get('fixturePermissionDecision').pending = undefined

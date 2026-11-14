@@ -15,6 +15,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createScope } from '@deepseek-ai/dsh-scope'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import PermissionPresetService from '@deepseek-ai/dsh-permission-presets'
@@ -26,6 +27,7 @@ async function harness(options: { withPermission?: boolean; config?: Config } = 
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(AgentRegistry)
   await ctx.plugin(CommandRuntime)
   ctx.provide('shell', {
     sandboxMode: 'workspace-write',
@@ -42,6 +44,7 @@ async function harness(options: { withPermission?: boolean; config?: Config } = 
 async function agentFor(ctx: Context, session: Session) {
   const inject = vi.fn<Agent['inject']>()
   const agent = { id: session.id, session, inject } as unknown as Agent
+  await ctx.agents.register(agent)
   await ctx.plugin(Object.assign((inner: Context) => { createScope(inner, agent) }, { inject: ['commands'] }))
   return { agent, inject }
 }

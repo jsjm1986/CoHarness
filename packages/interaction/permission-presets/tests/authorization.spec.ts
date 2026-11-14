@@ -18,6 +18,7 @@ async function fixture(authorizeSelection?: (agent: Agent, preset: string) => Pr
   contexts.push(ctx)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(AgentRegistry)
   await ctx.plugin(CommandRuntime)
   await ctx.plugin(Approval, {})
   ctx.provide('shell', {
@@ -34,9 +35,10 @@ async function fixture(authorizeSelection?: (agent: Agent, preset: string) => Pr
     id: session.id, session,
     inject(message) { session.append('user/message', message, { surfaceOp: 'append' }) },
   } as Agent
+  const releaseAgent = await ctx.agents.register(agent)
   await ctx.plugin(Object.assign((inner: Context) => { createScope(inner, agent) }, { inject: ['commands'] }))
   const select = (signal = new AbortController().signal) => ctx.commands.execute(agent, '/permission auto', [], signal)
-  return { ctx, session, agent, select, permissionFiber }
+  return { ctx, session, agent, select, permissionFiber, releaseAgent }
 }
 
 class TracedAuthority extends Service {
@@ -95,14 +97,14 @@ describe('permission command authorization', () => {
     expect(f.ctx.permissionPresets.current(f.session)).toBe(AUTO_PRESET)
   })
 
-  it('refuses a pending selection when a newly composed registry does not own its caller', async () => {
+  it('refuses a pending selection when the registry drops its caller', async () => {
     const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
     const f = await fixture(async () => { entered.resolve(undefined); await release.promise })
     const pending = f.select()
     const rejected = expect(pending).rejects.toThrow('Agent is no longer active')
     try {
       await entered.promise
-      await f.ctx.plugin(AgentRegistry)
+      await f.releaseAgent()
     } finally { release.resolve(undefined) }
     await rejected
     expect(f.ctx.permissionPresets.current(f.session)).toBe('workspace-write')

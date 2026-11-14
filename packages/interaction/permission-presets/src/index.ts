@@ -238,7 +238,7 @@ export class PermissionPresetService extends TypertRemoteService {
     defaultPreset: z.string(),
   })
 
-  static inject = ['shell', 'approval', 'sessions', 'sessionProjections']
+  static inject = ['shell', 'approval', 'sessions', 'agents', 'sessionProjections']
 
   private readonly presets: Record<string, PresetSpec>
   private autoAdmit: (() => void) | undefined
@@ -306,11 +306,11 @@ export class PermissionPresetService extends TypertRemoteService {
       apply: applyPermissionEvent,
       wire: { viewSchema: selectionSchema, view: state => ({ currentValue: this.derive(state) }) },
     })
-    ctx.on('session/created', (session) => {
-      this.pinInitialPermission(session)
-    })
-    for (const session of ctx.sessions.list()) {
-      this.pinInitialPermission(session)
+    ctx.on('agent/created', ({ agent }) => {
+      this.pinInitialPermission(agent.session)
+    }, { prepend: true })
+    for (const agent of ctx.agents.list()) {
+      this.pinInitialPermission(agent.session)
     }
 
     // The /permission command: the one write path a web client uses (the
@@ -494,12 +494,11 @@ export class PermissionPresetService extends TypertRemoteService {
   }
 
   /**
-   * Fill every missing permission fact before a session is published. A
-   * genuinely fresh session uses the current user default; seeded or partially
+   * Fill every missing permission fact during Agent creation. A genuinely
+   * fresh session uses the current user default; seeded or partially
    * initialized sessions preserve their effective knob values and only gain
    * the missing durable facts. A stored Auto identity requires its live
-   * integration and passes its admission check before
-   * publication.
+   * integration and passes its admission check before creation completes.
    */
   private pinInitialPermission(session: Session): void {
     const state = this.permissionState(session)

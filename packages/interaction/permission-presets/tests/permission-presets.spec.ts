@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, {
   Session,
   SessionId,
 } from '@deepseek-ai/dsh-session'
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { SandboxMode } from '@deepseek-ai/dsh-sandbox'
 import type { ApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
 import PermissionPresetService, {
@@ -36,8 +36,13 @@ async function mounted(options: {
   projection?: boolean
 } = {}): Promise<Context> {
   const ctx = new Context()
-  await ctx.plugin(SessionStore)
-  if (options.projection !== false) await ctx.plugin(SessionProjectionRegistry)
+  onTestFinished(() => ctx.fiber.dispose())
+  if (options.projection === false) {
+    await ctx.plugin(SessionStore)
+  } else {
+    await mountAgentLoopTestDependencies(ctx)
+    await mountAgentLoopTestHarness(ctx)
+  }
   ctx.provide('shell', {
     sandboxMode: 'bashDefault' in options ? options.bashDefault : 'workspace-write',
     resolve() { throw new Error('permission tests do not execute bash') },
@@ -53,7 +58,7 @@ describe('blank reuse permission ownership', () => {
   it('advances a still-effective default selection to the current future-session default', async () => {
     const ctx = await mountedStore()
     try {
-      const session = ctx.sessions.create(SessionId('reuse-default'))
+      const session = (await ctx.agents.create({ sessionId: SessionId('reuse-default') })).agent.session
       await ctx.settings.mutate('permission', [{ op: 'set', path: ['defaultPreset'], value: 'danger-full-access' }])
       ctx.permissionPresets.refreshDefaultForReuse(session)
       expect(ctx.permissionPresets.current(session)).toBe('danger-full-access')
@@ -66,7 +71,7 @@ describe('blank reuse permission ownership', () => {
     const ctx = await mountedStore()
     try {
       const session = kind === 'legacy' || kind === 'empty' ? freshSession(`reuse-${kind}`)
-        : ctx.sessions.create(SessionId(`reuse-${kind}`))
+        : (await ctx.agents.create({ sessionId: SessionId(`reuse-${kind}`) })).agent.session
       if (kind === 'started') session.append('turn/start', { turn: 1 })
       if (kind === 'explicit') {
         ctx.permissionPresets.set(session, 'danger-full-access')
@@ -85,7 +90,7 @@ describe('blank reuse permission ownership', () => {
   it('rejects a deployment-forbidden preset without changing either permission knob', async () => {
     const ctx = await mountedStore()
     try {
-      const session = ctx.sessions.create(SessionId('restricted-preset')), before = session.snapshotEvents()
+      const session = (await ctx.agents.create({ sessionId: SessionId('restricted-preset') })).agent.session, before = session.snapshotEvents()
       ctx.provide('permissionPresetAuthorization', { canSelect: () => false })
       expect(() => { ctx.permissionPresets.set(session, 'danger-full-access') }).toThrow('administrator-only')
       expect(session.snapshotEvents()).toEqual(before)
@@ -105,8 +110,9 @@ async function mountAuto(ctx: Context, admit: () => void = () => {}) {
 
 async function mountedStore(options: { approvalDefault?: ApprovalPolicy | undefined } = {}): Promise<Context> {
   const ctx = new Context()
-  await ctx.plugin(SessionStore)
-  await ctx.plugin(SessionProjectionRegistry)
+  onTestFinished(() => ctx.fiber.dispose())
+  await mountAgentLoopTestDependencies(ctx)
+  await mountAgentLoopTestHarness(ctx)
   await ctx.plugin(MemorySettings)
   ctx.provide('shell', {
     sandboxMode: 'workspace-write',
@@ -365,7 +371,7 @@ describe('new-session default', () => {
     source.append('approval/policy', { policy: 'never' })
 
     const id = SessionId('auto-without-integration')
-    expect(() => ctx.sessions.create(id, { seed: source.snapshotEvents() })).toThrow(/cannot restore preset "auto"/)
+    await expect(ctx.agents.create({ sessionId: id, seed: source.snapshotEvents() })).rejects.toThrow(/cannot restore preset "auto"/)
     expect(ctx.sessions.get(id)).toBeUndefined()
     expect(source.snapshotEvents().at(-1)).toMatchObject({ type: 'approval/policy' })
   })
@@ -379,7 +385,7 @@ describe('new-session default', () => {
     source.append('sandbox/mode', { mode: 'danger-full-access' })
     source.append('approval/policy', { policy: 'never' })
 
-    const resumed = ctx.sessions.create(SessionId('auto-with-integration'), { seed: source.snapshotEvents() })
+    const resumed = (await ctx.agents.create({ sessionId: SessionId('auto-with-integration'), seed: source.snapshotEvents() })).agent.session
     expect(admissions).toBe(1)
     expect(ctx.permissionPresets.current(resumed)).toBe(AUTO_PRESET)
     expect(resumed.snapshotEvents().filter(event => event.type === 'permission/preset')).toHaveLength(1)
@@ -387,7 +393,18 @@ describe('new-session default', () => {
 
   it('pins the current setting into each new session without changing earlier sessions', async () => {
     const ctx = await mountedStore()
-    const first = ctx.sessions.create(SessionId('first'))
+    const observed: string[][] = []
+    ctx.on('session/created', (session) => {
+      observed.push(session.snapshotEvents().map(event => event.type))
+    })
+    ctx.on('agent/created', ({ agent }) => {
+      observed.push(agent.session.snapshotEvents().map(event => event.type))
+    })
+    const first = (await ctx.agents.create({ sessionId: SessionId('first') })).agent.session
+    expect(observed).toEqual([
+      [],
+      ['permission/preset', 'sandbox/mode', 'approval/policy'],
+    ])
     expect(first.snapshotEvents().map(event => [event.type, event.data])).toEqual([
       ['permission/preset', { preset: 'workspace-write', origin: 'default' }],
       ['sandbox/mode', { mode: 'workspace-write' }],
@@ -398,7 +415,7 @@ describe('new-session default', () => {
       defaultPreset: 'danger-full-access',
     })
     expect(ctx.permissionPresets.defaultPreset).toBe('danger-full-access')
-    const second = ctx.sessions.create(SessionId('second'))
+    const second = (await ctx.agents.create({ sessionId: SessionId('second') })).agent.session
     expect(ctx.permissionPresets.current(first)).toBe('workspace-write')
     expect(ctx.permissionPresets.current(second)).toBe('danger-full-access')
     expect(second.snapshotEvents().map(event => event.type)).toEqual([
@@ -414,7 +431,7 @@ describe('new-session default', () => {
     const legacy = freshSession('legacy-source')
     legacy.append('turn/start', { turn: 1 })
     legacy.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
-    const resumed = ctx.sessions.create(SessionId('legacy-resumed'), { seed: legacy.snapshotEvents() })
+    const resumed = (await ctx.agents.create({ sessionId: SessionId('legacy-resumed'), seed: legacy.snapshotEvents() })).agent.session
     expect(ctx.permissionPresets.current(resumed)).toBe('workspace-write')
     expect(resumed.snapshotEvents().slice(-3).map(event => event.type)).toEqual([
       'permission/preset', 'sandbox/mode', 'approval/policy',
@@ -426,17 +443,18 @@ describe('new-session default', () => {
     await ctx.settings.update(PERMISSION_SETTINGS_NAMESPACE, {
       defaultPreset: 'danger-full-access',
     })
-    const resumed = ctx.sessions.create(SessionId('empty-resumed'), { seed: [] })
+    const resumed = (await ctx.agents.create({ sessionId: SessionId('empty-resumed'), seed: [] })).agent.session
     expect(ctx.permissionPresets.current(resumed)).toBe('workspace-write')
     expect(resumed.snapshotEvents().map(event => event.type)).toEqual([
       'session/end-seed', 'permission/preset', 'sandbox/mode', 'approval/policy',
     ])
   })
 
-  it('pins sessions that already exist when the service remounts', async () => {
+  it('pins agents that already exist when the service remounts', async () => {
     const ctx = new Context()
-    await ctx.plugin(SessionStore)
-    await ctx.plugin(SessionProjectionRegistry)
+    onTestFinished(() => ctx.fiber.dispose())
+    await mountAgentLoopTestDependencies(ctx)
+    await mountAgentLoopTestHarness(ctx)
     ctx.provide('shell', {
       sandboxMode: 'workspace-write',
       resolve() { throw new Error('permission tests do not execute bash') },
@@ -444,7 +462,7 @@ describe('new-session default', () => {
       start() { throw new Error('permission tests do not execute bash') },
     })
     ctx.provide('approval', { config: { policy: 'ask' } })
-    const existing = ctx.sessions.create(SessionId('existing-before-permission'))
+    const existing = (await ctx.agents.create({ sessionId: SessionId('existing-before-permission') })).agent.session
     expect(existing.snapshotEvents()).toEqual([])
 
     await ctx.plugin(PermissionPresetService, {})
@@ -456,8 +474,9 @@ describe('new-session default', () => {
 
   it('preserves existing knob overrides when the service remounts over a knob-bearing session', async () => {
     const ctx = new Context()
-    await ctx.plugin(SessionStore)
-    await ctx.plugin(SessionProjectionRegistry)
+    onTestFinished(() => ctx.fiber.dispose())
+    await mountAgentLoopTestDependencies(ctx)
+    await mountAgentLoopTestHarness(ctx)
     ctx.provide('shell', {
       sandboxMode: 'workspace-write',
       resolve() { throw new Error('permission tests do not execute bash') },
@@ -465,7 +484,7 @@ describe('new-session default', () => {
       start() { throw new Error('permission tests do not execute bash') },
     })
     ctx.provide('approval', { config: { policy: 'ask' } })
-    const existing = ctx.sessions.create(SessionId('existing-knobs'))
+    const existing = (await ctx.agents.create({ sessionId: SessionId('existing-knobs') })).agent.session
     existing.append('sandbox/mode', { mode: 'read-only' })
     existing.append('approval/policy', { policy: 'never' })
 
@@ -484,7 +503,7 @@ describe('new-session default', () => {
     const partial = freshSession('partial-source')
     partial.append('sandbox/mode', { mode: 'workspace-write' })
     partial.append('approval/policy', { policy: 'ask' })
-    const resumed = ctx.sessions.create(SessionId('partial-resumed'), { seed: partial.snapshotEvents() })
+    const resumed = (await ctx.agents.create({ sessionId: SessionId('partial-resumed'), seed: partial.snapshotEvents() })).agent.session
     expect(resumed.snapshotEvents().at(-1)).toMatchObject({
       type: 'permission/preset',
       data: { preset: 'workspace-write' },
@@ -493,7 +512,7 @@ describe('new-session default', () => {
     const custom = freshSession('custom-source')
     custom.append('sandbox/mode', { mode: 'read-only' })
     custom.append('approval/policy', { policy: 'never' })
-    const unmatched = ctx.sessions.create(SessionId('custom-resumed'), { seed: custom.snapshotEvents() })
+    const unmatched = (await ctx.agents.create({ sessionId: SessionId('custom-resumed'), seed: custom.snapshotEvents() })).agent.session
     expect(ctx.permissionPresets.current(unmatched)).toBe(CUSTOM_PRESET)
     expect(unmatched.snapshotEvents().at(-1)?.type).toBe('session/end-seed')
   })
@@ -502,7 +521,7 @@ describe('new-session default', () => {
     const ctx = await mountedStore({ approvalDefault: undefined })
     const partial = freshSession('approval-fallback-source')
     partial.append('sandbox/mode', { mode: 'workspace-write' })
-    const resumed = ctx.sessions.create(SessionId('approval-fallback-resumed'), { seed: partial.snapshotEvents() })
+    const resumed = (await ctx.agents.create({ sessionId: SessionId('approval-fallback-resumed'), seed: partial.snapshotEvents() })).agent.session
     expect(resumed.snapshotEvents().at(-1)).toMatchObject({
       type: 'approval/policy',
       data: { policy: 'ask' },

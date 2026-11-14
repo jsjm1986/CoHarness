@@ -262,6 +262,62 @@ describe('SessionProjectionRegistry drive', () => {
     expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['cached'] })
   })
 
+  it('freezes a released unit: checkpoints keep its last cell while every live face skips it', async () => {
+    const { ctx, session } = await harness()
+    const owner = await ctx.plugin(Object.assign(async (inner: Context) => {
+      inner.sessionProjections.register(marksUnit())
+    }, { inject: ['sessionProjections'] }))
+    ctx.sessionProjections.register(countUnit())
+    const released = mark(session, ['released'])
+    await owner.dispose()
+
+    const after = mark(session, ['after'])
+    expect(ctx.sessionProjections.snapshot(session).values).toEqual({})
+    expect(ctx.sessionProjections.stateOf(session, 'test/marks')).toBeUndefined()
+    expect(ctx.sessionProjections.stateOf(session, 'test/count')).toBe(2)
+    // No drive, snapshot, or materializing read advanced the released cell.
+    const rows = ctx.sessionProjections.checkpoint(session)
+    expect(rows).toEqual({
+      'test/marks': { ver: 1, seq: released.seq, val: { marks: ['released'] } },
+      'test/count': { ver: 1, seq: after.seq, val: 2 },
+    })
+    // A Session created after the release never gets a cell for the unit.
+    const fresh = ctx.sessions.create()
+    expect(ctx.sessionProjections.checkpoint(fresh)).toEqual({ 'test/count': { ver: 1, seq: -1, val: 0 } })
+
+    // Restore paths consult only live units, so the frozen row neither lowers the floor nor gets viewed.
+    expect(ctx.sessionProjections.restoreFloor(rows)).toBe(SessionLogOffset(after.seq))
+    expect(ctx.sessionProjections.viewCheckpoint(rows)).toEqual({})
+    const events = [released, after]
+    expect(ctx.sessionProjections.restore(rows, events, SessionLogOffset(0), RESTORE_HEADER, SessionLogOffset(0))).toEqual({
+      snapshot: { asOfSeq: after.seq, values: {} },
+      checkpoint: { 'test/count': { ver: 1, seq: after.seq, val: 2 } },
+    })
+    const prepared = ctx.sessions.prepare(SessionId('projection-hydrate-released'), { seed: events })
+    const hydrated = ctx.sessionProjections.hydrate(prepared, rows, events, SessionLogOffset(0))
+    expect(hydrated).toEqual({ asOfSeq: after.seq, values: {} })
+    expect(ctx.sessionProjections.hydrate(prepared, rows, events, SessionLogOffset(0))).toEqual(hydrated)
+    expect(ctx.sessionProjections.checkpoint(prepared)).not.toHaveProperty('test/marks')
+  })
+
+  it('re-registering a released key refolds the Session instead of continuing the frozen cell', async () => {
+    const { ctx, session } = await harness()
+    const owner = await ctx.plugin(Object.assign(async (inner: Context) => {
+      inner.sessionProjections.register(marksUnit())
+    }, { inject: ['sessionProjections'] }))
+    const released = mark(session, ['released'])
+    await owner.dispose()
+    const after = mark(session, ['after'])
+    expect(ctx.sessionProjections.checkpoint(session)['test/marks'])
+      .toEqual({ ver: 1, seq: released.seq, val: { marks: ['released'] } })
+
+    ctx.sessionProjections.register(marksUnit())
+    expect(ctx.sessionProjections.stateOf(session, 'test/marks')).toEqual({ marks: ['after'] })
+    expect(ctx.sessionProjections.checkpoint(session)['test/marks'])
+      .toEqual({ ver: 1, seq: after.seq, val: { marks: ['after'] } })
+    expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['after'] })
+  })
+
   it('removes registrations and change listeners when their owning fiber unloads (HMR safety)', async () => {
     const { ctx, session } = await harness()
     const notifications: string[] = []

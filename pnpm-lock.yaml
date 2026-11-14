@@ -10260,6 +10260,9 @@ importers:
       '@deepseek-ai/dsh-agent-loop':
         specifier: workspace:*
         version: link:../../core/agent-loop
+      '@deepseek-ai/dsh-agent-loop-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/agent-loop-testkit
       '@deepseek-ai/dsh-commands':
         specifier: workspace:*
         version: link:../commands

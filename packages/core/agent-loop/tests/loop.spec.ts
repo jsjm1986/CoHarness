@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime, { createUserMessage, ToolCallId, LlmError, expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -1539,8 +1539,8 @@ describe('agent loop', () => {
     })
     ctx.llm.registerAdapter(['mock'], adapter)
 
+    await vi.waitFor(() => { expect(ctx.agents.list()).toHaveLength(1) })
     const agent = ctx.agents.list()[0]!
-    expect(agent).toBeDefined()
     expect(agent.id).toBe(agent.session.id)
     expect(agent.id).toMatch(/^config-agent-session-/)
     expect(agent.options.model).toBe('mock')
@@ -1563,6 +1563,7 @@ describe('agent loop', () => {
       agents: [{ id: SessionId('config-agent'), provider: 'mock', model: 'mock', cwd: '/work/project' }],
     })
 
+    await vi.waitFor(() => { expect(ctx.agents.list()).toHaveLength(1) })
     const agent = ctx.agents.list()[0]!
     expect(agent.session.header.cwd).toBe('/work/project')
   })

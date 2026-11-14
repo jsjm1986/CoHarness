@@ -75,6 +75,7 @@ describe('loop-owned request freezing', () => {
     expect(Object.isFrozen(userEvent.data.content)).toBe(true)
     expect(Object.isFrozen(assistantEvent.data.message)).toBe(true)
     ctx.effect(() => ctx.sessions.enter(session))
+    ctx.sessions.announce(session)
     const agent = new ReactLoopAgent(loopCtx, id, { provider: 'mock', model: 'mock' }, session)
     cleanups.push(async () => {
       agent.cancel({ kind: 'disposed' })

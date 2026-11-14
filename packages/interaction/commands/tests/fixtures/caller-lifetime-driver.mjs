@@ -64,15 +64,18 @@ try {
       release.resolve()
       const execution = await operation
       const events = agent.session.snapshotEvents().filter(event => event.type.startsWith('command/'))
-      assert.deepEqual(events.map(event => event.type), ['command/run', 'command/done'])
       if (change === 'idle') {
+        assert.deepEqual(events.map(event => event.type), ['command/run', 'command/done'])
         assert.equal(execution.result.kind, 'success')
         assert.equal(handlerRuns, 1)
         assert.equal(await handle.tryDisposeIdle(), true)
         process.stdout.write(`${JSON.stringify({ operation: 'pending-command-idle', retiredWhilePending: false, handlerRuns, result: 'success', retiredAfterCompletion: true })}\n`)
       } else {
+        // Agent disposal detaches the Session before the refused command
+        // settles: command/done cannot land and is contained, so only
+        // command/run remains on the log.
+        assert.deepEqual(events.map(event => event.type), ['command/run'])
         assert.equal(execution.result.kind, 'error')
-        assert.equal(events.at(-1).data.kind, 'error')
         assert.equal(handlerRuns, 0)
         if (replacement) {
           assert.notEqual(replacement.agent, agent)

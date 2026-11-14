@@ -59,10 +59,12 @@ describe('config-driven session id', () => {
         { id: 'unchanged', sessionId: SessionId('config-unchanged'), model: 'mock' },
       ],
     })
-    expect(ctx.agents.get(SessionId('launcher-fresh'))?.session.id).toBe('launcher-fresh')
+    await vi.waitFor(() => {
+      expect(ctx.agents.get(SessionId('launcher-fresh'))?.session.id).toBe('launcher-fresh')
+      expect(ctx.agents.get(SessionId('config-unchanged'))?.session.id).toBe('config-unchanged')
+    })
     expect(ctx.agents.get(SessionId('launcher-resumed'))).toBeUndefined()
     expect(ctx.agents.get(SessionId('config-resumed'))).toBeUndefined()
-    expect(ctx.agents.get(SessionId('config-unchanged'))?.session.id).toBe('config-unchanged')
     await ctx.fiber.dispose()
   })
 
@@ -80,7 +82,9 @@ describe('config-driven session id', () => {
     await exact.plugin(AgentLoop, {
       agents: [{ id: 'main', sessionId: SessionId('config-exact'), model: 'mock' }],
     })
-    expect(exact.agents.get(SessionId('config-exact'))?.session.id).toBe('config-exact')
+    await vi.waitFor(() => {
+      expect(exact.agents.get(SessionId('config-exact'))?.session.id).toBe('config-exact')
+    })
     await exact.fiber.dispose()
 
     const conflicting = await makeCoreContext()
