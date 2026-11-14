@@ -1,0 +1,71 @@
+{
+  "release": "dsh-v0.2.2-rc.3",
+  "base": "dsh-v0.2.2-rc.2",
+  "branch": "sync/upstream-v0.2.2-rc3-p0",
+  "scope": "4216 commits / 1089 fix / 374 feat — selective sync per user policy: backport applicable bugs, absorb deep features, skip account/i18n/incidental",
+  "batches": {
+    "cordis": {
+      "commit": "7a7a9dc9e18",
+      "applied": ["canonical Fiber migration (fiber.ts ctx.fiber self-reference)", "app-boot previousFibers", "boot-hmr dispose path", "goal stateOf projection", "translator owner.fiber identity"],
+      "na": ["entry-tree commit-journal fixes — fork carries pre-journal loader", "typert colon-id — already present"],
+      "notes": "vendor/AGENTS.md sync log updated"
+    },
+    "tools": {
+      "commit": "66896839610",
+      "applied": ["persistent bash history-expansion disable", "unclassified cancellation -> TOOL_ABORTED", "tool-goal populated-fields ignored", "grep empty-include guard", "abort-after-settle classification + tests"],
+      "na": ["tool-executor-* commits — new packages, feature batch", "pipeline ctx.tools capture — different architecture", "plan-mode check — already fixed form", "session/types comments — doc drift", "setExecutor — absent", "locale commits — i18n batch skipped"]
+    },
+    "ptc": {
+      "commit": "e2bd55d9a6a",
+      "applied": ["whole ptc-runtime-node refactor absorbed (worker/rpc/evaluators)", "sandbox registerWritableRoot + additionalWritableRoots", "session announcement four-state + append guards", "spawn Promise adaptation", "vitest vm-modules pool"],
+      "notes": "860+ tests green; PTC批含 sandbox/escalation/policy 适配"
+    },
+    "fs": {
+      "commit": "991405a67cf",
+      "applied": ["~ expansion at resolve/lstat entry (ae0dfd1003+32004176bf)", "glob directory-prefix pruning under 8KiB argv (12f63eaf89 group)", "read-tool guidance wording (15c9e6006b)"],
+      "na": ["writable-root grant validation — already via PTC batch", "patch-parser quadratic trim — fs-patch feature batch", "fs-sandbox delete/move fence — apply_patch feature batch", "tool-error refactor/concurrency — feature batch"]
+    },
+    "session": {
+      "commit": "e0d84e167ec",
+      "applied": ["session publish before async agent setup; agent publish after setup commit", "failed setup emits session/created + session/disposed, no agent/created", "concurrent same-id creation rejected pre-setup", "released projection units retained for checkpoint", "command/done append containment"],
+      "deferred": ["batch append API (5e77db2d5c et al) — feature batch", "projection per-event frames — perf refactor"],
+      "na": ["sparse-append guard — inside batch path only"]
+    },
+    "agent-loop": {
+      "commit": "e0d84e167ec + 71dffc818f1",
+      "applied": ["prompt prefix preserved at series start when text unchanged (2676c67f32)", "natural-language runtime-context intro with section-based dedup (022da17f27)"],
+      "na": ["rejected-route diagnostics (b015d18e81) — structure absent"]
+    },
+    "compaction": {
+      "commit": "71dffc818f1",
+      "applied": ["compact history before model switches; MODEL_SWITCH_COMPACTION_FAILED preserves route (321d6362c5)"],
+      "na": ["aa685be0a44 — superseded, not in rc.3"]
+    },
+    "llm-deepseek": {
+      "commit": "71dffc818f1",
+      "applied": ["catalog context window synced to official listing 1,048,576 (e3a485bd32)"],
+      "na": ["all-deferred placeholder added-then-reverted upstream (156dad153d+624c3e91a9) — net equals current serializer"]
+    },
+    "mcp-client": {
+      "commit": "71dffc818f1",
+      "applied": ["cause-chain diagnostics describeError (032fd5f6d5)", "generation-entitled tool commits + abandoned flag (5285c6dcc4)", "give-up dispose containment + resolveReconnectPolicy export (09570cf383 partial)"],
+      "na": ["probe abort + async status listeners — probe.ts/status.ts absent (mcp-manager batch)"]
+    },
+    "jobs": { "commit": null, "na": ["ed645016cd inline-output settlement — different tool-jobs generation, no inline path"] },
+    "web-search": { "commit": null, "na": ["8b085b7e35 credential order — no deepseekAccount route locally"] },
+    "terminal": { "commit": null, "na": ["3ce9462e7f — local TerminalBackendCleanupError already aggregates both failures"] },
+    "approval-interaction": {
+      "commit": "fa0d3b0f1ca",
+      "applied": ["ToolArgsError classification in tool-ask-user timed + tool-workflow (5a8dc54372 partial)"],
+      "deferred": ["ToolContextUnavailableError taxonomy — upstream-new type, feature batch"],
+      "na": ["fda29f726d PROVIDER_ERROR message — no answerer path locally"]
+    },
+    "office": { "commit": null, "pending": "skill/office lineage differs from upstream office-kit; evaluate with feature batch" },
+    "sdk": { "commit": null, "pending": "20 fixes incl. live-runtime approval routing — needs dedicated pass, several feature-coupled" },
+    "subagent": { "commit": null, "pending": "30 fixes mostly upstream named/multi-level subagent line; generic candidates: authorized-catalog discovery intersect, caller-inbox wait, closing message" },
+    "cua": { "commit": null, "na": "89 fixes mostly upstream macOS helper packaging/signing — different lineage; generic candidates (0-999 coords, click-hold cap, cancel balance) deferred" },
+    "schedule": { "commit": null, "pending": "10 fixes mostly upstream schedule UI; timezone diagnostics candidates" }
+  },
+  "skipped_per_policy": ["settings-account/API-key adapter (account-specific)", "ja/es/fr/de/ru/pt-BR i18n", "client/web/desktop UI fixes — deep fork divergence", "ci/release infra — selective reference only", "forge fixes — pending forge feature decision"],
+  "feature_candidates": ["team/agent-team + tool-agent-team", "forge suite", "tool-executor-native/ptc", "mcp-manager", "fs-patch", "office-kit/tool-office", "subagent-oar", "terminal-controller", "session batch-append API", "deepseek-chat-import", "message-quotes/log-export", "client-ui-stats", "ToolContextUnavailableError taxonomy"]
+}
