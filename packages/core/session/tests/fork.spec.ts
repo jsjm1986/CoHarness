@@ -59,7 +59,7 @@ function inherited(session: Session): readonly SessionEvent[] {
 }
 
 describe('SessionStore.fork', () => {
-  it('forks an empty live session as an empty child with lineage metadata', async () => {
+  it('forks an empty live session as an independent child without lineage', async () => {
     const { ctx, sessions } = await setup()
     const source = ctx.sessions.create(SessionId('empty-parent'), { meta: { cwd: '/workspace' } })
 
@@ -69,7 +69,6 @@ describe('SessionStore.fork', () => {
     expect(child.header).toMatchObject({
       id: SessionId('empty-child'),
       cwd: '/workspace',
-      parentSession: SessionId('empty-parent'),
       isSeeded: true,
     })
     expect(child.inheritedEventCount).toBe(0)
@@ -94,7 +93,6 @@ describe('SessionStore.fork', () => {
     expect(child.header).toMatchObject({
       id: SessionId('child'),
       cwd: '/workspace',
-      parentSession: SessionId('parent'),
       isSeeded: true,
     })
     expect(child.inheritedEventCount).toBe(source.seq)

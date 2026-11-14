@@ -377,6 +377,7 @@ describe('automation-only ACP bridge', () => {
     await expect(harness.client.listSessions({ cwd: 'relative' })).rejects.toThrow(/absolute path/)
     await expect(harness.client.listSessions({ cwd: '/missing/filter' })).resolves.toEqual({
       sessions: [
+        { sessionId: 'fork', cwd: '/missing/filter' },
         { sessionId: 'valid-a', cwd: '/missing/filter' },
         { sessionId: 'valid-b', cwd: '/missing/filter' },
       ],
