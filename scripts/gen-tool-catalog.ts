@@ -26,6 +26,7 @@ import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
 import { PwshLocalExecutor } from '@deepseek-ai/dsh-pwsh-local'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
+import LocalSandboxProvider from '@deepseek-ai/dsh-sandbox-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
 import * as ToolWorkingDirectory from '@deepseek-ai/dsh-tool-working-directory'
@@ -268,6 +269,9 @@ const TOOL_PACKAGES: ToolPackage[] = [
     // which projects the mounted runtime's language and controls.
     executor: 'ptc',
     async mount(ctx) {
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LocalSandboxProvider)
+      await ctx.plugin(SandboxPolicy)
       await ctx.plugin(NodePtcRuntime)
     },
     note:

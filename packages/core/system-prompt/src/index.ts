@@ -28,7 +28,7 @@ declare module '@deepseek-ai/cordis' {
      * @param context - the caller's per-assembly context.
      * @mode waterfall
      */
-    'system-prompt/assemble'(this: Scoped<SystemPrompt>, assembly: PromptAssembly, context: AssembleContext, next: () => Promise<PromptAssembly>): Promise<PromptAssembly>
+    'system-prompt/assemble'(this: Scoped<SystemPrompt>, assembly: PromptPresentation, context: AssembleContext, next: () => Promise<PromptPresentation>): Promise<PromptPresentation>
     /**
      * Emitted when any prompt provider changes. This registry notification is
      * unfiltered because a global change affects every scope.
@@ -118,14 +118,19 @@ export interface ToolProviderResult {
 }
 
 /**
- * Merge-extensible assembled model input. Sections and contexts remain
- * uninterpolated until rendered; tools are already in canonical order.
+ * Prompt text contributions that the assembly waterfall may transform.
+ * Sections and contexts remain uninterpolated until rendered; tool
+ * declarations are owned by their providers.
  */
-export interface PromptAssembly {
+export interface PromptPresentation {
   sections: AssembledSection[]
   contexts: AssembledContext[]
-  tools: ToolSchema[]
   variables: Record<string, string | undefined>
+}
+
+/** Completed model input: the presentation plus tool declarations in canonical order. */
+export interface PromptAssembly extends PromptPresentation {
+  tools: ToolSchema[]
 }
 
 const SECTION_ORDERS = {
@@ -668,23 +673,24 @@ export class SystemPrompt extends Service {
         if (section.complete === true) completeSection = { ...assembled }
         return assembled
       })
-    const assembly: PromptAssembly = {
+    const tools = orderTools(collected, this.toolOrder, knownNames)
+    const assembly: PromptPresentation = {
       sections,
       contexts: [...contextByName.values()]
         .filter(entry => !runtimeContextSuppressed || entry.required === true)
         .sort((a, b) => a.order - b.order)
         .map(entry => resolveContext(entry, context)),
-      tools: orderTools(collected, this.toolOrder, knownNames),
       variables,
     }
     const transformed = await this.ctx.waterfall(
       scopeTarget(this, scope), 'system-prompt/assemble', assembly, context,
       () => Promise.resolve(assembly),
     )
-    if (completeSection === undefined && !runtimeContextSuppressed) return transformed
+    if (completeSection === undefined && !runtimeContextSuppressed) return { ...transformed, tools }
     const requiredContexts = new Set([...contextByName.values()].filter(entry => entry.required === true).map(entry => entry.name))
     return {
       ...transformed,
+      tools,
       sections: completeSection === undefined ? transformed.sections : [completeSection],
       contexts: runtimeContextSuppressed ? transformed.contexts.filter(entry => requiredContexts.has(entry.name)) : transformed.contexts,
     }
