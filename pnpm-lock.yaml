@@ -9249,6 +9249,12 @@ importers:
         specifier: workspace:*
         version: link:../../llm/llm
 
+  packages/fs/fs-patch:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+
   packages/fs/fs-sandbox:
     devDependencies:
       '@deepseek-ai/cordis':

@@ -359,6 +359,7 @@
     { "path": "./packages/fs/fs" },
     { "path": "./packages/fs/fs-local" },
     { "path": "./packages/fs/fs-observation-policy" },
+    { "path": "./packages/fs/fs-patch" },
     { "path": "./packages/fs/fs-sandbox" },
     { "path": "./packages/fs/tool-fs" },
     { "path": "./packages/fs/tool-fs-search" },

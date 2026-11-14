@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-25-upstream-fs-patch-absorption.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-fs-patch-absorption.md
+document:
+  en: 42cf39e4a816c6821c61dbbab65acc86e628e143
+  zh: 6077fff79436b90c20fc00755240debc9c6d8269
+/agent-note-upstream-fs-patch-absorption:
+  en: ecc8e5e22edfc679
+  zh: 3db1b36d06f8e502
+/agent-note-upstream-fs-patch-absorption/decision:
+  en: 3ccb30635c0f7081
+  zh: 43df0850bb7138f8
+/agent-note-upstream-fs-patch-absorption/rationale:
+  en: 69e322b4b3d59f9f
+  zh: e987796b9d52d608
+/agent-note-upstream-fs-patch-absorption/verification:
+  en: 0ead61d1365c6efa
+  zh: b86263fe72a5867c
+/agent-note-upstream-fs-patch-absorption/deferred:
+  en: ca999c5489cdeb15
+  zh: 618a9eed6754b801
