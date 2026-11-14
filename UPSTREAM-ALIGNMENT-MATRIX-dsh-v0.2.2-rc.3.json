@@ -356,7 +356,8 @@
       "0c19590cb4a",
       "b2ab7036ca9",
       "bba610dffe9",
-      "0d4c74b4dfc"
+      "0d4c74b4dfc",
+      "541b73282f6"
     ],
     "notes": "Adopted upstream executor-seam: core/tools split (executor/pipeline/contracts), NativeToolExecutor + PtcToolExecutor packages, batch ctx.tools.execute({calls}), PromptPresentation split (ctx.systemPrompt.tools). Testkit absorbed. All consumer specs migrated; fixtures mount executors explicitly. Verified: goal 162, compaction+session-title 126, subagent groups 1199, llm+persistence 1286, apiproxy+bundle 968, sweep 2047 — all green.",
     "divergence": [
@@ -364,6 +365,6 @@
       "goal service throws goal projection is not registered on unregistered unit (upstream blind-derefs)",
       "ptc-runtime-node publishes lib/configuration.js via packageFileExtras"
     ],
-    "tool_office": "deferred — lands with tool-office consumer wiring next"
+    "tool_office": "absorbed in 541b73282f6 — ResolvedToolSet step lifecycle wired into agent-loop preStep (resolve→assemble→execute→dispose), stepModelSelection() seeds resumed/fork routes (pending??options??lastUsed??header), admission snapshots pin registrations by identity (mid-step replace → UNKNOWN_TOOL), outputOwner dual-path rootOf()/parentSession-lineage; tool-office 127 green, agent-loop 462 green, catalog regen + pairing clean"
   }
 }
