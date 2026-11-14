@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-15-upstream-session-batch-append-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-15-upstream-session-batch-append-sync.md
+document:
+  en: 028b92528a05acf8c1e71e96d8e41b0ed64659be
+  zh: 0a6258e6755072a02d9322e8a95cc6ec40386705
+/agent-note-upstream-session-batch-append-sync:
+  en: 6febf0d6ce9f507d
+  zh: ed483a2731ca89f6
+/agent-note-upstream-session-batch-append-sync/problem:
+  en: 8194c95c8fb6df53
+  zh: ef871efb314c1ca1
+/agent-note-upstream-session-batch-append-sync/decision:
+  en: 30ae7a3f630d3bbe
+  zh: 7a1cbc3120f078d9
+/agent-note-upstream-session-batch-append-sync/consequences:
+  en: d7de86789f6d1734
+  zh: 66d149dd20afe48d
+/agent-note-upstream-session-batch-append-sync/alternatives-considered:
+  en: 4d07676f4af01e3c
+  zh: 33df0f94f9053aec
+/agent-note-upstream-session-batch-append-sync/verification:
+  en: b89fcec1ba4266c4
+  zh: f0a1f623a24f5080

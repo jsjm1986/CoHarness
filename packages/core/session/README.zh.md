@@ -72,7 +72,7 @@ kind: "package-reference"
 
 普通类（不是 Cordis 服务）。活跃会话通过 `ctx.sessions.create()` 创建，脱离态的回放或检查会话通过 `Session.create()` 创建；脱离态工厂不会发布生命周期事件，也不会将会话绑定到 fiber。
 
-- `session.append(type, data, opts?)` 会为持久数据和 surface 元数据制作快照并冻结它们，构造事件的 `SessionSeq`，校验规范化载荷字段（`validateSessionEventData`：`request/header` 省略 `header.system` 与空的 `tools`/`adapterDefaults`，携带 `error` 的 `tool/result` 要求 `content[0].isError`）、标记形态、被引用的源事件序号、替换覆盖完整性，以及仅修改内容的单个 `tool/result` 重写，随后同步提交，再在彼此独立的失败收容下通知观察者。对已挂接会话的重入追加会被拒绝，运行时检查也覆盖扩宽后的联合类型和已加载日志。
+- `session.append(type, data, opts?)` 会为持久数据和 surface 元数据制作快照并冻结它们，构造事件的 `SessionSeq`，校验规范化载荷字段（`validateSessionEventData`：`request/header` 省略 `header.system` 与空的 `tools`/`adapterDefaults`，携带 `error` 的 `tool/result` 要求 `content[0].isError`）、标记形态、被引用的源事件序号、替换覆盖完整性，以及仅修改内容的单个 `tool/result` 重写，随后同步提交，再在彼此独立的失败收容下通知观察者。对已挂接会话的重入追加会被拒绝，运行时检查也覆盖扩宽后的联合类型和已加载日志。`session.append(inputs)` 接受位置化的 `[type, data, opts?]` 成员数组，在提交任何成员之前先校验全部候选与分发（被拒绝的成员不改写日志与 surface，并回滚准入预留），随后提交全部成员并按序发布，`session.currentBatchPublication` 标识正在投递的成员。
 - `session.deriveMessages()` 对每个新的 surface 条目只做一次增量投影，并返回一个新数组，其中包含这些条目存储的完整、带标识且冻结的消息。assistant 消息的模型来源会保留生成该消息的提供方和模型，以及适配器私有回放状态。surface 重写会重建投影；不存在原始日志回退。
 - `session.deriveEventMessage(event)` 是重建和请求检查使用的规范逐事件投影。
 - `session.surface` 暴露只读 `SessionSurface` 视图，由会话唯一的增量 surface 管理器所有；每次提交重写，`replaceGeneration` 都会变化。

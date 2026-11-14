@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/session/README.md
 document:
-  en: e06e4133cdb1df0d95c4b5fc97ccf4e8f4285e84
-  zh: 0da2e57cb13af91deff82bdad7dbc1bc84f1d8f1
+  en: 8de88973c7b5432e28aa3d5e0f833fcdb72f3e71
+  zh: e0478aea536f6443a414dcd72cbfd8541566aa18
 /:
   en: 1c8be05e4c02cbd0
   zh: 61495d48365178df
@@ -36,8 +36,8 @@ document:
   en: 95c3def8eaf41d84
   zh: be0c22a91a0188d8
 /dsh-session/service-sessionstore-ctx-key-sessions/class-session:
-  en: 20cd567e87e1cb2a
-  zh: 3363ef7ade51d214
+  en: 71332582adf05908
+  zh: 19b3bfaec76e2bc3
 /dsh-session/service-sessionstore-ctx-key-sessions/lossless-json-utilities:
   en: b62d0d1407f3b529
   zh: d350721e3c5fe10a
