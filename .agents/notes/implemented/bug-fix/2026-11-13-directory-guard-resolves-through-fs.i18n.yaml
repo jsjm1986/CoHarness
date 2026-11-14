@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-13-directory-guard-resolves-through-fs.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-13-directory-guard-resolves-through-fs.md
+document:
+  en: 73088ca65a21c4a2ed10381b5e9a5c527d0149cd
+  zh: 3fbbf195e163898d62c2288dd85051964874dbf4
+/agent-note-directory-guard-classifies-the-filesystem-backend-s-resolved-target:
+  en: c1ea0c17b0a9f663
+  zh: 7ac8a0f087aa7c07
+/agent-note-directory-guard-classifies-the-filesystem-backend-s-resolved-target/problem:
+  en: dce13973697fcefc
+  zh: 9199f7e788ab74a4
+/agent-note-directory-guard-classifies-the-filesystem-backend-s-resolved-target/decision:
+  en: 4d83f57dfb771dc9
+  zh: 30d9a8121e960929
+/agent-note-directory-guard-classifies-the-filesystem-backend-s-resolved-target/alternatives-considered:
+  en: 81dfbefafd4808ec
+  zh: 172940261d5bc744
+/agent-note-directory-guard-classifies-the-filesystem-backend-s-resolved-target/consequences:
+  en: fb4be0402cbecacf
+  zh: 237a1c12213307b2
+/agent-note-directory-guard-classifies-the-filesystem-backend-s-resolved-target/verification:
+  en: 6f22eaa278fa154d
+  zh: be6b564449e9b928

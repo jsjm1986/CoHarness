@@ -5,7 +5,7 @@ import { registerGuard } from './dsh-adapter.ts'
 import { loadGrants } from './grants.ts'
 
 export const name = 'dsh-directory-guard'
-export const inject = ['tools']
+export const inject = ['tools', 'fs', 'workingDirectory']
 
 /**
  * Mount the directory guard. Grants are read once from

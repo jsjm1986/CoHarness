@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/dsh-directory-guard/README.md
 document:
-  en: 4de92002d2081a78fe0d2038a6aad5de780bab5a
-  zh: 5508905322e545fcb62f9caba3199b540f80f53a
+  en: 299ee06a920cdb8733ed78f56909c56b7c7331a9
+  zh: a1212a48e99e9c9f2ad39500d16c77c19b636fa8
 /deepseek-ai-dsh-directory-guard:
   en: 388b615962e47ac1
   zh: 3877bcd0bc25bee1
@@ -12,8 +12,8 @@ document:
   en: c5ec7dec385fd639
   zh: ccf3474da64ece53
 /deepseek-ai-dsh-directory-guard/enforcement-rule:
-  en: 23c9a614987319dc
-  zh: e1b362aa78a9756b
+  en: fbc24a6970225600
+  zh: 2feb55bd856a451f
 /deepseek-ai-dsh-directory-guard/boundary-honest-limits:
   en: efbc0c1c39701472
   zh: f38accbc80f808bd
@@ -21,14 +21,14 @@ document:
   en: 898de641ce3373e2
   zh: 1b6b91c5d57602fe
 /deepseek-ai-dsh-directory-guard/upstream-coupling-sync-strategy:
-  en: 4795e8f2ee79b85b
-  zh: 073e75f1af53b1f7
+  en: e9037911269e8a0d
+  zh: 7b01a2dd618aac5f
 /deepseek-ai-dsh-directory-guard/mounting:
   en: 50582bee4f9f8571
   zh: 6e49bf3f5707a4dd
 /deepseek-ai-dsh-directory-guard/tests:
-  en: 8524b9af9f08aee7
-  zh: 8df0731d15e5cf00
+  en: f9dffe8c880f8dce
+  zh: e1a85d4c0040c14e
 /deepseek-ai-dsh-directory-guard/remaining-verification-manual-needs-a-model-api-key:
   en: 745fbfab99363f30
   zh: 466f3d2f02647500

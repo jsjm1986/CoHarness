@@ -18,14 +18,17 @@ Grants are `{ path, mode: 'ro' | 'rw' }` entries and may also carry a `label` (d
 
 | Tool | Path arg | Operation |
 |---|---|---|
-| `read` | `file_path` | read |
+| `read`, `read_image` | `file_path` | read |
 | `write`, `edit` | `file_path` | write |
 | `str_replace_editor` | `path` | `view` = read; `create`/`str_replace`/`insert` = write |
 | `grep`, `glob` | `path` (defaults to the session cwd; patterns and `include` filters stay with the search engine) | read |
+| `lsp` | `file_path`, plus the session cwd it indexes as the workspace | read |
+| `present` | every `files[].path` | read |
+| any other tool | `file_path` | read |
 
 - **write** to a target not inside an `rw` grant → denied.
 - **read** of a target outside every grant → denied.
-- Paths are resolved against the session cwd (falling back to the process cwd), then the nearest existing ancestor is `realpath`-ed to defeat symlink escapes.
+- Relative paths use the Session working directory (`ctx.workingDirectory`; the process cwd for calls without an agent). Each path is classified as `ctx.fs.processPath(await ctx.fs.resolve(path, { cwd }))`, the canonical target the filesystem backend opens, so symlinks are followed before `..` exactly as the backend follows them. A path the backend cannot resolve is denied.
 
 ## Boundary (honest limits)
 
@@ -42,7 +45,7 @@ The gateway writes the user's role-aware grants to the instance's `$DSH_HOME/dir
 
 ## Upstream coupling (sync strategy)
 
-All dsh-internal type imports (`Context`, `ToolExecution`, `PreToolDecision`) live in the single file [`src/dsh-adapter.ts`](src/dsh-adapter.ts). An upstream rename touches that one file. `src/grants.ts` and `src/guard.ts` are pure Node logic with no dsh dependency and carry the full unit-test suite.
+All dsh-internal imports (`Context`, `ToolExecution`, `PreToolDecision`, `ctx.fs`, `ctx.workingDirectory`) live in the single file [`src/dsh-adapter.ts`](src/dsh-adapter.ts). An upstream rename touches that one file. `src/grants.ts` and `src/guard.ts` have no dsh dependency; `guard.ts` receives path resolution as a function, and its unit tests pass the `dsh-fs-local` backend's resolution.
 
 ## Mounting
 
@@ -53,7 +56,7 @@ Inspect the composed tree without booting: the regular `cordis.patch.yml` should
 
 ## Tests
 
-`npm test` runs the pure-logic suites (`grants`, `guard`) plus the deny-wording snapshot (`guard.snapshot.spec.ts`) that pins the model-visible denial text. `npm run typecheck` verifies the dsh-typed wiring against the built dsh declarations.
+`npm test` runs the `grants` and `guard` suites plus the deny-wording snapshot (`guard.snapshot.spec.ts`) that pins the model-visible denial text. `npm run typecheck` verifies the dsh-typed wiring against the built dsh declarations.
 
 ## Remaining verification (manual, needs a model/API key)
 
