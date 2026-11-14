@@ -2,7 +2,7 @@
   "release": "dsh-v0.2.2-rc.3",
   "base": "dsh-v0.2.2-rc.2",
   "branch": "sync/upstream-v0.2.2-rc3-p0",
-  "scope": "4216 commits / 1089 fix / 374 feat \u2014 selective sync per user policy: backport applicable bugs, absorb deep features, skip account/i18n/incidental",
+  "scope": "4216 commits / 1089 fix / 374 feat — selective sync per user policy: backport applicable bugs, absorb deep features, skip account/i18n/incidental",
   "batches": {
     "cordis": {
       "commit": "7a7a9dc9e18",
@@ -14,8 +14,8 @@
         "translator owner.fiber identity"
       ],
       "na": [
-        "entry-tree commit-journal fixes \u2014 fork carries pre-journal loader",
-        "typert colon-id \u2014 already present"
+        "entry-tree commit-journal fixes — fork carries pre-journal loader",
+        "typert colon-id — already present"
       ],
       "notes": "vendor/AGENTS.md sync log updated"
     },
@@ -29,12 +29,12 @@
         "abort-after-settle classification + tests"
       ],
       "na": [
-        "tool-executor-* commits \u2014 new packages, feature batch",
-        "pipeline ctx.tools capture \u2014 different architecture",
-        "plan-mode check \u2014 already fixed form",
-        "session/types comments \u2014 doc drift",
-        "setExecutor \u2014 absent",
-        "locale commits \u2014 i18n batch skipped"
+        "tool-executor-* commits — new packages, feature batch",
+        "pipeline ctx.tools capture — different architecture",
+        "plan-mode check — already fixed form",
+        "session/types comments — doc drift",
+        "setExecutor — absent",
+        "locale commits — i18n batch skipped"
       ]
     },
     "ptc": {
@@ -46,7 +46,7 @@
         "spawn Promise adaptation",
         "vitest vm-modules pool"
       ],
-      "notes": "860+ tests green; PTC\u6279\u542b sandbox/escalation/policy \u9002\u914d"
+      "notes": "860+ tests green; PTC批含 sandbox/escalation/policy 适配"
     },
     "fs": {
       "commit": "991405a67cf",
@@ -56,10 +56,10 @@
         "read-tool guidance wording (15c9e6006b)"
       ],
       "na": [
-        "writable-root grant validation \u2014 already via PTC batch",
-        "patch-parser quadratic trim \u2014 fs-patch feature batch",
-        "fs-sandbox delete/move fence \u2014 apply_patch feature batch",
-        "tool-error refactor/concurrency \u2014 feature batch"
+        "writable-root grant validation — already via PTC batch",
+        "patch-parser quadratic trim — fs-patch feature batch",
+        "fs-sandbox delete/move fence — apply_patch feature batch",
+        "tool-error refactor/concurrency — feature batch"
       ]
     },
     "session": {
@@ -72,11 +72,11 @@
         "command/done append containment"
       ],
       "deferred": [
-        "batch append API (5e77db2d5c et al) \u2014 feature batch",
-        "projection per-event frames \u2014 perf refactor"
+        "batch append API (5e77db2d5c et al) — feature batch",
+        "projection per-event frames — perf refactor"
       ],
       "na": [
-        "sparse-append guard \u2014 inside batch path only"
+        "sparse-append guard — inside batch path only"
       ]
     },
     "agent-loop": {
@@ -86,7 +86,7 @@
         "natural-language runtime-context intro with section-based dedup (022da17f27)"
       ],
       "na": [
-        "rejected-route diagnostics (b015d18e81) \u2014 structure absent"
+        "rejected-route diagnostics (b015d18e81) — structure absent"
       ]
     },
     "compaction": {
@@ -95,7 +95,7 @@
         "compact history before model switches; MODEL_SWITCH_COMPACTION_FAILED preserves route (321d6362c5)"
       ],
       "na": [
-        "aa685be0a44 \u2014 superseded, not in rc.3"
+        "aa685be0a44 — superseded, not in rc.3"
       ]
     },
     "llm-deepseek": {
@@ -104,7 +104,7 @@
         "catalog context window synced to official listing 1,048,576 (e3a485bd32)"
       ],
       "na": [
-        "all-deferred placeholder added-then-reverted upstream (156dad153d+624c3e91a9) \u2014 net equals current serializer"
+        "all-deferred placeholder added-then-reverted upstream (156dad153d+624c3e91a9) — net equals current serializer"
       ]
     },
     "mcp-client": {
@@ -115,25 +115,25 @@
         "give-up dispose containment + resolveReconnectPolicy export (09570cf383 partial)"
       ],
       "na": [
-        "probe abort + async status listeners \u2014 probe.ts/status.ts absent (mcp-manager batch)"
+        "probe abort + async status listeners — probe.ts/status.ts absent (mcp-manager batch)"
       ]
     },
     "jobs": {
       "commit": null,
       "na": [
-        "ed645016cd inline-output settlement \u2014 different tool-jobs generation, no inline path"
+        "ed645016cd inline-output settlement — different tool-jobs generation, no inline path"
       ]
     },
     "web-search": {
       "commit": null,
       "na": [
-        "8b085b7e35 credential order \u2014 no deepseekAccount route locally"
+        "8b085b7e35 credential order — no deepseekAccount route locally"
       ]
     },
     "terminal": {
       "commit": null,
       "na": [
-        "3ce9462e7f \u2014 local TerminalBackendCleanupError already aggregates both failures"
+        "3ce9462e7f — local TerminalBackendCleanupError already aggregates both failures"
       ]
     },
     "approval-interaction": {
@@ -142,10 +142,10 @@
         "ToolArgsError classification in tool-ask-user timed + tool-workflow (5a8dc54372 partial)"
       ],
       "deferred": [
-        "ToolContextUnavailableError taxonomy \u2014 upstream-new type, feature batch"
+        "ToolContextUnavailableError taxonomy — upstream-new type, feature batch"
       ],
       "na": [
-        "fda29f726d PROVIDER_ERROR message \u2014 no answerer path locally"
+        "fda29f726d PROVIDER_ERROR message — no answerer path locally"
       ]
     },
     "office": {
@@ -154,7 +154,7 @@
     },
     "sdk": {
       "commit": null,
-      "pending": "20 fixes incl. live-runtime approval routing \u2014 needs dedicated pass, several feature-coupled"
+      "pending": "20 fixes incl. live-runtime approval routing — needs dedicated pass, several feature-coupled"
     },
     "subagent": {
       "commit": null,
@@ -162,7 +162,7 @@
     },
     "cua": {
       "commit": null,
-      "na": "89 fixes mostly upstream macOS helper packaging/signing \u2014 different lineage; generic candidates (0-999 coords, click-hold cap, cancel balance) deferred"
+      "na": "89 fixes mostly upstream macOS helper packaging/signing — different lineage; generic candidates (0-999 coords, click-hold cap, cancel balance) deferred"
     },
     "schedule": {
       "commit": null,
@@ -172,9 +172,9 @@
   "skipped_per_policy": [
     "settings-account/API-key adapter (account-specific)",
     "ja/es/fr/de/ru/pt-BR i18n",
-    "client/web/desktop UI fixes \u2014 deep fork divergence",
-    "ci/release infra \u2014 selective reference only",
-    "forge fixes \u2014 pending forge feature decision"
+    "client/web/desktop UI fixes — deep fork divergence",
+    "ci/release infra — selective reference only",
+    "forge fixes — pending forge feature decision"
   ],
   "feature_candidates": [
     "team/agent-team + tool-agent-team",
@@ -229,7 +229,7 @@
         "1f522605ed",
         "a4c933ad1f"
       ],
-      "reason": "agent/subagent lifecycle-hardening series targets upstream newer architecture (lifetimeSignal, named catalog, joins); local ReactLoopAgent is prior generation \u2014 needs design port as a unit, not individual guards"
+      "reason": "agent/subagent lifecycle-hardening series targets upstream newer architecture (lifetimeSignal, named catalog, joins); local ReactLoopAgent is prior generation — needs design port as a unit, not individual guards"
     }
   ],
   "not_applicable": [
@@ -296,50 +296,50 @@
     },
     {
       "feature": "subagent-oar",
-      "blocker": "experimental bridge; new third-party runtime deps (@earendil-works/pi-ai, pi-coding-agent, agentclientprotocol/sdk) \u2014 supply-chain cost vs optional capability"
+      "blocker": "experimental bridge; new third-party runtime deps (@earendil-works/pi-ai, pi-coding-agent, agentclientprotocol/sdk) — supply-chain cost vs optional capability"
     },
     {
       "feature": "session batch append API",
-      "blocker": "5-commit series rewiring session append paths already modified by local lifecycle reorder \u2014 needs dedicated port session"
+      "blocker": "5-commit series rewiring session append paths already modified by local lifecycle reorder — needs dedicated port session"
     }
   ],
   "feature_skipped": [
     {
       "feature": "terminal-controller",
-      "reason": "zero src changes rc.2\u2192rc.3 (version bump only); local creator-ownership authorization layer is deliberate divergence \u2014 upstream duplex-attach rewrite needs dedicated merge strategy if ever adopted"
+      "reason": "zero src changes rc.2→rc.3 (version bump only); local creator-ownership authorization layer is deliberate divergence — upstream duplex-attach rewrite needs dedicated merge strategy if ever adopted"
     }
   ],
   "feature_assessment": [
     {
       "feature": "tool-executor (native/ptc)",
-      "verdict": "deferred \u2014 architecture divergence",
-      "note": "upstream core/tools rebuilt around executor.ts/pipeline.ts seam (batch/contracts/error-codes/events); local tools is a 2007-line monolith with PTC inline. Absorbing executor packages requires re-architecting tools first \u2014 dedicated refactor project, not a sync batch."
+      "verdict": "deferred — architecture divergence",
+      "note": "upstream core/tools rebuilt around executor.ts/pipeline.ts seam (batch/contracts/error-codes/events); local tools is a 2007-line monolith with PTC inline. Absorbing executor packages requires re-architecting tools first — dedicated refactor project, not a sync batch."
     },
     {
       "feature": "office-kit + tool-office",
       "verdict": "feature-batch port",
-      "note": "replaces local office-to-pdf; requires libreoffice-kit 0.1.x\u21920.2.x bump (patch/notices/packaging cascade) + ctx.workspaceFiles seam decision (ctx.get optional but renderImages needs it; local uses host-apiproxy workspace-files RPC instead)"
+      "note": "replaces local office-to-pdf; requires libreoffice-kit 0.1.x→0.2.x bump (patch/notices/packaging cascade) + ctx.workspaceFiles seam decision (ctx.get optional but renderImages needs it; local uses host-apiproxy workspace-files RPC instead)"
     },
     {
       "feature": "agent-team",
       "verdict": "same-lineage merge candidate",
-      "note": "upstream team/agent-team shares file lineage (client/error/journal/task-board/task-graph/types/validation) with local experimental/agent-team; local adds mailbox/lifecycle/roster/activity/fold + ui-agent-team client. A real merge, not absorption \u2014 dedicated session."
+      "note": "upstream team/agent-team shares file lineage (client/error/journal/task-board/task-graph/types/validation) with local experimental/agent-team; local adds mailbox/lifecycle/roster/activity/fold + ui-agent-team client. A real merge, not absorption — dedicated session."
     },
     {
       "feature": "forge",
       "verdict": "deferred",
-      "note": "355 files \u2014 largest batch, dedicated session"
+      "note": "355 files — largest batch, dedicated session"
     }
   ],
   "tools_refactor_plan": {
-    "decision": "path A \u2014 follow upstream executor-seam rebuild (user approved)",
+    "decision": "path A — follow upstream executor-seam rebuild (user approved)",
     "stages": [
       "1. land upstream tools wholesale (batch/contracts/events/error-codes/executor/pipeline + rebuilt index/schema/json-schema/presentation)",
       "2. add tool-executor-native + tool-executor-ptc packages",
       "3. reapply local deltas: PtcProgramFormat script, tools/ptc-dispatch-log waterfall (spill-policy dep), isUnclassifiedCancellation, knownNames",
-      "4. rewire agent-loop: tool-calls.ts scheduler \u2192 ctx.tools.execute(ToolBatchInput), remove append helpers, consume ToolBatchResult",
-      "5. config migration: tools Config{mode,maxParallelSubCalls} \u2192 toolCallErrorDetail; ~25 cordis.yml remounts",
-      "6. error-class rewire: ToolNotFoundError/ToolOutputError \u2192 result-based; tests + api-catalog regen"
+      "4. rewire agent-loop: tool-calls.ts scheduler → ctx.tools.execute(ToolBatchInput), remove append helpers, consume ToolBatchResult",
+      "5. config migration: tools Config{mode,maxParallelSubCalls} → toolCallErrorDetail; ~25 cordis.yml remounts",
+      "6. error-class rewire: ToolNotFoundError/ToolOutputError → result-based; tests + api-catalog regen"
     ],
     "local_deltas": [
       "PtcProgramFormat script",
@@ -350,9 +350,20 @@
     "unchanged": "4 waterfall events identical names+payloads; defineTool/ToolArgsError/schema/json-schema/presentation identical"
   },
   "tool-executor": {
-    "decision": "absorbed_executor_seam_refactor",
-    "state": "in_progress",
-    "detail": "tools monolith -> upstream seam (contracts/executor/pipeline/batch/events/error-codes/schema/json-schema/presentation); added tool-executor-native + tool-executor-ptc packages; agent-loop tool-calls.ts now delegates to ctx.tools.execute(ToolBatchInput); ToolRuntime kept as deprecated alias of ToolsService; Config rejects removed keys (mode/maxParallelSubCalls) loud; compositions select executors via disabled toggles (base+sdk-minimal+headless+web-app updated, DSH_TOOLS_MODE preserved); snapshot cordis.yml synced upstream where present; agent-tool-presentation replaced by upstream deprecated shim; step-level tools.resolve() admission deferred (no when: consumers exist today)",
-    "pending": "test-file migration by subagents, catalog/doc regeneration, full build+test, sdk expected outputs"
+    "status": "absorbed",
+    "decision": "follow_upstream_refactor",
+    "commits": [
+      "0c19590cb4a",
+      "b2ab7036ca9",
+      "bba610dffe9",
+      "0d4c74b4dfc"
+    ],
+    "notes": "Adopted upstream executor-seam: core/tools split (executor/pipeline/contracts), NativeToolExecutor + PtcToolExecutor packages, batch ctx.tools.execute({calls}), PromptPresentation split (ctx.systemPrompt.tools). Testkit absorbed. All consumer specs migrated; fixtures mount executors explicitly. Verified: goal 162, compaction+session-title 126, subagent groups 1199, llm+persistence 1286, apiproxy+bundle 968, sweep 2047 — all green.",
+    "divergence": [
+      "fork keeps parentSession (local corpus-scan traversal/purge need the edge; upstream walks catalog projections); origin still not inherited",
+      "goal service throws goal projection is not registered on unregistered unit (upstream blind-derefs)",
+      "ptc-runtime-node publishes lib/configuration.js via packageFileExtras"
+    ],
+    "tool_office": "deferred — lands with tool-office consumer wiring next"
   }
 }
