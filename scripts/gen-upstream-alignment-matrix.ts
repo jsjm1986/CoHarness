@@ -138,6 +138,46 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
     targetAssessment: 'increment-review-required',
     localDisposition: 'Same-lineage merge at rc.3: exec.signal threaded into team_task_create/team_task_update. Upstream\'s leaner tool surface tracks its v2 service and is deferred with it.',
   },
+  'packages/sdk/server': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'sdk-run-commands re-evaluation at rc.3: upstream adds the session/query native-command pipeline (query-activity/query-content/query-input/user-questions, ~340 lines) plus protocol host-request types and client run() routing. Deferred — the local server is a different generation (Scoped<SubagentRuntime> carrier vs upstream AsyncLocalStorage; 395-line diff on 520 lines), and a correct port needs the protocol vocabulary, Python SDK mirror, and upgrade guide in one milestone. Re-enter through dsh-create-upgrade-guide.',
+  },
+  'packages/experimental/forge': {
+    status: 'reject',
+    targetAssessment: 'not-carried',
+    rejectReason: 'Upstream experimental change-request registry with shared status polling; no local consumer and the forge-github provider is platform-coupled. Re-evaluate only if a local change-request workflow gains a provider-neutral owner.',
+  },
+  'packages/experimental/forge-bundle': {
+    status: 'reject',
+    targetAssessment: 'not-carried',
+    rejectReason: 'Bundle composition of the forge lane; deferred with packages/experimental/forge.',
+  },
+  'packages/experimental/forge-github': {
+    status: 'reject',
+    targetAssessment: 'not-carried',
+    rejectReason: 'GitHub provider for the forge registry; platform-coupled and deferred with packages/experimental/forge.',
+  },
+  'packages/experimental/forge-session': {
+    status: 'reject',
+    targetAssessment: 'not-carried',
+    rejectReason: 'Session projection of the forge lane; deferred with packages/experimental/forge.',
+  },
+  'packages/experimental/client-ui-forge': {
+    status: 'reject',
+    targetAssessment: 'not-carried',
+    rejectReason: 'Browser face of the forge lane; deferred with packages/experimental/forge.',
+  },
+  'packages/experimental/subagent-oar': {
+    status: 'reject',
+    targetAssessment: 'not-carried',
+    rejectReason: 'Upstream experimental one-shot subagent OAR runtime; the fork subagent driver family covers the delegation space and OAR adds a second one-shot model without a consumer. Re-evaluate if a consumer requests upstream OAR semantics.',
+  },
+  'packages/experimental/tool-subagent-oar': {
+    status: 'reject',
+    targetAssessment: 'not-carried',
+    rejectReason: 'Tool face of the OAR lane; deferred with packages/experimental/subagent-oar.',
+  },
   'packages/api/session-controller': {
     status: 'reject',
     targetAssessment: 'not-carried',
