@@ -106,7 +106,12 @@ export interface Config {
   /** The explicit model-facing tool order (see dsh-system-prompt's `Config`). */
   toolOrder?: SystemPromptConfig['toolOrder']
   /** The tool executor selection — `native` schemas or `ptc` run_code plus a generated SDK. */
-  tools?: { mode?: 'native' | 'ptc'; maxParallelSubCalls?: number }
+  tools?: {
+    /** Executor mode: `native` executes tool schemas directly; `ptc` exposes run_code plus a generated SDK. */
+    mode?: 'native' | 'ptc'
+    /** Maximum parallel sub-calls a PTC batch may issue. */
+    maxParallelSubCalls?: number
+  }
   /** DeepSeek Harness home directory shared by shell context and local skill discovery. */
   dshHome?: string
   /** Deterministic fallback and accepted-title limits; omission uses the bundle's example policy. */

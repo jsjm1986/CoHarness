@@ -3,13 +3,13 @@
  * Isolated file so vi.mock of the MCP SDK doesn't pollute other test suites.
  */
 import assert from 'node:assert/strict'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, onTestFinished } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import type { Transport } from '@modelcontextprotocol/client'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { createScope } from '@deepseek-ai/dsh-scope'
-import type { Config } from '@deepseek-ai/dsh-mcp-client'
 
 // ---- Mock MCP SDK ----
 
@@ -24,8 +24,15 @@ const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotification
   ) => Promise<unknown>>()
   const mockSetNotificationHandler = vi.fn()
   class MockClient {
-    transport = {}
-    connect = mockConnect
+    transport: Transport | undefined
+    onclose: (() => void) | undefined
+    async connect(transport: Transport): Promise<void> {
+      this.transport = transport
+      const onclose = transport.onclose
+      transport.onclose = () => { onclose?.(); this.onclose?.() }
+      await transport.start()
+      await mockConnect.call(this)
+    }
     close = mockClose
     listTools = mockListTools
     callTool = mockCallTool
@@ -38,12 +45,27 @@ const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotification
   return { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, MockClient }
 })
 
-vi.mock('@modelcontextprotocol/client', () => ({
+vi.mock('@modelcontextprotocol/client', async importOriginal => ({
+  ...await importOriginal<typeof import('@modelcontextprotocol/client')>(),
   Client: MockClient,
-  StreamableHTTPClientTransport: vi.fn(),
+  StreamableHTTPClientTransport: vi.fn(function () {
+    return {
+      onclose: undefined as (() => void) | undefined,
+      start: () => Promise.resolve(),
+      send: () => Promise.resolve(),
+      close() { this.onclose?.(); return Promise.resolve() },
+    }
+  }),
 }))
 
-vi.mock('../src/transport.ts', () => ({ createTransport: vi.fn(() => ({})) }))
+vi.mock('../src/transport.ts', () => ({
+  createTransport: vi.fn(() => ({
+    onclose: undefined as (() => void) | undefined,
+    start: () => Promise.resolve(),
+    send: () => Promise.resolve(),
+    close() { this.onclose?.(); return Promise.resolve() },
+  })),
+}))
 
 // vi.mock is hoisted above static imports, so the module under test sees the
 // mocked SDK even through a static import.
@@ -53,6 +75,7 @@ import { apply, name, inject, mountMcpClient, Config as ConfigSchema } from '@de
 
 async function mountRegistry(): Promise<Context> {
   const ctx = new Context()
+  onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(NativeToolExecutor)
@@ -68,7 +91,7 @@ function sleep(ms: number): Promise<void> {
   return gate.promise
 }
 
-const stdioConfig: Config = {
+const stdioConfig = ConfigSchema({
   transport: 'stdio',
   serverName: 'srv',
   command: 'echo',
@@ -76,8 +99,9 @@ const stdioConfig: Config = {
   env: {},
   cwd: '',
   toolCallTimeoutMs: 60_000,
+  startupTimeoutMs: 30_000,
   failOnStartupError: false,
-}
+})
 
 // ---- Tests ----
 
@@ -125,6 +149,9 @@ describe('mcp-client plugin module exports', () => {
       serverName: 'srv',
       command: 'echo',
     } as never)
+    expect(omitted.startupTimeoutMs).toBeUndefined()
+    expect(omitted.closeTimeoutMs).toBe(5_000)
+    expect(omitted.expandTemplates).toBe(false)
     expect(omitted.reconnect).toEqual({ enabled: true, initialDelayMs: 500, maxDelayMs: 30_000, maxAttempts: 10 })
 
     const partial = ConfigSchema({
@@ -153,8 +180,8 @@ describe('apply (plugin lifecycle)', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     mockConnect.mockResolvedValue(undefined)
-    mockClose.mockImplementation(function (this: { onclose?: () => void }) {
-      this.onclose?.()
+    mockClose.mockImplementation(function (this: { transport?: Transport }) {
+      this.transport?.onclose?.()
       return Promise.resolve()
     })
     mockListTools.mockResolvedValue({
@@ -232,9 +259,9 @@ describe('apply (plugin lifecycle)', () => {
   it('closes the transport when its owner unloads during initial connection', async () => {
     const connecting: PromiseWithResolvers<undefined> = Promise.withResolvers()
     mockConnect.mockImplementation(() => connecting.promise)
-    mockClose.mockImplementation(function (this: { onclose?: () => void }) {
-      this.onclose?.()
-      connecting.resolve(undefined)
+    mockClose.mockImplementation(function (this: { transport?: Transport }) {
+      this.transport?.onclose?.()
+      connecting.resolve()
       return Promise.resolve()
     })
     const fiber = ctx.plugin({ name: 'mcp-pending-startup', inject, apply }, { ...stdioConfig, reconnect: { enabled: false } })
@@ -369,7 +396,7 @@ describe('apply (plugin lifecycle)', () => {
       failOnStartupError: true,
     })).rejects.toThrow('initial connection or tool synchronization failed')
 
-    expect(mockListTools).toHaveBeenCalledTimes(2)
+    expect(mockListTools).toHaveBeenCalledTimes(1)
     expect(ctx.tools.get('mcp__srv__remote')?.description).toBe('Foreign squatter')
     await ctx.fiber.dispose()
   })
@@ -427,8 +454,8 @@ describe('apply (plugin lifecycle)', () => {
   })
 
   it('effect disposer handles client.close failure gracefully', async () => {
-    mockClose.mockImplementation(function (this: { onclose?: () => void }) {
-      this.onclose?.()
+    mockClose.mockImplementation(function (this: { transport?: Transport }) {
+      this.transport?.onclose?.()
       return Promise.reject(new Error('already closed'))
     })
 
@@ -442,14 +469,15 @@ describe('apply (plugin lifecycle)', () => {
   })
 
   it('uses streamable-http config path', async () => {
-    const httpConfig: Config = {
+    const httpConfig = ConfigSchema({
       transport: 'streamable-http',
       serverName: 'web',
       url: 'http://localhost:3000/mcp',
       headers: { Authorization: 'Bearer x' },
       toolCallTimeoutMs: 30_000,
+      startupTimeoutMs: 30_000,
       failOnStartupError: false,
-    }
+    })
 
     await apply(ctx, httpConfig)
 

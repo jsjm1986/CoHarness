@@ -4,10 +4,13 @@ Status: implemented
 
 English | [中文](2026-11-14-upstream-fs-sync.zh.md)
 
-Three applicable upstream fixes were transplanted; the rest of the fs churn is
-feature-coupled and rides with the fs-patch/tool-executor absorption batch.
+## Problem
 
-## Applied
+Upstream `rc.2..v0.2.2-rc.3` carried fs fixes worth transplanting, but most of the fs churn is feature-coupled (patch vocabulary, tool-executor refactor) and could not be absorbed file-for-file without dragging in unported surfaces.
+
+## Decision
+
+Three applicable upstream fixes were transplanted; the rest of the fs churn rides with the fs-patch/tool-executor absorption batch.
 
 - **`~` expansion (`ae0dfd1003`, `32004176bf`)** — `expandHomePrefix` in
   `fs-local/fsio.ts`, applied only at the `resolve`/`lstat` entry points so a
@@ -24,7 +27,7 @@ feature-coupled and rides with the fs-patch/tool-executor absorption batch.
   `6b71dcad85`, `64ece4cac1`)** — already present: the PTC batch took the
   sandbox roots/policy files at rc.3 state (verified byte-identical).
 
-## Deferred to the feature batch
+## Consequences
 
 `fs-patch`, `apply_patch`, `patchText`/`deleteFile`/`moveFile` on `ctx.fs`
 (we have none of these APIs), the ToolArgsError/FsError refactor, and the
@@ -33,6 +36,10 @@ quadratic-trim fix (`88f5aa1d43`) lands with `fs-patch` itself.
 `SDK_RENDERERS`/`renderToolsSdk` were widened to `PtcProgramFormat` here only
 to keep the PTC batch's `'script'` format compiling; script-aware renderer
 content rides with tool-executor-ptc.
+
+## Alternatives considered
+
+- **Absorb the whole fs diff** — rejected: the mutation vocabulary, `apply_patch`, and executor refactors are a single entangled feature set; taking them piecemeal here would have shipped broken half-features instead of the fixes alone.
 
 ## Verification
 

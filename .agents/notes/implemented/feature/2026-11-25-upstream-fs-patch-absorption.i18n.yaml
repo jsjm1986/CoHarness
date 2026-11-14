@@ -3,20 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-fs-patch-absorption.md
 document:
-  en: 1ab40156544f94de44f8a8bf78f2893ce0176402
-  zh: bc64a51f13918c5d2c5784a789e4a43eb1d10e78
+  en: c563178ad9bdc8e42452866cebc96d17ac2b1c76
+  zh: c6757af8f91b6c2606cfe7f0c9f539d3e45cb8b3
 /agent-note-upstream-fs-patch-absorption:
-  en: ecc8e5e22edfc679
-  zh: 3db1b36d06f8e502
+  en: 01d4d0a13bc7884a
+  zh: 89c2568f2975b314
+/agent-note-upstream-fs-patch-absorption/problem:
+  en: f8438548f3c0b0ec
+  zh: 1ab9da7b70a63f9e
 /agent-note-upstream-fs-patch-absorption/decision:
-  en: 3ccb30635c0f7081
-  zh: 43df0850bb7138f8
-/agent-note-upstream-fs-patch-absorption/rationale:
-  en: 69e322b4b3d59f9f
-  zh: e987796b9d52d608
+  en: e4bb4600e1bb8f47
+  zh: 5c425d237d22baa4
+/agent-note-upstream-fs-patch-absorption/consequences:
+  en: e5caac7e416bfed8
+  zh: 5748eb33a1d7aed8
+/agent-note-upstream-fs-patch-absorption/alternatives-considered:
+  en: c6346c31c9149782
+  zh: 055452561d581989
 /agent-note-upstream-fs-patch-absorption/verification:
   en: 0ead61d1365c6efa
   zh: b86263fe72a5867c
-/agent-note-upstream-fs-patch-absorption/deferred:
-  en: 3bfdca28882e62db
-  zh: 932b01c01baaf00d

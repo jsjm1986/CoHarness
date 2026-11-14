@@ -4,13 +4,15 @@ Status: implemented
 
 English | [中文](2026-11-14-upstream-ptc-runtime-sync.zh.md)
 
-Upstream `rc.2..v0.2.2-rc.3` replaced the `persistent.ts`/channel design of
-`ptc-runtime-node` with a modular evaluator/execution/worker/RPC architecture
-(configuration, async-function/REPL/VM-Script evaluators, top-level-await
-rewriting, import hooks, bootstrap validation, nested tool-call budget).
-We adopted the package wholesale and replayed only the local API adaptations.
+## Problem
 
-## Local adaptations kept
+Upstream `rc.2..v0.2.2-rc.3` replaced the `persistent.ts`/channel design of `ptc-runtime-node` with a modular evaluator/execution/worker/RPC architecture; the local package still ran the old design and needed the refactor plus the API adaptations this fork requires.
+
+## Decision
+
+Adopted the package wholesale and replayed only the local API adaptations.
+
+Local adaptations kept:
 
 - `ctx.subprocess.spawn` is async here; every spawn call site awaits, and two
   tests that assumed a synchronous handle were adjusted
@@ -27,13 +29,17 @@ We adopted the package wholesale and replayed only the local API adaptations.
   rather than upstream's handle-returning variant.
 - Locale additions (`de/es/fr/ja/pt/ru`) were excluded by sync policy.
 
-## SessionStore lifecycle guards carried along
+## Consequences
 
 The upstream append guards the refactor relies on were backported to
 `packages/core/session`: a `pending | dispatching | complete | failed`
 announcement state machine and a `WeakMap<Session, SessionEntry | null>`
 attachment table, so appends after detach or before `session/created`
 completes fail loudly instead of silently going store-less.
+
+## Alternatives considered
+
+- **Cherry-pick only the evaluator pieces** — rejected: the configuration, evaluators, worker, and RPC modules interlock on the new architecture's shared types, so wholesale adoption with local adaptations replayed was the only safe path.
 
 ## Verification
 

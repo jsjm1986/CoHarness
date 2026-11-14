@@ -48,7 +48,12 @@ export interface Config {
   /** Explicit model-facing tool order (the system-prompt plugin's `toolOrder` config; see dsh-system-prompt). */
   toolOrder?: string[]
   /** Tool executor selection — `native` schemas or `ptc` run_code plus a generated SDK (forwarded through agent-spine-demo). */
-  tools?: { mode?: 'native' | 'ptc'; maxParallelSubCalls?: number }
+  tools?: {
+    /** Executor mode: `native` executes tool schemas directly; `ptc` exposes run_code plus a generated SDK. */
+    mode?: 'native' | 'ptc'
+    /** Maximum parallel sub-calls a PTC batch may issue. */
+    maxParallelSubCalls?: number
+  }
   /** DeepSeek Harness home directory exposed to bash and used for local skill discovery. */
   dshHome?: string
   /** Fallback session-title limits forwarded through agent-spine-demo. */

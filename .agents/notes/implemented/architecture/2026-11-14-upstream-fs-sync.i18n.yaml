@@ -3,17 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-fs-sync.md
 document:
-  en: 573f60575dd45a0b161c013e8528405982a5addc
-  zh: f1bb0fc734084864434f62865d98ce5f3d9b2bb2
+  en: 817afcc86d94cdfc85abba81dc12b8ff030af31a
+  zh: 35763cbb7e7724f72cb1c5397a180d838fa8ae0e
 /agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3:
-  en: 726e683678454b5b
-  zh: d9a88a0665f1b5e0
-/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/applied:
-  en: 5ff5e32b214e13e1
-  zh: 71e52559cc0321f1
-/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/deferred-to-the-feature-batch:
-  en: 27ab65896d5d735b
-  zh: 2775769a7a36f8ac
+  en: 87a3b54363f57e94
+  zh: 435a817cd6697642
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/problem:
+  en: 634f96390bf24b86
+  zh: 6036fc18d55cd591
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/decision:
+  en: 4b58bff710c1866b
+  zh: 66eea52d182053a9
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/consequences:
+  en: 3bd7acb7d87066e1
+  zh: 094e477e3b9d5e3a
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/alternatives-considered:
+  en: 6ec7140c20d7d048
+  zh: f8a7df058b4bf374
 /agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/verification:
   en: 655ab7e579b0a127
   zh: 58b848f8a387f6e3

@@ -1,5 +1,5 @@
-import { z } from 'zod'
 /** Real SDK negotiation, subscription, and cancellation through the connection supervisor. */
+import { z } from 'zod'
 
 import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
@@ -13,15 +13,16 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
 import { startConnection, resolveReconnectPolicy } from '../src/connection.ts'
-import type { Config } from '../src/index.ts'
+import { McpStatusCell } from '../src/status.ts'
+import { Config } from '../src/index.ts'
 
 const { mockTransport } = vi.hoisted(() => ({ mockTransport: vi.fn<() => Transport>() }))
 vi.mock('../src/transport.ts', () => ({ createTransport: mockTransport }))
 
-const config: Config = {
+const config = Config({
   transport: 'stdio', serverName: 'fixture', command: 'fixture', args: [], env: {}, cwd: '',
-  toolCallTimeoutMs: 60_000, failOnStartupError: true,
-}
+  toolCallTimeoutMs: 60_000, startupTimeoutMs: 30_000, failOnStartupError: true,
+})
 
 async function connect(server: McpServer, options?: { resources: true }): Promise<Context> {
   const ctx = new Context()
@@ -31,7 +32,7 @@ async function connect(server: McpServer, options?: { resources: true }): Promis
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   const serving = serveStdio(() => server, { transport: serverTransport })
   mockTransport.mockReturnValue(clientTransport)
-  const connection = startConnection(ctx, config, resolveReconnectPolicy({ enabled: false }, 'fixture'))
+  const connection = startConnection(ctx, config, resolveReconnectPolicy({ enabled: false }, 'fixture'), new McpStatusCell(() => {}))
   onTestFinished(async () => {
     await connection.dispose()
     await serving.close()
@@ -65,6 +66,8 @@ describe('modern MCP connections', () => {
     expect(names.toSorted()).toEqual([
       'list_mcp_resource_templates', 'list_mcp_resources', 'mcp__fixture__ping', 'read_mcp_resource',
     ])
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    onTestFinished(() => { debug.mockRestore() })
     for (const [name, expected] of [
       ['list_mcp_resources', { resources: [] }],
       ['list_mcp_resource_templates', { resourceTemplates: [] }],
@@ -75,6 +78,8 @@ describe('modern MCP connections', () => {
       })
       expect(result).toMatchObject({ isError: false, value: expected })
     }
+    // console.debug writes stdout, which the ACP profile reserves for JSON-RPC.
+    expect(debug).not.toHaveBeenCalled()
     const read = await executeToolFixture(ctx, {
       name: 'read_mcp_resource', arguments: { server: 'fixture', uri: 'memo://readme' },
       callId: ToolCallId('unsupported-resource-read'), signal: new AbortController().signal,

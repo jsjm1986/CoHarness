@@ -12,6 +12,7 @@ import { startConnection, resolveReconnectPolicy } from '../src/connection.ts'
 import * as McpClient from '../src/index.ts'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import { McpProcessOwner } from '../src/managed-stdio.ts'
+import { McpStatusCell } from '../src/status.ts'
 
 type ResourceRequest = Parameters<Context['resourceBudget']['acquire']>[0]
 type ResourceLease = Awaited<ReturnType<Context['resourceBudget']['acquire']>>
@@ -28,8 +29,8 @@ it('refuses MCP probe and serving processes when node admission is denied', asyn
     transport: 'stdio', serverName: 'admission-fixture',
     command: process.execPath,
     args: ['--import', import.meta.resolve('tsx/esm'), fileURLToPath(new URL('./fixture-server.ts', import.meta.url))],
-    env: {}, cwd: process.cwd(), toolCallTimeoutMs: 5_000, failOnStartupError: true,
-  }, resolveReconnectPolicy({ enabled: false }, 'admission fixture'))
+    env: {}, cwd: process.cwd(), toolCallTimeoutMs: 5_000, failOnStartupError: true, closeTimeoutMs: 5_000, expandTemplates: false,
+  }, resolveReconnectPolicy({ enabled: false }, 'admission fixture'), new McpStatusCell(() => {}))
   onTestFinished(async () => { await connection.dispose() })
   expect((await connection.ready).error).toBeInstanceOf(Error)
   expect(acquire).toHaveBeenCalledWith(expect.objectContaining({ kind: 'process', origin: 'infrastructure' }))
@@ -50,7 +51,7 @@ it('captures the nearest exact Agent scope before private allocation instead of 
   new class extends ResourceBudget { acquire = acquire }(ctx)
   const owner = new McpProcessOwner(nested.ctx, {
     transport: 'stdio', serverName: 'scoped', command: 'unused', args: [], env: {}, cwd: '',
-    toolCallTimeoutMs: 5_000, failOnStartupError: true,
+    toolCallTimeoutMs: 5_000, failOnStartupError: true, closeTimeoutMs: 5_000, expandTemplates: false,
   })
   onTestFinished(async () => { await owner.close() })
   await expect(owner.transport().start()).rejects.toThrow('captured MCP allocation refused')
@@ -74,8 +75,8 @@ it('returns a late cancelled startup grant before any MCP probe can allocate', a
   const connection = startConnection(ctx, {
     transport: 'stdio', serverName: 'queued', command: process.execPath,
     args: [fileURLToPath(new URL('./fixtures/negotiation-lifecycle.mjs', import.meta.url)), events, barrier],
-    env: {}, cwd: root, toolCallTimeoutMs: 5_000, failOnStartupError: true,
-  }, resolveReconnectPolicy({ enabled: false }, 'queued fixture'))
+    env: {}, cwd: root, toolCallTimeoutMs: 5_000, failOnStartupError: true, closeTimeoutMs: 5_000, expandTemplates: false,
+  }, resolveReconnectPolicy({ enabled: false }, 'queued fixture'), new McpStatusCell(() => {}))
   onTestFinished(async () => {
     grant.resolve(lease)
     try { await connection.dispose(); await ctx.fiber.dispose() } finally { await rm(root, { recursive: true, force: true }) }
@@ -91,7 +92,7 @@ it('returns a late cancelled startup grant before any MCP probe can allocate', a
   expect(uncertain).not.toHaveBeenCalled()
 })
 
-it('retains its namespace after enclosing-owner cleanup fails and releases it after a confirmed retry', async () => {
+it('records failed enclosing-owner cleanup in the status cell and releases the namespace', async () => {
   const ctx = new Context()
   let reportingUnavailable = false
   onTestFinished(async () => { reportingUnavailable = false; await ctx.fiber.dispose() })
@@ -121,12 +122,13 @@ it('retains its namespace after enclosing-owner cleanup fails and releases it af
   })
   expect(allocation).toBe(2)
   reportingUnavailable = true
-  await expect(mounted?.dispose()).rejects.toThrow('MCP managed process cleanup failed')
-  await fiber.dispose()
-  await expect(ctx.plugin(McpClient, config)).rejects.toThrow('already in use')
-  expect(allocation).toBe(2)
-  reportingUnavailable = false
+  // Cleanup failure is recorded in the fiber's status cell, not thrown: disposal
+  // still settles so the namespace effect releases the serverName reservation.
   await mounted?.dispose()
+  const status = McpClient.connectionStatusOf(fiber)
+  expect(status?.current()).toMatchObject({ state: 'closed' })
+  await fiber.dispose()
+  reportingUnavailable = false
   const replacement = await ctx.plugin(McpClient, config)
   await replacement.dispose()
 }, 20_000)
@@ -144,8 +146,8 @@ it.each(['method-not-found', 'close'])('discovers a legacy server without initia
     transport: 'stdio', serverName: 'admission-legacy', command: process.execPath,
     args: [fileURLToPath(new URL('./fixtures/negotiation-lifecycle.mjs', import.meta.url)), events, release, mode],
     env: {}, cwd: root, toolCallTimeoutMs: 5_000, failOnStartupError: true,
-    processGraceMs: 50, processCloseTimeoutMs: 5_000, startupTimeoutMs: 10_000,
-  }, resolveReconnectPolicy({ enabled: false }, 'admission fixture'))
+    processGraceMs: 50, processCloseTimeoutMs: 5_000, startupTimeoutMs: 10_000, closeTimeoutMs: 5_000, expandTemplates: false,
+  }, resolveReconnectPolicy({ enabled: false }, 'admission fixture'), new McpStatusCell(() => {}))
   onTestFinished(async () => { await connection.dispose() })
   expect(await connection.ready).toEqual({})
   const observed = (await readFile(events, 'utf8')).trim().split('\n')
@@ -174,8 +176,8 @@ it('admits and drains its real modern discovery before publishing its serving pr
     transport: 'stdio', serverName: 'admission-modern', command: process.execPath,
     args: ['--import', import.meta.resolve('tsx/esm'), fileURLToPath(new URL('./fixture-server.ts', import.meta.url))],
     env: {}, cwd: process.cwd(), toolCallTimeoutMs: 5_000, failOnStartupError: true,
-    processGraceMs: 50, processCloseTimeoutMs: 5_000, startupTimeoutMs: 10_000,
-  }, resolveReconnectPolicy({ enabled: false }, 'admission fixture'))
+    processGraceMs: 50, processCloseTimeoutMs: 5_000, startupTimeoutMs: 10_000, closeTimeoutMs: 5_000, expandTemplates: false,
+  }, resolveReconnectPolicy({ enabled: false }, 'admission fixture'), new McpStatusCell(() => {}))
   onTestFinished(async () => { await connection.dispose() })
   expect(await connection.ready).toEqual({})
   expect(allocated).toBe(2)

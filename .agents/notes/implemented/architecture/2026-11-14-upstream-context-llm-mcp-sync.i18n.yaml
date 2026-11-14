@@ -3,20 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-context-llm-mcp-sync.md
 document:
-  en: 8be5b11bad8247d697b5e00a2ccc23456d3c5f9d
-  zh: a3c7d88d96c95bc7814e9f86eaaf2fe13c708093
+  en: 3b2194a7fccbe31dd2c9afdc3524b2aade964abe
+  zh: 08d32f2c7f01d6dc1fef36b5cf8a99038032aaf4
 /agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3:
-  en: 9360d684b9006cae
-  zh: 2780871eb1a9a607
-/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/backported-fixes:
-  en: fe3085c8dc8417e6
-  zh: 91a7ef8fb4ecbada
-/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/rejected-n-a:
-  en: 4619ecbecf304c48
-  zh: 3a925a9e4e5f9b4c
-/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/test-contract-changes:
-  en: 7ddfbd2f47470073
-  zh: ccc89b9893204767
+  en: 842c73d6543f9380
+  zh: 97e1f28aa2c919b0
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/problem:
+  en: 60c40e23bb5bc3b0
+  zh: 498d089e1b044d08
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/decision:
+  en: 98fdeaa4c07c363f
+  zh: 48826355eba53bf9
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/consequences:
+  en: 1241b4cbd3045a0d
+  zh: bc16a6c1cefc6b77
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/alternatives-considered:
+  en: 2f728fd89913832f
+  zh: e7e0a51ed8734875
 /agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/verification:
   en: 2343dee723ef68b6
   zh: cb3f30b7a6e68059

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/mcp/mcp-client/README.md
 document:
-  en: 877e643ae74d65af85101249864e541b83049a26
-  zh: c53303910974f51e678a47c2bc9bf5a5dc4dd0a5
+  en: 6b1e39c331c7c94f7051fa02cb82a6705d012645
+  zh: 9a7590bdc69c8a0d23448b1a92e3b7d3dd0e7b0b
 /:
   en: 6440e0efb151c0fa
   zh: d767308eb95b9d3f
@@ -21,8 +21,8 @@ document:
   en: e77871d58566601a
   zh: 01d5c6eabc8d2db9
 /deepseek-ai-dsh-mcp-client/use-this-package/minimal-configuration:
-  en: fd9a1b03d9295188
-  zh: 335433b704035c8f
+  en: 20f4ad9f169fbb35
+  zh: 839e5a69dc59e86f
 /deepseek-ai-dsh-mcp-client/use-this-package/tool-naming-and-coexistence:
   en: 75ae9745d5b04796
   zh: 8ae5b8ca6e73296e
@@ -30,8 +30,11 @@ document:
   en: cad16c6102b0e316
   zh: 03841eea6ead54cd
 /deepseek-ai-dsh-mcp-client/use-this-package/startup-updates-and-reconnection:
-  en: 7f395e8e0052dbf8
-  zh: 8d4ef444759fd10d
+  en: 213d2d67088beccc
+  zh: b360aafce96369d6
+/deepseek-ai-dsh-mcp-client/use-this-package/runtime-templates-and-credentials:
+  en: d8f149e5f85f9aa7
+  zh: f09894633ab19d25
 /deepseek-ai-dsh-mcp-client/understand-the-implementation:
   en: d33ddd080880b3f5
   zh: 64328f5239c26752
@@ -39,14 +42,14 @@ document:
   en: dc5647187103cb24
   zh: 0602112369690c32
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/source-map:
-  en: e10738d2a7322c43
-  zh: 4cc25b53df2b1b9e
+  en: 2c207c414dc14259
+  zh: 85556104e3be8882
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/lifecycle-and-sync:
-  en: ae9029b48b2a2e4e
-  zh: 048f08361b799667
+  en: c1f262c246cd8587
+  zh: 005a015a0c1cc64d
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/tool-execution-internals:
-  en: 5cadf27b570a0bd5
-  zh: d491784a74431ae2
+  en: 8006c6813439c332
+  zh: f15b3fb8f95eb6b7
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/environment-scrubbing-stdio:
   en: 482df2d6bcf532c5
   zh: acafad89548e703d
@@ -93,8 +96,8 @@ document:
   en: 189198f7ace2a991
   zh: 712a7ceed6bd6f41
 /deepseek-ai-dsh-mcp-client/known-limitations-and-deferred-work:
-  en: c262e008d77d0bc7
-  zh: 1f196d876d620f10
+  en: 9543a975b53497f5
+  zh: 8d9441a6273ecbbe
 /deepseek-ai-dsh-mcp-client/known-limitations-and-deferred-work/dev-note:
-  en: c36e7029dbe21c2c
-  zh: 6550376740cfc788
+  en: b0d31ca273c8d454
+  zh: 6a86a335c6f39f0e

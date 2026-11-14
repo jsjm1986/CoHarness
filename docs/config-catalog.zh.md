@@ -40,8 +40,8 @@ export interface AcpConfig {
 
 ## `@deepseek-ai/dsh-acp-demo`
 
-- `refs`: [`agentCore`](../packages/examples/agent-spine-demo/src/index.ts) · [`JsonlCompression`](../packages/session/session-persistence-jsonl/src/index.ts) · [`ToolsConfig`](#deepseek-aidsh-tools)
-- `source`: [`packages/examples/acp-demo/src/index.ts:40`](../packages/examples/acp-demo/src/index.ts)
+- `refs`: [`agentCore`](../packages/examples/agent-spine-demo/src/index.ts) · [`JsonlCompression`](../packages/session/session-persistence-jsonl/src/index.ts)
+- `source`: [`packages/examples/acp-demo/src/index.ts:39`](../packages/examples/acp-demo/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -63,8 +63,13 @@ export interface Config {
   persona?: string
   /** Explicit model-facing tool order (the system-prompt plugin's `toolOrder` config; see dsh-system-prompt). */
   toolOrder?: string[]
-  /** Tool-registry config — its presentation `mode` (forwarded through agent-spine-demo; see dsh-tools). */
-  tools?: ToolsConfig
+  /** Tool executor selection — `native` schemas or `ptc` run_code plus a generated SDK (forwarded through agent-spine-demo). */
+  tools?: {
+    /** Executor mode: `native` executes tool schemas directly; `ptc` exposes run_code plus a generated SDK. */
+    mode?: 'native' | 'ptc'
+    /** Maximum parallel sub-calls a PTC batch may issue. */
+    maxParallelSubCalls?: number
+  }
   /** DeepSeek Harness home directory exposed to bash and used for local skill discovery. */
   dshHome?: string
   /** Fallback session-title limits forwarded through agent-spine-demo. */
@@ -242,8 +247,8 @@ export type PresetTrust = 'system' | 'user'
 
 ## `@deepseek-ai/dsh-agent-spine-demo`
 
-- `refs`: [`AgentLoopConfig`](#deepseek-aidsh-agent-loop) · [`GoalDomainConfig`](#deepseek-aidsh-goal) · [`JobsConfig`](#deepseek-aidsh-jobs-local) · [`SessionTitleConfig`](#deepseek-aidsh-session-title) · [`SkillFileSystem`](../packages/skill/skill-filesystem/src/index.ts) · [`SkillRegistryConfig`](#deepseek-aidsh-skill) · [`SystemPromptConfig`](#deepseek-aidsh-system-prompt) · [`toolBash`](../packages/shell/tool-bash/src/index.ts) · [`toolGoal`](../packages/goal/tool-goal/src/index.ts) · [`toolJobs`](../packages/jobs/tool-jobs/src/index.ts) · [`ToolsConfig`](#deepseek-aidsh-tools) · [`toolSkill`](../packages/skill/tool-skill/src/index.ts) · [`workspaceContext`](../packages/context/agent-instructions/src/index.ts)
-- `source`: [`packages/examples/agent-spine-demo/src/index.ts:87`](../packages/examples/agent-spine-demo/src/index.ts)
+- `refs`: [`AgentLoopConfig`](#deepseek-aidsh-agent-loop) · [`GoalDomainConfig`](#deepseek-aidsh-goal) · [`JobsConfig`](#deepseek-aidsh-jobs-local) · [`SessionTitleConfig`](#deepseek-aidsh-session-title) · [`SkillFileSystem`](../packages/skill/skill-filesystem/src/index.ts) · [`SkillRegistryConfig`](#deepseek-aidsh-skill) · [`SystemPromptConfig`](#deepseek-aidsh-system-prompt) · [`toolBash`](../packages/shell/tool-bash/src/index.ts) · [`toolGoal`](../packages/goal/tool-goal/src/index.ts) · [`toolJobs`](../packages/jobs/tool-jobs/src/index.ts) · [`toolSkill`](../packages/skill/tool-skill/src/index.ts) · [`workspaceContext`](../packages/context/agent-instructions/src/index.ts)
+- `source`: [`packages/examples/agent-spine-demo/src/index.ts:89`](../packages/examples/agent-spine-demo/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -287,8 +292,13 @@ export interface Config {
   personaSuffix?: SystemPromptConfig['personaSuffix']
   /** The explicit model-facing tool order (see dsh-system-prompt's `Config`). */
   toolOrder?: SystemPromptConfig['toolOrder']
-  /** The tool registry's config — its presentation `mode` (see dsh-tools' `Config`). */
-  tools?: ToolsConfig
+  /** The tool executor selection — `native` schemas or `ptc` run_code plus a generated SDK. */
+  tools?: {
+    /** Executor mode: `native` executes tool schemas directly; `ptc` exposes run_code plus a generated SDK. */
+    mode?: 'native' | 'ptc'
+    /** Maximum parallel sub-calls a PTC batch may issue. */
+    maxParallelSubCalls?: number
+  }
   /** DeepSeek Harness home directory shared by shell context and local skill discovery. */
   dshHome?: string
   /** Deterministic fallback and accepted-title limits; omission uses the bundle's example policy. */
@@ -339,11 +349,13 @@ export interface GoalConfig {
 ## `@deepseek-ai/dsh-agent-tool-presentation`
 
 - `inject`: `tools`
-- `refs`: [`ToolPresentationMode`](subsystems/tools.zh.md)
-- `source`: [`packages/core/agent-tool-presentation/src/index.ts:38`](../packages/core/agent-tool-presentation/src/index.ts)
+- `source`: [`packages/core/agent-tool-presentation/src/index.ts:25`](../packages/core/agent-tool-presentation/src/index.ts)
 
 ```ts config-catalog
-/** Plugin config. */
+/**
+ * Plugin config.
+ * @deprecated Select the native or PTC executor plugin directly instead of configuring a mode.
+ */
 export interface Config {
   /**
    * The form this agent's model sees. `native` sends every visible schema,
@@ -352,7 +364,7 @@ export interface Config {
    * without this row already gets, so an omitted value would mean the row was
    * composed for nothing.
    */
-  mode: ToolPresentationMode
+  mode: 'native' | 'ptc'
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-tool-presentation -->
@@ -1337,7 +1349,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-fs-local`
 
-- `source`: [`packages/fs/fs-local/src/index.ts:46`](../packages/fs/fs-local/src/index.ts)
+- `source`: [`packages/fs/fs-local/src/index.ts:51`](../packages/fs/fs-local/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the local filesystem backend. */
@@ -2214,7 +2226,7 @@ export interface LspLocalServerConfig {
 ## `@deepseek-ai/dsh-mcp-client`
 
 - `inject`: `tools`
-- `source`: [`packages/mcp/mcp-client/src/index.ts:113`](../packages/mcp/mcp-client/src/index.ts)
+- `source`: [`packages/mcp/mcp-client/src/index.ts:139`](../packages/mcp/mcp-client/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for one stdio or Streamable HTTP MCP server. */
@@ -2246,6 +2258,10 @@ export interface StdioConfig {
   startupTimeoutMs?: number
   /** Timeout per tool call or resource request in milliseconds. */
   toolCallTimeoutMs: number
+  /** Budget for transport closure and local cleanup, in milliseconds (default 5000). */
+  closeTimeoutMs: number
+  /** Resolve `${credential:…}` in transport strings at runtime and redact resolved values from diagnostics (default false). */
+  expandTemplates: boolean
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
   /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
@@ -2270,6 +2286,12 @@ export interface StreamableHttpConfig {
   headers: Record<string, string>
   /** Timeout per tool call or resource request in milliseconds. */
   toolCallTimeoutMs: number
+  /** Optional budget for one connection attempt plus its initial tool sync, in milliseconds. */
+  startupTimeoutMs?: number
+  /** Budget for transport closure and local cleanup, in milliseconds (default 5000). */
+  closeTimeoutMs: number
+  /** Resolve `${credential:…}` in transport strings at runtime and redact resolved values from diagnostics (default false). */
+  expandTemplates: boolean
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
   /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
@@ -2280,13 +2302,13 @@ export interface StreamableHttpConfig {
 
 /** Automatic reconnect policy for one MCP server connection. */
 export interface ReconnectConfig {
-  /** Reconnect automatically after a lost connection (default true). */
+  /** Whether reconnect attempts run after a lost connection (default true). */
   enabled?: boolean
-  /** First reconnect delay in milliseconds; doubles per consecutive failed attempt (default 500). */
+  /** Delay before the first reconnect attempt, in milliseconds (default 500). */
   initialDelayMs?: number
-  /** Backoff ceiling in milliseconds; also the uptime after which the attempt budget resets (default 30000). */
+  /** Maximum reconnect delay cap for exponential backoff, in milliseconds (default 30000). */
   maxDelayMs?: number
-  /** Consecutive failed attempts per outage before giving up for good (default 10). */
+  /** Consecutive failed attempts tolerated before giving up (default 10). */
   maxAttempts?: number
 }
 ```
@@ -3489,7 +3511,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-spill-policy`
 
 - `inject`: `tools`
-- `source`: [`packages/spill/spill-policy/src/index.ts:25`](../packages/spill/spill-policy/src/index.ts)
+- `source`: [`packages/spill/spill-policy/src/index.ts:26`](../packages/spill/spill-policy/src/index.ts)
 
 ```ts config-catalog
 /** Optional result-retention budget. */
@@ -3948,7 +3970,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:261`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:267`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */
@@ -4158,13 +4180,32 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-bash-persistent -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-executor-ptc -->
+<a id="deepseek-aidsh-tool-executor-ptc"></a>
+
+## `@deepseek-ai/dsh-tool-executor-ptc`
+
+- `inject`: `tools` · `systemPrompt` · `ptcRuntime`
+- `source`: [`packages/core/tool-executor-ptc/src/config.ts:5`](../packages/core/tool-executor-ptc/src/config.ts)
+
+```ts config-catalog
+/** Program execution limits. */
+export interface Config {
+  /** Nested tool-call attempts per minute of resolved runtime timeout, including failed calls. */
+  maxSubCallsPerMinute: number
+  /** Maximum overlapping concurrency-safe program subcalls. */
+  maxParallelSubCalls: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-executor-ptc -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-fs -->
 <a id="deepseek-aidsh-tool-fs"></a>
 
 ## `@deepseek-ai/dsh-tool-fs`
 
 - `inject`: `tools` · `fs` · `systemPrompt` · `workingDirectory`
-- `source`: [`packages/fs/tool-fs/src/index.ts:26`](../packages/fs/tool-fs/src/index.ts)
+- `source`: [`packages/fs/tool-fs/src/index.ts:27`](../packages/fs/tool-fs/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config (all optional — `Config` supplies the defaults). */
@@ -4177,6 +4218,8 @@ export interface Config {
   write?: boolean
   /** Register `edit` and its guidance. Defaults to true. */
   edit?: boolean
+  /** Register `apply_patch` and its guidance beside `edit`. Defaults to false; shipped compositions set it on their `tool-fs` rows. */
+  applyPatch?: boolean
   /** Default and maximum number of lines returned by one `read` call. */
   readLimit?: number
   /** Maximum characters returned for a single line before truncation. */
@@ -4299,6 +4342,31 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-lsp -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-office -->
+<a id="deepseek-aidsh-tool-office"></a>
+
+## `@deepseek-ai/dsh-tool-office`
+
+- `inject`: `tools` · `fs` · `workingDirectory` · `agents`
+- `source`: [`packages/document/tool-office/src/index.ts:39`](../packages/document/tool-office/src/index.ts)
+
+```ts config-catalog
+/** Activation skills and render bounds; lower deployment attachment limits take precedence. */
+export interface Config {
+  /** Skill names whose successful loading admits all three tools from the following step. */
+  activationSkills: string[]
+  /** Maximum images one render returns, including worksheet fragments. */
+  maxImages: number
+  /** Maximum pixels of each image. */
+  maxImagePixels: number
+  /** Maximum width and height of each image in pixels. */
+  maxImageDimension: number
+  /** Maximum PNG bytes across all images of one render. */
+  maxImageBytes: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-office -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-present -->
 <a id="deepseek-aidsh-tool-present"></a>
@@ -4664,43 +4732,6 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-workspace-dependencies -->
-
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tools -->
-<a id="deepseek-aidsh-tools"></a>
-
-## `@deepseek-ai/dsh-tools`
-
-- `inject`: `systemPrompt`
-- `source`: [`packages/core/tools/src/index.ts:688`](../packages/core/tools/src/index.ts)
-
-```ts config-catalog
-/** Plugin config: how the registered tools are presented to the model. */
-export interface Config {
-  /**
-   * Model presentation. `native` (default) sends every visible schema; `ptc`
-   * sends only `run_code` plus a generated SDK prompt and collapses the
-   * executor to the same surface (a model-direct call may only name
-   * `run_code`; `run_code` SDK sub-dispatches keep every visible tool).
-   * PTC mode requires a `ctx.ptcRuntime` whose `language`
-   * has a registered SDK renderer (TypeScript or Python) and fails prompt
-   * assembly when it is absent or has no renderer. Under `ptc`, native names
-   * in `toolOrder` are invalid.
-   */
-  mode?: ToolPresentationMode
-  /**
-   * Concurrency cap for a `run_code` program's overlapping sub-calls
-   * (default 10, the loop scheduler's own default). Sub-calls follow the
-   * native scheduling contract — only calls whose tools classify
-   * concurrency-safe overlap; exclusive calls form barriers — so `1`
-   * restores strictly serial dispatch. Must be a positive integer.
-   */
-  maxParallelSubCalls?: number
-}
-
-/** How the registry presents its tools to the model (see {@link Config.mode}). */
-export type ToolPresentationMode = 'native' | 'ptc'
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-tools -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-typert-loader -->
 <a id="deepseek-aidsh-typert-loader"></a>
@@ -5244,10 +5275,12 @@ export interface Config {
 | `@deepseek-ai/dsh-terminal` | — | [`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts) |
 | `@deepseek-ai/dsh-tool-call-timeout-policy` | `tools` | [`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts) |
 | `@deepseek-ai/dsh-tool-cordis` | `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` | [`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts) |
+| `@deepseek-ai/dsh-tool-executor-native` | `tools` | [`packages/core/tool-executor-native/src/index.ts`](../packages/core/tool-executor-native/src/index.ts) |
 | `@deepseek-ai/dsh-tool-memory` | `memory` · `tools` · `systemPrompt` | [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts) |
 | `@deepseek-ai/dsh-tool-schedule` | `tools` | [`packages/schedule/tool-schedule/src/index.ts`](../packages/schedule/tool-schedule/src/index.ts) |
 | `@deepseek-ai/dsh-tool-subagent-control` | `tools` · `subagents` | [`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts) |
 | `@deepseek-ai/dsh-tool-working-directory` | `tools` · `workingDirectory` | [`packages/session/tool-working-directory/src/index.ts`](../packages/session/tool-working-directory/src/index.ts) |
+| `@deepseek-ai/dsh-tools` | `systemPrompt` | [`packages/core/tools/src/index.ts`](../packages/core/tools/src/index.ts) |
 | `@deepseek-ai/dsh-user-questions` | — | [`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts) |
 | `@deepseek-ai/dsh-userdoc-context` | `agents` · `sessions` | [`packages/context/userdoc-context/src/index.ts`](../packages/context/userdoc-context/src/index.ts) |
 | `@deepseek-ai/dsh-webhook` | `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` | [`packages/webhook/webhook/src/index.ts`](../packages/webhook/webhook/src/index.ts) |
@@ -5356,6 +5389,7 @@ export interface Config {
 | `@deepseek-ai/dsh-ssh-helper-runtime` | — | [`packages/ssh/ssh-helper-runtime/src/index.ts`](../packages/ssh/ssh-helper-runtime/src/index.ts) |
 | `@deepseek-ai/dsh-subagent-in-process-driver` | — | [`packages/subagent/subagent-in-process-driver/src/index.ts`](../packages/subagent/subagent-in-process-driver/src/index.ts) |
 | `@deepseek-ai/dsh-timeout` | — | [`packages/util/timeout/src/index.ts`](../packages/util/timeout/src/index.ts) |
+| `@deepseek-ai/dsh-tool-testkit` | — | [`packages/test-support/tool-testkit/src/index.ts`](../packages/test-support/tool-testkit/src/index.ts) |
 | `@deepseek-ai/dsh-typert-generator` | — | [`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts) |
 | `@deepseek-ai/dsh-typert-protocol` | — | [`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts) |
 | `@deepseek-ai/dsh-typert-registry` | — | [`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts) |

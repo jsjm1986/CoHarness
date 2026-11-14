@@ -1,12 +1,16 @@
-# Agent Note: 从 rc.2..v0.2.2-rc.3 吸纳的上游 fs 修复
+# Agent Note：从 rc.2..v0.2.2-rc.3 吸纳的上游 fs 修复
 
-Status: implemented
+状态：已实现
 
 [English](2026-11-14-upstream-fs-sync.md) | 中文
 
-三条适用的上游修复已移植；其余 fs 变更与新功能耦合，随 fs-patch/tool-executor 吸纳批次处理。
+## 问题
 
-## 已应用
+上游 `rc.2..v0.2.2-rc.3` 携带值得移植的 fs 修复，但多数 fs 变更与新功能耦合（patch 词汇、tool-executor 重构），无法在未移植其余面的情况下逐文件吸纳。
+
+## 决定
+
+三条适用的上游修复已移植；其余 fs 变更随 fs-patch/tool-executor 吸纳批次处理。
 
 - **`~` 展开（`ae0dfd1003`、`32004176bf`）**——在 `fs-local/fsio.ts` 中新增
   `expandHomePrefix`，仅在 `resolve`/`lstat` 入口应用：请求的 `~`/`~/`
@@ -22,13 +26,17 @@ Status: implemented
   `6b71dcad85`、`64ece4cac1`）**——已就位：PTC 批已将 sandbox roots/policy
   文件同步到 rc.3 状态（逐字节一致已验证）。
 
-## 推迟到功能批
+## 后果
 
 `fs-patch`、`apply_patch`、`ctx.fs` 的 `patchText`/`deleteFile`/`moveFile`
 （本地均无这些 API）、ToolArgsError/FsError 重构与 mutation 默认值工作是一个
 纠缠的功能集；patch-parser 二次方 trim 修复（`88f5aa1d43`）随 `fs-patch` 本体
 落地。此处仅将 `SDK_RENDERERS`/`renderToolsSdk` 放宽到 `PtcProgramFormat` 以维持
 PTC 批 `'script'` 格式可编译；感知 script 的渲染内容随 tool-executor-ptc 同步。
+
+## 备选方案
+
+- **吸纳整个 fs diff**——拒绝：mutation 词汇、`apply_patch` 与 executor 重构是一个纠缠的功能集；在此零散引入只会交付半成品功能，而非单独的修复。
 
 ## 验证
 

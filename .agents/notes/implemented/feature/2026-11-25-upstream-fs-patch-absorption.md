@@ -1,22 +1,27 @@
 # Agent Note: Upstream fs-patch absorption
 
+Status: implemented
+
 English | [中文](2026-11-25-upstream-fs-patch-absorption.zh.md)
 
-Status: implemented
+## Problem
+
+The upstream rc.3 apply-patch feature requires a Codex-style patch parser and LF text updater, but the local tree had no equivalent primitive and the apply_patch tool cannot land without it.
 
 ## Decision
 
-Absorb upstream `packages/fs/fs-patch` (dsh-v0.2.2-rc.3) verbatim: a pure Codex-style patch parser (`parsePatch`) and LF text updater (`applyHunks`) with structured match failures, zero runtime dependencies.
+Absorb upstream `packages/fs/fs-patch` (dsh-v0.2.2-rc.3) verbatim: a pure patch parser (`parsePatch`) and LF text updater (`applyHunks`) with structured match failures and zero runtime dependencies. The library is registered in `tsconfig.host.json` and the fs group README table.
 
-## Rationale
+## Consequences
 
-The library is self-contained — no `ctx.fs`, cordis runtime, or provider coupling — so wholesale file-for-file absorption carries no porting risk and lands the apply_patch primitive the fs feature batch depends on (upstream `tool-fs` `apply_patch` plumbing builds on it). The local `ctx.fs` Service Definition currently exposes no move/delete/patch operation, so the library ships unconsumed until the apply_patch tool lands; it is registered in `tsconfig.host.json` and the fs group README table as a library package.
+- `dsh-fs-patch` ships as a library package consumed by [the fs mutation vocabulary and apply_patch batch](2026-11-25-upstream-fs-mutations-and-apply-patch.md): `fs-local`'s `patchText` and the `apply_patch` tool build on `parsePatch`/`applyHunks`.
+- The parser enforces LF-only input and reports `ParsePatchError`/`ApplyHunksError` with hunk and line context; callers surface them as structured tool output.
+
+## Alternatives considered
+
+- **Hand-port only the hunk-application half** — rejected: the parser and updater interlock on the same structured-failure contract, and the file has no `ctx.fs`, cordis runtime, or provider coupling, so file-for-file absorption carried no porting risk.
 
 ## Verification
 
 - `pnpm exec vitest run packages/fs/fs-patch` — 147 tests pass (upstream suite unchanged).
 - `pnpm exec tsc --noEmit -p packages/fs/fs-patch/tsconfig.json` — clean.
-
-## Deferred
-
-- Consumed by [the fs mutation vocabulary and apply_patch Agent Note](2026-11-25-upstream-fs-mutations-and-apply-patch.md): `ctx.fs` `patchText`/`deleteFile`/`moveFile` and the `apply_patch` tool build on this library.

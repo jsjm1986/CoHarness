@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-25-upstream-mcp-client-generation-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-mcp-client-generation-sync.md
+document:
+  en: 2ca4a156545ee2ec00e485a93fc0a5484d94b94a
+  zh: 1478328354ed2f17c797666bbe693eb9a5d5aaea
+/agent-note-upstream-mcp-client-generation-sync:
+  en: 27074a0dfce9019e
+  zh: 60ed43a3553d80f4
+/agent-note-upstream-mcp-client-generation-sync/problem:
+  en: dd0e6112fadd2fa9
+  zh: a90966091b4e7d89
+/agent-note-upstream-mcp-client-generation-sync/decision:
+  en: 3f7dc7ad3dd2e833
+  zh: 4bc6b848ee909986
+/agent-note-upstream-mcp-client-generation-sync/consequences:
+  en: ea82e279537f0d81
+  zh: ef8d32ebf68511b0
+/agent-note-upstream-mcp-client-generation-sync/alternatives-considered:
+  en: 5e4a74a87f8338f0
+  zh: 7af4f774c4ea3efd
+/agent-note-upstream-mcp-client-generation-sync/verification:
+  en: 8eeef6766a535408
+  zh: 0ce220021d7fcaac

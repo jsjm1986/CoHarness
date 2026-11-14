@@ -3,17 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-office-kit-absorption.md
 document:
-  en: c6fad0bc826bd5653522e86d2b1605ee6c4328af
-  zh: 4215e5d1aab5b254869bb075501d55f88e747ad6
+  en: f550414fb1ef32e088eec1a3ef7b0292ad70f7fd
+  zh: d1f5b52fd316b5d0af7b551616b404df22a79d8f
 /agent-note-upstream-office-kit-absorption-replacing-office-to-pdf:
-  en: 39a1da50a15efbaf
-  zh: 17c607d5a1d711f9
+  en: 9cb10b895a360f6c
+  zh: 08a73ba034bb0502
+/agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/problem:
+  en: ced06db145fa26cf
+  zh: 02d8427c1bb25cef
 /agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/decision:
-  en: 823ab1e1559ed8fe
-  zh: 8c8efaded45a0775
-/agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/port-adaptations:
-  en: 173afab73616964c
-  zh: 41a9dc3a85fbc48f
+  en: 49f9220799cb4816
+  zh: ea3b656f56b9856b
+/agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/consequences:
+  en: 6b890e480786d860
+  zh: e26065340e3a5794
+/agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/alternatives-considered:
+  en: 3645706a1cd1ce1e
+  zh: 748dc390f47779ae
 /agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/verification:
   en: 7760c68bc6264313
-  zh: 57431264704aba55
+  zh: 228f0407b146942f

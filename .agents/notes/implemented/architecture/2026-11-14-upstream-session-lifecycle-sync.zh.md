@@ -1,13 +1,16 @@
-# Agent Note: 上游 session 生命周期同步（rc.2..v0.2.2-rc.3）
+# Agent Note：上游 session 生命周期同步（rc.2..v0.2.2-rc.3）
 
-Status: implemented
+状态：已实现
 
 [English](2026-11-14-upstream-session-lifecycle-sync.md) | 中文
 
-store 持有的写入重排与 released-checkpoint 修复已移植；批量 `append` API 与
-projection-frame 重构推迟到功能吸纳批。
+## 问题
 
-## 已应用
+上游 `rc.2..v0.2.2-rc.3` 在 store 所有权下重排了 session 写入并修复 released-checkpoint 处理；本地 session 主干需要这些修复，而批量 `append` API 与 projection-frame 重构规模过大，无法同批引入。
+
+## 决定
+
+store 持有的写入重排与 released-checkpoint 修复已移植；批量 `append` API 与 projection-frame 重构推迟到功能吸纳批。
 
 - **Session 先于 setup 发布（`49a7a75d75`）**——`PreparedAgent.publish` 改为
   `initializeAndPublish(source, setup?)`：Session 先 enter 并 announce，
@@ -31,7 +34,7 @@ projection-frame 重构推迟到功能吸纳批。
   因此已结算命令的 `command/done` 无法落盘时记录 warn 并仍返回结算结果，
   而不是抛出 append 失败。
 
-## 推迟
+## 后果
 
 - 批量 `append` API（`b5969f9e8d`、`748c53b865`、`b3d570cdf8`、`143fabbc34`、
   `5e77db2d5c`、`7f6b7ba4b6`、`1e7f265cfd`、`e00af4f994`、`e767bef144`、
@@ -39,12 +42,17 @@ projection-frame 重构推迟到功能吸纳批。
   隔离；属功能面，随 tool-executor 批吸纳。
 - `945006c984`（每个已提交事件一帧 projection frame）与 `fcca540841`
   （统一运行时 projection 读取）——面向 wire/消费者的重构，推迟到功能评估。
+- spec fixture 采用上游模式（agent-loop testkit harness、
+  `ctx.agents.create`、对异步 config 启动使用 `vi.waitFor`、fixture agent
+  走 `agents.register`）。
+
+## 备选方案
+
+- **在此一并引入批量 `append` API**——拒绝：它是与 tool-executor 批共享的功能面，捆进生命周期修复会把重排语义藏在无关的 API 扩张之后。
 
 ## 验证
 
 对 session、agent、agent-loop、commands、permission-presets、
 session-projection、session-projection-cache、session-persistence、
 session-persistence-jsonl 执行 `pnpm exec vitest run`：105 个文件、2544
-个测试全绿。spec fixture 采用上游模式（agent-loop testkit harness、
-`ctx.agents.create`、对异步 config 启动使用 `vi.waitFor`、fixture agent
-走 `agents.register`）。
+个测试全绿。
