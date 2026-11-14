@@ -12,6 +12,12 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../interaction/user-questions"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

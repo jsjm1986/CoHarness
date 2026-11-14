@@ -21,7 +21,22 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../goal/goal"
+    },
+    {
+      "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../interaction/user-approval"
+    },
+    {
+      "path": "../../interaction/user-questions"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session/session-persistence"
     },
     {
       "path": "../../llm/llm-deepseek"
