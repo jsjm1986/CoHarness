@@ -670,6 +670,17 @@ function errorInfo(error: unknown): ToolErrorInfo | undefined {
   }
 }
 
+/** Whether a value thrown after cancellation is that cancellation and carries no identity of its own. */
+function isUnclassifiedCancellation(error: unknown, signal: AbortSignal): boolean {
+  if (errorInfo(error) !== undefined) return false
+  try {
+    return error === signal.reason || (error instanceof Error && error.name === 'AbortError')
+  } catch {
+    // A value whose prototype or `name` cannot be read is not a recognizable cancellation.
+    return false
+  }
+}
+
 /** How the registry presents its tools to the model (see {@link Config.mode}). */
 export type ToolPresentationMode = 'native' | 'ptc'
 
@@ -1594,7 +1605,9 @@ export class ToolRuntime extends Service {
         ? toolAbortedResult(result)
         : result
     } catch (error: unknown) {
-      return toolErrorResult(error)
+      return isAborted(signal) && isUnclassifiedCancellation(error, signal)
+        ? toolErrorResult(error, { name: 'AbortError', code: TOOL_ABORTED })
+        : toolErrorResult(error)
     } finally {
       fused.dispose()
       exec.signal = wrapperSignal
@@ -1916,8 +1929,7 @@ function createExecutionToken(): ToolExecutionToken {
   return Symbol('dsh.tool.execution') as ToolExecutionToken
 }
 
-function toolErrorResult(error: unknown): ToolExecutionResult {
-  const info = errorInfo(error)
+function toolErrorResult(error: unknown, info = errorInfo(error)): ToolExecutionResult {
   const message = errorMessage(error)
   return {
     content: [{ type: 'text', text: `Error: ${message}` }],

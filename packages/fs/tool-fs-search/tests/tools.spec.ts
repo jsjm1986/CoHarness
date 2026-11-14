@@ -30,6 +30,7 @@ import {
   buildGlobCommand,
   buildGrepCommand,
   formatGrepMatches,
+  parseGrepArgs,
   parseGrepMatches,
   presentGlobCall,
   presentGlobResult,
@@ -1078,6 +1079,14 @@ describe('grep results', () => {
     expect(text(await call(ctx, 'grep', { pattern: 'x', include: '*.ts,*.js' }))).toContain('comma-separated list')
   })
 
+  it('treats an exact empty include as omitted', async () => {
+    const { ctx, subprocess } = await setup()
+    subprocess.handler = () => runResult('', { exitCode: 1 })
+    const result = await call(ctx, 'grep', { pattern: 'x', include: '' })
+    expect(result.isError).toBe(false)
+    expect(parseGrepArgs({ pattern: 'x', include: '' })).toEqual({ pattern: 'x' })
+  })
+
   it('accepts a whitespace-only pattern (a legitimate regex) and brace alternation in include', async () => {
     const { ctx, subprocess } = await setup()
     subprocess.handler = () => runResult('', { exitCode: 1 })
@@ -1128,6 +1137,7 @@ describe('presentation', () => {
   it('grep titles carry the pattern, target, and include filter', () => {
     expect(presentGrepCall({ pattern: 'todo' })).toMatchObject({ card: 'generic', title: 'Grep todo', kind: 'search' })
     expect(presentGrepCall({ pattern: 'todo', path: 'src', include: '*.ts' }).title).toBe('Grep todo in src (*.ts)')
+    expect(presentGrepCall({ pattern: 'todo', path: 'src', include: '' }).title).toBe('Grep todo in src')
   })
 
   it('grep projects a search card from a real execute, grouped by file with total and truncation', async () => {

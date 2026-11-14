@@ -471,20 +471,26 @@ describe('goal tool state transitions', () => {
     const invalidCreate = await execute(ctx, 'create_goal', { objective: ' ' }, root.agent)
     expect(invalidCreate.error?.info?.code).toBe('GOAL_INVALID_OBJECTIVE')
     const created = ctx.goals.create(root.agent, { objective: 'valid' })
-    const replacement = await execute(ctx, 'update_goal', {
-      goal_id: created.id,
-      revision: created.revision,
-      action: 'pause',
-      objective: 'not valid for pause',
+    const invalidEdit = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'edit', objective: ' ',
+      blocked_reason: 'ignored',
     }, root.agent)
-    expect(replacement.error?.info?.code).toBe('GOAL_TOOL_INVALID_UPDATE')
-    const terminalUpdate = await execute(ctx, 'update_goal', {
-      goal_id: created.id,
-      revision: created.revision,
-      action: 'complete',
-      max_goal_rounds: 2,
+    expect(invalidEdit.error?.info?.code).toBe('GOAL_INVALID_OBJECTIVE')
+    const invalidCap = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'edit', max_goal_rounds: -1,
+      blocked_reason: 'ignored',
     }, root.agent)
-    expect(terminalUpdate.error?.info?.code).toBe('GOAL_TOOL_INVALID_UPDATE')
+    expect(invalidCap.error?.info?.code).toBe('GOAL_INVALID_MAX_ROUNDS')
+    const stale = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision + 1, action: 'complete',
+      objective: 'ignored', max_goal_rounds: 12, blocked_reason: 'ignored',
+    }, root.agent)
+    expect(stale.error?.info?.code).toBe('GOAL_STALE_REVISION')
+    const wrongType = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete', max_goal_rounds: '12',
+    }, root.agent)
+    expect(wrongType.isError).toBe(true)
+    expect(ctx.goals.get(root.agent)).toMatchObject({ objective: 'valid', revision: created.revision, phase: 'active' })
     const blockedWithoutReason = await execute(ctx, 'update_goal', {
       goal_id: created.id, revision: created.revision, action: 'blocked',
     }, root.agent)
@@ -493,25 +499,48 @@ describe('goal tool state transitions', () => {
       goal_id: created.id, revision: created.revision, action: 'blocked', blocked_reason: ' ',
     }, root.agent)
     expect(blockedWithEmptyReason.error?.info?.code).toBe('GOAL_TOOL_INVALID_UPDATE')
-    const completeWithReason = await execute(ctx, 'update_goal', {
-      goal_id: created.id, revision: created.revision, action: 'complete', blocked_reason: 'Not a blocker.',
-    }, root.agent)
-    expect(completeWithReason.error?.info?.code).toBe('GOAL_TOOL_INVALID_UPDATE')
-    const editWithReason = await execute(ctx, 'update_goal', {
-      goal_id: created.id,
-      revision: created.revision,
-      action: 'edit',
-      objective: 'still valid',
-      blocked_reason: 'Not valid for edit.',
-    }, root.agent)
-    expect(editWithReason.error?.info?.code).toBe('GOAL_TOOL_INVALID_UPDATE')
     const malformedRef = await execute(ctx, 'update_goal', {
       goal_id: '', revision: 0, action: 'edit', objective: 'x',
     }, root.agent)
     expect(malformedRef.error?.info?.code).toBe('GOAL_TOOL_INVALID_UPDATE')
   })
 
-  it('accepts only empty fillers in fields unused by the selected action', async () => {
+  it.each(['edit', 'pause', 'resume', 'complete', 'blocked'] as const)(
+    'ignores populated fields unused by action %s without changing other goal values',
+    async (action) => {
+      const { ctx, root } = await harness()
+      try {
+        openTurn(root, { kind: 'user' })
+        const goal = ctx.goals.create(root.agent, { objective: 'keep this objective', maxGoalRounds: 4 })
+        if (action === 'resume') ctx.goals.disarm(root.agent)
+        const changesBefore = root.session.snapshotEvents().filter(event => event.type === 'goal/change').length
+        const result = await execute(ctx, 'update_goal', {
+          goal_id: goal.id,
+          revision: goal.revision,
+          action,
+          objective: 'replacement objective',
+          max_goal_rounds: 12,
+          blocked_reason: 'a concrete blocker',
+        }, root.agent)
+        const expected = {
+          objective: action === 'edit' ? 'replacement objective' : 'keep this objective',
+          maxGoalRounds: action === 'edit' ? 12 : 4,
+          revision: goal.revision + 1,
+          phase: action === 'pause' ? 'paused' : action === 'complete' || action === 'blocked' ? action : 'active',
+        }
+        expect(resultGoal(result)).toMatchObject(expected)
+        expect(ctx.goals.get(root.agent)).toMatchObject(expected)
+        expect(ctx.goals.get(root.agent)?.blockedReason).toEqual(action === 'blocked'
+          ? { code: 'model-reported', message: 'a concrete blocker' }
+          : undefined)
+        expect(root.session.snapshotEvents().filter(event => event.type === 'goal/change')).toHaveLength(changesBefore + 1)
+      } finally {
+        await ctx.fiber.dispose()
+      }
+    },
+  )
+
+  it('accepts empty fillers in fields unused by the selected action', async () => {
     const { ctx, root } = await harness()
     openTurn(root, { kind: 'user' })
     let goal = ctx.goals.create(root.agent, { objective: 'valid' })

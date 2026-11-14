@@ -1701,6 +1701,85 @@ describe('ToolRuntime', () => {
     })
   })
 
+  it('classifies an unclassified cancellation thrown by a started tool body as ABORTED', async () => {
+    const ctx = await setup()
+    const entered = Promise.withResolvers<undefined>()
+    ctx.tools.register({
+      ...echoTool,
+      name: 'reason-thrower',
+      execute(_args, exec) {
+        entered.resolve(undefined)
+        return new Promise<string>((_resolve, reject) => {
+          exec.signal.addEventListener('abort', () => { reject(exec.signal.reason) }, { once: true })
+        })
+      },
+    })
+    const controller = new AbortController()
+    const pending = ctx.tools.execute({
+      callId: ToolCallId('reason-thrown'), name: 'reason-thrower', arguments: {}, signal: controller.signal,
+    })
+    await entered.promise
+    controller.abort('caller reason value')
+
+    await expect(pending).resolves.toMatchObject({
+      isError: true,
+      error: { info: { name: 'AbortError', code: TOOL_ABORTED } },
+    })
+  })
+
+  it('classifies an AbortError thrown by a started tool body as ABORTED', async () => {
+    const ctx = await setup()
+    const entered = Promise.withResolvers<undefined>()
+    ctx.tools.register({
+      ...echoTool,
+      name: 'abort-thrower',
+      execute(_args, exec) {
+        entered.resolve(undefined)
+        return new Promise<string>((_resolve, reject) => {
+          exec.signal.addEventListener('abort', () => { reject(new DOMException('body cancelled', 'AbortError')) }, { once: true })
+        })
+      },
+    })
+    const controller = new AbortController()
+    const pending = ctx.tools.execute({
+      callId: ToolCallId('abort-thrown'), name: 'abort-thrower', arguments: {}, signal: controller.signal,
+    })
+    await entered.promise
+    controller.abort('caller cancel')
+
+    await expect(pending).resolves.toMatchObject({
+      isError: true,
+      error: { info: { name: 'AbortError', code: TOOL_ABORTED } },
+    })
+  })
+
+  it('keeps a plain body error unclassified even when the signal is already aborted', async () => {
+    const ctx = await setup()
+    const entered = Promise.withResolvers<undefined>()
+    ctx.tools.register({
+      ...echoTool,
+      name: 'plain-thrower',
+      execute(_args, exec) {
+        entered.resolve(undefined)
+        return new Promise<string>((_resolve, reject) => {
+          exec.signal.addEventListener('abort', () => { reject(new Error('unrelated domain failure')) }, { once: true })
+        })
+      },
+    })
+    const controller = new AbortController()
+    const pending = ctx.tools.execute({
+      callId: ToolCallId('plain-thrown'), name: 'plain-thrower', arguments: {}, signal: controller.signal,
+    })
+    await entered.promise
+    controller.abort('caller cancel')
+
+    await expect(pending).resolves.toMatchObject({
+      isError: true,
+    })
+    const result = await pending
+    expect(result.isError && result.error?.info?.code).not.toBe(TOOL_ABORTED)
+  })
+
   it('materializes a pre-aborted call and publishes one result without entering pipeline phases', async () => {
     const ctx = await setup()
     const phases = { pre: 0, around: 0, body: 0, post: 0, result: 0 }
