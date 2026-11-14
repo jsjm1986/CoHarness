@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sandbox/sandbox-local/README.md
 document:
-  en: 81deba99f4e9a66b450e24404c6e553f45ae0a25
-  zh: 1db8276044a4dd1f1432db8ae7bfc57c049a8f73
+  en: b11494b3ea990107c95c3511a66704e4202a8061
+  zh: 460b6db03c8f3a212182a967be30b4025fd20dc5
 /:
   en: f172767891b86bf4
   zh: e66e1cc8c96cc259
@@ -39,8 +39,8 @@ document:
   en: f0c44248c2ca6acc
   zh: 554e9f706671d222
 /deepseek-ai-dsh-sandbox-local/understand-the-implementation/platform-profiles:
-  en: 79f939a26d26ea02
-  zh: 68b38b7b445ad1cc
+  en: c4380fa811eb8b44
+  zh: 913bff0d4940699f
 /deepseek-ai-dsh-sandbox-local/understand-the-implementation/denial-and-runner-failure-dialects:
   en: 62adfc9229c656cc
   zh: 11b1534b6d61e5de

@@ -8,10 +8,10 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { LAUNCHER_FAILURE_EXIT } from '@deepseek-ai/node-addon-system/landlock-run'
 import { SANDBOX_UNAVAILABLE, SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
@@ -20,7 +20,7 @@ import {
   LocalSandboxProvider,
 } from '@deepseek-ai/dsh-sandbox-local'
 import type { Config } from '@deepseek-ai/dsh-sandbox-local'
-import { bwrapProfileArgs, landlockProfileArgs, seatbeltProfileArgs } from '../src/profiles.ts'
+import { bwrapProfileArgs, hiddenCredentialRoots, landlockProfileArgs, seatbeltProfileArgs } from '../src/profiles.ts'
 
 const RO: SandboxPolicy = { mode: 'read-only', workspaceRoot: '/ws' }
 const WW: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: '/ws' }
@@ -74,11 +74,11 @@ const SEATBELT_RO_PROFILE = '(version 1) (allow default) (deny file-write*) (all
 
 describe('profile dialects', () => {
   it('bwrap read-only: whole tree read-only with fresh /dev and private PID-scoped /proc, no writable mounts', () => {
-    expect(bwrapProfileArgs(RO)).toEqual(['--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent'])
+    expect(bwrapProfileArgs(RO, [])).toEqual(['--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent'])
   })
 
   it('bwrap workspace-write: adds an ephemeral /tmp and rebinds the workspace root', () => {
-    expect(bwrapProfileArgs(WW)).toEqual([
+    expect(bwrapProfileArgs(WW, [])).toEqual([
       '--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent',
       '--tmpfs', '/tmp', '--bind', '/ws', '/ws',
     ])
@@ -87,11 +87,69 @@ describe('profile dialects', () => {
   it('landlock read-only: readable tree plus a writable /dev/null, nothing else', () => {
     // /dev/null specifically, NOT /dev: a whole-/dev grant would let confined
     // commands write real host paths beneath it (/dev/shm) under read-only.
-    expect(landlockProfileArgs(RO)).toEqual(['--ro', '/', '--rw', '/dev/null'])
+    expect(landlockProfileArgs(RO, [])).toEqual(['--ro', '/', '--rw', '/dev/null'])
   })
 
   it('landlock workspace-write: adds the host /tmp and the workspace root', () => {
-    expect(landlockProfileArgs(WW)).toEqual(['--ro', '/', '--rw', '/dev/null', '--rw', '/tmp', '--rw', '/ws'])
+    expect(landlockProfileArgs(WW, [])).toEqual(['--ro', '/', '--rw', '/dev/null', '--rw', '/tmp', '--rw', '/ws'])
+  })
+
+  it('bwrap hides service-credential directories behind empty tmpfs mounts', () => {
+    expect(bwrapProfileArgs(RO, ['/run/credentials'])).toEqual([
+      '--ro-bind', '/', '/', '--tmpfs', '/run/credentials', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent',
+    ])
+  })
+
+  it('landlock omits service-credential directories from the read allow-list', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-landlock-hidden-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    mkdirSync(join(root, 'credentials', 'unit'), { recursive: true })
+    mkdirSync(join(root, 'state'))
+    const reads = landlockProfileArgs(RO, [join(root, 'credentials')])
+      .flatMap((arg, index, all) => arg === '--ro' ? [all[index + 1]!] : [])
+    expect(reads).toContain(join(root, 'state'))
+    expect(reads).not.toContain('/')
+    expect(reads.some(path => path === join(root, 'credentials') || path.startsWith(join(root, 'credentials') + '/'))).toBe(false)
+    expect(reads.some(path => root.startsWith(path + '/') || path === root)).toBe(false)
+  })
+
+  it('hiddenCredentialRoots keeps existing absolute credential directories without nested duplicates', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-credentials-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const unit = join(root, 'unit')
+    mkdirSync(unit)
+    const roots = hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: unit }, join(root, 'absent-system-root'))
+    expect(roots).toEqual([unit])
+    expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: join(root, 'missing') }, join(root, 'absent-system-root'))).toEqual([])
+    expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: 'relative' }, join(root, 'absent-system-root'))).toEqual([])
+    expect(hiddenCredentialRoots({ CREDENTIALS_DIRECTORY: unit }, root)).toEqual([root])
+  })
+
+  it('landlock keeps unrelated roots while expanding every hidden sibling', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-landlock-multi-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    for (const name of ['a', 'b', 'c']) mkdirSync(join(root, name))
+    const hidden = [join(root, 'a'), join(root, 'b')]
+    const reads = landlockProfileArgs(RO, hidden)
+      .flatMap((arg, index, all) => arg === '--ro' ? [all[index + 1]!] : [])
+    expect(reads).toContain(join(root, 'c'))
+    for (const dir of hidden) {
+      expect(reads.some(path => path === dir || path.startsWith(dir + '/'))).toBe(false)
+    }
+  })
+
+  it('landlock defaults to hiding the process credential directory when systemd provides one', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-landlock-env-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const unit = join(root, 'unit')
+    mkdirSync(unit)
+    mkdirSync(join(root, 'other'))
+    vi.stubEnv('CREDENTIALS_DIRECTORY', unit)
+    onTestFinished(() => { vi.unstubAllEnvs() })
+    const reads = landlockProfileArgs(RO)
+      .flatMap((arg, index, all) => arg === '--ro' ? [all[index + 1]!] : [])
+    expect(reads).not.toContain(unit)
+    expect(reads).toContain(join(root, 'other'))
   })
 
   it('seatbelt read-only: allow-default with every file write denied except the /dev/null literal', () => {
