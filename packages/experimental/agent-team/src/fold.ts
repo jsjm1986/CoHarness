@@ -85,6 +85,7 @@ const teamTaskSnapshotSchema = z.object({
   description: z.string(),
   status: z.enum(['pending', 'in_progress', 'completed', 'deleted']),
   ownerId: sessionIdSchema.optional(),
+  ownerName: z.string().optional(),
   blockedBy: z.array(teamTaskIdSchema),
   writeScopes: z.array(z.string()),
 }).strict() as z.ZodType<TeamTaskSnapshot>

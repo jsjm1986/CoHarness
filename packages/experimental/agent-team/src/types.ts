@@ -91,6 +91,8 @@ export interface TeamTaskSnapshot {
   readonly description: string
   readonly status: TeamTaskStatus
   readonly ownerId?: SessionId
+  /** Immutable member name captured at assignment; absent on tasks owned before this field existed. */
+  readonly ownerName?: string
   readonly blockedBy: TeamTaskId[]
   readonly writeScopes: string[]
 }

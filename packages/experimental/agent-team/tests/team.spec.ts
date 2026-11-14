@@ -738,6 +738,63 @@ describe('Team shared task DAG', () => {
     await Promise.all([waitNoAgent(ctx, alpha.id), waitNoAgent(ctx, beta.id)])
   })
 
+  it('persists owner attribution at claim and reassignment and clears it on release', async () => {
+    const { ctx, lead } = await setup(['hang'])
+    const member = await spawn(ctx, lead, 'alpha')
+    const alpha = await waitRunning(ctx, member.member.id)
+
+    const created = await ctx.agentTeams.createTask(lead, { subject: 'owned', description: 'owned task' })
+    const claimed = await ctx.agentTeams.updateTask(alpha, {
+      taskId: created.id,
+      expectedRevision: created.revision,
+      action: 'claim',
+    })
+    expect(claimed.ownerName).toBe('alpha')
+    const foldAfterClaim = foldTeam(lead.id, lead.session.snapshotEvents())
+    expect(foldAfterClaim.tasks.get(created.id)).toMatchObject({ ownerId: alpha.id, ownerName: 'alpha' })
+
+    const released = await ctx.agentTeams.updateTask(alpha, {
+      taskId: created.id,
+      expectedRevision: claimed.revision,
+      action: 'release',
+    })
+    const foldAfterRelease = foldTeam(lead.id, lead.session.snapshotEvents())
+    const releasedSnapshot = foldAfterRelease.tasks.get(created.id)!
+    expect(released.status).toBe('pending')
+    expect(releasedSnapshot.ownerId).toBeUndefined()
+    expect(releasedSnapshot.ownerName).toBeUndefined()
+
+    const reassigned = await ctx.agentTeams.updateTask(lead, {
+      taskId: created.id,
+      expectedRevision: released.revision,
+      action: 'reassign',
+      owner: 'alpha',
+    })
+    expect(reassigned.ownerName).toBe('alpha')
+    expect(foldTeam(lead.id, lead.session.snapshotEvents()).tasks.get(created.id))
+      .toMatchObject({ ownerId: alpha.id, ownerName: 'alpha' })
+
+    ctx.agentTeams.interrupt(lead, 'alpha')
+    await waitNoAgent(ctx, alpha.id)
+  })
+
+  it('rejects task create and update before append when the caller signal is aborted', async () => {
+    const { ctx, lead } = await setup([])
+    const aborted = AbortSignal.abort()
+    await expect(ctx.agentTeams.createTask(lead, {
+      subject: 'cancelled', description: 'cancelled task',
+    }, aborted)).rejects.toThrow(AbortSignal.abort().reason)
+    expect(ctx.agentTeams.listTasks(lead)).toEqual([])
+
+    const created = await ctx.agentTeams.createTask(lead, { subject: 'kept', description: 'kept task' })
+    await expect(ctx.agentTeams.updateTask(lead, {
+      taskId: created.id,
+      expectedRevision: created.revision,
+      action: 'claim',
+    }, aborted)).rejects.toThrow(AbortSignal.abort().reason)
+    expect(ctx.agentTeams.getTask(lead, created.id).status).toBe('pending')
+  })
+
   it('rejects malformed scopes and every invalid dependency relation', async () => {
     const { ctx, lead } = await setup([])
     const first = await ctx.agentTeams.createTask(lead, { subject: 'one', description: 'one' })

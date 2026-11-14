@@ -305,7 +305,7 @@ function install(agent: Agent, ctx: Context, config: Required<Config>): () => vo
           description: args.description,
           ...args.blocked_by === undefined ? {} : { blockedBy: args.blocked_by.map(TeamTaskId) },
           ...args.write_scopes === undefined ? {} : { writeScopes: args.write_scopes },
-        })
+        }, exec.signal)
       },
     })))
 
@@ -385,7 +385,7 @@ function install(agent: Agent, ctx: Context, config: Required<Config>): () => vo
           ...args.blocked_by === undefined ? {} : { blockedBy: args.blocked_by.map(TeamTaskId) },
           ...args.write_scopes === undefined ? {} : { writeScopes: args.write_scopes },
           ...args.owner === undefined ? {} : { owner: args.owner },
-        })
+        }, exec.signal)
       },
     })))
   } catch (error: unknown) {

@@ -43,11 +43,13 @@ export class TeamTaskBoard {
    * Create one unowned pending task in the Team Lead log.
    * @param membership - exact caller membership resolved by the Team roster.
    * @param request - task text, blockers, and advisory write scopes.
+   * @param signal - cancellation before append; omitted means no cancellation.
    * @returns the revision-one task view.
    */
-  async create(membership: TeamMembership, request: CreateTeamTaskRequest): Promise<TeamTaskView> {
+  async create(membership: TeamMembership, request: CreateTeamTaskRequest, signal?: AbortSignal): Promise<TeamTaskView> {
     const { root } = membership
     return this.journal.transact(root.id, async () => {
+      signal?.throwIfAborted()
       const state = this.journal.state(root)
       const active = [...state.tasks.values()].filter(task => task.status !== 'deleted').length
       if (active >= this.maxTasks) {
@@ -67,6 +69,7 @@ export class TeamTaskBoard {
         writeScopes: this.writeScopes(request.writeScopes ?? []),
       }
       this.assertTaskGraph(state, task)
+      signal?.throwIfAborted()
       await this.journal.appendAndFlush(root, 'team/task', { version: 1, teamId: TeamId(root.id), task })
       return this.taskView(root, state, task)
     })
@@ -104,15 +107,18 @@ export class TeamTaskBoard {
    * @param caller - exact live Team member authorizing the mutation.
    * @param membership - caller role and exact live Lead.
    * @param request - task identity, expected revision, action, and action fields.
+   * @param signal - cancellation before append; omitted means no cancellation.
    * @returns the committed next task revision.
    */
   async update(
     caller: Agent,
     membership: TeamMembership,
     request: UpdateTeamTaskRequest,
+    signal?: AbortSignal,
   ): Promise<TeamTaskView> {
     const root = membership.root
     return this.journal.transact(root.id, async () => {
+      signal?.throwIfAborted()
       const state = this.journal.state(root)
       const current = state.tasks.get(request.taskId)
       if (current === undefined) throw new TeamError(`team task "${request.taskId}" not found`, 'TEAM_TASK_NOT_FOUND')
@@ -137,7 +143,7 @@ export class TeamTaskBoard {
           if (current.status !== 'pending' || !this.taskReady(state, current)) {
             throw new TeamError(`team task "${current.id}" is not ready to claim`, 'TEAM_TASK_BLOCKED')
           }
-          next = { ...current, status: 'in_progress', ownerId: caller.id }
+          next = { ...current, status: 'in_progress', ownerId: caller.id, ownerName: membership.name }
           break
         case 'release':
           authorizeOwner()
@@ -187,7 +193,7 @@ export class TeamTaskBoard {
           }
           if (!this.taskReady(state, current)) throw new TeamError(`team task "${current.id}" is blocked`, 'TEAM_TASK_BLOCKED')
           const assignee = resolveActiveMember(root, state, request.owner)
-          next = { ...current, status: 'in_progress', ownerId: assignee.id }
+          next = { ...current, status: 'in_progress', ownerId: assignee.id, ownerName: assignee.name }
           break
         }
         case 'delete': {
@@ -209,6 +215,7 @@ export class TeamTaskBoard {
         revision: current.revision + 1,
       }
       this.assertTaskGraph(state, task)
+      signal?.throwIfAborted()
       await this.journal.appendAndFlush(root, 'team/task', { version: 1, teamId: TeamId(root.id), task })
       return this.taskView(root, state, task)
     })
@@ -256,9 +263,9 @@ export class TeamTaskBoard {
     return task.blockedBy.every(id => state.tasks.get(id)?.status === 'completed')
   }
 
-  /** Remove an optional owner field under exactOptionalPropertyTypes. */
+  /** Remove both optional owner fields under exactOptionalPropertyTypes. */
   private withoutOwner(task: TeamTaskSnapshot): TeamTaskSnapshot {
-    const { ownerId: _ownerId, ...without } = task
+    const { ownerId: _ownerId, ownerName: _ownerName, ...without } = task
     return without
   }
 
@@ -269,11 +276,11 @@ export class TeamTaskBoard {
    * do not change when that snapshot is appended.
    */
   private taskView(root: Agent, state: TeamFoldState, task: TeamTaskSnapshot): TeamTaskView {
+    // Persisted ownerName keeps attribution after the owner leaves the roster;
+    // historical tasks without it still resolve through the live member map.
     const ownerName = task.ownerId === undefined
       ? undefined
-      : task.ownerId === root.id
-        ? 'lead'
-        : state.members.get(task.ownerId)?.name
+      : task.ownerName ?? (task.ownerId === root.id ? 'lead' : state.members.get(task.ownerId)?.name)
     const warnings = new Set<string>()
     for (const other of state.tasks.values()) {
       if (other.id === task.id || other.status !== 'in_progress') continue

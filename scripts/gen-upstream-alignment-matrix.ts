@@ -128,6 +128,16 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
     targetAssessment: 'not-carried',
     rejectReason: 'Upstream removed the package between the baseline and rc.1 and folded its Web UI mount into agent-team-profile; the fork followed the fold and removed its copy.',
   },
+  'packages/team/agent-team': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Same-lineage merge at rc.3 onto the fork experimental/agent-team: ported durable ownerName attribution on task snapshots (claim/reassign persist, release strips, fold schema accepts) and caller AbortSignal through service→board→Remote→tool exec. Deferred upstream\'s v2 rewrite — ProjectionHandle state, team/mode flag, descendant-catalog membership, Agent-inbox messaging — which replaces the fork\'s durable roster/mailbox/fold and version-1 event schema.',
+  },
+  'packages/team/tool-agent-team': {
+    status: 'adapt',
+    targetAssessment: 'increment-review-required',
+    localDisposition: 'Same-lineage merge at rc.3: exec.signal threaded into team_task_create/team_task_update. Upstream\'s leaner tool surface tracks its v2 service and is deferred with it.',
+  },
   'packages/api/session-controller': {
     status: 'reject',
     targetAssessment: 'not-carried',

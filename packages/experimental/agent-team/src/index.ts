@@ -159,10 +159,11 @@ export class TeamService extends TypertRemoteService {
    * Create one unowned pending task in the Team Lead log.
    * @param caller - exact live Team member creating the task.
    * @param request - task text, blockers, and advisory write scopes.
+   * @param signal - cancellation before the task append commits.
    * @returns the revision-one task view.
    */
-  async createTask(caller: Agent, request: CreateTeamTaskRequest): Promise<TeamTaskView> {
-    return await this.tasks.create(this.roster.membership(caller), request)
+  async createTask(caller: Agent, request: CreateTeamTaskRequest, signal?: AbortSignal): Promise<TeamTaskView> {
+    return await this.tasks.create(this.roster.membership(caller), request, signal)
   }
 
   /**
@@ -188,10 +189,11 @@ export class TeamService extends TypertRemoteService {
    * Compare-and-set one authorized task transition.
    * @param caller - exact live Team member authorizing the mutation.
    * @param request - task identity, expected revision, action, and action fields.
+   * @param signal - cancellation before the mutation append commits.
    * @returns the committed next task revision.
    */
-  async updateTask(caller: Agent, request: UpdateTeamTaskRequest): Promise<TeamTaskView> {
-    return await this.tasks.update(caller, this.roster.membership(caller), request)
+  async updateTask(caller: Agent, request: UpdateTeamTaskRequest, signal?: AbortSignal): Promise<TeamTaskView> {
+    return await this.tasks.update(caller, this.roster.membership(caller), request, signal)
   }
 
   /**
@@ -233,22 +235,24 @@ export class TeamService extends TypertRemoteService {
    * Create one shared task through the generated Remote API.
    * @param agent - exact live Team member creating the task.
    * @param request - task text, blockers, and advisory write scopes.
+   * @param signal - caller cancellation before the task append commits.
    * @returns the revision-one task or a typed Team rejection.
    */
   @Remote('createTask')
-  remoteCreateTask(agent: Agent, request: CreateTeamTaskRequest): Promise<TeamTaskMutationResult> {
-    return this.taskMutationResult(this.createTask(agent, request))
+  remoteCreateTask(agent: Agent, request: CreateTeamTaskRequest, signal?: AbortSignal): Promise<TeamTaskMutationResult> {
+    return this.taskMutationResult(this.createTask(agent, request, signal))
   }
 
   /**
    * Apply one task mutation and preserve Team rejections as business results.
    * @param agent - exact live Team member authorizing the mutation.
    * @param request - task identity, expected revision, action, and action fields.
+   * @param signal - caller cancellation before the mutation append commits.
    * @returns the committed task or a typed Team rejection.
    */
   @Remote('updateTask')
-  remoteUpdateTask(agent: Agent, request: UpdateTeamTaskRequest): Promise<TeamTaskMutationResult> {
-    return this.taskMutationResult(this.updateTask(agent, request))
+  remoteUpdateTask(agent: Agent, request: UpdateTeamTaskRequest, signal?: AbortSignal): Promise<TeamTaskMutationResult> {
+    return this.taskMutationResult(this.updateTask(agent, request, signal))
   }
 
   /** Preserve Team task rejections while allowing unexpected failures to reject the Remote call. */
