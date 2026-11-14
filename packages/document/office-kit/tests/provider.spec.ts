@@ -1,22 +1,41 @@
 /** Disk output, resource bounds, and cancellation around the external kit. */
-import { access, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { Converter, ConverterOptions } from '@deepseek-ai/libreoffice-kit'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import OfficeToPdf, { Config, OfficeSourceKey, type OfficeToPdfRequest } from '../src/index.ts'
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from 'vitest'
+import OfficeKit, { Config, OfficeSourceKey, type OfficeKitRequest } from '../src/index.ts'
+import { resolveKitModule, type KitModuleResolution } from '../src/locate.ts'
+import { expectDefaultOutputsUntouched } from './default-outputs.ts'
+
+const home = await vi.hoisted(async () => {
+  const { mkdtemp } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  return mkdtemp(`${tmpdir()}/dsh-office-kit-home-`)
+})
+vi.mock('@deepseek-ai/dsh-home-paths', async (original) => {
+  const path = await import('node:path')
+  return { ...await original<typeof import('@deepseek-ai/dsh-home-paths')>(), dshHomePath: (...segments: string[]) => path.join(home, ...segments) }
+})
+expectDefaultOutputsUntouched(home)
+
+vi.mock('../src/locate.ts', async (original) => {
+  const actual = await original<typeof import('../src/locate.ts')>()
+  return { ...actual, resolveKitModule: vi.fn(actual.resolveKitModule) }
+})
 
 const kit = vi.hoisted(() => ({ create: vi.fn<(options?: ConverterOptions) => Promise<Converter>>() }))
 vi.mock('@deepseek-ai/libreoffice-kit', () => ({ createConverter: kit.create }))
 
+const absentKit = Object.assign(new Error('Cannot find package'), { code: 'ERR_MODULE_NOT_FOUND' })
 const pdf = Buffer.from('%PDF-1.7\npreview\n%%EOF\n')
 const input = new Uint8Array([80, 75, 3, 4])
-const request: OfficeToPdfRequest = { extension: 'docx', priority: 'foreground', source: {
+const request: OfficeKitRequest = { extension: 'docx', priority: 'foreground', source: {
   key: OfficeSourceKey('source'), version: 'v1', bytes: input.length,
   read: async () => ({ bytes: input, version: 'v1' }),
 } }
-function distinct(index: number): OfficeToPdfRequest {
+function distinct(index: number): OfficeKitRequest {
   return { ...request, source: { ...request.source, key: OfficeSourceKey(`source-${index}`),
     read: async () => ({ bytes: new Uint8Array([80, 75, 3, index]), version: 'v1' }) } }
 }
@@ -26,6 +45,7 @@ let dispose: ReturnType<typeof vi.fn<Converter['dispose']>>
 let converter: Converter
 
 beforeEach(() => {
+  vi.mocked(resolveKitModule).mockClear()
   ctx = new Context()
   render = vi.fn<Converter['render']>().mockImplementation(async ({ outputPath }) => {
     await writeFile(outputPath, pdf)
@@ -42,41 +62,89 @@ beforeEach(() => {
 })
 afterEach(async () => { await ctx.fiber.dispose() })
 
-async function mount(config: Partial<Config> = {}): Promise<OfficeToPdf> {
-  await ctx.plugin(OfficeToPdf, config)
-  return ctx.officeToPdf
+async function mount(config: Partial<Config> = {}): Promise<OfficeKit> {
+  const outputDirectory = await mkdtemp(join(tmpdir(), 'dsh-office-kit-outputs-'))
+  // Runs after the afterEach provider disposal, which deletes the provider's own outputs first.
+  onTestFinished(() => rm(outputDirectory, { recursive: true, force: true }))
+  await ctx.plugin(OfficeKit, { ...config, outputDirectory })
+  return ctx.officeKit
 }
+
+function resolvedKit(): Extract<KitModuleResolution, { kind: 'available' }> {
+  const resolution = vi.mocked(resolveKitModule).mock.results[0]
+  if (resolution?.type !== 'return' || resolution.value.kind !== 'available') throw new Error('Expected an available Kit')
+  return resolution.value
+}
+
+it('loads its own Kit installation and passes the engine resolver anchored there to the converter', async () => {
+  const provider = await mount()
+  await provider.convert(request)
+  expect(vi.mocked(resolveKitModule).mock.calls[0]?.[0]()).toBe(import.meta.resolve('@deepseek-ai/libreoffice-kit'))
+  expect(resolvedKit().entry).toBe(import.meta.resolve('@deepseek-ai/libreoffice-kit'))
+  expect(kit.create.mock.calls[0]?.[0]?.resolveEnginePackage).toBe(resolvedKit().resolveEnginePackage)
+})
+
+it.each([
+  ['missing', 'not installed', (): KitModuleResolution => ({ kind: 'missing', error: absentKit })],
+  ['unloadable', 'could not be loaded', (): KitModuleResolution => ({
+    kind: 'available', entry: new URL('./absent-kit.js', import.meta.url).href, resolveEnginePackage: () => { throw absentKit },
+  })],
+])('registers the provider with a %s Kit, rejects every conversion as unavailable, and reports the failure once', async (_state, message, resolution) => {
+  vi.mocked(resolveKitModule).mockImplementation(resolution)
+  onTestFinished(() => { vi.mocked(resolveKitModule).mockReset() })
+  const warn = vi.fn()
+  ctx.logger.warn = warn
+  const provider = await mount()
+  expect(resolveKitModule).not.toHaveBeenCalled()
+  for (const attempt of [request, distinct(1)]) {
+    const failure = await provider.convert(attempt).catch((error: unknown) => error)
+    expect(failure).toMatchObject({ name: 'OfficeKitError', code: 'unavailable' })
+    expect(String(failure)).toContain(message)
+    expect(String(failure)).toContain('This deployment does not provide LibreOffice Kit; install or enable it as this deployment requires, then retry.')
+  }
+  expect(resolveKitModule).toHaveBeenCalledTimes(2)
+  expect(warn).toHaveBeenCalledOnce()
+  expect(kit.create).not.toHaveBeenCalled()
+})
+
+it('reports each distinct Kit failure once', async () => {
+  const failures: unknown[] = [new Error('first'), 'second', new Error('first'), 'second']
+  for (const error of failures) vi.mocked(resolveKitModule).mockReturnValueOnce({ kind: 'missing', error })
+  const warn = vi.fn<(error: Error) => void>()
+  ctx.logger.warn = warn
+  const provider = await mount()
+  for (const index of failures.keys()) {
+    await expect(provider.convert(distinct(index))).rejects.toMatchObject({ code: 'unavailable' })
+  }
+  expect(warn.mock.calls.map(([error]) => error.cause)).toEqual([failures[0], failures[1]])
+})
+
+it.each([
+  ['missing', (): KitModuleResolution => ({ kind: 'missing', error: absentKit })],
+  ['unloadable', (): KitModuleResolution => ({
+    kind: 'available', entry: new URL('./absent-kit.js', import.meta.url).href, resolveEnginePackage: () => { throw absentKit },
+  })],
+])('locates Kit again after a %s Kit failure and converts once Kit is available', async (_state, resolution) => {
+  vi.mocked(resolveKitModule).mockReturnValueOnce(resolution())
+  ctx.logger.warn = vi.fn()
+  const provider = await mount()
+  await expect(provider.convert(request)).rejects.toMatchObject({ code: 'unavailable' })
+  const result = await provider.convert(distinct(1))
+  expect(Buffer.from(result.pdf)).toEqual(pdf)
+  expect(resolveKitModule).toHaveBeenCalledTimes(2)
+  expect(kit.create).toHaveBeenCalledOnce()
+  await provider.convert(distinct(2))
+  expect(resolveKitModule).toHaveBeenCalledTimes(2)
+})
 
 it('preserves the kit font defaults when font configuration is omitted', async () => {
   const provider = await mount()
   await provider.convert(request)
   expect(kit.create.mock.calls[0]![0]).not.toHaveProperty('fontDirectories')
   expect(kit.create.mock.calls[0]![0]).not.toHaveProperty('fontFallbacks')
-  expect(kit.create.mock.calls[0]![0]).not.toHaveProperty('fontMetadataCacheDirectory')
   expect(Config({ fontDirectories: [] }).fontDirectories).toEqual([])
   expect(Config({ fontFallbacks: [] }).fontFallbacks).toEqual([])
   expect(() => Config({ fontDirectories: [''] })).toThrow()
-})
-
-it.each([false, join(tmpdir(), 'office-font-metadata')] as const)('passes explicit font metadata cache settings %j to the kit', async (directory) => {
-  const provider = await mount({ fontMetadataCacheDirectory: directory, maxFontMetadataCacheBytes: 8192 })
-  await provider.convert(request)
-  expect(kit.create).toHaveBeenCalledWith(expect.objectContaining({
-    fontMetadataCacheDirectory: directory, maxFontMetadataCacheBytes: 8192,
-  }))
-})
-
-it.each(['relative/cache', join(tmpdir(), 'cache\0invalid')])('rejects invalid font metadata cache directory %j', (directory) => {
-  expect(() => new OfficeToPdf(ctx, Config({ fontMetadataCacheDirectory: directory })))
-    .toThrow('fontMetadataCacheDirectory must be an absolute path or false')
-  expect(kit.create).not.toHaveBeenCalled()
-})
-
-it('rejects invalid font metadata byte limits before allocating a converter', () => {
-  for (const bytes of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
-    expect(() => Config({ maxFontMetadataCacheBytes: bytes })).toThrow()
-  }
-  expect(kit.create).not.toHaveBeenCalled()
 })
 
 it.each([
@@ -112,8 +180,9 @@ it('passes configured limits to the kit, reuses the converter, and removes all s
   await provider.convert(request)
   const { maxConcurrentConversions: _count, maxQueuedJobs: _queued, maxReaders: _readers, maxSourceBytes: _source,
     maxBackgroundConversions: _background, maxCachedEntries: _entries, maxCachedBytes: _cached,
-    maxSourceEntries: _aliases, ...options } = config
-  expect(kit.create).toHaveBeenCalledExactlyOnceWith(options)
+    maxSourceEntries: _aliases, outputDirectory: _outputs, outputRetentionMs: _retention, maxOutputStoreBytes: _stored,
+    ...options } = config
+  expect(kit.create).toHaveBeenCalledExactlyOnceWith({ ...options, resolveEnginePackage: resolvedKit().resolveEnginePackage })
   await ctx.fiber.dispose()
   expect(dispose).toHaveBeenCalledOnce()
   expect(result.pdf).toEqual(Uint8Array.from(pdf))
@@ -260,12 +329,12 @@ it('rejects caller cancellation before allocating any conversion resources', asy
 })
 
 it('rejects relative font directories during provider configuration', async () => {
-  expect(() => new OfficeToPdf(ctx, Config({ fontDirectories: ['relative/fonts'] })))
+  expect(() => new OfficeKit(ctx, Config({ fontDirectories: ['relative/fonts'] })))
     .toThrow('fontDirectories must contain absolute paths')
 })
 
 it('rejects source capacity below one permitted input before allocating a converter', () => {
-  expect(() => new OfficeToPdf(ctx, Config({ maxInputBytes: 4, maxSourceBytes: 3 })))
+  expect(() => new OfficeKit(ctx, Config({ maxInputBytes: 4, maxSourceBytes: 3 })))
     .toThrow('maxSourceBytes must be at least maxInputBytes')
   expect(kit.create).not.toHaveBeenCalled()
 })

@@ -11,21 +11,21 @@ export type OfficeSourceKey = Branded<'OfficeSourceKey'>
 export function OfficeSourceKey(key: string): OfficeSourceKey { return brandString<OfficeSourceKey>(key) }
 
 /** One provider lifetime, including its engine, rendering settings, and font configuration. */
-export type OfficeToPdfGeneration = Branded<'OfficeToPdfGeneration'>
+export type OfficeKitGeneration = Branded<'OfficeKitGeneration'>
 /**
  * Label a provider lifetime.
  * @param value - unique generation created by the provider.
  * @returns branded converter generation.
  */
-export function OfficeToPdfGeneration(value: string): OfficeToPdfGeneration {
-  return brandString<OfficeToPdfGeneration>(value)
+export function OfficeKitGeneration(value: string): OfficeKitGeneration {
+  return brandString<OfficeKitGeneration>(value)
 }
 
 /** Provider generation and source-content digest; consumers must not parse it. */
-export type OfficeToPdfKey = Branded<'OfficeToPdfKey'>
+export type OfficeKitKey = Branded<'OfficeKitKey'>
 /**
  * Label a converter-owned content identity.
  * @param value - generation and content identity created by the provider.
  * @returns branded conversion identity.
  */
-export function OfficeToPdfKey(value: string): OfficeToPdfKey { return brandString<OfficeToPdfKey>(value) }
+export function OfficeKitKey(value: string): OfficeKitKey { return brandString<OfficeKitKey>(value) }

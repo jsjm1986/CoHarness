@@ -272,7 +272,6 @@
     }
   ],
   "feature_batch_remaining": [
-    "office-kit",
     "tool-executor",
     "mcp-manager",
     "subagent-oar",

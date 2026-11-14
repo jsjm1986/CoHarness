@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cordis-api/fiber.md
 document:
-  en: 3044301effde267bf580c3a5138481b10513f755
-  zh: bc8ba8645e1c81c88b016792a226eca05953f5ad
+  en: 563211d34021229e5ff94527f6449dad2db8f1db
+  zh: 700d9ddeca34881eb4968d8cfb6b9cf4ab23f453
 /:
   en: d2c0c5bce430d1be
   zh: 2173e2f1a2a3a13a
@@ -60,8 +60,8 @@ document:
   en: 62d68dedb20b4fa9
   zh: 5a735ae0ff1266f4
 /fiber/the-fiber-class/fiber-update-config-nosave:
-  en: b57ce0f6260c2cb8
-  zh: 93391df347b70b9e
+  en: 8254139ff43cd189
+  zh: d21a425c429da1a8
 /fiber/effect:
   en: 007d5b214e8a8610
   zh: d74c26fbb1b8aeb6

@@ -57,7 +57,7 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [web-server.md](web-server.md) | the HTTP carrier: `WebRouteKind`/`WebRoute`, match order, the claimable fallback seat, index taps |
 | [storage.md](storage.md) | the storage subsystem: the backend contract (`StorageBackend`), `StorageForms`, `DomainSpec`/`Domain`, `domain/changed` |
 | [deliverables.md](deliverables.md) | explicit file declarations and recorded per-turn workspace comparisons |
-| [office-to-pdf.md](office-to-pdf.md) | authorized deferred Office conversion, bounded PDF results, and preview integration |
+| [office-kit.md](office-kit.md) | authorized deferred Office rendering, conversion, recalculation, and preview integration |
 | [ssh.md](ssh.md) | shared SSH connection and lifecycle for POSIX remote filesystem, process and sandbox providers |
 | [webhook.md](webhook.md) | the fire-and-forget webhook runtime: `WebhookSessionRequest`, trusted rule registry, and provider-owned delivery intake |
 | [remote-desktop.md](remote-desktop.md) | the human-facing remote-desktop seam: grant model, enforced `resolve → attach` contract, stream sessions, and audit taxonomy |

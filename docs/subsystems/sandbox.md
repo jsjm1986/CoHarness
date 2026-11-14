@@ -193,7 +193,7 @@ Source: [`packages/sandbox/sandbox/src/index.ts`](../../packages/sandbox/sandbox
 
 ### `ctx.sandboxPolicy` — `SandboxPolicyService`
 
-The sandbox-policy service (`ctx.sandboxPolicy`). Owns the deployment default mode, fallback workspace root, and current request-time policy section. Tool layers call resolve for each execution so a session's mode log and immutable cwd travel together to every enforcing capability.
+The sandbox-policy service (`ctx.sandboxPolicy`). Owns the deployment default mode, fallback workspace root, session-scoped directory grants, and request-time policy section. Tool layers call resolve for each execution so a session's mode log and immutable cwd travel together to every enforcing capability.
 
 ```ts cordis-catalog
 /**
@@ -201,11 +201,28 @@ The sandbox-policy service (`ctx.sandboxPolicy`). Owns the deployment default mo
  * mode outranks the session's last `sandbox/mode` event, which outranks the
  * deployment default. A session cwd is its workspace-write boundary; the
  * configured root is the fallback for agentless calls and sessions without a
- * cwd.
+ * cwd. Configured extra roots and this Session's active registrations are
+ * snapshotted together; existing operations and processes keep their policy.
  * @param request - optional session and approved mode override.
  * @returns the fully resolved per-call mode and absolute workspace root.
+ * @throws `SandboxInvalidRootError` (`SANDBOX_INVALID_ROOT`) when the session's recorded cwd is
+ *   relative or contains a NUL byte.
  */
 resolve(request: SandboxPolicyRequest = {}): SandboxExecutionPolicy
+
+/**
+ * Permit writes under one directory in this Session's future workspace-write
+ * operations. The calling context owns the effect; disposal removes only this
+ * registration. Other grants to the directory remain effective. Existing
+ * operations and persistent processes retain their resolved permissions.
+ * Grants are runtime-only and must be registered again after resume or fork.
+ * On Windows, only harness file tools honor extra grants; process permissions stay unchanged.
+ * @param session - exact live Session receiving the grant; other Sessions and agentless calls are unaffected.
+ * @param directory - absolute execution-world path; execution rejects missing, non-directory, or symlinked paths.
+ * @returns the exact Cordis effect disposer for this registration.
+ * @throws when the directory is relative or contains a NUL byte.
+ */
+registerWritableRoot(session: Session, directory: string): () => void
 
 /**
  * Read the session override without applying the deployment default.

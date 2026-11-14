@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-25-upstream-office-kit-absorption.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-office-kit-absorption.md
+document:
+  en: c6fad0bc826bd5653522e86d2b1605ee6c4328af
+  zh: 4215e5d1aab5b254869bb075501d55f88e747ad6
+/agent-note-upstream-office-kit-absorption-replacing-office-to-pdf:
+  en: 39a1da50a15efbaf
+  zh: 17c607d5a1d711f9
+/agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/decision:
+  en: 823ab1e1559ed8fe
+  zh: 8c8efaded45a0775
+/agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/port-adaptations:
+  en: 173afab73616964c
+  zh: 41a9dc3a85fbc48f
+/agent-note-upstream-office-kit-absorption-replacing-office-to-pdf/verification:
+  en: 7760c68bc6264313
+  zh: 57431264704aba55

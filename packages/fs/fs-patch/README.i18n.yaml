@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-patch/README.md
 document:
-  en: 0ba192c41a16bde57c46009376bc3038e9ad34d6
-  zh: 8cea7dcc1cc1c2eb63ac17f7738d2c3622115405
+  en: df050bee8d239332847de23ff5837c915ce41ec7
+  zh: ddf93ae840f65ff85d35cf7ced7a8948ac21443b
 /:
   en: 80da396fec6cc3d9
   zh: 35d4d8c713d9450c
@@ -30,8 +30,8 @@ document:
   en: fcd630c121472565
   zh: 35cc062e2f76b195
 /dsh-fs-patch/understand-the-implementation:
-  en: 2ded4719a85a20bc
-  zh: e04f2614167a6c1c
+  en: 28f3b61dfe817d67
+  zh: 5edb092d1fb414c1
 /dsh-fs-patch/further-exploration:
   en: 41cdc8e7e14cb1cb
   zh: 3ad83315ffeb88d8

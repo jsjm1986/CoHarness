@@ -1752,7 +1752,7 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/document/office-to-pdf": {
+    "packages/document/office-kit": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.perf.ts"

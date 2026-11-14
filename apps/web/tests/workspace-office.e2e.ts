@@ -7,7 +7,7 @@ import { chromium, type Browser, type Page, type Response } from 'playwright'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@deepseek-ai/dsh-workspace'
-import type {} from '@deepseek-ai/dsh-office-to-pdf'
+import type {} from '@deepseek-ai/dsh-office-kit'
 import { realOfficeBytes } from './office-fixture.ts'
 import { pdfResourceFixture } from '../../../packages/client/ui-workbench/tests/pdf-resource-fixture.ts'
 import { launchWebScaffold, seedSession, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
@@ -32,10 +32,10 @@ describe('web e2e: authorized Office preview', () => {
     await mkdir(metadata, { mode: 0o700 })
     await writeFile(join(metadata, 'font-metadata.json'), '{invalid', { flag: 'wx', mode: 0o600 })
     const overlay = join(metadataRoot, 'cordis.patch.yml')
-    await writeFile(overlay, `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(metadata)}\n- id: connection\n  config:\n    serverTiming: true\n`,
+    await writeFile(overlay, `- id: office-kit\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(metadata)}\n- id: connection\n  config:\n    serverTiming: true\n`,
       { flag: 'wx', mode: 0o600 })
     scaffold = await launchWebScaffold({ workbench: true, extraOverlayPath: overlay })
-    expect(scaffold.ctx.get('officeToPdf')).toBeDefined()
+    expect(scaffold.ctx.get('officeKit')).toBeDefined()
     for (const extension of FORMATS) await writeFile(join(scaffold.workspaceCwd, `preview.${extension}`), realOfficeBytes(extension))
     for (const kind of PDF_RESOURCES) await writeFile(join(scaffold.workspaceCwd, `resource-${kind}.pdf`), pdfResourceFixture(kind))
     await writeFile(join(scaffold.workspaceCwd, 'readonly.csv'), 'key,value\nAlpha,1\nBeta,2\n')

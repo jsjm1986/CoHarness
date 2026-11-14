@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/ptc-runtime/ptc-runtime-node/README.md
 document:
-  en: 6f5d9f66acc2fb3f69e760b68b29c7677ae8d91b
-  zh: c35dba69e4dfb6cf0eed2f627d90b8ceed5a1522
+  en: 923b3cafc9ed3f5e453b70c6582b5db7da370520
+  zh: e9849c1927f15d83d5df8c0baa7d3f7183c755b7
 /:
   en: 66cfe944c731a54f
   zh: 30b9e7f852723301
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 725b47765ee8f30b
 /deepseek-ai-dsh-ptc-runtime-node/use-this-package:
-  en: 9c742ab3175c4f80
-  zh: 5fa7d1ce9c3920d2
+  en: 1ae5cdd7d4ce8082
+  zh: 62c198d19c1cd301
 /deepseek-ai-dsh-ptc-runtime-node/use-this-package/configuration:
   en: 8d42f921a1fa8e5c
   zh: 27b79ec4ec52b3fd
@@ -30,8 +30,8 @@ document:
   en: 41c54a052af70659
   zh: becb41300547089e
 /deepseek-ai-dsh-ptc-runtime-node/use-this-package/deadlines-and-cancellation:
-  en: ba520c35c9561f00
-  zh: f516938b2f18a3f4
+  en: 28d5a44b53bf3396
+  zh: 4e6536e89fa2e11f
 /deepseek-ai-dsh-ptc-runtime-node/use-this-package/failures:
   en: 34a221d0f26b8e47
   zh: 2fd20ac9c9953c7f
@@ -54,8 +54,8 @@ document:
   en: ac2e2ae13d3f1394
   zh: 5d08b9c658fcf83a
 /deepseek-ai-dsh-ptc-runtime-node/model-experience:
-  en: 4e89db2b3ccd585a
-  zh: 461b5e1e9caaf959
+  en: 96aabefc0d4dc51b
+  zh: 673f46c53ad02986
 /deepseek-ai-dsh-ptc-runtime-node/model-experience/kv-cache-effect:
   en: 40294c1c31b74824
   zh: d91e7b78c0619c7e

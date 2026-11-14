@@ -57,7 +57,7 @@
 | [web-server.md](web-server.zh.md) | HTTP 载体：`WebRouteKind`/`WebRoute`、匹配顺序、可认领的回退席位、index 渲染挂接点 |
 | [storage.md](storage.zh.md) | 存储子系统：后端约定（`StorageBackend`）、`StorageForms`、`DomainSpec`/`Domain`、`domain/changed` |
 | [deliverables.md](deliverables.zh.md) | 显式文件交付声明与已记录的工作区轮次比较 |
-| [office-to-pdf.md](office-to-pdf.zh.md) | 已授权的延迟 Office 转换、有界 PDF 结果及预览适配 |
+| [office-kit.md](office-kit.zh.md) | 已授权的延迟 Office 渲染、转换、重算及预览适配 |
 | [ssh.md](ssh.zh.md) | POSIX 远端文件、进程与沙箱共享的 SSH 连接及生命周期 |
 | [webhook.md](webhook.zh.md) | 即发即弃的 Webhook 运行时：`WebhookSessionRequest`、受信任规则注册表与提供方自持的交付接收 |
 | [remote-desktop.md](remote-desktop.zh.md) | 面向人类的远程桌面缝：授权模型、强制的 `resolve → attach` 契约、流式会话与审计分类法 |

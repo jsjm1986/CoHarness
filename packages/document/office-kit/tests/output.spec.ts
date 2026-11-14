@@ -23,7 +23,7 @@ afterEach(() => { io.opened = undefined; vi.restoreAllMocks() })
 const pdf = Buffer.from('%PDF-1.7\npreview\n%%EOF\n')
 
 async function output(): Promise<{ directory: string; path: string; handles: FileHandle[] }> {
-  const directory = await mkdtemp(join(tmpdir(), 'dsh-office-to-pdf-output-'))
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-office-kit-output-'))
   const handles: FileHandle[] = []
   onTestFinished(async () => {
     try { await Promise.all(handles.map(file => file.close())) }
@@ -60,5 +60,16 @@ it('rejects output that grows past the limit after opened-file metadata is read'
   }
   await expect(readPdf(path, pdf.length, new AbortController().signal)).rejects.toMatchObject({ code: 'output-too-large' })
   expect(handles).toHaveLength(1)
+  expect(handles[0]!.fd).toBe(-1)
+})
+
+it('rejects output that shrinks after opened-file metadata is read', async () => {
+  const { path, handles } = await output()
+  io.opened = async (file) => {
+    handles.push(file)
+    const inspect = file.stat.bind(file)
+    vi.spyOn(file, 'stat').mockImplementationOnce(async () => Object.assign(await inspect(), { size: pdf.length + 4 }))
+  }
+  await expect(readPdf(path, pdf.length + 4, new AbortController().signal)).rejects.toMatchObject({ code: 'invalid-output' })
   expect(handles[0]!.fd).toBe(-1)
 })

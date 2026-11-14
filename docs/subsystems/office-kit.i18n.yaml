@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for office-kit.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/office-kit.md
+document:
+  en: 7167e0e36c1e64b564c7447352c14e9d815b3647
+  zh: 5b372445c009ff0927b21578919634db900144c5
+/:
+  en: 6b6e8277c70dd63b
+  zh: f6c73a5b487dc3f8
+/office-kit:
+  en: b663aadbf3c92a21
+  zh: 906d26bae14e18ca
+/office-kit/summary:
+  en: 5dbba40e003602b2
+  zh: efafd28651be37b5
+/office-kit/requests-and-results:
+  en: 7391b957003e6413
+  zh: 52bb374ac6e54632
+/office-kit/authorized-preview:
+  en: 859605d4f7a9bd29
+  zh: 97dde650dd43a770
+/office-kit/engine-and-capacity:
+  en: 751b2e6c99a25258
+  zh: 0339b1a633708330

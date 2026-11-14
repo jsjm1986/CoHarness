@@ -216,7 +216,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'The dsh launcher supplies data-only profile locations and composition inputs; reload scheduling belongs to dsh-hmr.',
   },
   {
-    key: 'officeToPdf', pkg: 'office-to-pdf', title: 'Office to PDF conversion',
+    key: 'officeKit', pkg: 'office-kit', title: 'Office rendering, conversion, and recalculation',
     mode: 'core', consumers: ['host-apiproxy'],
     note: 'Authorized deferred source reads feed a bounded Host converter using the declared native engine or Node WASM.',
   },

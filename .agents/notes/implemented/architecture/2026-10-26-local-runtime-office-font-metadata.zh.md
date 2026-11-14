@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-[Office 提供方](../../../../packages/document/office-to-pdf/README.zh.md)开放已安装 kit 的有界元数据缓存选项。Gateway 本机启动器通过运行时配置提供一个节点所有的共享目录。字体发现、物理文件标识校验、原子发布、损坏缓存恢复与取消仍由 kit 负责。每次操作仍发现自己的字体来源。共享缓存不包含原始字体字节、文档输入、转换后的 PDF 或授权结果。
+[Office 提供方](../../../../packages/document/office-kit/README.zh.md)开放已安装 kit 的有界元数据缓存选项。Gateway 本机启动器通过运行时配置提供一个节点所有的共享目录。字体发现、物理文件标识校验、原子发布、损坏缓存恢复与取消仍由 kit 负责。每次操作仍发现自己的字体来源。共享缓存不包含原始字体字节、文档输入、转换后的 PDF 或授权结果。
 
 Gateway 接受部署指定的目录或 `off`。Systemd 运行时使用不同操作系统身份，因此保留独立缓存，并拒绝显式共享目录。[有界转换决策](2026-09-15-bounded-office-conversion.zh.md)继续定义源准入、完成的 PDF 与引擎生命周期。[授权预览决策](2026-09-23-authorized-office-preview.zh.md)继续定义 Session 访问与版本校验。
 

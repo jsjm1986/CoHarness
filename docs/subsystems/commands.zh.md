@@ -173,9 +173,9 @@ find(agent: Agent, name: string): CommandDefinition | undefined
  * log-only appends — no turn wraps them, and persistence drains them at
  * ordinary checkpoints. Admission misses (syntax or unknown name) log
  * nothing — they never entered a handler. A `command/run` append failure
- * fails the execution loud; a `command/done` append failure on the
- * handler-failure path is contained so the handler's own error stays the
- * reported failure.
+ * fails the execution loud; every `command/done` append failure is
+ * contained so the settled result — including a disposal-detached Session —
+ * stays the reported failure.
  *
  * Attachment admission is enforced here, not in the composer: attachments sent to a
  * command that does not declare `input.attachments`, an absent attachment store,
