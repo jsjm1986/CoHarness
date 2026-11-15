@@ -9443,9 +9443,6 @@ importers:
 
   packages/experimental/subagent-oar:
     dependencies:
-      '@botiverse/oar':
-        specifier: 0.67.0
-        version: 0.67.0(patch_hash=65de2ca1966421e30893d8d4fed6a3d88e4247e131e7575fe791246e594538d6)(@aws-sdk/credential-provider-node@3.972.82)(@modelcontextprotocol/sdk@1.32.0(supports-color@9.4.0)(zod@4.4.3))(@smithy/signature-v4@5.7.3)(supports-color@9.4.0)(ws@8.21.3)(zod@4.4.3)
       '@deepseek-ai/dsh-brand':
         specifier: workspace:*
         version: link:../../util/brand
@@ -9459,6 +9456,9 @@ importers:
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
     devDependencies:
+      '@botiverse/oar':
+        specifier: 0.67.0
+        version: 0.67.0(patch_hash=65de2ca1966421e30893d8d4fed6a3d88e4247e131e7575fe791246e594538d6)(@aws-sdk/credential-provider-node@3.972.82)(@modelcontextprotocol/sdk@1.32.0(supports-color@9.4.0)(zod@4.4.3))(@smithy/signature-v4@5.7.3)(supports-color@9.4.0)(ws@8.21.3)(zod@4.4.3)
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis

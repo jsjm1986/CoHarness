@@ -39,3 +39,8 @@
 - insert:
     - id: oar-loader-fixture
       name: './fixture.ts'
+
+# Replaces the disabled invocation provider so injected `headlessStartup` reads resolve.
+- insert:
+    - id: headless-startup-test-stub
+      name: '../../../../../test-support/loader-smoke/tests/fixtures/headless-startup-stub.ts'

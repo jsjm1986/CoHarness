@@ -56,3 +56,8 @@
         env:
           DSH_TELEMETRY_DISABLED: '1'
           DSH_TEST_CHILD_FAILURE: !!js String(process.env.DSH_TEST_CHILD_FAILURE ?? '')
+
+# Replaces the disabled invocation provider so injected `headlessStartup` reads resolve.
+- insert:
+    - id: headless-startup-test-stub
+      name: '../../../../../../packages/test-support/loader-smoke/tests/fixtures/headless-startup-stub.ts'

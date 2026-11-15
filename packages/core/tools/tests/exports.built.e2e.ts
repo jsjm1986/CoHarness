@@ -15,7 +15,8 @@ import * as tools from '@deepseek-ai/dsh-tools'
 import { ToolExecutionPipeline, executeToolBatch } from '@deepseek-ai/dsh-tools/pipeline'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 
-assert.equal(Object.hasOwn(tools, 'defineContentToolFixture'), false)
+assert.equal(Object.hasOwn(tools, 'defineContentToolFixture'), true)
+assert.equal(tools.defineContentToolFixture, defineContentToolFixture)
 assert.equal(Object.hasOwn(tools, 'executeToolFixture'), false)
 assert.equal(Object.hasOwn(tools, 'executeModelToolFixture'), false)
 await assert.rejects(import('@deepseek-ai/dsh-tools/testing'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' })

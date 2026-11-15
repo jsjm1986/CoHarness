@@ -38,13 +38,13 @@
     "@deepseek-ai/dsh-subprocess": "workspace:*"
   },
   "dependencies": {
-    "@botiverse/oar": "0.67.0",
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-timeout": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~"
   },
   "devDependencies": {
+    "@botiverse/oar": "0.67.0",
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
     "@deepseek-ai/dsh-agent": "workspace:*",
