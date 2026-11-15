@@ -17,7 +17,8 @@
   ],
   "ignoreWorkspaces": [
     "vendor/*",
-    "python/sdk-runtime"
+    "python/sdk-runtime",
+    "snapshots"
   ],
   "ignoreDependencies": [
     "@deepseek-ai/cordis",

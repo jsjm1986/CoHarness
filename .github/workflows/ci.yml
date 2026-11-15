@@ -46,6 +46,10 @@ env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
   DSH_TELEMETRY_DISABLED: '1'
+  # The host-aggregate `tsc -p tsconfig.host.json` exceeds Node's default ~4 GB
+  # heap on CI runners (windows-native, gateway, node 22, python matrix all died
+  # on mark-compacts). Raise it once here so every lane shares the headroom.
+  NODE_OPTIONS: '--max-old-space-size=8192'
 
 jobs:
 
