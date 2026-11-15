@@ -114,6 +114,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   forgeSession: 'forge.md',
   remoteAccess: 'typert.md',
   configEditor: 'boot.md',
+  headlessStartup: 'boot.md',
   pluginManagementAuthorization: 'boot.md',
   terminals: 'terminal.md',
   sandbox: 'sandbox.md',

@@ -53,10 +53,11 @@
         node: !!js process.cwd() + '/office-node'
         cli: !!js process.cwd() + '/render-cli.cjs'
 
-- id: tools
-  name: '@deepseek-ai/dsh-tools'
-  config:
-    mode: ptc
+- id: tool-executor-native
+  disabled: true
+
+- id: tool-executor-ptc
+  disabled: false
 
 - id: ptc-runtime
   config:

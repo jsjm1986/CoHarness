@@ -710,29 +710,28 @@ function materializeSessionTokens(entry: ReplayEntry, liveSessionIds: readonly (
   return replace(entry) as ReplayEntry
 }
 
-/** Learn child identities only from successful responses to the subagent tool. */
-function inferStartedSubagents(
-  messages: GenerateOptions['messages'],
+/**
+ * Pre-register a spawned subagent's real session id into the next unbound
+ * child-script slot so `{{session:N}}` tokens in the parent's later turns
+ * resolve before the child first calls the model, and the child's first call
+ * still proves it bound its own script. Registration rides `session/created`
+ * rather than the subagent tool's result text because that text names the
+ * agent handle, not the session id.
+ * @param ctx - the plugin context that observes `session/created`.
+ * @param liveSessionIds - slot array indexed like {@link loadSessionScripts}; slot 0 is the primary.
+ * @returns the listener disposer.
+ */
+function observeStartedSubagents(
+  ctx: Context,
   liveSessionIds: (string | undefined)[],
-): void {
-  const subagentCalls = new Set<string>()
-  for (const message of messages) {
-    if (message.role === 'assistant') {
-      for (const block of message.content) {
-        if (block.type === 'tool-call' && block.name === 'subagent') subagentCalls.add(block.id)
-      }
-    }
-    if (message.role !== 'tool' || message.isError
-      || !subagentCalls.has(message.source.callId)) continue
-    for (const content of message.content) {
-      if (content.type !== 'text') continue
-      const id = /^started subagent ([^\s"'<>]+)$/.exec(content.text)?.[1]
-      if (id === undefined || liveSessionIds.includes(id)) continue
-      const index = liveSessionIds.findIndex((value, candidate) => candidate > 0 && value === undefined)
-      if (index < 0) return
-      liveSessionIds[index] = id
-    }
-  }
+): () => void {
+  return ctx.on('session/created', (session) => {
+    if (session.header.origin !== 'subagent' || session.header.parentSession === undefined) return
+    const id = String(session.id)
+    if (liveSessionIds.includes(id)) return
+    const index = liveSessionIds.findIndex((value, candidate) => candidate > 0 && value === undefined)
+    if (index >= 0) liveSessionIds[index] = id
+  })
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1162,34 +1161,41 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
     throw new Error(`llm-replay: paceMs must be a non-negative integer, got ${String(config.paceMs)}`)
   }
   const scripts = loadSessionScripts(config)
-  // Live-session → its bound script + cursor. A new live session id claims the
-  // next not-yet-bound script (scripts are in bind order); `nextScript` is the
-  // index of the next unclaimed one.
+  // Live-session → its bound script + cursor. An announced session (a subagent
+  // observed through `session/created`) claims its own script slot; any other
+  // new live session id claims the next unclaimed script in bind order.
   const bound = new Map<string, { entries: ReplayEntry[]; cursor: number }>()
   const liveSessionIds: (string | undefined)[] = Array.from({ length: scripts.length })
-  let nextScript = 0
+  const claimed: boolean[] = Array.from({ length: scripts.length }, () => false)
+  let boundCount = 0
   const ANON = '\0anon\0' // the key for a call that carries no sessionId
+  const unobserveSubagents = observeStartedSubagents(ctx, liveSessionIds)
   const replay = (options: GenerateOptions): AsyncIterable<StreamChunk> => {
     const key = options.sessionId ?? ANON
     let state = bound.get(key)
     let unrecorded = false
     let bindingFailure: Error | undefined
     if (state === undefined) {
-      const script = scripts[nextScript]
-      if (script === undefined) {
+      // An announced session binds to its own slot even when parallel children
+      // call the model out of creation order; an unannounced caller claims the
+      // next unclaimed script in bind order.
+      let scriptIndex = liveSessionIds.indexOf(key)
+      if (scriptIndex === -1) scriptIndex = claimed.indexOf(false)
+      const script = scripts[scriptIndex]
+      if (script === undefined || claimed[scriptIndex]) {
         // More distinct live sessions made calls than the scenario recorded —
         // an unrecorded subagent appeared. Defer the throw into the returned
         // generator (the listener must return an AsyncIterable, not throw).
         unrecorded = true
         state = { entries: [], cursor: 0 }
       } else {
-        const scriptIndex = nextScript
         const expectedId = liveSessionIds[scriptIndex]
         if (expectedId !== undefined && expectedId !== key) {
           bindingFailure = new Error(`llm-replay: session ${key} does not match announced child ${expectedId}`)
           state = { entries: [], cursor: 0 }
         } else {
-          nextScript++
+          claimed[scriptIndex] = true
+          boundCount++
           if (key !== ANON) liveSessionIds[scriptIndex] = key
           state = { entries: script.entries, cursor: 0 }
           bound.set(key, state)
@@ -1197,7 +1203,7 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
       }
     }
     const boundState = state
-    const seenSessions = nextScript
+    const seenSessions = boundCount
     const totalScripts = scripts.length
     const index = boundState.cursor++
     const entry: ReplayEntry | undefined = boundState.entries[index]
@@ -1215,7 +1221,6 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
           + `but its script has only ${boundState.entries.length}; re-record the scenario`,
         )
       }
-      inferStartedSubagents(options.messages, liveSessionIds)
       const resolved = resolveScriptedEntry(
         materializeSessionTokens(materializeCwdTokens(entry, options.messages), liveSessionIds),
         options.messages,
@@ -1238,18 +1243,22 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
     })()
   }
   const providers = config.providers ?? []
-  const disposers = providers.length > 0
-    ? [ctx.llm.registerAdapter(providers.map(provider => provider.id), new ReplayAdapter(providers, replay))]
-    : [
-      ctx.on('llm/stream', (options: GenerateOptions, _next) => replay(options)),
-      ctx.on('llm/orchestration', (options: GenerateOptions, _next) => replay(options)),
-    ]
+  const disposers = [
+    unobserveSubagents,
+    ...providers.length > 0
+      ? [ctx.llm.registerAdapter(providers.map(provider => provider.id), new ReplayAdapter(providers, replay))]
+      : [
+        ctx.on('llm/stream', (options: GenerateOptions, _next) => replay(options)),
+        ctx.on('llm/orchestration', (options: GenerateOptions, _next) => replay(options)),
+      ],
+  ]
   return {
     dispose() { for (const dispose of disposers) dispose() },
     assertConsumed(): void {
       const problems: string[] = []
-      if (nextScript < scripts.length) {
-        problems.push(`${scripts.length - nextScript} recorded script(s) never bound to a live session`)
+      const unbound = scripts.length - boundCount
+      if (unbound > 0) {
+        problems.push(`${unbound} recorded script(s) never bound to a live session`)
       }
       for (const [key, state] of bound) {
         if (state.cursor < state.entries.length) {
