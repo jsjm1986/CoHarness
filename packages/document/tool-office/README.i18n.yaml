@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/document/tool-office/README.md
 document:
-  en: c1f95b59b53fdf17d29acaf16798c5c1be256537
-  zh: 063b2552c3ff14c0e42219bf07b7d68827288ed8
+  en: f6bb7c499384cad3ec848b18ea4ffa5dfd13a9da
+  zh: 3f4c8d4cf2c902b8771bdc17ec5f6215d3166f19
 /:
   en: 2ec7e66cd18356df
   zh: 4862555b5a4c9f51
@@ -24,8 +24,8 @@ document:
   en: 05a32b4fde4d8c21
   zh: f6ce05a11f5ccb6d
 /deepseek-ai-dsh-tool-office/further-exploration:
-  en: b737049ea0fc5349
-  zh: 5932f010c9225f58
+  en: a261f1c140288867
+  zh: 5bbc4c04c03e2ec2
 /deepseek-ai-dsh-tool-office/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

@@ -49,7 +49,7 @@ kind: "package-reference"
 
 #### What the model sees
 
-开启 Team 模式时，一节共享策略说明共享工作目录、写范围与依赖协调、claim-update-complete 工作流，以及任务变化不会唤醒任何成员——Lead 必须在最终答复前等待所需 teammate。未开启的会话看不到该节与这些工具。任务结果以紧凑 JSON 行返回；板面本身仅记入日志，不进入派生历史。
+开启 Team 模式时，一节共享策略说明共享工作目录、写范围与依赖协调、claim-update-complete 工作流，以及任务变化不会唤醒任何成员——Lead 必须在最终答复前等待所需 teammate。未开启的会话看不到该节与这些工具。任务结果以紧凑 JSON 行从[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-tool-agent-team)的四个 `team_task_*` 工具返回；板面本身仅记入日志，不进入派生历史。
 
 #### Token effect
 

@@ -1744,7 +1744,7 @@ describe('the run_code dispatch bridge', () => {
 
     expect(result.isError).toBe(true)
     expect(result.additionalContexts).toEqual([{
-      id: expect.any(String) as unknown,
+      id: expect.any(String),
       role: 'user',
       content: [{ type: 'text', text: 'nested context' }],
       source: { kind: 'test' },

@@ -69,7 +69,7 @@ function fakeSession(id: string, origin: 'root' | 'subagent'): Session {
         ? { origin: 'subagent' as const, parentSession: SessionId('live-parent') }
         : {},
     },
-  } as unknown as Session
+  } as Session
 }
 
 /** Build a minimal session-JSONL string: a header line + the given events. */
@@ -96,7 +96,7 @@ function sessionJsonl(
       seq: SessionSeq(header?.seedLength as number),
       time: 0,
       data: { inherited: true },
-    } as unknown as SessionEvent)
+    } as SessionEvent)
     for (let i = 0; i < rows.length; i += 1) {
       rows[i] = { ...rows[i], seq: SessionSeq(i) } as SessionEvent
     }
@@ -201,7 +201,7 @@ function legacyChunkEvent(seq: number, turn: number, step: number, chunk: Stream
     seq: SessionSeq(seq),
     time: 0,
     data: { turn, step, chunk },
-  } as unknown as SessionEvent
+  } as SessionEvent
 }
 
 /** A durable SessionEvent carrying one complete model call's stream for (turn, step). */
@@ -825,7 +825,7 @@ describe('installLlmReplay (through the real LlmRuntime)', () => {
     })
 
     it('skips non-string request leaves when building the corpus', () => {
-      const messages = requestMessages.map(message => ({ ...message, seq: 7 })) as unknown as GenerateOptions['messages']
+      const messages = requestMessages.map(message => ({ ...message, seq: 7 })) as GenerateOptions['messages']
       const entry: ReplayEntry = { kind: 'chunks', chunks: scriptedCall('{"goal_id":"{{fromRequest:goal-42[a-z]+}}"}') }
       const resolved = resolveScriptedEntry(entry, messages)
       if (resolved.kind !== 'chunks') throw new Error('expected chunks entry')

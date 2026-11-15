@@ -5403,7 +5403,7 @@
         "reviewState": "implemented-local-tests-passing"
       },
       "localPlan": "P5 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
-      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-15: 2/9 target files byte-identical locally; 7 carry fork diffs; 0 not carried; 0 removed upstream this round."
+      "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-15: 2/9 target files byte-identical locally; 7 carry fork diffs; 0 not carried; 0 removed upstream this round. fs-observation-policy: upstream rc.3 default-off (upgrade-guide v0.2.2-alpha.2) intentionally not absorbed; fork keeps it enabled in cordis.patch.yml to preserve read-before-write protection for deployed profiles, scenario overlays stay harmless."
     },
     {
       "area": "packages/bundle/headless",
@@ -10352,7 +10352,7 @@
       "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "fork-owned",
       "cumulativeFiles": [
         "packages/experimental/agent-team/README.i18n.yaml",
         "packages/experimental/agent-team/README.md",
@@ -10402,7 +10402,7 @@
       "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "fork-owned",
       "cumulativeFiles": [
         "packages/experimental/agent-team-profile/README.i18n.yaml",
         "packages/experimental/agent-team-profile/README.md",
@@ -10761,7 +10761,7 @@
       "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "fork-owned",
       "cumulativeFiles": [
         "packages/experimental/client-ui-agent-team/README.i18n.yaml",
         "packages/experimental/client-ui-agent-team/README.md",
@@ -12995,7 +12995,7 @@
       "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "fork-owned",
       "cumulativeFiles": [
         "packages/experimental/tool-agent-team/README.i18n.yaml",
         "packages/experimental/tool-agent-team/README.md",
@@ -19791,7 +19791,7 @@
       "reviewState": "implemented-local-tests-passing",
       "phase": "P2",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "fork-owned",
       "cumulativeFiles": [
         "packages/web/web-search-exa/README.i18n.yaml",
         "packages/web/web-search-exa/README.md",
@@ -19824,7 +19824,7 @@
       "reviewState": "implemented-local-tests-passing",
       "phase": "P2",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "fork-owned",
       "cumulativeFiles": [
         "packages/web/web-search-perplexity/README.i18n.yaml",
         "packages/web/web-search-perplexity/README.md",
@@ -19997,11 +19997,7 @@
       "phase": "P1",
       "phaseAssignment": "cross-audit-dsh-v0.2.1-rc.2",
       "targetAssessment": "increment-review-required",
-      "cumulativeFiles": [
-        "native/system/package.json",
-        "native/system/scripts/pack-release.mjs",
-        "native/system/test/release-packing.test.js"
-      ],
+      "cumulativeFiles": [],
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "non-package:native",

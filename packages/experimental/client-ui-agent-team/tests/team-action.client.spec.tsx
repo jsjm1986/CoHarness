@@ -60,7 +60,7 @@ function props(
     useProjection: (key: string) => key === 'agentTeam' ? bench.team : undefined,
     ...actions,
     t: makeTranslate(zh, commonZh),
-  } as unknown as TeamActionProps
+  } as TeamActionProps
 }
 
 function actions(overrides: Partial<TeamActionInjected> = {}): TeamActionInjected {

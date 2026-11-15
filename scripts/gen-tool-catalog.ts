@@ -446,7 +446,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
           maxInlineTextBytes: 1,
           upload: { protocol: 'resumable-v1', chunkBytes: 65_536, sessionTtlMs: 60_000, resumable: true },
         },
-      } as unknown as UserDocStore)
+      } as UserDocStore)
       await ctx.plugin(ToolUserDoc)
     },
     note:
@@ -653,17 +653,17 @@ const TOOL_PACKAGES: ToolPackage[] = [
       let agent!: Agent
       ctx.provide('agentTeams', {
         isEnabled: () => true,
-      } as unknown as TeamService)
+      } as TeamService)
       ctx.provide('subagents', {
         resolveName: () => { throw new Error('catalog mount does not execute tools') },
-      } as unknown as SubagentRuntime)
+      } as SubagentRuntime)
       await ctx.plugin(Object.assign((inner: Context) => {
         agent = {
           id: session.id,
           session,
           options: {},
           status: 'idle',
-        } as unknown as Agent
+        } as Agent
         Object.assign(agent, { ctx: createScope(inner, agent).ctx })
         inner.agents.register(agent)
       }, { inject: ['tools', 'systemPrompt', 'agents', 'agentTeams', 'subagents'] }))

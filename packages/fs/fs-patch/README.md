@@ -93,6 +93,15 @@ The [parser](src/parse.ts) builds syntax records without a Session or provider d
 
 - [Filesystem package group](../README.md) — providers, policies, and file tools.
 
+<a id="model-experience"></a>
+## Model Experience
+
+None, as the pure parser and text updater construct no model input; the apply_patch tool that consumes it owns model-facing schemas.
+
+#### KV Cache effect
+
+No direct effect.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>

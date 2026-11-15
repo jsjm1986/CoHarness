@@ -90,11 +90,6 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'forgePanel/retryWorktree': { action: 'write', path: ['sessionId'], execution: 'none' },
   'forgePanel/restoreWorktree': { action: 'write', path: ['sessionId'], execution: 'none' },
   'forgePanel/continueInProject': { action: 'write', path: ['sessionId'], execution: 'none' },
-  // Feedback records a remark on the Session log; it starts no execution.
-  'sessionFeedback/record': { action: 'write', path: ['sessionId'], execution: 'none' },
-  'messageFeedback/list': { action: 'read', path: ['sessionId'] },
-  'messageFeedback/put': { action: 'write', path: ['sessionId'], execution: 'none' },
-  'messageFeedback/delete': { action: 'write', path: ['sessionId'], execution: 'none' },
 })
 
 const REGISTERED_SESSION_POLICIES = new Map<string, RemoteSessionPolicy>()

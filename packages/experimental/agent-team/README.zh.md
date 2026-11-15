@@ -11,7 +11,7 @@ Agent Teams 协调域。`ctx.agentTeams` 持有每个根 Session 的 Team 模式
 
 ## Summary
 
-`dsh-experimental-agent-team` 在 Team 模式开启时把单个编码会话变成一个小型工作团队：根 agent 成为 Lead，向命名 teammate subagent 委派工作，并通过一块带 compare-and-set 更新的持久任务板协调共享工作。Team 状态存在 `agentTeam` Session 投影中——模式选择与任务快照从 Lead 日志确定性重放，上一代 roster/mailbox 写入的 version-1 记录保持可读且不被改写。本包自身不提供工具——模型面任务工具请挂载 `dsh-experimental-tool-agent-team`,teammate 消息请挂载 `dsh-tool-subagent-control`。本包以实验名称发布、不承诺稳定性，且需要持久 Session 存储才会激活。
+`dsh-experimental-agent-team` 在 Team 模式开启时把单个编码会话变成一个小型工作团队：根 agent 成为 Lead，向命名 teammate subagent 委派工作，并通过一块带 compare-and-set 更新的持久任务板协调共享工作。Team 状态存在 `agentTeam` Session 投影中——模式选择与任务快照从 Lead 日志确定性重放，上一代 roster/mailbox 写入的 version-1 记录保持可读。本包自身不提供工具——模型面任务工具请挂载 `dsh-experimental-tool-agent-team`,teammate 消息请挂载 `dsh-tool-subagent-control`。需要持久 Session 存储才会激活。
 
 ## Table of Contents
 

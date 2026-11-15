@@ -9,7 +9,7 @@ Types shared by the experimental implicit-root Team domain, model tools, and hos
 `TeamId` is the root `SessionId` under a distinct [brand](core.md#branded-ids). `TeamTaskId` is Team-local and monotonically allocated as `task-<n>`; `TeamMessageId` is globally random. A teammate's Session id remains its persistent identity, while `name` is an immutable model/UI label.
 
 ```ts type-equiv
-/** Whole durable value written on every teammate lifecycle change. */
+/** Historical roster value written by earlier Team builds on every teammate lifecycle change. */
 interface TeamMemberSnapshot {
   readonly id: SessionId
   readonly name: string
@@ -17,12 +17,6 @@ interface TeamMemberSnapshot {
   readonly provider: string
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
-  /**
-   * The route the member's own session would resume with, captured from the
-   * live child Agent when it first became active. Absent on members activated
-   * before this field existed and on members that never reached `active`.
-   */
-  readonly model?: string
   readonly error?: string
 }
 ```
@@ -34,15 +28,12 @@ Every member starts in `provisioning` and reaches exactly one terminal roster ph
 The Lead Session first stores the complete queued message. A target receipt is acknowledged only after its pending inbox item or recorded user message is durable, leaving queued-minus-delivered as the recovery mailbox.
 
 ```ts type-equiv
-/** One peer message retained until its target Session records it. */
+/** One peer message recorded by the historical Team mailbox. */
 interface TeamMessageSnapshot {
-  /** Captured participants; Team routing never recovers identity from the latest caller. */
-  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly id: TeamMessageId
   readonly senderId: SessionId
   readonly senderName: string
   readonly targetId: SessionId
-  readonly delivery: 'quiet' | 'wakeup'
   readonly content: ContentBlock[]
 }
 ```
@@ -50,9 +41,9 @@ interface TeamMessageSnapshot {
 The target Session keeps message identity and sender attribution on both the pending inbox item and the eventual user message. Folding that source across inbox and history is the target-side de-duplication key; the model-visible framing repeats the id and sender.
 
 ```ts type-equiv
-/** Source retained by the target Session for durable mailbox de-duplication. */
+/** Source recorded by a target Session for one historical Team mailbox delivery. */
 interface TeamMessageSource {
-  /** Verified adjacent routing-host scope for this exact queued delivery. */
+  /** Verified adjacent routing-host scope persisted by version-1 deliveries. */
   readonly gatewayExecutionScope?: ExecutionInheritance
   readonly kind: 'team-message'
   readonly teamId: TeamId
@@ -75,6 +66,8 @@ interface TeamTaskSnapshot {
   readonly description: string
   readonly status: TeamTaskStatus
   readonly ownerId?: SessionId
+  /** Immutable agent path captured at assignment; absent on unnamed historical owners. */
+  readonly ownerName?: string
   readonly blockedBy: TeamTaskId[]
   readonly writeScopes: string[]
 }

@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-11-15-agent-teams-v2-and-source-fields.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-15-agent-teams-v2-and-source-fields.md
+document:
+  en: cb201fd99a4f06870f79c40659e3032ff2d18008
+  zh: c100357453d309419299231b50f751bcddc3405c
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-15-agent-teams-v2-and-source-fields:
+  en: b1badbdc7a8d3ab1
+  zh: e4dfe60a43904f57
+/2026-11-15-agent-teams-v2-and-source-fields/summary:
+  en: 80fb55873aebeea7
+  zh: 699eb9c1fa15123d
+/2026-11-15-agent-teams-v2-and-source-fields/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-15-agent-teams-v2-and-source-fields/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-15-agent-teams-v2-and-source-fields/compatibility:
+  en: 3b96fac90620b337
+  zh: e7f87a9a8fa1dbd3
+/2026-11-15-agent-teams-v2-and-source-fields/verification:
+  en: 6d5b24ae5b7127e2
+  zh: b20c81722c7f3ad1
+/2026-11-15-agent-teams-v2-and-source-fields/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

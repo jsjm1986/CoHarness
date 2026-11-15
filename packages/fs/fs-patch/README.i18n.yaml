@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-patch/README.md
 document:
-  en: df050bee8d239332847de23ff5837c915ce41ec7
-  zh: ddf93ae840f65ff85d35cf7ced7a8948ac21443b
+  en: d3edabfa8e444ca340efd8fb867c6094ffcce10d
+  zh: c2f52ebe59ddad8412b85df8e75a480b910693fb
 /:
   en: 80da396fec6cc3d9
   zh: 35d4d8c713d9450c
@@ -33,8 +33,14 @@ document:
   en: 28f3b61dfe817d67
   zh: 5edb092d1fb414c1
 /dsh-fs-patch/further-exploration:
-  en: 41cdc8e7e14cb1cb
-  zh: 3ad83315ffeb88d8
+  en: 41981b2d54bd0bc0
+  zh: 7c2ab180fdf25e83
+/dsh-fs-patch/model-experience:
+  en: e31313300ebb9cbf
+  zh: e31313300ebb9cbf
+/dsh-fs-patch/model-experience/kv-cache-effect:
+  en: 60835eca1cee4e0e
+  zh: 60835eca1cee4e0e
 /dsh-fs-patch/known-limitations-and-deferred-work:
   en: b18ead2791224bc2
   zh: a4a8ab319c072445

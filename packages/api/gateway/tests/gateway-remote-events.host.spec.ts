@@ -187,7 +187,7 @@ async function setup(withAccess = false): Promise<{ ctx: Context; connection: Fa
   if (withAccess) await ctx.plugin(RemoteAccessService)
   await ctx.plugin(FakeConnectionService)
   await ctx.plugin(TypertGatewayService)
-  const receiver = ctx.get('connection') as unknown
+  const receiver = ctx.get('connection')
   return { ctx, connection: receiver as FakeConnectionService }
 }
 

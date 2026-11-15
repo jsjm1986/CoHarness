@@ -7,7 +7,6 @@ const commands: readonly CommandDescriptor[] = [
   { name: 'plan', definitionId: CommandDefinitionId('@deepseek-ai/dsh-plan-mode'), description: 'Plan', input: { hint: 'Task' } },
   { name: 'goal', definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-goal'), description: 'Goal', input: { hint: 'Goal' } },
   { name: 'permission', definitionId: CommandDefinitionId('@deepseek-ai/dsh-permission-presets'), description: 'Permission', input: { hint: 'Preset' } },
-  { name: 'feedback', definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-feedback'), description: 'Feedback', input: { hint: 'Feedback' } },
   { name: 'export', definitionId: CommandDefinitionId('@deepseek-ai/dsh-session-log-export'), description: 'Export' },
 ]
 
@@ -58,7 +57,6 @@ describe('SDK query text recognition', () => {
   })
 
   it('leaves other registered commands and unavailable supported commands unchanged', () => {
-    expect(queryCommand('/feedback', commands)).toBeUndefined()
     expect(queryCommand('/goal', [])).toBeUndefined()
     expect(queryCommand('/plan', [])).toBeUndefined()
     expect(queryCommand('/compact', [])).toBeUndefined()

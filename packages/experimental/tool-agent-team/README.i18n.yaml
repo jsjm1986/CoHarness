@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/tool-agent-team/README.md
 document:
-  en: 05d90c98ea1c53058aa140c01a6f68e254602ccd
-  zh: d38570fcafb2c874419f16b0c2ca25e7e93d811e
+  en: cca326412456a6e107f9d9acfe9b81e40149ab7b
+  zh: 606d629d740b8e515be7b0ddf55d8a7e379729d9
 /:
   en: 4133452b68183e6d
   zh: bcc3481d8c4348a0
@@ -30,8 +30,8 @@ document:
   en: 8e1e365ff3b0dfb2
   zh: 8e1e365ff3b0dfb2
 /deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools/what-the-model-sees:
-  en: 7ceb3ace831abb1f
-  zh: 5ea8e65fd4e4b2be
+  en: 7eb28d167068ac2a
+  zh: 27bf6f6c04fc66ce
 /deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools/token-effect:
   en: 1c0b3b6062cdb6ee
   zh: 745a23d11c962dad

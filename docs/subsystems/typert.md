@@ -412,11 +412,13 @@ type TypertGatewayErrorCode =
   | 'gateway/context-unavailable'
   | 'gateway/definition-unavailable'
   | 'gateway/input-invalid'
+  | 'gateway/interactions-forbidden'
   | 'gateway/invocation-unavailable'
   | 'gateway/lookup-failed'
   | 'gateway/lookup-not-found'
   | 'gateway/lookup-unavailable'
   | 'gateway/method-unavailable'
+  | 'gateway/peer-disposed'
   | 'gateway/provider-mismatch'
   | 'gateway/result-invalid'
   | 'gateway/service-unavailable'
@@ -426,6 +428,45 @@ type TypertGatewayErrorCode =
 ```ts type-equiv
 /** Host dispatcher consumed by Connection adapters. */
 interface TypertGateway {
+  /**
+   * Check for an active owner Client event stream, the only kind that can answer forwarded waterfalls.
+   * @returns whether an owner stream is open and has not been cancelled.
+   */
+  hasLiveClient(): boolean
+
+  /**
+   * Inspect unsettled forwarded events without changing their lifetime.
+   * @returns detached metadata for all unsettled forwarded events in arrival order.
+   */
+  getPendingRemoteEvents(): readonly PendingRemoteEventInfo[]
+
+  /**
+   * Register the application-selected forwarded-event source.
+   * @param source - stream factory installed by the Remote assembly.
+   * @param host - stable Host facts included in each Client generation's opening frame.
+   * @returns disposer removing this exact source and cancelling its active streams.
+   */
+  registerRemoteEvents(
+    source: TypertRemoteEventSource,
+    host: RemoteEventHostInfo,
+  ): () => Promise<void>
+
+  /**
+   * Open the `$events` downlink for one Client carrier generation: the ready
+   * frame binding later `$events/result` calls, then forwarded notifications
+   * and scoped waterfalls until the signal or the source ends the generation.
+   * @param payload - decoded carrier payload; the event stream requires the
+   *   standard Remote payload with an empty args object.
+   * @param signal - logical-stream cancellation joined with the source and Peer lifetimes.
+   * @param peer - Peer the stream speaks for; only an owner principal answers scoped waterfalls.
+   * @returns validated downlink frames in arrival order.
+   */
+  openRemoteEvents(
+    payload: unknown,
+    signal: AbortSignal,
+    peer: PeerScope,
+  ): AsyncGenerator<RemoteEventDownlinkFrame>
+
   /**
    * Invoke one live Remote method without assuming a carrier or response envelope.
    * @param request - decoded endpoint and named wire arguments.

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/agent-team.md
 document:
-  en: c8fa10f4d88cd653b7bbfd5baafcce870a257850
-  zh: 185d603ecb9ea29f9122ef9045c63e77d6cbbb89
+  en: 9cbcbf60bc1c681ce903bd48787a8a1df3e4577c
+  zh: 292828c6a7e1559d1b3bfb4820977b132d0c92fa
 /agent-teams:
   en: c525a2fd74fe5752
   zh: 0e3eb997b3436e53

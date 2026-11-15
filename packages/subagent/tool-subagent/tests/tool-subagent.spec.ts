@@ -46,7 +46,7 @@ function fakeAgent(ctx: Context, id = 'parent-1'): Agent {
     session: Session.create(sessionId),
     ctx: ctx.plugin(() => {}).ctx,
     inbox: { nextTurn: [], nextStep: [], remove: () => false },
-  } as unknown as Agent
+  } as Agent
 }
 
 /** Create a package-test context with the tool's required projection seam. */
@@ -151,7 +151,7 @@ describe('dsh-tool-subagent', () => {
     // Schema omission is advertising, not enforcement: the arg validator
     // allows undeclared keys, so the opt-out must also hold in execute().
     const ctx = await setup({ provider: 'mock', enableRunInBackground: false })
-    const parent = { id: SessionId('sess-off'), inject: () => {}, options: {}, session: Session.create(SessionId('sess-off')) } as unknown as Agent
+    const parent = { id: SessionId('sess-off'), inject: () => {}, options: {}, session: Session.create(SessionId('sess-off')) } as Agent
 
     const forced = await callSubagent(ctx, { description: 'd', prompt: 'p', run_in_background: true }, { agent: parent })
     expect(forced.isError).toBe(true)
@@ -767,7 +767,7 @@ describe('dsh-tool-subagent', () => {
   })
 
   it.each([
-    { label: 'a string', value: '1' as unknown as number },
+    { label: 'a string', value: '1' as number },
     { label: 'NaN', value: Number.NaN },
     { label: 'positive infinity', value: Number.POSITIVE_INFINITY },
     { label: 'negative infinity', value: Number.NEGATIVE_INFINITY },
@@ -843,7 +843,7 @@ describe('dsh-tool-subagent background mode', () => {
       options: {},
       session: Session.create(id),
       inbox: { nextTurn: [], nextStep: [], remove: () => false },
-    } as unknown as Agent
+    } as Agent
     ctx.agents.register(agent)
     return agent
   }
@@ -1330,7 +1330,7 @@ describe('background preflight failure (no orphaned child, by construction)', ()
       inject: () => {},
       options: {},
       session: Session.create(id),
-    } as unknown as Agent
+    } as Agent
     ctx.agents.register(parent)
 
     let starts = 0

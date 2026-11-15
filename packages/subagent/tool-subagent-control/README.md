@@ -17,7 +17,7 @@ The tool performs no lifecycle routing — residency, cold resume, and authoriza
 
 ## Summary
 
-`dsh-tool-subagent-control` adds the global control tools for a named subagent tree: `send_message` steers to any other member by name or Session id, `interrupt_agent` stops a descendant's current turn while keeping its inbox and descendants intact, and `list_agents` (from the separately loadable `list-agents` plugin) lists the root plus all reachable continuable descendants with names, statuses, and descriptions. The `subagent:identity` prompt context tells each agent its own name, its creator's name, and the tree root, plus messaging and discovery guidance for the tools admitted to its tool set. Parents and continuable children inherit the same `send_message` definition and ordering, so model communication adds no child-only tool schema. No tool's presence decides whether a delegation tool starts continuable work.
+`dsh-tool-subagent-control` adds the global control tools for a named subagent tree: `send_message` steers to any other member by name or Session id, `interrupt_agent` stops a descendant's current turn while keeping its inbox and descendants intact, and `list_agents` (a separately loadable plugin) lists the root plus all reachable continuable descendants with names, statuses, and descriptions. The `subagent:identity` prompt context tells each agent its name, its creator's name, and the tree root, plus guidance for the admitted tools. Model communication adds no child-only tool schema, and no tool decides whether delegation starts continuable work.
 
 ## Table of Contents
 

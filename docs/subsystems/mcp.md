@@ -85,7 +85,9 @@ type McpResourceRequest =
 /** One configured server's resource access, owned by its MCP connection plugin. */
 interface McpResourceProvider {
   /**
-   * Run an operation against one live connection generation.
+   * Run an operation against one live connection generation. The resource tools
+   * dispatch in parallel, so one provider may receive several concurrent requests;
+   * each must settle independently.
    * @param request - MCP resource method and parameters.
    * @param exec - caller identity and cancellation for this invocation.
    * @returns the protocol result as lossless JSON.
@@ -106,7 +108,10 @@ Programmatic owners mount with `mountMcpClient(ctx, config)` and retain its clea
 interface McpClientHandle {
   /** Initial connection and catalog readiness; rejects when strict startup fails. */
   ready: Promise<void>
-  /** Stop the connection and confirm retained local process cleanup. */
+  /** Stop the connection and settle within the close budget; incomplete cleanup
+    * is recorded in the Fiber's status cell rather than thrown. While that record
+    * is incomplete, a later call retries the process cleanup a stdio owner still
+    * retains and records the new result. */
   dispose(): Promise<void>
 }
 ```

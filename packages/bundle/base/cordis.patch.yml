@@ -252,7 +252,6 @@
 
     - id: fs-observation-policy
       name: '@deepseek-ai/dsh-fs-observation-policy'
-      disabled: true
 
     - id: tool-fs
       name: '@deepseek-ai/dsh-tool-fs'

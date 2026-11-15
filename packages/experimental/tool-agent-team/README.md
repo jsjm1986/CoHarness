@@ -49,7 +49,7 @@ Readiness, blockers, and `writeScopeWarnings` are advisory coordination: `write_
 
 #### What the model sees
 
-When Team mode is enabled, one shared policy section explains the shared working directory, write-scope and dependency coordination, the claim-update-complete workflow, and that task changes do not wake anyone — the Lead must wait for required teammates before its final answer. Disabled sessions see no section and no tools. Task results arrive as compact JSON rows; the board itself stays log-only and never enters derived history.
+When Team mode is enabled, one shared policy section explains the shared working directory, write-scope and dependency coordination, the claim-update-complete workflow, and that task changes do not wake anyone — the Lead must wait for required teammates before its final answer. Disabled sessions see no section and no tools. Task results arrive as compact JSON rows from the four `team_task_*` tools in the [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-agent-team); the board itself stays log-only and never enters derived history.
 
 #### Token effect
 

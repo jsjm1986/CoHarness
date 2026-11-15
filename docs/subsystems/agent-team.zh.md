@@ -9,7 +9,7 @@
 `TeamId` 是具有独立[品牌](core.zh.md#branded-ids)的 Root `SessionId`。`TeamTaskId` 在 Team 内按 `task-<n>` 单调分配；`TeamMessageId` 是全局随机值。teammate 的 Session id 始终是持久身份，而 `name` 是不可变的模型／UI 标签。
 
 ```ts type-equiv
-/** Whole durable value written on every teammate lifecycle change. */
+/** Historical roster value written by earlier Team builds on every teammate lifecycle change. */
 interface TeamMemberSnapshot {
   readonly id: SessionId
   readonly name: string
@@ -17,12 +17,6 @@ interface TeamMemberSnapshot {
   readonly provider: string
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
-  /**
-   * The route the member's own session would resume with, captured from the
-   * live child Agent when it first became active. Absent on members activated
-   * before this field existed and on members that never reached `active`.
-   */
-  readonly model?: string
   readonly error?: string
 }
 ```
@@ -34,15 +28,12 @@ interface TeamMemberSnapshot {
 Lead Session 首先存储完整 queued message。只有 target 的 pending inbox 条目或已记录用户消息完成持久化，才会写入独立 acknowledgement event，queued-minus-delivered 因而构成恢复 mailbox。
 
 ```ts type-equiv
-/** One peer message retained until its target Session records it. */
+/** One peer message recorded by the historical Team mailbox. */
 interface TeamMessageSnapshot {
-  /** Captured participants; Team routing never recovers identity from the latest caller. */
-  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly id: TeamMessageId
   readonly senderId: SessionId
   readonly senderName: string
   readonly targetId: SessionId
-  readonly delivery: 'quiet' | 'wakeup'
   readonly content: ContentBlock[]
 }
 ```
@@ -50,9 +41,9 @@ interface TeamMessageSnapshot {
 target Session 会在 pending inbox 条目和最终用户消息上保留消息身份与发送者归因。跨 inbox 与历史折叠该 source 构成 target 侧去重键；模型可见的 framing 会重复 id 和发送者。
 
 ```ts type-equiv
-/** Source retained by the target Session for durable mailbox de-duplication. */
+/** Source recorded by a target Session for one historical Team mailbox delivery. */
 interface TeamMessageSource {
-  /** Verified adjacent routing-host scope for this exact queued delivery. */
+  /** Verified adjacent routing-host scope persisted by version-1 deliveries. */
   readonly gatewayExecutionScope?: ExecutionInheritance
   readonly kind: 'team-message'
   readonly teamId: TeamId
@@ -75,6 +66,8 @@ interface TeamTaskSnapshot {
   readonly description: string
   readonly status: TeamTaskStatus
   readonly ownerId?: SessionId
+  /** Immutable agent path captured at assignment; absent on unnamed historical owners. */
+  readonly ownerName?: string
   readonly blockedBy: TeamTaskId[]
   readonly writeScopes: string[]
 }

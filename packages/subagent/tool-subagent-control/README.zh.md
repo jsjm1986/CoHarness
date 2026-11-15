@@ -17,7 +17,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-tool-subagent-control` 为命名 subagent 树添加全局控制工具：`send_message` 按名称或会话 id 向树中任何其他成员 steering（中途引导），`interrupt_agent` 停止后代当前轮次但保留其收件箱与后代，`list_agents`（来自可单独加载的 `list-agents` 插件）列出 root 加所有可达可继续后代的名称、状态与描述。`subagent:identity` 提示词上下文告诉每个 agent 它自己的名称、其创建者的名称与树 root，并为其工具集所准入的工具附带消息与发现指引。父级与可继续子级继承相同的 `send_message` 定义和顺序，因此模型通信不会增加子级专属工具 schema。是否加载这些工具不会决定委派工具是否启动可继续工作。
+`dsh-tool-subagent-control` 为命名 subagent 树添加全局控制工具：`send_message` 按名称或会话 id 向树中任何其他成员 steering（中途引导），`interrupt_agent` 停止后代当前轮次但保留其收件箱与后代，`list_agents`（可单独加载的插件）列出 root 加所有可达可继续后代的名称、状态与描述。`subagent:identity` 提示词上下文告诉每个 agent 它的名称、其创建者的名称与树 root，并为已准入的工具附带指引。模型通信不增加子级专属工具 schema，且没有任何工具决定委派是否启动可继续工作。
 
 ## 目录
 

@@ -307,7 +307,7 @@ describe('Remote event Host source', () => {
     const abort = new AbortController()
     const iterator = sourceOf(gateway)(abort.signal)[Symbol.asyncIterator]()
     const agentCtx = ctx.extend()
-    const agent = { id: 'agent-2', ctx: agentCtx } as unknown as Agent
+    const agent = { id: 'agent-2', ctx: agentCtx } as Agent
     const target = scopeTarget(ctx, agent)
     const request = { kind: 'fixture', agent }
 

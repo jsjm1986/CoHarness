@@ -618,6 +618,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'The one concrete loop plugin; extension packages depend on dsh-agent events and services, not on this package.',
   },
   {
+    key: 'headlessStartup',
+    pkg: 'headless',
+    title: 'One-shot headless invocation values',
+    mode: 'bundle',
+    consumers: ['headless'],
+    note: 'Parses the task, Session identity, permission options, and output mode once; the runner consumes the published values instead of re-reading argv.',
+  },
+  {
     key: 'goals',
     pkg: 'goal',
     title: 'Same-session goal domain',

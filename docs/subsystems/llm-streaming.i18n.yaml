@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/llm-streaming.md
 document:
-  en: bbc8d87f178de296aedf809355b5f4c872a75776
-  zh: cd50821c69231964ea9c5eb4c42dacd52dfb836a
+  en: c9509ec01df06fa6486d8491b96bafc4d0046c41
+  zh: d3a74290e5bd93ac128f9ebee6d51162e7634a69
 /llm-streaming:
   en: d40ab180baf95513
   zh: 93fddbf35c0d366a

@@ -78,7 +78,7 @@ Native request headers retain Office declarations across resume and fork, includ
 ## Further Exploration
 
 - [Office kit](../office-kit/README.md) — conversion queue, limits, and Kit location.
-- [Office tool decision](../../../.agents/notes/implemented/architecture/2026-10-31-native-office-tool.md) — why Office operations run through the Host.
+- [Office kit absorption](../../../.agents/notes/implemented/feature/2026-11-25-upstream-office-kit-absorption.md) — why Office operations run through the Host.
 - [Tool authoring reference](../../../docs/cookbook/adding-a-tool.md) — execution and presentation contracts.
 
 <a id="model-experience"></a>

@@ -11,7 +11,7 @@ Agent Teams coordination domain. `ctx.agentTeams` owns each root Session's Team 
 
 ## Summary
 
-`dsh-experimental-agent-team` turns one coding session into a small working team when Team mode is on: the root agent becomes the Lead, delegates to named teammate subagents, and coordinates shared work through a durable task board with compare-and-set updates. Team state lives in the `agentTeam` Session projection — mode selection and task snapshots replay deterministically from the Lead log, and version-1 records written by the earlier roster/mailbox generation remain readable without being rewritten. The package provides no tools of its own — mount `dsh-experimental-tool-agent-team` for the model-facing task tools and `dsh-tool-subagent-control` for teammate messaging. It is published under its experimental name, carries no stability promise, and needs durable session storage to activate.
+`dsh-experimental-agent-team` turns one coding session into a small working team when Team mode is on: the root agent becomes the Lead, delegates to named teammate subagents, and coordinates shared work through a durable task board with compare-and-set updates. Team state lives in the `agentTeam` Session projection — mode selection and task snapshots replay deterministically from the Lead log, and version-1 records written by the earlier roster/mailbox generation remain readable. The package provides no tools — mount `dsh-experimental-tool-agent-team` for the model-facing task tools and `dsh-tool-subagent-control` for teammate messaging. It needs durable session storage to activate.
 
 ## Table of Contents
 
@@ -72,7 +72,7 @@ No model tokens; durable records stay outside derived history.
 
 #### KV Cache effect
 
-None.
+No direct effect: durable records stay outside derived history and never enter the provider prefix.
 
 ## Known Limitations and Deferred Work
 

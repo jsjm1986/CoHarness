@@ -10,7 +10,7 @@ Agent Teams roster 的 `tryMembership` 通过折叠子 Session 自身事件中�
 
 ## 决策
 
-[TeamRoster.subagentDescriptor](../../../../packages/experimental/agent-team/src/roster.ts) 把 `session.header.origin === "subagent"` 作为第一分类依据：`childSessionMeta` 在创建时把该标记写入持久 session header，因此在 `agent/created` 公告子代理之前已经可见。descriptor 折叠仍是旧 session（origin 字段出现之前创建）以及已携带该事件的冷恢复子代理的权威。
+[按 origin 分类的子代理枚举](../../../../packages/subagent/subagent/src/list-children.ts) 把 `session.header.origin === "subagent"` 作为第一分类依据：`childSessionMeta` 在创建时把该标记写入持久 session header，因此在 `agent/created` 公告子代理之前已经可见。descriptor 折叠仍是旧 session（origin 字段出现之前创建）以及已携带该事件的冷恢复子代理的权威。
 
 ## 已考虑的备选方案
 

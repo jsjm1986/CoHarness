@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/attachment.md
 document:
-  en: 37cbb6e792d63b2e39d55785f7bb495bb562d1e9
-  zh: eac3d6fef70ffbbba8f7b7c35d294f6658355953
+  en: 2541e0b9390fc39df72fbcdf59b6be529a5c7c46
+  zh: 09ee18cbbad819a6f89d2c3d33d82767858063b5
 /durable-image-attachments:
   en: 82a5600d372d3d73
   zh: fce634b46be78821

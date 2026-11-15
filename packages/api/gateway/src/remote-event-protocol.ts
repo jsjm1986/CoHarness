@@ -179,7 +179,7 @@ export function projectRemoteEventRejection(reason: unknown): RemoteEventRejecti
   const name = stringProperty(record, 'name') ?? 'Error'
   const message = stringProperty(record, 'message') ?? String(reason)
   const code = stringProperty(record, 'code')
-  const details = record === undefined ? undefined : Reflect.get(record, 'details') as unknown
+  const details = record === undefined ? undefined : Reflect.get(record, 'details')
   return {
     name,
     message,

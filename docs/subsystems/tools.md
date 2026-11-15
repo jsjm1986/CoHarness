@@ -30,7 +30,7 @@ interface ToolDefinition extends ToolSchema {
   /**
    * Run one accepted call and return only its canonical lossless-JSON value.
    * Async work must observe or forward `exec.signal` and settle only after its
-   * owned work reaches quiescence. The registry preserves caller cancellation
+   * owned work reaches quiescence. The executor preserves caller cancellation
    * through around-dispatch signal replacement and does not abandon this
    * promise, but it cannot hard-kill same-process code.
    * @param args - losslessly snapshotted, frozen model arguments.
@@ -49,12 +49,12 @@ interface ToolDefinition extends ToolSchema {
    */
   projectContent?(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>): ContentBlock[] | undefined
   /**
-   * Synchronous last-mile transform for model-facing content. The registry
+   * Synchronous last-mile transform for model-facing content. The executor
    * snapshots this callback when execution starts and invokes it exactly once
    * for every normalized outcome, including pipeline failures that bypass
    * `tools/post-execute`, immediately before lossless materialization.
    * Returning `undefined` preserves the content; every other result field
-   * remains registry-owned. The callback must be total and must not throw.
+   * remains executor-owned. The callback must be total and must not throw.
    * @param exec - immutable execution identity and arguments.
    * @param result - complete normalized outcome before materialization.
    * @returns replacement content, or `undefined` to preserve it.
@@ -188,8 +188,8 @@ type ToolExecutionToken = symbol & { readonly [toolExecutionTokenBrand]: true }
 
 ```ts type-equiv
 /**
- * Caller-supplied description of one tool call. {@link ToolRuntime.execute}
- * adds the registry-owned token to form a pipeline {@link ToolExecution};
+ * Parsed input to the shared invocation pipeline. The pipeline
+ * adds its own token to form a {@link ToolExecution};
  * callers do not choose that token.
  */
 interface ToolExecutionInput {
@@ -200,20 +200,22 @@ interface ToolExecutionInput {
    */
   readonly rootCallId?: ToolCallId
   readonly name: string
-  /** Frozen binding-time PTC schema; auxiliary model consumers log their own request input. */
+  /** Binding-time tool schema for a PTC inner call; frozen by its producer and never logged. */
   readonly schema?: ToolSchema
   /** Losslessly JSON-serializable parsed arguments (tools validate their own schema). */
   readonly arguments: unknown
   /** The agent on whose behalf the call runs (set by the agent loop). */
   readonly agent?: Agent
+  /** Step admission shared by Native and PTC dispatch. Conditional tools require it. */
+  readonly toolSet?: ResolvedToolSet
   /**
    * Opaque token of the enclosing transport execution, when one exists. PTC
    * mode sets this on SDK sub-dispatches so commit-style observers can wait for
    * the outer `run_code` outcome without receiving its live mutable execution.
    * The token also marks the call as a transport sub-dispatch rather than a
-   * model-direct call: under `mode: 'ptc'`, only calls WITH a parent may
+   * model-direct call: with the PTC executor selected, only calls with a parent may
    * execute a native tool name — a model-direct call (no parent) is denied as
-   * `UNKNOWN_TOOL` before the policy pipeline. See {@link ToolRuntime.execute}.
+   * `UNKNOWN_TOOL` before the policy pipeline.
    */
   readonly parent?: ToolExecutionToken
   /** Required caller-owned cancellation for this invocation. */
@@ -225,7 +227,7 @@ A tool body receives the runtime extension. `deferContext()` attaches context to
 
 ```ts type-equiv
 /**
- * Runtime context handed to a tool implementation after the registry has
+ * Runtime context handed to a tool implementation after the executor has
  * accepted a {@link ToolExecution}. {@link deferContext} attaches context to
  * this execution's own result — a composite tool ferries nested-dispatch
  * context back to the outer result, and a leaf tool may mint a fresh
@@ -294,16 +296,16 @@ interface PtcDispatchLog {
 
 ```ts type-equiv
 /**
- * One pending tool call inside the registry pipeline. Parsed arguments cross
+ * One pending tool call inside the executor pipeline. Parsed arguments cross
  * one lossless-JSON materialization boundary before policy and are deep-frozen;
- * call identity, the caller signal, and the registry-assigned {@link token} are
- * readonly. The registry freezes the complete object before `tools/result`
+ * call identity, the caller signal, and the executor-assigned {@link token} are
+ * readonly. The executor freezes the complete object before `tools/result`
  * observers run.
  */
 interface ToolExecution extends ToolExecutionInput {
   /** Root model-requested call, resolved for every root and nested execution. */
   readonly rootCallId: ToolCallId
-  /** Registry-assigned identity shared with nested calls only as their opaque `parent` token. */
+  /** Executor-assigned identity shared with nested calls only as their opaque `parent` token. */
   readonly token: ToolExecutionToken
 }
 ```
@@ -312,7 +314,7 @@ interface ToolExecution extends ToolExecutionInput {
 /**
  * Around-dispatch view of a {@link ToolExecution}. A `tools/execute` wrapper
  * may replace the signal for its delegated lifetime, but it cannot remove it.
- * The registry fuses every replacement with the captured caller signal.
+ * The executor fuses every replacement with the captured caller signal.
  */
 interface ToolDispatchExecution extends Omit<ToolExecution, 'signal'> {
   /** Cancellation signal visible to the next wrapper or tool body. */
@@ -331,9 +333,9 @@ A `ToolGuard` is scope-aware final pre-dispatch policy. Its return type delibera
  * returning `undefined` leaves it unchanged. Because guards have no allow
  * result, listener ordering cannot turn a denial back into permission.
  * @param execution - the identity-protected call after extensible pre-execute policy completed.
- * @returns a final denial reason, or `undefined` to leave the call allowed.
+ * @returns a final denial reason, a denial with structured error identity, or `undefined` to leave the call allowed.
  */
-type ToolGuard = (execution: Readonly<ToolExecution>) => string | undefined
+type ToolGuard = (execution: Readonly<ToolExecution>) => string | ToolGuardDenial | undefined
 ```
 
 ```ts type-equiv
@@ -417,12 +419,13 @@ type PreToolDecision =
 ```ts type-equiv
 /**
  * Post-dispatch decision: accept, replace one projection, attach context for the
- * next request, or block by turning corrective feedback into an error result.
+ * next request, or block by turning corrective feedback into an error result
+ * whose optional `info` is its structured error identity.
  */
 type PostToolDecision =
   | { kind: 'accept'; content?: ContentBlock[]; value?: never; additionalContexts?: UserMessage[] }
   | { kind: 'accept'; value: JsonValue; content?: never; additionalContexts?: UserMessage[] }
-  | { kind: 'block'; feedback: ContentBlock[]; additionalContexts?: UserMessage[] }
+  | { kind: 'block'; feedback: ContentBlock[]; info?: ToolErrorInfo; additionalContexts?: UserMessage[] }
 ```
 
 Call `next()` for the default or return a decision to short-circuit. Pre-policy may deny or ask; only `allowed-once` proceeds, while a non-grant, missing approval channel or service, or agent-less request becomes a denial. Guards may still impose a final denial. Arguments cannot be rewritten because history, audit, UI, and execution must agree.

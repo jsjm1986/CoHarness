@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/tool-subagent-control/README.md
 document:
-  en: 3bbbb5814cb2b8413650bafd57260c70485b15af
-  zh: 725b0f74b2818c393357c1c46f5a08d612ed3d45
+  en: 8af03844d4d5c304f8285538d9e4cc7f0b0098e9
+  zh: 71273b3377bacc7c40c39cb8de0cf4ae64bdf015
 /:
   en: aef64316a93b182f
   zh: 61495d48365178df
@@ -12,8 +12,8 @@ document:
   en: 2efb8c938068aa24
   zh: 6f4a201039ce33f2
 /deepseek-ai-dsh-tool-subagent-control/summary:
-  en: b85bad0425d7bbea
-  zh: 8fdaab6348dabd43
+  en: 310273be4ff47c91
+  zh: 27df13a33bd06cfe
 /deepseek-ai-dsh-tool-subagent-control/table-of-contents:
   en: b4683d2a53256fda
   zh: 4e65ff63dc8c48fe

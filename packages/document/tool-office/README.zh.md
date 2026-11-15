@@ -78,7 +78,7 @@ kind: "package-reference"
 ## 进一步探索
 
 - [Office 套件](../office-kit/README.zh.md) — 转换队列、上限和 Kit 定位。
-- [Office 工具决策](../../../.agents/notes/implemented/architecture/2026-10-31-native-office-tool.md) — Office 操作为何通过 Host 执行。
+- [Office 套件吸收](../../../.agents/notes/implemented/feature/2026-11-25-upstream-office-kit-absorption.zh.md) — Office 操作为何通过 Host 执行。
 - [工具编写参考](../../../docs/cookbook/adding-a-tool.zh.md) — 执行与展示契约。
 
 <a id="model-experience"></a>

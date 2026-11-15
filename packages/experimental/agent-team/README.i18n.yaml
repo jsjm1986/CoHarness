@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/agent-team/README.md
 document:
-  en: 6d35070301a949f1a64a248d7a4bddaac5545617
-  zh: 9911b1592950bfe803d573b22ff5dc02c175c295
+  en: 484158f9a6398c1d3be4e2298f114b648b71f42a
+  zh: 402aa774accdace6f45517dc1d66ebb4c810f58a
 /:
   en: 4c45cb651b790eef
   zh: df773998a5cc7e2e
@@ -12,8 +12,8 @@ document:
   en: da24ec9141fbc7d7
   zh: a308fd97d96f8829
 /deepseek-ai-dsh-experimental-agent-team/summary:
-  en: d821d6b808befc1e
-  zh: 84b8a2bc5cc9d1d0
+  en: 917e06b0fcdcaaf3
+  zh: a03d9cfc38496dc2
 /deepseek-ai-dsh-experimental-agent-team/table-of-contents:
   en: 35867cdb517fb49b
   zh: 35867cdb517fb49b
@@ -42,7 +42,7 @@ document:
   en: cb8b56847b463be2
   zh: 34156f44bbcbaf49
 /deepseek-ai-dsh-experimental-agent-team/model-experience/team-state/kv-cache-effect:
-  en: 4f0eadf94828e66e
+  en: 4786d36f0eacc5fe
   zh: 97d3eb3e79199354
 /deepseek-ai-dsh-experimental-agent-team/known-limitations-and-deferred-work:
   en: 3891a1fe54e3a993

@@ -28,4 +28,4 @@ An unconfirmed cleanup refuses the affected query instead of creating another se
 
 ## Verification
 
-The real Loader [example](../../../../packages/lsp/lsp-stdio/tests/fixtures/cleanup-retry.mjs) retains a real stdio server through a controlled native-cleanup observation failure. It verifies that cleanup stops that server before replacement, then joins both native servers. Unit cases cover concurrent disposal failure, closed query admission, retained pool slots and sibling cleanup aggregation.
+The [lifecycle suite](../../../../packages/lsp/lsp-stdio/tests/lifecycle.spec.ts) retains failed instances after sibling drains and retries their cleanup against real stdio servers. It verifies that cleanup stops a server before replacement, then joins both native servers. Unit cases cover concurrent disposal failure, closed query admission, retained pool slots and sibling cleanup aggregation.

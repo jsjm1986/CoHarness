@@ -93,6 +93,15 @@ if (operation?.kind === 'update') {
 
 - [文件系统包组](../README.zh.md)——提供方、策略和文件工具。
 
+<a id="model-experience"></a>
+## Model Experience
+
+None, as the pure parser and text updater construct no model input; the apply_patch tool that consumes it owns model-facing schemas.
+
+#### KV Cache effect
+
+No direct effect.
+
 ## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>

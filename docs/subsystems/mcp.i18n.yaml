@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/mcp.md
 document:
-  en: 8bfacf69ac225c897445cb12bcdf9d32a8446911
-  zh: 206cad767f7acc84817b3296775e1cf55231acb9
+  en: c97fcaeb52fc48423fa556c392878517e7ad7a6f
+  zh: cc3118ee11ef8bccfb5b45ae94688c946055a2e4
 /mcp:
   en: 8e65e07d162dcc41
   zh: 5f4ae607cd468767
