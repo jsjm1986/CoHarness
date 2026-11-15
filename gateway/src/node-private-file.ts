@@ -1,7 +1,7 @@
 /** Owner-private state-file checks: POSIX mode/uid boundaries and the Windows ACL equivalent. @module */
 import { lstat, open } from 'node:fs/promises'
 import { z } from 'zod'
-import { runGatewayChildCommand } from './child-command.ts'
+import { runWindowsShellProbe } from './child-command.ts'
 
 /** Declared private-file verdicts; each caller maps them to its own error type. */
 export type PrivateFileState = 'private' | 'unreadable' | 'not-private'
@@ -160,7 +160,7 @@ async function protectedObjectState(directory:string,mode:number,file:boolean,si
   const link = await lstat(directory).catch(() => undefined)
   if (link === undefined) return 'unreadable'
   if (link.isSymbolicLink()) return 'unprotected'
-  const probe = await runGatewayChildCommand('powershell.exe',
+  const probe = await runWindowsShellProbe(
     ['-NoProfile', '-NonInteractive', '-Command', windowsProtectionProbe(WINDOWS_MODIFY_RIGHTS_MASK|(file?6:0),ownerReference!==undefined,false), directory,...(ownerReference?[ownerReference]:[])], 10_000, signal, 4096).catch(() => undefined)
   let acl: z.infer<typeof windowsProtectionSchema> | undefined
   try { acl = probe === undefined ? undefined : windowsProtectionSchema.parse(JSON.parse(probe.stdout)) } catch { acl = undefined }
@@ -205,7 +205,7 @@ async function windowsAclPrivate(file: string, signal: AbortSignal | undefined, 
  * @returns 'private' when every Allow grant is the owner SID or an OS-boundary principal.
  */
 export async function probeWindowsAclPrivate(file: string, signal?: AbortSignal): Promise<PrivateFileState> {
-  const probe = await runGatewayChildCommand('powershell.exe',
+  const probe = await runWindowsShellProbe(
     ['-NoProfile', '-NonInteractive', '-Command', windowsPrivateProbe(false), file], 10_000, signal, 4096).catch(() => undefined)
   let acl: z.infer<typeof windowsAclSchema> | undefined
   try { acl = probe === undefined ? undefined : windowsAclSchema.parse(JSON.parse(probe.stdout)) } catch { acl = undefined }
@@ -221,7 +221,7 @@ export async function probeWindowsAclPrivate(file: string, signal?: AbortSignal)
  */
 export async function tightenPrivateFileAcl(file: string, signal?: AbortSignal): Promise<void> {
   if (process.platform !== 'win32') return
-  await runGatewayChildCommand('powershell.exe',
+  await runWindowsShellProbe(
     ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_ACL_TIGHTEN, file], 10_000, signal, 4096)
 }
 

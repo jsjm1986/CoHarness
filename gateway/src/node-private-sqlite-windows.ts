@@ -1,6 +1,6 @@
 /** Cold Windows SQLite provisioning uses one bounded OS process for the complete path and its journals. */
 import {join,parse} from 'node:path'
-import {runGatewayChildCommand} from './child-command.ts'
+import {runGatewayChildCommand,runWindowsShellProbe} from './child-command.ts'
 import {windowsServiceStoreAclChecks} from './node-private-file.ts'
 
 /** @param directory - absolute private SQLite subdirectory. @param filename - fixed store filename.
@@ -51,7 +51,7 @@ foreach($suffix in @('','-wal','-shm','-journal')){
   const root=parse(directory).root,systemRoot=process.env.SystemRoot
   if(!systemRoot||!/^([A-Z]):\\$/iu.test(root))throw new Error('A fixed Windows drive is required.')
   const [{stdout},{stdout:mount}]=await Promise.all([
-    runGatewayChildCommand('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',encoded],timeout,undefined,8192),
+    runWindowsShellProbe(['-NoProfile','-NonInteractive','-EncodedCommand',encoded],timeout,undefined,8192),
     runGatewayChildCommand(join(systemRoot,'System32','mountvol.exe'),[root,'/l'],timeout,undefined,4096),
   ])
   if(!/^\\\\\?\\Volume\{[a-f0-9-]{36}\}\\$/iu.test(mount.trim()))throw new Error('The fixed Windows volume has no identity.')
