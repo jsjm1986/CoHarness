@@ -35,13 +35,13 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`@anthropic-ai/claude-agent-sdk`](https://github.com/anthropics/claude-agent-sdk-typescript) | SEE LICENSE IN README.md |
 | [`@anthropic-ai/sdk`](https://github.com/anthropics/anthropic-sdk-typescript) | MIT |
 | [`@babel/code-frame`](https://github.com/babel/babel) | MIT |
+| [`@botiverse/oar`](https://github.com/botiverse/oar) | Apache-2.0 |
 | [`@browserbasehq/stagehand`](https://github.com/browserbase/stagehand) | MIT |
 | [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/push-notifications`](https://github.com/ionic-team/capacitor-plugins) | MIT |
 | [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-harness/libreoffice-kit) | MPL-2.0 |
 | [`@earendil-works/pi-ai`](https://github.com/earendil-works/pi) | MIT |
-| [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi) | MIT |
 | [`@eslint-community/regexpp`](https://github.com/eslint-community/regexpp) | MIT |
 | [`@fortune-sheet/core`](https://github.com/ruilisi/fortune-sheet) | MIT |
 | [`@fortune-sheet/react`](https://github.com/ruilisi/fortune-sheet) | MIT |
@@ -85,7 +85,6 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`clsx`](https://github.com/lukeed/clsx) | MIT |
 | [`commander`](https://github.com/tj/commander.js) | MIT |
 | [`compression`](https://github.com/expressjs/compression) | MIT |
-| [`cross-spawn`](https://github.com/moxystudio/node-cross-spawn) | MIT |
 | [`diff`](https://github.com/kpdecker/jsdiff) | BSD-3-Clause |
 | [`eventsource-parser`](https://github.com/rexxars/eventsource-parser) | MIT |
 | [`exceljs`](https://github.com/exceljs/exceljs) | MIT |
@@ -138,7 +137,6 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`typescript`](https://github.com/microsoft/TypeScript) | Apache-2.0 |
 | [`undici`](https://github.com/nodejs/undici) | MIT |
 | [`use-sync-external-store`](https://github.com/facebook/react) | MIT |
-| [`which`](https://github.com/isaacs/node-which) | ISC |
 | [`ws`](https://github.com/websockets/ws) | MIT |
 | [`xlsx`](https://git.sheetjs.com/SheetJS/sheetjs) | Apache-2.0 |
 | [`yaml`](https://github.com/eemeli/yaml) | ISC |
@@ -200,7 +198,6 @@ External packages **directly declared** for development, tests, types, or toolin
 
 | Package | License |
 | --- | --- |
-| [`@botiverse/oar`](https://github.com/botiverse/oar) | Apache-2.0 |
 | [`@braintree/sanitize-url`](https://github.com/braintree/sanitize-url) | MIT |
 | [`@capacitor/cli`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@modelcontextprotocol/node`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
@@ -214,7 +211,6 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`@types/babel__code-frame`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/compression`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/hosted-git-info`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
-| [`@types/js-yaml`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/jsdom`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/mdast`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/mime-types`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |

@@ -2,54 +2,9 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { ToolExecutionPipeline } from '@deepseek-ai/dsh-tools/pipeline'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type {
-  DefineToolOptions, InferArgs, ParameterSchemaSpec, ToolDefinition,
-  ToolExecutionInput, ToolExecutionResult, ToolRunContext,
-} from '@deepseek-ai/dsh-tools'
+import type { ToolExecutionInput, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 
-// Expand interface fields so the fixture's content value is checked as JSON without changing runtime values.
-type JsonFields<T> = T extends string | number | boolean | null | undefined ? T
-  : T extends (...args: never[]) => unknown ? T
-    : { [K in keyof T]: JsonFields<T[K]> }
-type ContentValue = JsonFields<ContentBlock>
-
-const CONTENT_VALUE_SCHEMA = { type: 'array', items: { type: 'json' } } as const
-
-/** Options for a fixture whose canonical value is its rendered content array. */
-export type ContentToolFixtureOptions<S extends ParameterSchemaSpec> = Omit<
-  DefineToolOptions<S, typeof CONTENT_VALUE_SCHEMA>,
-  'output' | 'execute'
-> & {
-  /** Produce the fixture's content blocks as its canonical test value. */
-  execute(args: InferArgs<S>, exec: ToolRunContext): Promise<ContentBlock[]>
-}
-
-/**
- * Define a test fixture that deliberately uses its content blocks as the
- * canonical JSON value. Product tools must declare domain-owned DTOs instead.
- * @param options - ordinary fixture fields plus a content-producing body.
- * @returns a registry-ready tool with an explicit JSON-array output contract.
- * @internal
- */
-export function defineContentToolFixture<const S extends ParameterSchemaSpec>(
-  options: ContentToolFixtureOptions<S>,
-): ToolDefinition {
-  // oxlint-disable-next-line typescript/unbound-method
-  const execute = options.execute
-  return defineTool({
-    ...options,
-    output: {
-      schema: CONTENT_VALUE_SCHEMA,
-      render: (_args, value) => value as ContentValue[],
-    },
-    async execute(args, exec) {
-      const value: ContentValue[] = await execute(args, exec)
-      return value
-    },
-  })
-}
+export { defineContentToolFixture, type ContentToolFixtureOptions } from '@deepseek-ai/dsh-tools'
 
 /**
  * Exercise invocation stages directly, preserving parsed and nested test inputs.

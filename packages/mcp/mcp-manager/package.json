@@ -39,14 +39,10 @@
     "lib/index.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts",
-    "lib/types/**/*.d.ts.map",
-    "lib/**/*.js.map",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts",
-    "lib/typert.remote-client.d.ts.map",
-    "src"
+    "lib/typert.remote-client.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {
@@ -66,7 +62,6 @@
     "@modelcontextprotocol/client": "2.3.0",
     "@deepseek-ai/dsh-credentials": "workspace:*",
     "@deepseek-ai/dsh-mcp-client": "workspace:*",
-    "@deepseek-ai/dsh-settings": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",

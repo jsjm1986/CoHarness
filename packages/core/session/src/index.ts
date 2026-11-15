@@ -635,6 +635,20 @@ function createAppendEvent(snapshot: ReturnType<typeof snapshotAppend>, seq: Ses
 export class Session {
   private log: SessionEvent[] = []
   private batchPublication: SessionEvent | undefined
+
+  /**
+   * Reverse-order rollback of append admissions after a failed commit; rollback
+   * failures aggregate so one bad admission cannot mask the rest.
+   */
+  private rollbackAppendAdmissions(rollbacks: readonly (() => void)[], error: unknown): never {
+    const failures: unknown[] = [error]
+    for (const rollback of [...rollbacks].reverse()) {
+      try { rollback() } catch (failure: unknown) { failures.push(failure) }
+    }
+    if (failures.length > 1) throw new AggregateError(failures, 'session append admission rollback failed')
+    throw error
+  }
+
   /** Single incremental owner of surface acceptance and projection state. */
   private readonly surfaceManager: SurfaceManager
 
@@ -1011,13 +1025,7 @@ export class Session {
         }
       }
     } catch (error: unknown) {
-      if (!committed && rollbacks !== undefined) {
-        const failures: unknown[] = [error]
-        for (const rollback of rollbacks.reverse()) {
-          try { rollback() } catch (failure: unknown) { failures.push(failure) }
-        }
-        if (failures.length > 1) throw new AggregateError(failures, 'session append admission rollback failed')
-      }
+      if (!committed && rollbacks !== undefined) this.rollbackAppendAdmissions(rollbacks, error)
       throw error
     } finally {
       this.batchPublication = undefined
@@ -1106,13 +1114,7 @@ export class Session {
         invokeContainedSessionObservers(entry.emitCtx, 'session/event', entry.id, callbackArgs, callbacks)
       }
     } catch (error: unknown) {
-      if (!committed && rollbacks !== undefined) {
-        const failures: unknown[] = [error]
-        for (const rollback of rollbacks.reverse()) {
-          try { rollback() } catch (failure: unknown) { failures.push(failure) }
-        }
-        if (failures.length > 1) throw new AggregateError(failures, 'session append admission rollback failed')
-      }
+      if (!committed && rollbacks !== undefined) this.rollbackAppendAdmissions(rollbacks, error)
       throw error
     } finally {
       if (entry !== undefined) {

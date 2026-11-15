@@ -192,7 +192,7 @@ export function sandboxRecord(): SandboxRecord {
 }
 
 /** Sandbox double that records each confinement in its plugin config and returns the argv unchanged. */
-export class RecordingSandbox extends SandboxProvider {
+class RecordingSandbox extends SandboxProvider {
   constructor(ctx: Context, private readonly record: SandboxRecord) {
     super(ctx)
   }
@@ -275,7 +275,7 @@ export function snapshot(ref: ChangeRequestRef): ChangeRequestSnapshot {
 }
 
 /** Provider for `https://fake.test/<owner>/<name>.git` remotes and `https://fake.test/<owner>/<name>/pull/<n>` URLs. */
-export class FakeProvider implements ForgeProvider {
+class FakeProvider implements ForgeProvider {
   readonly forge = 'fake'
   readonly fetches: (readonly number[])[] = []
   readonly probes: string[] = []
@@ -369,7 +369,7 @@ export class FakeProvider implements ForgeProvider {
 }
 
 /** An Agent double that counts the turns it would start. */
-export interface TestAgent extends Agent {
+interface TestAgent extends Agent {
   /** Turns the Agent would have started: a wake while idle, or one latched behind maintenance and replayed when it ends. */
   readonly wakes: number
 }
@@ -385,7 +385,7 @@ export interface TestAgent extends Agent {
  * @param session - Session the Agent drives.
  * @returns the Agent, not yet registered.
  */
-export function testAgent(ctx: Context, session: Session): TestAgent {
+function testAgent(ctx: Context, session: Session): TestAgent {
   const scope = ctx.plugin(() => {})
   const inbox = createInboxStub()
   let maintenance: Maintenance | undefined

@@ -590,12 +590,7 @@ export class SubagentContinuationManager {
     root: Agent,
   ): Promise<MessageId> {
     try {
-      if (contentHasImage(content)) {
-        await this.assertImageCapable(activation.handle.agent, options.signal)
-        if (activation.inbox.closing !== undefined) {
-          throw new SubagentError(`subagent "${activation.childId}" is closing`, 'ACTIVATION_CLOSING')
-        }
-      }
+      await this.assertImageDelivery(activation, content, options.signal)
       const messageId = await this.submitMemberAdmitted(activation, content, options, root)
       activation.announced = true
       return messageId
@@ -909,12 +904,7 @@ export class SubagentContinuationManager {
     commit?: () => void,
   ): Promise<MessageId> {
     try {
-      if (contentHasImage(content)) {
-        await this.assertImageCapable(activation.handle.agent, options.signal)
-        if (activation.inbox.closing !== undefined) {
-          throw new SubagentError(`subagent "${activation.childId}" is closing`, 'ACTIVATION_CLOSING')
-        }
-      }
+      await this.assertImageDelivery(activation, content, options.signal)
       const messageId = await this.submitAdmitted(activation, content, options, parent)
       commit?.()
       activation.announced = true
@@ -952,6 +942,16 @@ export class SubagentContinuationManager {
       parent,
       options.signal,
     )
+  }
+
+  /** Image deliveries also fail when the activation started closing before the capability check ran. */
+  private async assertImageDelivery(activation: Activation, content: ContentBlock[], signal: AbortSignal): Promise<void> {
+    if (contentHasImage(content)) {
+      await this.assertImageCapable(activation.handle.agent, signal)
+      if (activation.inbox.closing !== undefined) {
+        throw new SubagentError(`subagent "${activation.childId}" is closing`, 'ACTIVATION_CLOSING')
+      }
+    }
   }
 
   /** Refuse image content when the child's resolved model is text-only. */

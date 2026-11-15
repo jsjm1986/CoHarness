@@ -25,10 +25,7 @@
   "files": [
     "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts",
-    "lib/types/**/*.d.ts.map",
-    "lib/**/*.js.map",
-    "src"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {
@@ -48,7 +45,6 @@
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
     "@deepseek-ai/dsh-hmr": "workspace:*",
     "@deepseek-ai/cordis-plugin-include": "workspace:~",
-    "@types/js-yaml": "^4.0.9",
     "@deepseek-ai/dsh-app-boot": "workspace:*"
   },
   "peerDependenciesMeta": {

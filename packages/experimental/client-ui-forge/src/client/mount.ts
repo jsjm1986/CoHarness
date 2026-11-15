@@ -414,6 +414,9 @@ function registerUi(ctx: Context): void {
     name: 'sidebar.session.row.hover', id: 'forge-panel.row', order: 20, locale: NS, inject: listFace,
   }, SessionHoverForge))
   const bound = ctx.settingsScope.bind<WorktreeSettingsFields>({ namespace: WORKTREE_NS, source: 'host' })
+  /* jscpd:ignore-start -- Scope adapter mirrors the settings-form wiring
+     every plugin carries; client rules forbid importing another plugin's
+     internals across packages. */
   const worktreeScope: SettingsFormScope<WorktreeSettingsFields> = {
     getSnapshot: () => bound.getSnapshot(),
     subscribe: listener => bound.subscribe(listener),
@@ -421,6 +424,7 @@ function registerUi(ctx: Context): void {
       ? { op: 'set', path: [...op.path], value: op.value as JsonValue }
       : { op: 'unset', path: [...op.path] }), expectedRevision),
   }
+  /* jscpd:ignore-end */
   const worktreeSettings = new WorktreeSettingsForm(worktreeScope)
   ctx.effect(() => () => { worktreeSettings.dispose() }, 'forge-panel: worktree settings form')
   ctx.slots.inject('plugins.row.config', () => ctx.slots.register({

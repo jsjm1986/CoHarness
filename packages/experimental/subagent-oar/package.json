@@ -26,11 +26,7 @@
     "icon.svg",
     "locale/*.json",
     "lib/index.js",
-    "LICENSE-OAR",
-    "lib/types/**/*.d.ts",
-    "lib/types/**/*.d.ts.map",
-    "lib/**/*.js.map",
-    "src"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "icon": "./icon.svg",
@@ -42,19 +38,13 @@
     "@deepseek-ai/dsh-subprocess": "workspace:*"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.4.0",
+    "@botiverse/oar": "0.67.0",
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-timeout": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",
-    "@deepseek-ai/schemastery": "workspace:~",
-    "@earendil-works/pi-ai": "1.3.0",
-    "@earendil-works/pi-coding-agent": "1.3.0",
-    "cross-spawn": "^7.0.6",
-    "undici": "8.10.2",
-    "which": "^2.0.2"
+    "@deepseek-ai/schemastery": "workspace:~"
   },
   "devDependencies": {
-    "@botiverse/oar": "0.67.0",
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
     "@deepseek-ai/dsh-agent": "workspace:*",

@@ -14,6 +14,9 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import type { SettingsFormShell } from './form-model.ts'
 import css from './SettingsForm.module.css'
 
+/* jscpd:ignore-start -- Form shell adapted from
+   ui-settings-plugins/SettingsForm.tsx; client rules forbid importing another
+   plugin's internals across packages. */
 /** The copy the form frame renders, from the owning plugin's dictionary. */
 export interface SettingsFormLabels {
   /** Shown in place of the controls while the namespace is not served. */
@@ -72,3 +75,4 @@ export function SettingsForm(props: SettingsFormProps) {
     </div>
   )
 }
+/* jscpd:ignore-end */

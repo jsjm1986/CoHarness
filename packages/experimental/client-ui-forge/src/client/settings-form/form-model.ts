@@ -15,6 +15,10 @@
 
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 
+/* jscpd:ignore-start -- Field-model machinery adapted from
+   ui-settings-plugins/card-form.ts; client rules forbid importing another
+   plugin's internals across packages. */
+
 /** What the model reads of one Host entry's form. */
 export interface SettingsFormScopeSnapshot<T> {
   /** `ready` while the Host serves the entry to this client; the form renders nothing otherwise. */
@@ -147,9 +151,6 @@ interface PlannedWrite {
   op?: SettingsFormPathOp
 }
 
-/* jscpd:ignore-start -- Field-model machinery adapted from
-   ui-settings-plugins/card-form.ts; client rules forbid importing another
-   plugin's internals across packages. */
 /**
  * A whole-number field. An empty draft clears the field; any other draft that
  * is not a finite number blocks the save.

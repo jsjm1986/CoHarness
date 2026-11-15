@@ -157,6 +157,16 @@ export const ReconnectSchema: z<ReconnectConfig> = z.object({
   maxAttempts: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(RECONNECT_DEFAULTS.maxAttempts),
 })
 
+/** Fields both transports validate identically. */
+const sharedServerFields = {
+  toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
+  closeTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(5_000),
+  expandTemplates: z.boolean().default(false),
+  failOnStartupError: z.boolean().default(false),
+  maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
+  reconnect: ReconnectSchema,
+} as const
+
 export const Config: z<ConfigInput, Config> = z.union([
   z.object({
     transport: z.const('stdio'),
@@ -168,25 +178,15 @@ export const Config: z<ConfigInput, Config> = z.union([
     processGraceMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(2_000),
     processCloseTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(5_000),
     startupTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS),
-    toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
-    closeTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(5_000),
-    expandTemplates: z.boolean().default(false),
-    failOnStartupError: z.boolean().default(false),
-    maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
-    reconnect: ReconnectSchema,
+    ...sharedServerFields,
   }),
   z.object({
     transport: z.const('streamable-http'),
     serverName: z.string().required().pattern(SERVER_NAME_PATTERN),
     url: z.string().required(),
     headers: z.dict(String).default({}),
-    toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     startupTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS),
-    closeTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(5_000),
-    expandTemplates: z.boolean().default(false),
-    failOnStartupError: z.boolean().default(false),
-    maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
-    reconnect: ReconnectSchema,
+    ...sharedServerFields,
   }),
 ])
 

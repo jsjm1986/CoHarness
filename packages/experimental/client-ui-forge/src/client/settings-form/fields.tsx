@@ -10,6 +10,9 @@ import { useState, type ReactNode } from 'react'
 import { IconInfoOutline16, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './fields.module.css'
 
+/* jscpd:ignore-start -- Controls adapted from
+   ui-settings-plugins/fields.tsx; client rules forbid importing another
+   plugin's internals across packages. */
 /** What every settings field control needs regardless of its value type. */
 export interface SettingsFieldProps {
   /** Stable id associating the label with its control. */
@@ -38,9 +41,6 @@ export interface SettingsFieldProps {
   onReset: () => void
 }
 
-/* jscpd:ignore-start -- Controls adapted from
-   ui-settings-plugins/fields.tsx; client rules forbid importing another
-   plugin's internals across packages. */
 /**
  * A staged value field. `numeric` only hints the keypad: which drafts a field
  * accepts is decided by its spec, so the control never silently rewrites what

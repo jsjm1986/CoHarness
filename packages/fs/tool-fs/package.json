@@ -71,7 +71,6 @@
     "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
     "@deepseek-ai/dsh-tool-testkit": "workspace:*",
     "@deepseek-ai/dsh-fs-sandbox": "workspace:*",
-    "@deepseek-ai/dsh-user-approval": "workspace:*",
-    "@deepseek-ai/dsh-util-values": "workspace:*"
+    "@deepseek-ai/dsh-user-approval": "workspace:*"
   }
 }
