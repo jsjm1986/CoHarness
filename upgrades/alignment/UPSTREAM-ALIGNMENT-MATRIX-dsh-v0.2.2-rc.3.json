@@ -4496,7 +4496,7 @@
       "commitScope": [
         "packages/acp/acp/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -4612,7 +4612,7 @@
       "commitScope": [
         "packages/api/job-controller/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -4880,7 +4880,7 @@
       "commitScope": [
         "packages/api/terminal-controller/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5009,7 +5009,7 @@
       "commitScope": [
         "packages/attachment/attachment/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P2",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
