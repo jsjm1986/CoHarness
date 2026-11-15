@@ -4,7 +4,7 @@ import z from '@deepseek-ai/schemastery'
 import { AnonymousEntries, NamedEntries, ScopedLayers, scopeOf, scopeChainOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey, ScopeLayer } from '@deepseek-ai/dsh-scope'
 import { ToolExecutorUnavailableError } from './executor.ts'
-import type { ToolExecutor, ToolBatchInput, ToolBatchResult } from './executor.ts'
+import type { ToolExecutor, ToolBatchInput, ToolBatchResult, ToolModelInput } from './executor.ts'
 import './events.ts'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import { projectToolSchema } from './schema.ts'
@@ -110,11 +110,7 @@ export class ToolsService extends Service {
 
   constructor(ctx: Context) {
     super(ctx, 'tools')
-    ctx.systemPrompt.tools(({ scope, toolSet }) => {
-      const executor = this.selectExecutor(scope)
-      const description = executor.describe(this.definitions(scope, toolSet))
-      return { ...description, knownNames: description.knownNames ?? [...this.view(scope).knownNames] }
-    })
+    ctx.systemPrompt.tools(({ scope, toolSet }) => this.describe(scope, toolSet))
   }
 
 
@@ -316,6 +312,19 @@ export class ToolsService extends Service {
   schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[] {
     return this.definitions(scope, toolSet).map(definition => projectToolSchema(definition, true))
   }
+
+  /**
+   * Describe the model-facing tool input for one scope: the owning executor's
+   * transport and wire schemas over the currently visible definitions.
+   * @param scope - the viewing scope; omitted selects the deployment default.
+   * @param toolSet - step admission, or omitted for registered-definition inspection.
+   * @returns the executor's schemas and validation names; throws when no executor serves the scope.
+   */
+  describe(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolModelInput {
+    const executor = this.selectExecutor(scope)
+    const description = executor.describe(this.definitions(scope, toolSet))
+    return { ...description, knownNames: description.knownNames ?? [...this.view(scope).knownNames] }
+  }
   /**
    * Provide the executor for the calling scope; an unscoped contribution is the deployment default.
    * Rendering any executor-owned section requires the viewing scope's selection to remain available.
@@ -327,7 +336,6 @@ export class ToolsService extends Service {
     const existing = scope === undefined ? this.root : this.scoped.get(scope)
     if (existing?.executor !== undefined) throw new Error('Only one tool executor may be registered in each scope')
     const record: Registration = { executor }
-    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; preserve the Cordis disposer identity
     return this.ctx.effect(function* (this: ToolsService) {
       for (const section of executor.sections ?? []) {
         yield this.ctx.systemPrompt.section({

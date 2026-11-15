@@ -122,6 +122,45 @@ describe('ToolRuntime', () => {
     expect(assembly.tools.map(t => t.name)).toEqual(['echo'])
   })
 
+  it('describe() merges the executor wire view with registered names', async () => {
+    const ctx = await setup()
+    ctx.tools.register(echoTool)
+
+    const described = ctx.tools.describe()
+    expect(described.schemas.map(schema => schema.name)).toEqual(['echo'])
+    expect(described.knownNames).toEqual(['echo'])
+    await ctx.fiber.dispose()
+  })
+
+  it('describe() surfaces executor transport schemas outside the registration layer', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    ctx.tools.setExecutor({
+      describe: () => ({
+        schemas: [{ name: 'run_code', description: 'transport', parameters: { type: 'object' } }],
+        knownNames: ['run_code'],
+      }),
+      execute: async () => ({ results: [], additionalContexts: [], concluded: true }),
+    })
+    ctx.tools.register(echoTool)
+    try {
+      expect(ctx.tools.describe()).toEqual({
+        schemas: [{ name: 'run_code', description: 'transport', parameters: { type: 'object' } }],
+        knownNames: ['run_code'],
+      })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('describe() throws when no executor serves the scope', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    try {
+      expect(() => ctx.tools.describe()).toThrow('selected tool executor is unavailable')
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('schemas() drops host callbacks — they must never reach the model', async () => {
     const ctx = await setup()
     // Tool definitions contain output, finalization, execution, and presentation

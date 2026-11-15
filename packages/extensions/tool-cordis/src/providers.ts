@@ -4,6 +4,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import { HOST_BUILTIN_INSPECTION } from '@deepseek-ai/dsh-cordis-host-runner'
 import type { HostCordisInspectProviderRegistration } from '@deepseek-ai/dsh-cordis-host-runner'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
+import type { ToolSchema } from '@deepseek-ai/dsh-llm'
+import { ToolExecutorUnavailableError } from '@deepseek-ai/dsh-tools'
 import { EVENT_API, queryEventApi, queryServiceApi } from './api-catalog.ts'
 import { queryLiveConfig } from './config.ts'
 
@@ -80,7 +82,17 @@ export function hostInspectProviders(ctx: Context): HostCordisInspectProviderReg
       },
       query(method, _input, context) {
         if (method !== 'listTools') throw new Error(`unknown Tool inspect method "${method}"`)
-        return Promise.resolve({ tools: ctx.tools.schemas(context.agent) } as unknown as JsonValue)
+        const registered = ctx.tools.schemas(context.agent)
+        // Executor transport (the PTC `run_code`) is callable but never a registration.
+        let transport: readonly ToolSchema[] = []
+        try {
+          transport = ctx.tools.describe(context.agent).schemas
+        } catch (cause) {
+          if (!(cause instanceof ToolExecutorUnavailableError)) throw cause
+        }
+        const seen = new Set(registered.map(schema => schema.name))
+        const tools = [...registered, ...transport.filter(schema => !seen.has(schema.name))]
+        return Promise.resolve({ tools } as unknown as JsonValue)
       },
     },
   ]

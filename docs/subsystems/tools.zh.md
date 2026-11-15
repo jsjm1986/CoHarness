@@ -580,6 +580,15 @@ definitions(scope?: ScopeKey, toolSet?: ResolvedToolSet): readonly ToolDefinitio
 schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[]
 
 /**
+ * Describe the model-facing tool input for one scope: the owning executor's
+ * transport and wire schemas over the currently visible definitions.
+ * @param scope - the viewing scope; omitted selects the deployment default.
+ * @param toolSet - step admission, or omitted for registered-definition inspection.
+ * @returns the executor's schemas and validation names; throws when no executor serves the scope.
+ */
+describe(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolModelInput
+
+/**
  * Provide the executor for the calling scope; an unscoped contribution is the deployment default.
  * Rendering any executor-owned section requires the viewing scope's selection to remain available.
  * @param executor - initialized provider owned by the contributing plugin.
