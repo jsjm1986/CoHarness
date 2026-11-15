@@ -9,17 +9,17 @@ import type {
 export class TestCredentials extends CredentialProvider {
   values = new Map<string, string>()
 
-  resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+  protected override resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
     const value = this.values.get(ref)
     return Promise.resolve(value === undefined ? undefined : { value, source: 'fixture' })
   }
 
-  describe(): Promise<CredentialInfo> { throw new Error('unexpected credential description') }
-  set(): Promise<void> { throw new Error('unexpected credential write') }
-  unset(): Promise<void> { throw new Error('unexpected credential removal') }
-  readRecord(): Promise<CredentialRecord | undefined> { throw new Error('unexpected record read') }
-  describeRecord(): Promise<CredentialRecordInfo> { throw new Error('unexpected record description') }
-  listRecords(): Promise<readonly CredentialRecordEntry[]> { throw new Error('unexpected record listing') }
-  modifyRecord(): Promise<CredentialRecord | undefined> { throw new Error('unexpected record write') }
-  deleteRecord(): Promise<void> { throw new Error('unexpected record removal') }
+  protected override describeOwned(): Promise<CredentialInfo> { throw new Error('unexpected credential description') }
+  protected override setOwned(): Promise<void> { throw new Error('unexpected credential write') }
+  protected override unsetOwned(): Promise<void> { throw new Error('unexpected credential removal') }
+  override readRecord(): Promise<CredentialRecord | undefined> { throw new Error('unexpected record read') }
+  override describeRecord(): Promise<CredentialRecordInfo> { throw new Error('unexpected record description') }
+  override listRecords(): Promise<readonly CredentialRecordEntry[]> { throw new Error('unexpected record listing') }
+  override modifyRecord(): Promise<CredentialRecord | undefined> { throw new Error('unexpected record write') }
+  override deleteRecord(): Promise<void> { throw new Error('unexpected record removal') }
 }

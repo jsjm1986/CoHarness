@@ -265,7 +265,7 @@ export function mountMcpClient(ctx: Context, config: Config): McpClientHandle {
   // the transport here releases startup requests that are still awaiting a reply.
   ctx.on('internal/plugin', (fiber) => {
     if (fiber !== ctx.fiber || fiber.uid !== null) return
-    return dispose()
+    void dispose()
   }, { global: true })
   ctx.effect(() => [releaseNamespace, dispose], 'mcp-client.connection')
 

@@ -61,7 +61,7 @@ class FakeConnectionService extends Service {
     const owner = this.ctx
     return {
       intercept: (
-        channel: string,
+        _channel: string,
         matches: (endpoint: string) => boolean,
         handler: (endpoint: string, payload: unknown, signal: AbortSignal) => Promise<FakeRpcResult>,
       ) =>

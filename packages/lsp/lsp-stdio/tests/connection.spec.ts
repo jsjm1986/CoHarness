@@ -302,7 +302,7 @@ describe('LspConnection edge behavior', () => {
       killGraceMs: 3_000,
       configuration: null,
     }, async (spec) => {
-      const handle = await spawnSubprocess(spec)
+      const handle = spawnSubprocess(spec)
       return Object.assign(Object.create(handle) as typeof handle, {
         done: Promise.resolve().then(() => { throw providerFailure }),
       })

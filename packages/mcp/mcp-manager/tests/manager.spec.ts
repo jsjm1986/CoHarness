@@ -93,32 +93,34 @@ class MemoryCredentials extends CredentialProvider {
 
   get writable(): boolean { return true }
 
-  async resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+  protected override async resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
     if (this.resolveGate !== undefined) await this.resolveGate
     const value = this.values.get(String(ref))
     return value === undefined ? undefined : { value, source: 'memory' }
   }
 
-  describe(ref: CredentialRef): Promise<CredentialInfo> {
+  protected override describeOwned(ref: CredentialRef): Promise<CredentialInfo> {
     return Promise.resolve({ configured: this.values.has(String(ref)), writable: true } as CredentialInfo)
   }
 
-  set(ref: CredentialRef, value: string): Promise<void> {
+  protected override setOwned(ref: CredentialRef, value: string): Promise<void> {
     this.values.set(String(ref), value)
     this.notifyUpdated(ref)
     return Promise.resolve()
   }
 
-  unset(ref: CredentialRef): Promise<void> {
+  protected override unsetOwned(ref: CredentialRef): Promise<void> {
     this.values.delete(String(ref))
     this.notifyUpdated(ref)
     return Promise.resolve()
   }
 
-  readRecord(): Promise<CredentialRecord | undefined> { return Promise.resolve(undefined) }
-  describeRecord(): Promise<CredentialRecordInfo> { return Promise.resolve({ configured: false, writable: false } as CredentialRecordInfo) }
-  listRecords(): Promise<readonly CredentialRecordEntry[]> { return Promise.resolve([]) }
-  modifyRecord(
+  override readRecord(): Promise<CredentialRecord | undefined> { return Promise.resolve(undefined) }
+  override describeRecord(): Promise<CredentialRecordInfo> {
+    return Promise.resolve({ configured: false, writable: false } as CredentialRecordInfo)
+  }
+  override listRecords(): Promise<readonly CredentialRecordEntry[]> { return Promise.resolve([]) }
+  override modifyRecord(
     _key: CredentialKey,
     _mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
   ): Promise<CredentialRecord | undefined> {

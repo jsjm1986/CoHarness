@@ -394,7 +394,7 @@ describe('persistent PTC host protocol', () => {
     await entered.promise
     const failure = new Error('first environment cleanup failed')
     h.waitForExit.mockRejectedValue(failure)
-    const reported = vi.spyOn(h.fiber.ctx.logger, 'error').mockImplementation(async () => {})
+    const reported = vi.spyOn(h.fiber.ctx.logger, 'error').mockImplementation(() => {})
     let closed = false
     const closing = h.fiber.dispose().then(() => { closed = true })
     try {
@@ -462,7 +462,7 @@ it.each(['owner release', 'provider unload'])('keeps idle-crash cleanup tracked 
 
 it('logs unexpected idle readiness and its failed cleanup', async () => {
   const h = await setup()
-  const reported = vi.spyOn(h.fiber.ctx.logger, 'warn').mockImplementation(async () => {})
+  const reported = vi.spyOn(h.fiber.ctx.logger, 'warn').mockImplementation(() => {})
   try {
     h.onBoot(() => { h.complete({}) })
     await h.start()
@@ -478,7 +478,7 @@ it('does not log a launch failure after cancellation closed the environment', as
   const entered = Promise.withResolvers<undefined>()
   const lookup = Promise.withResolvers<string>()
   h.resolveExecutable.mockImplementation(async () => { entered.resolve(undefined); return lookup.promise })
-  const reported = vi.spyOn(h.fiber.ctx.logger, 'warn').mockImplementation(async () => {})
+  const reported = vi.spyOn(h.fiber.ctx.logger, 'warn').mockImplementation(() => {})
   try {
     const controller = new AbortController()
     const result = h.start({ ...request, signal: controller.signal }, NO_INITIAL_FRAME)
@@ -492,7 +492,7 @@ it('does not log a launch failure after cancellation closed the environment', as
 
 it('ignores late output-stream errors after owner release', async () => {
   const h = await setup()
-  const warn = vi.spyOn(h.ctx.logger, 'warn').mockImplementation(async () => {})
+  const warn = vi.spyOn(h.ctx.logger, 'warn').mockImplementation(() => {})
   try {
     h.onBoot(() => { h.complete({}) })
     await h.start()
@@ -505,7 +505,7 @@ it('ignores late output-stream errors after owner release', async () => {
 
 it('logs an idle process failure with its bounded stderr tail', async () => {
   const h = await setup({ maxOutputBytes: 100 })
-  const reported = vi.spyOn(h.fiber.ctx.logger, 'warn').mockImplementation(async () => {})
+  const reported = vi.spyOn(h.fiber.ctx.logger, 'warn').mockImplementation(() => {})
   try {
     h.onBoot(() => { h.complete({}) })
     await h.start()
@@ -525,7 +525,7 @@ it('retries process observation before releasing an owner after cleanup fails', 
   const failure = new Error('release cleanup failed')
   h.waitForExit.mockRejectedValue(failure)
   await expect(h.runtime.release(request.stateOwner!)).rejects.toBe(failure)
-  const reported = vi.spyOn(h.fiber.ctx.logger, 'error').mockImplementation(async () => {})
+  const reported = vi.spyOn(h.fiber.ctx.logger, 'error').mockImplementation(() => {})
   try {
     await expect(h.runtime.run(h.runtime.resolve(request))).rejects.toThrow('cleanup is incomplete')
     h.waitForExit.mockResolvedValue(true)
@@ -592,7 +592,7 @@ it('releases a confirmed exited process even when its output pipe did not drain'
   h.onBoot(() => { h.complete({}) })
   await h.start()
   h.stdout.destroy()
-  const warn = vi.spyOn(h.ctx.logger, 'warn').mockImplementation(async () => {})
+  const warn = vi.spyOn(h.ctx.logger, 'warn').mockImplementation(() => {})
   try {
     await expect(h.runtime.release(request.stateOwner!)).resolves.toBeUndefined()
     expect(warn).toHaveBeenCalledWith('Node process exited but its output did not drain cleanly')

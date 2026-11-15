@@ -27,6 +27,7 @@ async function setup(options: { jobs?: boolean } = {}) {
         calls.push({ provider: name, request })
         return {
           id: SessionId(randomUUID()),
+          localAgent: undefined,
           result: Promise.resolve({ output: [{ type: 'text' as const, text: 'child result' }], stopReason: 'completed' as const }),
           dispose: () => Promise.resolve(),
         }
@@ -246,6 +247,7 @@ it('disposes a published run when job registration fails and frees the claimed n
       calls.push({ provider: 'disposable-provider', request })
       return {
         id: SessionId(randomUUID()),
+        localAgent: undefined,
         result: Promise.reject(new Error('run lost')),
         dispose: () => {
           disposed.push(request.descriptor.provider)
@@ -296,6 +298,7 @@ it('reports failed cleanup in the job outcome and hands it back for the next adm
       calls.push({ provider: 'flaky-cleanup-provider', request })
       return {
         id: SessionId(randomUUID()),
+        localAgent: undefined,
         result: Promise.resolve({ output: [{ type: 'text' as const, text: 'kept answer' }], stopReason: 'completed' as const }),
         dispose: () => {
           disposals += 1
@@ -336,6 +339,7 @@ it('cancels a registered run through its job', async (test) => {
     name: 'long-provider', capabilities: NO_START_CAPABILITIES, inheritsParentContext: false,
     start: async request => ({
       id: SessionId(randomUUID()),
+      localAgent: undefined,
       result: new Promise((resolve) => {
         request.signal.addEventListener('abort', () => {
           aborted = true
@@ -369,6 +373,7 @@ it('swallows cancel-time and settlement disposal failures the run cannot confirm
     name: 'noisy-provider', capabilities: NO_START_CAPABILITIES, inheritsParentContext: false,
     start: async request => ({
       id: SessionId(randomUUID()),
+      localAgent: undefined,
       result: new Promise((resolve) => {
         request.signal.addEventListener('abort', () => { resolve({ output: [], stopReason: 'aborted' as const }) }, { once: true })
       }),

@@ -174,6 +174,7 @@ describe('forgeSession discovery', () => {
   ])('logs a failed lookup (%s)', async (error, message) => {
     const { ctx, provider, session } = await open()
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- The lookup must surface non-Error rejections verbatim.
     provider.findImpl = () => Promise.reject(error)
     push(session, 'push', 'feat')
 

@@ -252,6 +252,11 @@ export const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
   'pluginRegistryProbe/fastest',
   'speech/catalog',
   'speech/follow',
+  // Streams the caller's own access grants — the service scopes rows to the
+  // calling principal itself.
+  'remoteAccess/follow',
+  // Session rows are filtered inside the stream by the remoteAccess grant map.
+  'forgePanel/changeRequestStates',
 ])
 
 /**
@@ -322,6 +327,10 @@ export const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set
   // Speech provider selection is shared mutable state; participants without
   // manage rights must not reconfigure the voice path for other members.
   'speech/configure',
+  // MCP servers are shared Host configuration: probing exercises a configured
+  // server's credentials and endpoint, restart remounts it for every member.
+  'mcpManager/probe',
+  'mcpManager/restart',
 ])
 
 /**

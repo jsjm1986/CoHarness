@@ -257,6 +257,7 @@ describe('reconnect supervisor', () => {
   it('publishes no tools when disposal follows connection completion before discovery', async () => {
     const connected: PromiseWithResolvers<void> = Promise.withResolvers()
     const continueStartup: PromiseWithResolvers<void> = Promise.withResolvers()
+    // oxlint-disable-next-line typescript/unbound-method -- The spy re-binds the captured implementation through apply().
     const connect = McpGeneration.prototype.connect
     const spy = vi.spyOn(McpGeneration.prototype, 'connect').mockImplementation(async function (this: McpGeneration, ...args) {
       await connect.apply(this, args)
@@ -486,7 +487,7 @@ describe('reconnect supervisor', () => {
     const { warns } = captureLogs(ctx)
     mockConnect.mockRejectedValue(new Error('initialize failed'))
     mockClose.mockImplementation(async function (this: { transport?: Transport }) {
-      entered.resolve()
+      entered.resolve(undefined)
       await closed.promise
       this.transport?.onclose?.()
     })

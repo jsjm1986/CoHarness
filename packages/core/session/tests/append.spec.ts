@@ -217,7 +217,7 @@ describe('multiple Session appends', () => {
     const session = ctx.sessions.create(SessionId('admission-batch'))
     const calls: number[] = []
     const rolledBack: number[] = []
-    ctx.sessions.registerAppendAdmission((current, candidate) => {
+    ctx.sessions.registerAppendAdmission((_current, candidate) => {
       calls.push(candidate.seq)
       if (candidate.type === 'step/start') throw new Error('admission veto')
       return () => { rolledBack.push(candidate.seq) }
@@ -225,7 +225,7 @@ describe('multiple Session appends', () => {
     expect(() => session.append([
       ['turn/start', { turn: 1 }],
       ['step/start', { turn: 1, step: 1 }],
-      ['turn/end', { turn: 1 }],
+      ['turn/end', { turn: 1, reason: { kind: 'completed' } }],
     ])).toThrow('admission veto')
     expect(calls).toEqual([0, 1])
     expect(rolledBack).toEqual([0])

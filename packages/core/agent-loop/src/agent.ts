@@ -348,13 +348,11 @@ export class ReactLoopAgent implements Agent {
         ? { provider: this.options.provider, model: this.options.model }
         : undefined)
       ?? state?.lastUsed
-      ?? (header?.provider !== undefined && header.model !== undefined
-        ? {
-          provider: header.provider,
-          model: header.model,
-          ...(header.reasoningEffort === undefined ? {} : { reasoningEffort: header.reasoningEffort }),
-        }
-        : undefined)
+      ?? (header === undefined ? undefined : {
+        provider: header.provider,
+        model: header.model,
+        ...(header.reasoningEffort === undefined ? {} : { reasoningEffort: header.reasoningEffort }),
+      })
       ?? { provider: this.options.provider ?? '', model: this.options.model ?? '' }
   }
 

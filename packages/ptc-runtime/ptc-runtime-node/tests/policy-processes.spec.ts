@@ -58,7 +58,7 @@ it('uses the standing policy for a temporary escalation and ignores detached res
 
 it('retries failed cleanup before admission without reverting the committed policy', async () => {
   const { ctx, session, processes, policy } = await setup()
-  const warning = vi.spyOn(ctx.logger, 'warn').mockImplementation(async () => {})
+  const warning = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
   const failure = new Error('process observation failed')
   const release = vi.fn(async (): Promise<void> => { throw failure })
   const detach = processes.register(policy, release)

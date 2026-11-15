@@ -47,7 +47,7 @@ async function setup() {
 }
 
 async function call(ctx: Context, name: string, args: unknown, agent: Agent) {
-  const toolSet = await ctx.tools.resolve({ agent, signal: SIGNAL })
+  const toolSet = await ctx.tools.resolve({ agent, modelSelection: { provider: 'mock', model: 'mock' }, signal: SIGNAL })
   try {
     return await executeModelToolFixture(ctx, {
       callId: ToolCallId(`call-${++calls}`),
@@ -63,7 +63,7 @@ async function call(ctx: Context, name: string, args: unknown, agent: Agent) {
 }
 
 async function admitted(ctx: Context, agent: Agent): Promise<string[]> {
-  const toolSet = await ctx.tools.resolve({ agent, signal: SIGNAL })
+  const toolSet = await ctx.tools.resolve({ agent, modelSelection: { provider: 'mock', model: 'mock' }, signal: SIGNAL })
   try {
     return [...toolSet.view(agent).keys()].sort()
   } finally {

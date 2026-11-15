@@ -35,6 +35,7 @@ function transport(url: string): ReturnType<typeof createTransport> {
     headers: { 'x-api-key': 'synthetic-test-key' },
     toolCallTimeoutMs: 60_000,
     failOnStartupError: false,
+    closeTimeoutMs: 5_000, expandTemplates: false,
   })
   transports.push(result)
   return result

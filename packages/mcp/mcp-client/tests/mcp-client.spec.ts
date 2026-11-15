@@ -1160,6 +1160,7 @@ describe('createTransport', () => {
       args: ['-e', 'console.log(JSON.stringify({jsonrpc:"2.0",method:"test/env",params:{safe:process.env.SAFE_VAR,key:process.env.API_KEY??null,token:process.env.AUTH_TOKEN??null,secret:process.env.MY_SECRET,extra:process.env.EXTRA}}));setInterval(()=>{},1000)'],
       env: { EXTRA: 'injected', MY_SECRET: 'explicit' }, cwd: process.cwd(),
       toolCallTimeoutMs: 5_000, failOnStartupError: true, processGraceMs: 50,
+      closeTimeoutMs: 5_000, expandTemplates: false,
     })
     onTestFinished(async () => {
       try { await owner.close() } finally { await ctx.fiber.dispose(); vi.unstubAllEnvs() }

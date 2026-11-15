@@ -117,7 +117,7 @@ class TestPersistence extends SessionPersistence {
   onRead: (() => void | Promise<void>) | undefined
   onStat: (() => void | Promise<void>) | undefined
 
-  async create(header: SessionHeader): Promise<SessionHandle> {
+  override async create(header: SessionHeader): Promise<SessionHandle> {
     if (this.durable.has(header.id)) throw new SessionAlreadyExistsError(header.id)
     const stored: StoredSession = { meta: header, events: [] }
     this.durable.set(header.id, stored)
@@ -125,16 +125,16 @@ class TestPersistence extends SessionPersistence {
   }
 
   // Appends are durable on resolution here; nothing buffers, so the service-wide flush is a no-op.
-  async flush(): Promise<void> {}
+  override async flush(): Promise<void> {}
 
-  async open(id: SessionId, access: SessionAccess): Promise<SessionHandle> {
+  override async open(id: SessionId, access: SessionAccess): Promise<SessionHandle> {
     this.openCalls.push(access)
     const stored = this.durable.get(id)
     if (stored === undefined) throw new SessionPersistenceNotFoundError(id)
     return this.handle(stored, access)
   }
 
-  async stat(id: SessionId): Promise<SessionPersistenceSnapshot | undefined> {
+  override async stat(id: SessionId): Promise<SessionPersistenceSnapshot | undefined> {
     this.statCalls += 1
     await this.onStat?.()
     const stored = this.durable.get(id)
@@ -142,7 +142,7 @@ class TestPersistence extends SessionPersistence {
     return { header: stored.meta, revision: SessionPersistenceRevision(`test:${id}:${stored.events.length}`) }
   }
 
-  async list(): Promise<SessionPersistenceSnapshot[]> {
+  override async list(): Promise<SessionPersistenceSnapshot[]> {
     return [...this.durable.entries()].map(([id, stored]) => ({
       header: stored.meta,
       revision: SessionPersistenceRevision(`test:${id}:${stored.events.length}`),

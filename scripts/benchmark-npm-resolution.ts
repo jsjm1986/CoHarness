@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
 import { setTimeout as pollDelay } from 'node:timers/promises'
-import { linuxProcessGroupHasLiveMembers } from '../packages/subprocess/subprocess-local/src/proc-stat.ts'
+import { linuxProcessGroupLiveMember } from '../packages/subprocess/subprocess-local/src/proc-stat.ts'
 import { valid as validVersion } from 'semver'
 import { z } from 'zod'
 
@@ -378,7 +378,7 @@ function processTreeCanExecute(child: ChildProcess): boolean {
   if (child.pid === undefined) return false
   if (process.platform === 'win32') return child.exitCode === null && child.signalCode === null
   if (!processGroupExists(child.pid)) return false
-  return process.platform !== 'linux' || linuxProcessGroupHasLiveMembers(child.pid) !== false
+  return process.platform !== 'linux' || linuxProcessGroupLiveMember(child.pid, undefined) !== false
 }
 
 function assertNever(value: never): never {

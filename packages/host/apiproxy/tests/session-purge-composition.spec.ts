@@ -88,10 +88,13 @@ it.each(['success', 'failure'] as const)('holds an admitted Team mutation throug
   const result = await settled
   stop()
   if (outcome === 'success') expect(result).toMatchObject({ value: { subject: 'in-flight task' } })
-  else expect(result.error).toMatchObject({
-    code: 'TEAM_TASK_PERSISTENCE_UNCONFIRMED',
-    cause: new Error('fixture checkpoint failed'),
-  })
+  else {
+    if (!('error' in result)) throw new Error('expected a rejected operation')
+    expect(result.error).toMatchObject({
+      code: 'TEAM_TASK_PERSISTENCE_UNCONFIRMED',
+      cause: new Error('fixture checkpoint failed'),
+    })
+  }
   expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
   expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
   expect(remove).toHaveBeenCalledOnce()

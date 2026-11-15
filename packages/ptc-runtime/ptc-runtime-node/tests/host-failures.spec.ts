@@ -406,7 +406,7 @@ describe('Node runtime host failures', () => {
   it.each([undefined, { kind: 'exception', message: 'program failed' }] as const)('bounds incomplete raw output after completion with %j', async (failure) => {
     const h = await setup({ graceMs: 5 })
     const cleaning = Promise.withResolvers<undefined>()
-    vi.mocked(h.terminate).mockImplementation(async () => { h.direct.resolve({ exitCode: 0, signal: null }) })
+    vi.mocked(h.terminate).mockImplementation(() => { h.direct.resolve({ exitCode: 0, signal: null }) })
     vi.mocked(h.waitForExit).mockImplementation(async () => { cleaning.resolve(undefined); return true })
     h.onBoot(() => { h.complete(failure === undefined ? {} : { error: failure }) })
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
@@ -440,7 +440,7 @@ describe('Node runtime host failures', () => {
 
   it('keeps the fitting native-output prefix and ignores later overflow chunks', async () => {
     const h = await setup({ maxOutputBytes: 256 })
-    vi.mocked(h.terminate).mockImplementation(async () => {
+    vi.mocked(h.terminate).mockImplementation(() => {
       h.stderr.end('later output')
       h.stdout.end()
       h.direct.resolve({ exitCode: 0, signal: null })

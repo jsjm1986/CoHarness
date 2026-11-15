@@ -219,6 +219,7 @@ export function createActivationObserver(
       emit('subagent/start', identity, parent)
     },
     capture: (child: Agent, structured?: StructuredAttachment): void => {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const own = child.session.snapshotEvents(boundary)
       const output = finalAssistantOutput(own)
       let stopReason = epochStopReason(own)

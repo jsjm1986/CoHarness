@@ -70,6 +70,7 @@ vi.mock('../src/transport.ts', () => ({
 // vi.mock is hoisted above static imports, so the module under test sees the
 // mocked SDK even through a static import.
 import { apply, name, inject, mountMcpClient, Config as ConfigSchema } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
+import type { StdioConfig } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
 
 // ---- Helpers ----
 
@@ -194,7 +195,7 @@ describe('apply (plugin lifecycle)', () => {
 
   it('rejects invalid stdio limits before reserving the server namespace', async () => {
     try {
-      expect(() => mountMcpClient(ctx, { ...stdioConfig, processGraceMs: 0 })).toThrow('positive timer integer')
+      expect(() => mountMcpClient(ctx, { ...stdioConfig, transport: 'stdio', processGraceMs: 0 } as StdioConfig)).toThrow('positive timer integer')
       expect(mockConnect).not.toHaveBeenCalled()
       const client = mountMcpClient(ctx, stdioConfig)
       await client.ready
@@ -261,7 +262,7 @@ describe('apply (plugin lifecycle)', () => {
     mockConnect.mockImplementation(() => connecting.promise)
     mockClose.mockImplementation(function (this: { transport?: Transport }) {
       this.transport?.onclose?.()
-      connecting.resolve()
+      connecting.resolve(undefined)
       return Promise.resolve()
     })
     const fiber = ctx.plugin({ name: 'mcp-pending-startup', inject, apply }, { ...stdioConfig, reconnect: { enabled: false } })

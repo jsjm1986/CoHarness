@@ -696,6 +696,7 @@ export async function apply(ctx: Context, config: Config, session?: Session): Pr
   const selectForSession = (target: Session): ModelSelectionPolicy | undefined => {
     if (!modelSelectionCapable || settings === undefined) return undefined
     const freshSession = target.firstLiveSeq === 0
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       && target.eventAt(SessionSeq(0))?.type !== 'session/end-seed'
     let allowedModels = subagentModelSelectionPolicy(ctx.sessionProjections, target)
     if (allowedModels === undefined) {

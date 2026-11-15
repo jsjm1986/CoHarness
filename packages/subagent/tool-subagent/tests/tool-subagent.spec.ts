@@ -40,7 +40,13 @@ const testToolSignal = new AbortController().signal
 /** A minimal parent Agent passed through to the provider request. */
 function fakeAgent(ctx: Context, id = 'parent-1'): Agent {
   const sessionId = SessionId(id)
-  return { id: sessionId, options: {}, session: Session.create(sessionId), ctx: ctx.plugin(() => {}).ctx } as unknown as Agent
+  return {
+    id: sessionId,
+    options: {},
+    session: Session.create(sessionId),
+    ctx: ctx.plugin(() => {}).ctx,
+    inbox: { nextTurn: [], nextStep: [], remove: () => false },
+  } as unknown as Agent
 }
 
 /** Create a package-test context with the tool's required projection seam. */
@@ -836,6 +842,7 @@ describe('dsh-tool-subagent background mode', () => {
       inject,
       options: {},
       session: Session.create(id),
+      inbox: { nextTurn: [], nextStep: [], remove: () => false },
     } as unknown as Agent
     ctx.agents.register(agent)
     return agent
