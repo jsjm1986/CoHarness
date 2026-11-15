@@ -552,26 +552,64 @@ resolveMaxDepth(configured?: number | 'provider-managed'): number | undefined
  * turn to start or for the message to reach the Session log; any earlier
  * failure rejects with no ids and rolls back the child entirely.
  * @param spec - provider, delegation request, and caller cancellation.
- * @returns the durable child id and the accepted prompt's message id.
+ * @returns the durable child id, the committed model-facing member name,
+ *   and the accepted prompt's message id.
  * @throws when continuation services are unavailable or materialization fails.
  */
 async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>
 
 /**
- * Steer one model-authored message to the sender's direct parent or direct
- * continuable child. A running target admits it at the nearest step boundary;
- * an idle target starts a turn, and an absent direct child cold-resumes from
- * persistence. The service derives durable sender attribution from the exact
- * live sender. Caller cancellation stops only pre-acceptance work.
+ * Steer one model-authored message to another member of the sender's
+ * subagent tree — the root, a sibling, a deeper descendant, or the sender's
+ * direct parent. A running target admits it at the nearest step boundary;
+ * an idle target starts a turn, and an absent member cold-resumes from
+ * persistence under the shared tree root without requiring its own creator
+ * live. The service derives durable sender attribution from the exact live
+ * sender. Caller cancellation stops only pre-acceptance work.
  * @param sender - exact live Agent authorizing and originating the message.
- * @param targetId - durable direct-parent or direct-child session id.
+ * @param targetId - durable session id of another member of the same tree.
  * @param content - model-authored content to deliver.
  * @param options - caller cancellation before inbox acceptance.
  * @returns the accepted message's inbox id.
- * @throws when continuation services are unavailable, adjacency is rejected,
- *   or the message was not admitted.
+ * @throws when continuation services are unavailable, the target is outside
+ *   the sender's tree, or the message was not admitted.
  */
 async sendMessage( sender: Agent, targetId: SessionId, content: ContentBlock[], options: SubagentSendMessageOptions, ): Promise<MessageId>
+
+/**
+ * Resolve the exact live Agent at the root of the caller's subagent tree. A
+ * root is the caller itself when it never became a subagent member; a
+ * member's root stays reachable only while that exact root Agent is live.
+ * @param caller - exact live Agent selecting the subagent tree.
+ * @returns the live subagent tree root.
+ * @throws {SubagentError} `UNAUTHORIZED` when the caller is stale or a member
+ *   whose tree root is not live.
+ */
+rootOf(caller: Agent): Agent
+
+/**
+ * Report the model-facing names of a live member and its direct creator.
+ * The root reports `lead` and no parent; a member reports its slash-separated
+ * path — or its raw Session id where a historical catalog link was unnamed —
+ * and its creator's name by the same rule.
+ * @param agent - exact live root or resident tree member.
+ * @returns the member's own name and, for a member, its creator's.
+ * @throws {SubagentError} `UNAUTHORIZED` when the caller has no active runtime owner.
+ */
+namesOf(agent: Agent): SubagentMemberNames
+
+/**
+ * Resolve one model-facing name or Session id into the durable member id it
+ * addresses. `lead` names the caller's tree root and a slash-separated path
+ * walks committed catalog names from it; a simple name matching no committed
+ * entry falls back to the raw Session id.
+ * @param caller - exact live Agent selecting the subagent tree.
+ * @param name - the target's name path or a raw Session id.
+ * @param signal - caller cancellation forwarded to catalog reads.
+ * @returns the durable Session id to address.
+ * @throws {SubagentError} `AGENT_NAME_NOT_FOUND` for an unmatched slash path.
+ */
+resolveName(caller: Agent, name: string, signal?: AbortSignal): Promise<SessionId>
 
 /**
  * Interrupt one live continuable child's current turn under a human parent

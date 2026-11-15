@@ -102,42 +102,35 @@ Agent Teams service backed by the exact live Lead Session log.
 
 ```ts cordis-catalog
 /**
- * Resolve one exact live Agent's Team role.
- * @param agent - exact live Agent used as the authority credential.
- * @returns its root, Team identity, role, and model-facing name.
+ * Read the Team selection shared by the caller's subagent tree.
+ * @param caller - exact live root or descendant.
+ * @returns whether Team tools and guidance are enabled.
  */
-membership(agent: Agent): TeamMembership
+isEnabled(caller: Agent): boolean
 
 /**
- * List the runtime-enriched roster visible to one Team member.
- * @param agent - exact live Team member.
- * @returns Lead and teammate rows in creation order.
+ * Save a root Session's Team selection without stopping children or deleting tasks.
+ * The selection takes effect before awaiting persistence. Tools resolve availability at
+ * step preparation; prompt providers read the selection when evaluated. Task mutations
+ * check the current mode when their queued operation starts; admitted operations finish.
+ * @param agent - exact live root whose tree receives the selection.
+ * @param enabled - selected Team mode.
+ * @param signal - cancellation checked before changing the selection.
+ * @returns fulfillment after the selection flushes.
+ * @throws when called by a descendant or persistence fails. An appended selection remains active;
+ * retrying the same selection flushes without a duplicate event.
  */
-listMembers(agent: Agent): TeamMemberView[]
-
-/**
- * Create one named, continuable direct child of the Team Lead.
- * @param caller - exact live Lead Agent.
- * @param request - immutable name, description, prompt, context mode, provider, and cancellation.
- * @returns the active roster row.
- */
-async spawnTeammate(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult>
-
-/**
- * Queue one durable peer message, then attempt immediate delivery.
- * @param caller - exact live sending Team member.
- * @param request - target name, content, scheduling mode, and pre-queue cancellation.
- * @returns durable message identity and immediate-delivery observation.
- */
-async sendMessage(caller: Agent, request: SendTeamMessageRequest): Promise<SendTeamMessageResult>
+@Remote async setEnabled(agent: Agent, enabled: boolean, signal?: AbortSignal): Promise<void>
 
 /**
  * Create one unowned pending task in the Team Lead log.
  * @param caller - exact live Team member creating the task.
  * @param request - task text, blockers, and advisory write scopes.
+ * @param signal - cancellation before the task event is appended; omitted means no cancellation.
  * @returns the revision-one task view.
+ * @throws TEAM_TASK_PERSISTENCE_UNCONFIRMED when the task is visible but durability is unknown; read it before retrying.
  */
-async createTask(caller: Agent, request: CreateTeamTaskRequest): Promise<TeamTaskView>
+async createTask(caller: Agent, request: CreateTeamTaskRequest, signal?: AbortSignal): Promise<TeamTaskView>
 
 /**
  * Return one task, including a deleted tombstone.
@@ -158,56 +151,11 @@ listTasks(caller: Agent): TeamTaskView[]
  * Compare-and-set one authorized task transition.
  * @param caller - exact live Team member authorizing the mutation.
  * @param request - task identity, expected revision, action, and action fields.
+ * @param signal - cancellation before the task event is appended; omitted means no cancellation.
  * @returns the committed next task revision.
+ * @throws TEAM_TASK_PERSISTENCE_UNCONFIRMED when the task is visible but durability is unknown; read it before retrying.
  */
-async updateTask(caller: Agent, request: UpdateTeamTaskRequest): Promise<TeamTaskView>
-
-/**
- * Wait for the next Team-domain or member-status change.
- * @param caller - exact live Team member waiting for activity.
- * @param timeoutMs - bounded wait duration from ten seconds through one hour.
- * @param signal - caller cancellation for the wait only.
- * @returns one observed change or a timeout result.
- */
-async waitForChange(caller: Agent, timeoutMs: number, signal: AbortSignal): Promise<TeamWaitResult>
-
-/**
- * Interrupt one live teammate turn without clearing its pending inbox.
- * @param caller - exact live Lead Agent.
- * @param targetName - durable teammate name.
- * @returns the target status sampled before cancellation.
- */
-interrupt(caller: Agent, targetName: string): { previousStatus: 'running' | 'inactive' }
-
-/**
- * Read the current roster and non-deleted task board through the generated Remote API.
- * @param agent - exact live Team member used as the authority credential.
- * @returns detached current roster and task views.
- */
-@Remote('view') remoteView(agent: Agent): TeamView
-
-/**
- * Create one shared task through the generated Remote API.
- * @param agent - exact live Team member creating the task.
- * @param request - task text, blockers, and advisory write scopes.
- * @returns the revision-one task or a typed Team rejection.
- */
-@Remote('createTask') remoteCreateTask(agent: Agent, request: CreateTeamTaskRequest): Promise<TeamTaskMutationResult>
-
-/**
- * Apply one task mutation and preserve Team rejections as business results.
- * @param agent - exact live Team member authorizing the mutation.
- * @param request - task identity, expected revision, action, and action fields.
- * @returns the committed task or a typed Team rejection.
- */
-@Remote('updateTask') remoteUpdateTask(agent: Agent, request: UpdateTeamTaskRequest): Promise<TeamTaskMutationResult>
-
-/**
- * Resolve a caller without throwing, used by scoped-tool installation and observers.
- * @param agent - candidate exact live Agent.
- * @returns Team membership, or undefined for non-Team subagents and stale identities.
- */
-tryMembership(agent: Agent): TeamMembership | undefined
+async updateTask(caller: Agent, request: UpdateTeamTaskRequest, signal?: AbortSignal): Promise<TeamTaskView>
 ```
 
 Types: [Agent](core.zh.md)

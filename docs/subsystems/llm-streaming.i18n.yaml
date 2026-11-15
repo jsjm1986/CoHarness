@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/llm-streaming.md
 document:
-  en: fb403c5f01ef7f791db0c8011b3984e3d378664f
-  zh: 40fc5c2105cba2ed31da59364ecdd1367ec9ce03
+  en: bbc8d87f178de296aedf809355b5f4c872a75776
+  zh: cd50821c69231964ea9c5eb4c42dacd52dfb836a
 /llm-streaming:
   en: d40ab180baf95513
   zh: 93fddbf35c0d366a
@@ -44,6 +44,9 @@ document:
 /llm-streaming/native-model-operations:
   en: 7fde9a0301d6d480
   zh: 90a688d23c613e47
+/llm-streaming/pi-ai-request-headers:
+  en: 8c140f9c5a799f01
+  zh: 8f59f74f98e06227
 /llm-streaming/service-and-provider-contracts:
   en: 5ac9128e441dbad7
   zh: 1a420276b2f640ca

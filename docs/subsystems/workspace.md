@@ -531,6 +531,26 @@ Ask the composed providers what still runs for a session before it is archived. 
 
 Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)
 
+<a id="workspacesession-archived--parallel"></a>
+
+#### `workspace/session-archived` — parallel
+
+Admit optional follow-up work after durable archival and any stop requests. Dispatched inside the registry's write queue: a listener registers its work and returns, and runs the work and any unbounded I/O afterwards. Listener failures are logged without undoing archival. Listeners own and drain their background work.
+
+```ts cordis-catalog
+/**
+ * Admit optional follow-up work after durable archival and any stop requests.
+ * Dispatched inside the registry's write queue: a listener registers its work
+ * and returns, and runs the work and any unbounded I/O afterwards. Listener
+ * failures are logged without undoing archival. Listeners own and drain their background work.
+ * @param request - newly archived Session; repeated archive requests do not dispatch.
+ * @mode parallel
+ */
+'workspace/session-archived'(request: SessionActivityRequest): Promise<void> | void
+```
+
+Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)
+
 <a id="workspacesession-stop--parallel"></a>
 
 #### `workspace/session-stop` — parallel
@@ -553,6 +573,24 @@ Stop a session's running work because the caller archived it with `stopActivity`
  * @mode parallel
  */
 'workspace/session-stop'(request: SessionActivityRequest): Promise<void> | void
+```
+
+Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)
+
+<a id="workspacesession-unarchiving--parallel"></a>
+
+#### `workspace/session-unarchiving` — parallel
+
+Cancel or settle archive follow-up work before making a Session available again. A rejection retains the archived state.
+
+```ts cordis-catalog
+/**
+ * Cancel or settle archive follow-up work before making a Session available again.
+ * A rejection retains the archived state.
+ * @param request - Session about to leave the archive set.
+ * @mode parallel
+ */
+'workspace/session-unarchiving'(request: SessionActivityRequest): Promise<void> | void
 ```
 
 Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)

@@ -233,6 +233,18 @@ register< K extends Exclude<keyof SessionProjectionStateMap, keyof SessionProjec
 onChanged(listener: ProjectionChangeListener): () => void
 
 /**
+ * Subscribe to the event-level change feed. The registration is an effect on
+ * the calling context's fiber. The listener runs synchronously inside the
+ * committed event's `session/event` handling, once after every unit has been
+ * driven and after every {@link onChanged} call for that event. If a unit or
+ * an {@link onChanged} listener throws during that drive, the listener still
+ * receives the changes made before the throw.
+ * @param listener - called once per committed event that changed at least one client-visible unit's raw view by `Object.is`.
+ * @returns the exact disposer that unsubscribes.
+ */
+onEventChanged(listener: ProjectionEventChangeListener): () => void
+
+/**
  * Read one unit's current host state without computing unrelated views.
  * The returned value is live; callers must not mutate it.
  * @param session - the session whose state is read.

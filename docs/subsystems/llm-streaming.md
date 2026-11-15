@@ -890,6 +890,10 @@ interface LlmCallConfigAdapterDefaults {
 
 Model streams capture their policy owner before asynchronous middleware. They refuse missing required policy, owner withdrawal or replacement across waits, then enforce that owner's route decision after final asynchronous guards. `modelAccessRequired` remains on a Gateway runtime's root lifetime, preventing provider withdrawal from restoring independent execution.
 
+## Pi-ai request headers
+
+`PiAiRequestHeaderContext` contains the prepared call's provider, model, resolved model `baseURL`, and optional Session id and auxiliary purpose. It is immutable, contains no messages or authentication fields, and accompanies a request-owned `Headers` object in the synchronous `llm-pi-ai/request-headers` waterfall. The [adapter's request-header documentation](../../packages/llm/llm-pi-ai/README.md#request-headers) defines contribution ownership, attribution precedence, and failure behavior. This extension point is specific to pi-ai inference requests.
+
 ## Service and provider contracts
 
 `PreparedLlmCall.stream(options, guard?)` keeps optional consumer authorization separate from model input. `PreparedLlmCallGuard.authorize(signal?)` rechecks asynchronous eligibility after resource admission and before every provider request, with effective caller and resource-lease cancellation. `assertCurrent()` synchronously refuses a changed owner after all authorization awaits, before adapter entry or physical I/O. Guard rejection follows ordinary adapter failure reporting and releases quiescent permits.
@@ -1411,6 +1415,35 @@ Waterfall around physical streaming model calls (retry, replay, routing). Bound 
 ```
 
 Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
+
+<a id="llm-pi-ai-events"></a>
+
+### `llm-pi-ai/*` events
+
+<a id="llm-pi-airequest-headers--waterfall"></a>
+
+#### `llm-pi-ai/request-headers` — waterfall
+
+Prepare headers for one pi-ai inference call, excluding model discovery. Listeners run synchronously and must call next(); they may edit only the request-owned headers and must not retain them. Throws fail the call with REQUEST_HEADERS before inference I/O. Harness attribution wins afterward. Non-TypeError messages are user-visible and must exclude secrets. TypeError details and non-Error values are replaced with safe guidance.
+
+```ts cordis-catalog
+/**
+ * Prepare headers for one pi-ai inference call, excluding model discovery.
+ * Listeners run synchronously and must call next(); they may edit only the
+ * request-owned headers and must not retain them. Throws fail the call with
+ * REQUEST_HEADERS before inference I/O. Harness attribution wins afterward.
+ * Non-TypeError messages are user-visible and must exclude secrets. TypeError
+ * details and non-Error values are replaced with safe guidance.
+ * @mode waterfall
+ * @param request - immutable routing metadata from the exact prepared call.
+ * @param headers - fresh profile headers, shared only within this dispatch.
+ * @param next - continue header preparation through the remaining listeners.
+ * @returns headers passed to pi-ai after Harness attribution is applied.
+ */
+'llm-pi-ai/request-headers'(request: PiAiRequestHeaderContext, headers: Headers, next: () => Headers): Headers
+```
+
+Source: [`packages/llm/llm-pi-ai/src/index.ts`](../../packages/llm/llm-pi-ai/src/index.ts)
 
 <a id="model-provider-config-events"></a>
 

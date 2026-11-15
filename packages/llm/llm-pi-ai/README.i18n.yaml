@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/llm-pi-ai/README.md
 document:
-  en: dc5c4d880be14c9d1ed29156ec0cb1dfd5163981
-  zh: d9cf998cb4ab52f862b7fb27b8f43b612cc35ef1
+  en: 716913d1633387b048b271f03f828dc3fbfe3282
+  zh: b875c88fe637468936b83533e81b06f60bfcffc5
 /:
   en: 5b95296b78f8bc9c
   zh: 61495d48365178df
@@ -15,8 +15,8 @@ document:
   en: ee82d88fee1332d6
   zh: 3e66b494e4844f97
 /deepseek-ai-dsh-llm-pi-ai/table-of-contents:
-  en: 6635be40b60776c2
-  zh: 63820bacf23b1406
+  en: f9022213e9e1825f
+  zh: 46134dcf91aa5036
 /deepseek-ai-dsh-llm-pi-ai/config:
   en: f505c0a654bbcefd
   zh: c795c807a4e8413b
@@ -45,8 +45,11 @@ document:
   en: b250956ac42d60e4
   zh: 86d9e2c9ed285528
 /deepseek-ai-dsh-llm-pi-ai/app-attribution:
-  en: 036e2a17cb17892e
-  zh: fc9f5de264ee169d
+  en: 01a6a0d98b6b032c
+  zh: 821337ea5f0ec058
+/deepseek-ai-dsh-llm-pi-ai/request-headers:
+  en: cfbe73ebf1671e91
+  zh: 7dfcfaae134123d4
 /deepseek-ai-dsh-llm-pi-ai/dependency-weight:
   en: af3f8e1ab665a987
   zh: 91092dc5b7ebcf31
