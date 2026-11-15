@@ -41,6 +41,8 @@ it.each(cases)('withdraws $phase data during completion in $kind scope', async (
       ownerContent: 'PRIVATE_RELEASE_BODY', changed: true,
     })
     const results = result.stdout.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line) as unknown)
-    expect(results.at(-1)).toEqual({ type: 'final', sessionId: expect.stringMatching(/^session-/), reason: { kind: 'completed' }, text: 'Done.' })
+    const final = results.at(-1) as { sessionId?: unknown }
+    expect(final.sessionId).toMatch(/^session-/)
+    expect(final).toEqual({ type: 'final', sessionId: final.sessionId, reason: { kind: 'completed' }, text: 'Done.' })
   } finally { rmSync(root, { recursive: true, force: true }) }
 }, 70_000)
