@@ -243,6 +243,13 @@ export interface LaunchOptions {
    */
   replayChildFixtures?: string[]
   /**
+   * Sidecar overrides indexed parallel to {@link replayChildFixtures}: a bare
+   * entry array replaces that child's derived script, `{ patches }` swaps the
+   * named call indexes. For nested-agent scenarios whose child calls need
+   * throw/hang entries a recorded log cannot express; replay/refresh only.
+   */
+  replayChildOverrideFiles?: string[]
+  /**
    * Optional replay.override.json sidecar (whole-script replacement or
    * `{ patches }` augmentation) for throw/hang scenarios not expressible as
    * recorded chunks; replay/refresh only.
@@ -764,6 +771,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
         })),
         ...(options.replayOverride === undefined ? {} : { overrideFile: options.replayOverride }),
         ...(options.replayChildFixtures === undefined ? {} : { childFiles: options.replayChildFixtures }),
+        ...(options.replayChildOverrideFiles === undefined ? {} : { childOverrideFiles: options.replayChildOverrideFiles }),
         ...(options.paceMs === undefined ? {} : { paceMs: options.paceMs }),
       })
     } else if (mode !== 'record' && options.deepSeekMissingCredential !== true) {

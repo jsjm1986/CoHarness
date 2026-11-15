@@ -148,6 +148,15 @@ export interface ReplayConfig {
    */
   childFiles?: string[]
   /**
+   * Optional sidecars for {@link childFiles}, indexed in parallel:
+   * `childOverrideFiles[i]` applies the same {@link ReplayOverrideDoc}
+   * semantics as {@link overrideFile} to child slot `i` — a bare
+   * `ReplayEntry[]` replaces that child's derived script; `{ patches }` swaps
+   * the named call indexes. Lets a nested-agent scenario express child calls
+   * the durable stream cannot (cancel/hang holds, injected failures).
+   */
+  childOverrideFiles?: string[]
+  /**
    * Optional provider catalog. When non-empty, replay registers an adapter for
    * these routes; when absent or empty, it retains the catch-all waterfall used
    * by tests that do not need discovery.
@@ -869,25 +878,29 @@ function resolveReplayScript(
   if (config.overrideFile !== undefined && existsSync(config.overrideFile)) {
     const doc = readOverrideDoc(JSON.parse(readFileSync(config.overrideFile, 'utf8')) as unknown, config.overrideFile)
     if (Array.isArray(doc)) return doc
-    const script = deriveScriptFromFixture(config.file, fixture)
-    const derivedLength = script.length
-    const seenIndexes = new Set<number>()
-    for (const patch of doc.patches) {
-      if (patch.at > derivedLength) {
-        throw new Error(
-          `llm-replay: override patch index ${String(patch.at)} out of range `
-          + `(derived script has ${derivedLength} call(s); == length appends): ${config.overrideFile}`,
-        )
-      }
-      if (seenIndexes.has(patch.at)) {
-        throw new Error(`llm-replay: duplicate override patch index ${patch.at}: ${config.overrideFile}`)
-      }
-      seenIndexes.add(patch.at)
-      script[patch.at] = patch.entry
-    }
-    return script
+    return applyOverrideDoc(doc, config.overrideFile, deriveScriptFromFixture(config.file, fixture))
   }
   return deriveScriptFromFixture(config.file, fixture)
+}
+
+/** Apply `{ patches }` augmentation to a derived script. */
+function applyOverrideDoc(doc: { patches: ReplayOverridePatch[] }, file: string, script: ReplayEntry[]): ReplayEntry[] {
+  const derivedLength = script.length
+  const seenIndexes = new Set<number>()
+  for (const patch of doc.patches) {
+    if (patch.at > derivedLength) {
+      throw new Error(
+        `llm-replay: override patch index ${String(patch.at)} out of range `
+        + `(derived script has ${derivedLength} call(s); == length appends): ${file}`,
+      )
+    }
+    if (seenIndexes.has(patch.at)) {
+      throw new Error(`llm-replay: duplicate override patch index ${patch.at}: ${file}`)
+    }
+    seenIndexes.add(patch.at)
+    script[patch.at] = patch.entry
+  }
+  return script
 }
 
 /** Derive a script from an already migrated fixture, failing loud when it is absent. */
@@ -916,7 +929,7 @@ export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
     recordedId: primaryHeader.id, createdAt: primaryHeader.createdAt, entries: primaryEntries, primary: true,
   }
   const children: SessionScript[] = []
-  for (const childFile of config.childFiles ?? []) {
+  for (const [childIndex, childFile] of (config.childFiles ?? []).entries()) {
     if (!existsSync(childFile)) {
       throw new Error(`llm-replay: child fixture not found: ${childFile} — re-record the scenario`)
     }
@@ -925,10 +938,18 @@ export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
     // Derive the child's script from its own events only — events AT OR after the seed
     // boundary.
     const ownEvents = fixture.events.slice(fixture.inheritedEventCount)
+    const childOverride = config.childOverrideFiles?.[childIndex]
+    let entries: ReplayEntry[]
+    if (childOverride !== undefined && existsSync(childOverride)) {
+      const doc = readOverrideDoc(JSON.parse(readFileSync(childOverride, 'utf8')) as unknown, childOverride)
+      entries = Array.isArray(doc) ? doc : applyOverrideDoc(doc, childOverride, deriveReplayScript(ownEvents))
+    } else {
+      entries = deriveReplayScript(ownEvents)
+    }
     children.push({
       recordedId: fixture.id,
       createdAt: fixture.createdAt,
-      entries: deriveReplayScript(ownEvents),
+      entries,
       primary: false,
     })
   }
