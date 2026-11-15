@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/README.md
 document:
-  en: c7394c09a72f713dac7ad6f804164a02cf002fad
-  zh: 8380da1167f04df56610a8067a6237b1d3457523
+  en: 3b42002d7b4ba09d6afd52ad0968698054a00030
+  zh: 6a32e671e2c001d13a50a838fac92d4a51732700
 /:
   en: d9627cabd25db0e3
   zh: 5bd6fa8ddf4daed3
@@ -15,8 +15,8 @@ document:
   en: 76afc68964a1e3b3
   zh: 81202caacb07f319
 /packages/hierarchy:
-  en: 3b5d3bf944ee3f77
-  zh: 424737adfa9ada1c
+  en: a1677ef49884a4a6
+  zh: 78a92bd8ce7152af
 /packages/dependencies:
   en: dd867c529aa13221
   zh: fd488acd51440b79

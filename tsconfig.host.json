@@ -302,6 +302,8 @@
     { "path": "./packages/core/agent" },
     { "path": "./packages/core/agent-default-model" },
     { "path": "./packages/interaction/commands" },
+    { "path": "./packages/feedback/command-feedback" },
+    { "path": "./packages/feedback/message-feedback" },
     { "path": "./packages/goal/goal" },
     { "path": "./packages/goal/tool-goal" },
     { "path": "./packages/goal/goal-round-driver" },
