@@ -22,7 +22,7 @@
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "files": [
     "locale/*.json",
     "lib/index.js",

@@ -28,7 +28,7 @@
     "lib/**/*.js.map",
     "src"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~"
   },

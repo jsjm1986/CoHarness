@@ -155,13 +155,19 @@ export const subagentCatalogProjectionDefinition = {
  * @param parent - durable direct parent receiving the discovery fact.
  * @param child - established child's immutable Session metadata.
  * @param descriptor - mode-discriminated creation label frozen with the child.
- * @param name - the continuable child's name, reserved unique among the parent's children.
  */
 export function establishCatalogChild(
   parent: Session,
   child: SessionHeader,
   descriptor: { readonly mode: 'one-shot'; readonly label?: string },
 ): void
+/**
+ * Append a continuable direct-child discovery fact carrying its reserved sibling name at v3.
+ * @param parent - durable direct parent receiving the discovery fact.
+ * @param child - established child's immutable Session metadata.
+ * @param descriptor - mode-discriminated creation label frozen with the child.
+ * @param name - the continuable child's name, reserved unique among the parent's children.
+ */
 export function establishCatalogChild(
   parent: Session,
   child: SessionHeader,

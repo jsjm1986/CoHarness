@@ -25,6 +25,7 @@ export type SubprocessErrorCode = typeof SUBPROCESS_ERROR_CODES[number]
 
 /** Subprocess failure carrying a stable {@link SubprocessErrorCode}. */
 export class SubprocessError extends Error {
+  /** Stable classification of the failed process operation. */
   readonly code: SubprocessErrorCode
 
   /**

@@ -145,7 +145,6 @@ export const coverageBaselineFiles: readonly string[] = [
   // Host-side runtime pieces with fork-added branches awaiting tests.
   'packages/core/agent-loop/src/index.ts',
   'packages/core/tools/src/index.ts',
-  'packages/core/tools/src/ptc.ts',
   'packages/credentials/credentials/src/index.ts',
   'packages/fs/fs/src/index.ts',
   'packages/goal/goal/src/index.ts',
@@ -194,7 +193,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/experimental/client-ui-voice-input/src/client/index.ts',
   'packages/experimental/client-ui-voice-input/src/client/mount.ts',
   'packages/experimental/speech-to-text/src/index.ts',
-  'packages/interaction/tool-ask-user/src/legacy.ts',
   'packages/llm/llm-deepseek/src/host.ts',
   'packages/session/session-format-v6-to-v7/src/codec.ts',
   'packages/session/session-format-v6-to-v7/src/content.ts',
@@ -260,7 +258,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/context/gateway-execution/src/index.ts',
   'packages/context/gateway-execution/src/plugin-management.ts',
   'packages/core/session/src/index.ts',
-  'packages/experimental/agent-team/src/fold.ts',
   'packages/experimental/client-ui-agent-team/src/client/TeamAction.tsx',
   'packages/host/apiproxy/src/workspace-changes.ts',
   'packages/jobs/jobs-local/src/index.ts',
