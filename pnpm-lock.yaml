@@ -11429,6 +11429,9 @@ importers:
       '@deepseek-ai/dsh-execution-authority':
         specifier: workspace:*
         version: link:../../context/execution-authority
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session

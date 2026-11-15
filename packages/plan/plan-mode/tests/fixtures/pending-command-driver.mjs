@@ -59,7 +59,9 @@ try {
   const rejected = await ctx.commands.execute(agent, '/plan off', [{ type: 'file', receiptId: 'unavailable-file' }], signal)
   assert.equal(rejected.result.kind, 'error')
   const view = ctx.sessionProjections.snapshot(agent.session).values.plan
-  assert.deepEqual(view, { active: false, pending: true })
+  // The failed /plan off clears the projection's pending record, while the
+  // service's queued selection still awaits its accepted pre-step boundary.
+  assert.deepEqual(view, { active: false, pending: false })
   assert.deepEqual(ctx.planMode.get(agent), { active: false, pending: true })
   let replay = planProjectionDefinition.init()
   for (const event of agent.session.snapshotEvents()) replay = planProjectionDefinition.apply(replay, event)

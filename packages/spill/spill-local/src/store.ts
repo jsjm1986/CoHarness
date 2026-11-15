@@ -120,11 +120,23 @@ export interface SavedText {
  */
 export async function saveTextFile(options: SaveTextOptions): Promise<SavedText> {
   const dir = sessionDir(options.root, options.sessionId)
-  await mkdir(dir, { recursive: true, mode: 0o700 })
   const safeName = encodeSegment(options.suggestedName)
   const path = join(dir, `${randomBytes(6).toString('hex')}-${safeName}`)
   const bytes = Buffer.byteLength(options.content, 'utf8')
-  const handle = await open(path, 'wx', 0o600)
+  let handle
+  for (;;) {
+    await mkdir(dir, { recursive: true, mode: 0o700 })
+    try {
+      handle = await open(path, 'wx', 0o600)
+      break
+    } catch (error: unknown) {
+      /* v8 ignore start -- requires another process to remove the directory
+         between mkdir and open, or an external permission/IO race. */
+      if (isErrno(error, 'ENOENT')) continue
+      throw error
+      /* v8 ignore stop */
+    }
+  }
   try {
     await handle.writeFile(options.content)
   } finally {

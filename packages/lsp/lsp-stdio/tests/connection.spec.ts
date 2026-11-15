@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import { LspConnection } from '@deepseek-ai/dsh-lsp-stdio'
+import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { ConnectionWriter } from '@deepseek-ai/dsh-lsp-stdio/src/connection.ts'
 import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
 import { spawnSubprocess } from '@deepseek-ai/dsh-subprocess-local/src/spawn.ts'
@@ -62,7 +63,11 @@ describe('LspConnection', () => {
   it('rejects a request when the server replies with an error', async () => {
     const conn = await connect({ LSP_FAKE_ERROR: '1' })
     await conn.request('initialize', { capabilities: {} })
-    await expect(conn.request('textDocument/hover', {})).rejects.toThrow(/server refused the request/)
+    await expect(conn.request('textDocument/hover', {})).rejects.toMatchObject({
+      name: 'LspError',
+      code: 'LSP_SERVER_ERROR',
+      message: 'language server rejected textDocument/hover with JSON-RPC error -32000: server refused the request',
+    })
   })
 
   it('treats terminating an already-closed child as a teardown race', async () => {
@@ -220,13 +225,21 @@ describe('LspConnection edge behavior', () => {
       + 'const fr=(s)=>{const x=Buffer.from(s);return Buffer.concat([Buffer.from(`Content-Length: ${x.length}\\r\\n\\r\\n`),x]);};'
       + 'process.stdin.on("data",c=>{b=Buffer.concat([b,c]);const s=b.indexOf("\\r\\n\\r\\n");if(s<0)return;const len=Number(/(\\d+)/.exec(b.toString("ascii",0,s))[1]);const body=JSON.parse(b.toString("utf8",s+4,s+4+len));process.stdout.write(fr(JSON.stringify({jsonrpc:"2.0",id:body.id,error:{code:-1}})));});'
     const conn = await connectScript(script)
-    await expect(conn.request('initialize', {})).rejects.toThrow(/LSP error response/)
+    await expect(conn.request('initialize', {})).rejects.toMatchObject({
+      name: 'LspError',
+      code: 'LSP_SERVER_ERROR',
+      message: 'language server rejected initialize with JSON-RPC error -1: no message',
+    })
   })
 
   it('rejects a pending request when the process exits mid-flight', async () => {
     // Never responds, then exits shortly: the pending request must reject on close.
     const conn = await connectScript('setTimeout(()=>process.exit(0), 100)')
-    await expect(conn.request('initialize', {})).rejects.toThrow(/exited|closed/)
+    await expect(conn.request('initialize', {})).rejects.toMatchObject({
+      name: 'LspError',
+      code: 'LSP_SERVER_EXITED',
+      message: expect.stringMatching(/^language server exited/) as string,
+    })
   })
 
   it('rejects a pending request when child stdin fails but the process stays alive', async () => {
@@ -247,6 +260,72 @@ describe('LspConnection edge behavior', () => {
       + 'process.stdin.on("data",c=>{b=Buffer.concat([b,c]);const s=b.indexOf("\\r\\n\\r\\n");if(s<0)return;const len=Number(/(\\d+)/.exec(b.toString("ascii",0,s))[1]);const body=JSON.parse(b.toString("utf8",s+4,s+4+len));process.stdout.write(fr(JSON.stringify({jsonrpc:"2.0",id:body.id,result:{ok:true}})));});'
     const conn = await connectScript(script)
     await expect(conn.request('initialize', {})).resolves.toEqual({ ok: true })
+  })
+
+  it('reports the subprocess launch failure as the settled failure', async () => {
+    const conn = await LspConnection.create({
+      command: '/nonexistent/dsh-lsp-missing-server',
+      args: [],
+      cwd: process.cwd(),
+      env: scrubbedParentEnv(),
+      maxMessageBytes: 1000,
+      maxStderrBytes: 1000,
+      killGraceMs: 3_000,
+      configuration: null,
+    }, spawnSubprocess, () => Promise.resolve(null))
+    open.push(conn)
+    // The failed launch usually surfaces first as a stdin write failure; once the process settles,
+    // the connection reports the provider's launch failure for it.
+    const failure: unknown = await conn.request('initialize', {}).catch((error: unknown) => error)
+    expect(failure).toMatchObject({ name: 'LspError', code: expect.stringMatching(/^LSP_(SERVER_EXITED|SPAWN_FAILED)$/) as string })
+    await conn.closed
+    expect(conn.failedWith(failure)).toBe(true)
+    expect(conn.settledFailure(failure)).toMatchObject({
+      name: 'LspError',
+      code: 'LSP_SPAWN_FAILED',
+      message: expect.stringMatching(/^language server process failed:/) as string,
+      cause: expect.any(Error) as Error,
+    })
+    const unrelated = new Error('unrelated')
+    expect(conn.settledFailure(unrelated)).toBe(unrelated)
+  })
+
+  it('keeps a subprocess provider HarnessError as the spawn failure', async () => {
+    const providerFailure = new HarnessError('sandbox refused the launch', 'SANDBOX_DENIED')
+    const conn = await LspConnection.create({
+      command: process.execPath,
+      args: ['-e', 'setInterval(()=>{}, 1000)'],
+      cwd: process.cwd(),
+      env: scrubbedParentEnv(),
+      maxMessageBytes: 1000,
+      maxStderrBytes: 1000,
+      killGraceMs: 3_000,
+      configuration: null,
+    }, async (spec) => {
+      const handle = await spawnSubprocess(spec)
+      return Object.assign(Object.create(handle) as typeof handle, {
+        done: Promise.resolve().then(() => { throw providerFailure }),
+      })
+    }, () => Promise.resolve(null))
+    open.push(conn)
+    const failure: unknown = await conn.request('initialize', {}).catch((error: unknown) => error)
+    await conn.closed
+    expect(conn.settledFailure(failure)).toBe(providerFailure)
+  })
+
+  it('reports one stdin failure from the error event and the write callback as one transport failure', async () => {
+    const failure = new Error('fixture stdin failure')
+    const writer: ConnectionWriter = (stdin, _message, done) => {
+      queueMicrotask(() => {
+        stdin.emit('error', failure)
+        done(failure)
+      })
+    }
+    const conn = await connectScript('setInterval(()=>{}, 1000)', 100_000, writer)
+    const rejection: unknown = await conn.request('initialize', {}).catch((error: unknown) => error)
+    expect(rejection).toMatchObject({ name: 'LspError', code: 'LSP_SERVER_EXITED', cause: failure })
+    expect(conn.failedWith(rejection)).toBe(true)
+    await expect(conn.notify('initialized', {})).rejects.toBe(rejection)
   })
 })
 

@@ -11,6 +11,8 @@
  */
 
 import type { Writable } from 'node:stream'
+import { LspError } from '@deepseek-ai/dsh-lsp'
+import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { encodeMessage, MessageDecoder } from './framing.ts'
 
@@ -41,6 +43,7 @@ export interface ConnectionSpec {
 }
 
 interface Pending {
+  method: string
   resolve: (value: unknown) => void
   reject: (error: Error) => void
 }
@@ -71,6 +74,8 @@ export class LspConnection {
   private readonly pending = new Map<number, Pending>()
   private nextId = 1
   private closeReason: Error | undefined
+  /** The subprocess provider's launch or run failure; it supersedes the stdin failure it causes. */
+  private launchFailure: Error | undefined
   /** Set once the process has fully exited; the instance awaits it during teardown. */
   readonly closed: Promise<void>
 
@@ -129,7 +134,7 @@ export class LspConnection {
     this.stdin = this.handle.stdin
     this.closed = new Promise<void>((resolve) => {
       const close = (): void => {
-        const reason = this.closeReason ?? new Error(this.exitMessage())
+        const reason = this.closeReason ?? new LspError(this.exitMessage(), 'LSP_SERVER_EXITED')
         // Record the reason so any request issued AFTER close rejects immediately instead of hanging
         // (a closed process sends no further responses).
         this.closeReason = reason
@@ -139,14 +144,16 @@ export class LspConnection {
       this.handle.done.then(close, (error: unknown) => {
         // A spawn-level failure never produces a close event; the rejection is
         // the fatal cause and the close boundary at once.
-        this.fail(asError(error))
+        const failure = spawnFailure(error)
+        this.launchFailure = failure
+        this.fail(failure)
         close()
       })
     })
     // Child stdin can fail while the process itself remains alive (for example, a server closes fd
     // 0). Treat that as a fatal connection error so pending requests reject immediately instead of
     // waiting for a process-close event that may never arrive.
-    this.stdin.on('error', (error) => { this.fail(error) })
+    this.stdin.on('error', (error) => { this.fail(this.stdinFailure(error)) })
     this.handle.stdout.on('data', (chunk: Buffer) => { this.onStdout(chunk) })
   }
 
@@ -167,7 +174,17 @@ export class LspConnection {
    * @returns `true` only when this connection produced that exact failure.
    */
   failedWith(error: unknown): boolean {
-    return this.closeReason === error
+    return this.closeReason === error || (this.launchFailure !== undefined && this.launchFailure === error)
+  }
+
+  /**
+   * Return the failure a settled query should report: the subprocess launch/run failure when it
+   * caused this rejection, else the rejection itself.
+   * @param error - the rejection the query settled with.
+   * @returns the launch failure when identified, else the original error.
+   */
+  settledFailure(error: unknown): unknown {
+    return this.launchFailure !== undefined && this.failedWith(error) ? this.launchFailure : error
   }
 
   /**
@@ -183,7 +200,7 @@ export class LspConnection {
         reject(this.closeReason)
         return
       }
-      this.pending.set(id, { resolve, reject })
+      this.pending.set(id, { method, resolve, reject })
       // `write()` records either synchronous or callback-delivered failures on the connection and
       // rejects every pending request. This handler only consumes the write promise itself.
       void this.write({ jsonrpc: '2.0', id, method, params }).catch(() => {})
@@ -285,8 +302,7 @@ export class LspConnection {
     this.pending.delete(id)
     const error = frame.error
     if (error !== null && typeof error === 'object') {
-      const record = error as Record<string, unknown>
-      pending.reject(new Error(typeof record.message === 'string' ? record.message : 'LSP error response'))
+      pending.reject(responseError(pending.method, error as Record<string, unknown>))
       return
     }
     pending.resolve(frame.result)
@@ -300,8 +316,9 @@ export class LspConnection {
           resolve()
           return
         }
-        this.fail(error)
-        reject(error)
+        const failure = this.stdinFailure(error)
+        this.fail(failure)
+        reject(failure)
       }
       try {
         this.writer(this.stdin, message, done)
@@ -322,8 +339,20 @@ export class LspConnection {
     return tail === '' ? 'language server exited' : `language server exited; stderr: ${tail}`
   }
 
+  /**
+   * Convert a stdin failure to `LSP_SERVER_EXITED`. The stream reports one failure through both its
+   * `error` event and the write callback, so the second report reuses the first conversion and
+   * {@link failedWith} still recognizes the rejection.
+   */
+  private stdinFailure(error: Error): Error {
+    const current = this.closeReason
+    if (current instanceof LspError && current.cause === error) return current
+    return new LspError(`language server stopped accepting input: ${error.message}`, 'LSP_SERVER_EXITED', { cause: error })
+  }
+
   private fail(error: Error): void {
-    /* v8 ignore next -- the second arm (closeReason already set) needs two fail() calls before close; defensive. */
+    /* v8 ignore next -- the second arm needs a second failure before close, such as a launch failure after a stdin
+       failure; the subprocess provider does not fix that order, so coverage cannot rely on it. */
     if (this.closeReason === undefined) this.closeReason = error
     this.failAll(error)
   }
@@ -333,6 +362,22 @@ export class LspConnection {
     this.pending.clear()
     for (const pending of waiting) pending.reject(error)
   }
+}
+
+/**
+ * Convert a subprocess `done` rejection to `LSP_SPAWN_FAILED`; a provider `HarnessError` already
+ * carries the classification and propagates unchanged.
+ */
+function spawnFailure(error: unknown): Error {
+  if (error instanceof HarnessError) return error
+  return new LspError(`language server process failed: ${asError(error).message}`, 'LSP_SPAWN_FAILED', { cause: error })
+}
+
+/** Convert a JSON-RPC error response, keeping its numeric code and message in `message`. */
+function responseError(method: string, error: Record<string, unknown>): LspError {
+  const code = typeof error.code === 'number' ? ` ${error.code}` : ''
+  const detail = typeof error.message === 'string' ? error.message : 'no message'
+  return new LspError(`language server rejected ${method} with JSON-RPC error${code}: ${detail}`, 'LSP_SERVER_ERROR')
 }
 
 /** Coerce an unknown thrown value to an `Error`. */

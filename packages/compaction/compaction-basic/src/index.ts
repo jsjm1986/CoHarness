@@ -181,7 +181,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     ctx.on('agent/request', async ({ agent, signal }, next) => {
       const config = await next()
       const previous = agent.session.requestHeader()
-      if (signal.aborted || previous === undefined
+      if (signal.aborted || previous === undefined || config.provider === '' || config.model === ''
         || (previous.config.provider === config.provider && previous.config.model === config.model)) return config
       try {
         const header = { ...previous, config }

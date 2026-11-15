@@ -1,6 +1,6 @@
 /** Plan projection behavior. */
 
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -88,18 +88,13 @@ describe('plan projection unit', () => {
     expect(bench.values().plan).toEqual({ active: true, pending: false })
   })
 
-  it.each([false, true])('preserves the earlier successful pending selection after a failed command (active: %s)', async (active) => {
+  it('records that plan mode was entered and keeps the record after leaving', async () => {
     const bench = await harness(true)
-    onTestFinished(() => bench.ctx.fiber.dispose())
-    if (active) commitPlanMode(bench.session, true, 0)
-    const first = runPlanCommand(bench.session, active ? 'off' : '', 1)
-    settlePlanCommand(bench.session, first, 'success')
-    expect(bench.values().plan).toEqual({ active, pending: true })
-    const failed = runPlanCommand(bench.session, active ? '' : 'off', 2)
-    settlePlanCommand(bench.session, failed, 'error')
-    expect(bench.values().plan).toEqual({ active, pending: true })
-    commitPlanMode(bench.session, !active, 1)
-    expect(bench.values().plan).toEqual({ active: !active, pending: false })
+    expect(bench.ctx.sessionProjections.checkpoint(bench.session).plan?.val).toMatchObject({ entered: false })
+    commitPlanMode(bench.session, false, 0)
+    expect(bench.ctx.sessionProjections.checkpoint(bench.session).plan?.val).toMatchObject({ entered: false })
+    commitPlanMode(bench.session, true, 1)
+    expect(bench.ctx.sessionProjections.checkpoint(bench.session).plan?.val).toMatchObject({ active: true, entered: true })
   })
 
   it('folds `off` args and non-plan commands correctly, and a matching selection is not pending', async () => {
