@@ -8,21 +8,22 @@ import {windowsServiceStoreAclChecks} from './node-private-file.ts'
  * @returns the fixed local volume identity and verified existing filenames.
  */
 export async function windowsSqliteProof(directory:string,filename:string,provision:boolean,timeout:number):Promise<{volume:string;files:string[]}>{
-  const input=Buffer.from(JSON.stringify({directory,filename,provision}),'utf8').toString('base64')
+  const input=Buffer.from([directory,filename,provision?'1':'0'].join('\n'),'utf8').toString('base64')
   const script=`$ProgressPreference='SilentlyContinue';$ErrorActionPreference='Stop'
-$cfg=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${input}')) | ConvertFrom-Json
+$cfgParts=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${input}')) -split "\`n",3
+$cfg=[pscustomobject]@{directory=$cfgParts[0];filename=$cfgParts[1];provision=($cfgParts[2] -eq '1')}
 ${windowsServiceStoreAclChecks()}
-function Get-HgwItem($path) { $item=Get-Item -Force -LiteralPath $path -ErrorAction SilentlyContinue; if($null -ne $item -and (([int64]$item.Attributes -band 0x441400) -ne 0)) {throw 'redirected object'}; return $item }
+function Get-HgwItem($path) { if([IO.Directory]::Exists($path)){$item=[IO.DirectoryInfo]::new($path)}else{if(![IO.File]::Exists($path)){return $null};$item=[IO.FileInfo]::new($path)}; if(([int64]$item.Attributes -band 0x441400) -ne 0) {throw 'redirected object'}; return $item }
 function Get-HgwVolume($path) {
-  $root=[IO.Path]::GetPathRoot($path); $v=New-Object IO.DriveInfo($root)
+  $root=[IO.Path]::GetPathRoot($path); $v=[IO.DriveInfo]::new($root)
   if($v.DriveType -ne 'Fixed' -or $v.DriveFormat -notin @('NTFS','ReFS')) {throw 'nonlocal volume'}
   return $v.Name
 }
-$dirs=New-Object 'Collections.Generic.List[string]'
+$dirs=[Collections.Generic.List[string]]::new()
 $d=[IO.DirectoryInfo]$cfg.directory; while($null -ne $d) { $dirs.Insert(0,$d.FullName); $d=$d.Parent }
-$acl=New-Object Security.AccessControl.DirectorySecurity
+$acl=[Security.AccessControl.DirectorySecurity]::new()
 $acl.SetAccessRuleProtection($true,$false)
-foreach($sid in @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value,'S-1-5-18','S-1-5-32-544')) { $id=New-Object Security.Principal.SecurityIdentifier($sid); [void]$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($id,'FullControl','ContainerInherit,ObjectInherit','None','Allow'))) }
+foreach($sid in @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value,'S-1-5-18','S-1-5-32-544')) { $id=[Security.Principal.SecurityIdentifier]::new($sid); [void]$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($id,'FullControl','ContainerInherit,ObjectInherit','None','Allow')) }
 $previous=$null;$volume=$null
 foreach($path in $dirs) {
   $item=Get-HgwItem $path
@@ -30,12 +31,12 @@ foreach($path in $dirs) {
     if($null -eq $volume){$volume=Get-HgwVolume $previous}
     [void][IO.Directory]::CreateDirectory($path,$acl); $item=Get-HgwItem $path
   }
-  if(!$item.PSIsContainer){throw 'invalid directory'}
+  if($item -isnot [IO.DirectoryInfo]){throw 'invalid directory'}
   Test-HgwAcl $path ($path -eq $cfg.directory) $previous
   $previous=$path
 }
 if($null -eq $volume){$volume=Get-HgwVolume $cfg.directory}
-$files=New-Object 'Collections.Generic.List[string]'
+$files=[Collections.Generic.List[string]]::new()
 foreach($suffix in @('','-wal','-shm','-journal')){
   $path=[IO.Path]::Combine($cfg.directory,$cfg.filename+$suffix); $item=Get-HgwItem $path
   if($null -eq $item -and $suffix -eq ''){
@@ -43,9 +44,9 @@ foreach($suffix in @('','-wal','-shm','-journal')){
     try{$f=[IO.File]::Open($path,'CreateNew','ReadWrite','ReadWrite');$f.Dispose()}catch [IO.IOException] {if(![IO.File]::Exists($path)){throw}}
     $item=Get-HgwItem $path
   }
-  if($null -ne $item){if($item.PSIsContainer){throw 'invalid database'};Test-HgwAcl $path $true $cfg.directory; $files.Add($suffix)}
+  if($null -ne $item){if($item -is [IO.DirectoryInfo]){throw 'invalid database'};Test-HgwAcl $path $true $cfg.directory; $files.Add($suffix)}
 }
-@{volume=$volume;files=$files.ToArray()} | ConvertTo-Json -Compress`
+'{"volume":"'+($volume -replace '\\','\\')+'","files":["'+($files.ToArray() -join '","')+'"]}'`
   const encoded=Buffer.from(script,'utf16le').toString('base64')
   if(encoded.length>30000)throw new Error('The Windows storage path exceeds the native command argument limit.')
   const root=parse(directory).root,systemRoot=process.env.SystemRoot

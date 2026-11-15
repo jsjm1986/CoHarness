@@ -1,4 +1,4 @@
-# Agent Note: Windows PowerShell probes run serially
+# Agent Note: Windows PowerShell probes are cmdlet-free
 
 Status: implemented
 
@@ -6,23 +6,24 @@ English | [中文](2026-11-16-powershell-probe-serialization.zh.md)
 
 ## Problem
 
-Every Windows ACL probe and tighten spawns `powershell.exe` through `runGatewayChildCommand`. Windows PowerShell 5.1 resolves cmdlets such as `Get-Acl`, `Set-Acl`, and `ConvertTo-Json` through a per-user module-analysis cache, and cold-starting several `powershell.exe` children concurrently lets one sibling's cache build fail another with `CouldNotAutoloadMatchingModule`. The windows-native CI lane reproduced this intermittently inside `node-private-sqlite` specs, while single children on a warm machine answer reliably.
+Every Windows ACL probe, mount check, and orphan sweep spawned `powershell.exe` with scripts that resolved cmdlets (`Get-Acl`, `Set-Acl`, `Get-Item`, `Get-Volume`, `Get-CimInstance`, `ConvertTo-Json`, `ConvertFrom-Json`) through the per-user module-analysis cache. Vitest runs specs in parallel worker processes, so several cold `powershell.exe` children race the shared cache; once corrupted, every later autoload fails with `CouldNotAutoloadMatchingModule` for the rest of the job. The windows-native CI lane reproduced the persistent failure inside the ACL specs while serialized single children stayed reliable.
 
 ## Decision
 
-- `runWindowsShellProbe` in `gateway/src/child-command.ts` owns all `powershell.exe` probes: a module-level promise queue serializes the children, and a documented `CouldNotAutoloadMatchingModule` failure retries once inside the same queue slot.
-- Every `powershell.exe` spawn — ACL probes and tighten, the SQLite provisioning proof, the local-mount volume check, and the orphan-process sweep — funnels through the serialized helper. `mountvol.exe`, `taskkill.exe`, and POSIX tools keep the unqueued path.
+- Every spawned script now uses only .NET APIs and language constructs: `[IO.File]::GetAccessControl`/`SetAccessControl` for ACLs, `[IO.FileInfo]`/`[IO.DirectoryInfo]` for attribute checks, `[Management.ManagementObjectSearcher]` for `Win32_Volume`/`Win32_Process`, manual `'{...}' -f` JSON output, and `[regex]` parsing in place of `ConvertTo-Json`/`ConvertFrom-Json`. Nothing resolves through the module subsystem.
+- `runWindowsShellProbe` in `gateway/src/child-command.ts` still owns `powershell.exe` spawns as a second line of defense: a module-level promise queue serializes children in-process and a documented `CouldNotAutoloadMatchingModule` retries once inside the slot.
+- `mountvol.exe`, `taskkill.exe`, and POSIX tools keep the unqueued path.
 
 ## Consequences
 
-- Powershell probe latency becomes first-come-first-served; the serialized burst adds at most one child deadline per queued probe.
-- A persistent module failure still propagates after the single retry, so the fix narrows cold-start flakes without masking real command errors.
+- The ACL verdict wire format stays JSON (`owner`, `deny`, `sids`, `foreignWriters`); TS consumers and test mocks keep their existing parse shape.
+- `win32` paths now degrade only on real OS failures — a broken PowerShell module environment cannot corrupt the verdict path.
 
 ## Alternatives considered
 
-- Rewriting the probes in pure .NET (`[IO.File]::GetAccessControl` instead of `Get-Acl`) — rejected for this change: correct but a larger surface, and the cache race also affects `Get-CimInstance` sweeps that have no cmdlet-free equivalent in this layer.
-- Seeding `PSModulePath` in the child environment — rejected: `scrubbedGatewayChildEnv` already preserves it; the failure is a race, not a missing path.
+- Per-process spawn serialization alone — rejected: vitest's parallel workers still race the machine-shared cache across processes; it was retained only as defense in depth.
+- Seeding `PSModulePath` in the child environment — rejected: `scrubbedGatewayChildEnv` already preserves it; discovery worked and the load itself failed.
 
 ## Verification
 
-- `gateway` `tsc --noEmit` passes; the windows-native `node-private-sqlite` spec lane is the acceptance surface on CI.
+- `gateway` `tsc --noEmit` passes; all generated scripts pass `System.Management.Automation.Language.Parser` parse checks; the mocked ACL specs pass 51/51 locally; the windows-native spec lane is the acceptance surface on CI.

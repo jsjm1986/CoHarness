@@ -182,7 +182,7 @@ export class LocalRuntimeControl implements InstanceProc {
   private async sweepOrphans(parentPid: number): Promise<void> {
     const { stdout } = await runWindowsShellProbe([
       '-NoProfile', '-NonInteractive', '-Command',
-      `& { (Get-CimInstance Win32_Process -Filter "ParentProcessId=${String(parentPid)}").ProcessId -join "," }`,
+      `& { $ids = @(); foreach ($p in [Management.ManagementObjectSearcher]::new('SELECT ProcessId FROM Win32_Process WHERE ParentProcessId=${String(parentPid)}').Get()) { $ids += [int]$p['ProcessId'] }; $ids -join "," }`,
     ], this.timeoutMs, undefined, 4096)
     for (const pid of stdout.trim().split(',').map(Number).filter(pid => Number.isSafeInteger(pid) && pid > 0)) {
       await runGatewayChildCommand('taskkill.exe', ['/PID', String(pid), '/T', '/F'], this.timeoutMs).catch(() => {})
