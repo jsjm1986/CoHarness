@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-remote-event-zero-delivery-delegation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-16-remote-event-zero-delivery-delegation.md
+document:
+  en: 5268c4f87753429708f33920431e99c25a1b1ee2
+  zh: 8aa819b7795e5cf620be79c6edbcba897ed87d01
+/agent-note-remote-event-zero-delivery-delegation:
+  en: 2d98b9917eed4109
+  zh: 843bfca7dffcd006
+/agent-note-remote-event-zero-delivery-delegation/problem:
+  en: a9b27360d9646463
+  zh: cad9e9334644fe1b
+/agent-note-remote-event-zero-delivery-delegation/decision:
+  en: 49ca31a27b5c36f1
+  zh: 0dd3c61dbc0e0e57
+/agent-note-remote-event-zero-delivery-delegation/consequences:
+  en: b371de0c33f0cc54
+  zh: c973aa52645db1d3
+/agent-note-remote-event-zero-delivery-delegation/alternatives-considered:
+  en: add4d1b774f4dcac
+  zh: 75fd778084f98791
+/agent-note-remote-event-zero-delivery-delegation/verification:
+  en: 29516fc4fc15006c
+  zh: 8058de04beeb86cd

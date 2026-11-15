@@ -522,15 +522,29 @@ describe('TypertGateway Remote events', () => {
     expect(await nextFrame(owner.iterator)).toEqual({ type: 'cancel', eventId: scopedDelivery.eventId })
   })
 
-  it('delivers an already-pending waterfall to a later owner generation', async () => {
-    const { ctx, connection } = await setup()
+  it('delegates a waterfall that no answer-capable Client can see at start', async () => {
+    const { ctx } = await setup()
     const source = new RemoteEventSourceProbe()
     ctx.typertGateway.registerRemoteEvents(source.source, REMOTE_HOST)
     const pending = pendingInvocation(ctx)
     source.push(pending.dispatch)
-    await vi.waitFor(() => { expect(ctx.typertGateway.getPendingRemoteEvents()).toHaveLength(1) })
+    // Holding the event for a later generation would starve every local
+    // waterfall listener on a Host with no attached Remote peers.
+    await vi.waitFor(() => { expect(pending.resolve).toHaveBeenCalledWith({ kind: 'next' }) })
+    expect(ctx.typertGateway.getPendingRemoteEvents()).toEqual([])
+  })
 
-    const late = await openEvents(ctx, ownerPeer(ctx))
+  it('delivers an already-pending waterfall to a later owner generation', async () => {
+    const { ctx, connection } = await setup()
+    const source = new RemoteEventSourceProbe()
+    ctx.typertGateway.registerRemoteEvents(source.source, REMOTE_HOST)
+    const first = await openEvents(ctx, ownerPeer(ctx))
+    const pending = pendingInvocation(ctx)
+    source.push(pending.dispatch)
+    const firstDelivery = await nextFrame(first.iterator) as { type: 'waterfall'; eventId: RemoteEventId }
+    expect(firstDelivery).toMatchObject({ event: 'fixture/approval' })
+
+    const late = await openEvents(ctx, peerFor(ctx, { kind: 'owner' }))
     const delivery = await nextFrame(late.iterator) as { type: 'waterfall'; eventId: RemoteEventId }
     expect(delivery).toMatchObject({ event: 'fixture/approval', request: { prompt: 'ship' } })
     await postResult(connection, {

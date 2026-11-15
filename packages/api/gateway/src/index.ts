@@ -598,6 +598,10 @@ export class TypertGatewayService extends Service implements TypertGateway {
         for (const client of this.remoteEventClients.values()) {
           if (client.answers) this.deliverRemoteEvent(pending, client)
         }
+        // No answer-capable Client holds this generation: holding the
+        // waterfall for a later generation would starve every local listener
+        // on a Host with no attached Remote peers.
+        if (pending.deliveries.size === 0) this.settleRemoteEvent(pending, { kind: 'next' })
       }
     } catch (error) {
       source.reject(error)
@@ -638,7 +642,12 @@ export class TypertGatewayService extends Service implements TypertGateway {
 
   private removeRemoteEventClient(client: RemoteEventClient): void {
     this.remoteEventClients.delete(client.id)
-    for (const pending of [...client.deliveries.values()]) this.removeRemoteEventDelivery(pending, client)
+    for (const pending of [...client.deliveries.values()]) {
+      this.removeRemoteEventDelivery(pending, client)
+      // A disconnect can empty the last delivery: the same starvation rule
+      // applies mid-flight as at start — no remaining answerer, delegate now.
+      if (pending.deliveries.size === 0) this.settleRemoteEvent(pending, { kind: 'next' })
+    }
     client.queue.end()
   }
 
