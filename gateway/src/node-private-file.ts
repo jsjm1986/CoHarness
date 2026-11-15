@@ -33,7 +33,7 @@ function windowsPrivateProbe(requireReference:boolean):string {return '& { ' + [
   '$sids = @(); $deny = 0',
   'foreach ($r in $acl.Access) { $sids += try { $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { "S-1-0-0" }; if ($r.AccessControlType -ne "Allow") { $deny++ } }',
   ...(requireReference?["$subject=$acl.GetOwner([Security.Principal.SecurityIdentifier]).Value", "$refAcl = if ([IO.Directory]::Exists($args[1])) { [IO.Directory]::GetAccessControl($args[1]) } else { [IO.File]::GetAccessControl($args[1]) }", "$reference=$refAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value", "$service=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value", "if ($subject -ne $reference -and $subject -ne $service -and $subject -ne 'S-1-5-18' -and $subject -ne 'S-1-5-32-544') { $deny++ }", '$mapped=@(); foreach ($s in $sids) { $mapped += if ($s -eq $service) { $subject } else { $s } }; $sids=$mapped']:[]),
-  "{{\"owner\":\"{0}\",\"deny\":{1},\"sids\":[\"{2}\"]}}' -f $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value,$deny,($sids -join '\",\"')",
+  "'{{\"owner\":\"{0}\",\"deny\":{1},\"sids\":[\"{2}\"]}}' -f $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value,$deny,($sids -join '\",\"')",
 ].join('; ') + ' }'}
 
 // icacls `:r` replaces only the named trustee's grant, so the ACL is rebuilt
@@ -104,7 +104,7 @@ function windowsProtectionProbe(mask: number,requireReferenceOwner: boolean,allo
   '$deny = 0; $foreign = 0',
   'foreach ($r in $acl.Access) { if (($r.PropagationFlags.value__ -band 2) -eq 0) { if ($r.AccessControlType -ne "Allow") { $deny++ } else { $sid = try { $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { "S-1-0-0" }; if ((($r.FileSystemRights.value__) -band ' + `0x${mask.toString(16)}` + ') -ne 0 -and $sid -ne $owner ' + (allowService ? '-and $sid -ne $service ' : '') + '-and $sid -ne "S-1-5-18" -and $sid -ne "S-1-5-32-544") { $foreign++ } } } }',
   ...(requireReferenceOwner ? ["$refAcl = if ([IO.Directory]::Exists($args[1])) { [IO.Directory]::GetAccessControl($args[1]) } else { [IO.File]::GetAccessControl($args[1]) }","$referenceOwner = [System.Security.Principal.NTAccount]::new($refAcl.Owner).Translate([System.Security.Principal.SecurityIdentifier]).Value","if ($owner -ne $referenceOwner -and $owner -ne 'S-1-5-18' -and $owner -ne 'S-1-5-32-544') { $foreign++ }"] : []),
-  "{{\"owner\":\"{0}\",\"deny\":{1},\"foreignWriters\":{2}}}' -f $owner,$deny,$foreign",
+  "'{{\"owner\":\"{0}\",\"deny\":{1},\"foreignWriters\":{2}}}' -f $owner,$deny,$foreign",
 ].join('; ') + ' }' }
 
 /** @returns static PowerShell checks for a service's own SQLite store and protected ancestors. */
