@@ -13938,7 +13938,7 @@
       "commitScope": [
         "packages/fs/tool-fs-search/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P2",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -14528,7 +14528,7 @@
       "commitScope": [
         "packages/interaction/commands/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -14599,7 +14599,7 @@
       "commitScope": [
         "packages/interaction/tool-ask-user/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -16518,7 +16518,7 @@
       "commitScope": [
         "packages/session/session-persistence/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P4",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -16957,7 +16957,7 @@
       "commitScope": [
         "packages/settings/settings/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -18689,7 +18689,7 @@
       "commitScope": [
         "packages/test-support/llm-replay/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P2",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
