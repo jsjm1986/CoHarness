@@ -358,6 +358,7 @@
   "experimental/client-ui-agent-team": "subagent",
   "experimental/client-ui-claude-code-mods": "conversation",
   "experimental/client-ui-cot-translation": "conversation",
+  "experimental/client-ui-forge": "workbench",
   "experimental/client-ui-voice-input": "conversation",
   "experimental/inspector": "workbench",
   "experimental/session-inspector": "workbench",
