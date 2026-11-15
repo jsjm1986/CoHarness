@@ -18796,7 +18796,7 @@
     },
     {
       "area": "packages/test-support/tool-testkit",
-      "status": "retain",
+      "status": "adapt",
       "localOwner": "packages/test-support/tool-testkit",
       "commitScope": [
         "packages/test-support/tool-testkit/"
@@ -18814,7 +18814,7 @@
         "packages/test-support/tool-testkit/tests/model-call.spec.ts",
         "packages/test-support/tool-testkit/tsconfig.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "localPlan": "P2 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
       "notes": "Cumulative dsh-v0.2.1-rc.2→dsh-v0.2.2-rc.3 review 2026-11-15: 5/7 target files byte-identical locally; 2 carry fork diffs; 0 not carried; 0 removed upstream this round."
     },
