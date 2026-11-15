@@ -139,10 +139,8 @@
     "approval-interaction": {
       "commit": "fa0d3b0f1ca",
       "applied": [
-        "ToolArgsError classification in tool-ask-user timed + tool-workflow (5a8dc54372 partial)"
-      ],
-      "deferred": [
-        "ToolContextUnavailableError taxonomy — upstream-new type, feature batch"
+        "ToolArgsError classification in tool-ask-user timed + tool-workflow (5a8dc54372 partial)",
+        "ToolContextUnavailableError taxonomy — already present in packages/core/tools (contracts.ts/error-codes.ts)"
       ],
       "na": [
         "fda29f726d PROVIDER_ERROR message — no answerer path locally"
@@ -157,8 +155,16 @@
       "pending": "20 fixes incl. live-runtime approval routing — feature-coupled to upstream sdk generation; dedicated pass deferred"
     },
     "subagent": {
-      "commit": null,
-      "pending": "evaluated against rc.5..rc.3 diff — catalog v3 naming, manager.ts lifecycle (closing/inbox waits) and discovery intersect all belong to upstream named/multi-level subagent generation; local is prior-generation layout, no generic hunks portable — stays deferred to architecture decision"
+      "commit": "72d5bf7e898",
+      "applied": [
+        "catalog v3 durable names + sibling uniqueness",
+        "rootOf/namesOf/resolveName tree addressing",
+        "tree-scoped sendMessage path routing"
+      ],
+      "na": [
+        "manager.ts closing/inbox-wait lifecycle — different local subagent manager generation"
+      ],
+      "notes": "absorbed via named-subagent/tree-addressing lane commit 72d5bf7e898; entry written after that landing, supersedes prior prior-generation assessment"
     },
     "cua": {
       "commit": null,

@@ -383,6 +383,7 @@ describe('mode-aware wire contribution', () => {
       return {
         ...assembly,
         sections: assembly.sections.filter(section => section.name !== 'tools:sdk'),
+        tools: [],
       }
     }, { prepend: true })
 
