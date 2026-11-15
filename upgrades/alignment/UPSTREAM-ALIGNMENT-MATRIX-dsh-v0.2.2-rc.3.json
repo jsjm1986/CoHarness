@@ -1441,7 +1441,7 @@
       "commitScope": [
         "apps/web/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P7",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5565,7 +5565,7 @@
       "commitScope": [
         "packages/client/connection/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5597,7 +5597,7 @@
       "commitScope": [
         "packages/client/file-upload/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5636,7 +5636,7 @@
       "commitScope": [
         "packages/client/hmr/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5666,7 +5666,7 @@
       "commitScope": [
         "packages/client/locale/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5714,7 +5714,7 @@
       "commitScope": [
         "packages/client/modules/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5828,7 +5828,7 @@
       "commitScope": [
         "packages/client/shortcuts/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5939,7 +5939,7 @@
       "commitScope": [
         "packages/client/ui-agent-preset/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6081,7 +6081,7 @@
       "commitScope": [
         "packages/client/ui-attachment/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6126,7 +6126,7 @@
       "commitScope": [
         "packages/client/ui-brand-official/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6314,7 +6314,7 @@
       "commitScope": [
         "packages/client/ui-commands/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6404,7 +6404,7 @@
       "commitScope": [
         "packages/client/ui-conversation/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6549,7 +6549,7 @@
       "commitScope": [
         "packages/client/ui-deliverables/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6600,7 +6600,7 @@
       "commitScope": [
         "packages/client/ui-directory-picker-browse/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6635,7 +6635,7 @@
       "commitScope": [
         "packages/client/ui-directory-picker-native/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6669,7 +6669,7 @@
       "commitScope": [
         "packages/client/ui-dockkit/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6838,7 +6838,7 @@
       "commitScope": [
         "packages/client/ui-goal/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6876,7 +6876,7 @@
       "commitScope": [
         "packages/client/ui-input-trigger/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6908,7 +6908,7 @@
       "commitScope": [
         "packages/client/ui-jobs/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -6945,7 +6945,7 @@
       "commitScope": [
         "packages/client/ui-layout/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7029,7 +7029,7 @@
       "commitScope": [
         "packages/client/ui-model-selection/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7071,7 +7071,7 @@
       "commitScope": [
         "packages/client/ui-open-in-app/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7129,7 +7129,7 @@
       "commitScope": [
         "packages/client/ui-permission-presets/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7166,7 +7166,7 @@
       "commitScope": [
         "packages/client/ui-plan/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7206,7 +7206,7 @@
       "commitScope": [
         "packages/client/ui-plugin-manager/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7262,7 +7262,7 @@
       "commitScope": [
         "packages/client/ui-plugin-market/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7307,7 +7307,7 @@
       "commitScope": [
         "packages/client/ui-primitives/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7472,7 +7472,7 @@
       "commitScope": [
         "packages/client/ui-reference/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7509,7 +7509,7 @@
       "commitScope": [
         "packages/client/ui-renderer/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7543,7 +7543,7 @@
       "commitScope": [
         "packages/client/ui-schedule/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7711,7 +7711,7 @@
       "commitScope": [
         "packages/client/ui-settings/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7847,7 +7847,7 @@
       "commitScope": [
         "packages/client/ui-settings-general/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7901,7 +7901,7 @@
       "commitScope": [
         "packages/client/ui-settings-models/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7955,7 +7955,7 @@
       "commitScope": [
         "packages/client/ui-settings-plugin-inventory/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -7991,7 +7991,7 @@
       "commitScope": [
         "packages/client/ui-settings-plugins/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8172,7 +8172,7 @@
       "commitScope": [
         "packages/client/ui-shortcuts/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8206,7 +8206,7 @@
       "commitScope": [
         "packages/client/ui-sidebar/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8257,7 +8257,7 @@
       "commitScope": [
         "packages/client/ui-sidebar-browser/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8384,7 +8384,7 @@
       "commitScope": [
         "packages/client/ui-sidebar-files/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8452,7 +8452,7 @@
       "commitScope": [
         "packages/client/ui-sidebar-right/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8517,7 +8517,7 @@
       "commitScope": [
         "packages/client/ui-sidebar-terminal/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8560,7 +8560,7 @@
       "commitScope": [
         "packages/client/ui-skill/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8594,7 +8594,7 @@
       "commitScope": [
         "packages/client/ui-slots/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8624,7 +8624,7 @@
       "commitScope": [
         "packages/client/ui-subagent/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8667,7 +8667,7 @@
       "commitScope": [
         "packages/client/ui-theme/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8726,7 +8726,7 @@
       "commitScope": [
         "packages/client/ui-tool/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8803,7 +8803,7 @@
       "commitScope": [
         "packages/client/ui-trajectory/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8867,7 +8867,7 @@
       "commitScope": [
         "packages/client/ui-user-questions/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8914,7 +8914,7 @@
       "commitScope": [
         "packages/client/ui-workflow-run/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -8947,7 +8947,7 @@
       "commitScope": [
         "packages/client/ui-workspace/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -9023,7 +9023,7 @@
       "commitScope": [
         "packages/client/web/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
