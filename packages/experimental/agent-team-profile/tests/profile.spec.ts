@@ -36,18 +36,15 @@ describe('Agent Teams profile bundle', () => {
       config?: Record<string, unknown>
       insert?: { id?: string; name?: string; config?: Record<string, unknown> }[]
     }[]
-    expect(patches.find(patch => patch.id === 'tool-subagent-control')).toMatchObject({ disabled: true })
-    expect(patches.find(patch => patch.id === 'tool-subagent-list-agents')).toMatchObject({ disabled: true })
-    expect(patches.find(patch => patch.id === 'tool-subagent')).toMatchObject({ disabled: true })
-    expect(patches.find(patch => patch.id === 'tool-subagent-fork')).toMatchObject({ disabled: true })
+    // Teammate creation and messaging ride the shipped subagent tools; the Team
+    // layer only adds the service, the four task tools, and the header panel.
+    expect(patches.filter(patch => patch.disabled === true)).toEqual([])
     const inserted = patches.flatMap(patch => patch.insert ?? [])
     expect(inserted.find(entry => entry.id === 'agent-team')).toMatchObject({
       name: '@deepseek-ai/dsh-experimental-agent-team',
-      config: { maxMembers: 8 },
     })
     expect(inserted.find(entry => entry.id === 'tool-agent-team')).toMatchObject({
       name: '@deepseek-ai/dsh-experimental-tool-agent-team',
-      config: { freshProvider: 'spawn', forkProvider: 'fork' },
     })
     expect(inserted.find(entry => entry.id === 'ui-agent-team')).toMatchObject({
       name: '@deepseek-ai/dsh-experimental-client-ui-agent-team',

@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import type {
-  TeamMemberView as TeamRosterMember,
-  TeamTaskView as TeamTask,
-  TeamView,
-} from '@deepseek-ai/dsh-experimental-agent-team/client'
-import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
+import type { TeamTaskView as TeamTask } from '@deepseek-ai/dsh-experimental-agent-team/client'
+import type { SubagentListEntry } from '@deepseek-ai/dsh-subagent/client'
 import {
   IconChevronDownOutline14, IconCloseOutline16, IconRefreshOutline14,
-  IconUserOutline16, StateDot, Tag, Tooltip,
+  IconUserOutline16, StateDot, Switch, Tag, Tooltip,
   useAnchoredPosition, useDismissOnOutsidePointer, type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -17,54 +13,65 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { NS, type TeamKey } from './locales.ts'
 import css from './TeamAction.module.css'
 
-/** Generated Remote result consumed directly by the Team UI. */
-export type TeamActionResult<T> = RemoteResult<T>
-
 /** Business actions injected by the browser plugin. */
 export interface TeamActionInjected {
-  load: (sessionId: SessionId) => Promise<TeamActionResult<TeamView>>
-  openTeammate: (sessionId: SessionId, member: TeamRosterMember) => Promise<void>
+  /** Save the root selection; null means success, otherwise the string describes the failure. */
+  selectTeamMode: (sessionId: SessionId, enabled: boolean) => Promise<string | null>
+  /** Repull the root's direct-child catalog. */
+  refreshMembers: (sessionId: SessionId) => Promise<void>
+  openTeammate: (sessionId: SessionId, memberId: SessionId) => Promise<void>
 }
 
 /** Full props of the Team conversation-header action. */
 export type TeamActionProps =
   PropsRuntime<'conversation.session.header.actions'> & TeamActionInjected & PropsLocale<typeof NS>
 
-/** One failure line for the Remote carrier. */
-function failureText(error: { readonly code: string; readonly message: string }): string {
-  return `${error.message} (${error.code})`
-}
-
 function statusKey(status: TeamTask['status']): TeamKey {
   switch (status) {
     case 'pending': return 'status.pending'
     case 'in_progress': return 'status.in_progress'
     case 'completed': return 'status.completed'
-    /* v8 ignore next -- Team views omit deleted task tombstones. */
+    /* v8 ignore next -- the wire view filters deleted task tombstones. */
     case 'deleted': return 'status.completed'
   }
 }
 
-function memberStatusKey(status: TeamRosterMember['status']): TeamKey {
-  switch (status) {
-    case 'running': return 'memberStatus.running'
-    case 'inactive': return 'memberStatus.inactive'
-    case 'provisioning': return 'memberStatus.provisioning'
-    case 'failed': return 'memberStatus.failed'
-  }
+function memberStatusKey(activity: 'running' | 'inactive'): TeamKey {
+  return activity === 'running' ? 'memberStatus.running' : 'memberStatus.inactive'
 }
 
-/** Render the live Team roster and shared task board. */
+/** One catalog member row as the panel renders it. */
+interface MemberRow {
+  readonly id: SessionId
+  readonly name: string
+  readonly activity: 'running' | 'inactive'
+}
+
+/** Render the root Session's mode selection, subagent roster, and shared task board. */
 export function TeamAction({
-  sessionId, load, openTeammate, t,
+  sessionId, useSession, useSessions, useProjection,
+  selectTeamMode, refreshMembers, openTeammate, t,
 }: TeamActionProps) {
+  const addressedChild = useSession(snapshot => snapshot.subagent !== null)
+  const listedChild = useSessions(state => state.byId[sessionId]?.origin === 'subagent')
+  if (addressedChild || listedChild) return null
+  return <RootTeamAction
+    sessionId={sessionId} useSessions={useSessions} useProjection={useProjection}
+    selectTeamMode={selectTeamMode} refreshMembers={refreshMembers} openTeammate={openTeammate} t={t}
+  />
+}
+
+function RootTeamAction({
+  sessionId, useSessions, useProjection,
+  selectTeamMode, refreshMembers, openTeammate, t,
+}: Pick<TeamActionProps,
+  'sessionId' | 'useSessions' | 'useProjection' | 'selectTeamMode' | 'refreshMembers' | 'openTeammate' | 't'
+>) {
+  const team = useProjection('agentTeam')
+  const catalog = useSessions(state => state.subagentsByParent[sessionId])
   const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [view, setView] = useState<TeamView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const sessionRef = useRef(sessionId)
-  const refreshGeneration = useRef(0)
-  sessionRef.current = sessionId
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const triggerLabelRef = useRef<HTMLSpanElement>(null)
@@ -76,30 +83,21 @@ export function TeamAction({
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pinnedRef = useRef(false)
 
+  sessionRef.current = sessionId
   useEffect(() => {
-    refreshGeneration.current += 1
     setOpen(false)
-    setLoading(false)
-    setView(null)
     setError(null)
   }, [sessionId])
 
-  const refresh = useCallback(async (): Promise<boolean> => {
-    const requestedSession = sessionId
-    const generation = ++refreshGeneration.current
-    setLoading(true)
-    const result = await load(requestedSession)
-    if (sessionRef.current !== requestedSession || refreshGeneration.current !== generation) return false
-    setLoading(false)
-    if (result.ok) {
-      setView(result.value)
-      setError(null)
-      return true
-    } else {
-      setError(failureText(result.error))
-      return false
-    }
-  }, [load, sessionId])
+  const members: MemberRow[] = [
+    { id: sessionId, name: t('lead'), activity: 'running' },
+    ...(catalog?.entries ?? [])
+      .filter((entry): entry is Extract<SubagentListEntry, { kind: 'child' }> => entry.kind === 'child')
+      .map(entry => ({ id: entry.id, name: entry.label ?? entry.id, activity: entry.activity })),
+  ]
+  const teammates = members.filter(member => member.id !== sessionId)
+  const enabled = team?.enabled === true
+  const compact = teammates.length === 0 && (team?.tasks.length ?? 0) === 0
 
   const cancelHoverChange = (): void => {
     clearTimeout(hoverTimer.current)
@@ -116,7 +114,7 @@ export function TeamAction({
     cancelHoverChange()
     if (!next) pinnedRef.current = false
     setOpen(next)
-    if (next) void refresh()
+    if (next) void refreshMembers(sessionId).catch(() => undefined)
   }
 
   const scheduleHoverOpen = (): void => {
@@ -159,8 +157,7 @@ export function TeamAction({
     return () => { document.removeEventListener('keydown', dismiss) }
   }, [open])
 
-  const teammates = view?.members.filter(member => member.role === 'teammate') ?? []
-  const compact = view !== null && view.members.length <= 1 && view.tasks.length === 0
+  if (team === undefined) return null
 
   return (
     <div
@@ -186,7 +183,7 @@ export function TeamAction({
       >
         <IconUserOutline16 size={14} />
         <span ref={triggerLabelRef} className={css.triggerLabel}>{t('trigger')}</span>
-        {teammates.length > 0 && <span className={css.count}>{teammates.length}</span>}
+        {enabled && teammates.length > 0 && <span className={css.count}>{teammates.length}</span>}
       </button>
       {open && createPortal(
         <div
@@ -203,28 +200,41 @@ export function TeamAction({
           <div className={css.toolbar}>
             <strong>{t('trigger')}</strong>
             <span className={css.spacer} />
-            <button type="button" className={css.iconButton} aria-label={t('refresh')} onClick={() => { void refresh() }}>
+            <button
+              type="button" className={css.iconButton} aria-label={t('refresh')}
+              onClick={() => { void refreshMembers(sessionId).catch(() => undefined) }}
+            >
               <IconRefreshOutline14 />
             </button>
             <button type="button" className={css.iconButton} aria-label={t('close')} onClick={() => { changeOpen(false) }}>
               <IconCloseOutline16 size={14} />
             </button>
           </div>
+          <TeamModeRow
+            sessionId={sessionId}
+            enabled={enabled}
+            selectTeamMode={selectTeamMode}
+            onError={setError}
+            t={t}
+          />
           {error !== null && <div className={css.error} role="alert">{error}</div>}
-          {loading && view === null && <div className={css.notice}>{t('loading')}</div>}
-          {view !== null && (
+          {team.failure !== undefined && (
+            <div className={css.error} role="alert">{t('failure', { message: team.failure })}</div>
+          )}
+          {!enabled && <div className={css.notice}>{t('mode.disabled')}</div>}
+          {enabled && (
             <>
               <section>
                 <h3>
                   {t('roster')}
-                  {view.members.length > 1 && <span className={css.count}>{view.members.length}</span>}
+                  {members.length > 1 && <span className={css.count}>{members.length}</span>}
                 </h3>
                 <div className={css.roster}>
-                  {view.members.map(member => (
+                  {members.map(member => (
                     <TeamMemberRow
                       key={member.id}
                       member={member}
-                      memberCount={view.members.length}
+                      memberCount={members.length}
                       sessionId={sessionId}
                       openTeammate={openTeammate}
                       onError={setError}
@@ -234,16 +244,16 @@ export function TeamAction({
                 </div>
               </section>
               <section>
-                {view.tasks.length === 0
+                {team.tasks.length === 0
                   ? <div className={css.notice}>{t('empty')}</div>
                   : (
                     <>
                       <h3>
                         {t('tasks')}
-                        <span className={css.count}>{view.tasks.length}</span>
+                        <span className={css.count}>{team.tasks.length}</span>
                       </h3>
                       <div className={css.tasks}>
-                        {view.tasks.map(task => <TaskCard key={task.id} task={task} t={t} />)}
+                        {team.tasks.map(task => <TaskCard key={task.id} task={task} t={t} />)}
                       </div>
                     </>
                   )}
@@ -257,10 +267,80 @@ export function TeamAction({
   )
 }
 
+/** Saved-mode switch; disabling arms a two-step confirmation inside the row. */
+function TeamModeRow({
+  sessionId, enabled, selectTeamMode, onError, t,
+}: {
+  sessionId: SessionId
+  enabled: boolean
+  selectTeamMode: TeamActionInjected['selectTeamMode']
+  onError: (message: string) => void
+  t: TeamActionProps['t']
+}) {
+  const [pending, setPending] = useState(false)
+  const [armed, setArmed] = useState(false)
+  useEffect(() => { setArmed(false) }, [sessionId])
+  const select = (next: boolean): void => {
+    if (pending) return
+    if (!next && !armed) {
+      setArmed(true)
+      return
+    }
+    setArmed(false)
+    setPending(true)
+    void selectTeamMode(sessionId, next).then((failure) => {
+      if (failure !== null) onError(t('mode.failed', { message: failure }))
+    }, (reason: unknown) => {
+      onError(t('mode.failed', { message: reason instanceof Error ? reason.message : String(reason) }))
+    }).finally(() => { setPending(false) })
+  }
+  return (
+    <div className={css.modeRow} data-team-mode>
+      <span className={css.modeLabel}>
+        <Tooltip label={t('mode.description')} side="bottom" gap={4}>
+          <span>{t('mode.label')}</span>
+        </Tooltip>
+      </span>
+      {armed && (
+        <span className={css.modeConfirm} data-team-disable-confirm>
+          <span className={css.modeWarning}>{t('disable.warning')}</span>
+          <button
+            type="button"
+            className={css.iconButton}
+            aria-label={t('disable.confirm')}
+            disabled={pending}
+            onClick={() => { select(false) }}
+          >
+            {t('disable.confirm')}
+          </button>
+          <button
+            type="button"
+            className={css.iconButton}
+            aria-label={t('disable.cancel')}
+            disabled={pending}
+            onClick={() => { setArmed(false) }}
+          >
+            {t('disable.cancel')}
+          </button>
+        </span>
+      )}
+      {!armed && (
+        <Switch
+          className={css.modeToggle}
+          checked={enabled}
+          disabled={pending}
+          label={t('mode.label')}
+          onChange={select}
+        />
+      )}
+    </div>
+  )
+}
+
 function TeamMemberRow({
   member, memberCount, sessionId, openTeammate, onError, t,
 }: {
-  member: TeamRosterMember
+  member: MemberRow
   memberCount: number
   sessionId: SessionId
   openTeammate: TeamActionInjected['openTeammate']
@@ -269,26 +349,24 @@ function TeamMemberRow({
 }) {
   const isCurrent = member.id === sessionId
   const highlightCurrent = isCurrent && memberCount > 1
-  const inert = isCurrent || member.status === 'failed' || member.status === 'provisioning'
 
   return (
-    <Tooltip label={t('open')} side="bottom" gap={4} disabled={inert}>
+    <Tooltip label={t('open')} side="bottom" gap={4} disabled={isCurrent}>
       <button
         type="button"
         className={highlightCurrent ? `${css.member} ${css.memberCurrent}` : css.member}
-        disabled={inert}
+        disabled={isCurrent}
         onClick={() => {
-          void openTeammate(sessionId, member).catch((reason: unknown) => { onError(String(reason)) })
+          void openTeammate(sessionId, member.id).catch((reason: unknown) => { onError(String(reason)) })
         }}
       >
-        <StateDot state={member.status === 'running' || member.status === 'provisioning' ? 'ongoing' : member.status === 'failed' ? 'error' : 'done'} />
+        <StateDot state={member.activity === 'running' ? 'ongoing' : 'done'} />
         <span className={css.memberText}>
           <span className={css.memberName}>
             <span className={css.memberNameText}>{member.name}</span>
             {isCurrent && <Tag tone="info" className={css.currentTag}>{t('current')}</Tag>}
           </span>
-          <small>{t(memberStatusKey(member.status))}{member.model === undefined ? '' : ` · ${t('model')}: ${member.model}`}</small>
-          {member.diagnostics.map(diagnostic => <small key={diagnostic} className={css.diagnostic}>{diagnostic}</small>)}
+          <small>{t(memberStatusKey(member.activity))}</small>
         </span>
       </button>
     </Tooltip>
@@ -316,6 +394,7 @@ function TaskCard({ task, t }: { task: TeamTask; t: TeamActionProps['t'] }) {
     observer.observe(paragraph)
     return () => { observer.disconnect() }
   }, [task.description, expanded])
+  const owner = task.ownerName ?? task.ownerId ?? t('unowned')
   return (
     <article className={css.task}>
       <div className={css.taskTitle}>
@@ -339,7 +418,7 @@ function TaskCard({ task, t }: { task: TeamTask; t: TeamActionProps['t'] }) {
           </button>
         )}
         <span>{task.id}</span>
-        <span>{t('owner')}: {task.ownerName ?? t('unowned')}</span>
+        <span>{t('owner')}: {owner}</span>
         {task.status === 'pending' && <span>{task.ready ? t('ready') : t('blocked')}</span>}
         {task.blockedBy.length > 0 && <span>{t('blockedBy')}: {task.blockedBy.join(', ')}</span>}
         {task.writeScopes.length > 0 && <span>{t('writeScopes')}: {task.writeScopes.join(', ')}</span>}

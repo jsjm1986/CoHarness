@@ -48,7 +48,8 @@
 | `@deepseek-ai/dsh-tool-subagent` | `list_subagent_models`、`subagent` | `ctx.tools`、`ctx.subagents`、`ctx.systemPrompt`、`ctx.sessionProjections` | `tool/call`、`tool/result`、`child session events through the chosen provider` | `subagent`、`subagent_fork` | 注册的委派工具名称取决于加载时 `toolName` 配置（默认为 `subagent`）；上述 schema 为模型选择关闭时的默认配置；`list_subagent_models` 是 Session 启用发现时注册的固定伴随工具。Web preset 会为每个新的顶层 Session 采样 Plugins 偏好并将该决定保留给其子 Session；`subagent_fork` 保持固定路由。随产品发布的组合为每个 subagent 后端各加载一次本包，因此模型还会看到绑定到 fork 后端的 `subagent_fork`。每个实例的描述、`run_in_background` 参数和系统提示词策略遵循各自的 `backgroundMode` 与 `enableRunInBackground`，因此两份发布的 schema 并不相同：`subagent` 是 `continuable`，省略参数的调用默认后台运行并自动投递结果；`subagent_fork` 保持 `one-shot` 并默认前台运行——见 `packages/bundle/base/cordis.patch.yml` 与 `examples/acp-agent/cordis.yml`。 |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message` | `ctx.tools`、`ctx.subagents`、`ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 这些是控制可继续后台 subagent 的全局命名工具：绑定提供方的 `tool-subagent` 实例注册不同的委派工具；本包注册一次 `send_message` 和 `interrupt_agent`，另由 `list_agents` 通过单独加载的 `/list-agents` 插件提供，其目录行使用 sessionProjections 和实时 Agent 注册表。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
-| `@deepseek-ai/dsh-experimental-tool-agent-team` | `followup_task`、`interrupt_agent`、`list_agents`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/message/queued`、`team/message/delivered`、`team/task`、`tool/result` | - | 这 10 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
+| `@deepseek-ai/dsh-experimental-tool-agent-team` | `team_task_create`、`team_task_get`、`team_task_list`、`team_task_update` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`ctx.subagents`、`an exact live Agent in a Team-enabled root tree` | `tool/call`、`team/mode`、`team/task`、`tool/result` | - | 这四个共享任务工具以 `ctx.agentTeams.isEnabled(caller)` 为条件注册，只在开启 Team 模式的根 Session 树内出现；目录生成时强制开启该模式。teammate 的创建、消息与中断仍归普通 subagent 工具。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它。 |
+| `@deepseek-ai/dsh-experimental-tool-subagent-oar` | `subagent_oar` | `ctx.tools`、`ctx.subagents`、`ctx.jobs at execution` | `tool/call`、`child session events through the chosen provider`、`tool/result` | `subagent_oar` | 一次性外部运行时委派：`runtime` 枚举加载时 `providers` 映射的别名——目录展示随发布的 `codex`/`claude` 对——每次调用在执行时经 `ctx.subagents` 解析具名提供方。该工具要求具独立上下文的一次性提供方与用于后台完成投递的 `ctx.jobs` 注册表；该实验包不挂载于任何随发布 bundle。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-experimental-tool-worktree` | `create_worktree` | `ctx.tools`、`ctx.worktrees`、`a calling Agent` | `tool/call`、`Git branch and checkout`、`working-directory/change`、`tool/result` | - | 仅限显式启用实验性组合。在既有写权限内，从钉住的本地提交创建新分支与检出，然后把 Session 目录切换过去。离开会保留分支与检出。 |
 | `@deepseek-ai/dsh-tool-working-directory` | `working_directory` | `ctx.tools`、`ctx.workingDirectory` | `tool/call`、`working-directory/change`、`user context for directory changes`、`tool/result` | - | 读取或修改调用方 Session 的目录。现有 shell 与进程保留各自的目录；起始元数据和权限根保持不变。 |
@@ -2515,19 +2516,19 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `interrupt_agent`
 
-请 subagent 停止当前工作。此调用不等待其停止即返回。之后可以用 send_message 继续与直接子级的对话。它启动的 subagent 会继续运行。
+按名称请求取消后台 agent 的当前回合。目标可以是你的直接子级，也可以是在你之下创建的更深层 agent。只有当前回合停止：已排入该 agent 队列的消息会停留至下一次 send_message，由它启动的 agent 继续运行，该 agent 本身仍接受跟进。此调用在停止请求被接受时即返回，因此目标可能还会短暂运行；对已经完成的 agent 调用是接受的无操作。
 
 ```json
 {
   "type": "object",
   "properties": {
-    "agent_id": {
+    "agent": {
       "type": "string",
-      "description": "The agent id of the running agent to interrupt."
+      "description": "The name of an agent created under you: your direct child or a deeper descendant."
     }
   },
   "required": [
-    "agent_id"
+    "agent"
   ]
 }
 ```
@@ -2536,21 +2537,12 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `list_agents`
 
-按持久 id 和标签列出你启动的可继续后台 subagent。用于回忆你启动了哪些，而非轮询完成状态——完成时你会收到通知。状态来自在线注册表：running 表示正在执行轮次；inactive 表示没有轮次在执行，无论该 child 已加载还是需恢复，且不描述任务完成、成功、失败或等待其它 agent。
+列出你的整棵 subagent 树：根 agent 与所有可达的可延续后代，包括你自己。行携带名称、描述与状态。后代的名称是相对于根的路径，如 reviewer/checker。你可以给树中任何其他 agent 发消息。running 表示正在工作；inactive 表示没有回合在执行，不表示任务完成、成功或失败。corrupt、unsupported 或 unavailable 表示该行自身的后代无法读取，但该行仍是可发消息的成员。在你保持活跃期间，直接子级完成时你会收到通知；无需反复查询其状态。用 send_message 继续对话。
 
 ```json
 {
   "type": "object",
-  "properties": {
-    "scope": {
-      "type": "string",
-      "description": "children (default) lists direct children only; descendants walks the complete tree below you.",
-      "enum": [
-        "children",
-        "descendants"
-      ]
-    }
-  }
+  "properties": {}
 }
 ```
 
@@ -2558,15 +2550,15 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `send_message`
 
-向某个 agent 发送消息。仍在工作的目标会在最近的 step 边界收到消息；inactive 目标会开启或恢复一个轮次。返回投递确认，而不是该 agent 的答案——失败表示消息未送达。
+向某个 agent 发送消息。正在工作的 agent 在其下一步收到；空闲 agent 用消息开启新回合。此调用不返回该 agent 的答案——只有消息已送达的确认。失败表示消息未送达。
 
 ```json
 {
   "type": "object",
   "properties": {
-    "agent_id": {
+    "agent": {
       "type": "string",
-      "description": "The agent id of your direct continuable child, or your direct parent when you are a resident continuable child."
+      "description": "The name of another agent in your subagent tree, as shown by list_agents."
     },
     "message": {
       "type": "string",
@@ -2574,7 +2566,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     }
   },
   "required": [
-    "agent_id",
+    "agent",
     "message"
   ]
 }
@@ -2657,138 +2649,14 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。
 
+
 <a id="deepseek-aidsh-experimental-tool-agent-team"></a>
 
 ## `@deepseek-ai/dsh-experimental-tool-agent-team`
 
-### `followup_task`
-
-向另一名 Team 成员发送持久 follow-up 任务，并在需要时启动一个 turn。
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "target": {
-      "type": "string",
-      "description": "Member target returned by spawn_teammate or list_agents, including lead."
-    },
-    "message": {
-      "type": "string",
-      "description": "Self-contained message for the target."
-    }
-  },
-  "required": [
-    "target",
-    "message"
-  ]
-}
-```
-
-来源：[`packages/experimental/tool-agent-team/src/index.ts`](../packages/experimental/tool-agent-team/src/index.ts)
-
-### `interrupt_agent`
-
-中断一名 teammate 的当前 turn，同时保留其待处理 inbox。仅 Team Lead 可用。
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "target": {
-      "type": "string",
-      "description": "Teammate target returned by spawn_teammate or list_agents."
-    }
-  },
-  "required": [
-    "target"
-  ]
-}
-```
-
-来源：[`packages/experimental/tool-agent-team/src/index.ts`](../packages/experimental/tool-agent-team/src/index.ts)
-
-### `list_agents`
-
-列出 Lead 与所有持久 teammate，以及可用于寻址的 target 和当前可用状态。inactive 表示没有轮次在执行，不表示任务结果。provisioning 与 failed 描述成员创建状态。
-
-```json
-{
-  "type": "object",
-  "properties": {}
-}
-```
-
-来源：[`packages/experimental/tool-agent-team/src/index.ts`](../packages/experimental/tool-agent-team/src/index.ts)
-
-### `send_message`
-
-向另一名 Team member 发送一条持久消息。running target 会在最近的步骤边界收到消息；inactive target 会启动或恢复一个 turn。
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "target": {
-      "type": "string",
-      "description": "Member target returned by spawn_teammate or list_agents, including lead."
-    },
-    "message": {
-      "type": "string",
-      "description": "Self-contained message for the target."
-    }
-  },
-  "required": [
-    "target",
-    "message"
-  ]
-}
-```
-
-来源：[`packages/experimental/tool-agent-team/src/index.ts`](../packages/experimental/tool-agent-team/src/index.ts)
-
-### `spawn_teammate`
-
-创建一名具名、持久的 teammate。只有 Team Lead 可以调用此工具。
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Unique lower-kebab-case teammate name."
-    },
-    "description": {
-      "type": "string",
-      "description": "Short description of the delegated responsibility."
-    },
-    "prompt": {
-      "type": "string",
-      "description": "Complete initial task for the teammate."
-    },
-    "context": {
-      "type": "string",
-      "description": "fresh starts without Lead history; fork inherits completed Lead turns. Defaults to fresh.",
-      "enum": [
-        "fresh",
-        "fork"
-      ]
-    }
-  },
-  "required": [
-    "name",
-    "description",
-    "prompt"
-  ]
-}
-```
-
-来源：[`packages/experimental/tool-agent-team/src/index.ts`](../packages/experimental/tool-agent-team/src/index.ts)
-
 ### `team_task_create`
 
-在共享 Team 任务板上创建一个无 owner 的 pending task。
+在共享 Team 任务板上创建一个无主 pending 任务。
 
 ```json
 {
@@ -2828,7 +2696,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `team_task_get`
 
-在修改或执行共享任务前，读取其完整的最新值。
+在变更或执行某个共享任务之前读取其完整最新值。
 
 ```json
 {
@@ -2849,7 +2717,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `team_task_list`
 
-列出共享任务，包括 readiness、owner、revision、blocker 与 write-scope warning。
+列出共享任务，含 readiness、owner、revision、blocker 与写范围警告。
 
 ```json
 {
@@ -2866,7 +2734,11 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "owner": {
       "type": "string",
-      "description": "Optional member target from spawn_teammate or list_agents, matching ownerName; use unowned for tasks without an owner."
+      "description": "Optional owner agent name filter; cannot be combined with unowned."
+    },
+    "unowned": {
+      "type": "boolean",
+      "description": "Filter tasks by whether they have no owner; cannot be combined with owner."
     },
     "ready": {
       "type": "boolean",
@@ -2888,7 +2760,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `team_task_update`
 
-使用 team_task_get 或 team_task_list 返回的最新 revision，对共享任务操作执行 compare-and-set。
+使用来自 team_task_get 或 team_task_list 的最新 revision 对共享任务执行 compare-and-set 操作。
 
 ```json
 {
@@ -2940,7 +2812,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "owner": {
       "type": "string",
-      "description": "Member target from spawn_teammate or list_agents for Lead-only reassign; omit to unassign."
+      "description": "Agent name of the root or any continuable descendant for root-only reassign; omit to unassign."
     }
   },
   "required": [
@@ -2953,25 +2825,56 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/experimental/tool-agent-team/src/index.ts`](../packages/experimental/tool-agent-team/src/index.ts)
 
-### `wait_agent`
+这四个共享任务工具以 `ctx.agentTeams.isEnabled(caller)` 为条件注册，只在开启 Team 模式的根 Session 树内出现；目录生成时强制开启该模式。teammate 的创建、消息与中断仍归普通 subagent 工具。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它。
 
-等待本次调用开始后下一次 teammate 状态、mailbox 或共享任务变更。它绝不会唤醒 inactive member；若没有其他 member 正在 running 或 provisioning，则立即返回 noProgress。唤醒或超时后应重新列出状态，而不是轮询。
+<a id="deepseek-aidsh-experimental-tool-subagent-oar"></a>
+
+## `@deepseek-ai/dsh-experimental-tool-subagent-oar`
+
+### `subagent_oar`
+
+把一个自足任务委派给已配置的外部 agent。每次调用选择其运行时。子代理在独立上下文中工作，看不到本会话。本工具返回子代理的名称；之后的完成通知会报告其后台任务 id——用 job_output 读取最终答案。子代理不接受跟进消息。一起启动相互独立的任务，并在其运行期间继续做有用的工作。只剩等待结果时，结束你的回合而不是轮询。
 
 ```json
 {
   "type": "object",
   "properties": {
-    "timeout_ms": {
-      "type": "integer",
-      "description": "Wait duration in milliseconds, from 10000 through 3600000. Defaults to 30000."
+    "runtime": {
+      "type": "string",
+      "description": "Configured external runtime for this task.",
+      "enum": [
+        "codex",
+        "claude"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "A short description of the delegated task, for display."
+    },
+    "name": {
+      "type": "string",
+      "description": "Optional short name for the subagent, unique among the subagents you create: lower-case letters, digits, and hyphens, starting with a letter, at most 32 characters; lead is reserved for the root agent. Omitted names default to agent-1, agent-2, and so on."
+    },
+    "prompt": {
+      "type": "string",
+      "description": "The complete, self-contained task. Include all context the external agent needs."
+    },
+    "cwd": {
+      "type": "string",
+      "description": "Initial child working directory. Relative paths use your current directory; omission inherits it."
     }
-  }
+  },
+  "required": [
+    "runtime",
+    "description",
+    "prompt"
+  ]
 }
 ```
 
-来源：[`packages/experimental/tool-agent-team/src/index.ts`](../packages/experimental/tool-agent-team/src/index.ts)
+来源：[`packages/experimental/tool-subagent-oar/src/index.ts`](../packages/experimental/tool-subagent-oar/src/index.ts)
 
-这 10 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。
+一次性外部运行时委派：`runtime` 枚举加载时 `providers` 映射的别名——目录展示随发布的 `codex`/`claude` 对——每次调用在执行时经 `ctx.subagents` 解析具名提供方。该工具要求具独立上下文的一次性提供方与用于后台完成投递的 `ctx.jobs` 注册表；该实验包不挂载于任何随发布 bundle。
 
 <a id="deepseek-aidsh-tool-todo"></a>
 

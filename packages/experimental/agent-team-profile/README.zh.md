@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-`dsh-experimental-agent-team-profile` 让 [Agent Teams](../agent-team/README.zh.md) 的团队协作、工具和 Web 界面通过一个组合包启用。开启后可委派 teammate，并在 Web 中查看成员、任务看板和成员会话。普通 subagent 委派及名称重叠的全局 child control 会被禁用；Workflow 仍可创建 fresh 子代理。本包随 dsh 安装提供，默认关闭，可在插件页开启或添加到已初始化的 profile。
+`dsh-experimental-agent-team-profile` 让 [Agent Teams](../agent-team/README.zh.md) 的团队协作、工具和 Web 界面通过一个组合包启用。teammate 是由既有 `subagent` 工具创建的普通命名可延续 subagent;Team 模式在其上添加共享任务板与一个可切换模式、列出成员并打开 teammate 会话的 Web 面板。本包随 dsh 安装提供，默认关闭，可在插件页开启或添加到已初始化的 profile。
 
 ## 目录
 
@@ -42,11 +42,11 @@ profile 必须已经包含 `@deepseek-ai/dsh-base`，本层会使用其中的 Su
 dsh plugin --profile web add @deepseek-ai/dsh-experimental-agent-team-profile
 ```
 
-已有 profile 的 `package.json` 中，`dsh.profile.bundles` 应只保留 `@deepseek-ai/dsh-experimental-agent-team-profile`，删除独立的 `@deepseek-ai/dsh-experimental-agent-team-web-profile` 条目。用户 patch 中的 `ui-agent-team` 配置仍然有效。
+已有 profile 的 `package.json` 中，`dsh.profile.bundles` 保留 `@deepseek-ai/dsh-experimental-agent-team-profile` 即可。用户 patch 中的 `ui-agent-team` 配置仍然有效。
 
 ### 获得的功能
 
-本层会添加 Agent Teams domain，以及 Team-scoped 创建、roster、消息、interrupt、等待与任务板工具。直接委派使用支持 fresh 和 fork 上下文的 `spawn_teammate`。`subagent`、`subagent_fork` 工具和名称重叠的全局 child control 均被禁用。Workflow 保留 base profile 的 `spawn` 提供方，底层 Subagent 服务和两个提供方仍供 teammate 与 workflow 使用。
+本层会添加 Agent Teams domain、四个条件 `team_task_*` 工具与 Web Team action。委派、命名、消息、恢复与中断全部沿用 base profile 的普通 subagent 工具——`subagent`、`subagent_fork`、`list_agents`、`send_message` 与 `interrupt_agent` 保持启用,Workflow 保留其 `spawn` 提供方。一旦根 Session 开启 Team 模式，任务工具与策略节对该树的每个成员生效。
 
 在 Web 和 Desktop 会话中，[Team UI](../client-ui-agent-team/README.zh.md) 显示成员列表与共享任务看板，并可打开成员会话。同一个组合包开关控制工具与浏览器 UI。插件页通过组合包的 `package.json.icon` 声明读取其[图标](icon.svg)，组合包禁用时也会显示。
 
@@ -58,7 +58,7 @@ dsh plugin --profile web add @deepseek-ai/dsh-experimental-agent-team-profile
 <details>
 <summary>实现细节——点击展开</summary>
 
-本包的运行时内容是 [`cordis.patch.yml`](cordis.patch.yml)。在 `dsh-base` 之后应用时，patch 会禁用 `tool-subagent-control`、`tool-subagent-list-agents`、`tool-subagent` 和 `tool-subagent-fork`，并以显式 provider 和限制插入 Team 服务、工具和 UI 行。UI 插件的 Host 入口不执行逻辑；只有 Web 客户端加载器会挂载其浏览器入口，因此 headless 无需启动 Web 服务。
+本包的运行时内容是 [`cordis.patch.yml`](cordis.patch.yml)。在 `dsh-base` 之后应用时，patch 在既有 subagent 栈旁插入 Team 服务、任务工具与 UI 行，不禁用任何 base 工具。UI 插件的 Host 入口不执行逻辑；只有 Web 客户端加载器会挂载其浏览器入口，因此 headless 无需启动 Web 服务。
 
 | 文件 | 职责 |
 |---|---|
@@ -87,7 +87,7 @@ dsh plugin --profile web add @deepseek-ai/dsh-experimental-agent-team-profile
 
 #### 模型会看到什么
 
-Team 策略与 schema 由 [`@deepseek-ai/dsh-experimental-tool-agent-team`](../tool-agent-team/README.zh.md) 所有。本 bundle 只改变 composition：Team-scoped `list_agents`、`send_message` 与 `interrupt_agent` 会替代已禁用的全局 continuable-child control。`spawn_teammate` 是直接委派工具。Workflow 的 `agent()` 调用创建 fresh 一次性子代理；其提示词必须包含任务所需的上下文。
+Team 策略与 schema 由 [`@deepseek-ai/dsh-experimental-tool-agent-team`](../tool-agent-team/README.zh.md) 所有。本 bundle 只改变 composition:base 的 `list_agents`、`send_message`、`interrupt_agent`、`subagent` 与 `subagent_fork` 工具保持全局注册,四个 `team_task_*` 工具在 Team 模式开启时出现。Workflow 的 `agent()` 调用创建 fresh 一次性子代理；其提示词必须包含任务所需的上下文。
 
 #### Token 影响
 

@@ -83,6 +83,7 @@ import McpResources from '@deepseek-ai/dsh-mcp-resources'
 import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
 import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-use-stagehand-native'
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
+import * as ToolSubagentOar from '@deepseek-ai/dsh-experimental-tool-subagent-oar'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
@@ -643,23 +644,19 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-experimental-tool-agent-team',
     dir: 'tool-agent-team',
     source: 'packages/experimental/tool-agent-team/src/index.ts',
-    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.agentTeams', 'an exact live Team member Agent'],
-    writes: ['tool/call', 'team/member', 'team/message/queued', 'team/message/delivered', 'team/task', 'tool/result'],
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.agentTeams', 'ctx.subagents', 'an exact live Agent in a Team-enabled root tree'],
+    writes: ['tool/call', 'team/mode', 'team/task', 'tool/result'],
     async mount(ctx) {
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(SessionStore)
       const session = ctx.sessions.create(SessionId('tool-catalog-team-lead'))
       let agent!: Agent
-      const membership = {
-        get root() { return agent },
-        id: session.id,
-        role: 'lead' as const,
-        name: 'lead',
-      }
       ctx.provide('agentTeams', {
-        tryMembership: (candidate: Agent) => candidate === agent ? membership : undefined,
-        membership: () => membership,
+        isEnabled: () => true,
       } as unknown as TeamService)
+      ctx.provide('subagents', {
+        resolveName: () => { throw new Error('catalog mount does not execute tools') },
+      } as unknown as SubagentRuntime)
       await ctx.plugin(Object.assign((inner: Context) => {
         agent = {
           id: session.id,
@@ -669,13 +666,27 @@ const TOOL_PACKAGES: ToolPackage[] = [
         } as unknown as Agent
         Object.assign(agent, { ctx: createScope(inner, agent).ctx })
         inner.agents.register(agent)
-      }, { inject: ['tools', 'systemPrompt', 'agents', 'agentTeams'] }))
+      }, { inject: ['tools', 'systemPrompt', 'agents', 'agentTeams', 'subagents'] }))
       await ctx.plugin(ToolTeam)
       catalogChildScopes.set(ctx, agent)
     },
     scope: ctx => catalogChildScopes.get(ctx) as Agent,
     note:
-      'All ten tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names.',
+      'The four shared-task tools register conditionally on `ctx.agentTeams.isEnabled(caller)`, so they appear only inside a Team-mode root Session tree; the catalog mounts with the mode forced on. Teammate creation, messaging, and interruption stay with the ordinary subagent tools. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-tool-subagent-oar',
+    dir: 'tool-subagent-oar',
+    source: 'packages/experimental/tool-subagent-oar/src/index.ts',
+    requires: ['ctx.tools', 'ctx.subagents', 'ctx.jobs at execution'],
+    writes: ['tool/call', 'child session events through the chosen provider', 'tool/result'],
+    shippedNames: ['subagent_oar'],
+    async mount(ctx) {
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(ToolSubagentOar, { providers: { codex: 'oar-codex', claude: 'oar-claude' } })
+    },
+    note:
+      'One-shot external-runtime delegation: `runtime` enumerates the load-time `providers` map aliases — the catalog shows the shipped `codex`/`claude` pair — and each call resolves the named provider through `ctx.subagents` at execution. The tool requires a one-shot provider with independent context and a `ctx.jobs` registry for background completion delivery; the experimental package mounts in no shipped bundle.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-todo',

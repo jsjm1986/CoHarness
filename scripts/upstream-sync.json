@@ -530,10 +530,11 @@
     },
     "experimental/agent-team": {
       "sovereignty": "owned",
-      "note": ".agents/notes/implemented/bug-fix/2026-09-26-one-shot-subagent-descriptor-at-publish.md"
+      "note": ".agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md"
     },
     "experimental/agent-team-profile": {
-      "sovereignty": "owned"
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md"
     },
     "experimental/api-speech-to-text": {
       "sovereignty": "tracked",
@@ -565,7 +566,8 @@
       "note": ".agents/notes/implemented/architecture/2026-10-17-experimental-claude-code-mods-extraction.md"
     },
     "experimental/client-ui-agent-team": {
-      "sovereignty": "owned"
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md"
     },
     "experimental/client-ui-claude-code-mods": {
       "sovereignty": "adapted",
@@ -655,7 +657,8 @@
       "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
     },
     "experimental/tool-agent-team": {
-      "sovereignty": "owned"
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md"
     },
     "experimental/tool-subagent-oar": {
       "sovereignty": "adapted",
@@ -1508,7 +1511,7 @@
     },
     {
       "package": "client/ui-agent-team",
-      "reason": "upstream relocated the agent-team UI into client/; the fork retains its same-lineage UI",
+      "reason": "upstream relocated the agent-team UI into client/; the fork absorbed the v2 projection-driven panel at experimental/client-ui-agent-team",
       "replacedBy": "experimental/client-ui-agent-team"
     },
     {
@@ -1593,12 +1596,12 @@
     },
     {
       "package": "team/agent-team",
-      "reason": "upstream moved agent-team to team/; the fork retains its same-lineage durable-roster service at experimental/agent-team",
+      "reason": "upstream moved agent-team to team/ with the v2 projection rewrite; the fork absorbed the v2 semantics at experimental/agent-team",
       "replacedBy": "experimental/agent-team"
     },
     {
       "package": "team/tool-agent-team",
-      "reason": "upstream moved tool-agent-team to team/; the fork retains its same-lineage tool at experimental/tool-agent-team",
+      "reason": "upstream moved tool-agent-team to team/ with the v2 four-tool task surface; the fork absorbed it at experimental/tool-agent-team",
       "replacedBy": "experimental/tool-agent-team"
     },
     {

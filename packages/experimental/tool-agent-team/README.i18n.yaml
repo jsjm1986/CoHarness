@@ -3,44 +3,44 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/tool-agent-team/README.md
 document:
-  en: 987446abd56995b00eb626dbb1a3864e5962d70d
-  zh: ce2b56d357368c8795f456e7bb954768839777d0
+  en: 05d90c98ea1c53058aa140c01a6f68e254602ccd
+  zh: d38570fcafb2c874419f16b0c2ca25e7e93d811e
 /:
-  en: 77decee38faddfa1
-  zh: 61495d48365178df
+  en: 4133452b68183e6d
+  zh: bcc3481d8c4348a0
 /deepseek-ai-dsh-experimental-tool-agent-team:
-  en: b1fa1bb8a063288c
-  zh: 6a38813dd1b41aef
+  en: aad2edd16df3bc47
+  zh: b765bc7e0cb69985
 /deepseek-ai-dsh-experimental-tool-agent-team/summary:
-  en: 0cce9e5ec6d1946a
-  zh: 6bc76243f494815c
+  en: 2a7fb09bb02fda68
+  zh: be17134745c4dfba
 /deepseek-ai-dsh-experimental-tool-agent-team/table-of-contents:
   en: 96470d1cac39acc5
-  zh: 1db39b265e71c654
+  zh: 96470d1cac39acc5
 /deepseek-ai-dsh-experimental-tool-agent-team/config:
-  en: a265cc7aadb45f0b
-  zh: ba6c1642b7c43010
+  en: 41e8ed3987457ac7
+  zh: d73f154ea0aefcd1
 /deepseek-ai-dsh-experimental-tool-agent-team/tools-and-authority:
-  en: 7c19c665abff0af4
-  zh: 7efec8298f0d5adf
+  en: 70fe415a2b728286
+  zh: ec38711f3e1400e6
 /deepseek-ai-dsh-experimental-tool-agent-team/model-experience:
   en: 215e7ba838619b7b
-  zh: a311da3843709f90
+  zh: 215e7ba838619b7b
 /deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools:
   en: 8e1e365ff3b0dfb2
-  zh: c6c91fbf1e1df934
+  zh: 8e1e365ff3b0dfb2
 /deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools/what-the-model-sees:
-  en: 80a2f0838e81e044
-  zh: 7bde214af80e7bf5
+  en: 7ceb3ace831abb1f
+  zh: 5ea8e65fd4e4b2be
 /deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools/token-effect:
-  en: fe314af98a2130b8
-  zh: ea89cb40dd11d57c
+  en: 1c0b3b6062cdb6ee
+  zh: 745a23d11c962dad
 /deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools/kv-cache-effect:
-  en: cba54e491b29b664
-  zh: f53b5507c6541f06
+  en: a87102025cd3b22c
+  zh: f0558a1778bce4da
 /deepseek-ai-dsh-experimental-tool-agent-team/known-limitations-and-deferred-work:
-  en: fe6add6145fc4fa5
-  zh: 9a0f0d0a9594dae0
+  en: 4456dbb12004a5d1
+  zh: 618bee2445063de4
 /deepseek-ai-dsh-experimental-tool-agent-team/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  zh: e67f633dc6fe7773

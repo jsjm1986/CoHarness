@@ -124,27 +124,6 @@
       }
     },
     {
-      "name": "followup_task",
-      "description": "Send a durable follow-up task to another Team member and start a turn when needed.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "target": {
-            "type": "string",
-            "description": "Member target returned by spawn_teammate or list_agents, including lead."
-          },
-          "message": {
-            "type": "string",
-            "description": "Self-contained message for the target."
-          }
-        },
-        "required": [
-          "target",
-          "message"
-        ]
-      }
-    },
-    {
       "name": "get_goal",
       "description": "Read the current session goal, including the id and revision that update_goal requires.",
       "parameters": {
@@ -198,17 +177,17 @@
     },
     {
       "name": "interrupt_agent",
-      "description": "Interrupt one teammate's current turn while preserving its pending inbox. Team Lead only.",
+      "description": "Request cancellation of a background agent's current turn by its name. The target may be your direct child or a deeper agent created under you. Only the current turn stops: messages already queued for the agent stay parked until a later send_message, agents it started keep running, and the agent itself stays available for follow-ups. This call returns as soon as the stop request is accepted, so the target may keep running briefly; interrupting an agent that already finished is an accepted no-op.",
       "parameters": {
         "type": "object",
         "properties": {
-          "target": {
+          "agent": {
             "type": "string",
-            "description": "Teammate target returned by spawn_teammate or list_agents."
+            "description": "The name of an agent created under you: your direct child or a deeper descendant."
           }
         },
         "required": [
-          "target"
+          "agent"
         ]
       }
     },
@@ -266,7 +245,7 @@
     },
     {
       "name": "list_agents",
-      "description": "List the Lead and every durable teammate with an addressable target and current availability. inactive means no turn is executing, not a task result. provisioning and failed describe member creation.",
+      "description": "List your entire subagent tree: the root agent and all reachable continuable descendants, including yourself. Rows carry names, descriptions, and status. A descendant's name is its path from the root, such as reviewer/checker. You can message any other agent in the subagent tree. running means it is working; inactive means no turn is executing; it does not indicate task completion, success, or failure. corrupt, unsupported, or unavailable means this row's own descendants could not be read; the row itself is still a member you can message. While you remain active, you will be notified when a direct child finishes; there is no need to keep checking its status. Use send_message to continue the conversation.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -347,21 +326,21 @@
     },
     {
       "name": "send_message",
-      "description": "Send durable information to another Team member without starting an inactive member.",
+      "description": "Send a message to an agent. A working agent receives it at its next step; an idle agent starts a new turn with it. This call returns no answer from the agent — only confirmation that the message was delivered. A failure means the message was NOT delivered.",
       "parameters": {
         "type": "object",
         "properties": {
-          "target": {
+          "agent": {
             "type": "string",
-            "description": "Member target returned by spawn_teammate or list_agents, including lead."
+            "description": "The name of another agent in your subagent tree, as shown by list_agents."
           },
           "message": {
             "type": "string",
-            "description": "Self-contained message for the target."
+            "description": "The message to deliver to the agent."
           }
         },
         "required": [
-          "target",
+          "agent",
           "message"
         ]
       }
@@ -383,34 +362,58 @@
       }
     },
     {
-      "name": "spawn_teammate",
-      "description": "Create one named, durable teammate. Only the Team Lead may call this tool.",
+      "name": "subagent",
+      "description": "Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This tool runs in the background by default and immediately returns the subagent's name. When that run settles, the runtime sends you a notice containing its outcome and any final answer, unless the child sent you a message just before finishing; `send_message` steers the child's nearest step while it is running and starts or resumes a turn while it is inactive. Set `run_in_background: false` only when your next action depends on receiving the result.",
       "parameters": {
         "type": "object",
         "properties": {
-          "name": {
+          "cwd": {
             "type": "string",
-            "description": "Unique lower-kebab-case teammate name."
+            "description": "Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent."
           },
           "description": {
             "type": "string",
-            "description": "Short description of the delegated responsibility."
+            "description": "A short (3-5 word) description of the delegated task, for display."
+          },
+          "name": {
+            "type": "string",
+            "description": "Optional short name for the subagent, unique among the subagents you create: lower-case letters, digits, and hyphens, starting with a letter, at most 32 characters; lead is reserved for the root agent. Omitted names default to agent-1, agent-2, and so on."
           },
           "prompt": {
             "type": "string",
-            "description": "Complete initial task for the teammate."
+            "description": "The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs."
           },
-          "context": {
-            "type": "string",
-            "description": "fresh starts without Lead history; fork inherits completed Lead turns. Defaults to fresh.",
-            "enum": [
-              "fresh",
-              "fork"
-            ]
+          "run_in_background": {
+            "type": "boolean",
+            "description": "Whether to run in the background and return a durable subagent name immediately. Defaults to true. Set false to wait for the result when your next action depends on it."
           }
         },
         "required": [
-          "name",
+          "description",
+          "prompt"
+        ]
+      }
+    },
+    {
+      "name": "subagent_fork",
+      "description": "Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn). Use this when the subtask builds on this conversation's context — a follow-up analysis, a review, a continuation — without consuming this conversation's context for the work itself. You receive its result, not its intermediate steps. This call waits for the subagent and returns its result.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "description": "Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent."
+          },
+          "description": {
+            "type": "string",
+            "description": "A short (3-5 word) description of the delegated task, for display."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The task for the subagent. It already sees this conversation's completed turns, so build on them freely and state only what is new."
+          }
+        },
+        "required": [
           "description",
           "prompt"
         ]
@@ -484,7 +487,11 @@
           },
           "owner": {
             "type": "string",
-            "description": "Optional member target from spawn_teammate or list_agents, matching ownerName; use unowned for tasks without an owner."
+            "description": "Optional owner agent name filter; cannot be combined with unowned."
+          },
+          "unowned": {
+            "type": "boolean",
+            "description": "Filter tasks by whether they have no owner; cannot be combined with owner."
           },
           "ready": {
             "type": "boolean",
@@ -553,7 +560,7 @@
           },
           "owner": {
             "type": "string",
-            "description": "Member target from spawn_teammate or list_agents for Lead-only reassign; omit to unassign."
+            "description": "Agent name of the root or any continuable descendant for root-only reassign; omit to unassign."
           }
         },
         "required": [
@@ -629,15 +636,15 @@
           },
           "objective": {
             "type": "string",
-            "description": "Replacement objective; valid only with action edit."
+            "description": "Replacement objective for action edit; ignored otherwise."
           },
           "max_goal_rounds": {
             "type": "number",
-            "description": "Replacement cap; valid only with action edit."
+            "description": "Replacement cap for action edit; ignored otherwise."
           },
           "blocked_reason": {
             "type": "string",
-            "description": "Required only with action blocked: the concrete condition that persisted across rounds and blocks progress."
+            "description": "Required for action blocked: the concrete condition that persisted across rounds and blocks progress; ignored otherwise."
           }
         },
         "required": [
@@ -645,19 +652,6 @@
           "revision",
           "action"
         ]
-      }
-    },
-    {
-      "name": "wait_agent",
-      "description": "Wait for the next teammate status, mailbox, or shared-task change after this call starts. This never wakes inactive members and returns noProgress immediately when no other member is running or provisioning. Re-list after wakeup or timeout instead of polling.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "timeout_ms": {
-            "type": "integer",
-            "description": "Wait duration in milliseconds, from 10000 through 3600000. Defaults to 30000."
-          }
-        }
       }
     },
     {

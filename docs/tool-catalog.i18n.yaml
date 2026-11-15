@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/tool-catalog.md
 document:
-  en: 09fd75169aefcdab90321baa64b410cdf89d0003
-  zh: be5ab4d6bc74b835c22ebe23f3aab9e15058dbb4
+  en: 3d5aab2e87bbda1a73348172a2192a6445dfeae6
+  zh: 97414221069e72a8aacf43e7f3c62ee928b9b03e
 /:
   en: 0be8ffbf23193557
   zh: ce2c69aa86875171
@@ -12,8 +12,8 @@ document:
   en: ddbe8316ec6b1363
   zh: b2d705c03641df84
 /tool-schema-catalog/tool-package-map:
-  en: be9e8774311daa4f
-  zh: 7ee61c1d563e7721
+  en: b0de7df5f2ac8dc8
+  zh: f865410b4636b024
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -285,14 +285,14 @@ document:
   en: ab82e130c3413f04
   zh: ab82e130c3413f04
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent-control/interrupt-agent:
-  en: 3eb5ac28342e354f
-  zh: 06735f086cea84f1
+  en: 5a4f1a485dcec196
+  zh: 87653b3ac6bb2605
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent-control/list-agents:
-  en: 95b9a1b5b2ac7ab0
-  zh: 9e32cdd9d7c8194d
+  en: 8d50c6e19c9517ab
+  zh: d4425c11b24b3d9a
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent-control/send-message:
-  en: b4d8ffa51c3c9cce
-  zh: 77587e69e83bc427
+  en: 03bed4d34de8a294
+  zh: 9094595c55772a1d
 /tool-schema-catalog/deepseek-ai-dsh-tool-jobs:
   en: 9be673b1604d0114
   zh: 9be673b1604d0114
@@ -308,36 +308,24 @@ document:
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team:
   en: 6b1106f417b50db6
   zh: 6b1106f417b50db6
-/tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/followup-task:
-  en: 0e53c76448c62f4f
-  zh: 73ba152696050e72
-/tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/interrupt-agent:
-  en: c3c7af05ceb9f8c9
-  zh: ec379e0b42110c6a
-/tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/list-agents:
-  en: f9457f033f75f00a
-  zh: a2d60ec44118c34c
-/tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/send-message:
-  en: 0a2d0146981a639e
-  zh: a8f88ec35cfe38b8
-/tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/spawn-teammate:
-  en: 02d6cc746e234b99
-  zh: 49bc60ac098bca48
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/team-task-create:
   en: 91e84febe063c3bd
-  zh: 550555d0f44f603b
+  zh: cdd2fb7e6f7e9bb0
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/team-task-get:
   en: 1c6ae0aba0b8041d
-  zh: f8d634387b74121d
+  zh: f9491d77d6c9338c
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/team-task-list:
   en: 2084d494aae8798a
-  zh: e4c136c91028a7b1
+  zh: f39cca0c5e33e00a
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/team-task-update:
-  en: 2eac7360ba68b1bd
-  zh: b5d676bf288c245e
-/tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/wait-agent:
-  en: 09890c7210cf89cb
-  zh: 672131ac2705f411
+  en: 31544bc0ba235874
+  zh: f0a2a03ef8e9e438
+/tool-schema-catalog/deepseek-ai-dsh-experimental-tool-subagent-oar:
+  en: 8daafae6faf7898e
+  zh: 8daafae6faf7898e
+/tool-schema-catalog/deepseek-ai-dsh-experimental-tool-subagent-oar/subagent-oar:
+  en: 0463629196d00c85
+  zh: 4ebf87ebc347ee75
 /tool-schema-catalog/deepseek-ai-dsh-tool-todo:
   en: dea62d26fb18ff68
   zh: dea62d26fb18ff68

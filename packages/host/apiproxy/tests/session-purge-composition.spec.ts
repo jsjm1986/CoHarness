@@ -67,6 +67,7 @@ async function fixture(goals = false) {
 
 it.each(['success', 'failure'] as const)('holds an admitted Team mutation through its real checkpoint, then permits purge (%s)', async (outcome) => {
   const { ctx, handle, owner } = await fixture()
+  await ctx.agentTeams.setEnabled(handle.agent, true)
   const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
   const stop = ctx.on('session/flush', async (session) => {
     if (session !== handle.agent.session) return
@@ -74,7 +75,7 @@ it.each(['success', 'failure'] as const)('holds an admitted Team mutation throug
     await release.promise
     if (outcome === 'failure') throw new Error('fixture checkpoint failed')
   })
-  const operation = ctx.agentTeams.remoteCreateTask(handle.agent, { subject: 'in-flight task', description: 'pending checkpoint' })
+  const operation = ctx.agentTeams.createTask(handle.agent, { subject: 'in-flight task', description: 'pending checkpoint' })
   const settled = operation.then(value => ({ value }), (error: unknown) => ({ error }))
   await entered.promise
   const remove = vi.fn(async () => { await ctx.sessionPersistence.remove(handle.agent.id); return 'removed' })
@@ -86,8 +87,11 @@ it.each(['success', 'failure'] as const)('holds an admitted Team mutation throug
   } finally { release.resolve(undefined) }
   const result = await settled
   stop()
-  if (outcome === 'success') expect(result).toMatchObject({ value: { ok: true, value: { subject: 'in-flight task' } } })
-  else expect(result).toEqual({ error: new Error('fixture checkpoint failed') })
+  if (outcome === 'success') expect(result).toMatchObject({ value: { subject: 'in-flight task' } })
+  else expect(result.error).toMatchObject({
+    code: 'TEAM_TASK_PERSISTENCE_UNCONFIRMED',
+    cause: new Error('fixture checkpoint failed'),
+  })
   expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
   expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
   expect(remove).toHaveBeenCalledOnce()
@@ -96,16 +100,17 @@ it.each(['success', 'failure'] as const)('holds an admitted Team mutation throug
 
 it('rejects a new Team mutation while its Session is reserved for removal without appending an event', async () => {
   const { ctx, handle } = await fixture()
+  await ctx.agentTeams.setEnabled(handle.agent, true)
   const before = handle.agent.session.seq
   {
     using _reservation = ctx.agents.reserveRemoval([handle.agent.id])
-    await expect(ctx.agentTeams.remoteCreateTask(handle.agent, { subject: 'late task', description: 'must not start' }))
+    await expect(ctx.agentTeams.createTask(handle.agent, { subject: 'late task', description: 'must not start' }))
       .rejects.toThrow('being removed')
   }
   expect(handle.agent.session.seq).toBe(before)
   expect(ctx.agentTeams.listTasks(handle.agent)).toEqual([])
-  expect(await ctx.agentTeams.remoteCreateTask(handle.agent, { subject: 'admitted task', description: 'after reservation' }))
-    .toMatchObject({ ok: true })
+  expect(await ctx.agentTeams.createTask(handle.agent, { subject: 'admitted task', description: 'after reservation' }))
+    .toMatchObject({ subject: 'admitted task' })
 })
 
 it.each(['pause', 'failure'] as const)('retains Goal data during its checkpoint and releases its reservation after %s', async (outcome) => {
