@@ -32,9 +32,9 @@ const task: TeamTask = {
 }
 
 interface BenchState {
-  team?: TeamProjection
+  team?: TeamProjection | undefined
   childSession?: boolean
-  catalog?: { entries: unknown[] }
+  catalog?: { entries: unknown[] } | undefined
 }
 
 const enabledTeam: BenchState['team'] = { enabled: true, tasks: [task] }

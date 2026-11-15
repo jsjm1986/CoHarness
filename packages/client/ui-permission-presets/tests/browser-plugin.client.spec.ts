@@ -33,6 +33,8 @@ const CATALOG: PermissionCatalog = {
     { value: 'workspace-write', name: 'workspace-write' },
     { value: 'danger-full-access', name: 'danger-full-access' },
   ],
+  defaultOptions: [{ value: 'read-only', name: 'read-only', description: 'Reads only.' }],
+  defaultPreset: 'read-only',
 }
 
 const SELECT: PermissionSelection = {
@@ -200,7 +202,7 @@ describe('ui-permission browser plugin', () => {
     const session = { sessionId: sid('managed') }
     b.values.set(session.sessionId, { currentValue: 'auto' })
     b.managed.add(session.sessionId)
-    b.setCatalog({ options: [...CATALOG.options, { value: 'auto', name: 'auto' }] })
+    b.setCatalog({ ...CATALOG, options: [...CATALOG.options, { value: 'auto', name: 'auto' }] })
     b.qualify('standard')
     const rows = await c.ui.options(session, new AbortController().signal)
     expect(rows.find(row => row.id === 'danger-full-access')).toMatchObject({ disabled: true })
@@ -257,7 +259,7 @@ describe('ui-permission browser plugin', () => {
     const c = b.decoration()!
     const proj = { sessionId: sid('s1') }
     expect(c.available(proj)).toBe(false)
-    b.setCatalog({ options: [...CATALOG.options, { value: 'custom', name: 'Custom' }] })
+    b.setCatalog({ ...CATALOG, options: [...CATALOG.options, { value: 'custom', name: 'Custom' }] })
     b.values.set(sid('s1'), { currentValue: 'custom' })
     expect(c.available(proj)).toBe(true)
     const options = await c.ui.options(proj, new AbortController().signal)
@@ -276,7 +278,7 @@ describe('ui-permission browser plugin', () => {
       cancelLabel: 'Cancel',
       confirmLabel: 'Enable Full access',
     })
-    b.setCatalog({ options: [{ value: 'plain', name: 'Ask Every Time' }] })
+    b.setCatalog({ ...CATALOG, options: [{ value: 'plain', name: 'Ask Every Time' }] })
     const passthrough = await c.ui.options(proj, new AbortController().signal)
     expect(passthrough[0]?.label).toBe('Ask Every Time')
     // A projection that vanished between availability and open rejects.
