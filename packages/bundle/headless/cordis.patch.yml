@@ -23,11 +23,6 @@
 - id: tool-executor-ptc
   disabled: !!js "process.env.DSH_TOOLS_MODE !== 'ptc'"
 
-# Headless uses the structured read/write/edit file tools. The legacy editor
-# remains available to the base/TUI composition and presets that opt into it.
-- id: tool-str-replace-editor
-  disabled: true
-
 - insert:
     - id: headless-startup
       name: '@deepseek-ai/dsh-headless/startup'
@@ -41,3 +36,15 @@
         sessionId: !!js ctx.headlessStartup.sessionId
         json: !!js ctx.headlessStartup.json
         progress: !!js process.env.COHARNESS_HEADLESS_PROGRESS === '1'
+
+# Replacing config retains the base mode/root defaults while adding the CLI grants.
+- id: sandbox-policy
+  inject: [headlessStartup]
+  config:
+    mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'
+    workspaceRoot: !!js process.cwd()
+    additionalWritableRoots: !!js ctx.headlessStartup.additionalWritableRoots
+
+# One-shot jobs use launch-time credentials instead of the interactive store.
+- id: credentials
+  disabled: true

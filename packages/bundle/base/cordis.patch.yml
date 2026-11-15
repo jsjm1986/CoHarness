@@ -252,6 +252,7 @@
 
     - id: fs-observation-policy
       name: '@deepseek-ai/dsh-fs-observation-policy'
+      disabled: true
 
     - id: tool-fs
       name: '@deepseek-ai/dsh-tool-fs'
@@ -433,7 +434,7 @@
     - id: web
       name: '@deepseek-ai/dsh-web'
       config:
-        searchProvider: deepseek-official
+        searchProvider: deepseek-search-api
         fetchProvider: http
 
     - id: web-search-deepseek
@@ -443,8 +444,6 @@
 
     - id: web-deepseek-api
       name: '@deepseek-ai/dsh-web-deepseek-api'
-      config:
-        apiKeyEnv: DEEPSEEK_API_KEY
 
     - id: web-fetch-http
       name: '@deepseek-ai/dsh-web-fetch-http'
