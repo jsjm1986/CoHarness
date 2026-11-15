@@ -67,6 +67,8 @@ export type {} from '@deepseek-ai/dsh-goal/client'
 export type {} from '@deepseek-ai/dsh-schedule/client'
 export type {} from '@deepseek-ai/dsh-memory/client'
 export type {} from '@deepseek-ai/dsh-settings/types'
+export type {} from '@deepseek-ai/dsh-user-approval/types'
+export type {} from '@deepseek-ai/dsh-user-questions/types'
 
 /**
  * The carrier's Client-facing types, re-exported so a business package names one

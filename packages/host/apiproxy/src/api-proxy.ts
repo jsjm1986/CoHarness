@@ -6821,23 +6821,29 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }),
             // Forwarded events are interaction-channel traffic: a 'none'
             // subscription gets no listeners, so no `host/remote-event`
-            // frame is ever produced for it.
-            ...interactions === 'none' ? [] : API_REMOTE_FORWARDED_EVENTS.map(name => ctx.on(
-              name,
-              ((...args: unknown[]) => {
-                const jsonArgs = assertJsonArgs(name, args)
-                publish(() => {
-                  if (name !== 'agent-preset/selected') {
-                    queue.push(frame({ type: 'host/remote-event', event: name, args: jsonArgs }))
-                    return
-                  }
-                  const sessionId = args[0] as SessionId
-                  void ensureReadable(sessionId).then((allowed) => {
-                    if (allowed) queue.push(frame({ type: 'host/remote-event', event: name, args: jsonArgs }))
+            // frame is ever produced for it. Waterfall entries need the one
+            // answerer the Gateway event stream elects; this broadcast channel
+            // carries notifications only.
+            ...interactions === 'none' ? [] : API_REMOTE_FORWARDED_EVENTS.flatMap((entry) => {
+              if (entry.mode !== 'emit') return []
+              const name = entry.event
+              return [ctx.on(
+                name,
+                ((...args: unknown[]) => {
+                  const jsonArgs = assertJsonArgs(name, args)
+                  publish(() => {
+                    if (name !== 'agent-preset/selected') {
+                      queue.push(frame({ type: 'host/remote-event', event: name, args: jsonArgs }))
+                      return
+                    }
+                    const sessionId = args[0] as SessionId
+                    void ensureReadable(sessionId).then((allowed) => {
+                      if (allowed) queue.push(frame({ type: 'host/remote-event', event: name, args: jsonArgs }))
+                    })
                   })
-                })
-              }),
-            )),
+                }),
+              )]
+            }),
           ]
           const cleanup = (): void => { for (const dispose of disposers) dispose() }
           try {
