@@ -3569,6 +3569,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 const target = composition.agentPreset
                 if (target !== undefined && resolveSessionPreset(agent.session) !== target) {
                   agent.session.append('agent-preset/selected', { agentPreset: target })
+                  // The reuse contract records the new composition durably with
+                  // the operation: an inspecting reader must not observe the
+                  // stored preset still naming the old composition.
+                  await ctx.sessions.flush(agent.session)
                 }
                 return commit
               },
