@@ -165,6 +165,16 @@ describe('PermissionPresetService', () => {
     expect(() => ctx.permissionPresets.resolve('plan')).toThrow(/unknown preset "plan"/)
   })
 
+  it('exposes configured default choices and the effective default in the catalog', async () => {
+    const ctx = await mounted()
+    await mountAuto(ctx)
+    const catalog = ctx.permissionPresets.catalog()
+    // `auto` is a current-session contribution, never a future-session default.
+    expect(catalog.options.map(option => option.value)).toEqual(['workspace-write', 'danger-full-access', AUTO_PRESET])
+    expect(catalog.defaultOptions.map(option => option.value)).toEqual(['workspace-write', 'danger-full-access'])
+    expect(catalog.defaultPreset).toBe('workspace-write')
+  })
+
   it('publishes an effect-scoped current-session preset and removes it on unload', async () => {
     const ctx = await mounted()
     const fiber = await mountAuto(ctx)

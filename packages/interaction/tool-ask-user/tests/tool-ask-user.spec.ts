@@ -5,6 +5,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { createToolResultMessage, ToolCallId, type ToolSchema } from '@deepseek-ai/dsh-llm'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import { Session, SessionId, SessionSeq, SESSION_FORMAT_VERSION, type SessionEvent } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import UserQuestionService, {
@@ -71,6 +72,7 @@ interface OptionSchemaShape {
 
 async function setup(config: toolAskUser.Config = { mode: 'timed', timeout: -1 }) {
   const ctx = new Context()
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
@@ -202,7 +204,8 @@ describe('ask_user_question tool', () => {
     expect(parameters.properties.questions.items.properties.options.items.properties).not.toHaveProperty('value')
     expect(parameters.properties.questions.items.properties.options.items.properties).not.toHaveProperty('recommended')
     expect(parameters.properties.questions.items.properties.options.items.properties).not.toHaveProperty('preview')
-    expect(schema?.description).toContain('A submitted skipped question is an answer item with empty selected and no custom')
+    expect(schema?.description).toContain('An answer item with empty selected and no custom means the user skipped that question: '
+      + 'continue without it, do not ask it again, and do not treat the skip as permission.')
   })
 
   it('lets Cordis select the exact legacy blocking tool instead of the timed tool', async () => {
@@ -218,7 +221,8 @@ describe('ask_user_question tool', () => {
 
     expect(schemas).toHaveLength(1)
     expect(schemas[0]).toMatchObject({
-      description: 'Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding.',
+      description: 'Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. '
+        + 'An answer item with empty selected and no custom means the user skipped that question: continue without it, do not ask it again, and do not treat the skip as permission.',
       parameters: { properties: { questions: { description: 'Questions to ask the user before continuing.' } } },
     })
     expect(schemas[0]?.parameters.properties).not.toHaveProperty('timeout')
@@ -585,7 +589,7 @@ describe('ask_user_question tool', () => {
 
     expect(result).toMatchObject({
       isError: true,
-      content: [{ type: 'text', text: 'Error: invalid arguments: question id "scope" must be unique within this call' }],
+      content: [{ type: 'text', text: 'Error: question id "scope" must be unique within this call' }],
     })
     expect(answerer).not.toHaveBeenCalled()
   })

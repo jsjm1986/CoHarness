@@ -18,6 +18,9 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../session/session-projection"
+    },
+    {
       "path": "../../core/system-prompt"
     },
     {
