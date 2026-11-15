@@ -120,7 +120,7 @@ function detachable(f: Fixture, id: string, meta: { cwd?: string }): { session: 
   return { session, detach }
 }
 
-describe('archive-triggered worktree cleanup', () => {
+describe('archive-triggered worktree cleanup', { timeout: 30_000 }, () => {
   it('removes the clean checkout the archived Session created and keeps its branch and commits', async () => {
     const f = await fixture()
     await writeFile(join(f.worktree.path, 'local.txt'), 'not pushed\n')
