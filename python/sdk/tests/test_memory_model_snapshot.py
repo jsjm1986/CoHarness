@@ -12,7 +12,7 @@ from deepseek_harness import DeepSeekHarness
 
 ROOT = Path(__file__).resolve().parents[3]
 CLI = ROOT / 'apps' / 'cli' / 'lib' / 'bin.js'
-FIXTURE = ROOT / 'snapshots' / 'sdk' / 'memory-auxiliary'
+FIXTURE = ROOT / 'examples' / 'headless-agent' / 'tests' / 'fixtures' / 'memory-auxiliary'
 SNAPSHOTS = ROOT / 'packages' / 'test-support' / 'session-snapshot' / 'lib' / 'index.js'
 
 
