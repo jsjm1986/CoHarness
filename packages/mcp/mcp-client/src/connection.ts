@@ -146,6 +146,9 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
   let reconnectTimer: NodeJS.Timeout | undefined
   let failedAttempts = 0
   let closureFailure: McpCloseResult | undefined
+  // Set by a failure the process owner cannot retry: tool cleanup, an unsettled
+  // supervisor, or a transport without a managed process range.
+  let permanentFailure = false
   let checkingCredentials: Promise<void> | undefined
   let credentialsDirty = false
   const isCurrent = (record: Generation): boolean => !disposed && current === record && !record.wire.lifetime.signal.aborted
@@ -160,6 +163,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       try { dispose() }
       catch (error) {
         closureFailure = { ...status.closure(), cleanupError: diagnostic(error, 'tool cleanup') }
+        permanentFailure = true
         status.recordClosure(closureFailure)
         ctx.logger.error(`${label}: tool cleanup failed: ${diagnostic(error, 'tool cleanup')}`)
       }
@@ -170,7 +174,10 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
 
   async function close(record: Generation): Promise<boolean> {
     const result = await record.wire.close()
-    if (!result.closeConfirmed || result.cleanupError !== undefined) closureFailure ??= result
+    if (!result.closeConfirmed || result.cleanupError !== undefined) {
+      closureFailure ??= result
+      if (processes === undefined) permanentFailure = true
+    }
     status.recordClosure(closureFailure ?? result)
     if (closureFailure !== undefined && !disposed) {
       const error = new Error(closureFailure.cleanupError)
@@ -386,6 +393,20 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       },
     },
     async dispose(): Promise<void> {
+      if (disposed) {
+        if (closureFailure === undefined || permanentFailure || processes === undefined) return
+        try {
+          await processes.close()
+        } catch (_rangeStillRetained) {
+          // The owner keeps the unreleased range; the recorded failure stands.
+          return
+        }
+        closureFailure = undefined
+        const result: McpCloseResult = { closeConfirmed: true }
+        status.recordClosure(result)
+        status.update({ state: 'closed', result })
+        return
+      }
       disposed = true
       readiness.resolve({ error: new Error('MCP client disposed') })
       lifetime.abort(new Error('MCP client disposed'))
@@ -399,6 +420,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
         await withDeadline(Promise.all([settling, syncChain, checkingCredentials]), config.closeTimeoutMs, 'MCP cleanup did not settle')
       } catch (error) {
         closureFailure ??= { ...status.closure(), cleanupError: diagnostic(error, 'cleanup') }
+        permanentFailure = true
       }
       try {
         await processClosure

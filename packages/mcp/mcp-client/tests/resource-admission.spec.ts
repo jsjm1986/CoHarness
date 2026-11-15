@@ -133,6 +133,56 @@ it('records failed enclosing-owner cleanup in the status cell and releases the n
   await replacement.dispose()
 }, 20_000)
 
+it('retries retained process cleanup on a repeated dispose and confirms the closure', async () => {
+  const ctx = new Context()
+  let reportingUnavailable = false
+  onTestFinished(async () => { reportingUnavailable = false; await ctx.fiber.dispose() })
+  await ctx.plugin(SystemPrompt)
+  await ctx.plugin(ToolRuntime)
+  const logged = vi.spyOn(ctx.logger, 'error').mockImplementation(() => {})
+  onTestFinished(() => { logged.mockRestore() })
+  let allocation = 0
+  const occupied = new Set<number>()
+  ctx.provide('resourceBudgetRequired', true)
+  new class extends ResourceBudget { async acquire() {
+    const index = ++allocation
+    occupied.add(index)
+    return {
+      signal: new AbortController().signal, async uncertain() {},
+      async release() {
+        if (reportingUnavailable) throw new Error('completion storage unavailable')
+        occupied.delete(index)
+      },
+    }
+  } }(ctx)
+  const config = McpClient.Config({
+    transport: 'stdio', serverName: 'retried', command: process.execPath,
+    args: ['--import', import.meta.resolve('tsx/esm'), fileURLToPath(new URL('./fixture-server.ts', import.meta.url))],
+    failOnStartupError: true, reconnect: { enabled: false }, processGraceMs: 50, processCloseTimeoutMs: 5_000,
+  })
+  let mounted: McpClient.McpClientHandle | undefined
+  const fiber = await ctx.plugin({
+    name: 'retried-mcp-fixture',
+    inject: McpClient.inject,
+    async apply(inner: Context) { mounted = McpClient.mountMcpClient(inner, config); await mounted.ready },
+  })
+  const status = McpClient.connectionStatusOf(fiber)
+  reportingUnavailable = true
+  await mounted?.dispose()
+  expect(status?.closure().cleanupError).toBeTypeOf('string')
+  expect(occupied.size).toBe(1)
+  // The report is still unavailable: the repeated call settles and the record stands.
+  await mounted?.dispose()
+  expect(status?.closure().cleanupError).toBeTypeOf('string')
+  expect(occupied.size).toBe(1)
+  reportingUnavailable = false
+  await mounted?.dispose()
+  expect(status?.closure()).toEqual({ closeConfirmed: true })
+  expect(status?.current()).toEqual({ state: 'closed', result: { closeConfirmed: true } })
+  expect(occupied.size).toBe(0)
+  await fiber.dispose()
+}, 20_000)
+
 it.each(['method-not-found', 'close'])('discovers a legacy server without initializing its disposable probe: %s', async (mode) => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-managed-mcp-legacy-'))
   const ctx = new Context()

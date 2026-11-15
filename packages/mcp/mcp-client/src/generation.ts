@@ -37,7 +37,11 @@ export class McpGeneration {
     const transport = this.transport = createTransport(config, this.processes)
     const close = transport.close.bind(transport)
     let closing: Promise<void> | undefined
-    transport.close = () => closing ??= close()
+    // A failed close of an owned process range stays repeatable for the owner's retry.
+    const owned = this.processes?.owns(transport) === true
+    transport.close = () => closing ??= owned
+      ? close().catch((error: unknown) => { closing = undefined; throw error })
+      : close()
     const start = transport.start.bind(transport)
     transport.start = () => {
       this.lifetime.signal.throwIfAborted()

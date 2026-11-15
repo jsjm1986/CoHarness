@@ -162,7 +162,7 @@ SDK 通过旧版通知或现代协议订阅接收工具列表变化。监督器�
 
 stdio 发现与服务分别使用经过准入的进程。发现进程不能执行 `initialize`；SDK 判断现代或旧版兼容性后，才由新的服务进程采用该结果。重连会等待旧受管范围停止。活跃 Agent 注册作用域提供捕获的 Session；全局服务器使用 Runtime 基础设施归属。关闭失败会记录到该 Fiber 的状态单元中——释放仍会停稳并释放命名空间，但同一 Fiber 在 Host 重启前不能挂载替代连接。
 
-`mountMcpClient(ctx, config)` 为编程所有者提供 `ready` 与可重试的 `dispose()`。释放依赖或独占浏览器预留前，必须等待此释放器；Cordis 作用域释放通过日志报告子项错误。Loader 的 `apply` 使用同一句柄完成激活。
+`mountMcpClient(ctx, config)` 为编程所有者提供 `ready` 与 `dispose()`。`dispose()` 在 `closeTimeoutMs` 内完成，未完成的清理记录在状态单元中而不抛出；该记录未完成期间，再次调用会重试 stdio 所有者仍保留的进程清理，并记录新的结果。释放依赖或独占浏览器预留前，必须等待此释放器并读取 `connectionStatusOf(fiber).closure()`；Cordis 作用域释放通过日志报告子项错误。Loader 的 `apply` 使用同一句柄完成激活。
 
 ### 环境清洗（stdio）
 

@@ -133,9 +133,14 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
       async open(agent, signal) {
         const scope = createScope(ctx, agent)
         let client: McpClient.McpClientHandle | undefined
+        let status: McpClient.McpConnectionStatusHandle | undefined
         let cancellation: Promise<void> | undefined
         const cleanup = async (): Promise<void> => {
           await client?.dispose()
+          const closure = status?.closure()
+          if (closure !== undefined && (!closure.closeConfirmed || closure.cleanupError !== undefined)) {
+            throw new Error(`${options.name}: MCP cleanup is incomplete`, { cause: closure.cleanupError })
+          }
           await scope.dispose()
         }
         const cancel = (): void => {
@@ -158,6 +163,7 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
             async apply(inner: Context, resolved: McpClient.Config) {
               signal.throwIfAborted()
               client = McpClient.mountMcpClient(inner, resolved)
+              status = McpClient.connectionStatusOf(inner.fiber)
               await client.ready
             },
           }, McpClient.Config({

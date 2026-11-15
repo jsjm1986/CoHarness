@@ -197,7 +197,9 @@ export interface McpClientHandle {
   /** Initial connection and catalog readiness; rejects when strict startup fails. */
   ready: Promise<void>
   /** Stop the connection and settle within the close budget; incomplete cleanup
-    * is recorded in the Fiber's status cell rather than thrown. */
+    * is recorded in the Fiber's status cell rather than thrown. While that record
+    * is incomplete, a later call retries the process cleanup a stdio owner still
+    * retains and records the new result. */
   dispose(): Promise<void>
 }
 
@@ -206,7 +208,7 @@ export interface McpClientHandle {
  * A Fiber whose previous cleanup did not settle or failed cannot mount a replacement until the Host restarts.
  * @param ctx - Plugin context carrying the tool registry and registration owner.
  * @param config - Resolved transport and namespace configuration.
- * @returns Startup readiness and a terminal cleanup that tolerates repeated calls.
+ * @returns Startup readiness and a cleanup that tolerates repeated calls and retries retained process cleanup.
  */
 export function mountMcpClient(ctx: Context, config: Config): McpClientHandle {
   // Fail loud at load: reconnect misconfiguration (including programmatic
@@ -251,13 +253,20 @@ export function mountMcpClient(ctx: Context, config: Config): McpClientHandle {
   const connection = startConnection(ctx, config, reconnect, status)
   registerServerContext(ctx, config.serverName, connection)
   let stopping: Promise<void> | undefined
+  let namespaceReleased = false
   const dispose = (): Promise<void> => stopping ??= (async () => {
     // Final unload (uid null) detaches observers before the closed update, so
     // watchers survive HMR reloads but never see the terminal transition.
     if (ctx.fiber.uid === null) status.detach()
     await connection.dispose()
-    await releaseNamespace()
-  })().catch((error: unknown) => {
+    if (!namespaceReleased) {
+      await releaseNamespace()
+      namespaceReleased = true
+    }
+  })().then(() => {
+    const closure = status.closure()
+    if (!closure.closeConfirmed || closure.cleanupError !== undefined) stopping = undefined
+  }, (error: unknown) => {
     stopping = undefined
     throw error
   })

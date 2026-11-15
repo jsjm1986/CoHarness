@@ -161,7 +161,7 @@ A tool call uses the SDK with the raw name, complete tool definition, JSON argum
 
 Stdio discovery and serving use separate admitted processes. The discovery process cannot execute `initialize`; the SDK decides modern or legacy compatibility before a fresh serving process adopts that verdict. Reconnect waits for the old managed range to stop. A live Agent registration scope supplies the captured Session; global servers use Runtime infrastructure attribution. Shutdown failure is recorded in the Fiber's status cell — disposal still settles and releases the namespace, while the same Fiber cannot mount a replacement until the Host restarts.
 
-`mountMcpClient(ctx, config)` exposes `ready` and retryable `dispose()` for programmatic owners. Await that disposer before releasing dependencies or exclusive browser reservations; Cordis scope disposal reports child errors through logging. `apply` uses the same handle for Loader activation.
+`mountMcpClient(ctx, config)` exposes `ready` and `dispose()` for programmatic owners. `dispose()` settles within `closeTimeoutMs` and records incomplete cleanup in the status cell instead of throwing; while that record is incomplete, another call retries the process cleanup a stdio owner still retains and records the new result. Await the disposer and read `connectionStatusOf(fiber).closure()` before releasing dependencies or exclusive browser reservations; Cordis scope disposal reports child errors through logging. `apply` uses the same handle for Loader activation.
 
 ### Environment scrubbing (stdio)
 

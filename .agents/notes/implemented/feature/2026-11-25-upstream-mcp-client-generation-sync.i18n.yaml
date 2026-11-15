@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-mcp-client-generation-sync.md
 document:
-  en: 2ca4a156545ee2ec00e485a93fc0a5484d94b94a
-  zh: 1478328354ed2f17c797666bbe693eb9a5d5aaea
+  en: 7d0a74a0ad015e2c30253e50445109723875e372
+  zh: c675db47aefb78b6991417f002f6201cc5dc60e0
 /agent-note-upstream-mcp-client-generation-sync:
   en: 27074a0dfce9019e
   zh: 60ed43a3553d80f4
@@ -12,8 +12,8 @@ document:
   en: dd0e6112fadd2fa9
   zh: a90966091b4e7d89
 /agent-note-upstream-mcp-client-generation-sync/decision:
-  en: 3f7dc7ad3dd2e833
-  zh: 4bc6b848ee909986
+  en: 887f688ce553094a
+  zh: 625eb6d6f8512db1
 /agent-note-upstream-mcp-client-generation-sync/consequences:
   en: ea82e279537f0d81
   zh: ef8d32ebf68511b0

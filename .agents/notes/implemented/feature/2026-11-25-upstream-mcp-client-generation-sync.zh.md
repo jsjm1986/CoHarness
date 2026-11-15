@@ -16,7 +16,7 @@
 
 `generation.ts` 拥有传输生命周期、待处理工作追踪，以及返回 `McpCloseResult { closeConfirmed, cleanupError? }` 而非抛错的 `close()`；`managed-stdio.ts` 保留本地准入、环境清洗、发现探测与进程范围清理——`McpGeneration` 可选地经 `processes.connect(client, transport)` 路由 stdio 连接。`status.ts` 在 `ctx.fiber` 上注册 `McpStatusCell`，在 HMR 重载后存活、保留最终 `McpCloseResult`、在最终卸载时解除观察者，并由管理器经 `connectionStatusOf(fiber)` 读取。`credentials.ts`/`templates.ts` 在 `expandTemplates` 下解析 `${credential:REF}`、监听 `credentials/reference-updated`，并把每个解析出的值——包括早期轮换值与 URL 编码形式——从诊断、工具错误与 `isError` 文本中脱敏。`probe.ts` 暴露 `probeServer`，用于不预留名称、不注册任何内容的一次性连接—识别—列举—关闭检查。`deadline.ts` 与 `types.ts` 补全共享截止时间与面向客户端的类型面。
 
-挂载契约有意变更：`dispose()` 总在 `closeTimeoutMs` 内停稳；未确认或失败的清理记录进状态单元并记日志，`mountMcpClient` 拒绝同一 Fiber 的下一次挂载（`previous connection cleanup is incomplete; restart the Host`）——同时命名空间仍会释放，使新 Fiber 可以接管该名称。观察者在 `mountMcpClient.dispose` 内、`ctx.fiber.uid === null` 时解除，早于监督器发布终态 `closed`，因此观察者能跨重载存活却永远观察不到最终转换。
+挂载契约有意变更：`dispose()` 总在 `closeTimeoutMs` 内停稳；未确认或失败的清理记录进状态单元并记日志，`mountMcpClient` 拒绝同一 Fiber 的下一次挂载（`previous connection cleanup is incomplete; restart the Host`）——同时命名空间仍会释放，使新 Fiber 可以接管该名称。记录的关闭结果未完成期间，再次调用 `dispose()` 会重试 stdio `McpProcessOwner` 仍保留的进程清理并记录新的结果；[`browser-use-runtime`](../../../../packages/experimental/browser-use-runtime/src/mcp.ts) 读取该结果，在清理确认前保持独占附件的预留。观察者在 `mountMcpClient.dispose` 内、`ctx.fiber.uid === null` 时解除，早于监督器发布终态 `closed`，因此观察者能跨重载存活却永远观察不到最终转换。
 
 ## 后果
 
