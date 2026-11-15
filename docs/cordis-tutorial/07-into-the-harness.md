@@ -33,15 +33,19 @@ export function apply(ctx: Context) {
   }))
 
   // Drive one call through the real execution pipeline, standing in for
-  // the model. ToolCallId brands the correlation id a provider would issue.
+  // the model. ToolCallId brands the correlation id a provider would issue;
+  // arguments travel as the raw JSON string a model emits.
   void (async () => {
     const result = await ctx.tools.execute({
-      callId: ToolCallId('demo-1'),
-      name: 'greet',
-      arguments: { name: 'Cordis' },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('demo-1'),
+        name: 'greet',
+        arguments: JSON.stringify({ name: 'Cordis' }),
+      }],
       signal: new AbortController().signal,
     })
-    console.log('tool replied:', JSON.stringify(result.content))
+    console.log('tool replied:', JSON.stringify(result.results[0]?.result.content))
   })()
 }
 ```
