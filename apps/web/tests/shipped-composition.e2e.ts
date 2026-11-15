@@ -60,6 +60,7 @@ const EXPECTED_TOOLS = [
   'session_search',
   'session_trace',
   'skill',
+  'str_replace_editor',
   'subagent',
   'subagent_fork',
   'todo_write',
@@ -154,11 +155,11 @@ it('assembles the shipped Web transport, catalog, guidance, and defaults', async
       "mode": "always",
     }
   `)
-  // The directory tool is global; every other model-facing row lives in a
-  // preset mounted under one session's scope, so a caller must name the agent
-  // to see anything else. This composes from the deployment default — what a
-  // session that names no preset gets.
-  expect(ctx.tools.schemas().map(schema => schema.name)).toEqual(['working_directory'])
+  // The directory and patch-editor tools are global; every other model-facing
+  // row lives in a preset mounted under one session's scope, so a caller must
+  // name the agent to see anything else. This composes from the deployment
+  // default — what a session that names no preset gets.
+  expect(ctx.tools.schemas().map(schema => schema.name)).toEqual(['str_replace_editor', 'working_directory'])
   const handle = await ctx.agents.create({
     sessionId: SessionId('shipped-composition'),
     setup: agentCtx => ctx.agentPresets.mount(agentCtx).then(() => undefined),

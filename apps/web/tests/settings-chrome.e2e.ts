@@ -122,8 +122,8 @@ describe('web e2e: settings modal and General preferences', () => {
 
   it('stores Permission as the default for future sessions without changing an existing session', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-permission'))
-    const existing = scaffold.ctx.sessions.create(SessionId('settings-permission-before'))
-    expect(existing.snapshotEvents().find(event => event.type === 'permission/preset')?.data)
+    const existing = await scaffold.ctx.agents.create({ sessionId: SessionId('settings-permission-before') })
+    expect(existing.agent.session.snapshotEvents().find(event => event.type === 'permission/preset')?.data)
       .toEqual({ preset: 'workspace-write', origin: 'default' })
 
     await page.getByRole('button', { name: '设置', exact: true }).click()
@@ -139,11 +139,11 @@ describe('web e2e: settings modal and General preferences', () => {
     const document = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')
     expect(document).toContain('permission:')
     expect(document).toContain('defaultPreset: read-only')
-    expect(existing.snapshotEvents().find(event => event.type === 'permission/preset')?.data)
+    expect(existing.agent.session.snapshotEvents().find(event => event.type === 'permission/preset')?.data)
       .toEqual({ preset: 'workspace-write', origin: 'default' })
 
-    const created = scaffold.ctx.sessions.create(SessionId('settings-permission-after'))
-    expect(created.snapshotEvents().map(event => [event.type, event.data])).toEqual([
+    const created = await scaffold.ctx.agents.create({ sessionId: SessionId('settings-permission-after') })
+    expect(created.agent.session.snapshotEvents().map(event => [event.type, event.data])).toEqual([
       ['permission/preset', { preset: 'read-only', origin: 'default' }],
       ['sandbox/mode', { mode: 'read-only' }],
       ['approval/policy', { policy: 'ask' }],
@@ -159,13 +159,21 @@ describe('web e2e: settings modal and General preferences', () => {
     await dialog.getByRole('button', { name: '完全权限' }).waitFor({ timeout: 10_000 })
     const confirmedDocument = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')
     expect(confirmedDocument).toContain('defaultPreset: danger-full-access')
-    const confirmed = scaffold.ctx.sessions.create(SessionId('settings-permission-confirmed'))
-    expect(confirmed.snapshotEvents().map(event => [event.type, event.data])).toEqual([
+    const confirmed = await scaffold.ctx.agents.create({ sessionId: SessionId('settings-permission-confirmed') })
+    expect(confirmed.agent.session.snapshotEvents().map(event => [event.type, event.data])).toEqual([
       ['permission/preset', { preset: 'danger-full-access', origin: 'default' }],
       ['sandbox/mode', { mode: 'danger-full-access' }],
       ['approval/policy', { policy: 'never' }],
     ])
+    // Restore the deployment default for the scenarios that follow in this
+    // shared scaffold; a stored danger-full-access would seed their sessions.
+    await dialog.getByRole('button', { name: '完全权限' }).click()
+    await page.getByRole('menuitem', { name: '工作区内修改' }).click()
+    await dialog.getByRole('button', { name: '工作区内修改' }).waitFor({ timeout: 10_000 })
+    await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'))
+      .not.toContain('defaultPreset: danger-full-access')
     await page.keyboard.press('Escape')
+    await Promise.all([existing.dispose(), created.dispose(), confirmed.dispose()])
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
@@ -614,6 +622,7 @@ describe('web e2e: settings modal and General preferences', () => {
 
   it.each([false, true])('uses account font permissions when available and otherwise enforces read-only Host settings (%s)', async (accountPreferences) => {
     const readonlyPage = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
+    onTestFailed(() => saveFailureShot(readonlyPage, `web-e2e-fonts-${String(accountPreferences)}`))
     let writes = 0
     const accountWrites: Array<Record<string, unknown>> = []
     const current = {
@@ -656,8 +665,14 @@ describe('web e2e: settings modal and General preferences', () => {
     })
     try {
       await readonlyPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await readonlyPage.getByRole('button', { name: '设置', exact: true }).click()
+      await readonlyPage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
       const dialog = readonlyPage.getByRole('dialog', { name: '设置', exact: true })
+      // A click that lands before the client finishes booting is lost forever —
+      // retry until the dialog actually opens.
+      await expect.poll(async () => {
+        if (await dialog.count() === 0) await readonlyPage.getByRole('button', { name: '设置', exact: true }).click()
+        return dialog.count()
+      }, { timeout: 30_000 }).toBe(1)
       const fonts = dialog.getByRole('group', { name: '更多字体设置', exact: true })
       if (accountPreferences) {
         await expect.poll(() => fonts.getByRole('button', { name: '增大字号', exact: true }).isEnabled()).toBe(true)
