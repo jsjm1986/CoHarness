@@ -23,7 +23,6 @@
 | [resource-budget.md](resource-budget.zh.md) | 节点范围的模型／进程许可请求及执行静止义务 |
 | [collaboration.md](collaboration.zh.md) | Gateway 签名请求 principal、个人/项目运行时 identity、根继承对话 ACL、请求捕获 authority 与共享交互抢占 |
 | [session-query.md](session-query.zh.md) | 逻辑记录、有界精确事件读取、关系追踪、语义筛选器/文档与全文检索结果页 |
-| [feedback.md](feedback.zh.md) | Session 级与逐消息反馈类型、乐观版本、权威持久化与 Host Remote 约定 |
 | [session-title.md](session-title.zh.md) | 持久标题快照、被引用的来源消息 seq 与异步提供方约定 |
 | [session-reference.md](session-reference.zh.md) | 结构化跨会话引用：`SessionReferenceInput`/`Candidate`、prepared 消息上下文、稳定错误分类 |
 | [system-prompt.md](system-prompt.zh.md) | 逐次组装的上下文、工具提供方结果、提示词段落与协作式组装 |

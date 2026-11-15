@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session-query/session-log-export/README.md
 document:
-  en: 3be48e0c3958a65acd82fe7d7cff6bc3ef3d1ef0
-  zh: 071ad96fa6be2b7af7abcc5b6ed1c843007fac8f
+  en: a609cf0d163276725cc04e9de87488067dd984cd
+  zh: ce0deb913add07e0981cf7ee8736958a85c6a249
 /:
   en: 3b67077a6dfacd19
   zh: e5b78d039d310dc2
@@ -18,8 +18,8 @@ document:
   en: b5cf97709d330964
   zh: 8ef4439c2b4b2f7f
 /deepseek-ai-dsh-session-log-export/use-this-package:
-  en: 1135b03eb3423c74
-  zh: 2fd2a18d503df70c
+  en: c8e486b07b76e503
+  zh: cd36f150f5f336b0
 /deepseek-ai-dsh-session-log-export/use-this-package/when-to-choose-it:
   en: 2b9dbec4877d332e
   zh: dcf6638938eedb01
