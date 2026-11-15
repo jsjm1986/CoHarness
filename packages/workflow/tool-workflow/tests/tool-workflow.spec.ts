@@ -7,7 +7,7 @@ import type { ToolExecutionResult, ToolExecutionToken } from '@deepseek-ai/dsh-t
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { unsupportedInbox, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { createInboxStub, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { WorkflowRunId, WorkflowEngine } from '@deepseek-ai/dsh-workflow'
 import type {
   WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowResult, WorkflowRun,
@@ -612,7 +612,7 @@ describe('dsh-tool-workflow', () => {
       const engine = ctx.workflowEngine as StubEngine
       const session = Session.create(SessionId('caller'))
       const parent: Agent = {
-        id: session.id, options: {}, session, inbox: unsupportedInbox(), status: 'idle', ctx: ctx.plugin(() => {}).ctx,
+        id: session.id, options: {}, session, inbox: createInboxStub(), status: 'idle', ctx: ctx.plugin(() => {}).ctx,
         send: () => {}, followup: () => {}, steer: () => {}, inject: () => {}, cancel: () => {},
         runMaintenance: task => task(new AbortController().signal), whenIdle: () => Promise.resolve(),
       }
@@ -750,9 +750,16 @@ describe('dsh-tool-workflow', () => {
       const settled = jobs.get(job.id, parent.id)
       expect(settled.detail).toBe('4 agents')
       expect(settled.progress).toBeUndefined()
-      const read = jobs.read(job.id, parent.id)
-      expect(read.result).toContain('workflow "audit" completed (4 agents)')
-      expect(read.result).toContain('"findings": 2')
+      const read = await executeToolFixture(ctx, {
+        signal: testToolSignal,
+        callId: ToolCallId('call-settled-read'),
+        name: 'job_output',
+        arguments: { job_id: jobId },
+        agent: parent,
+      })
+      const readText = (read.content[0] as { text: string }).text
+      expect(readText).toContain('workflow "audit" completed (4 agents)')
+      expect(readText).toContain('"findings": 2')
       expect(engine.disposed).toBe(1)
       // The durable session record still brackets the background run.
       expect(session.snapshotEvents().map(event => event.type)).toEqual([
@@ -1028,7 +1035,7 @@ describe('dsh-tool-workflow', () => {
       await ctx.plugin(toolWorkflow, {})
       const session = Session.create(SessionId('caller'))
       const parent: Agent = {
-        id: session.id, options: {}, session, inbox: unsupportedInbox(), status: 'idle', ctx,
+        id: session.id, options: {}, session, inbox: createInboxStub(), status: 'idle', ctx,
         send: () => {}, followup: () => {}, steer: () => {}, inject: () => {}, cancel: () => {},
         runMaintenance: task => task(new AbortController().signal), whenIdle: () => Promise.resolve(),
       }
@@ -1048,7 +1055,14 @@ describe('dsh-tool-workflow', () => {
       expect(jobs.get(jobId, parent.id).detail).toBe('0 agents')
       const ring = jobs.readAt(jobId, 0, parent.id).chunks.map(chunk => chunk.text).join('')
       expect(ring).toContain('halfway')
-      expect(jobs.read(jobId, parent.id).result).toContain('"ok": true')
+      const read = await executeToolFixture(ctx, {
+        signal: testToolSignal,
+        callId: ToolCallId('call-ptc-settled-read'),
+        name: 'job_output',
+        arguments: { job_id: jobId },
+        agent: parent,
+      })
+      expect((read.content[0] as { text: string }).text).toContain('"ok": true')
     }, 15_000)
   })
 })

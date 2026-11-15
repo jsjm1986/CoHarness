@@ -70,6 +70,7 @@ describe('ACP connection ownership', () => {
         order.push('drained')
         return Promise.resolve()
       },
+      waitForChildren: () => Promise.resolve(false),
     } as never)
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const { sessionId } = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
@@ -93,6 +94,7 @@ describe('ACP connection ownership', () => {
         await release.promise
         order.push('drain finished')
       },
+      waitForChildren: () => Promise.resolve(false),
     } as never)
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const { sessionId } = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
@@ -125,6 +127,7 @@ describe('ACP connection ownership', () => {
     harness.ctx.logger.warn = (message: string) => { warnings.push(message) }
     harness.ctx.provide('subagents', {
       drainContinuableDescendants: () => Promise.reject(new Error('activation teardown failed')),
+      waitForChildren: () => Promise.resolve(false),
     } as never)
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const { sessionId } = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })

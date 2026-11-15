@@ -408,16 +408,15 @@ describe('cancellation against a hanging backend (fake backend, every platform)'
     return { ctx, subprocess }
   }
 
-  it('relays a caller signal that was already aborted: aborted classification', async () => {
-    const { ctx, subprocess } = await bench()
+  it('relays a caller signal that was already aborted: abort rejection', async () => {
+    const { ctx } = await bench()
     const controller = new AbortController()
     controller.abort()
     const ex = (await ctx.shell.execute(ctx.shell.resolve({ command: 'Start-Sleep 30', timeoutMs: 20, signal: controller.signal })))
-    subprocess.settle({ exitCode: null, signal: 'SIGTERM' })
-    const result = await ex.result()
+    // Local spawn admission throws the caller's own abort reason before a
+    // handle exists; result() surfaces it instead of a fabricated outcome.
     expect(ex.status).toBe('killed')
-    expect(result.aborted).toBe(true)
-    expect(result.timedOut).toBe(false)
+    await expect(ex.result()).rejects.toMatchObject({ name: 'AbortError' })
   })
 
   it('a caller abort before the deadline stays the first cause when the process outlives the deadline', async () => {

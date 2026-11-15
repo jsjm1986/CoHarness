@@ -96,8 +96,13 @@ class NodeExecution {
     // Retained processes keep their launch-time directory grants until release.
     if (!worker || worker.closed) {
       if (worker) this.workers.delete(worker)
-      // Direct callers can own mutable policy values; the retained process owns its grant snapshot.
-      worker = new ProgramWorker(this.ctx, this.config, { ...spec.sandboxPolicy }, this.processes, this.mode, owner !== undefined)
+      // Direct callers can own mutable policy arrays; the retained process owns its grant snapshot.
+      worker = new ProgramWorker(this.ctx, this.config, {
+        ...spec.sandboxPolicy,
+        ...spec.sandboxPolicy.additionalWritableRoots === undefined
+          ? {}
+          : { additionalWritableRoots: [...spec.sandboxPolicy.additionalWritableRoots] },
+      }, this.processes, this.mode, owner !== undefined)
       this.workers.add(worker)
       if (owner !== undefined) this.owners.set(owner, worker)
     }

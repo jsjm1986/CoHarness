@@ -189,6 +189,10 @@ export function apply(ctx: Context, config: AcpConfig): void {
     ownedRecord(agent)?.onAgentError(turn, error)
   })
 
+  ctx.on('agent/status', ({ agent, status }) => {
+    ownedRecord(agent)?.onAgentStatus(status)
+  })
+
   ctx.on('llm/adapters-updated', () => {
     for (const record of sessions.values()) record.topologyChanged()
   })

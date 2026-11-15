@@ -49,6 +49,9 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../subprocess/subprocess"
     }
   ]
 }

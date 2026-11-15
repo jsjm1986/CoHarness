@@ -51,16 +51,29 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Machine-routable PTY service failures. */
+/**
+ * Machine-routable PTY service and backend failures. Backends use `NO_SANDBOX`
+ * when a confined mode has no sandbox provider, `STARTUP_EXITED` or
+ * `STARTUP_TIMEOUT` when the shell exits or misses readiness during startup, and
+ * `SESSION_CLOSING` or `SESSION_EXITED` for an operation on a closing or exited
+ * session. A consumer that drives a shell through the service uses
+ * `INIT_REJECTED` when that shell rejects the consumer's own setup input.
+ */
 export type TerminalErrorCode =
   | 'DUPLICATE_BACKEND'
   | 'DUPLICATE_NAME'
   | 'FOREIGN_SESSION'
+  | 'INIT_REJECTED'
   | 'NO_BACKEND'
+  | 'NO_SANDBOX'
   | 'NO_SESSION'
   | 'OWNER_NOT_LIVE'
   | 'SEND_ACTIVE'
   | 'SERVICE_DISPOSING'
+  | 'SESSION_CLOSING'
+  | 'SESSION_EXITED'
+  | 'STARTUP_EXITED'
+  | 'STARTUP_TIMEOUT'
 
 /** Error carrying a stable {@link TerminalErrorCode}. */
 export class TerminalError extends Error {
@@ -256,7 +269,7 @@ export class TerminalSessionService extends Service {
    */
   startSend(owner: Agent, id: TerminalSessionId, request: TerminalSendRequest): TerminalSendOperation {
     const record = this.expectOwned(owner, id)
-    if (record.closing !== undefined) throw new Error(`PTY session ${id} is closing`)
+    if (record.closing !== undefined) throw new TerminalError(`PTY session ${id} is closing`, 'SESSION_CLOSING')
     if (record.active !== undefined) throw new TerminalError(`PTY session ${id} already has an active send`, 'SEND_ACTIVE')
     const operation = record.session.startSend(request)
     record.active = operation
