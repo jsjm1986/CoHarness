@@ -46,7 +46,7 @@ foreach($suffix in @('','-wal','-shm','-journal')){
   }
   if($null -ne $item){if($item -is [IO.DirectoryInfo]){throw 'invalid database'};Test-HgwAcl $path $true $cfg.directory; $files.Add($suffix)}
 }
-'{"volume":"'+($volume -replace '\\','\\')+'","files":["'+($files.ToArray() -join '","')+'"]}'`
+'{"volume":"'+($volume -replace '\\\\','\\\\')+'","files":["'+($files.ToArray() -join '","')+'"]}'`
   const encoded=Buffer.from(script,'utf16le').toString('base64')
   if(encoded.length>30000)throw new Error('The Windows storage path exceeds the native command argument limit.')
   const root=parse(directory).root,systemRoot=process.env.SystemRoot
