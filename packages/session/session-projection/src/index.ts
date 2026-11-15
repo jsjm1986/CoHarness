@@ -106,6 +106,19 @@ export type ProjectionChangeListener = (
 ) => void
 
 /**
+ * Event-level change-feed listener: one committed event changed the raw `view`
+ * result of at least one client-visible unit by `Object.is` for one session.
+ * `changes` holds one entry per such unit in registration order, each with the
+ * unit's `key` and its schema-validated view as `val`; `seq` is the seq of the
+ * causing event.
+ */
+export type ProjectionEventChangeListener = (
+  session: Session,
+  changes: readonly { readonly key: Extract<keyof SessionProjectionMap, string>; readonly val: unknown }[],
+  seq: SessionSeq,
+) => void
+
+/**
  * One consistent read cut over every registered client-visible unit for one session.
  * `asOfSeq` is the shared watermark — the seq of the last event every value
  * reflects (`-1` for an empty log, mirroring `session/subscribed.lastSeq`).
@@ -204,6 +217,7 @@ function cursorBefore(offset: SessionLogOffset): SessionSeqCursor {
 export class SessionProjectionRegistry extends Service {
   private readonly registrations = new Map<string, Registration>()
   private readonly listeners = new Set<ProjectionChangeListener>()
+  private readonly eventListeners = new Set<ProjectionEventChangeListener>()
   /** Bumps when the set of registered projection keys changes. */
   private registrationRevision = 0
 
@@ -328,6 +342,26 @@ export class SessionProjectionRegistry extends Service {
         this.listeners.delete(listener)
       }
     }, 'sessionProjections.onChanged()')
+    return () => void dispose()
+  }
+
+  /**
+   * Subscribe to the event-level change feed. The registration is an effect on
+   * the calling context's fiber. The listener runs synchronously inside the
+   * committed event's `session/event` handling, once after every unit has been
+   * driven and after every {@link onChanged} call for that event. If a unit or
+   * an {@link onChanged} listener throws during that drive, the listener still
+   * receives the changes made before the throw.
+   * @param listener - called once per committed event that changed at least one client-visible unit's raw view by `Object.is`.
+   * @returns the exact disposer that unsubscribes.
+   */
+  onEventChanged(listener: ProjectionEventChangeListener): () => void {
+    const dispose = this.ctx.effect(() => {
+      this.eventListeners.add(listener)
+      return () => {
+        this.eventListeners.delete(listener)
+      }
+    }, 'sessionProjections.onEventChanged()')
     return () => void dispose()
   }
 
@@ -658,52 +692,72 @@ export class SessionProjectionRegistry extends Service {
     }
   }
 
-  /** Eager drive: pass one committed event through every registered unit; notify on changed references. */
+  /**
+   * Eager drive: pass one committed event through every registered unit; notify
+   * per-key listeners on each changed raw view reference, then event listeners
+   * once. When a unit or a per-key listener throws, event listeners still
+   * receive the changes collected before the throw, and the error then
+   * propagates.
+   */
   private drive(session: Session, event: SessionEvent): void {
-    for (const registration of this.registrations.values()) {
-      if (registration.refs === 0) continue
-      let cell = registration.cells.get(session)
-      if (cell !== undefined && cell.observedSeq >= event.seq) continue
-      if (cell === undefined) {
-        // Late build mid-stream: fold history before this event (seq = log
-        // index, so the prefix slice is exact), then take the normal gate.
-        cell = this.buildCell(
-          registration.def,
-          session.header,
-          session.inheritedEventCount,
-          // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-          session.snapshotEvents(SessionLogOffset(0), SessionLogOffset(event.seq)),
-        )
-        registration.cells.set(session, cell)
-      } else {
-        this.advanceCell(
-          registration.def,
-          cell,
-          session,
-          event.seq === 0 ? -1 : SessionSeq(event.seq - 1),
-        )
-      }
-      const previousState = cell.state
-      const next = registration.def.apply(previousState, event)
-      const changed = !Object.is(next, previousState)
-      cell.state = next
-      cell.observedSeq = event.seq
-      const wire = registration.def.wire
-      if (changed && wire !== undefined) {
-        const views = cell.views
-        views[0] = views[1]
-        if (this.listeners.size > 0) {
-          views[1] = wire.view(next)
-          if (!Object.is(views[0], views[1])) {
-            const value = wire.viewSchema.parse(views[1])
-            for (const listener of this.listeners) {
-              listener(session, registration.def.key as Extract<keyof SessionProjectionMap, string>, value, event.seq)
-            }
-          }
+    const observed = this.listeners.size > 0 || this.eventListeners.size > 0
+    const changes: { key: Extract<keyof SessionProjectionMap, string>; val: unknown }[] = []
+    try {
+      for (const registration of this.registrations.values()) {
+        if (registration.refs === 0) continue
+        let cell = registration.cells.get(session)
+        if (cell !== undefined && cell.observedSeq >= event.seq) continue
+        if (cell === undefined) {
+          // Late build mid-stream: fold history before this event (seq = log
+          // index, so the prefix slice is exact), then take the normal gate.
+          cell = this.buildCell(
+            registration.def,
+            session.header,
+            session.inheritedEventCount,
+            // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+            session.snapshotEvents(SessionLogOffset(0), SessionLogOffset(event.seq)),
+          )
+          registration.cells.set(session, cell)
         } else {
-          // Do not retain a view while nobody consumes the feed; the next
-          // subscriber receives a fresh comparison baseline.
-          views[1] = undefined
+          this.advanceCell(
+            registration.def,
+            cell,
+            session,
+            event.seq === 0 ? -1 : SessionSeq(event.seq - 1),
+          )
+        }
+        const previousState = cell.state
+        const next = registration.def.apply(previousState, event)
+        const changed = !Object.is(next, previousState)
+        cell.state = next
+        cell.observedSeq = event.seq
+        const wire = registration.def.wire
+        if (changed && wire !== undefined) {
+          const views = cell.views
+          views[0] = views[1]
+          if (observed) {
+            views[1] = wire.view(next)
+            if (!Object.is(views[0], views[1])) {
+              const key = registration.def.key as Extract<keyof SessionProjectionMap, string>
+              const value = wire.viewSchema.parse(views[1])
+              changes.push({ key, val: value })
+              for (const listener of this.listeners) {
+                listener(session, key, value, event.seq)
+              }
+            }
+          } else {
+            // Do not retain a view while nobody consumes the feed; the next
+            // subscriber receives a fresh comparison baseline.
+            views[1] = undefined
+          }
+        }
+        // An unchanged state keeps its current view as the valid comparison
+        // value for the next state change.
+      }
+    } finally {
+      if (changes.length > 0) {
+        for (const listener of this.eventListeners) {
+          listener(session, changes, event.seq)
         }
       }
     }

@@ -3,11 +3,12 @@
  * lazy cell build (registration after events, session after registration),
  * the Object.is no-change gate (same reference ⇒ zero change-feed work),
  * snapshot consistency (asOfSeq = last event seq; values from the watermark
- * cache), duplicate-key rejection, stateVersion validation, and effect-tied
- * removal of registrations and change listeners (HMR safety).
+ * cache), duplicate-key rejection, stateVersion validation, the per-event
+ * change frame feed, and effect-tied removal of registrations and change
+ * listeners (HMR safety).
  */
 
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import SessionStore, {
@@ -31,6 +32,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 
   interface SessionProjectionMap {
     'test/marks': { marks: string[] }
+    'test/stable-view': { marks: string[] }
   }
 }
 
@@ -77,22 +79,27 @@ const countUnit = (): ProjectionDefinition<'test/count', number> => ({
   stateVersion: 1,
 })
 
-/** State changes whose wire value intentionally keeps one object reference. */
-const stableViewUnit = (): Omit<ProjectionDefinition<'test/marks', MarksState>, 'wire'>
-  & { wire: NonNullable<ProjectionDefinition<'test/marks', MarksState>['wire']> } => {
-  const visible = { marks: ['stable'] }
-  return {
-    key: 'test/marks',
-    stateSchema: z.object({ marks: z.array(z.string()) }).nullable(),
-    init: () => null,
-    apply: (state, event) => event.type === 'test/mark' ? event.data : state,
-    wire: {
-      viewSchema: z.object({ marks: z.array(z.string()) }),
-      view: () => visible,
-    },
-    stateVersion: 2,
-  }
-}
+/** State changes on every matching event while the wire view may reuse one reference. */
+const stableViewUnit = (
+  view: (state: StableViewState) => StableViewState['value'],
+) => ({
+  key: 'test/stable-view',
+  stateSchema: z.object({
+    revision: z.number().int().nonnegative(),
+    value: z.object({ marks: z.array(z.string()) }),
+  }),
+  init: () => ({ revision: 0, value: { marks: [] } }),
+  apply: (state, event) => {
+    if (event.type === 'turn/start') return { ...state, revision: state.revision + 1 }
+    if (event.type === 'test/mark') return { revision: state.revision + 1, value: event.data }
+    return state
+  },
+  wire: {
+    viewSchema: z.object({ marks: z.array(z.string()) }),
+    view,
+  },
+  stateVersion: 1,
+}) satisfies ProjectionDefinition<'test/stable-view', StableViewState>
 
 /** Host-only unit whose initial state proves the exact inherited cut. */
 async function harness(): Promise<{ ctx: Context; session: Session }> {
@@ -160,13 +167,134 @@ describe('SessionProjectionRegistry drive', () => {
 
   it('suppresses a live notification when a changed state keeps the same raw view reference', async () => {
     const { ctx, session } = await harness()
-    ctx.sessionProjections.register(stableViewUnit())
+    const visible = { marks: ['stable'] }
+    ctx.sessionProjections.register(stableViewUnit(() => visible))
     const seen: number[] = []
     ctx.sessionProjections.onChanged((_session, _key, _value, seq) => { seen.push(seq) })
     mark(session, ['first'])
     mark(session, ['second'])
     expect(seen).toEqual([0])
-    expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['stable'] })
+    expect(ctx.sessionProjections.snapshot(session).values['test/stable-view']).toEqual({ marks: ['stable'] })
+  })
+
+  it('notifies onEventChanged once per event with every changed key in registration order', async () => {
+    const { ctx, session } = await harness()
+    ctx.sessionProjections.register(marksUnit())
+    ctx.sessionProjections.register(countUnit())
+    // A distinct but reference-stable view, so the two entries carry different values.
+    const upper = new WeakMap<MarksView, MarksView>()
+    ctx.sessionProjections.register(stableViewUnit((state) => {
+      const cached = upper.get(state.value)
+      if (cached !== undefined) return cached
+      const view = { marks: state.value.marks.map(item => item.toUpperCase()) }
+      upper.set(state.value, view)
+      return view
+    }))
+    const order: string[] = []
+    const events: { changes: readonly { key: string; val: unknown }[]; seq: SessionSeq; sessionId: string }[] = []
+    ctx.sessionProjections.onChanged((_session, key) => { order.push(`key:${key}`) })
+    ctx.sessionProjections.onEventChanged((changedSession, changes, seq) => {
+      order.push('event')
+      events.push({ changes, seq, sessionId: String(changedSession.id) })
+    })
+
+    const event = mark(session, ['a'])
+    // Host-only and unchanged-view state changes publish nothing.
+    session.append('turn/start', { turn: 1 })
+
+    expect(events).toEqual([{
+      changes: [{ key: 'test/marks', val: { marks: ['a'] } }, { key: 'test/stable-view', val: { marks: ['A'] } }],
+      seq: event.seq,
+      sessionId: String(session.id),
+    }])
+    expect(order).toEqual(['key:test/marks', 'key:test/stable-view', 'event'])
+  })
+
+  it('still delivers the changes made before a later unit throws', async () => {
+    const { ctx, session } = await harness()
+    ctx.sessionProjections.register(marksUnit())
+    // A fresh invalid view on every change: its schema parse throws after test/marks was collected.
+    ctx.sessionProjections.register(stableViewUnit(() => ({ marks: 1 }) as never))
+    const events: { changes: readonly { key: string; val: unknown }[]; seq: SessionSeq }[] = []
+    ctx.sessionProjections.onEventChanged((_session, changes, seq) => {
+      events.push({ changes, seq })
+    })
+
+    const event = mark(session, ['a'])
+
+    expect(events).toEqual([{ changes: [{ key: 'test/marks', val: { marks: ['a'] } }], seq: event.seq }])
+  })
+
+  it('computes views for an event listener alone and stops after its disposer runs', async () => {
+    const { ctx, session } = await harness()
+    const view = vi.fn((state: StableViewState) => state.value)
+    ctx.sessionProjections.register(stableViewUnit(view))
+    const seen: { keys: readonly string[]; seq: SessionSeq }[] = []
+    const stop = ctx.sessionProjections.onEventChanged((_session, changes, seq) => {
+      seen.push({ keys: changes.map(change => change.key), seq })
+    })
+
+    const event = session.append('turn/start', { turn: 1 })
+    expect(view).toHaveBeenCalledOnce()
+    expect(seen).toEqual([{ keys: ['test/stable-view'], seq: event.seq }])
+
+    stop()
+    mark(session, ['after-stop'])
+    expect(seen).toHaveLength(1)
+    expect(view).toHaveBeenCalledOnce()
+  })
+
+  it('publishes the first frame after a listener gap drops the comparison baseline', async () => {
+    const { ctx, session } = await harness()
+    const view = vi.fn((state: StableViewState) => state.value)
+    ctx.sessionProjections.register(stableViewUnit(view))
+    const collect = (frames: { changes: readonly { key: string; val: unknown }[] }[]) =>
+      ctx.sessionProjections.onEventChanged((_session, changes) => {
+        frames.push({ changes })
+      })
+    const first: { changes: readonly { key: string; val: unknown }[] }[] = []
+    const stop = collect(first)
+
+    session.append('turn/start', { turn: 1 })
+    stop()
+    session.append('turn/start', { turn: 2 })
+    expect(view).toHaveBeenCalledOnce()
+
+    const resumed: { changes: readonly { key: string; val: unknown }[] }[] = []
+    collect(resumed)
+    session.append('turn/start', { turn: 3 })
+
+    expect(first).toEqual([{ changes: [{ key: 'test/stable-view', val: { marks: [] } }] }])
+    expect(resumed).toEqual([{ changes: [{ key: 'test/stable-view', val: { marks: [] } }] }])
+    expect(view).toHaveBeenCalledTimes(2)
+  })
+
+  it('removes event-level change listeners when their owning fiber unloads (HMR safety)', async () => {
+    const { ctx, session } = await harness()
+    ctx.sessionProjections.register(marksUnit())
+    const notifications: (readonly string[])[] = []
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      inner.sessionProjections.onEventChanged((_session, changes) => {
+        notifications.push(changes.map(change => change.key))
+      })
+    }, { inject: ['sessionProjections'] }))
+    mark(session, ['live'])
+    await fiber.dispose()
+    mark(session, ['after-dispose'])
+    expect(notifications).toEqual([['test/marks']])
+    expect(ctx.sessionProjections.snapshot(session).values).toEqual({ 'test/marks': { marks: ['after-dispose'] } })
+  })
+
+  it('does not compute a view while no change listener exists', async () => {
+    const { ctx, session } = await harness()
+    const view = vi.fn((state: StableViewState) => state.value)
+    ctx.sessionProjections.register(stableViewUnit(view))
+
+    session.append('turn/start', { turn: 1 })
+    session.append('turn/start', { turn: 2 })
+
+    expect(ctx.sessionProjections.stateOf(session, 'test/stable-view')?.revision).toBe(2)
+    expect(view).not.toHaveBeenCalled()
   })
 
   it('drives independently per session (cells are per-session watermarks)', async () => {
