@@ -26,7 +26,7 @@ import { HarnessSdkJsonRpcServer } from '../src/server.ts'
  * entry before teardown can reach the partial record.
  */
 function bindActivation(ctx: Context, agent: Agent, root: Agent): () => void {
-  const registry = continuationActivations(ctx) as { resident: Map<SessionId, Activation> }
+  const registry = continuationActivations(ctx) as unknown as { resident: Map<SessionId, Activation> }
   registry.resident.set(agent.id, {
     handle: { agent, dispose: () => Promise.resolve(), tryDisposeIdle: () => Promise.resolve(false) },
     root,

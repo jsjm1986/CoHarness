@@ -26,10 +26,10 @@ function fakeAgent(seed: Array<{ type: string }> = [{ type: 'turn/start' }, { ty
         const event = { type, data }
         events.push(event)
         appended.push(event)
-        return event as SessionEvent
+        return event as unknown as SessionEvent
       },
     },
-  } as Agent
+  } as unknown as Agent
   return { agent, appended }
 }
 
@@ -123,7 +123,7 @@ describe('ApprovalService.request', () => {
     await ctx.plugin(ApprovalService)
     const session = ctx.sessions.create(SessionId('asked-observer-throw'))
     session.append('turn/start', { turn: 1 })
-    const agent = { session } as Agent
+    const agent = { session } as unknown as Agent
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     ctx.on('session/event', (_session, event) => {
       if (event.type === 'approval/asked') throw new Error('observer failed after asked append')
@@ -146,7 +146,7 @@ describe('ApprovalService.request', () => {
     await ctx.plugin(ApprovalService)
     const session = ctx.sessions.create(SessionId('decided-observer-throw'))
     session.append('turn/start', { turn: 1 })
-    const agent = { session } as Agent
+    const agent = { session } as unknown as Agent
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     ctx.on('session/event', (_session, event) => {
       if (event.type === 'approval/decided') throw new Error('observer failed after decided append')
@@ -172,7 +172,7 @@ describe('ApprovalService.request', () => {
         eventAt: () => ({ type: 'turn/start' }),
         append: () => { throw failure },
       },
-    } as Agent
+    } as unknown as Agent
 
     await expect(ctx.approval.request(requestOf(agent))).rejects.toBe(failure)
   })
@@ -365,7 +365,7 @@ describe('approval policy (the approval/policy fold)', () => {
   function sessionAgent(id: string): { agent: Agent; session: Session } {
     const session = Session.create(SessionId(id))
     session.append('turn/start', { turn: 1 })
-    const agent = { id, session } as Agent
+    const agent = { id, session } as unknown as Agent
     return { agent, session }
   }
 
@@ -381,7 +381,7 @@ describe('approval policy (the approval/policy fold)', () => {
 
   it('rejects a policy outside the closed vocabulary before appending', () => {
     const append = vi.fn()
-    const session = { append } as Session
+    const session = { append } as unknown as Session
 
     expect(() => { setApprovalPolicy(session, 'sometimes' as Parameters<typeof setApprovalPolicy>[1]) })
       .toThrow('approval policy must be one of "ask" or "never"')
@@ -459,7 +459,7 @@ describe('approval policy (the approval/policy fold)', () => {
     await ctx.plugin(ApprovalService)
     const { agent, session } = sessionAgent('sess-policy-notice')
     const inject = vi.fn<Agent['inject']>()
-    const liveAgent = { ...agent, inject } as Agent
+    const liveAgent = { ...agent, inject } as unknown as Agent
 
     ctx.approval.setPolicy(liveAgent, 'never')
     ctx.approval.setPolicy(liveAgent, 'never')

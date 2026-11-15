@@ -9,11 +9,11 @@ kind: "package-reference"
 
 [`ctx.agentTeams`](../agent-team/README.zh.md) 的模型面适配器。它只注册四个共享任务工具外加一节系统提示词策略，每项都以调用方根 Session 开启 Team 模式为条件。teammate 的创建、发现、消息与中断仍归标准 subagent 工具（`subagent`、`subagent_fork`、`list_agents`、`send_message`、`interrupt_agent`）；本包刻意不提供任何 Team 专用协作面。
 
-## Summary
+## 概述
 
 本包让模型通过一块共享的、带修订校验的任务板协调委派工作：创建带依赖与建议写范围的任务，列出与读取板面，并应用 compare-and-set 转移——claim、release、edit、set_dependencies、complete、reopen、reassign 与 delete。工具仅在根 Session 开启 Team 模式时存在，因此同一组合可同时服务普通会话与 Team 会话而不互相泄漏任务工具。本包以实验名称发布，不提供稳定性保证。
 
-## Table of Contents
+## 目录
 
 - [Config](#config)
 - [Tools and authority](#tools-and-authority)
@@ -66,7 +66,7 @@ kind: "package-reference"
 - **reassign 仅 root**——teammate 不能把自己的任务转给同伴，只能 release 供重新 claim。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

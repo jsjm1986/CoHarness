@@ -334,6 +334,9 @@ export function expectedDshPackageFiles(manifest: PackageManifest): readonly str
     ...exportDefault(manifest, './loader') === './lib/loader.js' ? ['lib/loader.js'] : [],
     // A store subpath ships its own bundle (single-entry builds; no shared chunk).
     ...exportDefault(manifest, './store') === './lib/store/index.js' ? ['lib/store/index.js'] : [],
+    // A second pipeline entry makes the build multi-entry: its code-split
+    // shared chunk is a published artifact (the name carries a content hash).
+    ...exportDefault(manifest, './pipeline') === './lib/pipeline.js' ? ['lib/pipeline.js', 'lib/shared-*.js'] : [],
     // A surface bundle's startup row is its own bundle: the Loader imports it
     // as a row module, so it cannot ride inside the package entry.
     ...exportDefault(manifest, './startup') === './lib/startup.js' ? ['lib/startup.js'] : [],

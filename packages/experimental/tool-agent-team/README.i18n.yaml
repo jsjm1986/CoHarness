@@ -4,7 +4,7 @@
 #   pnpm run verify-translation-pairing --write packages/experimental/tool-agent-team/README.md
 document:
   en: cca326412456a6e107f9d9acfe9b81e40149ab7b
-  zh: 606d629d740b8e515be7b0ddf55d8a7e379729d9
+  zh: 11806ef0d5399f11df126c91dcb57e21ff656a79
 /:
   en: 4133452b68183e6d
   zh: bcc3481d8c4348a0
@@ -13,10 +13,10 @@ document:
   zh: b765bc7e0cb69985
 /deepseek-ai-dsh-experimental-tool-agent-team/summary:
   en: 2a7fb09bb02fda68
-  zh: be17134745c4dfba
+  zh: 0bde83784de701a4
 /deepseek-ai-dsh-experimental-tool-agent-team/table-of-contents:
   en: 96470d1cac39acc5
-  zh: 96470d1cac39acc5
+  zh: 8c0d31da9fbe91b3
 /deepseek-ai-dsh-experimental-tool-agent-team/config:
   en: 41e8ed3987457ac7
   zh: d73f154ea0aefcd1
@@ -43,4 +43,4 @@ document:
   zh: 618bee2445063de4
 /deepseek-ai-dsh-experimental-tool-agent-team/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
-  zh: e67f633dc6fe7773
+  zh: cdd2a143b725accd

@@ -653,10 +653,10 @@ const TOOL_PACKAGES: ToolPackage[] = [
       let agent!: Agent
       ctx.provide('agentTeams', {
         isEnabled: () => true,
-      } as TeamService)
+      } as Partial<TeamService> as TeamService)
       ctx.provide('subagents', {
         resolveName: () => { throw new Error('catalog mount does not execute tools') },
-      } as SubagentRuntime)
+      } as Partial<SubagentRuntime> as SubagentRuntime)
       await ctx.plugin(Object.assign((inner: Context) => {
         agent = {
           id: session.id,

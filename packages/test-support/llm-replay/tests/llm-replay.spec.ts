@@ -96,9 +96,9 @@ function sessionJsonl(
       seq: SessionSeq(header?.seedLength as number),
       time: 0,
       data: { inherited: true },
-    } as SessionEvent)
+    } as unknown as SessionEvent)
     for (let i = 0; i < rows.length; i += 1) {
-      rows[i] = { ...rows[i], seq: SessionSeq(i) } as SessionEvent
+      rows[i] = { ...rows[i], seq: SessionSeq(i) } as unknown as SessionEvent
     }
   }
   return [headerLine, ...rows.map(e => JSON.stringify(e))].join('\n') + '\n'
@@ -113,7 +113,7 @@ function replaySessionJsonl(
   const events: SessionEvent[] = []
   let seq = 0
   const push = (type: string, data: SessionEvent['data']): void => {
-    events.push({ type, seq: SessionSeq(seq++), time: 0, data } as SessionEvent)
+    events.push({ type, seq: SessionSeq(seq++), time: 0, data } as unknown as SessionEvent)
   }
   push('turn/start', { turn: 1 })
   for (const [index, chunks] of calls.entries()) {
@@ -201,7 +201,7 @@ function legacyChunkEvent(seq: number, turn: number, step: number, chunk: Stream
     seq: SessionSeq(seq),
     time: 0,
     data: { turn, step, chunk },
-  } as SessionEvent
+  } as unknown as SessionEvent
 }
 
 /** A durable SessionEvent carrying one complete model call's stream for (turn, step). */

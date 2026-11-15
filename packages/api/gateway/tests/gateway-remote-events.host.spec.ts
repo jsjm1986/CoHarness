@@ -188,7 +188,7 @@ async function setup(withAccess = false): Promise<{ ctx: Context; connection: Fa
   await ctx.plugin(FakeConnectionService)
   await ctx.plugin(TypertGatewayService)
   const receiver = ctx.get('connection')
-  return { ctx, connection: receiver as FakeConnectionService }
+  return { ctx, connection: receiver as unknown as FakeConnectionService }
 }
 
 interface OpenedEvents {

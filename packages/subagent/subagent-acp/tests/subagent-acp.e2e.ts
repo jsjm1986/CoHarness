@@ -37,7 +37,7 @@ const childLaunch = resolveExampleLaunch({
 })
 
 /** The ACP backend ignores the parent, but the seam requires one with an execution-scoped ctx. */
-const fakeParent = (scope: Context): Agent => ({ id: 'parent', session: { header: {}, append: vi.fn<Agent['session']['append']>() as Agent['session']['append'] }, ctx: scope }) as Agent
+const fakeParent = (scope: Context): Agent => ({ id: 'parent', session: { header: {}, append: vi.fn<Agent['session']['append']>() as unknown as Agent['session']['append'] }, ctx: scope }) as Agent
 
 let ctx: Context | undefined
 let workdir: string | undefined

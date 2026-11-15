@@ -9,11 +9,11 @@ kind: "package-reference"
 
 Agent Teams 协调域。`ctx.agentTeams` 持有每个根 Session 的 Team 模式选择，以及一块从 Lead Session 日志折叠而来的共享、带修订校验的任务板。teammate 是普通的命名可延续 subagent——持久目录名、同级唯一、根相对路径——因此创建、消息、恢复与中断全部归标准 `ctx.subagents` 能力面。[Agent Teams v2 迁移 note](../../../.agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.zh.md) 持有事件版本与迁移决策。
 
-## Summary
+## 概述
 
 `dsh-experimental-agent-team` 在 Team 模式开启时把单个编码会话变成一个小型工作团队：根 agent 成为 Lead，向命名 teammate subagent 委派工作，并通过一块带 compare-and-set 更新的持久任务板协调共享工作。Team 状态存在 `agentTeam` Session 投影中——模式选择与任务快照从 Lead 日志确定性重放，上一代 roster/mailbox 写入的 version-1 记录保持可读。本包自身不提供工具——模型面任务工具请挂载 `dsh-experimental-tool-agent-team`,teammate 消息请挂载 `dsh-tool-subagent-control`。需要持久 Session 存储才会激活。
 
-## Table of Contents
+## 目录
 
 - [Config](#config)
 - [Team mode](#team-mode)
@@ -82,7 +82,7 @@ teammate 是根的 subagent 树中一个命名的可延续后代。名称遵循�
 - **无 Team 等待原语**——等待就是普通的 subagent 投递：结算通知与 `send_message`，而非任务板边沿。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>
