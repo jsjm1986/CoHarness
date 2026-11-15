@@ -39,10 +39,39 @@ export const taggedThinkingEvents = [
   '[DONE]',
 ]
 
+/**
+ * One Anthropic Messages SSE frame, named by its own `type`.
+ * @param data - the frame payload.
+ * @returns the frame as a named SSE event.
+ */
+export function anthropicFrame(data: Record<string, unknown>): { event: string; data: string } {
+  return { event: String(data['type']), data: JSON.stringify(data) }
+}
+
+/** The opening frame of every scripted Anthropic Messages response. */
+export const anthropicMessageStart = anthropicFrame({
+  type: 'message_start',
+  message: {
+    id: 'msg_1', type: 'message', role: 'assistant', model: 'm', content: [],
+    stop_reason: null, stop_sequence: null, usage: { input_tokens: 3, output_tokens: 1 },
+  },
+})
+
+/** The same minimal text generation in Anthropic Messages frames. */
+export const anthropicTextEvents = [
+  anthropicMessageStart,
+  anthropicFrame({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }),
+  anthropicFrame({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'hello' } }),
+  anthropicFrame({ type: 'content_block_stop', index: 0 }),
+  anthropicFrame({ type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 1 } }),
+  anthropicFrame({ type: 'message_stop' }),
+]
+
 /** Local provider stand-in: replays scripted behaviors per request. */
 export async function mockServer(script: {
   status?: number
-  events?: string[]
+  /** SSE frames: a string is sent as `data:` alone; a pair also names the frame's `event:`. */
+  events?: (string | { event: string; data: string })[]
   body?: string
   delayMs?: number
   /** Keep the SSE response open after its scripted events until the client disconnects. */
@@ -94,11 +123,15 @@ export async function mockServer(script: {
           if (behavior.holdOpen !== true) response.end()
           return
         }
-        const eventName = behavior.sseEvents === true
-          ? (JSON.parse(event) as { type?: unknown }).type
-          : undefined
-        if (typeof eventName === 'string') response.write(`event: ${eventName}\n`)
-        response.write(`data: ${event}\n\n`)
+        if (typeof event === 'string') {
+          const eventName = behavior.sseEvents === true
+            ? (JSON.parse(event) as { type?: unknown }).type
+            : undefined
+          if (typeof eventName === 'string') response.write(`event: ${eventName}\n`)
+          response.write(`data: ${event}\n\n`)
+        } else {
+          response.write(`event: ${event.event}\ndata: ${event.data}\n\n`)
+        }
         if (behavior.delayMs === undefined) writeNext()
         else timer = setTimeout(writeNext, behavior.delayMs)
       }

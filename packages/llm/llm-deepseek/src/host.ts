@@ -20,7 +20,7 @@ import type { DeepSeekAdapterOptions, DeepSeekConnectionOptions } from './types.
  */
 export function registerDeepSeekProvider<C extends DeepSeekConnectionOptions>(
   ctx: Context, provider: string, dependencies: Pick<DeepSeekAdapterOptions<C>,
-  'options' | 'resolveAuth' | 'providerName' | 'discoverModels'>): { refreshRetryPolicy: () => void } {
+  'options' | 'resolveAuth' | 'providerName' | 'discoverModels' | 'connect' | 'admit'>): { refreshRetryPolicy: () => void } {
   let userId: AnonymousUserId | undefined
   // These conditions repeat on every request of a route; log each first occurrence only.
   const degradedReplays = new Set<string>()
