@@ -541,7 +541,7 @@ describe('CI workflow', () => {
         .map(([name]) => name)
         .sort()
     )
-    expect(pushReachableOf(workflow)).toEqual(['web-snapshot-sweep', 'windows-native'])
+    expect(pushReachableOf(workflow)).toEqual(['gateway-windows', 'web-snapshot-sweep', 'windows-native'])
     expect(pushReachableOf(masterWorkflow)).toEqual(['python-runtime', 'serial-linux-selfhosted', 'serial-windows', 'wine-apt-cache'])
 
     // The browser sweep is the other compensating post-merge lane. The browser
