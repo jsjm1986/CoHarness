@@ -14,9 +14,7 @@ import { queryCommandImages, queryContent } from './query-content.ts'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import { admitEncodedImages, type EncodedImageAttachment, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { ReasoningEffortId, createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
-import { carrierKeyOf, type Scoped } from '@deepseek-ai/dsh-scope'
 import { SessionId, type SessionLogOffset } from '@deepseek-ai/dsh-session'
-import type SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { SubagentRunEndInfo } from '@deepseek-ai/dsh-subagent'
 import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek-api-key'
 import type {
@@ -67,11 +65,6 @@ async function durablePromptContent(ctx: Context, blocks: SessionPromptParams['c
   return blocks.map(block => encodedImage(block)
     ? { type: 'image', attachment: refs[next++] as ImageAttachmentRef }
     : block)
-}
-
-/** Recover the delegating parent from the service-owned scoped carrier. */
-function subagentParentOf(carrier: Scoped<SubagentRuntime>): Agent {
-  return carrierKeyOf(carrier) as Agent
 }
 
 /** Deployment-specific status mapping for SDK turn and subagent outcomes. */
@@ -193,8 +186,7 @@ export class HarnessSdkJsonRpcServer {
       }
       this.transport.notify('subagent.started', payload)
     }))
-    this.disposers.push(ctx.on('subagent/end', function (this: Scoped<SubagentRuntime>, info: SubagentRunEndInfo) {
-      const parent = subagentParentOf(this)
+    this.disposers.push(ctx.on('subagent/end', (info: SubagentRunEndInfo) => {
       // This protocol reports only in-process child sessions. The service
       // snapshots the provider name and local flag through child disposal;
       // matching ids or parent lineage alone never establishes locality.
@@ -202,7 +194,7 @@ export class HarnessSdkJsonRpcServer {
       const payload: SubagentFinishedNotification = {
         provider: info.provider,
         agentId: String(info.id),
-        parentSessionId: String(parent.session.id),
+        parentSessionId: String(info.parentSessionId),
         childSessionId: String(info.id),
         status: successStatus(info.stopReason, serverOptions),
         stopReason: info.stopReason,
@@ -401,25 +393,26 @@ export class HarnessSdkJsonRpcServer {
   }
 
   /**
-   * Resolves live SDK ownership through the durable parent chain; a live
-   * descendant of an SDK-owned root counts as owned.
+   * Resolves live SDK ownership; root lookup failures other than SubagentError/UNAUTHORIZED propagate.
    * @param agent - Agent whose requests need routing.
-   * @returns Whether this server owns the Agent or a live subagent ancestor of its root.
+   * @returns Whether this server owns the Agent or its live subagent tree root.
    */
   private ownsAgent(agent: Agent): boolean {
     const agents = this.ctx.agents
     if (agents.get(agent.id) !== agent) return false
     if (this.sessions.get(agent.session.id)?.handle.agent === agent) return true
-    let session = agent.session
-    for (let depth = 0; depth < 64; depth++) {
-      const header = session.header
-      if (header.origin !== 'subagent' || header.parentSession === undefined) return false
-      const parent = agents.get(SessionId(header.parentSession))
-      if (parent === undefined) return false
-      if (this.sessions.get(parent.session.id)?.handle.agent === parent) return true
-      session = parent.session
+    const subagents = this.ctx.get('subagents')
+    if (subagents === undefined) return false
+    let root: Agent
+    try {
+      root = subagents.rootOf(agent)
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null
+        && 'name' in error && error.name === 'SubagentError'
+        && 'code' in error && error.code === 'UNAUTHORIZED') return false
+      throw error
     }
-    return false
+    return this.sessions.get(root.session.id)?.handle.agent === root
   }
 
   /**

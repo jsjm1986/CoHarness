@@ -66,8 +66,9 @@ export class DeepSeekHarness implements AsyncDisposable {
 
   /**
    * The underlying JSON-RPC client (exposed for low-level access). A failed
-   * handshake reaps its runtime and swaps in a fresh instance, so do not
-   * cache this across a failed {@link start}.
+   * handshake swaps in a fresh instance only after cleanup proves the runtime
+   * exited; cleanup failure retains this client, so do not cache it across a
+   * failed {@link start}.
    * @returns the client currently owning the runtime subprocess.
    */
   get client(): HarnessClient {
@@ -76,9 +77,12 @@ export class DeepSeekHarness implements AsyncDisposable {
 
   /**
    * Start the subprocess and perform the `initialize` handshake once. On
-   * failure the runtime is reaped and a fresh client replaces it
-   * (`HarnessClient.close` is permanent), so a later call retries with a new
-   * subprocess — unless {@link close} already ended this harness.
+   * failure, successful SDK-owned cleanup reaps the runtime and installs a
+   * fresh client (`HarnessClient.close` is permanent), so a later call retries
+   * with a new subprocess unless {@link close} already ended this harness. If
+   * cleanup also fails, rejects with an `AggregateError` whose ordered errors
+   * preserve both causes and retains the failed client rather than spawning
+   * alongside a process whose exit was not proved.
    * @returns settlement of the (memoized) handshake.
    */
   start(): Promise<void> {

@@ -521,7 +521,8 @@ export class HarnessClient {
       // retain no per-call state (the server-side work still runs to close).
       const abandon = new AbortController()
       const timer = setTimeout(() => {
-        abandon.abort(new RequestTimeoutError(`${method} timed out after ${timeout}ms waiting for the DeepSeek Harness runtime`))
+        const stderr = this.stderrTail.length === 0 ? '' : `; stderr tail:\n${this.stderrTail.join('\n')}`
+        abandon.abort(new RequestTimeoutError(`${method} timed out after ${timeout}ms waiting for ${this.runtime.description}${stderr}`))
       }, timeout)
       try {
         return await transport.request(method, params ?? {}, abandon.signal)
@@ -710,7 +711,7 @@ export class HarnessClient {
   }
 
   private closedError(reason: string): TransportClosedError {
-    const parts = [reason]
+    const parts = [`${this.runtime.description}: ${reason}`]
     if (this.spawnError !== undefined) parts.push(`spawn error: ${this.spawnError.message}`)
     if (this.exitCode !== undefined) parts.push(`exit code: ${String(this.exitCode)}`)
     if (this.stderrTail.length > 0) parts.push(`stderr tail:\n${this.stderrTail.join('\n')}`)

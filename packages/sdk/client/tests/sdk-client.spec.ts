@@ -481,11 +481,28 @@ describe('HarnessClient', () => {
   })
 
   it('times out a hung request at the per-call bound', async () => {
-    const client = createProcessHarnessClient(fakeLaunch({ FAKE_HANG_PROMPT: '1' }))
+    const client = createProcessHarnessClient(fakeLaunch({
+      FAKE_HANG_PROMPT: '1',
+      FAKE_STDERR: 'runtime accepted initialize but hung the prompt',
+    }))
     cleanups.push(() => client.close())
     await client.initialize({ cwd: process.cwd(), provider: 'p', model: 'm' })
-    await expect(client.request('session/prompt', { sessionId: 's', contentBlocks: normalizeInput('hi') }, 200))
-      .rejects.toThrow(RequestTimeoutError)
+    const failure = await client.request('session/prompt', { sessionId: 's', contentBlocks: normalizeInput('hi') }, 200)
+      .then(() => { throw new Error('request unexpectedly succeeded') }, (error: unknown) => error)
+    expect(failure).toBeInstanceOf(RequestTimeoutError)
+    expect(String(failure)).toContain('session/prompt timed out after 200ms waiting for scripted SDK runtime')
+    expect(String(failure)).toContain('stderr tail:\nruntime accepted initialize but hung the prompt')
+    await client.close()
+  })
+
+  it('times out a hung initialize with the runtime description and stderr tail', async () => {
+    const client = createProcessHarnessClient(fakeLaunch(
+      { FAKE_HANG_INIT: '1', FAKE_STDERR: 'booted then hung initialize' },
+      { initializeTimeoutMs: 250 },
+    ))
+    cleanups.push(() => client.close())
+    await expect(client.initialize({ cwd: process.cwd(), provider: 'p', model: 'm' }))
+      .rejects.toThrow(/initialize timed out after 250ms waiting for scripted SDK runtime; stderr tail:\nbooted then hung initialize/)
     await client.close()
   })
 

@@ -78,7 +78,9 @@ export const DEFAULT_MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 /**
  * Line-delimited endpoint over caller-owned streams. {@link start} attaches
  * listeners; {@link close} detaches them and rejects pending requests without
- * destroying the streams. Missing request handlers return `-32601`; handler
+ * destroying the streams. Closure, input end, and input errors permanently reject
+ * later outbound requests with the first failure; start does not reset that failure.
+ * Missing request handlers return `-32601`; handler
  * failures return `-32603`. Notifications without a handler are dropped.
  */
 export class JsonRpcLineTransport implements JsonRpcTransportPeer {
@@ -97,6 +99,7 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
   private activeIncoming = 0
   private queuedOutputBytes = 0
   private closed = false
+  private failure: Error | undefined
 
   constructor(
     private readonly input: Readable,
@@ -119,7 +122,8 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
   }
 
   /**
-   * Detach listeners and reject pending requests. Safe before {@link start}.
+   * Detach listeners and reject pending and future outbound requests. Safe before
+   * {@link start}; starting again does not reset the request failure.
    */
   close(): void {
     if (this.closed) return
@@ -158,7 +162,7 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
    * @returns the result; rejects per {@link JsonRpcTransportPeer.request}.
    */
   request(method: string, params: object, signal?: AbortSignal): Promise<unknown> {
-    if (this.closed) return Promise.reject(new Error('JSON-RPC transport closed'))
+    if (this.failure !== undefined) return Promise.reject(this.failure)
     if (this.pending.size >= this.maxPendingRequests) {
       return Promise.reject(new Error('JSON-RPC pending request limit exceeded'))
     }
@@ -392,6 +396,7 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
   }
 
   private failPending(error: Error): void {
+    this.failure ??= error
     const pending = [...this.pending.values()]
     this.pending.clear()
     for (const waiter of pending) waiter.reject(error)

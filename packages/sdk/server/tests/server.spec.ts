@@ -1,6 +1,7 @@
 import { MESSAGES_RESPONSE } from './messages-response.ts'
 import { createUserMessage, LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -15,7 +16,8 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import SessionStore, { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek-api-key'
-import SubagentRuntime, { type SubagentResult, type SubagentRunEndInfo } from '@deepseek-ai/dsh-subagent'
+import SubagentRuntime, { SubagentRunId, type SubagentResult, type SubagentRunEndInfo } from '@deepseek-ai/dsh-subagent'
+import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { JsonRpcTransportPeer } from '@deepseek-ai/dsh-sdk-protocol'
 import { HarnessSdkJsonRpcServer } from '../src/index.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -81,7 +83,7 @@ async function makeHarness(storageDir: string) {
 async function settleSubagent(
   ctx: Context,
   parent: Agent,
-  info: Omit<SubagentRunEndInfo, 'runId' | 'local'> & { localAgent: Agent | undefined },
+  info: Omit<SubagentRunEndInfo, 'runId' | 'local' | 'parentSessionId'> & { localAgent: Agent | undefined },
   beforeSettle?: () => Promise<void>,
 ): Promise<void> {
   const result = Promise.withResolvers<SubagentResult>()
@@ -543,6 +545,43 @@ describe('HarnessSdkJsonRpcServer', () => {
       await parentHandle.dispose()
       await server.shutdown()
     } finally {
+      await ctx.fiber.dispose()
+      await rm(storageDir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports the durable direct creator in subagent.finished when scoped dispatch belongs to the tree root', async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), 'dsh-jsonrpc-nested-creator-'))
+    const ctx = await makeHarness(storageDir)
+    const transport = new FakeTransport()
+    const server = new HarnessSdkJsonRpcServer(ctx, transport)
+    try {
+      const root = await ctx.agents.create({ sessionId: SessionId('root'), meta: { cwd: storageDir } })
+      const creator = await ctx.agents.create({
+        sessionId: SessionId('creator'),
+        meta: { cwd: storageDir, parentSession: root.agent.id, origin: 'subagent' },
+      })
+      const child = await ctx.agents.create({
+        sessionId: SessionId('leaf'),
+        meta: { cwd: storageDir, parentSession: creator.agent.id, origin: 'subagent' },
+      })
+      await creator.dispose()
+      await child.dispose()
+      // A continuable epoch keys scoped dispatch by the live tree root while
+      // reporting its own durable creator in the payload.
+      ctx.emit(scopeTarget(ctx.subagents, root.agent), 'subagent/end', {
+        runId: SubagentRunId(randomUUID()), provider: 'spawn', id: child.agent.id,
+        parentSessionId: creator.agent.id, local: true, stopReason: 'completed',
+      })
+      expect(transport.notifications.filter(n => n.params?.childSessionId === 'leaf')).toEqual([
+        { method: 'subagent.started', params: { parentSessionId: 'creator', childSessionId: 'leaf' } },
+        { method: 'subagent.finished', params: {
+          provider: 'spawn', agentId: 'leaf', parentSessionId: 'creator', childSessionId: 'leaf',
+          status: 'ok', stopReason: 'completed',
+        } },
+      ])
+    } finally {
+      await server.shutdown()
       await ctx.fiber.dispose()
       await rm(storageDir, { recursive: true, force: true })
     }
