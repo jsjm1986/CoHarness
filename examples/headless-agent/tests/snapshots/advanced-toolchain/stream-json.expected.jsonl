@@ -24,4 +24,4 @@
 {"type":"text","text":"ADVANCED_HEADLESS_OK"}
 {"type":"status","phase":"step_end","turn":1,"step":6,"usage":{"inputTokens":3,"outputTokens":3}}
 {"type":"status","phase":"turn_end","turn":1,"reason":{"kind":"completed"}}
-{"type":"final","text":"ADVANCED_HEADLESS_OK"}
+{"type":"final","sessionId":"{{session:1}}","reason":{"kind":"completed"},"text":"ADVANCED_HEADLESS_OK"}

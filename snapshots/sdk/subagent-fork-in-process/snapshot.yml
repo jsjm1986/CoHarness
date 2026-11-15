@@ -4,4 +4,4 @@ profile: sdk
 composition: default
 recording: live
 header:
-  class: default
+  class: sdk-default

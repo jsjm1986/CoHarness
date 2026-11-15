@@ -66,7 +66,7 @@ it('refuses a full JSONL provider without accepting the new event and resumes it
 
     await writeFile(capacity, patch(100_000))
     const resumed = await runLoaderSmoke({ ...launch, label: 'JSONL capacity resume', binArgs: [...args, '--session-id', sessionId, 'Reply with exactly PONG.'] })
-    expect(rows(resumed.stdout).at(-1)).toEqual({ type: 'final', text: 'PONG' })
+    expect(rows(resumed.stdout).at(-1)).toEqual({ type: 'final', text: 'PONG', sessionId, reason: { kind: 'completed' } })
     const final = await readFile(path, 'utf8')
     expect(final.startsWith(prefix)).toBe(true)
     const finalRows = rows(final)

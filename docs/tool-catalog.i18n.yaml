@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/tool-catalog.md
 document:
-  en: 3d5aab2e87bbda1a73348172a2192a6445dfeae6
-  zh: 97414221069e72a8aacf43e7f3c62ee928b9b03e
+  en: 44d22f06bffed2a3696b3747a09305e681c7f535
+  zh: 9172ddfb2b35537a72ab75ec39373e8878b68080
 /:
   en: 0be8ffbf23193557
   zh: ce2c69aa86875171
@@ -63,7 +63,7 @@ document:
   en: e713a4a11a15d13c
   zh: e713a4a11a15d13c
 /tool-schema-catalog/deepseek-ai-dsh-tool-ask-user/ask-user-question:
-  en: 2f86adf8ae823afb
+  en: 664dae29d0eae65f
   zh: a5dad3d821e75e55
 /tool-schema-catalog/deepseek-ai-dsh-tool-executor-ptc:
   en: 8c8643ef46fd075f
@@ -87,7 +87,7 @@ document:
   en: f656575e6df094f6
   zh: f656575e6df094f6
 /tool-schema-catalog/deepseek-ai-dsh-tool-present/present:
-  en: 4af0d859e1d39dc5
+  en: c3ab3e71f3c5fd20
   zh: a2914d345bd8eefa
 /tool-schema-catalog/deepseek-ai-dsh-tool-pwsh:
   en: b222fc05f3f8ee4a
@@ -123,7 +123,7 @@ document:
   en: 591f6e54dbbc38fe
   zh: 591f6e54dbbc38fe
 /tool-schema-catalog/deepseek-ai-dsh-tool-str-replace-editor/str-replace-editor:
-  en: 15fee1b5c7edecf6
+  en: 3d11196a13e69228
   zh: 56019c74cf0633cd
 /tool-schema-catalog/deepseek-ai-dsh-tool-fs:
   en: 07d595ce1f1a5184

@@ -257,9 +257,12 @@ abstract validateImage(input: SaveImageAttachment): Promise<void>
 async saveImages(inputs: readonly SaveImageAttachment[]): Promise<readonly ImageAttachmentRef[]>
 
 /**
- * Admit one Host prompt and replace each uploaded image with its durable reference.
- * Text and durable file references pass through unchanged. A prompt without image parts performs no storage operation.
- * @param content - prompt parts in message order after file receipt resolution.
+ * Admit one Host prompt and replace each encoded image with its durable reference.
+ * Text, durable file references, and already stored images pass through unchanged.
+ * Every image part counts toward `maxImagesPerMessage` and `maxMessageImageBytes`;
+ * a stored image counts the bytes of the upload that stored it. Refused content
+ * starts no writes. A prompt without encoded images performs no storage operation.
+ * @param content - prompt parts in message order after upload receipt resolution.
  * @returns admitted prompt parts in the same order as `content`.
  * @throws AttachmentError when the image batch is refused.
  */
