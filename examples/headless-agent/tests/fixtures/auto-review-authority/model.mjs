@@ -75,7 +75,7 @@ export async function apply(ctx) {
         uncertain: async () => { throw new Error('Auto fixture must settle all model permits') } }
     },
   })
-  ctx.on('session/created', session => { ctx.permissionPresets.set(session, 'auto') })
+  ctx.on('agent/created', ({ agent }) => { ctx.permissionPresets.set(agent.session, 'auto') })
   ctx.on('session/event', (session, event) => {
     if (event.type === 'auto-review/request') requests.set(session.id, event.data.request)
     if (event.type === 'tool/call') reviewing = true

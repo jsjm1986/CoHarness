@@ -679,7 +679,8 @@ describe('dsh-agent-spine-demo bundle', () => {
         arguments: JSON.stringify({ job_id: id, wait: true }),
       }],
     })
-    expect(wait).toHaveBeenCalledWith(id, 7, undefined, testToolSignal)
+    // The executor hands each call a signal derived from the batch signal.
+    expect(wait).toHaveBeenCalledWith(id, 7, undefined, expect.any(AbortSignal))
 
     await ctx.fiber.dispose()
   })

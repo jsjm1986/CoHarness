@@ -124,7 +124,7 @@ describe('terminalCardModel', () => {
   })
 
   it('preserves an omitted exit as unknown and supplies its localized status label', () => {
-    const model = terminalCardModel(settled({ resultView: resultTerminal({}) }))
+    const model = terminalCardModel(settled({ resultView: { card: 'terminal', output: 'partial output' } }))
     if (model === null) throw new Error('terminal result lost its card')
     expect(model.card.exitCode).toBeUndefined()
     expect(terminalFailed(model)).toBe(true)

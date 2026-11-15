@@ -25,7 +25,7 @@ export async function apply(ctx) {
       }
     },
   })
-  ctx.on('session/created', session => { ctx.permissionPresets.set(session, 'auto') })
+  ctx.on('agent/created', ({ agent }) => { ctx.permissionPresets.set(agent.session, 'auto') })
   ctx.on('session/event', (session, event) => {
     if (event.type === 'auto-review/request') latest.set(session.id, event)
   })
