@@ -4570,7 +4570,7 @@
       "commitScope": [
         "packages/api/gateway/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -4648,7 +4648,7 @@
       "commitScope": [
         "packages/api/remote-access/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -4690,7 +4690,7 @@
       "commitScope": [
         "packages/api/remotes/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -5041,7 +5041,7 @@
       "commitScope": [
         "packages/attachment/attachment-local/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P2",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -13812,7 +13812,7 @@
       "commitScope": [
         "packages/fs/fs-patch/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P2",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -13877,7 +13877,7 @@
       "commitScope": [
         "packages/fs/tool-fs/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P2",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -14563,7 +14563,7 @@
       "commitScope": [
         "packages/interaction/permission-presets/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -14634,7 +14634,7 @@
       "commitScope": [
         "packages/interaction/user-approval/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -14670,7 +14670,7 @@
       "commitScope": [
         "packages/interaction/user-questions/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P5",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -15028,7 +15028,7 @@
       "commitScope": [
         "packages/llm/llm-pi-ai/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P3",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -16546,7 +16546,7 @@
       "commitScope": [
         "packages/session/session-persistence-jsonl/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P4",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -17904,7 +17904,7 @@
       "commitScope": [
         "packages/subagent/subagent/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -17979,7 +17979,7 @@
       "commitScope": [
         "packages/subagent/subagent-acp/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -18090,7 +18090,7 @@
       "commitScope": [
         "packages/subagent/subagent-dsh-sdk/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -18164,7 +18164,7 @@
       "commitScope": [
         "packages/subagent/subagent-spawn-in-process/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
@@ -18198,7 +18198,7 @@
       "commitScope": [
         "packages/subagent/tool-subagent/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "P8",
       "phaseAssignment": "cross-audit-dsh-v0.2.2-rc.3",
       "targetAssessment": "increment-review-required",
