@@ -17567,6 +17567,52 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0
 
+  snapshots:
+
+    dependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../packages/core/agent
+      '@deepseek-ai/dsh-llm-replay':
+        specifier: workspace:*
+        version: link:../packages/test-support/llm-replay
+      '@deepseek-ai/dsh-loader-smoke':
+        specifier: workspace:*
+        version: link:../packages/test-support/loader-smoke
+      '@deepseek-ai/dsh-pwsh-local':
+        specifier: workspace:*
+        version: link:../packages/shell/pwsh-local
+      '@deepseek-ai/dsh-sdk-client':
+        specifier: workspace:*
+        version: link:../packages/sdk/client
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../packages/core/session
+      '@deepseek-ai/dsh-session-format':
+        specifier: workspace:*
+        version: link:../packages/session/session-format
+      '@deepseek-ai/dsh-session-format-v0-to-v1':
+        specifier: workspace:*
+        version: link:../packages/session/session-format-v0-to-v1
+      '@deepseek-ai/dsh-session-snapshot':
+        specifier: workspace:*
+        version: link:../packages/test-support/session-snapshot
+      '@deepseek-ai/dsh-subagent':
+        specifier: workspace:*
+        version: link:../packages/subagent/subagent
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../packages/core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../packages/core/tool-executor-ptc
+      '@deepseek-ai/dsh-web-fetch-http':
+        specifier: workspace:*
+        version: link:../packages/web/web-fetch-http
+
   vendor/cordis:
     dependencies:
       '@deepseek-ai/cordis-plugin-include':

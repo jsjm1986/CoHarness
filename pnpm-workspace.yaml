@@ -18,6 +18,9 @@ packages:
   # globs (vendor/*, packages/*/*) exclude them. See examples/AGENTS.md and the archived
   # run-ci-examples-from-built-lib Agent Note.
   - examples
+  # Same role for scenario-local plugin files (snapshots/<case>/*.mjs): their bare
+  # imports walk up to snapshots/node_modules in lib mode. See snapshots/AGENTS.md.
+  - snapshots
   # Deploy root of the single-exe build: a pure dependency manifest whose
   # closure is what the exe bundles and what the Python runtime distributes.
   - python/sdk-runtime

@@ -91,7 +91,7 @@ describe('canonical event payload acceptance', () => {
       expect(() => accept(structuredClone(event))).not.toThrow()
       for (const source of [{ kind: 'runtime-context' }, { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }, { kind: 'user' }]) {
         const invalid = { ...event, data: { ...event.data, message: { ...message, source } } }
-        expect(() => accept(invalid as SessionEvent)).toThrow(/system-prompt source/)
+        expect(() => accept(invalid as unknown as SessionEvent)).toThrow(/system-prompt source/)
       }
     }
   })
@@ -128,7 +128,7 @@ describe('canonical event payload acceptance', () => {
       requestEvent({ header: { config, extra: { nested: [true, null] } }, reason: 'initial', extra: ['retained'] }),
       { type: 'system/message', seq: SessionSeq(0), time: 1, surfaceOp: 'append', data: {
         turn: 1, step: 1, message: { ...message, source: { ...message.source, extra: { nested: true } } }, extra: ['retained'],
-      } } as SessionEvent,
+      } } as unknown as SessionEvent,
     ]
     for (const event of events) {
       for (const [path, accept] of Object.entries(entryPaths)) {
@@ -264,7 +264,7 @@ function userEvent(): SessionEvent<'user/message'> {
 describe('canonical event-local surface metadata', () => {
   for (const [path, accept] of Object.entries(entryPaths)) {
     it.each(invalidOps)(path + ' rejects noncanonical replace keys (%j)', (surfaceOp) => {
-      expect(() => accept({ ...userEvent(), surfaceOp } as SessionEvent)).toThrow(/invalid replace surfaceOp/)
+      expect(() => accept({ ...userEvent(), surfaceOp } as unknown as SessionEvent)).toThrow(/invalid replace surfaceOp/)
     })
 
     it(path + ' requires markers and forbids non-surface and assistant source-event references', () => {
@@ -279,7 +279,7 @@ describe('canonical event-local surface metadata', () => {
         data: { turn: 1, step: 1, stream: [], message: createMessage({
           role: 'assistant', content: [], source: { kind: 'model', provider: 'mock', model: 'mock' },
         }) },
-      } as SessionEvent
+      } as unknown as SessionEvent
       expect(() => accept(assistant)).toThrow(/cannot carry sourceEventSeqs/)
     })
   }
@@ -288,7 +288,7 @@ describe('canonical event-local surface metadata', () => {
     const event = {
       type, seq: SessionSeq(0), time: 1, data: { nested: { retained: true } }, ignorable: true,
       surfaceOp: { opaque: ['not', 'placement'] }, sourceEventSeqs: { opaque: [null, true] },
-    } as SessionEvent
+    } as unknown as SessionEvent
     for (const [path, accept] of Object.entries(entryPaths)) {
       if (path === 'append') continue
       expect(() => accept(structuredClone(event))).not.toThrow()
@@ -303,7 +303,7 @@ describe('canonical event-local surface metadata', () => {
     for (const metadata of [{ surfaceOp: 'append' }, { sourceEventSeqs: [0] }]) {
       const event = {
         type, seq: SessionSeq(0), time: 1, data: { turn: 1, step: 1, stream: [] }, ignorable: true, ...metadata,
-      } as SessionEvent
+      } as unknown as SessionEvent
       for (const accept of Object.values(entryPaths)) expect(() => accept(event)).toThrow(/not surface-eligible/)
     }
   })
