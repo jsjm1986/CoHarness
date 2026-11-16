@@ -232,10 +232,13 @@ class LocalSendOperation implements TerminalSendOperation {
 
   /**
    * Consume text the terminal may have produced simply by redrawing the
-   * written input: PSReadLine echoes a long command verbatim (wrapped across
-   * fragments), which is not consumption evidence. Coverage saturates at the
-   * input length so a literal output that coincidentally appears inside the
-   * input — `echo hello` printing `hello` — still counts once echo completes.
+   * written input: the tty echoes input in order (wrapped across fragments),
+   * and a line editor may re-render accepted text or earlier segments.
+   * Coverage therefore accepts a fragment occurring at or before the matched
+   * position — contiguous continuation, overlap, or a backward re-render.
+   * Literal output embedded in the input — a marker the wrapper prints —
+   * only occurs ahead of echo coverage and stays evidence. `stty -echo`
+   * shells emit no echo at all, so wrapper markers arm them immediately.
    * @param text - sanitized non-prompt text of one chunk.
    * @returns whether the text was fully absorbed as input echo.
    */
@@ -243,8 +246,9 @@ class LocalSendOperation implements TerminalSendOperation {
     if (!this.expectsEcho) return false
     const normalized = text.replace(/\s+/g, '')
     if (normalized === '') return true
-    if (this.echoMatched >= this.echoText.length || !this.echoText.includes(normalized)) return false
-    this.echoMatched += normalized.length
+    const position = this.echoText.lastIndexOf(normalized, this.echoMatched)
+    if (position < 0) return false
+    this.echoMatched = Math.max(this.echoMatched, position + normalized.length)
     return true
   }
 

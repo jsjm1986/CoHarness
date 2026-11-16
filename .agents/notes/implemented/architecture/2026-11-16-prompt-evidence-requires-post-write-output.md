@@ -16,12 +16,15 @@ Sends that write input may attribute a prompt marker to themselves only after ev
 
 `promptSeen` itself is gated on the armed state: a marker chunk arriving while the active send is unarmed is discarded as the previous command's redraw and sets none of the prompt evidence. `pollReadiness`'s prompt branch keeps requiring `promptEvidenceArmed` as well.
 
+Echo absorption must not swallow literal output that also appears inside the input. Persistent shells run `stty -echo`, so no echo arrives at all — yet the wrapper's own `printf '<start marker>'` output is a substring of the written wrapper, and matching it as echo would leave `exec`-replaced shells unarmed forever (their only settle path is the replacement shell's prompt). `absorbEcho` therefore matches positionally — `lastIndexOf(fragment, echoMatched)` — so contiguous echo, overlaps, and backward re-renders absorb while output occurring ahead of echo coverage stays evidence.
+
 Empty sends (`text: ''`) never set `expectsEcho` and keep settling on prompt evidence alone; they are the tool loop's wait iterations and lose nothing by early return. The probe path (`acceptsStdinWait`) already required the foreground to have left its input wait since the send began and is unchanged.
 
 ## Consequences
 
 - A send that writes input can no longer settle `stdin_read` on a prompt repaint that lands mid-echo or before its own output; the command proceeds, its markers land, and the settle happens on the real post-command prompt.
 - Input echo is not consumption evidence either: the second CI signature returned the wrapper's echo tail as the command output because the redrawn input armed the stale prompt. Absorption also handles carriage-return/newline submit echoes, which carry no visible text.
+- `stty -echo` shells (the persistent bash backend) emit no echo; their sends arm on the wrapper's marker output, which positional matching keeps distinct from echo even though the marker text is embedded in the input.
 - Silent commands (`cd`, `export`) still settle on their prompt: the completed echo replay is the consumption evidence, so a post-echo prompt is accepted while a mid-echo one is not.
 - Fake-terminal tests that emitted a post-write prompt with no echo were updated to include the echo a real tty always produces; regression tests replay both CI interleavings (stale repaint before the echo, and a stale prompt inside a partial input echo).
 - A send whose input is consumed while `ECHO` is off, or whose echo never matches the written bytes, degrades to the silence tier rather than the fast prompt path: the outcome stays correct and the tool loop still observes the command's markers.

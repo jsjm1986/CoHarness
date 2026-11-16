@@ -1317,6 +1317,27 @@ describe('LocalPtySession readiness and output', () => {
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
 
+  it('arms on marker output embedded in a stty -echo wrapper', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    // Persistent shells run `stty -echo`: no echo arrives, and the wrapper's
+    // printed start marker is a substring of the written input. Absorbing it
+    // as echo would leave the replacement shell's prompt unarmed forever.
+    const command = "printf '%s\\n' '__DSH_START_a'; eval -- 'exec bash -i'"
+    const operation = session.startSend({ text: command, submit: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    terminal.emitData('__DSH_START_a\r\n')
+    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
   it('settles a silent command on its post-echo prompt', async () => {
     vi.useFakeTimers()
     const terminal = new FakeTerminal()

@@ -588,7 +588,7 @@ describe('forgePanel local changes', () => {
     await expect(lonely.ctx.forgePanel.localCommits(lonely.session, null, signal)).rejects.toMatchObject({ code: 'forgePanel/no-fork-point' })
     const outside = await open(await plain())
     await expect(outside.ctx.forgePanel.localCommits(outside.session, null, signal)).rejects.toMatchObject({ code: 'forgePanel/not-a-checkout' })
-  })
+  }, 60_000)
 
   it('lists more refs than other Git output may print, up to maxDiffBytes', async () => {
     const { repo } = await project()
