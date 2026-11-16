@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/config-catalog.md
 document:
-  en: a7400202fe2b44450c4a6bc32aa1d0426255f198
-  zh: feb00ebc6ec2757490d05469705463fac298c8c7
+  en: 177489e72e889584ca3e3ce26c1feff99d39add6
+  zh: 0a6a7bd7429266e9e9ac74e17741d8e6f7239c8e
 /:
   en: 0977df2d5eaa10e9
   zh: de18ef966e262873

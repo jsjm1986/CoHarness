@@ -946,7 +946,7 @@ export interface Config {
 
 - `inject`: `translator` · `typert` · `sessionController`
 - `refs`: [`TranslationProvider`](subsystems/translation.md) · `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/experimental/client-ui-cot-translation/src/index.ts:13`](../packages/experimental/client-ui-cot-translation/src/index.ts)
+- `source`: [`packages/experimental/client-ui-cot-translation/src/index.ts:19`](../packages/experimental/client-ui-cot-translation/src/index.ts)
 
 ```ts config-catalog
 /** Live preferences presented on the bundle's Plugins page. */
@@ -1464,7 +1464,7 @@ export type PaidTranslationProvider = 'deepseek-account' | 'deepseek-official'
 
 - `inject`: `workingDirectory` · `fs` · `subprocess` · `sandbox` · `sandboxPolicy` · `sessionProjections`
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/experimental/worktree/src/index.ts:34`](../packages/experimental/worktree/src/index.ts)
+- `source`: [`packages/experimental/worktree/src/index.ts:35`](../packages/experimental/worktree/src/index.ts)
 
 ```ts config-catalog
 /** Worktree location, generated names, executables, subprocess resource limits, and the archive cleanup switch. */
@@ -1673,7 +1673,7 @@ export interface HmrConfig extends ChokidarOptions {
 ## `@deepseek-ai/dsh-hooks-claude-code`
 
 - `inject`: `shell` · `sessionProjections` · `workingDirectory`
-- `source`: [`packages/hooks/hooks-claude-code/src/index.ts:54`](../packages/hooks/hooks-claude-code/src/index.ts)
+- `source`: [`packages/hooks/hooks-claude-code/src/index.ts:57`](../packages/hooks/hooks-claude-code/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: where the CC hook config lives + substitution roots. */
@@ -1719,7 +1719,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-hooks-codex`
 
 - `inject`: `shell` · `sessionProjections` · `workingDirectory`
-- `source`: [`packages/hooks/hooks-codex/src/index.ts:53`](../packages/hooks/hooks-codex/src/index.ts)
+- `source`: [`packages/hooks/hooks-codex/src/index.ts:56`](../packages/hooks/hooks-codex/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: where the Codex hooks.json lives + the model name for payloads. */
@@ -1754,7 +1754,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-apiproxy`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `directoryPicker` · `llm` · `sessions` · `subagents` · `sessionQuery` · `tools` · `userQuestions` · `workspaceRegistry`
-- `source`: [`packages/host/apiproxy/src/index.ts:60`](../packages/host/apiproxy/src/index.ts)
+- `source`: [`packages/host/apiproxy/src/index.ts:61`](../packages/host/apiproxy/src/index.ts)
 
 ```ts config-catalog
 /** Gateway plugin configuration. */
@@ -3005,7 +3005,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-remote-desktop-vnc`
 
-- `source`: [`packages/remote-desktop/remote-desktop-vnc/src/index.ts:99`](../packages/remote-desktop/remote-desktop-vnc/src/index.ts)
+- `source`: [`packages/remote-desktop/remote-desktop-vnc/src/index.ts:101`](../packages/remote-desktop/remote-desktop-vnc/src/index.ts)
 
 ```ts config-catalog
 type ResolvedConfig = Required<Config>
@@ -3061,6 +3061,8 @@ export interface Config {
   auditCapacity?: number
   /** Milliseconds `status` allows for the endpoint reachability probe. */
   probeTimeoutMs?: number
+  /** Milliseconds a credential-managed RFB handshake may take before failing. */
+  handshakeTimeoutMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-remote-desktop-vnc -->

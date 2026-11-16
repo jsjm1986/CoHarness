@@ -183,6 +183,8 @@ export interface ManagedHandshake {
  * @param upstream - the dialed VNC endpoint socket.
  * @param credential - the resolved endpoint credential; `username` may be
  *   absent for None-capable servers.
+ * @param timeoutMs - handshake budget in milliseconds; defaults to
+ *   {@link HANDSHAKE_TIMEOUT_MS}.
  * @returns both directions' already-consumed residual bytes for the pump.
  */
 export async function managedHandshake(
