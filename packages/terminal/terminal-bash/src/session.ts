@@ -163,6 +163,8 @@ class LocalSendOperation implements TerminalSendOperation {
   private initialForegroundLeftWait: boolean
   private initialForegroundPgid: number | undefined
   private expectsEcho = false
+  private echoText = ''
+  private echoMatched = 0
   private sawNonPromptOutput = false
 
   constructor(
@@ -222,8 +224,28 @@ class LocalSendOperation implements TerminalSendOperation {
    * Record that input was written so a bare prompt redraw cannot count as
    * completion evidence before its echo or other output arrives.
    */
-  noteInput(): void {
+  noteInput(input: string): void {
     this.expectsEcho = true
+    this.echoText = input.replace(/\s+/g, '')
+    this.echoMatched = 0
+  }
+
+  /**
+   * Consume text the terminal may have produced simply by redrawing the
+   * written input: PSReadLine echoes a long command verbatim (wrapped across
+   * fragments), which is not consumption evidence. Coverage saturates at the
+   * input length so a literal output that coincidentally appears inside the
+   * input — `echo hello` printing `hello` — still counts once echo completes.
+   * @param text - sanitized non-prompt text of one chunk.
+   * @returns whether the text was fully absorbed as input echo.
+   */
+  absorbEcho(text: string): boolean {
+    if (!this.expectsEcho) return false
+    const normalized = text.replace(/\s+/g, '')
+    if (normalized === '') return true
+    if (this.echoMatched >= this.echoText.length || !this.echoText.includes(normalized)) return false
+    this.echoMatched += normalized.length
+    return true
   }
 
   /** Record sanitized text that the prompt's own tail cannot explain. */
@@ -232,11 +254,14 @@ class LocalSendOperation implements TerminalSendOperation {
   }
 
   /**
-   * Whether a fresh prompt may settle this send: sends that wrote input first
-   * need output a stale prompt redraw cannot supply.
+   * Whether a fresh prompt may settle this send. Sends that wrote input first
+   * need either output a stale prompt redraw cannot supply, or the completed
+   * echo replay that proves the injected line left the prompt editor — a
+   * prompt redrawn mid-echo still belongs to the previous command.
    */
   get promptEvidenceArmed(): boolean {
     return !this.expectsEcho || this.sawNonPromptOutput
+      || this.echoMatched >= this.echoText.length
   }
 
   acceptsStdinWait(pgid: number, waiting: boolean): boolean {
@@ -419,7 +444,7 @@ export class LocalPtySession implements TerminalBackendSession {
       const input = `${request.text}${request.submit ? '\r' : ''}`
       if (input.length > 0 && !operation.cancelRequested) {
         this.resetReadinessEvidence()
-        operation.noteInput()
+        operation.noteInput(input)
         const write = this.terminal.write(input)
         this.activeWrite = write.then(() => true, () => false)
         try {
@@ -533,10 +558,11 @@ export class LocalPtySession implements TerminalBackendSession {
     const promptTail = sanitized.prompt ? sanitized.promptTail || '' : ''
     const content = sanitized.text.slice(0, Math.max(0, sanitized.text.length - promptTail.length))
     const midTail = !sanitized.prompt && this.promptSeen && !this.promptTextSeen
-    if (content.length > 0 && !CONTROLLED_PROMPT.startsWith(content) && !midTail) {
-      this.active?.noteNonPromptOutput()
+    if (content.length > 0 && !CONTROLLED_PROMPT.startsWith(content) && !midTail
+      && this.active?.absorbEcho(content) === false) {
+      this.active.noteNonPromptOutput()
     }
-    if (sanitized.prompt) {
+    if (sanitized.prompt && (this.active?.promptEvidenceArmed ?? true)) {
       // TODO(pty-delayed-signal-prompt): With a reproducer, define a marker-generation boundary
       // before attributing a signal-delayed prompt to a later send.
       // Bash can print PROMPT_COMMAND before the kernel publishes its return

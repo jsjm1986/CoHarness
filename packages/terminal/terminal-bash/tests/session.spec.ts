@@ -571,6 +571,7 @@ describe('LocalPtySession readiness and output', () => {
       const operation = session.startSend({ text: 'slow-render', submit: true })
       await Promise.resolve()
       await Promise.resolve()
+      terminal.emitData('slow-render\r\n')
       terminal.emitData('\x1b]133;D;0\x07')
       await vi.advanceTimersByTimeAsync(70)
       expect((await operation.done).waitReason).toBe('inferred_idle')
@@ -593,6 +594,7 @@ describe('LocalPtySession readiness and output', () => {
       let settled: string | undefined
       void operation.done.then((result) => { settled = result.waitReason })
 
+      terminal.emitData('silent-render\r\n')
       terminal.emitData('\x1b]133;D;0\x07')
       await vi.advanceTimersByTimeAsync(70)
       expect(settled).toBeUndefined()
@@ -617,6 +619,7 @@ describe('LocalPtySession readiness and output', () => {
 
       // The prompt arrives and is immediately followed by command output, so the tail is no
       // longer completable and the tolerance has nothing left to wait for.
+      terminal.emitData('noisy-command\r\n')
       terminal.emitData('\x1b]133;D;0\x07dsh> ')
       terminal.emitData('partial output')
       await vi.advanceTimersByTimeAsync(70)
@@ -1284,6 +1287,51 @@ describe('LocalPtySession readiness and output', () => {
     expect(settled).toBe(false)
 
     terminal.emitData('echo hi\r\nhi\r\n\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
+  it('does not settle on a stale prompt inside a partial input echo', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    const command = '; $LASTEXITCODE = $null; $__s = 1; try { Invoke-Expression "Write-Output cwd=$PWD" }'
+    const operation = session.startSend({ text: command, submit: true })
+    let settled = false
+    void operation.done.then(() => { settled = true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // The echo replay is mid-flight when the previous prompt lands: neither
+    // the redrawn input tail nor the stale prompt can settle this send.
+    terminal.emitData(command.slice(0, 40))
+    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(40)
+    expect(settled).toBe(false)
+
+    terminal.emitData('cwd=/tmp/x\r\n\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
+  it('settles a silent command on its post-echo prompt', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    const operation = session.startSend({ text: 'cd /tmp/x', submit: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // No command output: the completed echo replay is the consumption
+    // evidence, and the fresh prompt after it may settle the send.
+    terminal.emitData('cd /tmp/x\r\n')
+    terminal.emitData('\x1b]133;D;0\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
     expect((await operation.done).waitReason).toBe('stdin_read')
   })

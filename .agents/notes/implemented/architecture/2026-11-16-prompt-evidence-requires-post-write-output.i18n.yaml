@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-16-prompt-evidence-requires-post-write-output.md
 document:
-  en: 7cf427bbe14798f2332bd09699d69f6981956489
-  zh: 41247f36e71b66f15d50cf5fd9a908843ca3821f
+  en: 52a2bd0460eff8f1b7555974324d2fbefa30012a
+  zh: e3df35de82465fe9281653498c10f4335b680ecb
 /agent-note-prompt-settlement-requires-post-write-output-evidence:
   en: 0679286da1f8bf3a
   zh: d3a770ec2b0e08e1
@@ -12,14 +12,14 @@ document:
   en: c4a6b111e22e55af
   zh: abbc2221fb3679e2
 /agent-note-prompt-settlement-requires-post-write-output-evidence/decision:
-  en: c19e92128a21dbc0
-  zh: 708deda5672935fb
+  en: 54258f4595e8a6ac
+  zh: df2c81bb0632099c
 /agent-note-prompt-settlement-requires-post-write-output-evidence/consequences:
-  en: fb4f36fdcfc2e42e
-  zh: febec7a811d77864
+  en: 2083f85d1742237a
+  zh: 15fe4c9a80ab43f6
 /agent-note-prompt-settlement-requires-post-write-output-evidence/alternatives-considered:
-  en: a028950a954a61c4
-  zh: c019516139506ed0
+  en: 58a71b0fdb73487a
+  zh: 9b33b4c7cb146a7d
 /agent-note-prompt-settlement-requires-post-write-output-evidence/verification:
-  en: af5525ed67170324
-  zh: ebf593af9d243fb9
+  en: 49fbcf5127da9ebf
+  zh: a69b5813857d9cae
