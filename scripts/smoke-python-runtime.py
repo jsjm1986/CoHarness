@@ -127,7 +127,7 @@ if IS_WINDOWS:
 # The agent loop's dynamic runtime-context snapshot is the one model-visible message this
 # expected output cannot carry: the same composition emits it on macOS and not on Linux
 # (deepseek-harness#2488), and the file must replay on both. Everything else is compared.
-RUNTIME_CONTEXT_PREFIX = "Current runtime context"
+RUNTIME_CONTEXT_PREFIXES = ("Current runtime context", "The following information describes your current session")
 IN_HISTORY_SNAPSHOT_DIRECTORY = (
     Path(__file__).resolve().parent / "snapshots" / "python-sdk-single-exe" / "minimal-in-history"
 )
@@ -2442,7 +2442,7 @@ def is_runtime_context_message(message: object) -> bool:
     return (
         isinstance(message, dict)
         and message.get("role") == "user"
-        and message_text(message.get("content")).startswith(RUNTIME_CONTEXT_PREFIX)
+        and message_text(message.get("content")).startswith(RUNTIME_CONTEXT_PREFIXES)
     )
 
 
@@ -2499,7 +2499,7 @@ def minimal_snapshot_message(message: object, cwd: Path) -> dict[str, object]:
                 isinstance(block, dict)
                 and block.get("type") == "text"
                 and isinstance(block.get("text"), str)
-                and block["text"].startswith(RUNTIME_CONTEXT_PREFIX)
+                and block["text"].startswith(RUNTIME_CONTEXT_PREFIXES)
             )
         ]
     return {"role": role, "text": minimal_snapshot_text(message_text(content), cwd)}

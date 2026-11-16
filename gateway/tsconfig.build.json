@@ -9,6 +9,7 @@
     "rewriteRelativeImportExtensions": true,
     "tsBuildInfoFile": "./lib/tsconfig.tsbuildinfo",
     "paths": {
+      "@deepseek-ai/cordis": ["../vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-subprocess-local": ["../packages/subprocess/subprocess-local/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-subprocess": ["../packages/subprocess/subprocess/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-app-boot": ["../packages/boot/app-boot/lib/types/index.d.ts"],

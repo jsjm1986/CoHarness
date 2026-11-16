@@ -118,7 +118,7 @@
         "content": [
           {
             "type": "text",
-            "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
+            "text": "The following information describes your current session:\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).\n\nYou are the root agent. Your name is \"lead\".\n\nTo message other agents, use send_message({ agent: \"<agent-name>\", message: \"...\" }).\nUse list_agents({}) to find your collaborator agents and their names."
           }
         ],
         "source": {
@@ -135,7 +135,11 @@
             },
             {
               "name": "approval:policy",
-              "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
+              "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+            },
+            {
+              "name": "subagent:identity",
+              "text": "You are the root agent. Your name is \"lead\".\n\nTo message other agents, use send_message({ agent: \"<agent-name>\", message: \"...\" }).\nUse list_agents({}) to find your collaborator agents and their names."
             }
           ]
         },
@@ -1378,7 +1382,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
+                "text": "The following information describes your current session:\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).\n\nYou are the root agent. Your name is \"lead\".\n\nTo message other agents, use send_message({ agent: \"<agent-name>\", message: \"...\" }).\nUse list_agents({}) to find your collaborator agents and their names."
               }
             ],
             "source": {
@@ -1395,7 +1399,11 @@
                 },
                 {
                   "name": "approval:policy",
-                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
+                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+                },
+                {
+                  "name": "subagent:identity",
+                  "text": "You are the root agent. Your name is \"lead\".\n\nTo message other agents, use send_message({ agent: \"<agent-name>\", message: \"...\" }).\nUse list_agents({}) to find your collaborator agents and their names."
                 }
               ]
             },
@@ -2351,7 +2359,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`).\n\nDelegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.\n\nYou are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session \u2014 operations that require approval are rejected automatically. When the task needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it."
+                "text": "The following information describes your current session:\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).\n\nYour agent id is \"{{agent-1}}\". Your subagent tree root is unavailable. Continue independent work; subagent discovery and messaging require an active root.\n\nDelegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.\n\nDelegation depth for `subagent_fork`: current 1, maximum 1, remaining levels 0. Do not call `subagent_fork` at this depth; carry out the work directly.\n\nYou are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session — operations that require approval are rejected automatically. When the task needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it."
               }
             ],
             "source": {
@@ -2368,15 +2376,23 @@
                 },
                 {
                   "name": "approval:policy",
-                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
+                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+                },
+                {
+                  "name": "subagent:identity",
+                  "text": "Your agent id is \"{{agent-1}}\". Your subagent tree root is unavailable. Continue independent work; subagent discovery and messaging require an active root."
                 },
                 {
                   "name": "tool:subagent:depth",
                   "text": "Delegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly."
                 },
                 {
+                  "name": "tool:subagent_fork:depth",
+                  "text": "Delegation depth for `subagent_fork`: current 1, maximum 1, remaining levels 0. Do not call `subagent_fork` at this depth; carry out the work directly."
+                },
+                {
                   "name": "subagent:delegation",
-                  "text": "You are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session \u2014 operations that require approval are rejected automatically. When the task needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it."
+                  "text": "You are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session — operations that require approval are rejected automatically. When the task needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it."
                 }
               ]
             },
@@ -3101,7 +3117,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`).\n\nDelegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.\n\nYou are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session \u2014 operations that require approval are rejected automatically. When the task needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it."
+                "text": "The following information describes your current session:\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).\n\nYour agent id is \"{{agent-2}}\". Your subagent tree root is unavailable. Continue independent work; subagent discovery and messaging require an active root.\n\nDelegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.\n\nDelegation depth for `subagent_fork`: current 1, maximum 1, remaining levels 0. Do not call `subagent_fork` at this depth; carry out the work directly.\n\nYou are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session — operations that require approval are rejected automatically. When the task needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it."
               }
             ],
             "source": {
@@ -3118,15 +3134,23 @@
                 },
                 {
                   "name": "approval:policy",
-                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
+                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+                },
+                {
+                  "name": "subagent:identity",
+                  "text": "Your agent id is \"{{agent-2}}\". Your subagent tree root is unavailable. Continue independent work; subagent discovery and messaging require an active root."
                 },
                 {
                   "name": "tool:subagent:depth",
                   "text": "Delegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly."
                 },
                 {
+                  "name": "tool:subagent_fork:depth",
+                  "text": "Delegation depth for `subagent_fork`: current 1, maximum 1, remaining levels 0. Do not call `subagent_fork` at this depth; carry out the work directly."
+                },
+                {
                   "name": "subagent:delegation",
-                  "text": "You are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session \u2014 operations that require approval are rejected automatically. When the task needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it."
+                  "text": "You are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session — operations that require approval are rejected automatically. When the task needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it."
                 }
               ]
             },

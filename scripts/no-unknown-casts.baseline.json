@@ -1206,6 +1206,7 @@
   "packages/core/session/tests/canonical-envelopes.spec.ts": {
     "23574fdfdba1d085e9d7aa52f76f723732597efdad04ca6b6742c3f5131376d6": 1,
     "476c99eec169317b1861e5377999bb7a14411c14414de3e9a53b699361c83e61": 1,
+    "6370792878103b8fe2963dfeb036963572c1da2bb6dd7fcc10681be1c866b490": 1,
     "7c3d5e2e45cbec1c49a61c78a7bed30e5a885d4493c873f4bcf610f728717269": 1,
     "91c3fb85a86c310091394ecde51f4c014a5d0b502a5cd4b6398b434a375f484a": 1,
     "9e542140cc76bc6ac92ce797e135cf810faa9ca1f50a6d344b54ebff46d613d0": 1,
@@ -1497,7 +1498,7 @@
     "1b3ab83a5e026a9147a8e49324b677b78af1f2983acde975fe791b29ff755f40": 1,
     "2efdc6a912b71e4b7c561b1e7ba6975dab2927589c8b1f1af65806410d065a1e": 1,
     "3706ba0e7ecb37ef9aa4d5e6bb732001b78443acf77f015f97b1b11d3a2cf941": 1,
-    "67c8811e65c7d4c40d6de95cb9b9576873c717164d609124dcac39e82e95abca": 1
+    "d02a0faf723c67764c6c39824a027515e6ed298c7d99cf4a71909d1a8ea55364": 1
   },
   "packages/extensions/ui-cordis/src/client/card-model.ts": {
     "5ab6f97ffb174897844794792cab042f7d1e7596742e8b5a77c61f3b861eb515": 1
@@ -1729,8 +1730,13 @@
     "d423bbcd1caff7aab2e2de52564efbc9061e775620a530157805a43d851c6fe9": 1
   },
   "packages/interaction/user-approval/tests/approval-legacy.spec.ts": {
+    "3261a2af17649cc35cf8698e3b7278101044ed1a07efce757615616e0f918d3a": 1,
+    "4dd1f265ec710503bb27f057a582099a1e9d8b5db80fb45f148e32fd2afb5325": 2,
     "744b30e13b6390439c34f4970441a292a07f4ac3d26f25e9be75d1b5c18f4f33": 1,
-    "971ec45a1146ab52f2fb13f75b782d5d35c0fb2ddba1fb9ccab14cc54f7291d5": 1
+    "971ec45a1146ab52f2fb13f75b782d5d35c0fb2ddba1fb9ccab14cc54f7291d5": 1,
+    "a24d1e8b8c082c97803265cdbd4e934af7fb069295691ec1d46233d65c7b55a0": 1,
+    "a6a2f2761dfd14ff3624a7f8684b025d6aa733d41cac4381db7c83f2a38f0c35": 1,
+    "f33c4a795e2cda267cb28d2937c632d56134b8e6438d21e4bf74da2735b1c154": 1
   },
   "packages/interaction/user-approval/tests/approval.spec.ts": {
     "4dd1f265ec710503bb27f057a582099a1e9d8b5db80fb45f148e32fd2afb5325": 2,
@@ -2394,6 +2400,9 @@
   "packages/storage/storage-sqlite/src/unit.ts": {
     "c09156ebe0e8eaa23eac06d9cf5549b67ee038f2bf2e4fa77a5f9ca63e0416ec": 1
   },
+  "packages/subagent/subagent-acp/tests/subagent-acp.e2e.ts": {
+    "7ba275b674aea9caaa5feb7887464f08ac2207b31d144a3880961ec468e084b6": 1
+  },
   "packages/subagent/subagent-acp/tests/subagent-acp.spec.ts": {
     "e9268866f334d91a368f51e3098654a280b0eb2dc2b5a072aa198eb3ddd7424c": 4
   },
@@ -2407,6 +2416,10 @@
     "e8b1ee15c333c589be9f08e0558110b71dc17dbb142681682306a9abe48b8d2e": 1,
     "ecca47886cd459f9d7384fad6e7050593542c9a84efcadd29609babbb2d71857": 1
   },
+  "packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts": {
+    "7480e32b3fe27db108ffa72aeb5e1e310320ef1bb8ccd5693e87d5c64cae2bcc": 1,
+    "7ba275b674aea9caaa5feb7887464f08ac2207b31d144a3880961ec468e084b6": 1
+  },
   "packages/subagent/subagent-claude-code/tests/subagent-claude-code.spec.ts": {
     "2cedee48f4fb8ce4bbd10567fdfbee69e8dd11dbc85af9b824de33c2b77abfbf": 1,
     "4e94c461ab08f535e20f71ebe8bb9a8c911a936c7068f24e259956c06d17c05d": 2,
@@ -2419,6 +2432,10 @@
   },
   "packages/subagent/subagent-codex/tests/member.spec.ts": {
     "0df9ce961f91bd4fc22c73c9a5f947b99fd3e9ac8575d295052252e2ec51eb69": 1
+  },
+  "packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts": {
+    "7480e32b3fe27db108ffa72aeb5e1e310320ef1bb8ccd5693e87d5c64cae2bcc": 1,
+    "7ba275b674aea9caaa5feb7887464f08ac2207b31d144a3880961ec468e084b6": 1
   },
   "packages/subagent/subagent-in-process-driver/tests/structured.spec.ts": {
     "647bbba1ee35ea6acd23faa1e2988e24c49f0284be571ab3e716ab36a11cc38c": 1,
@@ -2645,6 +2662,7 @@
   "packages/test-support/llm-replay/src/index.ts": {
     "b22a9080c4eb56888f38b6d502f7ca6fb20cee7fa09075a5f9b46c63b764caab": 1,
     "c2f5d8183cb5d8d5fa31e64ed3747cc34ada55c2a41d23b0dc831cccad89f902": 1,
+    "cbbea4dbc4e871ff047f2ec021e9dc93b4fd05fed04ab75839993cd1890daf48": 1,
     "e3b3858336ae260253abe549d2b763f5087ab4e8650f4eb5b323339eff0a6ce4": 1
   },
   "packages/test-support/llm-replay/tests/llm-replay.spec.ts": {
