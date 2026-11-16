@@ -78,6 +78,10 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
   let restoredDirectory: { runtimeId: string; rows: readonly SessionSummary[]; paged: boolean } | undefined
   let restoreWork: Promise<void> | undefined
   let retryQueued = false
+  // An attention-triggered restore retry must survive the refresh that carries
+  // it: a superseding or aborted refresh applies the pending intent when it
+  // next lands instead of dropping the retry with its call frame.
+  let selectionRetry = false
   const restoreSelection = (retry = false): void => {
     const bootstrap = sessions.bootstrapRuntimeTarget().runtimeId
     if (initialNavigation === undefined && account !== undefined && bootstrap !== undefined
@@ -160,6 +164,7 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
   const stopSelection = sessions.committedSelection.subscribe(rememberSelection)
   const stopBootstrap = sessions.list.subscribe(() => { restoreSelection() })
   const refresh = (retrySelection = false): Promise<void> => {
+    if (retrySelection) selectionRetry = true
     if (disposed || work !== undefined) return work ?? Promise.resolve()
     if (ctx.projectUiPolicy.getSnapshot().verifiedAccountId === undefined
       || connection.hostDescription.getSnapshot()?.executionAuthorityRequired !== true
@@ -224,7 +229,9 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
       workspaces.setDirectoryState('ready')
       if (active.kind === 'personal' && runtime !== null && account !== undefined) {
         restoredDirectory = { runtimeId: text(active.runtimeId), rows, paged: root.paged === true }
-        restoreSelection(retrySelection)
+        const retry = selectionRetry
+        selectionRetry = false
+        restoreSelection(retry)
       }
     })().catch((error: unknown) => {
       if (pending === request && (!request.signal.aborted || expired)) {
@@ -274,6 +281,7 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
       account = next; pending?.abort(); pending = undefined; work = undefined
       accountLifetime.abort(); accountLifetime = new AbortController()
       selection = undefined; restoredDirectory = undefined; recovery = undefined; initialNavigation = undefined
+      selectionRetry = false
       directory.set([])
       sessions.installPersonalDirectory([], false); workspaces.installPersonalDirectory([], '')
     }
