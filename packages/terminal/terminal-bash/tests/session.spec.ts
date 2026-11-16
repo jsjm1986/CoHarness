@@ -1332,6 +1332,7 @@ describe('LocalPtySession readiness and output', () => {
     await Promise.resolve()
     await Promise.resolve()
 
+    terminal.emitData('\r\n')
     terminal.emitData('__DSH_START_a\r\n')
     terminal.emitData('\x1b]133;D;0\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
