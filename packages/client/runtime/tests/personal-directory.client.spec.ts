@@ -358,7 +358,7 @@ it('retries the pending restore when a superseding refresh drops the retried fli
     await vi.waitFor(() => { expect(catalogReads).toBe(2) })
     // A deployment republish aborts the in-flight retry refresh and restarts a
     // plain one — the pending retry must land on the refresh that replaces it.
-    ;(f.ctx.get('deploymentContext') as { set: (value: unknown) => void })
+    ;(f.ctx.get('deploymentContext') as unknown as { set: (value: unknown) => void })
       .set({ phase: 'ready', showComputer: true, aggregateComputers: true })
     await vi.waitFor(() => { expect(catalogReads).toBe(3) })
     for (const hold of holds) hold.resolve(Response.json(catalog))
