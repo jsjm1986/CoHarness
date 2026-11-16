@@ -530,7 +530,7 @@ export class LocalPtySession implements TerminalBackendSession {
     // land inside this send and must not arm its prompt settlement alone. A
     // prompt-tail fragment split across the send boundary is no such evidence
     // either, and text mid-tail is still prompt until the tail completes.
-    const promptTail = sanitized.prompt ? (sanitized.promptTail ?? '') : ''
+    const promptTail = sanitized.prompt ? sanitized.promptTail || '' : ''
     const content = sanitized.text.slice(0, Math.max(0, sanitized.text.length - promptTail.length))
     const midTail = !sanitized.prompt && this.promptSeen && !this.promptTextSeen
     if (content.length > 0 && !CONTROLLED_PROMPT.startsWith(content) && !midTail) {
