@@ -25,7 +25,8 @@ const group = (n: number): PersonalRuntimeDirectory => ({ runtime: target(n), st
 async function fixture() {
   const ctx = new Context()
   await ctx.plugin(() => {}).await()
-  ctx.provide('deploymentContext', { ...createSnapshotStore({ phase: 'ready', showComputer: true, aggregateComputers: true }) } as never)
+  const deployment = createSnapshotStore({ phase: 'ready', showComputer: true, aggregateComputers: true })
+  ctx.provide('deploymentContext', { ...deployment } as never)
   const api = new FakeApiClient(), remoteApi = new FakeApiClient()
   const hostDescription = createSnapshotStore<ReturnType<ConnectionHandle['hostDescription']['getSnapshot']>>(undefined)
   const handle = (owned: FakeApiClient): ConnectionHandle => ({ metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 }, api: owned, isLoopback: false, interactions: 'none', hostDescription,
@@ -42,7 +43,7 @@ async function fixture() {
   const sessions = new SessionRuntimePool(ctx, base, connection, fakeRemote(api))
   sessions.setBaseRuntimeTarget(target(1))
   const workspaces = new WorkspaceRuntime(ctx, api, sessions)
-  return { ctx, api, remoteApi, connection, hostDescription, forTarget, base, sessions, workspaces }
+  return { ctx, api, remoteApi, connection, hostDescription, forTarget, base, sessions, workspaces, deployment }
 }
 
 it('lists twenty authorized computers and colliding Host ids without opening any target transport', async () => {
@@ -358,8 +359,7 @@ it('retries the pending restore when a superseding refresh drops the retried fli
     await vi.waitFor(() => { expect(catalogReads).toBe(2) })
     // A deployment republish aborts the in-flight retry refresh and restarts a
     // plain one — the pending retry must land on the refresh that replaces it.
-    ;(f.ctx.get('deploymentContext') as unknown as { set: (value: unknown) => void })
-      .set({ phase: 'ready', showComputer: true, aggregateComputers: true })
+    f.deployment.set({ phase: 'ready', showComputer: true, aggregateComputers: true })
     await vi.waitFor(() => { expect(catalogReads).toBe(3) })
     for (const hold of holds) hold.resolve(Response.json(catalog))
     await retryFlight
