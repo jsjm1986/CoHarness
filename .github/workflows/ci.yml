@@ -1647,6 +1647,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # A pull_request checkout does not carry tags by default; the
+          # sovereignty and upgrade-records gates resolve mirrored release
+          # commits through them.
+          fetch-tags: true
           persist-credentials: false
 
       - name: Enable Developer Mode (symlink support)
@@ -1674,8 +1678,11 @@ jobs:
       - name: Run complete native Windows gate inventory
         shell: pwsh
         # Below the job budget so a wedged gate cannot occupy the slot for the
-        # full 120 minutes before GitHub's own cancellation lands.
-        timeout-minutes: 90
+        # full 120 minutes before GitHub's own cancellation lands. The gate set
+        # grew past the old 90-minute cap: coverage alone measures ~66 minutes
+        # on the two-partition hosted runner, leaving the remaining inventory
+        # inside this bound with headroom.
+        timeout-minutes: 105
         run: pnpm run check:ci:windows-complete
       - name: Preserve gate evidence
         if: always()

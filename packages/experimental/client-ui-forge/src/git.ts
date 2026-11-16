@@ -103,7 +103,11 @@ export async function inspectCheckout(
   const git = gitIn(ctx, config, session, directory, signal)
   const top = await git('rev-parse', ['rev-parse', '--show-toplevel'], [0, 128])
   if (top.exitCode !== 0) {
+    /* v8 ignore else -- only the POSIX stand-in Git suite produces a rev-parse
+     * failure whose stderr is not the not-a-checkout dialect; the win32 lanes
+     * run real Git, where every failure matches it. */
     if (NOT_A_CHECKOUT.test(top.stderr)) return undefined
+    /* v8 ignore next -- same POSIX-only driver as the else path above */
     throw new Error(`git rev-parse failed: ${firstLine(top.stderr)}`)
   }
   const [root, commonDir, gitDir, branch, commit, upstream, remotes] = await together(signal, (signal) => {
@@ -289,5 +293,7 @@ async function runGit(
 }
 
 function firstLine(text: string): string {
+  /* v8 ignore next -- an all-empty diagnostic stream is only produced by the
+   * POSIX stand-in Git suite; the win32 lanes run real Git */
   return text.split(/\r?\n/).map(line => line.trim()).find(line => line.length > 0) ?? 'no diagnostic'
 }

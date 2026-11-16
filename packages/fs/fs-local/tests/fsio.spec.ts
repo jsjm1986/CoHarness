@@ -825,6 +825,30 @@ describe('readByteRange', () => {
       vi.resetModules()
     }
   })
+
+  it('translates a post-stat open failure into the errno dialect', async () => {
+    const file = join(dir, 'vanished.bin')
+    await writeFile(file, 'data')
+    vi.resetModules()
+    vi.doMock('node:fs/promises', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:fs/promises')>()
+      return {
+        ...actual,
+        async open() {
+          throw Object.assign(new Error('target vanished'), { code: 'ENOENT' })
+        },
+      }
+    })
+
+    try {
+      const { readByteRange: isolatedRead } = await import('../src/fsio.ts')
+      await expect(isolatedRead(localTarget(file), { offset: 0, length: 4 }))
+        .rejects.toMatchObject({ code: 'FS_NOT_FOUND' })
+    } finally {
+      vi.doUnmock('node:fs/promises')
+      vi.resetModules()
+    }
+  })
 })
 
 // Windows drives only the read-only attribute through `chmod` and reports synthetic `stat` mode
