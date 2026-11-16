@@ -3,20 +3,20 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-16-python-single-exe-runtime-context-fixtures.md
 document:
-  en: 7cbf36f1c2c7dd9615f61fc29d542d501820341b
-  zh: 68a46444528f2a9046fbf287f5d6e58e2306a7d2
+  en: c6ce64800a91a6ba2b4c2cc52475b5bb1cc63c8c
+  zh: 5854a8fc2c749193ad633675994da0795fee68f6
 /agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text:
   en: b76902772db41c3f
   zh: 01a88e37771cada9
 /agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text/problem:
-  en: c9c4cdcfd071c5b8
-  zh: baee5087de92c023
+  en: d4004f81e3a65626
+  zh: 01df92c271e97735
 /agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text/decision:
-  en: 8b7d447c46f4b80a
-  zh: 4c0b5ecba15ce05d
+  en: 6b80eb74a50e2238
+  zh: aabfb5e25da32f6e
 /agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text/consequences:
-  en: 238e80d7fcb3d4b1
-  zh: 08da1e43c402002a
+  en: 1c3cfe54807a97bc
+  zh: 8f013d750dc9a013
 /agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text/alternatives-considered:
-  en: 5ab7503b09bb83cf
-  zh: 1be912e0309c5279
+  en: 0bf8ea34afd49e5a
+  zh: 2ac7807df44d9f84
