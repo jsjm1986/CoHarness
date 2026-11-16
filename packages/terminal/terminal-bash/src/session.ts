@@ -162,6 +162,8 @@ class LocalSendOperation implements TerminalSendOperation {
   private cancellationRequested = false
   private initialForegroundLeftWait: boolean
   private initialForegroundPgid: number | undefined
+  private expectsEcho = false
+  private sawNonPromptOutput = false
 
   constructor(
     maxBytes: number,
@@ -214,6 +216,27 @@ class LocalSendOperation implements TerminalSendOperation {
   setInitialForeground(foreground: SubprocessTerminalForeground | undefined): void {
     this.initialForegroundPgid = foreground?.processGroupId
     this.initialForegroundLeftWait = foreground?.inputWaiting !== true
+  }
+
+  /**
+   * Record that input was written so a bare prompt redraw cannot count as
+   * completion evidence before its echo or other output arrives.
+   */
+  noteInput(): void {
+    this.expectsEcho = true
+  }
+
+  /** Record sanitized text that the prompt's own tail cannot explain. */
+  noteNonPromptOutput(): void {
+    this.sawNonPromptOutput = true
+  }
+
+  /**
+   * Whether a fresh prompt may settle this send: sends that wrote input first
+   * need output a stale prompt redraw cannot supply.
+   */
+  get promptEvidenceArmed(): boolean {
+    return !this.expectsEcho || this.sawNonPromptOutput
   }
 
   acceptsStdinWait(pgid: number, waiting: boolean): boolean {
@@ -396,6 +419,7 @@ export class LocalPtySession implements TerminalBackendSession {
       const input = `${request.text}${request.submit ? '\r' : ''}`
       if (input.length > 0 && !operation.cancelRequested) {
         this.resetReadinessEvidence()
+        operation.noteInput()
         const write = this.terminal.write(input)
         this.activeWrite = write.then(() => true, () => false)
         try {
@@ -501,6 +525,17 @@ export class LocalPtySession implements TerminalBackendSession {
   private onData(data: string): void {
     const sanitized = this.sanitizer.push(data)
     this.appendOutput(sanitized.text)
+    // Text beyond the prompt's own tail is consumption evidence a stale prompt
+    // redraw cannot supply: a trailing repaint from the previous command can
+    // land inside this send and must not arm its prompt settlement alone. A
+    // prompt-tail fragment split across the send boundary is no such evidence
+    // either, and text mid-tail is still prompt until the tail completes.
+    const promptTail = sanitized.prompt ? (sanitized.promptTail ?? '') : ''
+    const content = sanitized.text.slice(0, Math.max(0, sanitized.text.length - promptTail.length))
+    const midTail = !sanitized.prompt && this.promptSeen && !this.promptTextSeen
+    if (content.length > 0 && !CONTROLLED_PROMPT.startsWith(content) && !midTail) {
+      this.active?.noteNonPromptOutput()
+    }
     if (sanitized.prompt) {
       // TODO(pty-delayed-signal-prompt): With a reproducer, define a marker-generation boundary
       // before attributing a signal-delayed prompt to a later send.
@@ -572,7 +607,7 @@ export class LocalPtySession implements TerminalBackendSession {
         this.shellPgid = foreground.processGroupId
       }
       if (this.promptSeen && this.promptTextSeen && idleFor >= this.config.pollIntervalMs
-        && foreground?.processGroupId === this.shellPgid) {
+        && foreground?.processGroupId === this.shellPgid && operation.promptEvidenceArmed) {
         this.settleActive('stdin_read')
         return
       }

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-prompt-evidence-requires-post-write-output.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-16-prompt-evidence-requires-post-write-output.md
+document:
+  en: 7cf427bbe14798f2332bd09699d69f6981956489
+  zh: 41247f36e71b66f15d50cf5fd9a908843ca3821f
+/agent-note-prompt-settlement-requires-post-write-output-evidence:
+  en: 0679286da1f8bf3a
+  zh: d3a770ec2b0e08e1
+/agent-note-prompt-settlement-requires-post-write-output-evidence/problem:
+  en: c4a6b111e22e55af
+  zh: abbc2221fb3679e2
+/agent-note-prompt-settlement-requires-post-write-output-evidence/decision:
+  en: c19e92128a21dbc0
+  zh: 708deda5672935fb
+/agent-note-prompt-settlement-requires-post-write-output-evidence/consequences:
+  en: fb4f36fdcfc2e42e
+  zh: febec7a811d77864
+/agent-note-prompt-settlement-requires-post-write-output-evidence/alternatives-considered:
+  en: a028950a954a61c4
+  zh: c019516139506ed0
+/agent-note-prompt-settlement-requires-post-write-output-evidence/verification:
+  en: af5525ed67170324
+  zh: ebf593af9d243fb9
