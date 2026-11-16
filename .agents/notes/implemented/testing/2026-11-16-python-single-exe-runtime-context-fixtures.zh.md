@@ -13,7 +13,7 @@ Python 发布形态矩阵将打包可执行文件的输出与 fixture 比对，�
 ## 决定
 
 - `scripts/smoke-python-runtime.py`：`RUNTIME_CONTEXT_PREFIX` → `RUNTIME_CONTEXT_PREFIXES = ("Current runtime context", "The following information describes your current session")`；两处剥离点改用 `str.startswith(tuple)`。
-- `scripts/snapshots/python-sdk-single-exe/` 下 15 个 fixture 文件（`advanced`、`advanced-ptc`、`restart`、`scheduler-recovery`、`authoring`）：替换引语句；root 会话复合文本补上 root `subagent:identity` 尾段与小节；委托复合文本补上 agent-id 身份句与 `tool:subagent_fork:depth` 小节，保留 `tool:subagent:depth`/`subagent:delegation`，并使用场景的 `{{agent-1}}`/`{{agent-2}}` 占位符锚定。
+- `scripts/snapshots/python-sdk-single-exe/` 下 15 个 fixture 文件（`advanced`、`advanced-ptc`、`restart`、`scheduler-recovery`、`authoring`）：替换引语句。首轮手工编辑还把 `authoring` 变体的 `subagent:identity` 尾段与 `tool:subagent_fork:depth` 小节错植进了从不发出它们的场景；随后的 `--update-snapshots` 重录恢复了每个场景真实的小节清单（委托事实经 `sandbox/mode`、`approval/policy`、`permission/preset` 事件浮现，已启用的 `plugin_manager` 进入工具列表）。
 - `gateway/tsconfig.build.json`：将 `@deepseek-ai/cordis` 映射到 `vendor/cordis/lib/types`——生产 `tsc -p tsconfig.build.json` 会整体覆盖父级 `paths`，该 vendored 导入此前只能经本地 `node_modules` 符号链接解析，而 `npm ci` 不会创建该链接；windows-native 车道的 spec 首次通过到构建步骤时才撞上 TS2307。
 - `.github/workflows/release-vendor.yml`：`NODE_OPTIONS --max-old-space-size=12288`——被调用的 workflow 不继承调用方的 `env`，而 `pnpm run build:lib:host`（直接 `tsc -b tsconfig.host.json`，不走 `compile-referenced-projects.ts` 的堆参数）在默认约 4 GB 堆上 OOM。
 - `scripts/no-unknown-casts.baseline.json`：为 rc.3 吸收的断言集合重新生成清单（指纹是内容哈希，任何被编辑的断言都会被视为新增）。
