@@ -163,7 +163,7 @@ async function protectedObjectState(directory:string,mode:number,file:boolean,si
   if (link === undefined) return 'unreadable'
   if (link.isSymbolicLink()) return 'unprotected'
   const probe = await runWindowsShellProbe(
-    ['-NoProfile', '-NonInteractive', '-Command', windowsProtectionProbe(WINDOWS_MODIFY_RIGHTS_MASK|(file?6:0),ownerReference!==undefined,false), directory,...(ownerReference?[ownerReference]:[])], 10_000, signal, 4096).catch((e:unknown) => { console.warn('acl-probe-failed', e); return undefined })
+    ['-NoProfile', '-NonInteractive', '-Command', windowsProtectionProbe(WINDOWS_MODIFY_RIGHTS_MASK|(file?6:0),ownerReference!==undefined,false), directory,...(ownerReference?[ownerReference]:[])], 30_000, signal, 4096).catch((e:unknown) => { console.warn('acl-probe-failed', e); return undefined })
   let acl: z.infer<typeof windowsProtectionSchema> | undefined
   try { acl = probe === undefined ? undefined : windowsProtectionSchema.parse(JSON.parse(probe.stdout)) } catch { acl = undefined }
   if (acl === undefined || acl.deny !== 0) return 'unprotected'
@@ -208,7 +208,7 @@ async function windowsAclPrivate(file: string, signal: AbortSignal | undefined, 
  */
 export async function probeWindowsAclPrivate(file: string, signal?: AbortSignal): Promise<PrivateFileState> {
   const probe = await runWindowsShellProbe(
-    ['-NoProfile', '-NonInteractive', '-Command', windowsPrivateProbe(false), file], 10_000, signal, 4096).catch((e:unknown) => { console.warn('acl-probe-failed', e); return undefined })
+    ['-NoProfile', '-NonInteractive', '-Command', windowsPrivateProbe(false), file], 30_000, signal, 4096).catch((e:unknown) => { console.warn('acl-probe-failed', e); return undefined })
   let acl: z.infer<typeof windowsAclSchema> | undefined
   try { acl = probe === undefined ? undefined : windowsAclSchema.parse(JSON.parse(probe.stdout)) } catch { acl = undefined }
   if (acl === undefined || acl.deny !== 0 || acl.sids.length === 0) return 'not-private'
@@ -224,7 +224,7 @@ export async function probeWindowsAclPrivate(file: string, signal?: AbortSignal)
 export async function tightenPrivateFileAcl(file: string, signal?: AbortSignal): Promise<void> {
   if (process.platform !== 'win32') return
   await runWindowsShellProbe(
-    ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_ACL_TIGHTEN, file], 10_000, signal, 4096)
+    ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_ACL_TIGHTEN, file], 30_000, signal, 4096)
 }
 
 /**
