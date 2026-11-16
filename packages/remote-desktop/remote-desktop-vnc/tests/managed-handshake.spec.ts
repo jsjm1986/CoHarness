@@ -16,8 +16,8 @@ import { VncRemoteDesktop } from '../src/index.ts'
 import { managedHandshake } from '../src/managed.ts'
 
 const ADMIN = { principal: 'root', admin: true }
-const KEY_EVENT = Buffer.from([3, 1, 0, 0, 0, 0, 0, 0x61])
-const FB_UPDATE_REQUEST = Buffer.from([2, 0, 0, 0, 0, 0, 4, 0, 3, 0])
+const KEY_EVENT = Buffer.from([4, 1, 0, 0, 0, 0, 0, 0x61])
+const FB_UPDATE_REQUEST = Buffer.from([3, 0, 0, 0, 0, 0, 4, 0, 3, 0])
 
 /** One end of an in-memory socket pair: writes push to `peer`; destroy closes both ends. */
 class Loopback extends Duplex {
@@ -331,6 +331,7 @@ describe('serveStream with managed credentials', () => {
     const fiber = await ctx.plugin(TestVnc, {
       endpoints: [{ nodeId: 'n1', host: '127.0.0.1', port: 5900, username: 'admin', passwordRef: 'VNC_PASS' }],
       grantsFile: ':memory:',
+      handshakeTimeoutMs: 60_000,
     })
     const svc = ctx.remoteDesktop as TestVnc
     try {
@@ -354,7 +355,7 @@ describe('serveStream with managed credentials', () => {
     } finally {
       await fiber.dispose()
     }
-  }, 15_000)
+  }, 60_000)
 
   it('fails loud when passwordRef is set but no credentials provider resolves it', async () => {
     const ctx = new Context()

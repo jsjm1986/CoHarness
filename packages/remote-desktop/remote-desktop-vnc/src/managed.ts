@@ -189,6 +189,7 @@ export async function managedHandshake(
   client: Duplex,
   upstream: Duplex,
   credential: { username?: string; password: string },
+  timeoutMs = HANDSHAKE_TIMEOUT_MS,
 ): Promise<ManagedHandshake> {
   const inClient = new ByteReader(client)
   const inUpstream = new ByteReader(upstream)
@@ -196,7 +197,7 @@ export async function managedHandshake(
     const error = new RemoteDesktopError('managed RFB handshake: timed out', 'REMOTE_DESKTOP_TRANSPORT')
     inClient.failWith(error)
     inUpstream.failWith(error)
-  }, HANDSHAKE_TIMEOUT_MS)
+  }, timeoutMs)
   timeout.unref()
   try {
     client.write(RFB_38)

@@ -94,6 +94,8 @@ export interface Config {
   auditCapacity?: number
   /** Milliseconds `status` allows for the endpoint reachability probe. */
   probeTimeoutMs?: number
+  /** Milliseconds a credential-managed RFB handshake may take before failing. */
+  handshakeTimeoutMs?: number
 }
 
 type ResolvedConfig = Required<Config>
@@ -192,6 +194,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
     auditFile: z.string().default(':memory:'),
     auditCapacity: z.number().step(1).min(1).default(1024),
     probeTimeoutMs: z.number().step(1).min(1).default(3_000),
+    handshakeTimeoutMs: z.number().step(1).min(1).default(15_000),
   })
 
   private readonly endpoints = new Map<string, VncEndpoint>()
@@ -444,7 +447,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
     const handshake = await managedHandshake(socket, upstream, {
       ...(endpoint.username === undefined ? {} : { username: endpoint.username }),
       password: resolved.value,
-    })
+    }, this.config.handshakeTimeoutMs)
     return { client: handshake.clientResidual, upstream: handshake.upstreamResidual }
   }
 
