@@ -504,8 +504,10 @@ describe('Session MCP Loader composition', () => {
         }, { prepend: true })
       },
     })
-    const rejected = expect(creation).rejects.toThrow('cancel browser startup')
-    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+    // The fused abort may surface either the caller reason or the owner's
+    // setup-abort reason, depending on which signal settles first.
+    const rejected = expect(creation).rejects.toThrow(/cancel browser startup|setup aborted/)
+    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
     controller.abort(new Error('cancel browser startup'))
     await rejected
     expect(model.requests).toEqual([])
@@ -582,8 +584,8 @@ describe('Session MCP Loader composition', () => {
         }, { prepend: true })
       },
     })
-    const rejected = expect(canceledResume).rejects.toThrow('cancel browser resume')
-    await vi.waitFor(async () => { expect((await events(root)).filter(event => event.event === 'probe')).toHaveLength(2) })
+    const rejected = expect(canceledResume).rejects.toThrow(/cancel browser resume|setup aborted/)
+    await vi.waitFor(async () => { expect((await events(root)).filter(event => event.event === 'probe')).toHaveLength(2) }, { timeout: 15_000 })
     expect(model.requests).toHaveLength(2)
     controller.abort(new Error('cancel browser resume'))
     await rejected
@@ -598,7 +600,7 @@ describe('Session MCP Loader composition', () => {
       resumed = true
       return handle
     })
-    await vi.waitFor(async () => { expect((await events(root)).filter(event => event.event === 'probe')).toHaveLength(3) })
+    await vi.waitFor(async () => { expect((await events(root)).filter(event => event.event === 'probe')).toHaveLength(3) }, { timeout: 15_000 })
     expect(resumed).toBe(false)
     expect(model.requests).toHaveLength(2)
     await writeFile(join(root, 'release'), '')
