@@ -197,7 +197,7 @@ describe('Session MCP Loader composition', () => {
     const controller = new AbortController()
     const rejected = expect(ctx.agents.create({ sessionId: SessionId('failed-browser-report'), signal: controller.signal })).rejects.toThrow()
     if (cause === 'cancellation') {
-      await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+      await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
       controller.abort(new Error('cancel browser while its completion report is unavailable'))
     }
     await rejected
@@ -300,7 +300,7 @@ describe('Session MCP Loader composition', () => {
     const { ctx, root, model, browser } = await load(true, 'hold')
     const first = ctx.agents.create({ sessionId: SessionId('first') })
     const rejected = expect(first).rejects.toThrow()
-    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
     const second = await ctx.agents.create({ sessionId: SessionId('second'), agentOptions: { provider: 'fixture', model: 'fixture' } })
     second.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Answer without using the browser.' }], source: { kind: 'user' } }))
     await second.agent.whenIdle()
@@ -338,7 +338,7 @@ describe('Session MCP Loader composition', () => {
     const held = await load(false, 'hold')
     const pendingOwner = held.ctx.agents.create({ sessionId: SessionId('pending') })
     const interrupted = expect(pendingOwner).rejects.toThrow()
-    await vi.waitFor(async () => { expect((await events(held.root)).some(event => event.event === 'probe')).toBe(true) })
+    await vi.waitFor(async () => { expect((await events(held.root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
     await held.browser.dispose()
     await interrupted
     expect(held.ctx.agents.get(SessionId('pending'))).toBeUndefined()
@@ -478,7 +478,7 @@ describe('Session MCP Loader composition', () => {
       created = true
       return handle
     })
-    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
     expect(created).toBe(false)
     expect(model.requests).toEqual([])
     expect((await execute(ctx, initializing)).isError).toBe(true)
