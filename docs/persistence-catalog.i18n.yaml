@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-catalog.md
 document:
-  en: a3da88b4296511820c4a2fea58c1bd601b1c16e7
-  zh: 712c7a4cdbf4c3daab50730db4169fdb6b421213
+  en: ec8ed789e613fa6239662b454cf30d41d8d99277
+  zh: c5c6442d143d9830da49e3492b36bac66a8f55fb
 /:
   en: a11f106978c9dce7
   zh: a11f106978c9dce7
@@ -648,8 +648,8 @@ document:
   en: 3add65baf05084e5
   zh: a90507b003000527
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-113:
-  en: 306d329f91bef465
-  zh: 574ab4ad91f5c402
+  en: 638cc6f775a610da
+  zh: 35292451083bfb30
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-115:
   en: caa416c431dbca48
   zh: a03af7098cdbae93
