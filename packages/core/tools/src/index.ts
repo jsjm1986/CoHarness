@@ -1,5 +1,6 @@
 /** Tool definitions and scoped dispatch to plugin-owned executors. @module */
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { Disposable } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { AnonymousEntries, NamedEntries, ScopedLayers, scopeOf, scopeChainOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey, ScopeLayer } from '@deepseek-ai/dsh-scope'
@@ -331,7 +332,7 @@ export class ToolsService extends Service {
    * @param executor - initialized provider owned by the contributing plugin.
    * @returns the effect disposer. Unloading leaves the selection unavailable until it is replaced.
    */
-  setExecutor(executor: ToolExecutor): () => void {
+  setExecutor(executor: ToolExecutor): Disposable<Promise<void>> {
     const scope = scopeOf(this.ctx)
     const existing = scope === undefined ? this.root : this.scoped.get(scope)
     if (existing?.executor !== undefined) throw new Error('Only one tool executor may be registered in each scope')

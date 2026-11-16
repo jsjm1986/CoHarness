@@ -1744,7 +1744,7 @@ describe('the run_code dispatch bridge', () => {
 
     expect(result.isError).toBe(true)
     expect(result.additionalContexts).toEqual([{
-      id: expect.any(String),
+      id: expect.any(String) as string,
       role: 'user',
       content: [{ type: 'text', text: 'nested context' }],
       source: { kind: 'test' },
@@ -2503,7 +2503,7 @@ describe('per-agent presentation', () => {
     const { scope, agent } = await mintAgentScope(ctx)
     const dispose = scope.ctx.tools.setExecutor(new PtcExecutor(scope.ctx))
 
-    dispose()
+    await dispose()
 
     await expect(systemPrompt.assemble({ scope: agent })).rejects.toThrow('selected tool executor is unavailable')
   })

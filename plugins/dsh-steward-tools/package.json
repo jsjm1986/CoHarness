@@ -23,6 +23,7 @@
     "@deepseek-ai/dsh-gateway-runtime": "*",
     "@deepseek-ai/dsh-session": "*",
     "@deepseek-ai/dsh-system-prompt": "*",
+    "@deepseek-ai/dsh-tool-executor-native": "*",
     "@deepseek-ai/dsh-tools": "*"
   },
   "devDependencies": {

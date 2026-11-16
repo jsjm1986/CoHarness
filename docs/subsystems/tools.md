@@ -592,7 +592,7 @@ describe(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolModelInput
  * @param executor - initialized provider owned by the contributing plugin.
  * @returns the effect disposer. Unloading leaves the selection unavailable until it is replaced.
  */
-setExecutor(executor: ToolExecutor): () => void
+setExecutor(executor: ToolExecutor): Disposable<Promise<void>>
 
 /**
  * Delegate a raw call batch to its Agent's provider or the deployment default.
