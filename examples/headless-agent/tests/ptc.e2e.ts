@@ -309,11 +309,12 @@ describe('PTC mode typed values: keyless real-worker contracts', () => {
       return { provider: provider.id, names: inspected.data.tools.map(tool => tool.name) };
     `, testToolSignal, agent))
 
-    // `run_code` is the reserved PTC transport, not a registered tool.
+    // Under the PTC executor `run_code` is the one directly callable tool; the
+    // inspected list names it alongside the mounted cordis_inspect tools.
     expect(value).toEqual({
       provider: 'Tool',
       names: [
-        'cordis_inspect_list', 'cordis_inspect_query', 'cordis_inspect_self',
+        'cordis_inspect_list', 'cordis_inspect_query', 'cordis_inspect_self', 'run_code',
       ],
     })
     for (const retired of ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine']) {
