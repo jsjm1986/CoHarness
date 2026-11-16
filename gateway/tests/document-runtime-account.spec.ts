@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { documentRuntimeAccess } from '../src/document-storage.ts'
 
 const io = vi.hoisted(() => ({ command: vi.fn(), chown: vi.fn(), chmod: vi.fn(), lstat: vi.fn() }))
-vi.mock('../src/child-command.ts', () => ({ runGatewayChildCommand: io.command, runWindowsShellProbe: (...a: unknown[]) => io.command('powershell.exe', ...(a as [string[], number, AbortSignal?, number?])) }))
+vi.mock('../src/child-command.ts', () => ({ runGatewayChildCommand: io.command, runWindowsShellProbe: (args: string[], timeoutMs: number, signal?: AbortSignal, maxBuffer?: number) => io.command('powershell.exe', args, timeoutMs, signal, maxBuffer) }))
 vi.mock('node:fs/promises', async original => ({
   ...await original<typeof import('node:fs/promises')>(), chown: io.chown, chmod: io.chmod, lstat: io.lstat,
 }))

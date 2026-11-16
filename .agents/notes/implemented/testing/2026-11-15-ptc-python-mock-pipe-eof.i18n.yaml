@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-15-ptc-python-mock-pipe-eof.md
 document:
-  en: beaa53ca54bf11fc1f0b1a68a8cf1e1ae2fdca84
-  zh: 761435be952d5b63072eb4a9682dc2bac1498b52
+  en: 18d93ef1c9c57a3127f314510862204a5a293715
+  zh: 244fbda6b128595b3a745971f2a7efeef879007b
 /agent-note-controlled-subprocess-fixtures-must-eof-pipes-like-a-real-exit:
   en: 0f1e2befbc3d1722
   zh: 25eefc47f69267c5
@@ -17,3 +17,6 @@ document:
 /agent-note-controlled-subprocess-fixtures-must-eof-pipes-like-a-real-exit/consequences:
   en: a20b16511020fefc
   zh: 8832a2ca9771d0c9
+/agent-note-controlled-subprocess-fixtures-must-eof-pipes-like-a-real-exit/alternatives-considered:
+  en: a06e460f910abc27
+  zh: 416160fae6172420

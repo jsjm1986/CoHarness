@@ -15,3 +15,8 @@ The mock ends all four pipe streams wherever the real kernel would deliver EOF: 
 ## Consequences
 
 Fixtures that fake process pipes own the pipe lifecycle: `close`/`error`/`terminate` must produce stream `end`, or the runtime under test legitimately waits its close bound and the test times out on a compliant implementation. The same `PassThrough` mock shape appears wherever subprocess pipes are controlled; authors adding such fixtures should end streams at the emulated exit point rather than relying on test-teardown destruction.
+
+## Alternatives considered
+
+- **Raising the suite timeout** — rejected: it hides the missing-EOF defect and still pays the full 5s drain bound per settling run.
+- **Ending pipes only on `close`** — rejected: the pid-less fakes never emit `close`, so `terminate()` must close the streams it would have closed in the kernel.

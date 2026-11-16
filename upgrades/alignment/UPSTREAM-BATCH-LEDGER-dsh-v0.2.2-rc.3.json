@@ -4,7 +4,7 @@
   "branch": "sync/upstream-v0.2.2-rc3-p0",
   "scope": "4216 commits / 1089 fix / 374 feat — selective sync per user policy: backport applicable bugs, absorb deep features, skip account/i18n/incidental",
   "batches": {
-    "cordis": {
+    "@deepseek-ai/cordis": {
       "commit": "7a7a9dc9e18",
       "applied": [
         "canonical Fiber migration (fiber.ts ctx.fiber self-reference)",
