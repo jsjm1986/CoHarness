@@ -186,6 +186,10 @@ export interface ManagedHandshake {
  * @param timeoutMs - handshake budget in milliseconds; defaults to
  *   {@link HANDSHAKE_TIMEOUT_MS}.
  * @returns both directions' already-consumed residual bytes for the pump.
+ *   Both sockets resolve paused: the readers' `data` taps put them in
+ *   flowing mode, so bytes arriving between reader detach and the caller's
+ *   pump attach would be discarded — the caller must `resume()` each socket
+ *   after its own listeners are installed.
  */
 export async function managedHandshake(
   client: Duplex,
@@ -246,6 +250,8 @@ export async function managedHandshake(
     return { clientResidual: inClient.residual(), upstreamResidual: inUpstream.residual() }
   } finally {
     clearTimeout(timeout)
+    client.pause()
+    upstream.pause()
     inClient.close()
     inUpstream.close()
   }

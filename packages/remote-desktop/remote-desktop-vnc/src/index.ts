@@ -5,7 +5,7 @@
  * @module @deepseek-ai/dsh-remote-desktop-vnc
  */
 
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -15,6 +15,7 @@ import { createWriteStream, type WriteStream } from 'node:fs'
 import { connect } from 'node:net'
 import { join } from 'node:path'
 import type { Duplex } from 'node:stream'
+import { finished } from 'node:stream/promises'
 import {
   levelRank,
   RemoteDesktop,
@@ -114,6 +115,7 @@ interface LiveSession {
   readonly session: RemoteDesktopSession
   readonly spec: RemoteDesktopSpec
   readonly principal: string
+  readonly stop: AbortController
   /** The caller's Session address; re-matches session-scoped grants on mutations. */
   readonly sessionId?: SessionId
   pump?: RfbPump
@@ -204,7 +206,8 @@ export class VncRemoteDesktop extends RemoteDesktop {
   private consents: ConsentRecord[] = []
   private auditLog!: VncAuditLog
   private store!: VncGrantStore
-  private readonly ready: Promise<void>
+  private readonly lifetime = new AbortController()
+  private readonly operations = new Set<Promise<unknown>>()
 
   constructor(ctx: Context, private readonly config: ResolvedConfig) {
     super(ctx)
@@ -215,15 +218,30 @@ export class VncRemoteDesktop extends RemoteDesktop {
       }
       this.endpoints.set(key, endpointRow(endpoint, `endpoint "${key}"`))
     }
-    this.ready = this.init()
-    ctx.effect(() => () => {
-      for (const session of this.live.values()) session.pump?.close()
-      for (const entry of this.pending.values()) clearTimeout(entry.timer)
-      this.pending.clear()
-    })
+    ctx.effect(() => () => this.shutdown())
   }
 
-  private async init(): Promise<void> {
+  private assertOpen(): void {
+    if (this.lifetime.signal.aborted) throw new RemoteDesktopError('remote-desktop provider is stopping', 'REMOTE_DESKTOP_TARGET_UNAVAILABLE')
+  }
+
+  private operate<T>(operation: () => Promise<T>): Promise<T> {
+    this.assertOpen()
+    const task = operation()
+    this.operations.add(task)
+    void task.then(() => this.operations.delete(task), () => this.operations.delete(task))
+    return task
+  }
+
+  private async shutdown(): Promise<void> {
+    this.lifetime.abort()
+    for (const token of this.pending.keys()) this.dropPending(token)
+    for (const id of this.live.keys()) this.finishDetach(id)
+    await Promise.allSettled([...this.operations])
+    await this.auditLog?.drain()
+  }
+
+  async [Service.init](): Promise<void> {
     this.store = await VncGrantStore.open(this.config.grantsFile)
     this.auditLog = await VncAuditLog.open(this.config.auditFile, this.config.auditCapacity, this.ctx.logger)
     if (this.config.endpointsFile !== '') {
@@ -260,166 +278,179 @@ export class VncRemoteDesktop extends RemoteDesktop {
   }
 
   override async resolve(request: RemoteDesktopAttachRequest): Promise<RemoteDesktopSpec> {
-    await this.ready
-    await this.store.refresh()
-    const grants = matchingGrants(this.store.all(), request.principal, request.target, request.sessionId, Date.now())
-    if (grants.length === 0) {
-      throw new RemoteDesktopError(
-        `no remote-desktop grant for principal "${request.principal}" on "${endpointKey(request.target)}"`,
-        'REMOTE_DESKTOP_FORBIDDEN',
-      )
-    }
-    const granted = Math.max(...grants.map(g => levelRank(g.level)))
-    if (levelRank(request.level) > granted) {
-      throw new RemoteDesktopError(
-        `grant level does not authorize "${request.level}" access`,
-        'REMOTE_DESKTOP_FORBIDDEN',
-      )
-    }
-    return {
-      target: request.target,
-      level: request.level,
-      grants,
-      recording: grants.some(g => g.recording),
-    }
+    return this.operate(async () => {
+      await this.store.refresh()
+      const grants = matchingGrants(this.store.all(), request.principal, request.target, request.sessionId, Date.now())
+      if (grants.length === 0) {
+        throw new RemoteDesktopError(
+          `no remote-desktop grant for principal "${request.principal}" on "${endpointKey(request.target)}"`,
+          'REMOTE_DESKTOP_FORBIDDEN',
+        )
+      }
+      const granted = Math.max(...grants.map(g => levelRank(g.level)))
+      if (levelRank(request.level) > granted) {
+        throw new RemoteDesktopError(
+          `grant level does not authorize "${request.level}" access`,
+          'REMOTE_DESKTOP_FORBIDDEN',
+        )
+      }
+      return {
+        target: request.target,
+        level: request.level,
+        grants,
+        recording: grants.some(g => g.recording),
+      }
+    })
   }
 
   override async confirm(request: RemoteDesktopAttachRequest): Promise<RemoteDesktopSpec> {
-    const spec = await this.resolve(request)
-    const consent: ConsentRecord = {
-      principal: request.principal,
-      targetKey: endpointKey(spec.target),
-      level: spec.level,
-      grants: new Set(spec.grants.map(g => g.id)),
-      at: Date.now(),
-    }
-    this.consents = this.consents.filter(c =>
-      !(c.principal === consent.principal && c.targetKey === consent.targetKey && c.level === consent.level))
-    this.consents.push(consent)
-    this.record({
-      kind: 'consent',
-      principal: request.principal,
-      target: spec.target,
-      level: spec.level,
-      grants: spec.grants.map(g => g.id),
-      at: consent.at,
+    return this.operate(async () => {
+      const spec = await this.resolve(request)
+      this.assertOpen()
+      const consent: ConsentRecord = {
+        principal: request.principal,
+        targetKey: endpointKey(spec.target),
+        level: spec.level,
+        grants: new Set(spec.grants.map(g => g.id)),
+        at: Date.now(),
+      }
+      this.consents = this.consents.filter(c =>
+        !(c.principal === consent.principal && c.targetKey === consent.targetKey && c.level === consent.level))
+      this.consents.push(consent)
+      this.record({
+        kind: 'consent',
+        principal: request.principal,
+        target: spec.target,
+        level: spec.level,
+        grants: spec.grants.map(g => g.id),
+        at: consent.at,
+      })
+      return spec
     })
-    return spec
   }
 
   override async attach(request: RemoteDesktopAttachRequest): Promise<RemoteDesktopSession> {
-    const spec = await this.resolve(request)
-    this.requireConsent(spec, request.principal)
-    const id = RemoteDesktopSessionId(randomUUID())
-    const token = RemoteDesktopToken(randomBytes(32).toString('base64url'))
-    if (this.pending.size >= MAX_PENDING_ATTACHMENTS) {
-      throw new RemoteDesktopError('too many pending remote-desktop attachments', 'REMOTE_DESKTOP_TRANSPORT')
-    }
-    const timer = setTimeout(() => { this.expirePending(token) }, this.config.attachTokenTtlMs)
-    timer.unref()
-    this.pending.set(token, {
-      sessionId: id,
-      spec,
-      principal: request.principal,
-      expiresAt: Date.now() + this.config.attachTokenTtlMs,
-      timer,
+    return this.operate(async () => {
+      const spec = await this.resolve(request)
+      this.assertOpen()
+      this.requireConsent(spec, request.principal)
+      const id = RemoteDesktopSessionId(randomUUID())
+      const token = RemoteDesktopToken(randomBytes(32).toString('base64url'))
+      if (this.pending.size >= MAX_PENDING_ATTACHMENTS) {
+        throw new RemoteDesktopError('too many pending remote-desktop attachments', 'REMOTE_DESKTOP_TRANSPORT')
+      }
+      const timer = setTimeout(() => { this.expirePending(token) }, this.config.attachTokenTtlMs)
+      timer.unref()
+      this.pending.set(token, {
+        sessionId: id,
+        spec,
+        principal: request.principal,
+        expiresAt: Date.now() + this.config.attachTokenTtlMs,
+        timer,
+      })
+      const session: RemoteDesktopSession = {
+        id,
+        spec,
+        stream: { path: this.config.streamPath, token },
+        detach: () => {
+          this.dropPending(token)
+          this.finishDetach(id)
+          return Promise.resolve()
+        },
+      }
+      this.live.set(id, {
+        id, session, spec, principal: request.principal, stop: new AbortController(),
+        ...(request.sessionId === undefined ? {} : { sessionId: request.sessionId }),
+      })
+      this.record({ kind: 'attach', session: id, spec, principal: request.principal, at: Date.now() })
+      this.ctx.emit('remote-desktop/attached', session, true)
+      return session
     })
-    const session: RemoteDesktopSession = {
-      id,
-      spec,
-      stream: { path: this.config.streamPath, token },
-      detach: () => {
-        this.dropPending(token)
-        this.finishDetach(id)
-        return Promise.resolve()
-      },
-    }
-    this.live.set(id, {
-      id, session, spec, principal: request.principal,
-      ...(request.sessionId === undefined ? {} : { sessionId: request.sessionId }),
-    })
-    this.record({ kind: 'attach', session: id, spec, principal: request.principal, at: Date.now() })
-    this.ctx.emit('remote-desktop/attached', session, true)
-    return session
   }
 
-  override async serveStream(token: RemoteDesktopToken, socket: Duplex): Promise<void> {
-    await this.ready
-    await this.syncEndpoints()
-    const entry = this.pending.get(token)
-    this.dropPending(token)
-    if (!entry || entry.expiresAt <= Date.now()) {
+  override async serveStream(token: RemoteDesktopToken, socket: Duplex, requestSignal?: AbortSignal): Promise<void> {
+    if (this.lifetime.signal.aborted) {
       socket.destroy()
-      if (entry !== undefined) this.finishDetach(entry.sessionId)
-      throw new RemoteDesktopError('invalid or expired remote-desktop attach token', 'REMOTE_DESKTOP_FORBIDDEN')
+      this.assertOpen()
     }
-    const endpoint = this.endpoints.get(endpointKey(entry.spec.target))
-    if (!endpoint) {
-      socket.destroy()
-      this.finishDetach(entry.sessionId)
-      throw new RemoteDesktopError(
-        `no VNC endpoint for "${endpointKey(entry.spec.target)}"`,
-        'REMOTE_DESKTOP_TARGET_UNAVAILABLE',
-      )
-    }
-    let upstream: Duplex
-    try {
-      upstream = await this.dial(endpoint)
-    } catch (error) {
-      socket.destroy()
-      this.finishDetach(entry.sessionId)
-      throw new RemoteDesktopError(
-        `cannot reach VNC endpoint for "${endpointKey(entry.spec.target)}": ${(error as Error).message}`,
-        'REMOTE_DESKTOP_TARGET_UNAVAILABLE',
-      )
-    }
-    const session = this.live.get(entry.sessionId)
-    if (!session) {
-      upstream.destroy()
-      socket.destroy()
-      return
-    }
-    let recorder: WriteStream | undefined
-    try {
-      recorder = await this.openRecorder(entry)
-    } catch (error) {
-      upstream.destroy()
-      socket.destroy()
-      this.finishDetach(entry.sessionId)
-      throw error
-    }
-    if (!this.live.has(entry.sessionId)) {
-      recorder?.end()
-      upstream.destroy()
-      socket.destroy()
-      return
-    }
-    if (recorder) upstream.on('data', (chunk: Buffer) => recorder.write(chunk))
-    let residuals: { client?: Buffer; upstream?: Buffer } = {}
-    const passwordRef = endpoint.passwordRef
-    if (passwordRef !== undefined) {
+    return this.operate(async () => {
+      const streamStop = new AbortController()
+      let upstream: Duplex | undefined, recorder: WriteStream | undefined, entry: PendingAttach | undefined
+      let recordingDone: Promise<unknown> | undefined
+      let signal = AbortSignal.any([this.lifetime.signal, streamStop.signal, ...(requestSignal === undefined ? [] : [requestSignal])])
+      const cancelClient = (): void => { streamStop.abort() }
+      const failTransport = (error: Error): void => { streamStop.abort(error) }
+      const stop = (): void => { socket.destroy(); upstream?.destroy() }
+      const recordChunk = (chunk: Buffer): void => { recorder!.write(chunk) }
+      socket.once('close', cancelClient)
+      socket.on('error', failTransport)
+      signal.addEventListener('abort', stop, { once: true })
       try {
-        residuals = await this.managedStreamHandshake(socket, upstream, { username: endpoint.username, passwordRef })
-      } catch (error) {
+        signal.throwIfAborted()
+        await this.syncEndpoints()
+        signal.throwIfAborted()
+        entry = this.pending.get(token)
+        this.dropPending(token)
+        if (entry === undefined || entry.expiresAt <= Date.now()) {
+          throw new RemoteDesktopError('invalid or expired remote-desktop attach token', 'REMOTE_DESKTOP_FORBIDDEN')
+        }
+        const session = this.live.get(entry.sessionId)
+        if (session === undefined) return
+        signal.removeEventListener('abort', stop)
+        signal = AbortSignal.any([signal, session.stop.signal])
+        signal.addEventListener('abort', stop, { once: true })
+        signal.throwIfAborted()
+        const endpoint = this.endpoints.get(endpointKey(entry.spec.target))
+        if (endpoint === undefined) {
+          throw new RemoteDesktopError(`no VNC endpoint for "${endpointKey(entry.spec.target)}"`, 'REMOTE_DESKTOP_TARGET_UNAVAILABLE')
+        }
+        try {
+          upstream = await this.dial(endpoint, undefined, signal)
+        } catch (error) {
+          throw new RemoteDesktopError(`cannot reach VNC endpoint for "${endpointKey(entry.spec.target)}": ${(error as Error).message}`,
+            'REMOTE_DESKTOP_TARGET_UNAVAILABLE')
+        }
+        upstream.on('error', failTransport)
+        signal.throwIfAborted()
+        recorder = await this.openRecorder(entry)
+        if (recorder !== undefined) {
+          recordingDone = finished(recorder, { cleanup: true }).then(() => undefined, (error: unknown) => {
+            streamStop.abort(error)
+            return error
+          })
+          upstream.on('data', recordChunk)
+        }
+        signal.throwIfAborted()
+        let residuals: { client?: Buffer; upstream?: Buffer } = {}
+        const passwordRef = endpoint.passwordRef
+        if (passwordRef !== undefined) {
+          residuals = await this.managedStreamHandshake(socket, upstream, { username: endpoint.username, passwordRef }, signal)
+        }
+        signal.throwIfAborted()
+        if (residuals.upstream !== undefined && residuals.upstream.length > 0) socket.write(residuals.upstream)
+        const pump = pumpRfb(socket, upstream, entry.spec.level, {
+          ...(passwordRef === undefined ? {} : { frameOnly: true }),
+          ...(residuals.client === undefined ? {} : { clientResidual: residuals.client }),
+        })
+        session.pump = pump
+        if (passwordRef !== undefined) {
+          socket.resume()
+          upstream.resume()
+        }
+        await pump.done
+      } finally {
+        if (entry !== undefined) this.finishDetach(entry.sessionId)
+        signal.removeEventListener('abort', stop)
+        upstream?.removeListener('data', recordChunk)
         recorder?.end()
-        upstream.destroy()
-        socket.destroy()
-        this.finishDetach(entry.sessionId)
-        throw error
+        await Promise.all([closeTransport(socket), ...(upstream === undefined ? [] : [closeTransport(upstream)])])
+        socket.removeListener('close', cancelClient)
+        socket.removeListener('error', failTransport)
+        upstream?.removeListener('error', failTransport)
+        const recordingError = await recordingDone
+        if (recordingError !== undefined) throw recordingError
       }
-    }
-    if (residuals.upstream !== undefined && residuals.upstream.length > 0) socket.write(residuals.upstream)
-    const pump = pumpRfb(socket, upstream, entry.spec.level, {
-      ...(passwordRef === undefined ? {} : { frameOnly: true }),
-      ...(residuals.client === undefined ? {} : { clientResidual: residuals.client }),
     })
-    session.pump = pump
-    try {
-      await pump.done
-    } finally {
-      recorder?.end()
-      if (this.live.has(entry.sessionId)) this.finishDetach(entry.sessionId)
-    }
   }
 
   /**
@@ -435,12 +466,14 @@ export class VncRemoteDesktop extends RemoteDesktop {
     socket: Duplex,
     upstream: Duplex,
     endpoint: { username?: string | undefined; passwordRef: string },
+    signal: AbortSignal,
   ): Promise<{ client: Buffer; upstream: Buffer }> {
     const credentials: CredentialProvider | undefined = this.ctx.get('credentials')
     if (credentials === undefined) {
       throw new RemoteDesktopError('endpoint declares passwordRef but no credentials provider is mounted', 'REMOTE_DESKTOP_TRANSPORT')
     }
     const resolved = await credentials.resolve(credentialRef(endpoint.passwordRef))
+    signal.throwIfAborted()
     if (resolved === undefined) {
       throw new RemoteDesktopError(`endpoint credential "${endpoint.passwordRef}" resolves to nothing`, 'REMOTE_DESKTOP_TRANSPORT')
     }
@@ -456,109 +489,116 @@ export class VncRemoteDesktop extends RemoteDesktop {
     target: RemoteDesktopTarget,
     options?: { sessionId?: SessionId },
   ): Promise<RemoteDesktopTargetStatus> {
-    await this.ready
-    await this.store.refresh()
-    await this.syncEndpoints()
-    const grants = matchingGrants(this.store.all(), actor.principal, target, options?.sessionId, Date.now())
-    if (grants.length === 0) {
-      throw new RemoteDesktopError(
-        `no remote-desktop grant for principal "${actor.principal}" on "${endpointKey(target)}"`,
-        'REMOTE_DESKTOP_FORBIDDEN',
-      )
-    }
-    const endpoint = this.endpoints.get(endpointKey(target))
-    let available = false
-    if (endpoint) {
-      try {
-        const probe = await this.dial(endpoint, this.config.probeTimeoutMs)
-        probe.destroy()
-        available = true
-      } catch {
-        available = false
+    return this.operate(async () => {
+      await this.store.refresh()
+      await this.syncEndpoints()
+      const grants = matchingGrants(this.store.all(), actor.principal, target, options?.sessionId, Date.now())
+      if (grants.length === 0) {
+        throw new RemoteDesktopError(
+          `no remote-desktop grant for principal "${actor.principal}" on "${endpointKey(target)}"`,
+          'REMOTE_DESKTOP_FORBIDDEN',
+        )
       }
-    }
-    const attachments = [...this.live.values()].filter(
-      s => endpointKey(s.spec.target) === endpointKey(target),
-    ).length
-    const level: RemoteDesktopLevel = grants.some(g => g.level === 'control') ? 'control' : 'view'
-    return {
-      target,
-      available,
-      attachments,
-      level,
-      recording: grants.some(g => g.recording),
-      consented: this.consentCovers(actor.principal, endpointKey(target), level, grants),
-    }
+      const endpoint = this.endpoints.get(endpointKey(target))
+      let available = false
+      if (endpoint) {
+        try {
+          const probe = await this.dial(endpoint, this.config.probeTimeoutMs, this.lifetime.signal)
+          await closeTransport(probe)
+          this.assertOpen()
+          available = true
+        } catch {
+          available = false
+        }
+      }
+      const attachments = [...this.live.values()].filter(
+        s => endpointKey(s.spec.target) === endpointKey(target),
+      ).length
+      const level: RemoteDesktopLevel = grants.some(g => g.level === 'control') ? 'control' : 'view'
+      return {
+        target,
+        available,
+        attachments,
+        level,
+        recording: grants.some(g => g.recording),
+        consented: this.consentCovers(actor.principal, endpointKey(target), level, grants),
+      }
+    })
   }
 
   override async listGrants(actor: RemoteDesktopActor, filter?: RemoteDesktopGrantFilter): Promise<RemoteDesktopGrant[]> {
-    await this.ready
-    await this.store.refresh()
-    const principal = actor.admin ? filter?.principal : actor.principal
-    const rows = this.store.all().filter(g =>
-      (principal === undefined || g.principal === principal)
-      && (filter?.includeRevoked || g.revokedAt === undefined)
-      && (filter?.target === undefined
-        || (g.target.nodeId === filter.target.nodeId && (g.target.desktop ?? '') === (filter.target.desktop ?? ''))))
-    if (filter?.attachable !== true) return rows
-    await this.syncEndpoints()
-    const now = Date.now()
-    return rows.filter(g =>
-      this.endpoints.has(endpointKey(g.target))
-      && matchingGrants([g], actor.principal, g.target, filter.sessionId, now).length > 0)
+    return this.operate(async () => {
+      await this.store.refresh()
+      const principal = actor.admin ? filter?.principal : actor.principal
+      const rows = this.store.all().filter(g =>
+        (principal === undefined || g.principal === principal)
+        && (filter?.includeRevoked || g.revokedAt === undefined)
+        && (filter?.target === undefined
+          || (g.target.nodeId === filter.target.nodeId && (g.target.desktop ?? '') === (filter.target.desktop ?? ''))))
+      if (filter?.attachable !== true) return rows
+      await this.syncEndpoints()
+      const now = Date.now()
+      return rows.filter(g =>
+        this.endpoints.has(endpointKey(g.target))
+        && matchingGrants([g], actor.principal, g.target, filter.sessionId, now).length > 0)
+    })
   }
 
   override async grant(input: RemoteDesktopGrantInput, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant> {
-    await this.ready
-    await this.store.refresh()
-    this.requireAdmin(actor)
-    const grant: RemoteDesktopGrant = { ...input, id: RemoteDesktopGrantId(randomUUID()), createdAt: Date.now() }
-    await this.store.insert(grant)
-    this.record({ kind: 'grant', grant, actor, at: Date.now() })
-    this.ctx.emit('remote-desktop/grants-changed')
-    return grant
+    return this.operate(async () => {
+      await this.store.refresh()
+      this.requireAdmin(actor)
+      const grant: RemoteDesktopGrant = { ...input, id: RemoteDesktopGrantId(randomUUID()), createdAt: Date.now() }
+      await this.store.insert(grant)
+      this.record({ kind: 'grant', grant, actor, at: Date.now() })
+      this.ctx.emit('remote-desktop/grants-changed')
+      return grant
+    })
   }
 
   override async setLevel(id: RemoteDesktopGrantId, level: RemoteDesktopLevel, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant> {
-    await this.ready
-    await this.store.refresh()
-    this.requireAdmin(actor)
-    const updated = await this.store.update(id, { level })
-    this.record({ kind: 'set-level', grant: updated, actor, at: Date.now() })
-    for (const session of this.live.values()) {
-      if (session.spec.grants.some(g => g.id === id) && levelRank(level) > levelRank(session.spec.level)) {
-        this.record({ kind: 'level-escalate', session: session.id, from: session.spec.level, to: level, principal: session.principal, at: Date.now() })
+    return this.operate(async () => {
+      await this.store.refresh()
+      this.requireAdmin(actor)
+      const updated = await this.store.update(id, { level })
+      this.record({ kind: 'set-level', grant: updated, actor, at: Date.now() })
+      for (const session of this.live.values()) {
+        if (session.spec.grants.some(g => g.id === id) && levelRank(level) > levelRank(session.spec.level)) {
+          this.record({ kind: 'level-escalate', session: session.id, from: session.spec.level, to: level, principal: session.principal, at: Date.now() })
+        }
       }
-    }
-    this.enforceLiveSessions()
-    this.ctx.emit('remote-desktop/grants-changed')
-    return updated
+      this.enforceLiveSessions()
+      this.ctx.emit('remote-desktop/grants-changed')
+      return updated
+    })
   }
 
   override async revoke(id: RemoteDesktopGrantId, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant> {
-    await this.ready
-    await this.store.refresh()
-    this.requireAdmin(actor)
-    const updated = await this.store.update(id, { revokedAt: Date.now() })
-    this.record({ kind: 'revoke', grant: updated, actor, at: Date.now() })
-    this.enforceLiveSessions()
-    this.ctx.emit('remote-desktop/grants-changed')
-    return updated
+    return this.operate(async () => {
+      await this.store.refresh()
+      this.requireAdmin(actor)
+      const updated = await this.store.update(id, { revokedAt: Date.now() })
+      this.record({ kind: 'revoke', grant: updated, actor, at: Date.now() })
+      this.enforceLiveSessions()
+      this.ctx.emit('remote-desktop/grants-changed')
+      return updated
+    })
   }
 
   override async audit(
     actor: RemoteDesktopActor,
     filter?: { target?: RemoteDesktopTarget; principal?: string },
   ): Promise<RemoteDesktopAuditEvent[]> {
-    await this.ready
-    const principal = actor.admin ? filter?.principal : actor.principal
-    return this.auditLog.all().filter((event) => {
-      const touched = eventPrincipal(event)
-      if (principal !== undefined && touched !== principal) return false
-      const target = eventTarget(event)
-      return filter?.target === undefined
-        || (target !== undefined && target.nodeId === filter.target.nodeId && (target.desktop ?? '') === (filter.target.desktop ?? ''))
-    }).reverse()
+    return this.operate(async () => {
+      const principal = actor.admin ? filter?.principal : actor.principal
+      return this.auditLog.all().filter((event) => {
+        const touched = eventPrincipal(event)
+        if (principal !== undefined && touched !== principal) return false
+        const target = eventTarget(event)
+        return filter?.target === undefined
+          || (target !== undefined && target.nodeId === filter.target.nodeId && (target.desktop ?? '') === (filter.target.desktop ?? ''))
+      }).reverse()
+    })
   }
 
   private consentCovers(
@@ -593,6 +633,8 @@ export class VncRemoteDesktop extends RemoteDesktop {
     const session = this.live.get(id)
     if (!session) return
     this.live.delete(id)
+    for (const [token, pending] of this.pending) if (pending.sessionId === id) this.dropPending(token)
+    session.stop.abort()
     session.pump?.close()
     this.record({ kind: 'detach', session: id, spec: session.spec, principal: session.principal, at: Date.now() })
     this.ctx.emit('remote-desktop/attached', session.session, false)
@@ -644,25 +686,42 @@ export class VncRemoteDesktop extends RemoteDesktop {
    * Dial a VNC endpoint; the TCP seam providers and tests replace.
    * @param endpoint - the resolved host/port pair.
    * @param timeoutMs - optional connect timeout; the socket fails on expiry.
+   * @param signal - cancellation before the connection is returned.
+   * @returns the connected transport; cancellation closes an unfinished socket.
    */
-  protected dial(endpoint: { host: string; port: number }, timeoutMs?: number): Promise<Duplex> {
+  protected dial(endpoint: { host: string; port: number }, timeoutMs?: number, signal?: AbortSignal): Promise<Duplex> {
     return new Promise((resolve, reject) => {
+      signal?.throwIfAborted()
       const socket = connect(endpoint.port, endpoint.host)
-      const fail = (error: Error): void => {
-        socket.destroy()
-        reject(error)
-      }
-      socket.once('connect', () => {
+      const cleanup = (): void => {
         socket.removeListener('error', fail)
+        socket.removeListener('connect', connected)
+        signal?.removeEventListener('abort', aborted)
         if (timeoutMs !== undefined) socket.setTimeout(0)
-        resolve(socket)
-      })
+      }
+      const fail = (error: Error): void => {
+        cleanup()
+        void closeTransport(socket).then(() => reject(error))
+      }
+      const connected = (): void => { cleanup(); resolve(socket) }
+      const aborted = (): void => { fail(new RemoteDesktopError('VNC endpoint connection cancelled', 'REMOTE_DESKTOP_TARGET_UNAVAILABLE')) }
+      socket.once('connect', connected)
       socket.once('error', fail)
+      signal?.addEventListener('abort', aborted, { once: true })
       if (timeoutMs !== undefined) {
         socket.setTimeout(timeoutMs, () => { fail(new RemoteDesktopError('VNC endpoint probe timed out', 'REMOTE_DESKTOP_TARGET_UNAVAILABLE')) })
       }
     })
   }
+
+}
+
+/** Close a provider-owned transport and wait for its actual close notification. */
+async function closeTransport(stream: Duplex): Promise<void> {
+  if (stream.closed) return
+  const closed = new Promise<void>(resolve => { stream.once('close', resolve) })
+  stream.destroy()
+  await closed
 }
 
 /**

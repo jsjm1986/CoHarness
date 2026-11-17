@@ -243,6 +243,23 @@ describe('managedHandshake', () => {
     upstream.destroy()
   }, 15_000)
 
+  it('keeps post-handshake bytes buffered on the paused sockets until the caller resumes', async () => {
+    const [client, browserEnd] = duplexPair()
+    const [upstream, serverEnd] = duplexPair()
+    const server = ardServer(serverEnd, { username: 'admin', password: 's3cret' })
+    const browser = browserPreamble(browserEnd)
+    await managedHandshake(client, upstream, { username: 'admin', password: 's3cret' })
+    await Promise.all([server, browser])
+    browserEnd.write(KEY_EVENT)
+    await new Promise(resolve => setImmediate(resolve))
+    const got: Buffer[] = []
+    client.on('data', (chunk: Buffer) => got.push(chunk))
+    client.resume()
+    await vi.waitFor(() => { expect(Buffer.concat(got).equals(KEY_EVENT)).toBe(true) }, { timeout: 10_000 })
+    client.destroy()
+    upstream.destroy()
+  })
+
   it('surfaces the upstream refusal reason verbatim', async () => {
     const [client] = duplexPair()
     const [upstream, serverEnd] = duplexPair()
