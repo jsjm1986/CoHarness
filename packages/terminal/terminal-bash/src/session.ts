@@ -162,6 +162,7 @@ class LocalSendOperation implements TerminalSendOperation {
   private cancellationRequested = false
   private initialForegroundLeftWait: boolean
   private initialForegroundPgid: number | undefined
+  private foregroundBusyPolls = 0
   private expectsEcho = false
   private echoText = ''
   private echoMatched = 0
@@ -217,7 +218,8 @@ class LocalSendOperation implements TerminalSendOperation {
 
   setInitialForeground(foreground: SubprocessTerminalForeground | undefined): void {
     this.initialForegroundPgid = foreground?.processGroupId
-    this.initialForegroundLeftWait = foreground?.inputWaiting !== true
+    this.foregroundBusyPolls = foreground !== undefined && !foreground.inputWaiting ? 1 : 0
+    this.initialForegroundLeftWait = foreground === undefined
   }
 
   /**
@@ -271,10 +273,17 @@ class LocalSendOperation implements TerminalSendOperation {
   acceptsStdinWait(pgid: number, waiting: boolean): boolean {
     // The same group may still expose the wait that existed before terminal.write.
     // Observe every poll so a departure before the exact-settlement threshold
-    // still makes a later return to that wait post-write evidence.
+    // still makes a later return to that wait post-write evidence. A line
+    // editor's paste-echo churn can flicker the flag for a single poll without
+    // the shell having run the line, so the departure must hold across two
+    // consecutive busy polls before a return counts as completion.
     if (pgid !== this.initialForegroundPgid) return waiting
-    if (!waiting) this.initialForegroundLeftWait = true
-    return waiting && this.initialForegroundLeftWait
+    if (!waiting) {
+      if (++this.foregroundBusyPolls >= 2) this.initialForegroundLeftWait = true
+      return false
+    }
+    this.foregroundBusyPolls = 0
+    return this.initialForegroundLeftWait
   }
 
   cancel(): boolean {

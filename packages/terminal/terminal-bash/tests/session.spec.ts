@@ -653,7 +653,7 @@ describe('LocalPtySession readiness and output', () => {
     vi.useFakeTimers()
     const terminal = new FakeTerminal()
     const inspector = new FakeInspector()
-    const session = makeSession(terminal, inspector, config())
+    const session = makeSession(terminal, inspector, config({ idleSilenceMs: 200 }))
     await initialize(session, terminal)
 
     inspector.waiting = true
@@ -663,10 +663,21 @@ describe('LocalPtySession readiness and output', () => {
     await vi.advanceTimersByTimeAsync(20)
     expect(settled).toBe(false)
 
+    // A single busy poll is only churn evidence; the wait's departure must
+    // hold across consecutive polls before its return settles the send.
     inspector.waiting = false
     await vi.advanceTimersByTimeAsync(10)
     expect(settled).toBe(false)
     inspector.waiting = true
+    terminal.emitData('echo rea')
+    await vi.advanceTimersByTimeAsync(10)
+    expect(settled).toBe(false)
+
+    inspector.waiting = false
+    await vi.advanceTimersByTimeAsync(10)
+    await vi.advanceTimersByTimeAsync(10)
+    inspector.waiting = true
+    terminal.emitData('dy\r\nready\r\n')
     await vi.advanceTimersByTimeAsync(10)
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
@@ -688,8 +699,9 @@ describe('LocalPtySession readiness and output', () => {
     void operation.done.then(() => { settled = true })
     inspector.waiting = false
     await vi.advanceTimersByTimeAsync(10)
+    await vi.advanceTimersByTimeAsync(10)
     inspector.waiting = true
-    await vi.advanceTimersByTimeAsync(30)
+    await vi.advanceTimersByTimeAsync(20)
     expect(settled).toBe(false)
     await vi.advanceTimersByTimeAsync(10)
     expect(settled).toBe(true)
@@ -1287,6 +1299,41 @@ describe('LocalPtySession readiness and output', () => {
     expect(settled).toBe(false)
 
     terminal.emitData('echo hi\r\nhi\r\n\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
+  it('does not settle on a single-poll stdin-wait departure flicker during input echo', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    inspector.waiting = true
+    const operation = session.startSend({ text: 'slow command', submit: true })
+    let settled = false
+    void operation.done.then(() => { settled = true })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(terminal.writes).toEqual(['slow command\r'])
+
+    // A line editor's paste-echo churn can flicker inputWaiting for a single
+    // poll while the written line is still rendering: the departure and return
+    // do not prove the command ran, so the send must keep waiting.
+    inspector.waiting = false
+    await vi.advanceTimersByTimeAsync(10)
+    inspector.waiting = true
+    terminal.emitData('slow comm')
+    await vi.advanceTimersByTimeAsync(10)
+    expect(settled).toBe(false)
+
+    // A sustained busy departure followed by the wait is completion evidence.
+    terminal.emitData('and\r\n')
+    inspector.waiting = false
+    await vi.advanceTimersByTimeAsync(10)
+    await vi.advanceTimersByTimeAsync(10)
+    inspector.waiting = true
     await vi.advanceTimersByTimeAsync(10)
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
