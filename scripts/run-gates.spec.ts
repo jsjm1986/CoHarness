@@ -459,6 +459,14 @@ describe('gate graph validation', () => {
     }
   })
 
+  it('keeps every blocking native Windows check on pull requests', () => {
+    const inventory = (value: string) => withEnv('DSH_WINDOWS_REQUIRED_ONLY', value,
+      () => withPnpmEntrypoint(() => gatesForMode('ci-windows-complete')))
+    const complete = inventory('0')
+    expect(complete.some(gate => gate.allowFailure)).toBe(true)
+    expect(inventory('1')).toEqual(complete.filter(gate => !gate.allowFailure))
+  })
+
   it('runs the Windows built-bin smoke after other observational gates settle', () => {
     const observational = withPnpmEntrypoint(() => gatesForMode('ci-windows-observational-ready'))
     const builtBin = observational.find(gate => gate.id === 'built-bin-smoke')

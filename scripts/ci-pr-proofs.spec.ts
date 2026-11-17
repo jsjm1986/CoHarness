@@ -95,6 +95,21 @@ describe('additional PR proof selection', () => {
       .not.toContain('shared-runtime-input:packages/api-other/future/src/index.ts')
   })
 
+  it('selects the directory guard filesystem consumers and its packed workspace', () => {
+    const guard = 'plugins/dsh-directory-guard/'
+    for (const file of ['src/guard.ts', 'tests/guard.snapshot.spec.ts', 'package.json', 'tsconfig.json']) {
+      expect(proofs([guard + file]), file).toMatchObject({
+        releasePack: true, nativeWindows: true, sandbox: true, nativePack: false, vendorPack: false, provider: false,
+      })
+    }
+    for (const path of [guard + 'src/new-provider.ts', guard + 'package-lock.json', guard + 'cordis.patch.yml',
+      'plugins/new-plugin/src/guard.ts']) {
+      const selected = proofs([guard + 'src/guard.ts', path])
+      expect(selected, path).toMatchObject({ nativePack: true, nativeWindows: true, sandbox: true, provider: true, vendorPack: true })
+    }
+    expect(proofs([guard + 'src/guard.ts', 'native/system/src/bridge.cc']).nativePack).toBe(true)
+  })
+
   it('falls back to every supported proof and records unsupported impact for unknown input or an empty diff', () => {
     for (const paths of [[], ['new-runtime/index.rs'], ['packages/future-capability/new/src/index.ts']]) {
       const result = proofs(paths)

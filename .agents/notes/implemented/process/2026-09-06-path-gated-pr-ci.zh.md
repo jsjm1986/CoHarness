@@ -14,7 +14,7 @@ CI 工作流新增轻量的 `pr-scope` 分类器 [`scripts/ci-pr-scope.ts`](../.
 
 [`scripts/ci-pr-scope.ts`](../../../../scripts/ci-pr-scope.ts) 生成与提交绑定的验证计划。`all checks passed` 任务使用 [`scripts/verify-pr-results.ts`](../../../../scripts/verify-pr-results.ts)，要求每个被选中的任务成功，并允许有意省略的任务。
 
-scope 命令在完整 checkout 后，以 GitHub Pull Request 事件提供的基线 SHA 计算改动路径。默认的 `shadow` 执行取冻结分类结果与候选分类结果的并集；显式的 `candidate` 策略使用候选计划。本地测试无需 GitHub Actions，即可验证纯文档、安装器以及源码和依赖的分类。
+scope 命令在完整 checkout 后，以 GitHub Pull Request 事件提供的基线 SHA 计算改动路径。默认的 `shadow` 执行取冻结分类结果与候选分类结果的并集；显式的 `candidate` 策略使用候选计划。本地测试无需 GitHub Actions，即可验证纯文档、安装器以及源码和依赖的分类。 目录权限插件清单列明的 TypeScript 源文件、测试和构建配置变更会运行工作区打包、沙箱和原生 Windows 检查。新增文件和插件组合变更仍按未知输入处理。
 
 ## 考虑过的替代方案
 

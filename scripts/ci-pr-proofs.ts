@@ -35,6 +35,13 @@ const WORKFLOW_INPUTS = {
 } as const
 const NAMES: readonly PrProofName[] = ['releasePack', 'vendorPack', 'nativePack', 'sandbox', 'provider', 'piAi', 'nativeWindows']
 
+// The directory guard uses the harness filesystem and platform path semantics.
+const DIRECTORY_GUARD_INPUTS = new Set([
+  'package.json', 'tsconfig.json', 'tsconfig.build.json', 'tsconfig.ci.json',
+  'src/dsh-adapter.ts', 'src/grants.ts', 'src/guard.ts', 'src/index.ts',
+  'tests/grants.spec.ts', 'tests/guard.snapshot.spec.ts', 'tests/guard.spec.ts',
+].map(file => `plugins/dsh-directory-guard/${file}`))
+
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -119,6 +126,11 @@ export function classifyCiPrProofs(
       add(proof as keyof typeof WORKFLOW_INPUTS, `workflow-input:${path}`)
       // The broad dsh publish set owns packaging, not every new package's runtime impact.
       if (proof !== 'releasePack' || !/^(?:packages|apps|plugins)\//.test(path)) known = true
+    }
+    if (DIRECTORY_GUARD_INPUTS.has(path)) {
+      add('sandbox', `directory-guard:${path}`)
+      add('nativeWindows', `directory-guard:${path}`)
+      known = true
     }
     const shared = /^(?:vendor\/|packages\/(?:api|core|session|sdk|boot|bundle|preset|typert)\/)/.test(path)
       || inTree(path, 'packages/host/apiproxy')
