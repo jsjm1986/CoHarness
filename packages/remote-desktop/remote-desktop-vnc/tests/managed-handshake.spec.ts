@@ -313,8 +313,19 @@ describe('managedHandshake', () => {
 class TestVnc extends VncRemoteDesktop {
   readonly servers: Duplex[] = []
   readonly providerWrites: Buffer[] = []
+  readonly providerWriteCalls: Buffer[] = []
   protected override dial(): Promise<Duplex> {
     const [upstreamEnd, serverEnd] = duplexPair()
+    const originalWrite = upstreamEnd.write.bind(upstreamEnd)
+    upstreamEnd.write = ((
+      chunk: Buffer,
+      encoding?: BufferEncoding | ((error?: Error | null) => void),
+      callback?: (error?: Error | null) => void,
+    ) => {
+      this.providerWriteCalls.push(Buffer.from(chunk))
+      if (typeof encoding === 'function') return originalWrite(chunk, encoding)
+      return encoding === undefined ? originalWrite(chunk) : originalWrite(chunk, encoding, callback)
+    }) as typeof upstreamEnd.write
     upstreamEnd._write = (chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void) => {
       this.providerWrites.push(Buffer.from(chunk))
       serverEnd.push(chunk)
@@ -373,7 +384,8 @@ describe('serveStream with managed credentials', () => {
         if (event === 'data') {
           const chunk = args[0]
           const hex = Buffer.isBuffer(chunk) ? chunk.toString('hex') : String(chunk)
-          emitLog.push(`n=${clientEnd.listenerCount('data')} paused=${clientEnd.isPaused()} len=${Buffer.isBuffer(chunk) ? chunk.length : -1} hex=${hex}`)
+          const names = clientEnd.listeners('data').map(l => l.name || l.toString().slice(0, 40)).join(',')
+          emitLog.push(`n=${clientEnd.listenerCount('data')} [${names}] paused=${clientEnd.isPaused()} len=${Buffer.isBuffer(chunk) ? chunk.length : -1} hex=${hex}`)
         }
         return originalEmit(event, ...args)
       }
@@ -385,7 +397,7 @@ describe('serveStream with managed credentials', () => {
       const upstreamReceived: Buffer[] = []
       svc.servers[0]!.on('data', (chunk: Buffer) => upstreamReceived.push(chunk))
       browserEnd.write(Buffer.concat([KEY_EVENT, FB_UPDATE_REQUEST]))
-      const diag = () => `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState} client saw: ${Buffer.concat(clientSeen).toString('hex')} provider wrote: ${Buffer.concat(svc.providerWrites).toString('hex')} clientListeners=${clientEnd.listenerCount('data')} clientPaused=${clientEnd.isPaused()} serverPaused=${svc.servers[0]!.isPaused()} emits=[${emitLog.join(' | ')}]`
+      const diag = () => `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState} client saw: ${Buffer.concat(clientSeen).toString('hex')} provider write() calls: ${Buffer.concat(svc.providerWriteCalls).toString('hex')} provider wrote: ${Buffer.concat(svc.providerWrites).toString('hex')} clientListeners=${clientEnd.listenerCount('data')} clientPaused=${clientEnd.isPaused()} serverPaused=${svc.servers[0]!.isPaused()} emits=[${emitLog.join(' | ')}]`
       await vi.waitFor(() => {
         expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST), diag()).toBe(true)
       }, { timeout: 10_000 })
