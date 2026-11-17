@@ -360,6 +360,8 @@ describe('serveStream with managed credentials', () => {
       const done = svc.serveStream(session.stream.token, clientEnd)
       let doneState = 'pending'
       done.then(() => { doneState = 'resolved' }, (error: unknown) => { doneState = `rejected: ${error}` })
+      const clientSeen: Buffer[] = []
+      clientEnd.on('data', (chunk: Buffer) => clientSeen.push(chunk))
       await vi.waitFor(() => { expect(svc.servers.length).toBe(1) })
       const server = ardServer(svc.servers[0]!, { username: 'admin', password: 's3cret' })
       await browserPreamble(browserEnd)
@@ -368,7 +370,7 @@ describe('serveStream with managed credentials', () => {
       svc.servers[0]!.on('data', (chunk: Buffer) => upstreamReceived.push(chunk))
       browserEnd.write(Buffer.concat([KEY_EVENT, FB_UPDATE_REQUEST]))
       await vi.waitFor(() => {
-        expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST), `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState}`).toBe(true)
+        expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST), `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState} client saw: ${Buffer.concat(clientSeen).toString('hex')}`).toBe(true)
       }, { timeout: 10_000 })
       browserEnd.destroy()
       await done
