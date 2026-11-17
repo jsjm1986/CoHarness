@@ -201,12 +201,27 @@ describe('CI workflow', () => {
       DSH_COVERAGE_TEST_TIMEOUT_MS: '90000',
     })
     expectExternalCapacityExpression(windowsNative.env.DSH_COVERAGE_PARTITIONS, '8', '4')
+    expectExternalCapacityExpression(windowsNative.env.DSH_COVERAGE_MAX_WORKERS, '6', '4')
+    expect(String(windowsNative.env.DSH_COVERAGE_TIMING_PROFILE))
+      .toContain('selfhosted-dsh-win-ci')
+    expect(String(windowsNative.env.DSH_COVERAGE_TIMING_PROFILE))
+      .toContain('dsh-windows-2025-16core')
+    expect(String(windowsNative.env.DSH_COVERAGE_TIMING_PROFILE))
+      .toContain('github-windows-2025')
     expectExternalCapacityExpression(windowsNative.env.DSH_GATE_CONCURRENCY, '4', '1')
     expectExternalCapacityExpression(windowsNative.env.DSH_PUBLINT_CONCURRENCY, '8', '1')
     const nativeCommandSteps = (windowsNative.steps as unknown[]).filter((step): step is Record<string, unknown> & { run: string } => (
       isRecord(step) && typeof step.run === 'string'
     ))
     expect(nativeCommandSteps.map(step => step.run)).toContain('pnpm run check:ci:windows-complete')
+    // Coverage scheduling weights persist across runs through the same
+    // .coverage-times.json cache the Linux coverage lane uses.
+    const nativeUsesSteps = (windowsNative.steps as unknown[]).filter(
+      (step): step is Record<string, unknown> & { uses: string } => isRecord(step) && typeof step.uses === 'string')
+    const timingStep = (action: string) => nativeUsesSteps.some(step => step.uses.startsWith(`actions/cache/${action}`)
+      && JSON.stringify(step['with']).includes('.coverage-times.json'))
+    expect(timingStep('restore')).toBe(true)
+    expect(timingStep('save')).toBe(true)
     // The upstream sovereignty gate diffs mirrored release tags, which a
     // depth-1 clone does not carry; the same applies to serial-windows below.
     const windowsNativeCheckout = (windowsNative.steps as unknown[]).filter(isRecord)

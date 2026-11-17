@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-18-in-job-partitioned-coverage.md
 document:
-  en: f86c2dffb6d3d30fdccfa445c57043c5217e439b
-  zh: 62bb77511dd2c28b31e470288ff5c906dd346aeb
+  en: 43b499f6f10ce19d191495a9ccaa81d82c728a9f
+  zh: 9f9cf34bea23373132bbc7c9da66c44d3877cbb8
 /agent-note-in-job-partitioned-coverage:
   en: eb25ff049a1ecc31
   zh: d7430b14ccea5707
@@ -12,8 +12,8 @@ document:
   en: ab6dcac4ca2bbfb3
   zh: c754cc8077671b25
 /agent-note-in-job-partitioned-coverage/decision:
-  en: ce6a7a9ed6d49bfe
-  zh: 347c2719d1e784f4
+  en: 70d511d4908db692
+  zh: 7cfab9d16e51ef61
 /agent-note-in-job-partitioned-coverage/failure-and-output-semantics:
   en: c73ddbc65107e34e
   zh: dbc7649637f8d1c0

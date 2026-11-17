@@ -914,6 +914,8 @@ jobs:
           HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_dump"]'
           HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_restore"]'
         run: npm run test:postgres --prefix gateway
+      - name: Replay managed node maintenance control transcript
+        run: DSH_SNAPSHOT=replay ./node_modules/.bin/vitest run --config vitest.snapshot.config.ts gateway/tests/node-maintenance.snapshot.ts --maxWorkers=1
       - name: Test node content volumes on a disposable cluster
         run: |
           docker pull postgres:17.6-bookworm
@@ -925,6 +927,8 @@ jobs:
         run: |
           command -v restic || sudo apt-get install -y --no-install-recommends restic
           HGW_TEST_RESTIC="$(command -v restic)" node tests/run-node-content-postgres.mjs --recovery
+          cd ..
+          DSH_SNAPSHOT=replay HGW_TEST_RESTIC="$(command -v restic)" ./node_modules/.bin/vitest run --config vitest.snapshot.config.ts gateway/tests/peer-backup-capacity.snapshot.ts --maxWorkers=1
         working-directory: gateway
       - name: Preserve gate evidence
         if: always()
@@ -1630,6 +1634,14 @@ jobs:
       # Hosted Windows runners lose a different spec to the old 30 s floor on
       # roughly every run; the floor now sits above every measured stall.
       DSH_COVERAGE_TEST_TIMEOUT_MS: '90000'
+      DSH_COVERAGE_TIMING_PROFILE: >-
+        ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && 'selfhosted-dsh-win-ci'
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-windows-2025-16core'
+          || 'github-windows-2025' }}
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -1675,15 +1687,35 @@ jobs:
         shell: pwsh
         run: pnpm install --frozen-lockfile
 
+      - name: Compute coverage timing cache key
+        id: coverage-timing
+        shell: pwsh
+        run: node --import tsx/esm scripts/coverage-timing-key.ts >> "$env:GITHUB_OUTPUT"
+
+      - name: Restore compatible scheduling weights
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: .coverage-times.json
+          key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ steps.coverage-timing.outputs.key }}-
+
       - name: Run complete native Windows gate inventory
         shell: pwsh
         # Below the job budget so a wedged gate cannot occupy the slot for the
         # full 120 minutes before GitHub's own cancellation lands. The gate set
-        # grew past the old 90-minute cap: coverage alone measures ~66 minutes
-        # on the two-partition hosted runner, leaving the remaining inventory
-        # inside this bound with headroom.
+        # grew past the old 90-minute cap: coverage measured ~66 minutes on the
+        # two-partition hosted runner and ~44 minutes under the current
+        # four-partition fan-out, leaving the remaining inventory inside this
+        # bound with headroom.
         timeout-minutes: 105
         run: pnpm run check:ci:windows-complete
+      - name: Save successful scheduling weights
+        if: success() && hashFiles('.coverage-times.json') != ''
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: .coverage-times.json
+          key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence
