@@ -14,7 +14,6 @@ import { RemoteDesktopError } from '@deepseek-ai/dsh-remote-desktop'
 import type { RemoteDesktopGrantInput } from '@deepseek-ai/dsh-remote-desktop'
 import { VncRemoteDesktop } from '../src/index.ts'
 import { managedHandshake } from '../src/managed.ts'
-import { RfbClientFilter } from '../src/rfb.ts'
 
 const ADMIN = { principal: 'root', admin: true }
 const KEY_EVENT = Buffer.from([4, 1, 0, 0, 0, 0, 0, 0x61])
@@ -313,25 +312,8 @@ describe('managedHandshake', () => {
 
 class TestVnc extends VncRemoteDesktop {
   readonly servers: Duplex[] = []
-  readonly providerWrites: Buffer[] = []
-  readonly providerWriteCalls: Buffer[] = []
   protected override dial(): Promise<Duplex> {
     const [upstreamEnd, serverEnd] = duplexPair()
-    const originalWrite = upstreamEnd.write.bind(upstreamEnd)
-    upstreamEnd.write = ((
-      chunk: Buffer,
-      encoding?: BufferEncoding | ((error?: Error | null) => void),
-      callback?: (error?: Error | null) => void,
-    ) => {
-      this.providerWriteCalls.push(Buffer.from(chunk))
-      if (typeof encoding === 'function') return originalWrite(chunk, encoding)
-      return encoding === undefined ? originalWrite(chunk) : originalWrite(chunk, encoding, callback)
-    }) as typeof upstreamEnd.write
-    upstreamEnd._write = (chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void) => {
-      this.providerWrites.push(Buffer.from(chunk))
-      serverEnd.push(chunk)
-      callback()
-    }
     this.servers.push(serverEnd)
     return Promise.resolve(upstreamEnd)
   }
@@ -374,35 +356,8 @@ describe('serveStream with managed credentials', () => {
       const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
       await svc.confirm(request)
       const session = await svc.attach(request)
-      const filterCalls: string[] = []
-      const realPush = RfbClientFilter.prototype.push
-      vi.spyOn(RfbClientFilter.prototype, 'push').mockImplementation(function (this: RfbClientFilter, chunk: Uint8Array) {
-        try {
-          const out = realPush.call(this, chunk)
-          filterCalls.push(`in=${Buffer.from(chunk).toString('hex')} out=${out.toString('hex')} dropped=${this.dropped}`)
-          return out
-        } catch (error) {
-          filterCalls.push(`in=${Buffer.from(chunk).toString('hex')} threw=${(error as Error).message}`)
-          throw error
-        }
-      })
       const [browserEnd, clientEnd] = duplexPair()
       const done = svc.serveStream(session.stream.token, clientEnd)
-      let doneState = 'pending'
-      done.then(() => { doneState = 'resolved' }, (error: unknown) => { doneState = `rejected: ${error}` })
-      const clientSeen: Buffer[] = []
-      const emitLog: string[] = []
-      const originalEmit = clientEnd.emit.bind(clientEnd)
-      clientEnd.emit = (event: string | symbol, ...args: unknown[]) => {
-        if (event === 'data') {
-          const chunk = args[0]
-          const hex = Buffer.isBuffer(chunk) ? chunk.toString('hex') : String(chunk)
-          const names = clientEnd.listeners('data').map(l => l.name || l.toString().slice(0, 40)).join(',')
-          emitLog.push(`n=${clientEnd.listenerCount('data')} [${names}] paused=${clientEnd.isPaused()} len=${Buffer.isBuffer(chunk) ? chunk.length : -1} hex=${hex}`)
-        }
-        return originalEmit(event, ...args)
-      }
-      clientEnd.on('data', (chunk: Buffer) => clientSeen.push(chunk))
       await vi.waitFor(() => { expect(svc.servers.length).toBe(1) })
       const server = ardServer(svc.servers[0]!, { username: 'admin', password: 's3cret' })
       await browserPreamble(browserEnd)
@@ -410,14 +365,10 @@ describe('serveStream with managed credentials', () => {
       const upstreamReceived: Buffer[] = []
       svc.servers[0]!.on('data', (chunk: Buffer) => upstreamReceived.push(chunk))
       browserEnd.write(Buffer.concat([KEY_EVENT, FB_UPDATE_REQUEST]))
-      const diag = () => `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState} client saw: ${Buffer.concat(clientSeen).toString('hex')} provider write() calls: ${Buffer.concat(svc.providerWriteCalls).toString('hex')} provider wrote: ${Buffer.concat(svc.providerWrites).toString('hex')} clientListeners=${clientEnd.listenerCount('data')} clientPaused=${clientEnd.isPaused()} serverPaused=${svc.servers[0]!.isPaused()} filterCalls=[${filterCalls.join(' | ')}] emits=[${emitLog.join(' | ')}]`
-      await vi.waitFor(() => {
-        expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST), diag()).toBe(true)
-      }, { timeout: 10_000 })
+      await vi.waitFor(() => { expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST)).toBe(true) }, { timeout: 10_000 })
       browserEnd.destroy()
       await done
     } finally {
-      vi.restoreAllMocks()
       await fiber.dispose()
     }
   }, 60_000)
