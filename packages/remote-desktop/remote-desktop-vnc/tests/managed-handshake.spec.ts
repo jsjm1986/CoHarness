@@ -367,6 +367,16 @@ describe('serveStream with managed credentials', () => {
       let doneState = 'pending'
       done.then(() => { doneState = 'resolved' }, (error: unknown) => { doneState = `rejected: ${error}` })
       const clientSeen: Buffer[] = []
+      const emitLog: string[] = []
+      const originalEmit = clientEnd.emit.bind(clientEnd)
+      clientEnd.emit = (event: string | symbol, ...args: unknown[]) => {
+        if (event === 'data') {
+          const chunk = args[0]
+          const hex = Buffer.isBuffer(chunk) ? chunk.toString('hex') : String(chunk)
+          emitLog.push(`n=${clientEnd.listenerCount('data')} paused=${clientEnd.isPaused()} len=${Buffer.isBuffer(chunk) ? chunk.length : -1} hex=${hex}`)
+        }
+        return originalEmit(event, ...args)
+      }
       clientEnd.on('data', (chunk: Buffer) => clientSeen.push(chunk))
       await vi.waitFor(() => { expect(svc.servers.length).toBe(1) })
       const server = ardServer(svc.servers[0]!, { username: 'admin', password: 's3cret' })
@@ -375,7 +385,7 @@ describe('serveStream with managed credentials', () => {
       const upstreamReceived: Buffer[] = []
       svc.servers[0]!.on('data', (chunk: Buffer) => upstreamReceived.push(chunk))
       browserEnd.write(Buffer.concat([KEY_EVENT, FB_UPDATE_REQUEST]))
-      const diag = () => `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState} client saw: ${Buffer.concat(clientSeen).toString('hex')} provider wrote: ${Buffer.concat(svc.providerWrites).toString('hex')} clientListeners=${clientEnd.listenerCount('data')} clientPaused=${clientEnd.isPaused()} serverPaused=${svc.servers[0]!.isPaused()}`
+      const diag = () => `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState} client saw: ${Buffer.concat(clientSeen).toString('hex')} provider wrote: ${Buffer.concat(svc.providerWrites).toString('hex')} clientListeners=${clientEnd.listenerCount('data')} clientPaused=${clientEnd.isPaused()} serverPaused=${svc.servers[0]!.isPaused()} emits=[${emitLog.join(' | ')}]`
       await vi.waitFor(() => {
         expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST), diag()).toBe(true)
       }, { timeout: 10_000 })
