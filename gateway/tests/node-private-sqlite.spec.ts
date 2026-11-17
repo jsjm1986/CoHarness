@@ -14,6 +14,9 @@ const directories:string[]=[]
 async function fixture(){const parent=await mkdtemp(join(await realpath(tmpdir()),'hgw-private-db-'));directories.push(parent);await tightenPrivateFileAcl(parent);const root=join(parent,'state'),elsewhere=join(parent,'separate');await mkdir(root,{mode:0o700});await mkdir(elsewhere,{mode:0o700});return{parent,root,elsewhere}}
 afterEach(async()=>{for(const parent of directories.splice(0))await rm(parent,{recursive:true,force:true})})
 
+// Windows ACL tightening spawns one PowerShell child per call across the
+// fixture and each storage path; on a loaded hosted runner that alone can
+// exhaust the shared 30s test timeout ahead of the lazy host spawn.
 it('shares one lazy local process, resumes a committed draft and directory revision, and uses no idle IPC',async()=>{
   const {root}=await fixture(),host=new NodePrivateSqliteHost(root)
   const drafts=new LocalNodeDrafts(root,host),index=new PersonalNodeIndex(root,host)
@@ -29,7 +32,7 @@ it('shares one lazy local process, resumes a committed draft and directory revis
   expect(host.stats().pid).toBeNull()
   const later=new LocalNodeDrafts(root)
   try{expect(await later.apply(key,{kind:'read'})).toEqual({status:200,value:{revision:1,text:'retained'}})}finally{await later.close()}
-})
+},90_000)
 
 it.each(['drafts','personal'] as const)('rejects links in every SQLite file and its storage directories for %s',async domain=>{
   const {root,elsewhere}=await fixture(),dir=join(root,domain==='drafts'?'node-content-drafts':'personal-directory')

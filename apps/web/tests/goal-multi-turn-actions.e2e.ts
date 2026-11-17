@@ -167,8 +167,10 @@ describe('web e2e: Goal keeps one assistant action row per completed turn', () =
       { timeout: 5_000 },
     ).toBe(1)
     // The transcript follow-scroll settles after the last turn; the pill
-    // unmounts only once the scroller reports at-bottom.
-    await expect.poll(() => page.getByRole('button', { name: 'Back to bottom' }).count()).toBe(0)
+    // unmounts only once the scroller reports at-bottom. vitest's poll default
+    // is a one-second budget, far under the settle time on loaded runners, so
+    // give it the same explicit budget as the assertions above.
+    await expect.poll(() => page.getByRole('button', { name: 'Back to bottom' }).count(), { timeout: 15_000 }).toBe(0)
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
