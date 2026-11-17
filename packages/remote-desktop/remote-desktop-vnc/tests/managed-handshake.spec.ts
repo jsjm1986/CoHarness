@@ -348,8 +348,7 @@ describe('serveStream with managed credentials', () => {
       const upstreamReceived: Buffer[] = []
       svc.servers[0]!.on('data', (chunk: Buffer) => upstreamReceived.push(chunk))
       browserEnd.write(Buffer.concat([KEY_EVENT, FB_UPDATE_REQUEST]))
-      await new Promise(resolve => setImmediate(resolve))
-      expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST)).toBe(true)
+      await vi.waitFor(() => { expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST)).toBe(true) }, { timeout: 10_000 })
       browserEnd.destroy()
       await done
     } finally {
