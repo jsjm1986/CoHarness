@@ -588,6 +588,41 @@ it('uses the saved v2 encoding for opaque IDs and never stages a lexical v3 look
   } finally { view.dispose() }
 })
 
+it('does not adopt the restored active pane before the joint sessions/workspaces baseline resolves', async () => {
+  const h = harness()
+  const alpha = clientSessionKey({ kind: 'personal' }, id('alpha'))
+  const beta = clientSessionKey({ kind: 'project', projectId: 7 }, id('beta'))
+  h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+  h.list.set({ ...h.list.getSnapshot(), phase: 'pending', current: undefined, ids: [alpha, beta],
+    byId: Object.fromEntries([alpha, beta].map(key => [key, {
+      id: key, displayTitle: key, running: false, blank: false, updatedAt: 1,
+    }])),
+  })
+  const workspaceList = createSnapshotStore<{ phase: string; archivedSessionIds: SessionId[] }>({ phase: 'pending', archivedSessionIds: [] })
+  const workspaces = { list: workspaceList } as never
+  localStorage.setItem('dsh.conversation.workbenches.v3.account%3A1', JSON.stringify({ version: 3, mode: 'workbench', activeId: 'default', workbenches: [
+    { id: 'default', name: 'Saved', paneIds: [alpha, beta], activePaneId: beta, paneRatios: [0.5, 0.5], updatedAt: 1 },
+  ] }))
+  const view = new ConversationViewportController(h.sessions, createConversationViewportStore().create(), workspaces)
+  try {
+    view.setPersistenceScope('account:1')
+    view.setEnabled(true)
+    // Catalog verification clears while both lists are still pending — the
+    // restore-adoption select must wait for the joint baseline, not fire on
+    // catalog readiness alone.
+    view.setPaneVerification({})
+    view.markCatalogReady()
+    expect(h.opened).toEqual([])
+
+    h.list.set({ ...h.list.getSnapshot(), phase: 'ready' })
+    expect(h.opened).toEqual([])
+
+    workspaceList.set({ phase: 'ready', archivedSessionIds: [] })
+    expect(h.opened).toEqual([beta])
+    expect(h.list.getSnapshot().current).toBe(beta)
+  } finally { view.dispose() }
+})
+
 it('preserves hidden layout identities when unused runtimes unload and verifies them again before re-entry', async () => {
   const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
   const h = harness()

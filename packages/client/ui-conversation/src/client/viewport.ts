@@ -146,6 +146,7 @@ export class ConversationViewportController implements ConversationViewport {
     this.stopList = sessions.list.subscribe(() => { this.reconcileSessions() })
     this.stopWorkspaces = workspaces?.list.subscribe(() => { this.reconcileSessions() }) ?? (() => {})
     this.baselineReady = sessions.list.getSnapshot().phase === 'ready'
+      && (workspaces === undefined || workspaces.list.getSnapshot().phase === 'ready')
     this.restoringWorkbenches = true
     this.restoreWorkbenches(undefined)
     this.restoringWorkbenches = false
@@ -205,8 +206,7 @@ export class ConversationViewportController implements ConversationViewport {
       }
     }
     this.syncStaged()
-    if (enabled && state.mode === 'workbench' && state.activePaneId !== undefined
-      && validSession(this.sessions, state.activePaneId, this.workspaces)) this.select(state.activePaneId)
+    if (enabled) this.selectWorkbenchFocus()
   }
 
   setMode(mode: ConversationViewportMode): void {
@@ -470,9 +470,7 @@ export class ConversationViewportController implements ConversationViewport {
     if (this.catalogReady && !restoring) return
     this.catalogReady = true
     this.reconcileSessions()
-    const state = this.store.getSnapshot()
-    if (restoring && this.enabled && state.mode === 'workbench' && state.activePaneId !== undefined
-      && validSession(this.sessions, state.activePaneId, this.workspaces)) this.select(state.activePaneId)
+    if (restoring) this.selectWorkbenchFocus()
   }
 
   listWorkbenches() { return [...this.workbenches.values()].map(item => ({ ...item, paneIds: [...item.paneIds] })) }
@@ -691,7 +689,10 @@ export class ConversationViewportController implements ConversationViewport {
 
   private selectWorkbenchFocus(): void {
     const state = this.store.getSnapshot()
-    if (this.enabled && state.mode === 'workbench' && state.pendingIdentity !== true
+    // Restore-time adoption waits for the joint baseline the same way
+    // firstBaseline does: catalog or enablement alone must not move `current`
+    // onto the saved active pane before sessions and workspaces both resolve.
+    if (this.enabled && this.baselineReady && state.mode === 'workbench' && state.pendingIdentity !== true
       && state.activePaneId !== undefined
       && validSession(this.sessions, state.activePaneId, this.workspaces)) this.select(state.activePaneId)
   }
