@@ -312,8 +312,14 @@ describe('managedHandshake', () => {
 
 class TestVnc extends VncRemoteDesktop {
   readonly servers: Duplex[] = []
+  readonly providerWrites: Buffer[] = []
   protected override dial(): Promise<Duplex> {
     const [upstreamEnd, serverEnd] = duplexPair()
+    upstreamEnd._write = (chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void) => {
+      this.providerWrites.push(Buffer.from(chunk))
+      serverEnd.push(chunk)
+      callback()
+    }
     this.servers.push(serverEnd)
     return Promise.resolve(upstreamEnd)
   }
@@ -369,8 +375,9 @@ describe('serveStream with managed credentials', () => {
       const upstreamReceived: Buffer[] = []
       svc.servers[0]!.on('data', (chunk: Buffer) => upstreamReceived.push(chunk))
       browserEnd.write(Buffer.concat([KEY_EVENT, FB_UPDATE_REQUEST]))
+      const diag = () => `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState} client saw: ${Buffer.concat(clientSeen).toString('hex')} provider wrote: ${Buffer.concat(svc.providerWrites).toString('hex')} clientListeners=${clientEnd.listenerCount('data')} clientPaused=${clientEnd.isPaused()} serverPaused=${svc.servers[0]!.isPaused()}`
       await vi.waitFor(() => {
-        expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST), `upstream got: ${Buffer.concat(upstreamReceived).toString('hex')} done=${doneState} client saw: ${Buffer.concat(clientSeen).toString('hex')}`).toBe(true)
+        expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST), diag()).toBe(true)
       }, { timeout: 10_000 })
       browserEnd.destroy()
       await done
