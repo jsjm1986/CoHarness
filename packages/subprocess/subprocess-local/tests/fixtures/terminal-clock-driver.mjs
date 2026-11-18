@@ -24,7 +24,7 @@ async function bounded(operation, timeoutMs) {
 }
 
 async function until(check) {
-  const deadline = performance.now() + 20_000
+  const deadline = performance.now() + (Number(process.env.DSH_TERMINAL_CLOCK_DEADLINE_MS) || 20_000)
   for (;;) {
     if (await check()) return
     if (performance.now() >= deadline) throw new Error('Terminal fixture readiness or cleanup was not observed')
