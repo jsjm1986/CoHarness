@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 
-it('refuses stale Inspector startup and recovers through the real Web composition', { timeout: 150_000 }, async () => {
+it('refuses stale Inspector startup and recovers through the real Web composition', async () => {
   const mode = process.env.DSH_EXAMPLE_MODE ?? 'src'
   if (mode !== 'src' && mode !== 'lib') throw new Error('Inspector startup example requires src or lib')
   const root = await mkdtemp(join(tmpdir(), 'dsh-inspector-owner-example-'))
@@ -23,4 +23,4 @@ it('refuses stale Inspector startup and recovers through the real Web compositio
     } })
     await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./startup-owner/expected.jsonl', import.meta.url)))
   } finally { await rm(root, { recursive: true, force: true }) }
-}, 70_000)
+}, 150_000)
