@@ -39,6 +39,7 @@ function mount() {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
     usePanelInfo: emptyPanelInfo(),
+    useRemoteAccess: () => true,
     useBusyEnter: bindSnapshotSelector(policy.busyEnter),
     useSettings: bindSnapshotSelector(policy.settings),
     setBusyEnter,

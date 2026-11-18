@@ -3,7 +3,7 @@
  * Session's registered workspace; host absolute paths never cross this API.
  */
 
-import type { OfficeToPdfGeneration } from '@deepseek-ai/dsh-office-to-pdf/types'
+import type { OfficeKitGeneration } from '@deepseek-ai/dsh-office-kit/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
@@ -53,7 +53,7 @@ export interface WorkspaceOfficePreview {
   bytes: string
   missingFonts: string[]
   /** Converter lifetime, including its font and engine configuration. */
-  generation: OfficeToPdfGeneration
+  generation: OfficeKitGeneration
 }
 
 /** Read-only Workspace file methods. */

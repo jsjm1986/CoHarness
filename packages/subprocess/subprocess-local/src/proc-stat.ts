@@ -49,19 +49,34 @@ const DEFAULT_OPERATIONS: ProcOperations = {
 /* v8 ignore stop */
 
 /**
- * Report whether a Linux process group has an executing member. `false`
- * means the group contains only zombie/dead entries; `undefined` means the
- * process table could not prove either outcome. A failed or malformed row
- * makes a zombie-only observation incomplete; an observed live member still
- * establishes occupancy.
+ * Find an executing member of a Linux process group. `false` means the group
+ * contains only zombie/dead entries; `undefined` means the process table could
+ * not prove either outcome. A still-executing `knownMember` is returned from
+ * its own stat entry without enumerating `/proc`, so repeated polls of a
+ * long-lived group cost one file read instead of one per host process. A failed
+ * or malformed row makes a zombie-only observation incomplete; an observed live
+ * member still establishes occupancy.
  * @param processGroupId - POSIX process-group id to inspect.
+ * @param knownMember - member PID returned by an earlier call, if any.
  * @param internals - injectable process-table operations.
- * @returns Live-member presence, or `undefined` when unavailable/absent.
+ * @returns An executing member's PID; `false` when every group entry is
+ * zombie/dead; `undefined` when `/proc` is unreadable or lists no provable
+ * group entry.
  */
-export function linuxProcessGroupHasLiveMembers(
+export function linuxProcessGroupLiveMember(
   processGroupId: number,
+  knownMember: number | undefined,
   internals: ProcOperations = DEFAULT_OPERATIONS,
-): boolean | undefined {
+): number | false | undefined {
+  if (knownMember !== undefined) {
+    let known: ProcStat | undefined
+    try {
+      known = parseProcStat(internals.readFile(`/proc/${knownMember}/stat`))
+    } catch (_unreadableProcEntry) {
+      known = undefined
+    }
+    if (known?.pgrp === processGroupId && !/^[ZXx]$/.test(known.state)) return knownMember
+  }
   let entries: string[]
   try {
     entries = internals.readDir('/proc')
@@ -82,7 +97,7 @@ export function linuxProcessGroupHasLiveMembers(
     if (stat === undefined) { complete = false; continue }
     if (stat.pgrp !== processGroupId) continue
     matched = true
-    if (!/^[ZXx]$/.test(stat.state)) return true
+    if (!/^[ZXx]$/.test(stat.state)) return stat.pid
   }
   return matched && complete ? false : undefined
 }

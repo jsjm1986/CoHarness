@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-15-gateway-windows-native-spec-lane.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-11-15-gateway-windows-native-spec-lane.md
+document:
+  en: 7ec753c85e2c2d3d9283aef6ae90315f6a9266e5
+  zh: 8c86a99f9aeb04e18ed1583d6ac51ebe62f9f7f0
+/agent-note-gateway-windows-native-spec-lane:
+  en: ddca43c30e7c8696
+  zh: 113b4d8713bc01df
+/agent-note-gateway-windows-native-spec-lane/problem:
+  en: af5b4e74795468a8
+  zh: 972b5bc355122b23
+/agent-note-gateway-windows-native-spec-lane/decision:
+  en: 11f8c3cd281ed9d2
+  zh: 565779d4b8704723
+/agent-note-gateway-windows-native-spec-lane/verification:
+  en: 382b1a24b5149128
+  zh: d127a08e68e1309d
+/agent-note-gateway-windows-native-spec-lane/alternatives-considered:
+  en: f4a9a0c524ba788c
+  zh: f4b648aae04cc579
+/agent-note-gateway-windows-native-spec-lane/consequences:
+  en: 35548c73620792bf
+  zh: eedca6a5657f1d32

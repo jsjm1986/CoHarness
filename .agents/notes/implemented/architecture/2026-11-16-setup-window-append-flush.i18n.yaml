@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-setup-window-append-flush.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-16-setup-window-append-flush.md
+document:
+  en: 79f89d763b59b8e9ba6df3bc8bbb9c07a46aed52
+  zh: 65e11e6fd5becdc76585e128ae4d5affb083c2ba
+/agent-note-setup-window-append-durability:
+  en: 5a9eadcff992322d
+  zh: 785e244dad85ba4c
+/agent-note-setup-window-append-durability/problem:
+  en: be44542915dc1c73
+  zh: be55640102013672
+/agent-note-setup-window-append-durability/decision:
+  en: 38795977886cbc68
+  zh: b7bd940ff61d60a9
+/agent-note-setup-window-append-durability/consequences:
+  en: daee19d46c082942
+  zh: 45bf15b5ace05322
+/agent-note-setup-window-append-durability/alternatives-considered:
+  en: b97b0ff1bc0dc47b
+  zh: 3d0b7709589851e9
+/agent-note-setup-window-append-durability/verification:
+  en: 51b3727a880d3b06
+  zh: 15ad42fea7091833

@@ -41,10 +41,13 @@ export function TeamMessageId(id: string): TeamMessageId {
   return id as TeamMessageId
 }
 
-/** Durable teammate lifecycle. */
+/**
+ * Teammate lifecycle. Continuable children of the Lead are always `active`;
+ * `provisioning` and `failed` appear only in historical roster records.
+ */
 export type TeamMemberPhase = 'provisioning' | 'active' | 'failed'
 
-/** Whole durable value written on every teammate lifecycle change. */
+/** Historical roster value written by earlier Team builds on every teammate lifecycle change. */
 export interface TeamMemberSnapshot {
   readonly id: SessionId
   readonly name: string
@@ -52,32 +55,21 @@ export interface TeamMemberSnapshot {
   readonly provider: string
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
+  readonly error?: string
+}
+
+/**
+ * Version-1 roster value, kept only so historical Session logs decode. The
+ * `model` field captured the member's declared route at activation; version-2
+ * records and the current writer omit it.
+ */
+export interface TeamMemberSnapshotV1 extends TeamMemberSnapshot {
   /**
    * The route the member's own session would resume with, captured from the
    * live child Agent when it first became active. Absent on members activated
    * before this field existed and on members that never reached `active`.
    */
   readonly model?: string
-  readonly error?: string
-}
-
-/** Current runtime-enriched roster row. */
-export interface TeamMemberView {
-  readonly id: SessionId
-  readonly name: string
-  readonly role: 'lead' | 'teammate'
-  readonly status: 'running' | 'inactive' | 'provisioning' | 'failed'
-  readonly description?: string
-  readonly provider?: string
-  readonly context?: 'fresh' | 'fork'
-  /**
-   * Model the member's next request would use: a live member resolves its
-   * durable pending selection or last-used route; an inactive member shows
-   * the declared route persisted on its snapshot at activation. Absent for
-   * members activated before that field existed or that never activated.
-   */
-  readonly model?: string
-  readonly diagnostics: string[]
 }
 
 /** Durable task lifecycle. */
@@ -91,6 +83,8 @@ export interface TeamTaskSnapshot {
   readonly description: string
   readonly status: TeamTaskStatus
   readonly ownerId?: SessionId
+  /** Immutable agent path captured at assignment; absent on unnamed historical owners. */
+  readonly ownerName?: string
   readonly blockedBy: TeamTaskId[]
   readonly writeScopes: string[]
 }
@@ -104,26 +98,55 @@ export interface TeamTaskView {
   readonly status: TeamTaskStatus
   readonly blockedBy: TeamTaskId[]
   readonly writeScopes: string[]
+  readonly ownerId?: SessionId
+  /** Immutable agent path captured at assignment; absent on unnamed historical owners. */
   readonly ownerName?: string
   readonly ready: boolean
   readonly writeScopeWarnings: string[]
 }
 
-/** One peer message retained until its target Session records it. */
+/**
+ * Durable Team state published to browser clients through the Lead Session's
+ * `agentTeam` projection. `failure` names the first rejected persisted Team
+ * record; tasks then stay at the last valid state.
+ */
+export interface TeamProjection {
+  readonly enabled: boolean
+  readonly tasks: TeamTaskView[]
+  readonly failure?: string
+}
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionMap {
+    /** Saved selection and non-deleted task board of the Team rooted at the projected Session. */
+    agentTeam: TeamProjection
+  }
+}
+
+/** One peer message recorded by the historical Team mailbox. */
 export interface TeamMessageSnapshot {
-  /** Captured participants; Team routing never recovers identity from the latest caller. */
-  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly id: TeamMessageId
   readonly senderId: SessionId
   readonly senderName: string
   readonly targetId: SessionId
-  readonly delivery: 'quiet' | 'wakeup'
   readonly content: ContentBlock[]
 }
 
-/** Source retained by the target Session for durable mailbox de-duplication. */
+/**
+ * Version-1 mailbox value, kept only so historical Session logs decode. The
+ * current writer delivers peer messages through the target Agent inbox
+ * (`ctx.subagents.sendMessage`), which records no queue entry.
+ */
+export interface TeamMessageSnapshotV1 extends TeamMessageSnapshot {
+  /** Captured participants; Team routing never recovers identity from the latest caller. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
+  /** Whether the queued delivery may start an inactive target. */
+  readonly delivery: 'quiet' | 'wakeup'
+}
+
+/** Source recorded by a target Session for one historical Team mailbox delivery. */
 export interface TeamMessageSource {
-  /** Verified adjacent routing-host scope for this exact queued delivery. */
+  /** Verified adjacent routing-host scope persisted by version-1 deliveries. */
   readonly gatewayExecutionScope?: ExecutionInheritance
   readonly kind: 'team-message'
   readonly teamId: TeamId
@@ -138,47 +161,12 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 
-/** Team-service deployment limits. */
+/** Team-service defaults and deployment limits. */
 export interface Config {
-  /** Maximum immutable teammate names retained by one Team. */
-  readonly maxMembers?: number
+  /** Enable new roots without a saved selection before their first step; defaults to false. Resumes retain saved mode. */
+  readonly defaultEnabled?: boolean
   /** Maximum non-deleted tasks retained by one Team. */
   readonly maxTasks?: number
-  /** Maximum queued-minus-delivered messages for one target member. */
-  readonly maxPendingMessagesPerMember?: number
-  /** Maximum UTF-8 bytes in one complete sender-framed delivery. */
-  readonly maxMessageBytes?: number
-  /** Maximum milliseconds allowed for Team-owned runtime disposal. */
-  readonly disposalTimeoutMs?: number
-}
-
-/** Input for creating one durable teammate. */
-export interface SpawnTeammateRequest {
-  readonly name: string
-  readonly description: string
-  readonly prompt: ContentBlock[]
-  readonly context: 'fresh' | 'fork'
-  readonly provider: string
-  readonly signal: AbortSignal
-}
-
-/** Result after one teammate reaches a durable active or failed edge. */
-export interface SpawnTeammateResult {
-  readonly member: TeamMemberView
-}
-
-/** Input for one durable peer message. */
-export interface SendTeamMessageRequest {
-  readonly target: string
-  readonly content: ContentBlock[]
-  readonly delivery: 'quiet' | 'wakeup'
-  readonly signal: AbortSignal
-}
-
-/** Result after a peer message enters the durable mailbox. */
-export interface SendTeamMessageResult {
-  readonly messageId: TeamMessageId
-  readonly status: 'accepted' | 'queued'
 }
 
 /** Input for creating one shared task. */
@@ -209,45 +197,42 @@ export interface UpdateTeamTaskRequest {
   readonly description?: string
   readonly blockedBy?: readonly TeamTaskId[]
   readonly writeScopes?: readonly string[]
-  readonly owner?: string
+  readonly owner?: SessionId
 }
-
-/** Result of waiting for Team activity. */
-export interface TeamWaitResult {
-  readonly timedOut: boolean
-}
-
-/** Point-in-time roster and task-board projection returned to browser clients. */
-export interface TeamView {
-  readonly members: TeamMemberView[]
-  readonly tasks: TeamTaskView[]
-}
-
-/** Browser task mutation result with stale revisions kept distinct from other Team rejections. */
-export type TeamTaskMutationResult =
-  | { readonly ok: true; readonly value: TeamTaskView }
-  | {
-    readonly ok: false
-    readonly error: {
-      readonly code: 'team-task-conflict' | 'team-rejected'
-      readonly message: string
-    }
-  }
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
-    /** Whole teammate lifecycle value, stored only in the Team Lead Session. */
-    'team/member': { version: 1; teamId: TeamId; member: TeamMemberSnapshot }
-    /** Whole shared-task value, stored only in the Team Lead Session. */
-    'team/task': { version: 1; teamId: TeamId; task: TeamTaskSnapshot }
-    /** Durable mailbox enqueue, stored before delivery is attempted. */
-    'team/message/queued': { version: 1; teamId: TeamId; message: TeamMessageSnapshot }
-    /** Durable acknowledgement that the target Session recorded the message. */
-    'team/message/delivered': {
-      version: 1
-      teamId: TeamId
-      messageId: TeamMessageId
-      targetId: SessionId
-    }
+    /** User-selected Team mode; child Agents use the selection of their runtime root. */
+    'team/mode': { enabled: boolean }
+    /**
+     * Historical teammate lifecycle value; new teammates are continuable
+     * entries in the Lead's subagent catalog. Version-1 records remain in
+     * released logs and decode only — never written by the current writer.
+     */
+    'team/member':
+      | { version: 1; teamId: TeamId; member: TeamMemberSnapshotV1 }
+      | { version: 2; teamId: TeamId; member: TeamMemberSnapshot }
+    /**
+     * Whole shared-task value, stored only in the Team Lead Session.
+     * Version-1 records remain in released logs and fold into the `agentTeam`
+     * projection; the current writer emits only version 2.
+     */
+    'team/task':
+      | { version: 1; teamId: TeamId; task: TeamTaskSnapshot }
+      | { version: 2; teamId: TeamId; task: TeamTaskSnapshot }
+    /**
+     * Historical mailbox enqueue; new sends use the target Agent inbox.
+     * Version-1 records remain in released logs and decode only.
+     */
+    'team/message/queued':
+      | { version: 1; teamId: TeamId; message: TeamMessageSnapshotV1 }
+      | { version: 2; teamId: TeamId; message: TeamMessageSnapshot }
+    /**
+     * Historical acknowledgement that the target Session recorded a queued
+     * message. Version-1 records remain in released logs and decode only.
+     */
+    'team/message/delivered':
+      | { version: 1; teamId: TeamId; messageId: TeamMessageId; targetId: SessionId }
+      | { version: 2; teamId: TeamId; messageId: TeamMessageId; targetId: SessionId }
   }
 }

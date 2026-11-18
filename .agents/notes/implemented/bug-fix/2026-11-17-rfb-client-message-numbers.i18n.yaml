@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-17-rfb-client-message-numbers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-rfb-client-message-numbers.md
+document:
+  en: 33e0886809d7b95f45c951dac987424ec19707c6
+  zh: 68f76674bdcc0a5d2d0d874b6bc05c4dd6ede44a
+/agent-note-rfbclientfilter-frames-client-messages-by-their-rfc-6143-type-numbers:
+  en: 3a5beba8e9879819
+  zh: 8d224a04ef19e3cc
+/agent-note-rfbclientfilter-frames-client-messages-by-their-rfc-6143-type-numbers/problem:
+  en: 15d9e71dc02af6f3
+  zh: d793b3df30360614
+/agent-note-rfbclientfilter-frames-client-messages-by-their-rfc-6143-type-numbers/decision:
+  en: 8dee969e0ade81f3
+  zh: 836ced10b4009d76
+/agent-note-rfbclientfilter-frames-client-messages-by-their-rfc-6143-type-numbers/consequences:
+  en: 6e15ee78c7cfd419
+  zh: 52e14ed9639b7f9d
+/agent-note-rfbclientfilter-frames-client-messages-by-their-rfc-6143-type-numbers/alternatives-considered:
+  en: 6b91c57d148d19eb
+  zh: 425ca631170dad23
+/agent-note-rfbclientfilter-frames-client-messages-by-their-rfc-6143-type-numbers/verification:
+  en: 918fb7fe2b2881f6
+  zh: 83de89dd028bbc6e

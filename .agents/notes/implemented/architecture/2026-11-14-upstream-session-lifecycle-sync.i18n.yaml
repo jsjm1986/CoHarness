@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-14-upstream-session-lifecycle-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-session-lifecycle-sync.md
+document:
+  en: a62475ef67cb6d1ee797903d6a6cabc28ec799fc
+  zh: 5a4fb34daab9234469910d64f929a31b9cc0b3b4
+/agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3:
+  en: 5cc08674223115e2
+  zh: 13d059a7a86ef34d
+/agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/problem:
+  en: 6a9d12f511b095a7
+  zh: 6339b6ae04273215
+/agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/decision:
+  en: 3fe580b7fa725230
+  zh: 58942ffde34e0789
+/agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/consequences:
+  en: 1e9d14cc95cc29b5
+  zh: 607055ee7d63dbf0
+/agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/alternatives-considered:
+  en: f3baa43eac191365
+  zh: aff99baf7bceecfe
+/agent-note-upstream-session-lifecycle-sync-from-rc-2-v0-2-2-rc-3/verification:
+  en: a790490d0091685d
+  zh: f5f860a159bd7e5e

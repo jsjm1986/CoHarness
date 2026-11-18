@@ -424,6 +424,8 @@ describe('dsh-subagent-spawn-in-process', () => {
     await expect(starting).rejects.toThrow(/owner disposed during setup|inactive context/)
     await parentHandle.dispose()
 
-    expect(published).toEqual([])
+    // Session publication precedes setup under the revised lifecycle; the
+    // aborted child still must not reach agent/created or subagent/start.
+    expect(published).toEqual(['session/created'])
   })
 })

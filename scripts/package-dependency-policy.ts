@@ -69,7 +69,7 @@ const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-host-apiproxy/api/request-scope': ['bindRequestInteractions'],
   '@deepseek-ai/dsh-remote-desktop': ['RemoteDesktopError', 'RemoteDesktopGrantId'],
   '@deepseek-ai/dsh-resource-budget': ['ResourceAdmissionError'],
-  '@deepseek-ai/dsh-scope': ['scopeOf', 'scopeTarget'],
+  '@deepseek-ai/dsh-scope': ['carrierKeyOf', 'scopeOf', 'scopeTarget'],
   '@deepseek-ai/dsh-session': ['SessionId'],
   '@deepseek-ai/dsh-session-format/surface': ['SESSION_SURFACE_EVENT_TYPES'],
   '@deepseek-ai/dsh-settings': ['settingsNamespace'],

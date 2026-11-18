@@ -1195,7 +1195,7 @@ describe('InstanceManager', () => {
       + '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
       + '- id: api-gateway\n  inject: [executionAuthority]\n'
       + '- id: connection\n  config:\n    serverTiming: true\n'
-      + `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(join(root, 'state', 'cache', 'office-font-metadata'))}\n`
+      + `- id: office-kit\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(join(root, 'state', 'cache', 'office-font-metadata'))}\n`
       + "- insert:\n    - id: desktop-availability\n      name: '@deepseek-ai/dsh-gateway-execution/desktop-availability'\n"
       + `- id: remote-desktop-vnc\n  config:\n    endpointsFile: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'endpoints.json'))}\n`
       + `    grantsFile: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'grants.jsonl'))}\n`

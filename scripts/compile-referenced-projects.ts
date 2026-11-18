@@ -109,7 +109,9 @@ export function aggregateBuildArgs(face: 'host' | 'client'): string[] {
 }
 
 function hostHeapArgs(face: 'host' | 'client'): string[] {
-  return face === 'host' ? ['--max-old-space-size=4096'] : []
+  // Command-line flag, not NODE_OPTIONS: it must survive gates that strip the
+  // inherited environment. The host aggregate program exceeds 8 GiB on CI.
+  return face === 'host' ? ['--max-old-space-size=12288'] : []
 }
 
 /**

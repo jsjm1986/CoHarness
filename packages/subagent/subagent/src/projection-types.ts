@@ -6,18 +6,23 @@
 
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 
+/**
+ * The cataloged child modes this build knows. `external` and `continuable`
+ * rows may carry the child's name — unique among its siblings — absent only
+ * on historical records that predate named catalogs.
+ */
+export type KnownSubagentCatalogFields =
+  | { readonly mode: 'one-shot'; readonly label?: string }
+  | { readonly mode: 'external'; readonly label?: string; readonly name?: string }
+  | { readonly mode: 'continuable'; readonly label: string; readonly name?: string }
+
 /** One current direct-child discovery row materialized from parent facts. */
 export type SubagentCatalogEntry =
   & {
     readonly id: SessionId
     readonly createdAt: number
   }
-  & (
-    | { readonly mode: 'one-shot'; readonly label?: string }
-    | { readonly mode: 'external'; readonly label?: string }
-    | { readonly mode: 'continuable'; readonly label: string }
-    | { readonly mode: 'unknown'; readonly label?: string }
-  )
+  & (KnownSubagentCatalogFields | { readonly mode: 'unknown'; readonly label?: string })
 
 /** Durable active-turn timing for one descriptor-backed child session. */
 export interface SubagentTimingProjection {

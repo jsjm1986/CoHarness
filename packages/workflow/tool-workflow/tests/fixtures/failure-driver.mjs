@@ -12,7 +12,7 @@ const { LlmAdapter, ToolCallId, createUserMessage } = await import(entry('llm/ll
 const { SessionId } = await import(entry('core/session'))
 const { settleRun } = await import(entry('subagent/subagent'))
 const plugins = [
-  ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
+  ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/tool-executor-native'], ['core/system-prompt'],
   ['session/session-persistence-jsonl', { root: join(process.cwd(), 'sessions'), compression: 'none' }],
   ['session/session-projection'], ['core/agent-loop', { agents: [] }],
   ['jobs/jobs-local'], ['jobs/tool-jobs'],
@@ -105,11 +105,11 @@ try {
       if (!allowWorkflowCleanup) throw Object.create(null)
     } }
   }
-  const accepted = await ctx.tools.execute({
-    signal, callId: ToolCallId('background-failure-workflow'), name: 'workflow',
-    arguments: { script: 'return { released: true }', meta: { name: 'failure-flow', description: 'Retain the real workflow result after cleanup reporting fails.' }, run_in_background: true },
-    agent: parent,
-  })
+  const accepted = (await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: ToolCallId('background-failure-workflow'), name: 'workflow',
+      arguments: JSON.stringify({ script: 'return { released: true }', meta: { name: 'failure-flow', description: 'Retain the real workflow result after cleanup reporting fails.' }, run_in_background: true }) }],
+    signal, agent: parent,
+  })).results[0].result
   ctx.workflowEngine.start = start
   assert.equal(accepted.isError, false, JSON.stringify(accepted))
   const { jobId, runId } = accepted.value
@@ -128,15 +128,15 @@ try {
   assert.equal(workflow.status, 'failed')
   assert.equal(workflowDisposals, 2)
   assert.equal(workflowDisposed, true)
-  const collected = await ctx.tools.execute({ signal, callId: ToolCallId('background-failure-output'), name: 'job_output', arguments: { job_id: jobId }, agent: parent })
+  const collected = (await ctx.tools.execute({ calls: [{ type: 'tool-call', id: ToolCallId('background-failure-output'), name: 'job_output', arguments: JSON.stringify({ job_id: jobId }) }], signal, agent: parent })).results[0].result
   assert.equal(collected.isError, false)
   assert.ok(collected.content.some(block => block.type === 'text' && block.text.includes('Workflow cleanup failed')))
   assert.ok(!collected.content.some(block => block.type === 'text' && block.text.includes('"released": true')))
   const ended = parent.session.snapshotEvents().some(event => event.type === 'tool-workflow/run-end' && event.data.runId === runId)
   assert.equal(ended, true)
   assert.ok(warnings.some(message => message.includes('dispose failed: [unrenderable thrown value]')))
-  const bash = await ctx.tools.execute({ signal, callId: ToolCallId('durable-bash'), name: 'bash',
-    arguments: { command: 'echo durable-job', description: 'Verify durable job attribution', run_in_background: true }, agent: parent })
+  const bash = (await ctx.tools.execute({ calls: [{ type: 'tool-call', id: ToolCallId('durable-bash'), name: 'bash',
+      arguments: JSON.stringify({ command: 'echo durable-job', description: 'Verify durable job attribution', run_in_background: true }) }], signal, agent: parent })).results[0].result
   assert.equal(bash.isError, false, JSON.stringify(bash))
   assert.equal((await jobs.wait(bash.value.jobId, 10_000, parent.id)).status, 'completed')
   const publication = Promise.withResolvers(), publicationOrder = []
@@ -169,8 +169,8 @@ try {
     start: async () => { throw Object.create(null) },
   })
   await ctx.plugin(await import(entry('subagent/tool-subagent')), { provider: 'failure-start', maxDepth: 'provider-managed' })
-  const failedStart = await ctx.tools.execute({ signal, callId: ToolCallId('failed-subagent-start'), name: 'subagent',
-    arguments: { description: 'startup failure', prompt: 'Fail before child publication.', run_in_background: true }, agent: parent })
+  const failedStart = (await ctx.tools.execute({ calls: [{ type: 'tool-call', id: ToolCallId('failed-subagent-start'), name: 'subagent',
+      arguments: JSON.stringify({ description: 'startup failure', prompt: 'Fail before child publication.', run_in_background: true }) }], signal, agent: parent })).results[0].result
   assert.equal(failedStart.isError, false, JSON.stringify(failedStart))
   const failedStartState = await jobs.wait(failedStart.value.jobId, 10_000, parent.id)
   assert.equal(failedStartState.status, 'failed')

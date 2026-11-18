@@ -272,3 +272,31 @@
   padding: 9px;
   font-size: 12px;
 }
+
+.modeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.modeLabel {
+  flex: 1;
+  font-size: 12px;
+  color: var(--dsh-color-text, inherit);
+}
+
+.modeToggle {
+  flex: none;
+}
+
+.modeConfirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modeWarning {
+  font-size: 11px;
+  color: var(--dsh-color-warning, #b54708);
+}

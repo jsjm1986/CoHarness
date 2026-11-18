@@ -98,6 +98,7 @@ const kitBase: Omit<QuestionComposerProps, 'matched' | 'useStore' | 'useQuestion
   useSessions: selector => selector(sessionList),
   useWorkspaces: selector => selector(workspaceState),
   usePanelInfo: selector => selector({ activePanelId: null }),
+  useRemoteAccess: () => true,
   useProjection: (() => undefined),
   useInput: selector => selector(inputState),
   inputActions: {

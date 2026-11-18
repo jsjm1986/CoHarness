@@ -24,6 +24,7 @@ The package root exposes the Cordis plugin contract, `PiAiAdapter`, and `support
 - [Provider/model routing and replay](#providermodel-routing-and-replay)
 - [Vocabulary differences](#vocabulary-differences)
 - [App attribution](#app-attribution)
+- [Request headers](#request-headers)
 - [Dependency weight](#dependency-weight)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -207,6 +208,11 @@ This is a compatibility heuristic, not a general XML parser. An answer deliberat
 ## App attribution
 
 Every request carries the shared attribution header from dsh-llm's `attributionHeaders()`, merged through pi-ai's `headers` stream option. Provider-specific app-attribution headers are not synthesized. See the [mandatory app-attribution note](../../../.agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.md) and dsh-llm's `src/attribution.ts`.
+
+<a id="request-headers"></a>
+## Request headers
+
+Plugins can contribute model-hidden transport metadata through the synchronous `llm-pi-ai/request-headers` waterfall. Each inference call supplies immutable routing metadata (`PiAiRequestHeaderContext`) and a fresh `Headers` copy of its profile headers; when configured names differ only in capitalization, the last entry wins. The endpoint belongs to the prepared model, so concurrent calls and configuration changes cannot exchange header state. Listeners edit that copy, call `next()`, and release their references on return; `ctx.on()` removes their registration when the owning plugin unloads. Harness attribution is applied after all contributors, and pi-ai receives a detached header record.
 
 <a id="dependency-weight"></a>
 ## Dependency weight

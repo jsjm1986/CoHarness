@@ -7,27 +7,14 @@
       - id: llm-deepseek
         name: '@deepseek-ai/dsh-llm-deepseek-api-key'
         disabled: true
-      - id: tool-subagent-control
-        name: '@deepseek-ai/dsh-tool-subagent-control'
-        disabled: true
-      - id: tool-subagent
-        name: '@deepseek-ai/dsh-tool-subagent'
-        config:
-          provider: spawn
-          toolName: subagent
-          backgroundMode: one-shot
-          maxDepth: 1
-      - id: tool-subagent-fork
-        name: '@deepseek-ai/dsh-tool-subagent'
-        config:
-          provider: fork
-          toolName: subagent_fork
-          backgroundMode: one-shot
-          maxDepth: 1
       - insert:
           - id: agent-team
             name: '@deepseek-ai/dsh-experimental-agent-team'
           - id: tool-agent-team
             name: '@deepseek-ai/dsh-experimental-tool-agent-team'
+          - id: tool-subagent-list-agents
+            name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
           - id: team-fixture-llm
             name: './tests/fixtures/team-llm.mjs'
+          - id: enable-team-fixture
+            name: '../../packages/experimental/agent-team/tests/enable-team-fixture.ts'

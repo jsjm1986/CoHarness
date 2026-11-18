@@ -22,7 +22,7 @@ This package owns the Service Definition and provider contract layer of the four
 
 ## Summary
 
-Use `dsh-fs` when an application needs consistent filesystem operations across host, confined, or remote execution environments. It lets consumers resolve stable file identities, map shared host files where supported, perform bounded text and byte reads, list directories, and apply atomic text writes and literal edits. Version guards are optional, so a backend works without policy enforcement; callers can supply a guard to reject a mutation after the file changes. Choose `fs-local` or `fs-sandbox` for host execution. Model-facing filesystem tools are provided separately by `dsh-tool-fs`.
+Use `dsh-fs` when an application needs consistent filesystem operations across host, confined, or remote execution environments. It lets consumers resolve stable file identities, map shared host files where supported, perform bounded text and byte reads, list directories, watch targets, and apply atomic writes, literal edits, patch hunks, deletes, and moves. Moves report destination publication separately from source removal. Version guards are optional, so a backend works without policy enforcement; callers can supply a guard to reject a mutation after the file changes. Choose `fs-local` or `fs-sandbox` for host execution. Model-facing filesystem tools are provided separately by `dsh-tool-fs`.
 
 ## Table of Contents
 
@@ -39,7 +39,7 @@ Use `dsh-fs` when an application needs consistent filesystem operations across h
 <a id="service-api-ctxfs"></a>
 ## Service API (`ctx.fs`)
 
-A backend subclasses `FileSystem` and implements thirteen primitives.
+A backend subclasses `FileSystem` and implements sixteen primitives.
 
 | Member | Semantics |
 |---|---|
@@ -54,15 +54,21 @@ A backend subclasses `FileSystem` and implements thirteen primitives.
 | `readBytes(target, signal, maxBytes)` | Read a complete regular file as raw bytes with no decoding or binary rejection. `maxBytes` is required and bounds the complete content at this seam: a known or discovered overflow fails with `FS_TOO_LARGE` instead of truncating or buffering without a bound. |
 | `readByteRange(target, range, signal?)` | Read a zero-based bounded raw-byte window without buffering bytes outside the requested range; an offset at or beyond EOF returns an empty array. |
 | `listDir(target, signal?, maxEntries?)` | List direct directory children in stable name order. Returns entry names, entry types, resolved child targets, and cheap metadata (`version`/file `size` when available); never reads file contents. `maxEntries` lets bounded consumers stop processing after a finite prefix. Missing targets throw `FS_NOT_FOUND`, non-directories throw `FS_NOT_DIRECTORY`, permission failures throw `FS_PERMISSION_DENIED`, and other backend I/O failures throw `FS_IO_ERROR`. Broken/disappeared children may be returned as `other` without metadata; child permission/IO failures fail the whole listing with the same structured codes. |
+| `watch(target, changed, signal)` | Report invalidations for one file or a directory's direct entries; resolves once observation is ready with an async close function the caller must await. Unsupported providers reject without polling. |
 | `writeText(target, content, expected?, signal?)` | Atomic create/replace. `expected` is OPTIONAL: omit ⇒ unconditional create-or-overwrite; supply an `FsWriteIntent` (`createIfAbsent`/`replaceIfVersion`) to guard. `createIfAbsent` must perform a no-replace publication so a creator racing the initial probe is preserved. |
 | `editText(target, edit, expected?, signal?)` | Literal edit. `expected` is OPTIONAL: omit ⇒ unconditional edit of the current content; supply `{ version }` to guard (verified BEFORE matching). A missing target reports `FS_STALE_VERSION` either way. Applies and writes atomically — one mutation critical section. |
+| `patchText(target, hunks, expected?, signal?)` | Apply parsed `PatchHunk`s under the same lock as the version check; mismatched context rejects with `FS_PATCH_MISMATCH`. |
+| `deleteFile(target, expected?, signal?)` | Remove a regular file after the optional version guard; returns the bounded `before` basis (`null` for binary content). |
+| `moveFile(source, destination, options, signal?)` | Lock both targets in lexical order, optionally patch the source text, publish the destination, then remove the source. Two effects, not a transaction: `sourceDeleted: false` means the destination is published and the source remains, with `sourceFailure` describing the removal failure. Same target rejects with `FS_SAME_TARGET`. |
 
 The mutation runs inside the backend's per-target lock either way, so an unconditional write/edit is still atomic — "unconditional" drops the *version* precondition, not the atomicity.
+
+Host-backed providers classify Node errno failures with `fsErrorFromErrno` (`src/errno.ts`): `ENOENT`/`ENOTDIR` → `FS_NOT_FOUND`, `EACCES`/`EPERM` → `FS_PERMISSION_DENIED`, `EISDIR` where a file is required → `FS_NOT_REGULAR_FILE`, other errno values → `FS_IO_ERROR`, keeping the original error as `cause`. The runtime `FS_ERROR_CODES` list is exported for transport validators.
 
 <a id="the-fs-policy-events"></a>
 ## The `fs/*` policy events
 
-This package declares three events (see the generated region of [filesystem.md](../../../docs/subsystems/filesystem.md#cordis-surface)) so the emitter (`@deepseek-ai/dsh-tool-fs`) and the policy listener (`@deepseek-ai/dsh-fs-observation-policy`) share a vocabulary without the emitter depending on the policy plugin. `fs/write-intent` and `fs/edit-intent` are single-slot decision waterfalls (the listener fully decides, never calling `next()`); `fs/observed` is a fire-and-forget recording event carrying an `FsObservation` discriminated union: present with a version or confirmed absent. They carry only `dsh-fs` vocabulary plus an opaque `object` actor — no model-facing concepts and no agent/session owner structure.
+This package declares four events (see the generated region of [filesystem.md](../../../docs/subsystems/filesystem.md#cordis-surface)) so the emitter (`@deepseek-ai/dsh-tool-fs`) and the policy listener (`@deepseek-ai/dsh-fs-observation-policy`) share a vocabulary without the emitter depending on the policy plugin. `fs/write-intent`, `fs/edit-intent`, and `fs/delete-intent` are single-slot decision waterfalls (the listener fully decides, never calling `next()`); `fs/observed` is a fire-and-forget recording event carrying an `FsObservation` discriminated union: present with a version or confirmed absent. Write and move-destination guards ride `fs/write-intent`; literal-edit, patch, and move-source guards ride `fs/edit-intent`; deletes ride `fs/delete-intent`. They carry only `dsh-fs` vocabulary plus an opaque `object` actor — no model-facing concepts and no agent/session owner structure.
 
 <a id="a-provider-contract-not-the-policy-layer"></a>
 ## A provider contract, not the policy layer
@@ -87,8 +93,9 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
-- **Text-only mutations by contract** — text reads and both mutations reject binary/non-UTF-8 content with `FS_NOT_TEXT`; `readBytes` and `readByteRange` are raw-byte primitives, and binary-safe mutations remain a deliberate deferral of [the tool-schemas Agent Note](../../../.agents/notes/implemented/feature/2026-06-17-filesystem-tool-schemas.md).
-- **Twelve primitives only** — no delete, rename/move, copy, or watch; `listDir` is single-level, with recursion, globbing, pagination, and search out of scope per [the directory-listing Agent Note](../../../.agents/notes/archived/architecture/2026-07-03-filesystem-directory-listing-seam.md).
+- **Text-only mutations by contract** — text reads, edits, patches, and moves reject binary/non-UTF-8 content with `FS_NOT_TEXT`; `readBytes` and `readByteRange` are raw-byte primitives, and deletion also accepts binary regular files, returning `before: null` for them. Binary-safe edits remain a deliberate deferral of [the tool-schemas Agent Note](../../../.agents/notes/implemented/feature/2026-06-17-filesystem-tool-schemas.md).
+- **Moves are two effects, not a transaction** — `sourceDeleted: false` means the destination is published and the source remains; copying and recursive directory operations are outside this API.
+- **`listDir` is single-level** — recursion, globbing, pagination, and search are out of scope per [the directory-listing Agent Note](../../../.agents/notes/archived/architecture/2026-07-03-filesystem-directory-listing-seam.md).
 - **No IO deadline** — the seam arms no timeout; cancellation is a best-effort optional `AbortSignal` per primitive (the deliberate [fs-family stance](../README.md)).
 - **Resolve-then-operate costs a remote backend two round-trips per tool call** — folding or caching resolution is left to such a backend.
 

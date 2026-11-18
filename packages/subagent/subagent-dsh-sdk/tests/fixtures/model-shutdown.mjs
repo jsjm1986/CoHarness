@@ -41,6 +41,7 @@ try {
   ]))
   const plugins = [
     ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
+    ['core/tool-executor-native'],
     ['session/session-persistence-jsonl', { root: join(process.cwd(), 'sessions'), compression: 'none' }],
     ['session/session-projection'], ['fs/fs-local'], ['session/working-directory'], ['core/agent-loop', { agents: [] }], ['subagent/subagent'],
     ['subagent/subagent-dsh-sdk', { providerName: 'shutdown-child', profile: 'sdk', patches: [childPatch],

@@ -19,6 +19,7 @@ import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
 
 const roots: string[] = []
@@ -52,6 +53,8 @@ async function composition(): Promise<LoopComposition> {
     "    personaSuffix: ''",
     '- id: tools',
     "  name: '@deepseek-ai/dsh-tools'",
+    '- id: toolExecutor',
+    "  name: '@deepseek-ai/dsh-tool-executor-native'",
     '- id: agents',
     "  name: '@deepseek-ai/dsh-agent'",
     '- id: agentLoop',
@@ -73,6 +76,7 @@ async function composition(): Promise<LoopComposition> {
       ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
       ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
       ['@deepseek-ai/dsh-tools', ToolRuntime],
+      ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
       ['@deepseek-ai/dsh-agent', AgentRegistry],
       ['@deepseek-ai/dsh-agent-loop', AgentLoop],
     ])

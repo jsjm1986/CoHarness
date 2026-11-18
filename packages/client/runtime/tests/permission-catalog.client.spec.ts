@@ -8,8 +8,8 @@ import { FakeApiClient } from './fake-api.client.ts'
 
 type CatalogCall = () => Promise<RemoteResult<PermissionCatalog>>
 
-const CATALOG_A: PermissionCatalog = { options: [{ value: 'a', name: 'A' }] }
-const CATALOG_B: PermissionCatalog = { options: [{ value: 'b', name: 'B' }] }
+const CATALOG_A: PermissionCatalog = { options: [{ value: 'a', name: 'A' }], defaultOptions: [{ value: 'a', name: 'A' }], defaultPreset: 'a' }
+const CATALOG_B: PermissionCatalog = { options: [{ value: 'b', name: 'B' }], defaultOptions: [{ value: 'b', name: 'B' }], defaultPreset: 'b' }
 
 const DESCRIPTION_A = { version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true } as HostDescription
 

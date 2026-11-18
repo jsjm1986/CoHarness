@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-15-sdk-run-commands-transcreation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-15-sdk-run-commands-transcreation.md
+document:
+  en: eb6c4551120e983a87631a8a5061664f56999703
+  zh: 39df009888cc934d3ea53852561599016eceff7d
+/agent-note-sdk-run-commands-transcreation-onto-the-carrier-architecture:
+  en: 421955b1e5835c40
+  zh: 8a87eda2b328966d
+/agent-note-sdk-run-commands-transcreation-onto-the-carrier-architecture/problem:
+  en: e1df4ffe8606cb41
+  zh: 83e3596f7f4b0294
+/agent-note-sdk-run-commands-transcreation-onto-the-carrier-architecture/decision:
+  en: 7b09d0ce8a6e31c8
+  zh: d90cc5c9fd67119b
+/agent-note-sdk-run-commands-transcreation-onto-the-carrier-architecture/alternatives-considered:
+  en: 5ab7a6752bef94a0
+  zh: 55225d9f3ac752b8
+/agent-note-sdk-run-commands-transcreation-onto-the-carrier-architecture/consequences:
+  en: cce321d316c21455
+  zh: e45861d14c1b127c
+/agent-note-sdk-run-commands-transcreation-onto-the-carrier-architecture/verification:
+  en: f543f209d7afcfee
+  zh: 1f4051afb1225d9f

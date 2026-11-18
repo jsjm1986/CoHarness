@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-25-agent-team-same-lineage-merge.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-agent-team-same-lineage-merge.md
+document:
+  en: ce9a7adc3b4dde36a983b6c713265a9289668e72
+  zh: 8855a9634ff918dc51aee25e353d319326a3e719
+/agent-note-agent-teams-same-lineage-merge-rc-3:
+  en: 79f88a4faa6e486b
+  zh: 5fe24889cbca113e
+/agent-note-agent-teams-same-lineage-merge-rc-3/problem:
+  en: 7f902436280b9e87
+  zh: f9ff4da3bc2f8d51
+/agent-note-agent-teams-same-lineage-merge-rc-3/decision:
+  en: b31fa8af6412df32
+  zh: 1c976c1b09119816
+/agent-note-agent-teams-same-lineage-merge-rc-3/consequences:
+  en: a833d7c5c4c53415
+  zh: 33f758badeb57906
+/agent-note-agent-teams-same-lineage-merge-rc-3/alternatives-considered:
+  en: 60e0c73d4f4c2735
+  zh: 9daf0ab4f506609a
+/agent-note-agent-teams-same-lineage-merge-rc-3/verification:
+  en: ca326949b8383c8a
+  zh: d4160426a8cde848

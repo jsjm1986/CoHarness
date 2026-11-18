@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-18-workbench-restore-adoption-joint-baseline.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-18-workbench-restore-adoption-joint-baseline.md
+document:
+  en: 0a6973c5e10f25f1a7506035af7b9936ab2fe0c2
+  zh: 49efdef4f49d888bf177b3aa4f4268733bade3e3
+/agent-note-workbench-restore-adoption-must-wait-for-the-joint-sessions-workspaces-baseline:
+  en: 8ec0a6206ebb4e9a
+  zh: 2e1b6306e6eef6d2
+/agent-note-workbench-restore-adoption-must-wait-for-the-joint-sessions-workspaces-baseline/problem:
+  en: 24c3e41619dd2b94
+  zh: 14f5a0127fe671f9
+/agent-note-workbench-restore-adoption-must-wait-for-the-joint-sessions-workspaces-baseline/decision:
+  en: 6867488d5a04cb54
+  zh: 66caa597f1a731f2
+/agent-note-workbench-restore-adoption-must-wait-for-the-joint-sessions-workspaces-baseline/alternatives-considered:
+  en: 46d8f1845a628d47
+  zh: 3750e9e78e42f3eb
+/agent-note-workbench-restore-adoption-must-wait-for-the-joint-sessions-workspaces-baseline/consequences:
+  en: 0b76f760bf43bee4
+  zh: a1a20ff972dcef6e
+/agent-note-workbench-restore-adoption-must-wait-for-the-joint-sessions-workspaces-baseline/verification:
+  en: ac9892fa0dee258d
+  zh: c5be698dbc399c6a

@@ -9,22 +9,34 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../../llm/llm"
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     },
     {
       "path": "../../attachment/attachment"
     },
     {
       "path": "../../fs/fs"
+    },
+    {
+      "path": "../../identity/anonymous-user-id"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
+      "path": "../../settings/settings-file"
     },
     {
       "path": "../../util/atomic-write"
@@ -36,7 +48,7 @@
       "path": "../../util/home-paths"
     },
     {
-      "path": "../deepseek-llm-api-extensions"
+      "path": "../../util/http-proxy"
     },
     {
       "path": "../../util/launch-environment"
@@ -45,22 +57,13 @@
       "path": "../../util/timeout"
     },
     {
-      "path": "../../identity/anonymous-user-id"
-    },
-    {
-      "path": "../../util/http-proxy"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
-      "path": "../../settings/settings"
-    },
-    {
-      "path": "../../settings/settings-file"
+      "path": "../../util/values"
     },
     {
       "path": "../../web/web-search-deepseek"
+    },
+    {
+      "path": "../deepseek-llm-api-extensions"
     }
   ]
 }

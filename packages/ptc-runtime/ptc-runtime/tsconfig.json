@@ -9,10 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../sandbox/sandbox"
+      "path": "../../../vendor/cosmokit"
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../sandbox/sandbox"
     }
   ]
 }

@@ -27,6 +27,7 @@ import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import { AUTO_PRESET } from '@deepseek-ai/dsh-permission-presets'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-subagent'
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc'
 import type {} from '@deepseek-ai/dsh-user-approval'
 import {
   RUN_CODE_NAME,

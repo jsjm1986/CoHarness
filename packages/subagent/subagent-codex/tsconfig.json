@@ -9,27 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../sdk/protocol"
-    },
-    {
-      "path": "../subagent"
-    },
-    {
-      "path": "../../subprocess/subprocess"
-    },
-    {
-      "path": "../../util/timeout"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -39,10 +18,34 @@
       "path": "../../../vendor/schemastery"
     },
     {
+      "path": "../../context/resource-budget"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
       "path": "../../preset/agent-preset-registry"
     },
     {
+      "path": "../../sdk/protocol"
+    },
+    {
       "path": "../../ssh/ssh"
+    },
+    {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../util/timeout"
+    },
+    {
+      "path": "../subagent"
     }
   ]
 }

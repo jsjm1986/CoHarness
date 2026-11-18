@@ -53,3 +53,8 @@
 
     - id: team-fixture-llm
       name: './tests/fixtures/team-llm.mjs'
+
+# Replaces the disabled invocation provider so injected `headlessStartup` reads resolve.
+- insert:
+    - id: headless-startup-test-stub
+      name: '../../../../../packages/test-support/loader-smoke/tests/fixtures/headless-startup-stub.ts'

@@ -1,0 +1,23 @@
+{
+  "name": "dsh-snapshots",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Workspace umbrella for recorded-session scenarios: declares every package a scenario-local plugin file imports so plain Node resolves real exports→lib under DSH_EXAMPLE_MODE=lib. Not a build target.",
+  "dependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-llm-replay": "workspace:*",
+    "@deepseek-ai/dsh-loader-smoke": "workspace:*",
+    "@deepseek-ai/dsh-pwsh-local": "workspace:*",
+    "@deepseek-ai/dsh-sdk-client": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-session-format": "workspace:*",
+    "@deepseek-ai/dsh-session-format-v0-to-v1": "workspace:*",
+    "@deepseek-ai/dsh-session-snapshot": "workspace:*",
+    "@deepseek-ai/dsh-subagent": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-native": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
+    "@deepseek-ai/dsh-web-fetch-http": "workspace:*"
+  }
+}

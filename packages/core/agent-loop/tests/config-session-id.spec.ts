@@ -10,6 +10,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -40,6 +41,7 @@ async function makeCoreContext(): Promise<Context> {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SessionProjectionRegistry)
   return ctx
@@ -59,10 +61,12 @@ describe('config-driven session id', () => {
         { id: 'unchanged', sessionId: SessionId('config-unchanged'), model: 'mock' },
       ],
     })
-    expect(ctx.agents.get(SessionId('launcher-fresh'))?.session.id).toBe('launcher-fresh')
+    await vi.waitFor(() => {
+      expect(ctx.agents.get(SessionId('launcher-fresh'))?.session.id).toBe('launcher-fresh')
+      expect(ctx.agents.get(SessionId('config-unchanged'))?.session.id).toBe('config-unchanged')
+    })
     expect(ctx.agents.get(SessionId('launcher-resumed'))).toBeUndefined()
     expect(ctx.agents.get(SessionId('config-resumed'))).toBeUndefined()
-    expect(ctx.agents.get(SessionId('config-unchanged'))?.session.id).toBe('config-unchanged')
     await ctx.fiber.dispose()
   })
 
@@ -80,7 +84,9 @@ describe('config-driven session id', () => {
     await exact.plugin(AgentLoop, {
       agents: [{ id: 'main', sessionId: SessionId('config-exact'), model: 'mock' }],
     })
-    expect(exact.agents.get(SessionId('config-exact'))?.session.id).toBe('config-exact')
+    await vi.waitFor(() => {
+      expect(exact.agents.get(SessionId('config-exact'))?.session.id).toBe('config-exact')
+    })
     await exact.fiber.dispose()
 
     const conflicting = await makeCoreContext()
@@ -336,6 +342,7 @@ describe('config-driven session id', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionProjectionRegistry)
     const loopFiber = await ctx.plugin(AgentLoop, {
@@ -359,6 +366,7 @@ describe('config-driven session id', () => {
     await ctx1.plugin(SessionStore)
     await ctx1.plugin(SystemPrompt)
     await ctx1.plugin(ToolRuntime)
+    await ctx1.plugin(NativeToolExecutor)
     await ctx1.plugin(AgentRegistry)
     await ctx1.plugin(JsonlSessionPersistence, { root })
     await ctx1.plugin(SessionProjectionRegistry)
@@ -380,6 +388,7 @@ describe('config-driven session id', () => {
     await ctx2.plugin(SessionStore)
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
+    await ctx2.plugin(NativeToolExecutor)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
     await ctx2.plugin(SessionProjectionRegistry)
@@ -406,6 +415,7 @@ describe('config-driven session id', () => {
     await ctx1.plugin(SessionStore)
     await ctx1.plugin(SystemPrompt)
     await ctx1.plugin(ToolRuntime)
+    await ctx1.plugin(NativeToolExecutor)
     await ctx1.plugin(AgentRegistry)
     await ctx1.plugin(JsonlSessionPersistence, { root })
     await ctx1.plugin(SessionProjectionRegistry)
@@ -423,6 +433,7 @@ describe('config-driven session id', () => {
     await ctx2.plugin(SessionStore)
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
+    await ctx2.plugin(NativeToolExecutor)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
     await ctx2.plugin(SessionProjectionRegistry)
@@ -449,6 +460,7 @@ describe('config-driven session id', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(JsonlSessionPersistence, { root })
     await ctx.plugin(SessionProjectionRegistry)

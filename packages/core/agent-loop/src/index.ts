@@ -223,8 +223,8 @@ interface PreparedAgent {
   agent: ReactLoopAgent
   /** Aborts when the factory unloads, the caller cancels, or teardown begins — ends any setup await. */
   signal: AbortSignal
-  /** Enter registries and emit creation notifications; publication failures reject. */
-  publish(source: SessionStartSource): Promise<AgentHandle>
+  /** Announce the Session, run setup/commit, then enter and announce the Agent. */
+  initializeAndPublish(source: SessionStartSource, setup?: AgentSetup): Promise<AgentHandle>
   /** Reverse teardown: stop the machine, unregister, unwind the scope. Memoized. */
   dispose(): Promise<void>
 }
@@ -620,6 +620,7 @@ export class AgentLoop extends Service implements AgentFactory {
     let detachAgent: (() => void) | undefined
     let disposing: Promise<void> | undefined
     let publication: ReturnType<typeof Promise.withResolvers<undefined>> | undefined
+    let ready = false
     const machineReady = Promise.withResolvers<undefined>()
     // Reverse teardown, memoized so every racing owner awaits one quiescence:
     // stop the machine, unwind the scope, drain and close the session's write
@@ -644,7 +645,7 @@ export class AgentLoop extends Service implements AgentFactory {
         if (machine === undefined) await machineReady.promise
         /* v8 ignore next -- setup failure untracks this disposer before resolving without a machine. */
         if (machine !== undefined) {
-          machine.cancel({ kind: 'disposed' })
+          machine.cancel({ kind: 'disposed' }, { keepInbox: !ready })
           await machine.whenIdle()
         }
       } catch (error: unknown) {
@@ -735,18 +736,23 @@ export class AgentLoop extends Service implements AgentFactory {
       return {
         agent,
         signal: abort.signal,
-        publish: async (source) => {
+        initializeAndPublish: async (source, setup) => {
           publication = Promise.withResolvers<undefined>()
           try {
             assertLive()
             detachSession = agent.ctx.sessions.enter(session)
+            agent.ctx.sessions.announce(session)
+            assertLive()
+            const setupCommit = await raceAbort(setup?.(agent.ctx, agent), abort.signal, id)
+            assertLive()
+            setupCommit?.commit()
+            assertLive()
             // The mounted backend routes announced live events into the active
             // write handle by session id; the loop only owns the handle itself.
             detachAgent = loopCtx.agents.enter(agent, parentAgent)
-            agent.ctx.sessions.announce(session)
-            assertLive()
             await loopCtx.agents.announce(agent, source, abort.signal)
             assertLive()
+            ready = true
             return { agent, dispose, tryDisposeIdle: () => {
               if (disposing !== undefined) return disposing.then(() => true)
               if (loopCtx.agents.list().some(child => loopCtx.agents.isOwnedBy(child.id, agent))
@@ -791,7 +797,7 @@ export class AgentLoop extends Service implements AgentFactory {
     }
     return (await this.initializeAgent(prepared, async () => {
       await this.appendUnstoredSuffix(stored, preparation.session)
-      return await prepared.publish('startup')
+      return await prepared.initializeAndPublish('startup')
     })).agent
   }
 
@@ -987,10 +993,8 @@ export class AgentLoop extends Service implements AgentFactory {
       throw error
     }
     return await this.initializeAgent(prepared, async () => {
-      const setupCommit = await raceAbort(setup?.(prepared.agent.ctx, prepared.agent), prepared.signal, id)
-      setupCommit?.commit()
       await this.appendUnstoredSuffix(stored, session)
-      return await prepared.publish(source)
+      return await prepared.initializeAndPublish(source, setup)
     })
   }
 

@@ -30,4 +30,4 @@ Windows 没有 POSIX 进程组，受监督的运行时进程树一直依赖 `tas
 
 ## 验证
 
-[local-runtime-win32-job.spec.ts](../../../../gateway/tests/local-runtime-win32-job.spec.ts) 在非 Windows 上验证「不可用」契约，并在 Windows 主机上运行时验证创建时刻读取、复用 PID 拒绝与经 Job 的整树终止。owner 规格在 POSIX 主机上覆盖凭证持久化、与 `groupPid` 的成对要求及 capability 不可变性。Gateway 测试只在 Linux `gateway` CI job 执行——Windows 门控的 spec 主体没有任何 CI 通道——因此 Job/创建时刻路径的首次真实运行发生在生产 Windows 节点上，正是该运行捕获了 FILETIME 解码里从未被执行过的 `readBigUInt64LE` 越界错误。
+[local-runtime-win32-job.spec.ts](../../../../gateway/tests/local-runtime-win32-job.spec.ts) 在非 Windows 上验证「不可用」契约，并在 Windows 主机上运行时验证创建时刻读取、复用 PID 拒绝与经 Job 的整树终止。owner 规格在 POSIX 主机上覆盖凭证持久化、与 `groupPid` 的成对要求及 capability 不可变性。Gateway 测试当时只在 Linux `gateway` CI job 执行——Windows 门控的 spec 主体没有任何 CI 通道——因此 Job/创建时刻路径的首次真实运行发生在生产 Windows 节点上，正是该运行捕获了 FILETIME 解码里从未被执行过的 `readBigUInt64LE` 越界错误。[`gateway-windows` 车道](../process/2026-11-15-gateway-windows-native-spec-lane.zh.md)现已在 `windows-2025` 上运行这些主体。

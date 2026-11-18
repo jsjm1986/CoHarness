@@ -151,6 +151,7 @@ function renderTab(
   const unusedStandardHook = (): never => { throw new Error('Plugin manager fixture does not provide global state') }
   const standard = {
     usePanelInfo: unusedStandardHook,
+    useRemoteAccess: () => true,
     useWorkspaces: unusedStandardHook,
     useSessions: unusedStandardHook,
   }

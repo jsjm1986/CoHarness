@@ -1,8 +1,5 @@
 - id: llm-deepseek
   disabled: true
-- id: tools
-  config:
-    mode: native
 - id: sdk-jsonrpc-server
   inject: [sdkAppStartup, loader, autoAuthorityReady]
 - insert:

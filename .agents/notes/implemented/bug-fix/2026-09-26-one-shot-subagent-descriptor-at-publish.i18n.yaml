@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-26-one-shot-subagent-descriptor-at-publish.md
 document:
-  en: 8f4b54bde09472bde41cc2accb8c1393654df7ca
-  zh: f93b5e5c34b89e2ede2fe06bcfd85521198a0a5a
+  en: f8aeb97e009d75cff3d9a5310501a6d38913d61e
+  zh: 055c8b49d10c34d6c0408d05f8f48c5fc61ccdec
 /agent-note-agent-teams-classify-subagent-children-by-durable-session-origin:
   en: 7308629724e71894
   zh: f33518c99a5f7129
@@ -12,8 +12,8 @@ document:
   en: 646121405342c9e2
   zh: dc453994cccd772f
 /agent-note-agent-teams-classify-subagent-children-by-durable-session-origin/decision:
-  en: 17d9d114b2ade1ca
-  zh: 85b38464a327597a
+  en: 7e8ae61d355a2ac2
+  zh: ff4ec2415958561c
 /agent-note-agent-teams-classify-subagent-children-by-durable-session-origin/alternatives-considered:
   en: 3f11963659024351
   zh: b62a634e5aa507ff

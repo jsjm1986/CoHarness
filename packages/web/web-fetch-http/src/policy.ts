@@ -87,20 +87,31 @@ export function parseCharset(contentType: string | null): string | undefined {
 }
 
 /**
- * Build a `TextDecoder` for the declared charset, falling back to UTF-8 when
- * none is declared. Throws {@link WebError} `WEB_UNSUPPORTED_CONTENT_TYPE` when
- * the label is present but not a charset `TextDecoder` recognizes — better to
- * fail loudly than return mojibake.
+ * Resolve the declared charset, defaulting to UTF-8 when absent. A malformed
+ * comma- or whitespace-joined declaration containing a UTF-8 label uses a fatal
+ * UTF-8 decoder; other unsupported declarations throw `WEB_UNSUPPORTED_CONTENT_TYPE`.
+ * UTF-8 recovery is a preference, not proof of the original encoding.
  *
- * @param charset - the declared charset label (from {@link parseCharset}), or
- *   `undefined` to default to UTF-8.
- * @returns a decoder for the declared (or defaulted) encoding.
+ * @param charset - the declared charset parameter, or `undefined` to default.
+ * @returns a decoder; callers must report fatal decoding failures and flush at
+ *   EOF unless they deliberately truncated the bytes.
  */
 export function decoderForCharset(charset: string | undefined): TextDecoder {
-  if (charset === undefined) return new TextDecoder('utf-8')
+  const declared = charset ?? 'utf-8'
   try {
-    return new TextDecoder(charset)
+    return new TextDecoder(declared)
   } catch (error: unknown) {
-    throw new WebError(`unsupported charset "${charset}"`, 'WEB_UNSUPPORTED_CONTENT_TYPE', { cause: error })
+    if (declared.split(/[\s,]+/).some(isUtf8Label)) return new TextDecoder('utf-8', { fatal: true })
+    throw new WebError(`unsupported charset "${declared}"`, 'WEB_UNSUPPORTED_CONTENT_TYPE', { cause: error })
+  }
+}
+
+/** Whether a label names UTF-8, including its standard aliases. */
+function isUtf8Label(label: string): boolean {
+  try {
+    return new TextDecoder(label).encoding === 'utf-8'
+  } catch (_error: unknown) {
+    // An unsupported label does not authorize UTF-8 recovery.
+    return false
   }
 }

@@ -706,8 +706,10 @@ export function launchLinuxScope(
   const invocation = internals.runnerInvocation ?? spawnRunnerInvocation()
   const unitBase = unitStem('dsh-subprocess')
   const args = scopeArgs(unitBase, literalArgv, invocation, spec.argv, internals)
+  const stdio = runnerStdio(spec, false)
   const files = createLinuxLaunchFiles({
     cwd: spec.cwd, env: targetEnv,
+    pipeFds: stdio.slice(0, 3).flatMap((disposition, fd) => disposition === 'pipe' ? [fd] : []),
     ...spec.stdio.control === undefined ? {} : { control: spec.stdio.control },
   })
   const startup = new LinuxScopeStartup(files, 'subprocess')
@@ -716,7 +718,7 @@ export function launchLinuxScope(
     child = (internals.spawn ?? spawn)(internals.systemdRun ?? 'systemd-run', args, {
       cwd: process.cwd(),
       env: scopeRunnerEnvironment(files, invocation),
-      stdio: runnerStdio(spec, false),
+      stdio,
       detached: true,
     })
   } catch (error) {

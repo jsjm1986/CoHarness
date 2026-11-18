@@ -10,12 +10,14 @@ import { SESSION_FORMAT_VERSION, SessionLogOffset } from '@deepseek-ai/dsh-sessi
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { unzipSync, strFromU8 } from 'fflate'
+import { AttachmentError } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionLineageNode } from '@deepseek-ai/dsh-session-query'
 import type { SessionRawArtifact } from '@deepseek-ai/dsh-session-persistence'
 import ApiProxyService, { createApiProxy, toFetchHandler } from '@deepseek-ai/dsh-host-apiproxy'
+import { sessionLogZipEntries } from '../src/session-export.ts'
 
 const sid = (id: string): SessionId => id as SessionId
 
@@ -871,6 +873,126 @@ describe('session.export download endpoint', () => {
       new Request('http://host/api/session.export?sessionId=session-root'),
     )
     await expect(response.arrayBuffer()).rejects.toThrow('file bytes missing')
+  })
+
+  it('fails the export when the first file chunk reports a real failure', async () => {
+    const digest = 'f'.repeat(64)
+    const id = `sha256:${digest}`
+    const root = artifact('session-root', undefined, [
+      '{"type":"session","version":0,"id":"session-root","createdAt":1000}',
+      fileEventLine(id),
+    ].join('\n') + '\n')
+    const api = await buildApi({ 'session-root': root }, [], {
+      readFileStream: () => (async function* (): AsyncIterable<Uint8Array> {
+        throw new AttachmentError('Stored file attachment failed integrity verification.', 'ATTACHMENT_CORRUPT')
+      })(),
+    })
+    const response = await toFetchHandler(api).fetch(
+      new Request('http://host/api/session.export?sessionId=session-root'),
+    )
+    await expect(response.arrayBuffer()).rejects.toThrow('Stored file attachment failed integrity verification.')
+  })
+
+  it('exports an empty file whose stream ends before its first chunk', async () => {
+    const digest = '1'.repeat(64)
+    const id = `sha256:${digest}`
+    const root = artifact('session-root', undefined, [
+      '{"type":"session","version":0,"id":"session-root","createdAt":1000}',
+      fileEventLine(id, 'empty.txt', 0),
+    ].join('\n') + '\n')
+    const api = await buildApi({ 'session-root': root }, [], {
+      readFileStream: () => (async function* (): AsyncIterable<Uint8Array> {})(),
+    })
+    const response = await toFetchHandler(api).fetch(
+      new Request('http://host/api/session.export?sessionId=session-root'),
+    )
+    const files = unzipSync(await responseBytes(response))
+    expect(files[`files/11/${digest}/empty.txt`]).toEqual(new Uint8Array())
+  })
+
+  it('keeps the export and reports a reference the store rejects as invalid', async () => {
+    const digest = '9'.repeat(64)
+    const id = `sha256:${digest}`
+    const root = artifact('session-root', undefined, [
+      '{"type":"session","version":0,"id":"session-root","createdAt":1000}',
+      fileEventLine(id, 'bad?name.pdf', 5),
+    ].join('\n') + '\n')
+    const api = await buildApi({ 'session-root': root }, [], {
+      readFileStream: () => (async function* (): AsyncIterable<Uint8Array> {
+        throw new AttachmentError('File attachment reference is invalid.', 'INVALID_ATTACHMENT_REF')
+      })(),
+    })
+    const response = await toFetchHandler(api).fetch(
+      new Request('http://host/api/session.export?sessionId=session-root'),
+    )
+    const files = unzipSync(await responseBytes(response))
+    expect(Object.keys(files).sort()).toEqual(['attachments-missing.txt', 'session.jsonl'].sort())
+    expect(strFromU8(files['attachments-missing.txt']!)).toContain('File attachment reference is invalid.')
+  })
+
+  it('closes the file stream when the consumer stops before its last chunk', async () => {
+    const digest = '8'.repeat(64)
+    const id = `sha256:${digest}`
+    const root = artifact('session-root', undefined, [
+      '{"type":"session","version":0,"id":"session-root","createdAt":1000}',
+      fileEventLine(id),
+    ].join('\n') + '\n')
+    let closed = false
+    const deps = {
+      attachments: {
+        readFileStream: () => ({
+          [Symbol.asyncIterator]: () => ({
+            next: () => Promise.resolve({ done: false as const, value: new Uint8Array([1, 2, 3]) }),
+            return: () => { closed = true; return Promise.resolve({ done: true as const, value: undefined }) },
+          }),
+        }),
+      },
+      sessions: undefined,
+    } as never
+    const entries = sessionLogZipEntries(deps, root, sid('session-root'), false)
+    const first = await entries.next()
+    expect(first.done).toBe(false)
+    const second = await entries.next()
+    expect(second.done).toBe(false)
+    expect(closed).toBe(false)
+    await entries.return(undefined)
+    expect(closed).toBe(true)
+  })
+
+  it('keeps the export and reports a file whose stored object is gone', async () => {
+    const digest = 'd'.repeat(64)
+    const id = `sha256:${digest}`
+    const root = artifact('session-root', undefined, [
+      '{"type":"session","version":0,"id":"session-root","createdAt":1000}',
+      fileEventLine(id, 'gone.pdf', 5),
+    ].join('\n') + '\n')
+    const api = await buildApi({ 'session-root': root }, [], {
+      readFileStream: () => (async function* (): AsyncIterable<Uint8Array> {
+        throw new AttachmentError('File attachment object is missing.', 'ATTACHMENT_NOT_FOUND')
+      })(),
+    })
+    const response = await toFetchHandler(api).fetch(
+      new Request('http://host/api/session.export?sessionId=session-root'),
+    )
+    const files = unzipSync(await responseBytes(response))
+    expect(Object.keys(files).sort()).toEqual(['attachments-missing.txt', 'session.jsonl'].sort())
+    expect(strFromU8(files['attachments-missing.txt']!))
+      .toBe(`files/dd/${digest}/gone.pdf\tFile attachment object is missing.\n`)
+  })
+
+  it('keeps the export and reports an image whose stored object is gone', async () => {
+    const root = artifact('session-root', undefined, [
+      '{"type":"session","version":0,"id":"session-root","createdAt":1000}',
+      imageEventLine(`sha256:${'e'.repeat(64)}`),
+    ].join('\n') + '\n')
+    const api = await buildApi({ 'session-root': root }, [], {
+      attachments: () => Promise.reject(new AttachmentError('Attachment object is missing.', 'ATTACHMENT_NOT_FOUND')),
+    })
+    const response = await toFetchHandler(api).fetch(new Request('http://host/api/session.export?sessionId=session-root'))
+    const files = unzipSync(await responseBytes(response))
+    expect(Object.keys(files).sort()).toEqual(['attachments-missing.txt', 'session.jsonl'].sort())
+    expect(strFromU8(files['attachments-missing.txt']!))
+      .toMatch(/^media\/\S+\tAttachment object is missing\.\n$/)
   })
 
   it('answers 500 when the deployment mounts no attachments service', async () => {

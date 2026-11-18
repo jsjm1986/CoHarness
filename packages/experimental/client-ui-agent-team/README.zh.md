@@ -1,5 +1,5 @@
 ---
-description: "使用并排查实验性 Web Agent Teams roster、共享任务板与 teammate 导航面板。"
+description: "使用并排查实验性 Web Agent Teams 模式开关、roster、共享任务板与 teammate 导航面板。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-本包向 Web 会话页头添加 Agent Teams action，让用户检查当前 roster 与共享任务板并导航到 teammate 会话。它通过生成的 `ctx.remote.agentTeams` contribution 读取权威 Team 状态，并让普通 child history 导航继续使用稳定的 addressed-subagent 路径。通过公开发布的实验性 Agent Teams Web profile 选择本包。这个浏览器 projection 不扩展稳定 API Proxy、不存储 Team 状态，也不注册面向模型的输入。
+本包向 Web 会话页头添加 Agent Teams action，让用户为根 Session 启停 Team 模式、检查当前 roster 与共享任务板并导航到 teammate 会话。Team 状态来自客户端 `agentTeam` Session 投影与 addressed-subagent 成员目录；唯一的 Remote 调用是 `agentTeams/setEnabled`，用于翻转持久根 Session 选择。通过公开发布的实验性 Agent Teams Web profile 选择本包。这个浏览器 projection 不扩展稳定 API Proxy、不存储 Team 状态，也不注册面向模型的输入。
 
 ## 目录
 
@@ -29,7 +29,11 @@ kind: "package-reference"
 
 ### 检查并导航 roster
 
-打开 panel 会调用 `agentTeams/view`。Roster row 展示持久 name、运行时 status、model 与 diagnostics。选择健康 teammate 时，系统刷新既有直接 child catalog，并打开普通的 `{ parentSessionId, childSessionId, mode: 'continuable' }` address。History 与后续人类提示词继续使用稳定 addressed-subagent 会话路径；本包不会添加 Team 专用 address 字段。
+Panel 通过 `useProjection('agentTeam')` 渲染模式与任务，成员行来自直接 child 目录：持久 name 与运行时 activity,Lead 固定为首行。选择 teammate 会打开普通的 `{ parentSessionId, childSessionId, mode: 'continuable' }` address。History 与后续人类提示词继续使用稳定 addressed-subagent 会话路径；本包不会添加 Team 专用 address 字段。该 action 只在根 Session 上渲染——被寻址或已列出的 child 会话返回 null。
+
+### 启停 Team 模式
+
+触发器的模式控件对当前根 Session 调用 `agentTeams.setEnabled`。对已不带 Team 模式运行过的会话启用、以及对仍有存活 teammate 的会话停用，都会请求确认，因为每次翻转都是一条比点击更长命的持久 `team/mode` 记录。Remote 失败在面板内呈现而不是关闭面板。
 
 ### 查看任务板
 
@@ -45,7 +49,7 @@ kind: "package-reference"
 
 Client export 挂载来自 [`@deepseek-ai/dsh-experimental-agent-team/remote`](../agent-team/README.zh.md) 的生成的 `ctx.remote.agentTeams` contribution，然后通过 Cordis effect 注册 locale dictionary 与一个 conversation-header slot。Dispose plugin fiber 会移除这两项 registration。
 
-较新的 refresh 会让更早的 refresh 失效，因此重叠的重新读取不会复活陈旧状态。切换 session 会关闭 panel 并丢弃为上一个 session 发出的在途 load。
+切换 session 会关闭 panel 并丢弃为上一个 session 发出的在途模式变更；投影与目录无需面板级 refresh 就能让其他行保持最新。
 
 panel 通过 portal 渲染，由 `useAnchoredPosition` 锚定到触发器右缘并在任意视口尺寸下钳制在视口内。悬停经短延迟打开并保留触发器到面板的跨越宽限，点击会钉住 panel；外部指针、Escape 或工具栏关闭按钮都会将其关闭。钉住时 panel 获得焦点，Escape 把焦点还给触发器。当页头容器把触发器文案折叠为纯图标时，仅点击可打开。选择 roster 成员会导航到该会话；当前成员会被标记且不可点击。
 
@@ -85,9 +89,9 @@ panel 通过 portal 渲染，由 `useAnchoredPosition` 锚定到触发器右缘�
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Snapshot refresh**——panel 会在打开与显式 refresh 时刷新；它没有实时事件订阅或 mailbox timeline。
-- **普通 child continuation**——导航后发送的人类消息使用稳定 addressed-subagent 提示词路径，而不是 Team peer mailbox。
-- **没有 lifecycle 或 workspace control**——panel 不能 spawn、rename、delete 或 interrupt teammate，write scope 仍只是提示性 metadata。
+- **普通 child continuation**——导航后发送的人类消息使用稳定 addressed-subagent 提示词路径；panel 不添加 Team 专用消息面。
+- **没有 lifecycle 或 workspace control**——panel 不能 spawn、rename、delete 或 interrupt teammate，也不能编辑任务，write scope 仍只是提示性 metadata。
+- **仅根 Session 的 action**——触发器在被寻址或已列出的 child Session 上隐藏；不存在 teammate 侧视图。
 
 <a id="dev-note"></a>
 ### 开发备注

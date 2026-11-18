@@ -16,6 +16,15 @@
       "path": "./tsconfig.session-controller.json"
     },
     {
+      "path": "../gateway/tsconfig.types.json"
+    },
+    {
+      "path": "../../mcp/mcp-manager"
+    },
+    {
+      "path": "../../boot/plugin-manager"
+    },
+    {
       "path": "../../boot/plugin-market"
     },
     {
@@ -23,6 +32,9 @@
     },
     {
       "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/scope"
     },
     {
       "path": "../../core/session"
@@ -41,6 +53,12 @@
     },
     {
       "path": "../../interaction/permission-presets"
+    },
+    {
+      "path": "../../interaction/user-approval"
+    },
+    {
+      "path": "../../interaction/user-questions"
     },
     {
       "path": "../../llm/llm"
@@ -68,6 +86,12 @@
     },
     {
       "path": "../../typert/registry"
+    },
+    {
+      "path": "../../util/deque"
+    },
+    {
+      "path": "../../util/values"
     },
     {
       "path": "../../../vendor/cordis"

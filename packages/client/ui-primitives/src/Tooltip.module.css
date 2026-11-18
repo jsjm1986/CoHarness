@@ -45,6 +45,10 @@
   transform: translateY(-50%);
 }
 
+.bubble[data-side='left'] {
+  transform: translate(-100%, -50%);
+}
+
 .bubble[data-side='bottom'] {
   transform: translateX(-50%);
 }
@@ -73,6 +77,7 @@
 .bubble[data-side='top'] { --dsh-tooltip-from: 0 2px; }
 .bubble[data-side='bottom'] { --dsh-tooltip-from: 0 -2px; }
 .bubble[data-side='right'] { --dsh-tooltip-from: -2px 0; }
+.bubble[data-side='left'] { --dsh-tooltip-from: 2px 0; }
 
 @keyframes tooltip-slide-in {
   from { translate: var(--dsh-tooltip-from, 0 0); }

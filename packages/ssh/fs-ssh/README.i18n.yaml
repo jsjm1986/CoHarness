@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/ssh/fs-ssh/README.md
 document:
-  en: 78fadbe6060d61fd0cdb0998c03dd8dbf5688738
-  zh: 3ff9a25a40747f0d2c3770d274710d40b7912a05
+  en: 7697eab6aa13684876bdcf995aec0ac956dd5d14
+  zh: 81287d8357a421166bd8f17440803403e11ca005
 /:
   en: 7ee4b79f88be1b77
   zh: 915152892d037c3c
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 725b47765ee8f30b
 /deepseek-ai-dsh-fs-ssh/use-this-package:
-  en: ce278245478a358d
-  zh: 9e292b591bcbaa70
+  en: 33fa4c10b96c7ade
+  zh: 4fd3db455c3c14cf
 /deepseek-ai-dsh-fs-ssh/understand-the-implementation:
   en: 6accf6090a5ae7b6
   zh: 46817a063c2c5fa9

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent/README.md
 document:
-  en: 210ec78d92a6e978aebeb73c5df98085a0780175
-  zh: b58d2be10db50cbfb9bfae8939b56516d26b75c1
+  en: e869144bee4f53ffa33ab70807ee6c1087835461
+  zh: f861f1b6cb5d37de8205a8c9132ee4afcb20bc1e
 /:
   en: 935b897e90e232e9
   zh: 61495d48365178df
@@ -12,17 +12,17 @@ document:
   en: 3c19dadb92e590bf
   zh: e3dd2a468d18992e
 /deepseek-ai-dsh-subagent/summary:
-  en: 1f703bada27ba909
-  zh: a610f688d9cb8a75
+  en: 35f336fb5c51cdce
+  zh: 4b7a4963a7d50401
 /deepseek-ai-dsh-subagent/table-of-contents:
-  en: cb2346e239532669
-  zh: 96be653e1482895a
+  en: 63b83908db599167
+  zh: ca49124795b5973c
 /deepseek-ai-dsh-subagent/service-api:
-  en: f02f814a8d46acd7
-  zh: 743633932cb48b87
+  en: cf3281ba7d1e5877
+  zh: 0c25cff501b39810
 /deepseek-ai-dsh-subagent/configuration:
-  en: 5111984e43d3217f
-  zh: f88f26215b72548c
+  en: c27cd0107a68a195
+  zh: d26e5d3e6b583f93
 /deepseek-ai-dsh-subagent/capabilities:
   en: 2f808f204e434606
   zh: a985f0bc1140f6ed
@@ -45,23 +45,26 @@ document:
   en: e8b46ffba9cf84f0
   zh: 75afebffd92152e3
 /deepseek-ai-dsh-subagent/continuable-children-and-activations:
-  en: 722d771240a83590
-  zh: 091a2a6252ec8efd
+  en: 132648b99a703a7b
+  zh: 0892d3b8627e921b
 /deepseek-ai-dsh-subagent/continuable-children-and-activations/external-runtime-members:
   en: ad9e9a8880cafc01
   zh: 658dfd8b4352498b
 /deepseek-ai-dsh-subagent/continuable-children-and-activations/settlement-delivery:
   en: dfeec9d098e19c26
-  zh: daa35c1dbba92e29
+  zh: ed0f8aba24294a3d
 /deepseek-ai-dsh-subagent/parent-owned-catalog:
-  en: 54b36a93446c569a
-  zh: 402fd8d6b9d5b808
+  en: a61f53c92f41c107
+  zh: a852a82cf3d1443a
+/deepseek-ai-dsh-subagent/agent-names:
+  en: b024a6afc82e8711
+  zh: bfe31f76f960754e
 /deepseek-ai-dsh-subagent/lifecycle-events:
-  en: 02890a917bc67c97
-  zh: f216ab9e92000c3f
+  en: a3e69c973171fcc6
+  zh: 28d9cbf4fe336461
 /deepseek-ai-dsh-subagent/collection-model:
-  en: f401e949a04c51f1
-  zh: 05e7ffbaba9992eb
+  en: fe3ec19df83e5b5b
+  zh: 0aee1649e891863d
 /deepseek-ai-dsh-subagent/model-experience:
   en: 215e7ba838619b7b
   zh: 739af62540d76c1a
@@ -69,8 +72,8 @@ document:
   en: f7cec22ba9d3fb4f
   zh: 67b1d40f9b136f71
 /deepseek-ai-dsh-subagent/model-experience/settlement-notice/what-the-model-sees:
-  en: 7cd7c9172f341154
-  zh: 6918708ef1a2cf7d
+  en: 08a62d7136ba5051
+  zh: 6da598e1d2e0de86
 /deepseek-ai-dsh-subagent/model-experience/settlement-notice/token-effect:
   en: 45dc428c61f606f5
   zh: 7e9a2587e98c8ca6
@@ -93,8 +96,8 @@ document:
   en: 59e848fca82a46fb
   zh: e5ba3f584bd0987f
 /deepseek-ai-dsh-subagent/known-limitations-and-deferred-work:
-  en: a7b3dc771798ce3b
-  zh: 89df9369819cb86a
+  en: 09a55d8a46c34788
+  zh: 60170aab94fd01c6
 /deepseek-ai-dsh-subagent/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

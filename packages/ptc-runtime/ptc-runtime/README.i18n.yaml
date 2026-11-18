@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/ptc-runtime/ptc-runtime/README.md
 document:
-  en: b7964d7a3661a623ac7b16ab29c446f170a6fde9
-  zh: 937596b4f227b1819891a2b7e5e9a126b7de6404
+  en: eb9a2e3c6dae4ee93ec1799fdc45c02a7f06f326
+  zh: 0fef2d6b77c403bb0256296ac6b36857f8709e69
 /:
   en: 8904d5f5d5251a83
   zh: 69b48f289b0416f0
@@ -12,17 +12,17 @@ document:
   en: cced8c691b58657a
   zh: 3da9cdf76a1a07ff
 /deepseek-ai-dsh-ptc-runtime/summary:
-  en: b04917e62d63c7ff
-  zh: 12cb9f38cbf8ee3f
+  en: 6bf8184a933be9fa
+  zh: 19fe0bb198744a77
 /deepseek-ai-dsh-ptc-runtime/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-ptc-runtime/use-this-package:
-  en: 7e5ebf7420c13af4
-  zh: 9ad1e056e794ca4a
+  en: 346f62bbfd0e6d9d
+  zh: bf86b2d7a26e8193
 /deepseek-ai-dsh-ptc-runtime/use-this-package/run-a-program:
-  en: c856760ebc15d59e
-  zh: dc093083b29794e0
+  en: aa58e5977dc6c33b
+  zh: cfa416436582b1cc
 /deepseek-ai-dsh-ptc-runtime/use-this-package/choose-a-backend:
   en: fc0d515f0c3664f3
   zh: 0a1b646b5cf92232
@@ -36,8 +36,8 @@ document:
   en: 686d570f5e669fa4
   zh: 2075cf27c30f251a
 /deepseek-ai-dsh-ptc-runtime/understand-the-implementation/design-concept:
-  en: 9f0055e22a1595a5
-  zh: 0aa3ceb9dd145128
+  en: ea0b622628e418c6
+  zh: 230d7f9ef73513a7
 /deepseek-ai-dsh-ptc-runtime/understand-the-implementation/service-api:
   en: 1d7a792c9a78a517
   zh: b49bddf18c259edc
@@ -52,13 +52,13 @@ document:
   zh: 52df7f06d4e49d6e
 /deepseek-ai-dsh-ptc-runtime/further-exploration:
   en: a77e68bc4f5e66d9
-  zh: fe8d41c58f540b08
+  zh: 101a57bcad581668
 /deepseek-ai-dsh-ptc-runtime/model-experience:
-  en: 5506904c50c1ee20
-  zh: f0ffa9f4f08b20cf
+  en: 711163291bdd8157
+  zh: 4e05f1e7c60058a0
 /deepseek-ai-dsh-ptc-runtime/model-experience/kv-cache-effect:
   en: 40294c1c31b74824
-  zh: bae2ab2083da8a65
+  zh: 081cebc2e2650f03
 /deepseek-ai-dsh-ptc-runtime/known-limitations-and-deferred-work:
   en: e20364d073f78c60
   zh: 6cac5c46ff91b3ca
@@ -70,4 +70,4 @@ document:
   zh: 2157b7a97eb62667
 /deepseek-ai-dsh-ptc-runtime/known-limitations-and-deferred-work/dev-note/future-container-backend:
   en: 2b94202842f0556c
-  zh: 5d4e2ef2e26ad1a3
+  zh: 5aa0311fa621a018

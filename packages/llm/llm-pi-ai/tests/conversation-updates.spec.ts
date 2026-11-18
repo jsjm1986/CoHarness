@@ -119,7 +119,7 @@ describe('serialized conversation updates', () => {
         { role: 'system', content: [{ type: 'text', text: 'full updated prompt' }] },
         { role: 'system', content: [
           { type: 'text', text: 'Instruction one.\nInstruction two.' },
-          { type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) as object } },
+          { type: 'tool_addition', tool: { type: 'tool_definition', definition: { name: 'search', description: added.description, input_schema: added.parameters } } },
         ] },
       ],
       tools: [
@@ -141,7 +141,7 @@ describe('serialized conversation updates', () => {
         { role: 'user', content: 'first' },
         { role: 'system', content: [
           { type: 'text', text: 'Instruction one.\nInstruction two.' },
-          { type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) as object } },
+          { type: 'tool_addition', tool: { type: 'tool_definition', definition: { name: 'search', description: added.description, input_schema: added.parameters } } },
         ] },
       ],
     })
@@ -170,7 +170,7 @@ describe('serialized conversation updates', () => {
     ])
   })
 
-  it('sends concatenated system messages and current tools on unsupported routes', async () => {
+  it('keeps system reminders in history and current tools on unsupported routes', async () => {
     const update = addition()
     const { requests } = await send('openai', 'gpt-4.1', {
       system: 'direct',
@@ -180,7 +180,15 @@ describe('serialized conversation updates', () => {
       toolHistory: { tools: [baseline], updates: [{ messageId: update.id, additions: [added] }] },
     })
     expect(requests).toHaveLength(1)
-    expect(requests[0]).toHaveProperty('input.0', { role: 'system', content: 'direct\n\ninitial\n\ncurrent\n\ncurrent' })
+    expect(requests[0]).toHaveProperty('input.0', { role: 'system', content: 'direct\n\ninitial' })
+    expect(requests[0]).toHaveProperty('input', [
+      { role: 'system', content: 'direct\n\ninitial' },
+      expect.objectContaining({ role: 'user' }),
+      { role: 'user', content: [{ type: 'input_text', text: '<system-reminder>\ncurrent\n</system-reminder>' }] },
+      expect.objectContaining({ role: 'user' }),
+      expect.objectContaining({ role: 'assistant' }),
+      { role: 'user', content: [{ type: 'input_text', text: '<system-reminder>\ncurrent\n</system-reminder>' }] },
+    ])
     expect(JSON.stringify(requests[0])).not.toContain('Instruction one.')
     expect(JSON.stringify(requests[0])).not.toContain('additional_tools')
   })
@@ -240,11 +248,11 @@ describe('historical tool availability on the wire', () => {
     expect(requests[0]).toMatchObject({ messages: [
       { role: 'user', content: 'first' }, { role: 'user', content: 'restore' },
       { role: 'system', content: [{ type: 'tool_removal', tool: { type: 'tool_reference', name: 'search' } }] },
-      { role: 'system', content: [{ type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) as object } }] },
+      { role: 'system', content: [{ type: 'tool_addition', tool: { type: 'tool_definition', definition: { name: 'search', description: added.description, input_schema: added.parameters } } }] },
     ] })
   })
 
-  it('anchors additions in Responses without emitting removal updates', async () => {
+  it('rebuilds the Responses baseline after its immediate tool is removed', async () => {
     const update = addition()
     const remove = createDeveloperMessage({ source: { kind: 'tool-registry' }, content: [{ type: 'tool-removal', toolName: 'read' }] })
     const { requests } = await send('openai', 'gpt-5.4', {
@@ -254,9 +262,11 @@ describe('historical tool availability on the wire', () => {
       ] },
     })
     expect(requests).toHaveLength(1)
-    expect(requests[0]).toHaveProperty('input', expect.arrayContaining([
-      expect.objectContaining({ type: 'additional_tools', tools: [expect.objectContaining({ name: 'search' })] }),
-    ]))
+    expect(requests[0]).toHaveProperty('tools', [expect.objectContaining({ name: 'search' })])
+    expect(requests[0]).toHaveProperty('input', [
+      { role: 'user', content: [{ type: 'input_text', text: 'first' }] },
+      { role: 'developer', content: 'Instruction one.\nInstruction two.' },
+    ])
     expect(JSON.stringify(requests[0])).not.toContain('tool_removal')
     expect(JSON.stringify(requests[0])).not.toContain('Read a file')
   })

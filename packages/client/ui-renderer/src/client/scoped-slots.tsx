@@ -448,9 +448,14 @@ function buildRootStandard(host: SlotRendererHost): InjectedProps {
     useSessions: observableHook(host.sessions.list),
     useWorkspaces: observableHook(host.workspaces.list),
   }
-  for (const [name, source] of Object.entries(host.rootSources())) {
+  const roster = host.rootSources()
+  for (const [name, source] of Object.entries(roster.hooks)) {
     root[standardHookPropName(name)] = observableHook(source)
   }
+  for (const [name, source] of Object.entries(roster.keyedHooks)) {
+    root[standardHookPropName(name)] = keyedObservableHook(source)
+  }
+  Object.assign(root, roster.props)
   return root
 }
 

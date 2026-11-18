@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SessionLogOffset, SessionSeq, TOOL_OUTCOME_UNKNOWN, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { createToolResultMessage, createUserMessage, ToolCallId, type ToolSchema } from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-tools/types'
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc/types'
 import {
   applyUserQuestionEvent, foldUserQuestions, isTimedAskUserQuestionSchema, questionsOf, TIMED_WAIT_PARAMETER,
   userQuestionProjectionDefinition,
@@ -157,7 +157,7 @@ describe('userQuestions projection fold', () => {
     expect(foldUserQuestions([...continued, event(3, 'user/message', reply('dismissed'))])).toEqual(settled)
   })
 
-  it('continues a pending PTC sub-call when only run_code appeared in the request header', () => {
+  it('continues a pending PTC sub-call and ignores dispatches that are not one', () => {
     const subCallId = ToolCallId('run_1:ptc:1')
     const dispatchData: SessionEvent<'tool/ptc-dispatch'>['data'] = {
       rootCallId: ToolCallId('run_1'), parentCallId: ToolCallId('run_1'), subCallId,
@@ -165,33 +165,28 @@ describe('userQuestions projection fold', () => {
       content: [{ type: 'text', text: JSON.stringify({ pending: true, callId: subCallId }) }],
     }
     const dispatch = event(2, 'tool/ptc-dispatch', dispatchData)
-    const fold = [timedHeader, asked, dispatch].reduce(applyUserQuestionEvent, { timed: false, questions: empty })
-    expect(fold.questions).toEqual({ active: [{ callId, questions, state: 'open' }, { callId: subCallId, questions, state: 'continued' }], settled: [] })
-
-    const reply = createUserMessage({
+    const runCodeHeader = header(0, [{ name: 'run_code', description: 'Run code.', parameters: { type: 'object' } }])
+    expect(foldUserQuestions([runCodeHeader, dispatch])).toEqual({
+      active: [{ callId: subCallId, questions, state: 'continued' }], settled: [],
+    })
+    expect(foldUserQuestions([runCodeHeader, dispatch, dispatch])).toEqual({
+      active: [{ callId: subCallId, questions, state: 'continued' }], settled: [],
+    })
+    // A reply settles by the dispatch's own callId, not the parent's.
+    expect(foldUserQuestions([runCodeHeader, dispatch, event(3, 'user/message', createUserMessage({
       source: { kind: 'user-question-reply', callId: subCallId, outcome: 'answered' },
       content: [{ type: 'text', text: answeredText }],
-    })
-    expect(applyUserQuestionEvent(fold, event(3, 'user/message', reply)).questions).toEqual({
-      active: [{ callId, questions, state: 'open' }],
+    }))])).toEqual({
+      active: [],
       settled: [{ callId: subCallId, answers: answerBatch }],
     })
-  })
-
-  it('ignores PTC dispatches that are not a pending ask_user_question call', () => {
-    const fold = [timedHeader, asked].reduce(applyUserQuestionEvent, { timed: false, questions: empty })
-    const base: SessionEvent<'tool/ptc-dispatch'>['data'] = {
-      rootCallId: ToolCallId('run_1'), parentCallId: ToolCallId('run_1'), subCallId: ToolCallId('run_1:ptc:1'),
-      name: 'ask_user_question', arguments: JSON.parse(toolArguments), isError: false,
-      content: [{ type: 'text', text: JSON.stringify({ pending: true, callId: 'run_1:ptc:1' }) }],
-    }
-    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', { ...base, name: 'bash' }))).toBe(fold)
-    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', { ...base, isError: true }))).toBe(fold)
-    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', {
-      ...base, content: [{ type: 'text', text: '{"answers":[]}' }],
-    }))).toBe(fold)
-    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', { ...base, arguments: { questions: 'nope' } }))).toBe(fold)
-    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', { ...base, arguments: {} }))).toBe(fold)
+    expect(foldUserQuestions([runCodeHeader, event(2, 'tool/ptc-dispatch', { ...dispatchData, name: 'bash' })])).toEqual(empty)
+    expect(foldUserQuestions([runCodeHeader, event(2, 'tool/ptc-dispatch', { ...dispatchData, isError: true })])).toEqual(empty)
+    expect(foldUserQuestions([runCodeHeader, event(2, 'tool/ptc-dispatch', {
+      ...dispatchData, content: [{ type: 'text', text: '{"answers":[]}' }],
+    })])).toEqual(empty)
+    expect(foldUserQuestions([runCodeHeader, event(2, 'tool/ptc-dispatch', { ...dispatchData, arguments: { questions: 'nope' } })])).toEqual(empty)
+    expect(foldUserQuestions([runCodeHeader, event(2, 'tool/ptc-dispatch', { ...dispatchData, arguments: {} })])).toEqual(empty)
   })
 
   it('records the answers one reply carried, exactly once across its splice and its own event', () => {

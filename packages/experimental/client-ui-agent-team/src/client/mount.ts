@@ -1,9 +1,6 @@
 /** Source-safe Agent Teams browser registration and Remote mount lifecycle. */
 
-import type {
-  TeamMemberView as TeamRosterMember,
-  TeamView,
-} from '@deepseek-ai/dsh-experimental-agent-team/client'
+import type {} from '@deepseek-ai/dsh-experimental-agent-team/client'
 import type {} from '@deepseek-ai/dsh-experimental-agent-team/remote'
 import type {
   ClientContext, SessionId, SubagentAddress,
@@ -13,12 +10,12 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
-import { TeamAction, type TeamActionInjected, type TeamActionResult } from './TeamAction.tsx'
+import { TeamAction, type TeamActionInjected } from './TeamAction.tsx'
 import { en, NS, zh, type TeamKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** Agent Teams roster and task-board copy. */
+    /** Agent Teams roster, mode selection, and task-board copy. */
     'agent-team': TeamKey
   }
 }
@@ -29,26 +26,29 @@ export const inject = ['sessions', 'remote', 'slots', 'locale']
 function registerUi(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'client-ui-agent-team: dictionaries')
   const sessions = ctx.sessions
-  const leadSessionId = (sessionId: SessionId): SessionId => {
-    const address = sessions.binding(sessionId)?.session.getSnapshot().subagent?.address
-    return address?.parentSessionId ?? sessionId
-  }
 
   const actions: TeamActionInjected = {
-    async load(sessionId): Promise<TeamActionResult<TeamView>> {
-      return await ctx.remote.agentTeams.view(leadSessionId(sessionId))
+    async selectTeamMode(sessionId: SessionId, enabled: boolean): Promise<string | null> {
+      const response = await ctx.remote.agentTeams.setEnabled(sessionId, enabled)
+      return response.ok ? null : response.error.message
     },
-    async openTeammate(sessionId: SessionId, member: TeamRosterMember): Promise<void> {
-      const parentSessionId = leadSessionId(sessionId)
-      if (member.role !== 'teammate') {
-        sessions.open(parentSessionId)
+    async refreshMembers(sessionId: SessionId): Promise<void> {
+      await sessions.refreshSubagents(sessionId)
+    },
+    async openTeammate(sessionId: SessionId, memberId: SessionId): Promise<void> {
+      if (memberId === sessionId) {
+        sessions.open(sessionId)
         return
       }
-      await sessions.refreshSubagents(parentSessionId)
+      await sessions.refreshSubagents(sessionId)
       // The refresh is asynchronous: skip navigation when the user has already
       // moved to another session view while it was in flight.
       if (sessions.list.getSnapshot().current !== sessionId) return
-      const address: SubagentAddress = { parentSessionId, childSessionId: sessions.keyFor?.(member.id, sessions.runtimeIdentityFor?.(parentSessionId)) ?? member.id, mode: 'continuable' }
+      const address: SubagentAddress = {
+        parentSessionId: sessionId,
+        childSessionId: sessions.keyFor?.(memberId, sessions.runtimeIdentityFor?.(sessionId)) ?? memberId,
+        mode: 'continuable',
+      }
       sessions.openSubagent(address)
     },
   }

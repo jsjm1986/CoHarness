@@ -74,6 +74,9 @@ export function requiredPrJobs(input: unknown, commit: string): string[] {
     if (typeof proofs[field] !== 'boolean') throw new Error(`invalid proof selection: ${field}`)
     if (proofs[field]) jobs.add(job)
   }
+  // The Windows gateway lane triggers on either the gateway input or the
+  // native-Windows proof; the required set mirrors its job condition exactly.
+  if (scope.gatewayMode === 'full' || proofs.nativeWindows === true) jobs.add('gateway-windows')
   return [...jobs].sort()
 }
 

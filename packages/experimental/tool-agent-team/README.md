@@ -1,5 +1,5 @@
 ---
-description: "Scoped model-facing Agent Teams tools over ctx.agentTeams"
+description: "Conditional shared-task tools and policy for Agent Teams mode"
 kind: "package-reference"
 ---
 
@@ -7,11 +7,11 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-Scoped model-facing adapter for [`ctx.agentTeams`](../agent-team/README.md). It installs the Agent Teams policy and collaboration tools in each implicit Lead and durable teammate scope. Scoped Team definitions shadow same-named legacy global continuable-subagent controls, so a composition that mounts both must disable the legacy definitions.
+Model-facing adapter for [`ctx.agentTeams`](../agent-team/README.md). It registers exactly four shared-task tools plus one system-prompt policy section, each conditional on the caller's root Session having Team mode enabled. Teammate creation, discovery, messaging, and interruption stay with the standard subagent tools (`subagent`, `subagent_fork`, `list_agents`, `send_message`, `interrupt_agent`); this package deliberately adds no Team-specific collaboration surface.
 
 ## Summary
 
-This package lets the model create named teammates, send them messages, inspect availability, wait for progress, interrupt stuck work, and coordinate through a shared task board. Every team member receives the same nine tools and guidance for coordinating in a shared workspace. Choose it when the model should operate a team only after you explicitly request one. It replaces legacy subagent controls with the same tool names, so compositions that need both must disable the legacy definitions. The package is published under its experimental name and provides no stability guarantee.
+This package lets the model coordinate delegated work through a shared, revision-checked task board: create tasks with dependency and advisory write-scope metadata, list and read the board, and apply compare-and-set transitions — claim, release, edit, set_dependencies, complete, reopen, reassign, and delete. The tools exist only while Team mode is enabled on the root Session, so the same composition serves ordinary and Team sessions without leaking task tools into either. The package is published under its experimental name and provides no stability guarantee.
 
 ## Table of Contents
 
@@ -29,25 +29,18 @@ This package lets the model create named teammates, send them messages, inspect 
 ```yaml
 - id: tool-agent-team
   name: '@deepseek-ai/dsh-experimental-tool-agent-team'
-  config:
-    freshProvider: spawn
-    forkProvider: fork
 ```
 
-`freshProvider` and `forkProvider` select registered continuable-subagent providers. Any provider advertising `prepareContinuable` works, including the external-runtime ones: `subagent-claude-code` and `subagent-codex` when the `llm` service is mounted, and `subagent-acp` with `resume: true` — each keeps the durable Team member as an in-process child while routing model calls through its external runtime's resumable session. A provider without the capability rejects the spawn with `UNSUPPORTED_CAPABILITY`. The fixed model policy creates teammates only when the user explicitly asks for Agent Teams or teammates.
+The plugin takes no configuration. The retired `interrupt`, `freshProvider`, and `forkProvider` keys fail at load with an explicit error; create teammates through a `subagent` tool provider and interrupt them through `interrupt_agent` instead.
 
 <a id="tools-and-authority"></a>
 ## Tools and authority
 
-The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-agent-team) owns exact schemas. The adapter supplies teammate creation; quiet and waking peer delivery; roster listing, waiting, and Lead-only interruption; and task create/list/get/compare-and-set update operations.
+The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-agent-team) owns exact schemas. The adapter supplies `team_task_create`, `team_task_list`, `team_task_get`, and `team_task_update`; every registration is conditional on `ctx.agentTeams.isEnabled(caller)`, so tool discovery and the policy section appear only in Team sessions.
 
-Every tool requires the exact calling `Agent`. `spawn_teammate` and `interrupt_agent` enforce Lead authority inside `ctx.agentTeams`, not only in their descriptions. All members can communicate with any peer and use the task board. Task mutations retain the domain's owner/Lead and revision checks.
+`team_task_update` is compare-and-set: `expected_revision` must match the board's current revision or the call fails with `TEAM_TASK_STALE_REVISION`, which is how concurrent members avoid overwriting each other. `owner` arguments are agent names resolved through `ctx.subagents.resolveName` — the durable names `subagent` returns and `list_agents` shows, including root-relative paths. Reassign is root-only; the root may target itself or any continuable descendant. Other members claim only ready, unowned tasks and manage tasks they own. Task results replace the internal owner Session id with the member's agent name.
 
-Creation and listing results identify members by `target` — the durable member name, with no member Session ID in model-facing output. Use that value in message and interrupt calls and in the task tools' `owner` parameter. `inactive` means no turn is executing, whether the member is loaded or must be resumed; it does not describe task completion or outcome. `provisioning` and `failed` describe member creation.
-
-`send_message` succeeds once mail is durable and never wakes an inactive target. `followup_task` also makes the message the target's next turn and can cold-resume it. A `queued` result is accepted durable work and must not be retried. Task readiness does not start an owner. Before arming its 10,000-through-3,600,000-millisecond edge wait, `wait_agent` checks for another member that is running or provisioning; without one it returns `noProgress` immediately with instructions to re-list and use `followup_task`. Otherwise it waits for one post-call Team edge, defaulting to 30,000 milliseconds, and callers re-list after wakeup or timeout because earlier changes are not replayed.
-
-The plugin listens to Agent publication and installs its registrations through that Agent's scope. Fresh creation and cold resume therefore receive the same tool/prompt set before the first model request. Agent disposal and plugin HMR remove every scoped registration; reloading the plugin installs one fresh set in each still-live member without changing its continuation Activation.
+Readiness, blockers, and `writeScopeWarnings` are advisory coordination: `write_scopes` record intent for reviewers, not filesystem locks. Task changes never deliver messages or start idle agents — use `send_message` when another member must act.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -56,21 +49,21 @@ The plugin listens to Agent publication and installs its registrations through t
 
 #### What the model sees
 
-One shared system policy states the explicit-delegation requirement, shared-cwd behavior, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, Steer delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. All nine Team schemas are identical for Leads and teammates; execution enforces Lead-only operations. `spawn_teammate` prefixes its initial user message with `<system-reminder>\nYou are teammate "<name>".\n</system-reminder>`, followed by a blank line and the task. The prefix contains no Team id and works when runtime context is disabled. Forks inherit history without an additional Lead identity message.
+When Team mode is enabled, one shared policy section explains the shared working directory, write-scope and dependency coordination, the claim-update-complete workflow, and that task changes do not wake anyone — the Lead must wait for required teammates before its final answer. Disabled sessions see no section and no tools. Task results arrive as compact JSON rows from the four `team_task_*` tools in the [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-agent-team); the board itself stays log-only and never enters derived history.
 
 #### Token effect
 
-Fixed policy and schema cost on every Team member request. The initial identity text follows ordinary history through later steps, cold recovery, and compaction; the plugin neither scans for it nor reinserts it. Tool calls add compact JSON roster, task, wait, or receipt results. Peer content is retained by the Team domain in the target's history.
+The policy section and four schemas cost tokens on every Team-enabled request; other sessions pay nothing. Tool calls add small JSON results.
 
 #### KV Cache effect
 
-With the same provider/model, shared system policy, and tool schemas, a fork retains the parent request prefix and appends the initial task with its identity prefix. Tool results and peer messages append after the reusable request prefix. Sessions recorded with identity inside the system prompt can change that prefix on their first request under this layout; actual provider cache hits remain best-effort.
+Enabling Team mode inserts the policy section and schemas into the system prefix, so a Session's first Team-mode request rebuilds the provider prefix; subsequent requests in the same mode reuse it. Teammate sessions under the same mode share the identical prefix.
 
 ## Known Limitations and Deferred Work
 
-- **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.
-- **No autonomous team creation** — ordinary tasks do not trigger delegation unless the user explicitly requests it.
-- **No Web controls** — browser roster and task-board presentation is outside this runtime package.
+- **Advisory write scopes** — Bash, formatters, code generators, and external processes can bypass the overlap warning; Leads must review the final diff.
+- **No Team-owned waiting primitive** — the Lead waits through `send_message` reports and settlement notices; task changes do not interrupt or wake any member.
+- **Reassign is root-only** — teammates cannot hand owned tasks to peers; they release for re-claim instead.
 
 <a id="dev-note"></a>
 ### Dev Note

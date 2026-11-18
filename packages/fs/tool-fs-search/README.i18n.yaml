@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/tool-fs-search/README.md
 document:
-  en: 90f06672b2df2b4300ab3fcc17a3cdbae3ec1deb
-  zh: e57132509863916f8fb415dded3e03d8feb2ce30
+  en: 3be77fe6d7390ab6703c1fcb3c55131b9de7ac43
+  zh: 61c16c31087b305d93cb8fc972e16c4ccf75630c
 /:
   en: e7dc8e2a51b03faa
   zh: 61495d48365178df
@@ -24,8 +24,8 @@ document:
   en: 5e5b58a2d598b7dd
   zh: 09a5ac415d4cbdce
 /deepseek-ai-dsh-tool-fs-search/tools:
-  en: e4072b8dde66656f
-  zh: f355ace8a376ec00
+  en: 83917f7fa23deac4
+  zh: bc61d6511b0f9a82
 /deepseek-ai-dsh-tool-fs-search/two-budgets-two-artifacts:
   en: c539602650a2212f
   zh: cf7eb74865cba271

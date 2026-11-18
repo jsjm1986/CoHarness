@@ -108,43 +108,6 @@
       }
     },
     {
-      "name": "exit_plan_mode",
-      "description": "Use only in plan mode. Present your plan for the user's review and, on approval, leave plan mode. The user may approve (carry out the plan from your next step) or keep planning — their feedback comes back in the tool result; revise and present again.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "plan": {
-            "type": "string",
-            "description": "The complete plan, as markdown, starting with a # heading that names it."
-          }
-        },
-        "required": [
-          "plan"
-        ]
-      }
-    },
-    {
-      "name": "followup_task",
-      "description": "Send a durable follow-up task to another Team member and start a turn when needed.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "target": {
-            "type": "string",
-            "description": "Member target returned by spawn_teammate or list_agents, including lead."
-          },
-          "message": {
-            "type": "string",
-            "description": "Self-contained message for the target."
-          }
-        },
-        "required": [
-          "target",
-          "message"
-        ]
-      }
-    },
-    {
       "name": "get_goal",
       "description": "Read the current session goal, including the id and revision that update_goal requires.",
       "parameters": {
@@ -198,17 +161,17 @@
     },
     {
       "name": "interrupt_agent",
-      "description": "Interrupt one teammate's current turn while preserving its pending inbox. Team Lead only.",
+      "description": "Request cancellation of a background agent's current turn by its name. The target may be your direct child or a deeper agent created under you. Only the current turn stops: messages already queued for the agent stay parked until a later send_message, agents it started keep running, and the agent itself stays available for follow-ups. This call returns as soon as the stop request is accepted, so the target may keep running briefly; interrupting an agent that already finished is an accepted no-op.",
       "parameters": {
         "type": "object",
         "properties": {
-          "target": {
+          "agent": {
             "type": "string",
-            "description": "Teammate target returned by spawn_teammate or list_agents."
+            "description": "The name of an agent created under you: your direct child or a deeper descendant."
           }
         },
         "required": [
-          "target"
+          "agent"
         ]
       }
     },
@@ -266,7 +229,7 @@
     },
     {
       "name": "list_agents",
-      "description": "List the Lead and every durable teammate with an addressable target and current availability. inactive means no turn is executing, not a task result. provisioning and failed describe member creation.",
+      "description": "List your entire subagent tree: the root agent and all reachable continuable descendants, including yourself. Rows carry names, descriptions, and status. A descendant's name is its path from the root, such as reviewer/checker. You can message any other agent in the subagent tree. running means it is working; inactive means no turn is executing; it does not indicate task completion, success, or failure. corrupt, unsupported, or unavailable means this row's own descendants could not be read; the row itself is still a member you can message. While you remain active, you will be notified when a direct child finishes; there is no need to keep checking its status. Use send_message to continue the conversation.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -274,7 +237,7 @@
     },
     {
       "name": "present",
-      "description": "Declare selected existing files accessible through the Session filesystem as final deliverables. Use present when the user needs a separate file deliverable, especially Office documents, spreadsheets, and slide decks. Prefer showing results in your final response when that is sufficient; creating or editing a file does not by itself require present. Usually select the 1-2 most important deliverables; include more when needed, but at most 4 files in a single present call. The files must already exist. The user opens the current source files; their contents are not copied or preserved.",
+      "description": "Declare existing files as final deliverables for the user. Hosts may show presented files only after your turn ends, so call it once the files are final. If the user needs to review files earlier, such as before a tool call that waits for their answer, link them in your message instead. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -347,21 +310,21 @@
     },
     {
       "name": "send_message",
-      "description": "Send durable information to another Team member without starting an inactive member.",
+      "description": "Send a message to an agent. A working agent receives it at its next step; an idle agent starts a new turn with it. This call returns no answer from the agent — only confirmation that the message was delivered. A failure means the message was NOT delivered.",
       "parameters": {
         "type": "object",
         "properties": {
-          "target": {
+          "agent": {
             "type": "string",
-            "description": "Member target returned by spawn_teammate or list_agents, including lead."
+            "description": "The name of another agent in your subagent tree, as shown by list_agents."
           },
           "message": {
             "type": "string",
-            "description": "Self-contained message for the target."
+            "description": "The message to deliver to the agent."
           }
         },
         "required": [
-          "target",
+          "agent",
           "message"
         ]
       }
@@ -383,34 +346,143 @@
       }
     },
     {
-      "name": "spawn_teammate",
-      "description": "Create one named, durable teammate. Only the Team Lead may call this tool.",
+      "name": "str_replace_editor",
+      "description": "Custom editing tool for viewing, creating and editing files\n* State is persistent across command calls and discussions with the user\n* If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep\n* The `create` command cannot be used if the specified `path` already exists as a file\n* If a `command` generates a long output, it will be truncated and marked with `<response clipped>`\n* A null placeholder for a parameter unused by the selected command is treated as omitted. Required parameters still need values; omit `str_replace.new_str` rather than setting it to null when deleting a match\n\nNotes for using the `str_replace` command:\n* The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!\n* If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique\n* The `new_str` parameter should contain the edited lines that should replace the `old_str`",
       "parameters": {
         "type": "object",
         "properties": {
-          "name": {
+          "command": {
             "type": "string",
-            "description": "Unique lower-kebab-case teammate name."
-          },
-          "description": {
-            "type": "string",
-            "description": "Short description of the delegated responsibility."
-          },
-          "prompt": {
-            "type": "string",
-            "description": "Complete initial task for the teammate."
-          },
-          "context": {
-            "type": "string",
-            "description": "fresh starts without Lead history; fork inherits completed Lead turns. Defaults to fresh.",
+            "description": "The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`.",
             "enum": [
-              "fresh",
-              "fork"
+              "view",
+              "create",
+              "str_replace",
+              "insert"
             ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Absolute path to file or directory, e.g. `/repo/file.py` or `/repo`."
+          },
+          "file_text": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required string parameter of `create` command, with the content of the file to be created. A null placeholder is treated as omitted by commands that do not use this parameter."
+          },
+          "insert_line": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required integer parameter of `insert` command. The `new_str` will be inserted AFTER the line `insert_line` of `path`. A null placeholder is treated as omitted by commands that do not use this parameter."
+          },
+          "new_str": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional string parameter of `str_replace` command containing the new string (if omitted, no string will be added). Required string parameter of `insert` command containing the string to insert. A null placeholder is accepted only by commands that do not use this parameter."
+          },
+          "old_str": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required string parameter of `str_replace` command containing the string in `path` to replace. A null placeholder is treated as omitted by commands that do not use this parameter."
+          },
+          "view_range": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional parameter of `view` command when `path` points to a file. If omitted or null, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file."
           }
         },
         "required": [
-          "name",
+          "command",
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "subagent",
+      "description": "Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This tool runs in the background by default and immediately returns the subagent's name. When that run settles, the runtime sends you a notice containing its outcome and any final answer, unless the child sent you a message just before finishing; `send_message` steers the child's nearest step while it is running and starts or resumes a turn while it is inactive. Set `run_in_background: false` only when your next action depends on receiving the result.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "description": "Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent."
+          },
+          "description": {
+            "type": "string",
+            "description": "A short (3-5 word) description of the delegated task, for display."
+          },
+          "name": {
+            "type": "string",
+            "description": "Optional short name for the subagent, unique among the subagents you create: lower-case letters, digits, and hyphens, starting with a letter, at most 32 characters; lead is reserved for the root agent. Omitted names default to agent-1, agent-2, and so on."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs."
+          },
+          "run_in_background": {
+            "type": "boolean",
+            "description": "Whether to run in the background and return a durable subagent name immediately. Defaults to true. Set false to wait for the result when your next action depends on it."
+          }
+        },
+        "required": [
+          "description",
+          "prompt"
+        ]
+      }
+    },
+    {
+      "name": "subagent_fork",
+      "description": "Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn). Use this when the subtask builds on this conversation's context — a follow-up analysis, a review, a continuation — without consuming this conversation's context for the work itself. You receive its result, not its intermediate steps. This call waits for the subagent and returns its result.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "description": "Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent."
+          },
+          "description": {
+            "type": "string",
+            "description": "A short (3-5 word) description of the delegated task, for display."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The task for the subagent. It already sees this conversation's completed turns, so build on them freely and state only what is new."
+          }
+        },
+        "required": [
           "description",
           "prompt"
         ]
@@ -484,7 +556,11 @@
           },
           "owner": {
             "type": "string",
-            "description": "Optional member target from spawn_teammate or list_agents, matching ownerName; use unowned for tasks without an owner."
+            "description": "Optional owner agent name filter; cannot be combined with unowned."
+          },
+          "unowned": {
+            "type": "boolean",
+            "description": "Filter tasks by whether they have no owner; cannot be combined with owner."
           },
           "ready": {
             "type": "boolean",
@@ -553,7 +629,7 @@
           },
           "owner": {
             "type": "string",
-            "description": "Member target from spawn_teammate or list_agents for Lead-only reassign; omit to unassign."
+            "description": "Agent name of the root or any continuable descendant for root-only reassign; omit to unassign."
           }
         },
         "required": [
@@ -629,15 +705,15 @@
           },
           "objective": {
             "type": "string",
-            "description": "Replacement objective; valid only with action edit."
+            "description": "Replacement objective for action edit; ignored otherwise."
           },
           "max_goal_rounds": {
             "type": "number",
-            "description": "Replacement cap; valid only with action edit."
+            "description": "Replacement cap for action edit; ignored otherwise."
           },
           "blocked_reason": {
             "type": "string",
-            "description": "Required only with action blocked: the concrete condition that persisted across rounds and blocks progress."
+            "description": "Required for action blocked: the concrete condition that persisted across rounds and blocks progress; ignored otherwise."
           }
         },
         "required": [
@@ -645,19 +721,6 @@
           "revision",
           "action"
         ]
-      }
-    },
-    {
-      "name": "wait_agent",
-      "description": "Wait for the next teammate status, mailbox, or shared-task change after this call starts. This never wakes inactive members and returns noProgress immediately when no other member is running or provisioning. Re-list after wakeup or timeout instead of polling.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "timeout_ms": {
-            "type": "integer",
-            "description": "Wait duration in milliseconds, from 10000 through 3600000. Defaults to 30000."
-          }
-        }
       }
     },
     {

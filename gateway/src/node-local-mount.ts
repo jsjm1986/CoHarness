@@ -1,7 +1,7 @@
 /** Local storage identities as reported by the node operating system. */
 import { readFile } from 'node:fs/promises'
 import { isAbsolute, relative, sep } from 'node:path'
-import { runGatewayChildCommand } from './child-command.ts'
+import { runGatewayChildCommand, runWindowsShellProbe } from './child-command.ts'
 import { NodeContentUnavailable } from './node-content-error.ts'
 
 function onMount(path: string, root: string): boolean {
@@ -36,11 +36,11 @@ export async function localMountIdentity(path: string, timeout: number): Promise
     const encodedPath=Buffer.from(path,'utf8').toString('base64')
     const script=`$ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'
 $path=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedPath}'))
-$item=Get-Item -Force -LiteralPath $path
+$item=if([IO.Directory]::Exists($path)){[IO.DirectoryInfo]::new($path)}elseif([IO.File]::Exists($path)){[IO.FileInfo]::new($path)}else{throw 'missing object'}
 while ($null -ne $item) { if (([int64]$item.Attributes -band 0x441400) -ne 0) { throw 'The local object cannot be recalled or redirected.' }; $item=[IO.Directory]::GetParent($item.FullName) }
-$v = Get-Volume -FilePath $path
-if ($v.DriveType -eq 'Fixed' -and $v.FileSystem -in @('NTFS','ReFS')) { [Console]::Write($v.UniqueId) }`
-    const {stdout}=await runGatewayChildCommand('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',
+$best=$null; foreach($v in [Management.ManagementObjectSearcher]::new('SELECT DeviceID,Name,DriveType,FileSystem FROM Win32_Volume').Get()) { if($path.StartsWith([string]$v['Name']) -and ($null -eq $best -or [string]$v['Name'].Length -gt [string]$best['Name'].Length)) { $best=$v } }
+if ($null -ne $best -and [int]$best['DriveType'] -eq 3 -and [string]$best['FileSystem'] -in @('NTFS','ReFS')) { [Console]::Write([string]$best['DeviceID']) }`
+    const {stdout}=await runWindowsShellProbe(['-NoProfile','-NonInteractive','-EncodedCommand',
       Buffer.from(script,'utf16le').toString('base64')],timeout,undefined,8192)
     if(stdout.trim())return stdout.trim()
   }

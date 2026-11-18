@@ -30,3 +30,8 @@
       name: '@deepseek-ai/dsh-tool-cordis'
     - id: cordis-inspection-llm
       name: '../../../../../../apps/cli/tests/profiles/headless/tests/fixtures/cordis-inspection-llm.ts'
+
+# Replaces the disabled invocation provider so injected `headlessStartup` reads resolve.
+- insert:
+    - id: headless-startup-test-stub
+      name: '../../../../../../packages/test-support/loader-smoke/tests/fixtures/headless-startup-stub.ts'

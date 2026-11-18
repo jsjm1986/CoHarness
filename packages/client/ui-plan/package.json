@@ -53,6 +53,7 @@
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-plan-mode": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-util-crypto": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~"
@@ -74,7 +75,8 @@
     "@deepseek-ai/dsh-util-crypto": "workspace:*",
     "@types/react": "~19.2.7",
     "@deepseek-ai/cordis": "workspace:~",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*"
   },
   "files": [
     "locale/*.json",

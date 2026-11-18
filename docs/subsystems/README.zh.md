@@ -39,6 +39,7 @@
 | [browser-use.md](browser-use.zh.md) | 按名称独占注册浏览器操作提供方、提供方选项与按 Session 管理的浏览器所有权 |
 | [extensions.md](extensions.zh.md) | 带版本的动态 Cordis Plugin 与 Package、Host/Client 激活、审批、运行时检查和生命周期撤销 |
 | [filesystem.md](filesystem.zh.md) | 文件系统 seam：`FsTarget`、读/写/编辑结果、观测到的文件状态、`FsErrorCode` |
+| [forge.md](forge.zh.md) | 实验性代码宿主变更请求：provider 契约、共享状态轮询与 Session 绑定 |
 | [lsp.md](lsp.zh.md) | LSP 导航 seam：`LspQueryRequest`/`Result`、`LspProvider`/`Service`、四种操作、`LspError` |
 | [skills.md](skills.zh.md) | skill（技能）服务：发现优先级、`SkillSummary`/`SkillDefinition`、会话前缀目录、面向模型的 `skill` 加载 |
 | [compaction.md](compaction.zh.md) | 压缩（compaction）seam：`compaction/*` 会话事件、`CompactionResult`、`CompactionEngine` 接口 |
@@ -57,7 +58,7 @@
 | [web-server.md](web-server.zh.md) | HTTP 载体：`WebRouteKind`/`WebRoute`、匹配顺序、可认领的回退席位、index 渲染挂接点 |
 | [storage.md](storage.zh.md) | 存储子系统：后端约定（`StorageBackend`）、`StorageForms`、`DomainSpec`/`Domain`、`domain/changed` |
 | [deliverables.md](deliverables.zh.md) | 显式文件交付声明与已记录的工作区轮次比较 |
-| [office-to-pdf.md](office-to-pdf.zh.md) | 已授权的延迟 Office 转换、有界 PDF 结果及预览适配 |
+| [office-kit.md](office-kit.zh.md) | 已授权的延迟 Office 渲染、转换、重算及预览适配 |
 | [ssh.md](ssh.zh.md) | POSIX 远端文件、进程与沙箱共享的 SSH 连接及生命周期 |
 | [webhook.md](webhook.zh.md) | 即发即弃的 Webhook 运行时：`WebhookSessionRequest`、受信任规则注册表与提供方自持的交付接收 |
 | [remote-desktop.md](remote-desktop.zh.md) | 面向人类的远程桌面缝：授权模型、强制的 `resolve → attach` 契约、流式会话与审计分类法 |

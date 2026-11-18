@@ -2,6 +2,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import PluginMarket from '../src/index.ts'
@@ -31,7 +32,7 @@ async function fixture() {
   await ctx.plugin(ToolRuntime)
   const fiber = await ctx.plugin(tool)
   const call = async (args: unknown, signal = new AbortController().signal) => {
-    const result = await ctx.tools.execute({ name: 'plugin_market', arguments: args, callId: ToolCallId('market-call'), signal })
+    const result = await executeToolFixture(ctx, { name: 'plugin_market', arguments: args, callId: ToolCallId('market-call'), signal })
     return { ...result, json: typeof result.value === 'string' ? JSON.parse(result.value) as Record<string, unknown> : undefined }
   }
   return { ctx, call, fiber }

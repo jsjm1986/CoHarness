@@ -17,7 +17,6 @@ import z from '@deepseek-ai/schemastery'
 import * as acp from '@deepseek-ai/dsh-acp'
 import * as agentCore from '@deepseek-ai/dsh-agent-spine-demo'
 import * as workspaceContext from '@deepseek-ai/dsh-agent-instructions'
-import ToolRuntime, { type Config as ToolsConfig } from '@deepseek-ai/dsh-tools'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
   JsonlCompressionSchema,
@@ -48,8 +47,13 @@ export interface Config {
   persona?: string
   /** Explicit model-facing tool order (the system-prompt plugin's `toolOrder` config; see dsh-system-prompt). */
   toolOrder?: string[]
-  /** Tool-registry config — its presentation `mode` (forwarded through agent-spine-demo; see dsh-tools). */
-  tools?: ToolsConfig
+  /** Tool executor selection — `native` schemas or `ptc` run_code plus a generated SDK (forwarded through agent-spine-demo). */
+  tools?: {
+    /** Executor mode: `native` executes tool schemas directly; `ptc` exposes run_code plus a generated SDK. */
+    mode?: 'native' | 'ptc'
+    /** Maximum parallel sub-calls a PTC batch may issue. */
+    maxParallelSubCalls?: number
+  }
   /** DeepSeek Harness home directory exposed to bash and used for local skill discovery. */
   dshHome?: string
   /** Fallback session-title limits forwarded through agent-spine-demo. */
@@ -84,7 +88,7 @@ export const Config: z<Config> = z.object({
   // order" (the owning dsh-system-prompt schema does the same), while
   // schemastery's native [] default would read as an invalid configured list.
   toolOrder: z.array(z.string()).default(undefined as unknown as string[]),
-  tools: ToolRuntime.Config,
+  tools: z.object({ mode: z.union(['native', 'ptc'] as const), maxParallelSubCalls: z.natural().min(1) }),
   dshHome: z.string(),
   sessionTitle: agentCore.SessionTitleConfigSchema,
   persistenceRoot: z.string().default(DEFAULT_PERSISTENCE_ROOT),

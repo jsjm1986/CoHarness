@@ -349,6 +349,7 @@ describe('GoalDock adapter', () => {
       useSessions: () => { throw new Error('unused') },
       useWorkspaces: () => { throw new Error('unused') },
       usePanelInfo: () => { throw new Error('unused') },
+      useRemoteAccess: () => true,
       useInput: () => { throw new Error('unused') },
       inputActions: {
         setDraft: () => {}, addImages: () => true, removeImage: () => {},

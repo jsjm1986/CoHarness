@@ -28,6 +28,7 @@ function previewProps(loadSkill: PreviewProps['loadSkill'], skillName = 'review'
     useSessions: () => { throw new Error('unused') },
     useWorkspaces: () => { throw new Error('unused') },
     usePanelInfo: () => { throw new Error('unused') },
+    useRemoteAccess: () => true,
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: {

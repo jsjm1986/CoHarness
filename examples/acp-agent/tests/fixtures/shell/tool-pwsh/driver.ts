@@ -19,24 +19,30 @@ try {
   if (schema === undefined) throw new Error('pwsh tool not registered by the composition')
   const prompt = (await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'tool:pwsh')
 
-  const foreground = await ctx.tools.execute({
+  const foreground = (await ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: ToolCallId('loader-fg'),
-    name: 'pwsh',
-    arguments: { command: 'Write-Output loader-ok', description: 'loader foreground' },
-  })
+    calls: [{
+      type: 'tool-call',
+      id: ToolCallId('loader-fg'),
+      name: 'pwsh',
+      arguments: JSON.stringify({ command: 'Write-Output loader-ok', description: 'loader foreground' }),
+    }],
+  })).results[0]!.result
   const foregroundText = foreground.content.filter(block => block.type === 'text').map(block => block.text).join('')
 
-  const background = await ctx.tools.execute({
+  const background = (await ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: ToolCallId('loader-bg'),
-    name: 'pwsh',
-    arguments: {
-      command: 'Start-Sleep -Milliseconds 200; Write-Output loader-bg-ok',
-      description: 'loader background',
-      run_in_background: true,
-    },
-  })
+    calls: [{
+      type: 'tool-call',
+      id: ToolCallId('loader-bg'),
+      name: 'pwsh',
+      arguments: JSON.stringify({
+        command: 'Start-Sleep -Milliseconds 200; Write-Output loader-bg-ok',
+        description: 'loader background',
+        run_in_background: true,
+      }),
+    }],
+  })).results[0]!.result
   const jobId = (background.value as { jobId: string }).jobId
 
   // The output delta and the terminal status can land in separate reads
@@ -44,12 +50,15 @@ try {
   let backgroundText = ''
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
-    const read = await ctx.tools.execute({
+    const read = (await ctx.tools.execute({
       signal: new AbortController().signal,
-      callId: ToolCallId('loader-bg-read'),
-      name: 'job_output',
-      arguments: { job_id: jobId },
-    })
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('loader-bg-read'),
+        name: 'job_output',
+        arguments: JSON.stringify({ job_id: jobId }),
+      }],
+    })).results[0]!.result
     backgroundText += read.content.filter(block => block.type === 'text').map(block => block.text).join('')
     if (backgroundText.includes('loader-bg-ok') && backgroundText.includes('[status: completed')) break
     await new Promise(resolve => setTimeout(resolve, 50))

@@ -321,7 +321,8 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
     await expect(running).resolves.toBeUndefined()
     expect(connects).toBeGreaterThanOrEqual(3)
     expect(events).toContainEqual({ status: 'degraded', reason: 'node-access/already-connected' })
-    expect(events.at(-1)).toEqual({ status: 'stopped' })
+    // Aborted mid-flight connect leaves release uncertainty; both stop terminals are valid.
+    expect(['stopped', 'stopped-lease-uncertain']).toContain(events.at(-1)?.status)
   })
 
   it('refuses a lease for a different identity and retains acquisition uncertainty', async () => {

@@ -157,6 +157,7 @@ export function observeRun(
   const identity = {
     runId: SubagentRunId(randomUUID()),
     provider,
+    parentSessionId: parent.id,
     id: run.id,
     local: run.localAgent !== undefined,
   }
@@ -187,7 +188,9 @@ export function observeRun(
  * @param emit - the contained lifecycle emitter.
  * @param provider - the provider name recorded in the durable descriptor.
  * @param childId - the durable child session id.
- * @param parent - the exact live direct parent keying scoped dispatch.
+ * @param parent - the exact live tree owner keying scoped dispatch: the direct
+ *   parent for a fresh child, the subagent tree root for a member resume.
+ * @param parentSessionId - the durable direct creator carried in the payload.
  * @returns the observer whose edges this epoch publishes.
  */
 export function createActivationObserver(
@@ -195,8 +198,9 @@ export function createActivationObserver(
   provider: string,
   childId: SessionId,
   parent: Agent,
+  parentSessionId: SessionId,
 ): ActivationObserver {
-  const identity = { runId: SubagentRunId(randomUUID()), provider, id: childId, local: true }
+  const identity = { runId: SubagentRunId(randomUUID()), provider, parentSessionId, id: childId, local: true }
   // A cold resume replays earlier turns, so this epoch's telemetry must come
   // from the suffix it actually produced — never the whole session, which
   // would report a previous epoch's answer when this one opened no turn.

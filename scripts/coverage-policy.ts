@@ -99,6 +99,9 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       'packages/subagent/subagent-codex/src/member.ts',
       'packages/subagent/subagent-codex/src/rollout.ts',
       'packages/util/managed-data/src/index.ts',
+      // The gh runner's only suite (gh.spec.ts) skips entirely on win32; its
+      // scripted stand-in requires a POSIX shell.
+      'packages/experimental/forge-github/src/gh.ts',
     ]
     : []
 

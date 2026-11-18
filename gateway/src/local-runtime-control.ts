@@ -2,7 +2,7 @@
 import { request } from 'node:http'
 import { performance } from 'node:perf_hooks'
 import type { InstanceProc } from './launcher.ts'
-import { runGatewayChildCommand } from './child-command.ts'
+import { runGatewayChildCommand, runWindowsShellProbe } from './child-command.ts'
 import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerLease, type LocalRuntimeOwnerRecord } from './local-runtime-owner.ts'
 import { localKernelBootId } from './local-runtime-protocol.ts'
 import { localLinuxRuntimeEmpty, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
@@ -180,9 +180,9 @@ export class LocalRuntimeControl implements InstanceProc {
 
   /** Kill every descendant tree rooted at a dead supervisor's children. */
   private async sweepOrphans(parentPid: number): Promise<void> {
-    const { stdout } = await runGatewayChildCommand('powershell.exe', [
+    const { stdout } = await runWindowsShellProbe([
       '-NoProfile', '-NonInteractive', '-Command',
-      `& { (Get-CimInstance Win32_Process -Filter "ParentProcessId=${String(parentPid)}").ProcessId -join "," }`,
+      `& { $ids = @(); foreach ($p in [Management.ManagementObjectSearcher]::new('SELECT ProcessId FROM Win32_Process WHERE ParentProcessId=${String(parentPid)}').Get()) { $ids += [int]$p['ProcessId'] }; $ids -join "," }`,
     ], this.timeoutMs, undefined, 4096)
     for (const pid of stdout.trim().split(',').map(Number).filter(pid => Number.isSafeInteger(pid) && pid > 0)) {
       await runGatewayChildCommand('taskkill.exe', ['/PID', String(pid), '/T', '/F'], this.timeoutMs).catch(() => {})

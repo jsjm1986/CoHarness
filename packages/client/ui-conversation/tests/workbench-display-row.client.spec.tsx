@@ -24,6 +24,7 @@ function mount() {
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
+    useRemoteAccess: () => true,
     useDisplaySettings: bindSnapshotSelector(settings),
     setWidth: vi.fn((value: number) => { settings.setWidth(value) }),
     setFullWidth: vi.fn((value: boolean) => { settings.setFullWidth(value) }),

@@ -7,4 +7,4 @@ sessionFormat:
   version: 2
   coverage: [adjacent-migration]
 header:
-  class: default
+  class: sdk-default

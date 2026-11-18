@@ -28,6 +28,9 @@ import Subprocess from '@deepseek-ai/dsh-subprocess-local'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import { estimateContent } from '@deepseek-ai/dsh-token-meter/estimate'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import sharp from 'sharp'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -50,7 +53,9 @@ async function setup(mode: 'native' | 'ptc' = 'native') {
     try { await ctx.fiber.dispose() } finally { await rm(root, { recursive: true, force: true }) }
   })
   await ctx.plugin(SystemPrompt)
-  await ctx.plugin(ToolRuntime, { mode })
+  await ctx.plugin(ToolRuntime)
+  if (mode === 'ptc') ctx.tools.setExecutor(new PtcExecutor(ctx))
+  else await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(FileSystem, { cwd: root })
   await ctx.plugin(LocalAttachments, { dshHome: join(root, 'home') })
   await ctx.plugin(ToolFs)
@@ -74,7 +79,7 @@ async function setup(mode: 'native' | 'ptc' = 'native') {
   const session = ctx.sessions.create(SessionId('recovery'), { meta: { cwd: root } })
   const agent = { session, options: { provider: 'vision', model: MODEL }, ctx } as Agent
   let ordinal = 0
-  const execute = (name: string, args: JsonValue = {}) => ctx.tools.execute({
+  const execute = (name: string, args: JsonValue = {}) => executeModelToolFixture(ctx, {
     name, arguments: args, callId: ToolCallId(`recovery-${++ordinal}`), agent, signal: new AbortController().signal,
   })
   const red = await sharp({ create: { width: 1920, height: 1080, channels: 3, background: '#ff0000' } }).png().toBuffer()

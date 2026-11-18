@@ -9,6 +9,7 @@ import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as timeContext from '@deepseek-ai/dsh-time-context'
 import type { Config } from '@deepseek-ai/dsh-time-context'
 import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
@@ -40,6 +41,7 @@ afterEach(() => {
 async function mount(config: Config = {}) {
   const ctx = new Context()
   await ctx.plugin(AgentRegistry)
+  await ctx.plugin(SessionProjectionRegistry)
   const fiber = await ctx.plugin(timeContext, config)
   return { ctx, fiber }
 }
@@ -381,6 +383,7 @@ describe('configuration and lifecycle', () => {
   it('fails loud for an invalid explicit zone or an unavailable process zone', async () => {
     const invalid = new Context()
     await invalid.plugin(AgentRegistry)
+    await invalid.plugin(SessionProjectionRegistry)
     await expect(invalid.plugin(timeContext, { timeZone: 'Not/A_Real_Zone' })).rejects.toThrow(
       /invalid IANA timeZone/,
     )
@@ -390,6 +393,7 @@ describe('configuration and lifecycle', () => {
     })
     const unresolved = new Context()
     await unresolved.plugin(AgentRegistry)
+    await unresolved.plugin(SessionProjectionRegistry)
     await expect(unresolved.plugin(timeContext, {})).rejects.toThrow(/failed to resolve the system time zone/)
   })
 
@@ -491,12 +495,13 @@ describe('real Loader export path', () => {
     const unwrapped = loader.unwrapExports(timeContext) as Record<string, unknown>
     expect(unwrapped).toBe(timeContext)
     expect(unwrapped.name).toBe('time-context')
-    expect(unwrapped.inject).toEqual(['agents'])
+    expect(unwrapped.inject).toEqual(['agents', 'sessionProjections'])
     expect(unwrapped.Config).toBeDefined()
     expect(typeof unwrapped.apply).toBe('function')
 
     const ctx = new Context()
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionProjectionRegistry)
     const plugin = loader.unwrapExports(timeContext) as Parameters<Context['plugin']>[0]
     await ctx.plugin(plugin)
     const session = Session.create(SessionId('loader'))

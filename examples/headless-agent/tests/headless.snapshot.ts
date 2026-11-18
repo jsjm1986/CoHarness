@@ -1033,24 +1033,23 @@ describe('headless stream-json snapshots', () => {
         const parent = logs.find(log => typeof log.header.parentSession !== 'string')
         if (parent === undefined) throw new Error('Agent Teams snapshot did not persist its Lead')
         const rows = parseJsonl(parent.content)
-        const members = rows.filter(row => row.type === 'team/member')
-          .map(row => ((row.data as JsonObject).member as JsonObject))
+        const catalogText = rows.filter(row => row.type === 'subagent/catalog')
+          .map(row => JSON.stringify(row.data)).join('\n')
+        const catalogNames = ['implementer', 'researcher'].filter(name => catalogText.includes(`"${name}"`))
         const tasks = rows.filter(row => row.type === 'team/task')
           .map(row => ((row.data as JsonObject).task as JsonObject))
         const latestTasks = Object.values(Object.fromEntries(tasks.map(task => [String(task.subject), task])))
         projection = {
           sessions: logs.length,
-          memberEdges: members.length,
-          activeMembers: members.filter(member => member.phase === 'active').map(member => member.name).sort(),
+          modeEnabled: rows.some(row => row.type === 'team/mode' && (row.data as JsonObject).enabled === true),
+          catalogNames: [...catalogNames].sort(),
           tasks: latestTasks.map(task => ({
             subject: task.subject,
             revision: task.revision,
             status: task.status,
           })).sort((left, right) => String(left.subject).localeCompare(String(right.subject))),
-          queuedMessages: rows.filter(row => row.type === 'team/message/queued').length,
-          deliveredMessages: rows.filter(row => row.type === 'team/message/delivered').length,
-          waited: rows.some(row => row.type === 'tool/call'
-            && (row.data as JsonObject).name === 'wait_agent'),
+          peerMessages: logs.flatMap(log => parseJsonl(log.content))
+            .filter(row => row.type === 'tool/call' && (row.data as JsonObject).name === 'send_message').length,
           checkedRoster: rows.some(row => row.type === 'tool/call'
             && (row.data as JsonObject).name === 'list_agents'),
         }
@@ -1063,14 +1062,13 @@ describe('headless stream-json snapshots', () => {
     })
     expect(projection).toMatchInlineSnapshot(`
       {
-        "activeMembers": [
+        "catalogNames": [
           "implementer",
           "researcher",
         ],
         "checkedRoster": true,
-        "deliveredMessages": 2,
-        "memberEdges": 4,
-        "queuedMessages": 2,
+        "modeEnabled": true,
+        "peerMessages": 2,
         "sessions": 3,
         "tasks": [
           {
@@ -1084,7 +1082,6 @@ describe('headless stream-json snapshots', () => {
             "subject": "Research",
           },
         ],
-        "waited": true,
       }
     `)
   }, 75_000)

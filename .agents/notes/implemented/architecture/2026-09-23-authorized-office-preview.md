@@ -10,7 +10,7 @@ Office conversion can outlive its initiating request or return a shared cached P
 
 ## Decision
 
-The upstream [Office converter](../../../../packages/document/office-to-pdf/README.md) retains its admission queue, deferred source reads, content cache, rendering limits, and engine ownership. The [bounded conversion decision](2026-09-15-bounded-office-conversion.md) owns those mechanisms. ApiProxy's existing Workspace file domain supplies the only browser conversion entry. It checks Session and file access, probes content authorization before cache lookup, and rechecks access and source identity after conversion. Requests and responses use workspace-relative paths; engine diagnostics and Host paths stay internal.
+The upstream [Office converter](../../../../packages/document/office-kit/README.md) retains its admission queue, deferred source reads, content cache, rendering limits, and engine ownership. The [bounded conversion decision](2026-09-15-bounded-office-conversion.md) owns those mechanisms. ApiProxy's existing Workspace file domain supplies the only browser conversion entry. It checks Session and file access, probes content authorization before cache lookup, and rechecks access and source identity after conversion. Requests and responses use workspace-relative paths; engine diagnostics and Host paths stay internal.
 
 Deferred reads use version-guarded FS byte windows within the admitted capacity. This preserves the SSH provider's window limit without truncating an accepted document or weakening version checks. A cold Session header suffices; conversion neither activates an Agent nor adds Session events. Principal revocation, request cancellation, and plugin disposal invalidate pending results.
 

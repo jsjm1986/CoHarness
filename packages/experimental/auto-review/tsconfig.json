@@ -9,10 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../context/execution-authority"
+      "path": "../../../vendor/cordis"
     },
     {
       "path": "../../context/agent-instructions"
+    },
+    {
+      "path": "../../context/execution-authority"
     },
     {
       "path": "../../core/agent"
@@ -21,25 +24,28 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../core/tool-executor-ptc"
+    },
+    {
       "path": "../../core/tools"
     },
     {
       "path": "../../interaction/permission-presets"
     },
     {
+      "path": "../../interaction/user-approval"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session/working-directory"
     },
     {
       "path": "../../subagent/subagent"
     },
     {
       "path": "../../util/values"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../session/working-directory"
     }
   ]
 }

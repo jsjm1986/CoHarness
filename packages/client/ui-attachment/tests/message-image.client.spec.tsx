@@ -209,6 +209,7 @@ describe('ImageGallery', () => {
       useSessions,
       useWorkspaces,
       usePanelInfo,
+      useRemoteAccess: () => true,
       useProjection: () => undefined,
       useInput,
       inputActions: {

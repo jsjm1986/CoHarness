@@ -6,11 +6,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import { ExecutionAuthority, type ExecutionCapability, type ExecutionInheritance, type ExecutionInputId, type ExecutionState } from '@deepseek-ai/dsh-execution-authority'
 import LlmRuntime, { createMessage, LlmAdapter, ToolCallId, type GenerateOptions, type LlmOperationDispatch, type MessageId, type StreamChunk, type UserMessage } from '@deepseek-ai/dsh-llm'
 import PermissionPresets, { AUTO_PRESET } from '@deepseek-ai/dsh-permission-presets'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture, type ToolExecution } from '@deepseek-ai/dsh-tools'
@@ -113,7 +114,7 @@ async function world(managed = true, withoutAuthority = false) {
     ['@deepseek-ai/dsh-session', SessionStore], ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt], ['@deepseek-ai/dsh-fs-local', LocalFileSystem],
     ['@deepseek-ai/dsh-working-directory', WorkingDirectory], ['@deepseek-ai/dsh-llm', LlmRuntime],
-    ['@deepseek-ai/dsh-tools', ToolRuntime], ['@deepseek-ai/dsh-user-approval', Approval],
+    ['@deepseek-ai/dsh-tools', ToolRuntime], ['@deepseek-ai/dsh-agent', AgentRegistry], ['@deepseek-ai/dsh-user-approval', Approval],
     ['fixture:execution-authority', Authority], ['@deepseek-ai/dsh-permission-presets', PermissionPresets],
     ['@deepseek-ai/dsh-experimental-auto-review', AutoReview],
   ])
@@ -160,7 +161,7 @@ async function world(managed = true, withoutAuthority = false) {
   const fresh = create(SessionId('managed-auto')), callId = ToolCallId('managed-call')
   const execute = (session = fresh, signal = new AbortController().signal) => {
     const agent = { id: session.id, session, options: { provider: 'review', model: 'same-model' }, ctx, inject(_message: UserMessage) {} } as Agent
-    return ctx.tools.execute({ signal, agent, callId, name: 'write_probe', arguments: {} })
+    return executeToolFixture(ctx, { signal, agent, callId, name: 'write_probe', arguments: {} })
   }
   return { ctx, fresh, authority, reviewer, output, execute, auto, authorityFiber, create }
 }

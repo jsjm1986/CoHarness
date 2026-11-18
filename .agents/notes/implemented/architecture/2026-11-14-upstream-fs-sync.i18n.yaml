@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-14-upstream-fs-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-fs-sync.md
+document:
+  en: 00c20687b861bba29082d1cbc8ac51a29863e723
+  zh: 90dcbfff1cd33f3418a6aa1e5698a47578cbd252
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3:
+  en: 87a3b54363f57e94
+  zh: 435a817cd6697642
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/problem:
+  en: 634f96390bf24b86
+  zh: 6036fc18d55cd591
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/decision:
+  en: 7fc53a0b99f26e27
+  zh: 58ff6dec05304fdb
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/consequences:
+  en: f3ddd79162d0ad0c
+  zh: 13b5b373e5562ab3
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/alternatives-considered:
+  en: 6ec7140c20d7d048
+  zh: f8a7df058b4bf374
+/agent-note-upstream-fs-fixes-absorbed-from-rc-2-v0-2-2-rc-3/verification:
+  en: 59f20837c70a2f02
+  zh: 238fe9b75b63eb93

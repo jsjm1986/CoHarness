@@ -18,6 +18,8 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import MemoryService from '@deepseek-ai/dsh-memory'
 import * as MemoryContext from '../src/index.ts'
 import * as MemoryCuration from '@deepseek-ai/dsh-memory-curation'
@@ -47,6 +49,7 @@ async function boot(storageRoot: string, memoryConfig = '{}'): Promise<Context> 
     "- name: '@deepseek-ai/dsh-agent'",
     "- name: '@deepseek-ai/dsh-system-prompt'",
     "- name: '@deepseek-ai/dsh-tools'",
+    "- name: '@deepseek-ai/dsh-tool-executor-native'",
     "- name: '@deepseek-ai/dsh-memory'",
     `  config: ${memoryConfig}`,
     "- name: '@deepseek-ai/dsh-memory-context'",
@@ -68,6 +71,7 @@ async function boot(storageRoot: string, memoryConfig = '{}'): Promise<Context> 
     ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-memory', MemoryService],
     ['@deepseek-ai/dsh-memory-context', MemoryContext],
     ['@deepseek-ai/dsh-memory-curation', MemoryCuration],
@@ -111,7 +115,7 @@ describe('memory loader composition', () => {
 
     const ctx1 = await boot(storageRoot)
     const agent1 = await agent(ctx1, 'session-1', '/repo')
-    const saved = await ctx1.tools.execute({
+    const saved = await executeModelToolFixture(ctx1, {
       signal,
       callId: ToolCallId('call-1'),
       name: 'memory_save',

@@ -3,104 +3,92 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/tools/README.md
 document:
-  en: ecb186b8b8c8db2de0d83288dc639b6b0ac0d7d3
-  zh: 660ba2de909630e17ff19f68cd7b2d95404f96d4
+  en: 1178eab7f750e1826b500aa0618aa0bac15a0552
+  zh: 9811499066e557b729bfbc6bee3c1048c7c03636
 /:
-  en: fab100837d641f85
-  zh: 61495d48365178df
-/dsh-tools:
-  en: 94a6620b61030c73
-  zh: bc94aa529044ce6f
-/dsh-tools/summary:
-  en: 8c0a34155997a980
-  zh: ae6031db472b33e3
-/dsh-tools/table-of-contents:
-  en: 5a203bd4ee50a995
-  zh: 0547dbfef2bc2437
-/dsh-tools/service-toolruntime-ctx-key-tools:
-  en: 865a7c4b99798db9
-  zh: fbbeac098ef8d930
-/dsh-tools/service-toolruntime-ctx-key-tools/config:
-  en: 4d2cd8b8039aa8f2
-  zh: 0650ccec45a134a7
-/dsh-tools/service-toolruntime-ctx-key-tools/public-api:
-  en: 0165751a44af8686
-  zh: 86e8fa9f5f32aa84
-/dsh-tools/service-toolruntime-ctx-key-tools/injected-services:
-  en: 88966a112f94b32b
-  zh: a384cf7079eb6be4
-/dsh-tools/service-toolruntime-ctx-key-tools/cancellation:
-  en: 54a4155019004ebb
-  zh: 8f88f997f9e72b07
-/dsh-tools/service-toolruntime-ctx-key-tools/live-events:
-  en: 6070700fe80681d7
-  zh: 44da574387118db6
-/dsh-tools/service-toolruntime-ctx-key-tools/key-types:
-  en: f9aeb8b218d0e66b
-  zh: 1caa4f59844358c3
-/dsh-tools/service-toolruntime-ctx-key-tools/extension-points:
-  en: 24885acaf0c68c3e
-  zh: 1b9abeb8efea836f
-/dsh-tools/service-toolruntime-ctx-key-tools/typed-tool-parameter-schemas:
-  en: 0664c3db3baaf31a
-  zh: 62b29ce1b2b4f7ba
-/dsh-tools/service-toolruntime-ctx-key-tools/enforced-raw-json-schema-subset:
-  en: 41d35539d33e50e1
-  zh: bbfe9c9dba4be551
-/dsh-tools/service-toolruntime-ctx-key-tools/tool-owned-ui-presentation:
-  en: ffe07dcca9771b22
-  zh: df7d3c7f6c84c928
-/dsh-tools/service-toolruntime-ctx-key-tools/ptc-mode:
-  en: 58f449a1c308abbe
-  zh: baee4d312331d227
-/dsh-tools/service-toolruntime-ctx-key-tools/parallel-execution:
-  en: 2761c50026965892
-  zh: 3b6aee27f794d9ab
-/dsh-tools/model-experience:
+  en: 3b12a77945c0d1e9
+  zh: e9af32047e4f658b
+/deepseek-ai-dsh-tools:
+  en: bb2af1250bfefe4b
+  zh: 893e3ab2e563a8a5
+/deepseek-ai-dsh-tools/summary:
+  en: ad53df5cc542fc32
+  zh: 1ab915da46e01d20
+/deepseek-ai-dsh-tools/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-tools/use-this-package:
+  en: d382227271bf92ae
+  zh: 1f66b181418c91b9
+/deepseek-ai-dsh-tools/use-this-package/register-a-tool:
+  en: 1808e2a95ee21584
+  zh: 40c40da7d1418407
+/deepseek-ai-dsh-tools/use-this-package/conditional-tools:
+  en: eb80334754c2493a
+  zh: b431635ec1f4664f
+/deepseek-ai-dsh-tools/use-this-package/select-an-executor:
+  en: bdf27b6f339ea866
+  zh: b89205eedea1db0a
+/deepseek-ai-dsh-tools/use-this-package/restrict-tools-per-agent:
+  en: c6f98b2283cc2e47
+  zh: c2cdce5d13473f15
+/deepseek-ai-dsh-tools/use-this-package/enforce-policy-on-calls:
+  en: cbfe8317565ac62d
+  zh: 1e71c66941e50881
+/deepseek-ai-dsh-tools/use-this-package/host-presentation-descriptors:
+  en: 258e16bb367229e5
+  zh: 7c1eb91062b4e4ad
+/deepseek-ai-dsh-tools/understand-the-implementation:
+  en: ce7e776e9d516bdb
+  zh: 59d2751743db7795
+/deepseek-ai-dsh-tools/understand-the-implementation/design-concept:
+  en: 516a6195a21e742b
+  zh: 33c7b99b42c5acac
+/deepseek-ai-dsh-tools/understand-the-implementation/source-map:
+  en: 2dee0a37e0c1fa38
+  zh: 0963cba32685612e
+/deepseek-ai-dsh-tools/understand-the-implementation/execution-and-cancellation:
+  en: c6db8efb31370459
+  zh: 07aec8a6230d943a
+/deepseek-ai-dsh-tools/understand-the-implementation/ptc-mode:
+  en: 83cf9a5077158879
+  zh: 80508a70a3674226
+/deepseek-ai-dsh-tools/understand-the-implementation/extension-points:
+  en: c2a14d6f22bc9428
+  zh: 89c1414fca465931
+/deepseek-ai-dsh-tools/further-exploration:
+  en: 0fc18a3dad901c06
+  zh: 4ea9fa6dd5fdec92
+/deepseek-ai-dsh-tools/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
-/dsh-tools/model-experience/normal-tool-schemas:
+/deepseek-ai-dsh-tools/model-experience/normal-tool-schemas:
   en: 483b01d9bb2cb49a
   zh: 1d95095e76fb0996
-/dsh-tools/model-experience/normal-tool-schemas/what-the-model-sees:
-  en: beda295a874b30a1
-  zh: 253c4cf007c4db3f
-/dsh-tools/model-experience/normal-tool-schemas/token-effect:
+/deepseek-ai-dsh-tools/model-experience/normal-tool-schemas/what-the-model-sees:
+  en: d6a5c32a421bfe97
+  zh: 542d49df376e70a4
+/deepseek-ai-dsh-tools/model-experience/normal-tool-schemas/token-effect:
   en: d594b71ff5e4cc87
   zh: dcec1ea0dd2a0fa6
-/dsh-tools/model-experience/normal-tool-schemas/kv-cache-effect:
+/deepseek-ai-dsh-tools/model-experience/normal-tool-schemas/kv-cache-effect:
   en: 7c5e75964e020b2c
   zh: d50d0402d15232d9
-/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt:
-  en: eaefd7303f22977d
-  zh: 9c425f9501128224
-/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/what-the-model-sees:
-  en: 3e170a222d746e98
-  zh: 1ea442fc59874cc5
-/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/what-the-model-sees/typescript-ptc-mode-sdk-instructions-with-bash:
-  en: 3a8df15e4ae32f9e
-  zh: fc4a800ba363e835
-/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/token-effect:
-  en: 12296fcafc14562c
-  zh: f8e9351bb8c6437d
-/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/kv-cache-effect:
-  en: 78906628d634441f
-  zh: c10e5df748f5e0da
-/dsh-tools/model-experience/tool-call-history-and-results:
+/deepseek-ai-dsh-tools/model-experience/tool-call-history-and-results:
   en: a8503137ad03720c
   zh: 611a2dadf7c0c706
-/dsh-tools/model-experience/tool-call-history-and-results/what-the-model-sees:
-  en: 493cc0826cfec514
-  zh: f7e8d798a5e11c09
-/dsh-tools/model-experience/tool-call-history-and-results/token-effect:
+/deepseek-ai-dsh-tools/model-experience/tool-call-history-and-results/what-the-model-sees:
+  en: 7c568da5a45e99ab
+  zh: 7e78f04448fc5450
+/deepseek-ai-dsh-tools/model-experience/tool-call-history-and-results/token-effect:
   en: 8fe3f024f364ed9f
-  zh: 8468693e081defdb
-/dsh-tools/model-experience/tool-call-history-and-results/kv-cache-effect:
-  en: f5d5f97a153f7c70
-  zh: 3df78525d1db9020
-/dsh-tools/known-limitations-and-deferred-work:
-  en: f4c41736f9e0e91a
-  zh: 2c92bff24f29cbe8
-/dsh-tools/known-limitations-and-deferred-work/dev-note:
+  zh: 89c1d5d24c5f950b
+/deepseek-ai-dsh-tools/model-experience/tool-call-history-and-results/kv-cache-effect:
+  en: 2fbf2175168e8244
+  zh: ad59a120b54a0996
+/deepseek-ai-dsh-tools/known-limitations-and-deferred-work:
+  en: e8c410dee66e1639
+  zh: ae4965fa70234fd1
+/deepseek-ai-dsh-tools/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

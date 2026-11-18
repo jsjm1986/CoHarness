@@ -66,8 +66,11 @@ export async function apply(ctx) {
       await dispatchRequest(async () => {})
       const parent = ctx.agents.get(options.sessionId)
       assert.ok(parent)
-      const call = ordinal => ctx.tools.execute({ name: 'subagent', callId: ToolCallId(`retry-${ordinal}`),
-        signal: new AbortController().signal, arguments: { description: 'retained child', prompt: 'work' }, agent: parent })
+      const call = async ordinal => (await ctx.tools.execute({
+        calls: [{ type: 'tool-call', id: ToolCallId(`retry-${ordinal}`), name: 'subagent',
+          arguments: JSON.stringify({ description: 'retained child', prompt: 'work' }) }],
+        signal: new AbortController().signal, agent: parent,
+      })).results[0].result
       const originalAppend = parent.session.append, directory = ctx.workingDirectory, originalEnsure = directory.ensure
       let proof
       try {

@@ -15,8 +15,8 @@
  *
  * Public operations express caller intent: `start` returns one published owned
  * one-shot run, `startContinuable` establishes a durable continuable child, and
- * `sendMessage` steers between adjacent Agents without exposing whether a child
- * is resident. Continuable children never become a {@link SubagentRun}: the
+ * `sendMessage` steers between members of one subagent tree without exposing
+ * whether the target is resident. Continuable children never become a {@link SubagentRun}: the
  * continuation manager holds their `AgentHandle` directly and orders every turn
  * through the child's own inbox, so providers contribute only the detached
  * creation spec and see no handle, turn, or teardown. Child and descendant
@@ -70,6 +70,7 @@ import type {
   ResolvedSubagentStartRequest,
   SubagentCapabilities,
   SubagentInterruptAuthority,
+  SubagentMemberNames,
   SubagentProvider,
   SubagentRun,
   SubagentRunEndInfo,
@@ -139,13 +140,26 @@ export type {
   ContinuableStart,
   ContinuableStartSpec,
   SubagentInterruptAuthority,
+  SubagentMemberNames,
   SubagentSendMessageOptions,
 } from './types.ts'
 export type { SubagentDescendantListEntry } from './list-children.ts'
+export {
+  ROOT_AGENT_NAME,
+  agentAddress,
+  isAgentName,
+  joinAgentPath,
+  parentAgentPath,
+} from './names.ts'
 export type {} from './catalog.ts'
 export type * from './control-types.ts'
 export type { SubagentRunEndInfo, SubagentRunInfo } from './types.ts'
-export type { SubagentIdentityProjection, SubagentTimingProjection } from './projection-types.ts'
+export type {
+  KnownSubagentCatalogFields,
+  SubagentCatalogEntry,
+  SubagentIdentityProjection,
+  SubagentTimingProjection,
+} from './projection-types.ts'
 export {
   attachStructuredRuntime,
   STRUCTURED_OUTPUT_INSTRUCTION,
@@ -342,7 +356,10 @@ export class SubagentRuntime extends TypertRemoteService {
       const manager = new SubagentContinuationManager(childCtx, {
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
         agentRouteDefaults: name => this.expectProvider(name).agentRouteDefaults,
-        observeActivation: (provider, childId, parent) => this.observeActivation(provider, childId, parent),
+        observeActivation: (provider, childId, carrier, parentSessionId) =>
+          this.observeActivation(provider, childId, carrier, parentSessionId),
+        identityOf: session => this.ctx.get('sessionProjections')?.snapshot(session).values.subagent,
+        catalogOf: session => this.ctx.get('sessionProjections')?.snapshot(session).values.subagentCatalog,
       }, () => ({
         maxActivations: resolved().maxContinuableActivations,
         maxActivationsPerParent: resolved().maxContinuableActivationsPerParent,
@@ -376,7 +393,8 @@ export class SubagentRuntime extends TypertRemoteService {
    * turn to start or for the message to reach the Session log; any earlier
    * failure rejects with no ids and rolls back the child entirely.
    * @param spec - provider, delegation request, and caller cancellation.
-   * @returns the durable child id and the accepted prompt's message id.
+   * @returns the durable child id, the committed model-facing member name,
+   *   and the accepted prompt's message id.
    * @throws when continuation services are unavailable or materialization fails.
    */
   async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart> {
@@ -399,18 +417,20 @@ export class SubagentRuntime extends TypertRemoteService {
   }
 
   /**
-   * Steer one model-authored message to the sender's direct parent or direct
-   * continuable child. A running target admits it at the nearest step boundary;
-   * an idle target starts a turn, and an absent direct child cold-resumes from
-   * persistence. The service derives durable sender attribution from the exact
-   * live sender. Caller cancellation stops only pre-acceptance work.
+   * Steer one model-authored message to another member of the sender's
+   * subagent tree — the root, a sibling, a deeper descendant, or the sender's
+   * direct parent. A running target admits it at the nearest step boundary;
+   * an idle target starts a turn, and an absent member cold-resumes from
+   * persistence under the shared tree root without requiring its own creator
+   * live. The service derives durable sender attribution from the exact live
+   * sender. Caller cancellation stops only pre-acceptance work.
    * @param sender - exact live Agent authorizing and originating the message.
-   * @param targetId - durable direct-parent or direct-child session id.
+   * @param targetId - durable session id of another member of the same tree.
    * @param content - model-authored content to deliver.
    * @param options - caller cancellation before inbox acceptance.
    * @returns the accepted message's inbox id.
-   * @throws when continuation services are unavailable, adjacency is rejected,
-   *   or the message was not admitted.
+   * @throws when continuation services are unavailable, the target is outside
+   *   the sender's tree, or the message was not admitted.
    */
   async sendMessage(
     sender: Agent,
@@ -419,6 +439,47 @@ export class SubagentRuntime extends TypertRemoteService {
     options: SubagentSendMessageOptions,
   ): Promise<MessageId> {
     return this.withPendingParent(sender, () => this.requireContinuations().sendMessage(sender, targetId, content, options))
+  }
+
+  /**
+   * Resolve the exact live Agent at the root of the caller's subagent tree. A
+   * root is the caller itself when it never became a subagent member; a
+   * member's root stays reachable only while that exact root Agent is live.
+   * @param caller - exact live Agent selecting the subagent tree.
+   * @returns the live subagent tree root.
+   * @throws {SubagentError} `UNAUTHORIZED` when the caller is stale or a member
+   *   whose tree root is not live.
+   */
+  rootOf(caller: Agent): Agent {
+    return this.requireContinuations().rootOf(caller)
+  }
+
+  /**
+   * Report the model-facing names of a live member and its direct creator.
+   * The root reports `lead` and no parent; a member reports its slash-separated
+   * path — or its raw Session id where a historical catalog link was unnamed —
+   * and its creator's name by the same rule.
+   * @param agent - exact live root or resident tree member.
+   * @returns the member's own name and, for a member, its creator's.
+   * @throws {SubagentError} `UNAUTHORIZED` when the caller has no active runtime owner.
+   */
+  namesOf(agent: Agent): SubagentMemberNames {
+    return this.requireContinuations().namesOf(agent)
+  }
+
+  /**
+   * Resolve one model-facing name or Session id into the durable member id it
+   * addresses. `lead` names the caller's tree root and a slash-separated path
+   * walks committed catalog names from it; a simple name matching no committed
+   * entry falls back to the raw Session id.
+   * @param caller - exact live Agent selecting the subagent tree.
+   * @param name - the target's name path or a raw Session id.
+   * @param signal - caller cancellation forwarded to catalog reads.
+   * @returns the durable Session id to address.
+   * @throws {SubagentError} `AGENT_NAME_NOT_FOUND` for an unmatched slash path.
+   */
+  resolveName(caller: Agent, name: string, signal?: AbortSignal): Promise<SessionId> {
+    return this.requireContinuations().resolveName(caller, name, signal)
   }
 
   /**
@@ -798,7 +859,7 @@ export class SubagentRuntime extends TypertRemoteService {
    */
   registerProvider(provider: SubagentProvider): () => void {
     const name = provider.name
-    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; direct return preserves disposer identity
+    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; preserve the Cordis disposer identity
     return this.ctx.effect(function* (this: SubagentRuntime) {
       if (this.providers.has(name)) {
         throw new SubagentError(`a subagent provider named "${name}" is already registered`, 'DUPLICATE_PROVIDER')
@@ -1026,9 +1087,10 @@ export class SubagentRuntime extends TypertRemoteService {
   private observeActivation(
     provider: string,
     childId: SessionId,
-    parent: Agent,
+    carrier: Agent,
+    parentSessionId: SessionId,
   ): ActivationObserver {
-    return createActivationObserver(this.emitLifecycle, provider, childId, parent)
+    return createActivationObserver(this.emitLifecycle, provider, childId, carrier, parentSessionId)
   }
 
   /** Reject the first requested capability that the provider lacks. */

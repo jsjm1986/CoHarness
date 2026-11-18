@@ -35,6 +35,33 @@ export async function runGatewayChildCommand(command: string, args: string[], ti
   }
 }
 
+// Windows PowerShell 5.1 resolves cmdlets through a per-user module-analysis
+// cache; cold-starting several powershell.exe children concurrently lets one
+// sibling's cache build fail another with CouldNotAutoloadMatchingModule.
+let powershellQueue: Promise<unknown> = Promise.resolve()
+
+/**
+ * Run a bounded Windows PowerShell child serially and retry the documented
+ * cold-start race once inside the same queue slot.
+ * @param args - literal powershell.exe arguments.
+ * @param timeoutMs - validated command deadline per attempt.
+ * @param signal - caller cancellation.
+ * @param maxBuffer - retained byte limit per output stream; defaults to one MiB.
+ * @returns bounded stdout and stderr from a successful command.
+ */
+export async function runWindowsShellProbe(args: string[], timeoutMs: number, signal?: AbortSignal, maxBuffer = 1024 * 1024): Promise<{ stdout: string; stderr: string }> {
+  const run = powershellQueue.then(async () => {
+    try {
+      return await runGatewayChildCommand('powershell.exe', args, timeoutMs, signal, maxBuffer)
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes('CouldNotAutoloadMatchingModule'))) throw error
+      return runGatewayChildCommand('powershell.exe', args, timeoutMs, signal, maxBuffer)
+    }
+  })
+  powershellQueue = run.then(() => undefined, () => undefined)
+  return run
+}
+
 /**
  * Distinguish a command killed by its own deadline or cancellation from an autonomous exit.
  * @param error - rejection from runGatewayChildCommand.

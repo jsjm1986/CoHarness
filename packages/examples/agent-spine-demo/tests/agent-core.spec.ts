@@ -672,11 +672,15 @@ describe('dsh-agent-spine-demo bundle', () => {
     const wait = vi.spyOn(ctx.jobs, 'wait')
     await ctx.tools.execute({
       signal: testToolSignal,
-      callId: ToolCallId('task-config-forwarding'),
-      name: 'job_output',
-      arguments: { job_id: id, wait: true },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('task-config-forwarding'),
+        name: 'job_output',
+        arguments: JSON.stringify({ job_id: id, wait: true }),
+      }],
     })
-    expect(wait).toHaveBeenCalledWith(id, 7, undefined, testToolSignal)
+    // The executor hands each call a signal derived from the batch signal.
+    expect(wait).toHaveBeenCalledWith(id, 7, undefined, expect.any(AbortSignal))
 
     await ctx.fiber.dispose()
   })

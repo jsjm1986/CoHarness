@@ -49,6 +49,7 @@
           - option "OpenAI Chat Completions" [selected]
           - option "OpenAI Responses"
           - option "Anthropic Messages"
+          - option "google-generative-ai"
         - region "模型目录":
           - text: 模型目录 已自定义模型目录
           - button "恢复默认模型"

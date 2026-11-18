@@ -10,6 +10,7 @@ import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed, ContextSnapshotSection, Message } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionSeq, SurfaceIntent, SystemMessage, UserMessage } from '@deepseek-ai/dsh-session'
 import { isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session'
+import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import type { Context } from '@deepseek-ai/cordis'
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -27,6 +28,12 @@ function isOwned(message: UserMessage): boolean {
 function textOf(message: Message): string | undefined {
   const [block] = message.content
   return message.content.length === 1 && block?.type === 'text' ? block.text : undefined
+}
+
+/** Contributions a snapshot-form message attributed itself to; absent on the cleared marker and legacy entries. */
+function sectionsOf(message: Message): readonly ContextSnapshotSection[] | undefined {
+  const source = message.source
+  return source.kind === SOURCE && 'sections' in source ? source.sections : undefined
 }
 
 /** One uncommitted system-prompt surface operation for request admission or reconciliation. */
@@ -106,7 +113,7 @@ export class SystemPromptProjection {
       return [{ message: createSystemMessage(rendered), intent: { surfaceOp: 'append' } }]
     }
     const latest = nodes.findLast(node => node.text !== '') ?? head
-    if (!input.inHistory || input.startsSeries || rendered.length === 0) {
+    if (!input.inHistory || rendered.length === 0 || (input.startsSeries && latest.text !== rendered)) {
       const updates = nodes.slice(1).filter(node => node.text !== '')
         .map(node => this.replace(node.seq, ''))
       if (head.text !== rendered) updates.push(this.replace(head.seq, rendered))
@@ -127,7 +134,11 @@ export class SystemPromptProjection {
 /** Tracks the last retained runtime-context snapshot without owning its commit. */
 export class RuntimeContextProjection {
   /** `undefined` means no snapshot ever existed; `null` means none is retained. */
-  private retained: { seq: SessionSeq; text: string | undefined } | null | undefined
+  private retained: {
+    seq: SessionSeq
+    text: string | undefined
+    sections: readonly ContextSnapshotSection[] | undefined
+  } | null | undefined
 
   /**
    * Restore projection state once, then follow authoritative session events.
@@ -140,7 +151,7 @@ export class RuntimeContextProjection {
       if (event.type !== 'user/message' || !isOwned(event.data)) continue
       this.retained ??= null
       if (surface.has(event.seq)) {
-        this.retained = { seq: event.seq, text: textOf(event.data) }
+        this.retained = { seq: event.seq, text: textOf(event.data), sections: sectionsOf(event.data) }
         break
       }
     }
@@ -148,7 +159,7 @@ export class RuntimeContextProjection {
     ctx.on('session/event', (subject, event) => {
       if (subject !== session) return
       if (event.type === 'user/message' && isOwned(event.data)) {
-        this.retained = { seq: event.seq, text: textOf(event.data) }
+        this.retained = { seq: event.seq, text: textOf(event.data), sections: sectionsOf(event.data) }
       } else if (this.retained
         && isReplacementSurfaceEvent(event)
         && event.sourceEventSeqs?.includes(this.retained.seq) === true) {
@@ -165,8 +176,14 @@ export class RuntimeContextProjection {
    */
   project(current: string, sections: readonly ContextSnapshotSection[]): UserMessage | undefined {
     if (this.retained === undefined && current.length === 0) return
-    const snapshot = current.length === 0 ? CLEARED : current
-    if (this.retained?.text === snapshot) return
+    if (this.retained?.sections !== undefined && deepEqualJson(this.retained.sections, sections)) return
+    const intro = this.retained === undefined
+      ? 'The following information describes your current session:'
+      : 'The following information describes your current session. It replaces earlier versions of this context, including any retained in conversation summaries.'
+    const snapshot = current.length === 0 ? CLEARED : `${intro}\n\n${current}`
+    // Restored entries that predate the snapshot form compare on their text.
+    if (this.retained?.sections === undefined
+      && (this.retained?.text === snapshot || (current.length > 0 && this.retained?.text === current))) return
     return createUserMessage({
       content: [{ type: 'text', text: snapshot }],
       // The cleared marker has no contributions left to attribute.

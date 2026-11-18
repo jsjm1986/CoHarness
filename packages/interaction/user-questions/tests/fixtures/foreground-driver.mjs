@@ -14,6 +14,7 @@ const { SessionId } = await import(entry('core/session'))
 const sources = new Map([
   ['@deepseek-ai/dsh-session', 'core/session'], ['@deepseek-ai/dsh-agent', 'core/agent'],
   ['@deepseek-ai/dsh-llm', 'llm/llm'], ['@deepseek-ai/dsh-tools', 'core/tools'],
+  ['@deepseek-ai/dsh-tool-executor-native', 'core/tool-executor-native'],
   ['@deepseek-ai/dsh-system-prompt', 'core/system-prompt'], ['@deepseek-ai/dsh-session-projection', 'session/session-projection'],
   ['@deepseek-ai/dsh-agent-loop', 'core/agent-loop'], ['@deepseek-ai/dsh-user-questions', 'interaction/user-questions'],
   ['@deepseek-ai/dsh-plan-mode', 'plan/plan-mode'],

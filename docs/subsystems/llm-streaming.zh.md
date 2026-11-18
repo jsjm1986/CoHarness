@@ -415,6 +415,8 @@ interface AppIdentity {
   version: string
   /** Repository home URL of the app, used as the `User-Agent` comment. */
   url: string
+  /** RFC 9110 product token appended after the comment, such as `dsh-profile/web`. */
+  suffix?: string | undefined
 }
 ```
 
@@ -894,6 +896,10 @@ interface LlmCallConfigAdapterDefaults {
 `LlmRuntime.prepareOperation()` 与 `prepareCall()` 一样捕获适配器代次和模型元数据。返回的 `PreparedLlmOperation<Name>` 暴露冻结元数据、分离并冻结的 `request`，以及代替 `stream()` 的一次性 `run()`。Consumer 在调用 `run()` 前将请求记录到其 Session 事件中。执行以空对话消息和 `GenerateOptions.operation` 经过普通中间件、checkpoint、策略和模型准入。拒绝或取消的操作会失败；未得到实际操作结果时，中间件不能合成成功。不支持的操作以 `MODEL_OPERATION_UNSUPPORTED` 失败。[原生 Messages 搜索](../../packages/web/web-search-deepseek/README.zh.md) 是其中一个 Consumer。
 
 模型流在异步中间件前捕获策略所有者。跨等待时拒绝缺少必需策略、所有者撤下或替换，再在最终异步防护后执行其路由决定。`modelAccessRequired` 保留在 Gateway runtime 的根生命周期内，防止撤下提供方后恢复独立执行。
+
+## Pi-ai 请求标头
+
+`PiAiRequestHeaderContext` 携带预备调用的 provider、model、已解析的模型 `baseURL`，以及可选的 Session id 与辅助用途。它不可变，不含消息或凭据字段，并与一份请求自有的 `Headers` 对象一起进入同步的 `llm-pi-ai/request-headers` waterfall。[适配器的请求标头文档](../../packages/llm/llm-pi-ai/README.zh.md#request-headers)定义了贡献归属、归因优先级与失败行为。该扩展点专属于 pi-ai 推理请求。
 
 ## 服务与提供方约定
 
@@ -1415,6 +1421,35 @@ Waterfall around physical streaming model calls (retry, replay, routing). Bound 
 ```
 
 Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
+
+<a id="llm-pi-ai-events"></a>
+
+### `llm-pi-ai/*` events
+
+<a id="llm-pi-airequest-headers--waterfall"></a>
+
+#### `llm-pi-ai/request-headers` — waterfall
+
+Prepare headers for one pi-ai inference call, excluding model discovery. Listeners run synchronously and must call next(); they may edit only the request-owned headers and must not retain them. Throws fail the call with REQUEST_HEADERS before inference I/O. Harness attribution wins afterward. Non-TypeError messages are user-visible and must exclude secrets. TypeError details and non-Error values are replaced with safe guidance.
+
+```ts cordis-catalog
+/**
+ * Prepare headers for one pi-ai inference call, excluding model discovery.
+ * Listeners run synchronously and must call next(); they may edit only the
+ * request-owned headers and must not retain them. Throws fail the call with
+ * REQUEST_HEADERS before inference I/O. Harness attribution wins afterward.
+ * Non-TypeError messages are user-visible and must exclude secrets. TypeError
+ * details and non-Error values are replaced with safe guidance.
+ * @mode waterfall
+ * @param request - immutable routing metadata from the exact prepared call.
+ * @param headers - fresh profile headers, shared only within this dispatch.
+ * @param next - continue header preparation through the remaining listeners.
+ * @returns headers passed to pi-ai after Harness attribution is applied.
+ */
+'llm-pi-ai/request-headers'(request: PiAiRequestHeaderContext, headers: Headers, next: () => Headers): Headers
+```
+
+Source: [`packages/llm/llm-pi-ai/src/index.ts`](../../packages/llm/llm-pi-ai/src/index.ts)
 
 <a id="model-provider-config-events"></a>
 

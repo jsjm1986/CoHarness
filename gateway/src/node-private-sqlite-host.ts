@@ -19,7 +19,7 @@ export class NodePrivateSqliteHost {
   private id=0
   private owners=0
   private pending=new Map<number,{resolve:(value:unknown)=>void;reject:(error:Error)=>void}>()
-  constructor(private readonly root:string,private readonly proofTimeoutMs=10_000){}
+  constructor(private readonly root:string,private readonly proofTimeoutMs=30_000){}
 
   /** @returns a release function that drains the worker when its final owning service closes. */
   retain():()=>Promise<void>{

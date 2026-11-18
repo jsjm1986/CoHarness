@@ -17,13 +17,25 @@ function handshake(security: number, authBytes = 0): Buffer {
   ])
 }
 
-const KEY_EVENT = Buffer.from([3, 1, 0, 0, 0, 0, 0, 0x61])
-const POINTER_EVENT = Buffer.from([4, 1, 0, 10, 0, 20])
-const FB_UPDATE_REQUEST = Buffer.from([2, 0, 0, 0, 0, 0, 4, 0, 3, 0])
-const SET_ENCODINGS = Buffer.from([1, 0, 0, 1, 0, 0, 0, 0])
-const CUT_TEXT = Buffer.concat([Buffer.from([5, 0, 0, 0, 0, 0, 0, 3]), Buffer.from('abc', 'latin1')])
+const KEY_EVENT = Buffer.from([4, 1, 0, 0, 0, 0, 0, 0x61])
+const POINTER_EVENT = Buffer.from([5, 1, 0, 10, 0, 20])
+const FB_UPDATE_REQUEST = Buffer.from([3, 0, 0, 0, 0, 0, 4, 0, 3, 0])
+const SET_ENCODINGS = Buffer.from([2, 0, 0, 1, 0, 0, 0, 0])
+const CUT_TEXT = Buffer.concat([Buffer.from([6, 0, 0, 0, 0, 0, 0, 3]), Buffer.from('abc', 'latin1')])
 
 describe('RfbClientFilter', () => {
+  it('matches RFC 6143 message numbers through every byte-split boundary', () => {
+    const pixelFormat = Buffer.alloc(20)
+    const allowed = Buffer.concat([pixelFormat, SET_ENCODINGS, FB_UPDATE_REQUEST])
+    const wire = Buffer.concat([pixelFormat, KEY_EVENT, SET_ENCODINGS, POINTER_EVENT, CUT_TEXT, FB_UPDATE_REQUEST])
+    for (let split = 0; split <= wire.length; split++) {
+      const filter = new RfbClientFilter('frame')
+      const output = Buffer.concat([filter.push(wire.subarray(0, split)), filter.push(wire.subarray(split))])
+      expect(output).toEqual(allowed)
+      expect(filter.dropped).toBe(3)
+    }
+  })
+
   it('passes the handshake and negotiation frames through untouched', () => {
     const filter = new RfbClientFilter()
     const input = Buffer.concat([handshake(1), SET_ENCODINGS, FB_UPDATE_REQUEST])

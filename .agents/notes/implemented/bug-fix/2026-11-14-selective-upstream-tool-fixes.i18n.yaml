@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-14-selective-upstream-tool-fixes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-14-selective-upstream-tool-fixes.md
+document:
+  en: ff2c820498db89294550396692f17687be1bb465
+  zh: 44b8fabb96f30bfa8138f6a7e2c2e932a7e485b7
+/agent-note-selective-backport-of-upstream-tool-layer-fixes-rc-2-v0-2-2-rc-3:
+  en: 6818b3559bc8bc9d
+  zh: ca8fb48a619cd0b8
+/agent-note-selective-backport-of-upstream-tool-layer-fixes-rc-2-v0-2-2-rc-3/problem:
+  en: 9812b9a8484d7cb7
+  zh: 8e153ec39704c45a
+/agent-note-selective-backport-of-upstream-tool-layer-fixes-rc-2-v0-2-2-rc-3/decision:
+  en: 6ceaa6d235ba0cbd
+  zh: 10285fd363604d65
+/agent-note-selective-backport-of-upstream-tool-layer-fixes-rc-2-v0-2-2-rc-3/alternatives-considered:
+  en: 909633c52b937137
+  zh: 0c89701177cfeb38
+/agent-note-selective-backport-of-upstream-tool-layer-fixes-rc-2-v0-2-2-rc-3/consequences:
+  en: 1a365e86f1a4175f
+  zh: b19fa6b917389e5f
+/agent-note-selective-backport-of-upstream-tool-layer-fixes-rc-2-v0-2-2-rc-3/verification:
+  en: fcbbaaebb1407357
+  zh: 539be797e618a22c

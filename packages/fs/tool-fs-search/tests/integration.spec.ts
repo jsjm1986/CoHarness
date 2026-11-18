@@ -1,6 +1,6 @@
 /**
  * Integration tests: the REAL local subprocess service plus the PACKAGED
- * ripgrep binary (`@vscode/ripgrep`), exercised through `ctx.tools.execute()`.
+ * ripgrep binary (`@vscode/ripgrep`), exercised through `executeToolFixture(ctx, )`.
  * These verify the WORLD — actual files on disk are discovered and grepped,
  * hostile patterns stay inert (they are plain argv elements; there is no
  * shell layer to escape), and real `rg` stderr classifies into the
@@ -9,7 +9,7 @@
  * fake-service suite (tools.spec.ts) carries the coverage gate.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -18,6 +18,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as ToolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -29,7 +31,7 @@ let ctx: Context
 
 let callCounter = 0
 function call(name: string, args: unknown, agentObj?: object) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: testToolSignal,
     callId: ToolCallId(`it-${++callCounter}`),
     name,
@@ -65,6 +67,7 @@ describe('search tools over the real subprocess service + the packaged rg', () =
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(LocalSubprocessRuntime)
     await ctx.plugin(ToolFsSearch, { sampleOverCapGlobResults: true })
   })
@@ -83,6 +86,21 @@ describe('search tools over the real subprocess service + the packaged rg', () =
       expect(paths).toContain(join('spaced dir', "wei'rd name.ts"))
       expect(paths).not.toContain(join('.git', 'config.ts'))
       expect(paths).not.toContain('notes.md')
+    })
+
+    it('prunes literal directory prefixes without admitting sibling subtrees', async () => {
+      await mkdir(join(dir, 'packages', 'core', 'src'), { recursive: true })
+      await writeFile(join(dir, 'packages', 'core', 'src', 'old.ts'), '')
+      await mkdir(join(dir, 'packages', 'src', 'core'), { recursive: true })
+      await writeFile(join(dir, 'packages', 'src', 'core', 'other.ts'), '')
+      const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+      const result = await call('glob', { pattern: 'packages/core/src/*.ts' }, agent())
+      expect(result.isError).toBe(false)
+      expect(text(result).split('\n').sort()).toEqual([join('packages', 'core', 'src', 'old.ts')])
+      expect(spawn.mock.calls[0]?.[0].argv.slice(3, 6)).toEqual([
+        '--glob=!**', '--glob={packages,core,src}/', '--glob=packages/core/src/*.ts',
+      ])
+      expect(spawn.mock.calls[0]?.[0].argv).not.toContain('--')
     })
 
     it('scopes to a directory search root (path arg)', async () => {
@@ -181,7 +199,7 @@ describe('search tools over the real subprocess service + the packaged rg', () =
     it('a pre-aborted registry call is ABORTED_BEFORE_DISPATCH', async () => {
       const controller = new AbortController()
       controller.abort()
-      const result = await ctx.tools.execute({
+      const result = await executeToolFixture(ctx, {
         callId: ToolCallId(`it-${++callCounter}`),
         name: 'grep',
         arguments: { pattern: 'x' },

@@ -62,7 +62,7 @@ interface BenchOptions {
   modelEntry?: React.ReactNode
   /** Hot text-ref lexicon (injects a minimal slash stub exposing only lexicon()). */
   lexicon?: ReadonlyMap<'/' | '@', readonly string[]>
-  permissions?: { options: { value: string; name: string; description?: string }[]; currentValue: string }
+  permissions?: { options: { value: string; name: string; description?: string }[]; currentValue: string; defaultPreset?: string }
   /** The `imageLimits` projection value (absent = no attachment service). */
   imageLimits?: {
     maxImageBytes: number
@@ -191,6 +191,7 @@ function bench(over?: BenchOptions) {
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
+    useRemoteAccess: () => true,
     useProjection: ((key: string, selector?: (v: unknown) => unknown) =>
       (selector ?? (v => v))(key === 'permissions'
         ? (over?.permissions === undefined ? undefined : { currentValue: over.permissions.currentValue })
@@ -216,7 +217,11 @@ function bench(over?: BenchOptions) {
     useDocuments: bindSnapshotSelector(documentStore),
     usePermissionAvailability: (() => 'local') as InputBarProps['usePermissionAvailability'],
     usePermissionCatalog: bindSnapshotSelector(createSnapshotStore(
-      over?.permissions === undefined ? undefined : { options: over.permissions.options })),
+      over?.permissions === undefined ? undefined : {
+        options: over.permissions.options,
+        defaultOptions: over.permissions.options,
+        defaultPreset: over.permissions.defaultPreset ?? over.permissions.options[0]?.value ?? '',
+      })),
     stop,
     command: over?.command ?? (() => Promise.resolve(true)),
     // Mirrors the real lookup chain (conversation namespace, then common).

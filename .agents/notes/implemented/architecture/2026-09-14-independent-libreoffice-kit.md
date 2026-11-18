@@ -10,7 +10,7 @@ LibreOffice compilation, source patches, platform qualification, and large binar
 
 ## Decision
 
-The `deepseek-harness/libreoffice-kit` repository owns the reusable `@deepseek-ai/libreoffice-kit` Node API, its Worker, font handling, engine selection, build recipes, patches, tests, and releases. The API has no Cordis dependency. Harness owns the adapter from its `OfficeToPdf` service to this API, Session authorization, conversion lifetime, transport, Web UI, and application packaging.
+The `deepseek-harness/libreoffice-kit` repository owns the reusable `@deepseek-ai/libreoffice-kit` Node API, its Worker, font handling, engine selection, build recipes, patches, tests, and releases. The API has no Cordis dependency. Harness owns the adapter from its `OfficeKit` service to this API, Session authorization, conversion lifetime, transport, Web UI, and application packaging.
 
 Kit releases run independently of Harness releases. The kit repository qualifies and publishes the Node API and engine npm packages at a shared version, starting at `0.0.1`. Harness consumes an exact npm version and commits its dependency resolution in `pnpm-lock.yaml`; Harness releases neither build nor publish kit packages.
 

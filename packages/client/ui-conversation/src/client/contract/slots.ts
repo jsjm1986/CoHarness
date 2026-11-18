@@ -281,6 +281,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * entry roster supplies choices for the next conversation.
      */
     'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe'; owner: HeroAgentPresetOwnerProps }
+    /**
+     * Per-Session option rows of the hero's workspace row: rendered only while a
+     * Session exists, so a blank Session can still offer start-in-worktree-style
+     * choices before its first turn.
+     */
+    'conversation.hero.options': { kind: 'list'; scope: 'session' }
     // 'conversation.input.overlay' merges in ui-input-trigger (the dependency
     // direction is the hard constraint — ui-input-trigger cannot import
     // this package, while this package's input contract already imports
@@ -413,6 +419,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
         'conversation.hero.context': { kind: 'list'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
+        'conversation.hero.options': { kind: 'list'; scope: 'session' }
       }
       inject: ConversationInjected
       locale: 'conversation'

@@ -215,7 +215,7 @@
 - button "Open b/style.css": style.css
 - button "Open site/index.html": index.html
 - button "Open site/app.js": app.js
-- text: + 1 file
+- text: + 2 files
 - button "Show in folder"
 - button "Copy":
   - img

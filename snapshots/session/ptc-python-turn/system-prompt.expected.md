@@ -9,11 +9,11 @@ Verify your work by running the code or tests. Keep answers brief and factual.
 
 Check the [exit code: N] marker on every bash result; investigate failures before moving on.
 
-Use the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.
+Use the read tool — not shell commands like cat, sed, head, or tail — to inspect text files. Use offset and limit to read a line range or continue a large file.
 
-Read an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.
+Read an existing file before overwriting it with write and prefer edit for targeted changes.
 
-Read a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.
+Read a file before editing it unless you just created or edited it in this session.
 
 Use the glob tool — not shell find — to discover files by path pattern.
 
@@ -152,14 +152,6 @@ class EditOutput(TypedDict):
     before: str
     after: str
 
-class ExitPlanModeArgs(TypedDict):
-    # The complete plan, as markdown, starting with a # heading that names it.
-    plan: str
-    # Additional keys beyond those declared are allowed.
-
-class ExitPlanModeOutput(TypedDict):
-    approved: bool
-
 class GetGoalOutput1(TypedDict):
     goal: None
 
@@ -209,8 +201,8 @@ class GrepOutput(TypedDict):
     matches: list[GrepOutputMatches]
 
 class InterruptAgentArgs(TypedDict):
-    # The agent id of the running agent to interrupt.
-    agent_id: str
+    # The name of an agent created under you: your direct child or a deeper descendant.
+    agent: str
     # Additional keys beyond those declared are allowed.
 
 class InterruptAgentOutput(TypedDict):
@@ -267,25 +259,10 @@ class JobOutputOutput(TypedDict):
     text: str
     job: JobOutputOutputJob
 
-class ListAgentsArgs(TypedDict):
-    # children (default) lists direct children only; descendants walks the complete tree below you.
-    scope: NotRequired[Literal["children", "descendants"]]
-    # Additional keys beyond those declared are allowed.
-
-class ListAgentsOutput1(TypedDict):
-    kind: Literal["child"]
-    id: str
-    label: str
-    status: Literal["running", "inactive"]
-    parent: NotRequired[str]
-    depth: NotRequired[float]
-
-class ListAgentsOutput2(TypedDict):
-    kind: Literal["diagnostic"]
-    id: str
-    reason: Literal["corrupt", "unsupported", "unavailable"]
-    parent: NotRequired[str]
-    depth: NotRequired[float]
+class ListAgentsOutput(TypedDict):
+    name: str
+    status: Literal["running", "inactive", "corrupt", "unsupported", "unavailable"]
+    description: NotRequired[str]
 
 class PresentArgsFiles(TypedDict):
     # Path of an existing regular file. Relative paths use the Session working directory.
@@ -350,8 +327,8 @@ class ReadImageOutput(TypedDict):
     image: ReadImageOutputImage
 
 class SendMessageArgs(TypedDict):
-    # The agent id of your direct continuable child, or your direct parent when you are a resident continuable child.
-    agent_id: str
+    # The name of another agent in your subagent tree, as shown by list_agents.
+    agent: str
     # The message to deliver to the agent.
     message: str
     # Additional keys beyond those declared are allowed.
@@ -382,14 +359,33 @@ class SkillOutput(TypedDict):
     resourceBase: NotRequired[SkillOutputResourceBase1 | SkillOutputResourceBase2 | SkillOutputResourceBase3]
     content: str
 
+class StrReplaceEditorArgs(TypedDict):
+    # The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`.
+    command: Literal["view", "create", "str_replace", "insert"]
+    # Absolute path to file or directory, e.g. `/repo/file.py` or `/repo`.
+    path: str
+    # Required string parameter of `create` command, with the content of the file to be created. A null placeholder is treated as omitted by commands that do not use this parameter.
+    file_text: NotRequired[str | None]
+    # Required integer parameter of `insert` command. The `new_str` will be inserted AFTER the line `insert_line` of `path`. A null placeholder is treated as omitted by commands that do not use this parameter.
+    insert_line: NotRequired[int | None]
+    # Optional string parameter of `str_replace` command containing the new string (if omitted, no string will be added). Required string parameter of `insert` command containing the string to insert. A null placeholder is accepted only by commands that do not use this parameter.
+    new_str: NotRequired[str | None]
+    # Required string parameter of `str_replace` command containing the string in `path` to replace. A null placeholder is treated as omitted by commands that do not use this parameter.
+    old_str: NotRequired[str | None]
+    # Optional parameter of `view` command when `path` points to a file. If omitted or null, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file.
+    view_range: NotRequired[list[int] | None]
+    # Additional keys beyond those declared are allowed.
+
 class SubagentArgs(TypedDict):
     # Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent.
     cwd: NotRequired[str]
     # A short (3-5 word) description of the delegated task, for display.
     description: str
+    # Optional short name for the subagent, unique among the subagents you create: lower-case letters, digits, and hyphens, starting with a letter, at most 32 characters; lead is reserved for the root agent. Omitted names default to agent-1, agent-2, and so on.
+    name: NotRequired[str]
     # The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs.
     prompt: str
-    # Whether to run in the background and return a durable subagent id immediately. Defaults to true. Set false to wait for the result when your next action depends on it.
+    # Whether to run in the background and return a durable subagent name immediately. Defaults to true. Set false to wait for the result when your next action depends on it.
     run_in_background: NotRequired[bool]
     # Additional keys beyond those declared are allowed.
 
@@ -399,7 +395,7 @@ class SubagentOutput1(TypedDict):
 
 class SubagentOutput2(TypedDict):
     kind: Literal["continuable"]
-    subagentId: str
+    name: str
 
 class SubagentOutput3(TypedDict):
     kind: Literal["foreground"]
@@ -421,7 +417,7 @@ class SubagentForkOutput1(TypedDict):
 
 class SubagentForkOutput2(TypedDict):
     kind: Literal["continuable"]
-    subagentId: str
+    name: str
 
 class SubagentForkOutput3(TypedDict):
     kind: Literal["foreground"]
@@ -459,11 +455,11 @@ class UpdateGoalArgs(TypedDict):
     revision: float
     # edit, pause, and resume require a direct top-level human request. complete and blocked are also allowed during an automatic continuation of this goal; blocked is rejected before the configured minimum round count.
     action: Literal["edit", "pause", "resume", "complete", "blocked"]
-    # Replacement objective; valid only with action edit.
+    # Replacement objective for action edit; ignored otherwise.
     objective: NotRequired[str]
-    # Replacement cap; valid only with action edit.
+    # Replacement cap for action edit; ignored otherwise.
     max_goal_rounds: NotRequired[float]
-    # Required only with action blocked: the concrete condition that persisted across rounds and blocks progress.
+    # Required for action blocked: the concrete condition that persisted across rounds and blocks progress; ignored otherwise.
     blocked_reason: NotRequired[str]
     # Additional keys beyond those declared are allowed.
 
@@ -556,8 +552,6 @@ class Tools(Protocol):
         """Create a persisted goal that keeps this session working across automatic continuation rounds. Use it when the direct human request is a long-running objective, even if the user did not say \"goal\"; not for single-turn work."""
     async def edit(self, args: EditArgs) -> EditOutput:
         """Edit an existing UTF-8 text file by replacing literal text."""
-    async def exit_plan_mode(self, args: ExitPlanModeArgs) -> ExitPlanModeOutput:
-        """Use only in plan mode. Present your plan for the user's review and, on approval, leave plan mode. The user may approve (carry out the plan from your next step) or keep planning — their feedback comes back in the tool result; revise and present again."""
     async def get_goal(self, args: dict[str, Any]) -> GetGoalOutput1 | GetGoalOutput2:
         """Read the current session goal, including the id and revision that update_goal requires."""
     async def glob(self, args: GlobArgs) -> GlobOutput:
@@ -565,27 +559,29 @@ class Tools(Protocol):
     async def grep(self, args: GrepArgs) -> GrepOutput:
         """Search file contents with a ripgrep regular expression. Returns matching lines with line numbers, grouped by file. Returns up to 250 matches; a larger result reports where the complete match list was saved."""
     async def interrupt_agent(self, args: InterruptAgentArgs) -> InterruptAgentOutput:
-        """Request cancellation of a background agent's current turn by its agent id. The target may be your direct child or a deeper agent created under you. Only the current turn stops: messages already queued for the agent stay parked until a later send_message, agents it started keep running, and the agent itself stays available for follow-ups. This call returns as soon as the stop request is accepted, so the target may keep running briefly; interrupting an agent that already finished is an accepted no-op."""
+        """Request cancellation of a background agent's current turn by its name. The target may be your direct child or a deeper agent created under you. Only the current turn stops: messages already queued for the agent stay parked until a later send_message, agents it started keep running, and the agent itself stays available for follow-ups. This call returns as soon as the stop request is accepted, so the target may keep running briefly; interrupting an agent that already finished is an accepted no-op."""
     async def job_kill(self, args: JobKillArgs) -> JobKillOutput:
         """Request cancellation of a running background job."""
     async def job_list(self, args: dict[str, Any]) -> list[JobListOutput]:
         """List your background jobs (running and finished) with their ids, kinds, and statuses."""
     async def job_output(self, args: JobOutputArgs) -> JobOutputOutput:
         """Read a background job: output since the previous read for stream jobs, or the result of a finished final-output job."""
-    async def list_agents(self, args: ListAgentsArgs) -> list[ListAgentsOutput1 | ListAgentsOutput2]:
-        """List your continuable background subagents by durable id and label. Use it to recall which ones you started, not to poll for completion — you are told when one finishes. Status comes from the live registry: running means the agent is working right now; inactive means no turn is executing, whether the child is loaded or must be resumed. inactive does not describe task completion, success, failure, or waiting for other agents. A `send_message` steers a running child at its nearest step boundary or starts or resumes a turn for an inactive child, and a direct child remains a `send_message` candidate in every status. The snapshot is not a delivery promise — `send_message` performs the authoritative check and may still fail. Children that could not be read are reported as diagnostics instead of being silently dropped. Scope `descendants` walks the whole tree below you in stable pre-order, annotating each entry with its durable direct-parent session id and depth. You may use `send_message` only for depth-1 entries; deeper entries are candidates for `interrupt_agent` only."""
+    async def list_agents(self, args: dict[str, Any]) -> list[ListAgentsOutput]:
+        """List your entire subagent tree: the root agent and all reachable continuable descendants, including yourself. Rows carry names, descriptions, and status. A descendant's name is its path from the root, such as reviewer/checker. You can message any other agent in the subagent tree. running means it is working; inactive means no turn is executing; it does not indicate task completion, success, or failure. corrupt, unsupported, or unavailable means this row's own descendants could not be read; the row itself is still a member you can message. While you remain active, you will be notified when a direct child finishes; there is no need to keep checking its status. Use send_message to continue the conversation."""
     async def present(self, args: PresentArgs) -> PresentOutput:
-        """Declare selected existing files accessible through the Session filesystem as final deliverables. Use present when the user needs a separate file deliverable, especially Office documents, spreadsheets, and slide decks. Prefer showing results in your final response when that is sufficient; creating or editing a file does not by itself require present. Usually select the 1-2 most important deliverables; include more when needed, but at most 4 files in a single present call. The files must already exist. The user opens the current source files; their contents are not copied or preserved."""
+        """Declare existing files as final deliverables for the user. Hosts may show presented files only after your turn ends, so call it once the files are final. If the user needs to review files earlier, such as before a tool call that waits for their answer, link them in your message instead. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied."""
     async def read(self, args: ReadArgs) -> ReadOutput:
         """Read a UTF-8 text file and return line-numbered content."""
     async def read_image(self, args: ReadImageArgs) -> ReadImageOutput:
         """Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image."""
     async def send_message(self, args: SendMessageArgs) -> SendMessageOutput:
-        """Send a message to a direct continuable child by its agent id. If you are a resident continuable child, you may also target your direct parent. If the target is still working, the message steers its nearest step; if it is inactive, the message starts or resumes a turn. This call returns no answer from the agent — only confirmation that the message was delivered. A failure means the message was NOT delivered."""
+        """Send a message to an agent. A working agent receives it at its next step; an idle agent starts a new turn with it. This call returns no answer from the agent — only confirmation that the message was delivered. A failure means the message was NOT delivered."""
     async def skill(self, args: SkillArgs) -> SkillOutput:
         """Load the full instructions for a skill. Call it before acting on a task that names or clearly matches a skill in the session skill catalog."""
+    async def str_replace_editor(self, args: StrReplaceEditorArgs) -> str:
+        """Custom editing tool for viewing, creating and editing files * State is persistent across command calls and discussions with the user * If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep * The `create` command cannot be used if the specified `path` already exists as a file * If a `command` generates a long output, it will be truncated and marked with `<response clipped>` * A null placeholder for a parameter unused by the selected command is treated as omitted. Required parameters still need values; omit `str_replace.new_str` rather than setting it to null when deleting a match Notes for using the `str_replace` command: * The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces! * If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique * The `new_str` parameter should contain the edited lines that should replace the `old_str`"""
     async def subagent(self, args: SubagentArgs) -> SubagentOutput1 | SubagentOutput2 | SubagentOutput3:
-        """Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This tool runs in the background by default, immediately returns a durable subagent id, and keeps the child conversation available for later turns. When that run settles, the runtime sends the parent a notice containing its outcome and any final assistant message; `send_message` steers the child's nearest step while it is running and starts or resumes a turn while it is inactive. Set `run_in_background: false` only when your next action depends on receiving the result."""
+        """Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This tool runs in the background by default and immediately returns the subagent's name. When that run settles, the runtime sends you a notice containing its outcome and any final answer, unless the child sent you a message just before finishing; `send_message` steers the child's nearest step while it is running and starts or resumes a turn while it is inactive. Set `run_in_background: false` only when your next action depends on receiving the result."""
     async def subagent_fork(self, args: SubagentForkArgs) -> SubagentForkOutput1 | SubagentForkOutput2 | SubagentForkOutput3:
         """Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn). Use this when the subtask builds on this conversation's context — a follow-up analysis, a review, a continuation — without consuming this conversation's context for the work itself. You receive its result, not its intermediate steps. This call waits for the subagent and returns its result."""
     async def todo_write(self, args: TodoWriteArgs) -> TodoWriteOutput:

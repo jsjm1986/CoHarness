@@ -14,7 +14,7 @@ const { SessionId } = await import(entry('core/session'))
 const { planProjectionDefinition } = await import(entry('plan/plan-mode'))
 const { ExecutionAuthority } = await import(entry('context/execution-authority'))
 const plugins = [
-  ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
+  ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/tool-executor-native'], ['core/system-prompt'],
   ['session/session-projection'], ['core/agent-loop', { agents: [] }],
   ['interaction/commands'], ['plan/plan-mode', { section: 'Explore before implementing.' }],
 ]
@@ -59,7 +59,9 @@ try {
   const rejected = await ctx.commands.execute(agent, '/plan off', [{ type: 'file', receiptId: 'unavailable-file' }], signal)
   assert.equal(rejected.result.kind, 'error')
   const view = ctx.sessionProjections.snapshot(agent.session).values.plan
-  assert.deepEqual(view, { active: false, pending: true })
+  // The failed /plan off clears the projection's pending record, while the
+  // service's queued selection still awaits its accepted pre-step boundary.
+  assert.deepEqual(view, { active: false, pending: false })
   assert.deepEqual(ctx.planMode.get(agent), { active: false, pending: true })
   let replay = planProjectionDefinition.init()
   for (const event of agent.session.snapshotEvents()) replay = planProjectionDefinition.apply(replay, event)

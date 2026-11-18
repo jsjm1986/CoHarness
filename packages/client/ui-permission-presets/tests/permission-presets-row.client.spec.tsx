@@ -54,6 +54,7 @@ const runtime = {
   useSessions: (() => { throw new Error('unused') }) as never,
   useWorkspaces: (() => { throw new Error('unused') }) as never,
   usePanelInfo: (() => { throw new Error('unused') }) as never,
+  useRemoteAccess: () => true,
 }
 
 function mount(controller: PermissionPresetSettingsController, availability = createSnapshotStore<PermissionAvailability>('local')) {

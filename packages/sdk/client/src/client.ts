@@ -16,11 +16,16 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import {
   JsonRpcLineTransport,
   JsonRpcResponseError,
+  type CommandExecution,
   type InitializeParams,
   type InitializeResult,
   type SessionPromptParams,
+  type SessionQueryParams,
+  type SessionQueryResult,
+  type SdkPromptContentBlock,
+  type SdkUserQuestionRequest,
 } from '@deepseek-ai/dsh-sdk-protocol'
-import type { SdkPromptContentBlock } from '@deepseek-ai/dsh-sdk-protocol'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { disposeRuntimeProcess } from './dispose.ts'
 import { resolveDshLaunch, type RuntimeProcessOptions } from './launch.ts'
 import type { HarnessClientOptions, HarnessNotification, NotificationFilter } from './types.ts'
@@ -265,6 +270,9 @@ export class HarnessClient {
   private streamsSettled: Promise<void> = Promise.resolve()
   private closed = false
   private closeTask: Promise<void> | undefined
+  private readonly userQuestions = new Map<string, AbortController>()
+  private userQuestionHandler: HarnessClientOptions['onUserQuestion']
+  private requestHandler: ((method: string, params: Record<string, unknown>) => Promise<unknown>) | undefined
 
   /** @param options - launch spec, complete child environment, and timeouts. */
   constructor(options?: HarnessClientOptions)
@@ -294,6 +302,7 @@ export class HarnessClient {
     if (this.notificationFailure !== undefined) throw this.notificationFailure
     if (this.closed) throw new TransportClosedError('DeepSeek Harness runtime client is closed')
     if (this.child !== undefined) return
+    this.userQuestionHandler = this.options.onUserQuestion
     const child = spawn(this.runtime.command, this.runtime.args, {
       cwd: this.runtime.cwd,
       env: this.runtime.environment(),
@@ -355,9 +364,59 @@ export class HarnessClient {
       ...(this.options.maxConcurrentIncoming === undefined ? {} : { maxConcurrentIncoming: this.options.maxConcurrentIncoming }),
       ...(this.options.maxOutputBytes === undefined ? {} : { maxOutputBytes: this.options.maxOutputBytes }),
     })
-    transport.onNotification((method, params) => { this.dispatchNotification({ method, params }) })
+    transport.onRequest(async (method, params) => {
+      if (method !== 'user-question/ask') {
+        if (this.requestHandler !== undefined) return this.requestHandler(method, params)
+        throw new SdkProtocolError(`unknown runtime request: ${method}`)
+      }
+      const handler = this.userQuestionHandler
+      if (handler === undefined) throw new SdkProtocolError('user-question/ask requires an onUserQuestion callback')
+      if (!isUserQuestionRequest(params)) {
+        throw new SdkProtocolError('user-question/ask requires requestId, sessionId, and questions')
+      }
+      const requestId = params.requestId
+      if (this.userQuestions.has(requestId)) throw new SdkProtocolError('duplicate user-question requestId')
+      const controller = new AbortController()
+      this.userQuestions.set(requestId, controller)
+      const cancelled = Promise.withResolvers<never>()
+      const onAbort = (): void => { cancelled.reject(controller.signal.reason) }
+      controller.signal.addEventListener('abort', onAbort, { once: true })
+      try {
+        return await Promise.race([
+          Promise.resolve().then(() => {
+            controller.signal.throwIfAborted()
+            return handler(params, { signal: controller.signal })
+          }),
+          cancelled.promise,
+        ])
+      } finally {
+        controller.signal.removeEventListener('abort', onAbort)
+        this.userQuestions.delete(requestId)
+      }
+    })
+    transport.onNotification((method, params) => {
+      if (method === 'user-question.cancelled' && typeof params.requestId === 'string') {
+        this.userQuestions.get(params.requestId)?.abort(new Error('SDK runtime cancelled the user question'))
+      }
+      this.dispatchNotification({ method, params })
+    })
     transport.start()
     this.transport = transport
+  }
+
+  /**
+   * Install the additional-request handler; native questions retain their onUserQuestion callback.
+   * @param handler - receives wire parameters and returns the JSON-RPC result; rejection sends an error.
+   * @throws when the client has not started or has already closed.
+   */
+  onRequest(handler: (method: string, params: Record<string, unknown>) => Promise<unknown>): void {
+    if (this.closeTask !== undefined || this.closed) {
+      throw new TransportClosedError('DeepSeek Harness runtime client is closed; create a new client to install a request handler')
+    }
+    if (this.transport === undefined) {
+      throw new TransportClosedError('start the SDK client before installing a request handler')
+    }
+    this.requestHandler = handler
   }
 
   /**
@@ -366,7 +425,11 @@ export class HarnessClient {
    * @returns the runtime's wire identity.
    */
   async initialize(params: InitializeParams): Promise<InitializeResult> {
-    const result = await this.request('initialize', { ...params }, this.runtime.initializeTimeoutMs)
+    this.start()
+    const result = await this.request('initialize', {
+      ...params,
+      ...this.userQuestionHandler === undefined ? {} : { capabilities: { ...params.capabilities, userQuestions: true } },
+    }, this.runtime.initializeTimeoutMs)
     if (!isRecord(result) || !isRecord(result.serverInfo)
       || typeof result.serverInfo.name !== 'string' || typeof result.serverInfo.version !== 'string') {
       throw new SdkProtocolError(`initialize returned no server identity: ${JSON.stringify(result)}`)
@@ -458,7 +521,8 @@ export class HarnessClient {
       // retain no per-call state (the server-side work still runs to close).
       const abandon = new AbortController()
       const timer = setTimeout(() => {
-        abandon.abort(new RequestTimeoutError(`${method} timed out after ${timeout}ms waiting for the DeepSeek Harness runtime`))
+        const stderr = this.stderrTail.length === 0 ? '' : `; stderr tail:\n${this.stderrTail.join('\n')}`
+        abandon.abort(new RequestTimeoutError(`${method} timed out after ${timeout}ms waiting for ${this.runtime.description}${stderr}`))
       }, timeout)
       try {
         return await transport.request(method, params ?? {}, abandon.signal)
@@ -537,6 +601,7 @@ export class HarnessClient {
   }
 
   private async performClose(): Promise<void> {
+    this.abortUserQuestions(new TransportClosedError('SDK client is closing'))
     const child = this.child
     if (child === undefined) {
       // A subscription may be created before lazy start. Closing such a client
@@ -609,12 +674,17 @@ export class HarnessClient {
   }
 
   private failSubscriptions(error: Error): void {
+    this.abortUserQuestions(error)
     const subscriptions = [...this.subscriptions.values()]
     // Detach the producer map at the same time as failing the handles. Each
     // handle owns its queue, so callers can drain prior notifications while no
     // dead-runtime references or late deliveries remain in this client.
     this.subscriptions.clear()
     for (const subscription of subscriptions) subscription.fail(error)
+  }
+
+  private abortUserQuestions(error: Error): void {
+    for (const controller of this.userQuestions.values()) controller.abort(error)
   }
 
   private appendStderr(lines: string[]): void {
@@ -641,12 +711,48 @@ export class HarnessClient {
   }
 
   private closedError(reason: string): TransportClosedError {
-    const parts = [reason]
+    const parts = [`${this.runtime.description}: ${reason}`]
     if (this.spawnError !== undefined) parts.push(`spawn error: ${this.spawnError.message}`)
     if (this.exitCode !== undefined) parts.push(`exit code: ${String(this.exitCode)}`)
     if (this.stderrTail.length > 0) parts.push(`stderr tail:\n${this.stderrTail.join('\n')}`)
     return new TransportClosedError(parts.join('\n'))
   }
+}
+
+/**
+ * Send routed input for the package's high-level run API; absent from the package exports.
+ * @param client - client owning the initialized runtime connection.
+ * @param sessionId - target Session; an unknown id creates it.
+ * @param input - text or content blocks, without client-side command interpretation.
+ * @returns the validated prompt receipt or native command execution.
+ */
+export async function queryInput(
+  client: HarnessClient,
+  sessionId: string,
+  input: string | SdkPromptContentBlock[],
+): Promise<SessionQueryResult> {
+  const params: SessionQueryParams = {
+    sessionId: SessionId(sessionId), contentBlocks: normalizeInput(input),
+  }
+  const value = await client.request('session/query', params)
+  if (isRecord(value)) {
+    if (value.kind === 'prompt' && typeof value.messageId === 'string' && value.messageId.length > 0) {
+      return { kind: 'prompt', messageId: value.messageId }
+    }
+    if (value.kind === 'command') {
+      return { kind: 'command', execution: commandExecution(value.execution) }
+    }
+  }
+  throw new SdkProtocolError(`session/query returned an invalid routing result: ${JSON.stringify(value)}`)
+}
+
+/**
+ * Normalize routed input: a string becomes one text block; blocks pass verbatim.
+ * @param input - prompt or command text, or content blocks.
+ * @returns the content blocks to send.
+ */
+export function normalizeInput(input: string | SdkPromptContentBlock[]): SdkPromptContentBlock[] {
+  return typeof input === 'string' ? [{ type: 'text', text: input }] : input
 }
 
 /**
@@ -656,6 +762,35 @@ export class HarnessClient {
  */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Decode the native handler result returned by session/query. */
+function commandExecution(value: unknown): CommandExecution {
+  if (isRecord(value) && typeof value.commandId === 'string' && value.commandId.length > 0 && isRecord(value.result)) {
+    const commandId = value.commandId as CommandExecution['commandId']
+    const { kind, text, sourceEventSeq } = value.result
+    if (kind === 'success' && (text === undefined || typeof text === 'string')
+      && (sourceEventSeq === undefined || (typeof sourceEventSeq === 'number'
+        && Number.isSafeInteger(sourceEventSeq) && sourceEventSeq >= 0))) {
+      return { commandId, result: {
+        kind,
+        ...text === undefined ? {} : { text },
+        ...sourceEventSeq === undefined ? {} : { sourceEventSeq: SessionSeq(sourceEventSeq) },
+      } }
+    }
+    if (kind === 'error' && typeof text === 'string' && text.trim().length > 0) {
+      return { commandId, result: { kind, text } }
+    }
+  }
+  throw new SdkProtocolError(`session/query returned an invalid command result: ${JSON.stringify(value)}`)
+}
+
+/** Check the question envelope before handing runtime input to application code. */
+function isUserQuestionRequest(value: unknown): value is SdkUserQuestionRequest {
+  return isRecord(value) && typeof value.requestId === 'string' && value.requestId.length > 0
+    && typeof value.sessionId === 'string' && Array.isArray(value.questions)
+    && value.questions.length > 0 && value.questions.every((question: unknown) => isRecord(question)
+      && typeof question.id === 'string' && typeof question.question === 'string')
 }
 
 /** The message of a thrown value (the transport only throws `Error`s; `String` covers the rest). */

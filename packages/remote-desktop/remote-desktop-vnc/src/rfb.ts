@@ -12,13 +12,13 @@ import { RemoteDesktopError } from '@deepseek-ai/dsh-remote-desktop'
 /** Fixed total lengths of framed client→server message types. */
 const FRAME_FIXED: Readonly<Record<number, number>> = {
   0: 20, // SetPixelFormat
-  2: 10, // FramebufferUpdateRequest
-  3: 8, // KeyEvent
-  4: 6, // PointerEvent
+  3: 10, // FramebufferUpdateRequest
+  4: 8, // KeyEvent
+  5: 6, // PointerEvent
 }
 
 /** Message types a view-only attachment may send upstream. */
-const VIEW_ALLOWED: ReadonlySet<number> = new Set([0, 1, 2])
+const VIEW_ALLOWED: ReadonlySet<number> = new Set([0, 2, 3])
 
 /**
  * Byte length of the client's security handshake response, by security type.
@@ -43,11 +43,11 @@ function frameLength(buf: Buffer): number {
   const type = buf.readUInt8(0)
   const fixed = FRAME_FIXED[type]
   if (fixed !== undefined) return fixed
-  if (type === 1) {
+  if (type === 2) {
     // SetEncodings: 4-byte header + 4 bytes per encoding.
     return buf.length < 4 ? 0 : 4 + 4 * buf.readUInt16BE(2)
   }
-  if (type === 5) {
+  if (type === 6) {
     // ClientCutText: 8-byte header + text length.
     return buf.length < 8 ? 0 : 8 + buf.readUInt32BE(4)
   }

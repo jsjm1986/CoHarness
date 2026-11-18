@@ -393,10 +393,13 @@ async function recompose(
     const prepared = prepareProfilePatches(ctx, patches, parentURL, binName)
     applying = true
     const retried = [...new Set([...running, ...withResolution ? [...ctx.loader.entries()].filter(importFailed) : []])]
+    // Group.update replaces its data array and attempts every row it still lists, including failed imports.
+    const priorData = new Map(retried.map(row => [row, row.parent.data]))
     try {
       await entry.update({ config: { ...includeConfig, patches: prepared } })
     } finally {
-      await resume(ctx, retried)
+      // Only rows whose Group did not update still need an explicit retry after the awaited update.
+      await resume(ctx, retried.filter(row => row.parent.data === priorData.get(row)))
     }
     const results = await Promise.allSettled(previousFibers.map(({ fiber }) => fiber.await()))
     await ctx.loader.await()
@@ -422,7 +425,7 @@ async function recompose(
         // Ascending original positions put each row back where it was.
         for (const { group, options, index } of stopped.toSorted((left, right) => left.index - right.index)) {
           // `create` starts the entry but leaves the group's option list as it is; that list is what the next update
-          // compares against to remove the row and what the Include writes back.
+          // compares against to remove the row.
           group.data.splice(index, 0, options)
           await group.create(options)
         }

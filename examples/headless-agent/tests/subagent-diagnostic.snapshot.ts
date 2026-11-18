@@ -1,7 +1,7 @@
 /**
  * Assembled-app regression: a persisted `origin: 'subagent'` child whose log
  * carries no descriptor event is surfaced by `list_agents` as a
- * `[diagnostic: corrupt]` row instead of being silently dropped.
+ * `[corrupt]` row instead of being silently dropped.
  */
 
 import { readFile, readdir, writeFile } from 'node:fs/promises'
@@ -111,7 +111,7 @@ describe('descriptor-less cold child diagnostic snapshot', () => {
 
         // THE model-visible fact: the descriptor-less child is reported, not
         // silently dropped, and its reason is the corrupt classification.
-        expect(parent).toContain(`${childId} [diagnostic: corrupt]`)
+        expect(parent).toContain(`${childId} [corrupt]`)
 
         const context: NormalizeContext = { sessionIds: [parentId, childId], cwd }
         const normalizedParent = normalizeSessionSnapshot(parent, context)

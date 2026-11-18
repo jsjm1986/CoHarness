@@ -64,6 +64,8 @@ export interface MenuItemButtonProps {
   icon?: ReactNode
   /** Trailing key hint (same slot a data row's shortcut occupies). */
   shortcut?: MenuItem['shortcut']
+  /** Whether this row identifies the currently displayed page or view. */
+  current?: boolean
   /** Whether the row cannot be activated. */
   disabled?: boolean
   /** Destructive row: error-colored text/icon and danger hover fill. */
@@ -86,6 +88,7 @@ export interface MenuItemButtonProps {
  * @param props.children - visible row label.
  * @param props.icon - optional leading icon.
  * @param props.shortcut - optional trailing key hint.
+ * @param props.current - whether the row identifies the currently displayed page or view.
  * @param props.disabled - whether the row cannot be activated.
  * @param props.danger - whether to use the destructive row colors.
  * @param props.separatorBefore - whether this row starts a new group (hairline above it).
@@ -93,7 +96,7 @@ export interface MenuItemButtonProps {
  * @returns one menu-item row.
  */
 export function MenuItemButton({
-  children, icon, shortcut, disabled = false, danger = false, separatorBefore = false, onSelect,
+  children, icon, shortcut, current = false, disabled = false, danger = false, separatorBefore = false, onSelect,
 }: MenuItemButtonProps) {
   return (
     <div className={css.itemWrap}>
@@ -104,6 +107,7 @@ export function MenuItemButton({
         className={clsx(css.item, danger && css.danger)}
         disabled={disabled}
         aria-keyshortcuts={shortcut?.aria}
+        aria-current={current ? 'page' : undefined}
         onClick={onSelect}
       >
         {icon !== undefined && <span className={css.itemIcon}>{icon}</span>}

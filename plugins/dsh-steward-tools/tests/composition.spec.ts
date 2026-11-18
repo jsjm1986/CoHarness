@@ -2,6 +2,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as StewardTools from '../src/index.ts'
 
 async function setup(response?: object) {
@@ -9,6 +10,7 @@ async function setup(response?: object) {
   onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   const request = vi.fn(async () => new Response(JSON.stringify(response)))
   ctx.provide('gatewayRuntime', { request } as never)
   const fiber = await ctx.plugin(StewardTools)
@@ -21,10 +23,14 @@ describe('dsh-steward-tools composition', () => {
       classification: 'write', dryRun: true, columns: ['QUERY PLAN'],
       rows: null, plan: [{ 'QUERY PLAN': 'Update on projects' }], rowCount: truncated ? 2 : 1, truncated,
     })
-    const result = await ctx.tools.execute({
-      name: 'steward_query', arguments: { sql: 'UPDATE projects SET active = false', dry_run: true, row_limit: 1 },
-      callId: 'dry-run-plan' as never, signal: new AbortController().signal,
+    const batch = await ctx.tools.execute({
+      calls: [{
+        type: 'tool-call', id: 'dry-run-plan', name: 'steward_query',
+        arguments: JSON.stringify({ sql: 'UPDATE projects SET active = false', dry_run: true, row_limit: 1 }),
+      }],
+      signal: new AbortController().signal,
     })
+    const result = batch.results[0]!.result
     expect(result.isError).not.toBe(true)
     expect(result.content).toEqual([{
       type: 'text',

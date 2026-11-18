@@ -1,6 +1,6 @@
 /** Session-authorized, relative-path Workspace file reads over the existing FS provider. */
 import { createHash } from 'node:crypto'
-import { OfficeSourceKey, OfficeToPdfError } from '@deepseek-ai/dsh-office-to-pdf'
+import { OfficeSourceKey, OfficeKitError } from '@deepseek-ai/dsh-office-kit'
 import { posix, win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -150,7 +150,7 @@ function readFailure(error: unknown, sessionId: SessionId, path: string, signal:
     return { code: 'cancelled', message: 'Workspace file operation was cancelled.', details: {} }
   }
   if (error instanceof FileFailure) return error.error
-  if (error instanceof OfficeToPdfError) return { code: 'document-error', message: 'Office preview conversion failed.', details: { reason: error.code } }
+  if (error instanceof OfficeKitError) return { code: 'document-error', message: 'Office preview conversion failed.', details: { reason: error.code } }
   // A realm-boundary admission failure (a thrown RemoteError escaping the
   // agent resolver) keeps its wire code so callers can tell denial from
   // failure. 'ssh/forbidden' lives in dsh-ssh's RemoteErrorDetailsMap
@@ -263,9 +263,9 @@ export function createWorkspaceFilesApi(ctx: Context, options: ReadOptions): Wor
       if (request.payload.version !== undefined && request.payload.version !== version) refuse('workspace-file/stale-version', file.sessionId, file.path)
       const extension = file.path.split('.').at(-1)?.toLowerCase()
       if (extension !== 'doc' && extension !== 'docx' && extension !== 'xls' && extension !== 'xlsx'
-        && extension !== 'ppt' && extension !== 'pptx') throw new OfficeToPdfError('unsupported-format', 'Unsupported Office document extension.')
-      const converter = ctx.get('officeToPdf')
-      if (converter === undefined) throw new OfficeToPdfError('unavailable', 'Office conversion is not mounted on this runtime.')
+        && extension !== 'ppt' && extension !== 'pptx') throw new OfficeKitError('unsupported-format', 'Unsupported Office document extension.')
+      const converter = ctx.get('officeKit')
+      if (converter === undefined) throw new OfficeKitError('unavailable', 'Office conversion is not mounted on this runtime.')
       // Content authorization precedes even a cache hit; metadata visibility alone is insufficient.
       await file.fs.readByteRange(file.target, { offset: 0, length: 1, expectedVersion: file.info.version }, abort)
       const result = await converter.convert({ extension, priority: request.payload.priority ?? 'foreground', source: {

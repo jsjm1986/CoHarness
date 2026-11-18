@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-25-upstream-fs-mutations-and-apply-patch.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-fs-mutations-and-apply-patch.md
+document:
+  en: 9147fe463aaf323c95f9fa9587bb3e97a65e2ccc
+  zh: d52c1f1c94b0947f85c9ebabae5f852dc033002a
+/agent-note-upstream-fs-mutation-vocabulary-and-apply-patch-absorption:
+  en: a6801ff085fa4ea5
+  zh: c7ba5162b859f580
+/agent-note-upstream-fs-mutation-vocabulary-and-apply-patch-absorption/problem:
+  en: 900380d9e5769870
+  zh: 134c4234dffabab7
+/agent-note-upstream-fs-mutation-vocabulary-and-apply-patch-absorption/decision:
+  en: 7342646c7790aecf
+  zh: dbcb56caf4fc26e9
+/agent-note-upstream-fs-mutation-vocabulary-and-apply-patch-absorption/consequences:
+  en: 118d4c8c21fe8381
+  zh: cfd6c444aac01c9e
+/agent-note-upstream-fs-mutation-vocabulary-and-apply-patch-absorption/alternatives-considered:
+  en: d7ec8ba7d4229a12
+  zh: 67f07253d33a9338
+/agent-note-upstream-fs-mutation-vocabulary-and-apply-patch-absorption/verification:
+  en: c496797e16e24e39
+  zh: 04af39e3b7677b27

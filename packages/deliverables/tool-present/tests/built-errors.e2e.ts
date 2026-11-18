@@ -15,6 +15,7 @@ import AgentRegistry from './packages/core/agent/lib/index.js'
 import LocalFileSystem from './packages/fs/fs-local/lib/index.js'
 import SystemPrompt from './packages/core/system-prompt/lib/index.js'
 import ToolRuntime from './packages/core/tools/lib/index.js'
+import * as NativeToolExecutor from './packages/core/tool-executor-native/lib/index.js'
 import { Session, SESSION_FORMAT_VERSION } from './packages/core/session/lib/index.js'
 import * as Present from './packages/deliverables/tool-present/lib/index.js'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -25,6 +26,7 @@ const ctx = new Context()
 try {
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(LocalFileSystem, { cwd: root })
   ctx.provide('sessionProjections', { stateOf() { return { openTurnStartSeq: 1, lastTurn: 1 } } })
@@ -38,7 +40,10 @@ try {
   ctx.on('tools/result', (_exec, result) => events.push(result))
   let n = 0
   for (const [files, code] of [[[{ path: 'missing' }], 'FS_NOT_FOUND'], [[{ path: 42 }], 'INVALID_ARGS']]) {
-    const result = await ctx.tools.execute({ signal: new AbortController().signal, name: 'present', callId: 'call-' + (++n), arguments: { files }, agent: owner })
+    const result = (await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: 'call-' + (++n), name: 'present', arguments: JSON.stringify({ files }) }],
+      signal: new AbortController().signal, agent: owner,
+    })).results[0].result
     assert.equal(result.isError, true)
     assert.equal(result.error.info.code, code)
     assert.equal(events.at(-1).error.info.code, code)

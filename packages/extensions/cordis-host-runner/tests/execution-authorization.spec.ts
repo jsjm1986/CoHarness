@@ -1,6 +1,7 @@
 /** Deployment authorization at dynamic Host execution and activation commit points. */
 import { expect, it, onTestFinished } from 'vitest'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { AGENT_A, CLIENT_CODE, setup } from './helpers.ts'
 
 const HOST = 'let calls = 0; harness.handle("count", () => ++calls); return { apply(ctx) { ctx.provide("authorizationProbe", "active") } }'
@@ -98,7 +99,7 @@ it('rechecks the executable tool registered by a previously authorized dynamic P
     protectedModules: new Set<string>(),
     authorize: async () => { if (!allowed) throw new Error('dynamic tool authority revoked') },
   })
-  const execute = () => ctx.tools.execute({
+  const execute = () => executeToolFixture(ctx, {
     callId: ToolCallId('dynamic-probe'), name: 'authorized_probe', arguments: {}, signal: new AbortController().signal,
   })
   expect(await execute()).toMatchObject({ isError: true, error: { message: 'dynamic tool authority revoked' } })

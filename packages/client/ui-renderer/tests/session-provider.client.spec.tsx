@@ -68,7 +68,7 @@ function makeHost(bodies: { root: (rp: (key: string, owner: object) => React.Rea
     },
     getRootRevision: () => 0,
     subscribeRootRevision: () => () => {},
-    rootSources: () => ({}),
+    rootSources: () => ({ hooks: {}, keyedHooks: {}, props: {} }),
     workspaces: { list: observable<unknown>({ items: [] }) },
   }
   return {

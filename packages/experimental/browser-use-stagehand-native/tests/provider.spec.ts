@@ -1,6 +1,7 @@
 /** Native browser ownership through real Agent, Session, and ToolRuntime services. */
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { StagehandDrainError } from '../src/native.ts'
 import { ResourceAcquisitionCleanupError } from '@deepseek-ai/dsh-experimental-browser-use-runtime'
 import type { NativeBrowserConfig } from '../src/native.ts'
@@ -131,7 +132,7 @@ beforeEach(async () => {
 afterEach(async () => { await ctx.fiber.dispose() })
 
 function execute(agent: Agent, suffix: string, args: unknown, signal = new AbortController().signal) {
-  return ctx.tools.execute({ agent, name: `stagehand_${suffix}`, arguments: args, callId: ToolCallId(`test-${suffix}`), signal })
+  return executeToolFixture(ctx, { agent, name: `stagehand_${suffix}`, arguments: args, callId: ToolCallId(`test-${suffix}`), signal })
 }
 
 async function cancelConnection(): Promise<void> {
@@ -370,9 +371,9 @@ it('uses its independent model for actions, observations, and a caller-selected 
 it('refuses unavailable tabs and calls without an exact live Agent', async () => {
   await ctx.plugin(Provider, { model: nativeModel, mode: 'launch' })
   expect((await execute(first, 'navigate', { url: 'https://example.com', pageId: 'missing' })).isError).toBe(true)
-  expect((await ctx.tools.execute({ name: 'stagehand_tabs', arguments: { action: 'list' }, callId: ToolCallId('agentless'), signal: new AbortController().signal })).isError).toBe(true)
+  expect((await executeToolFixture(ctx, { name: 'stagehand_tabs', arguments: { action: 'list' }, callId: ToolCallId('agentless'), signal: new AbortController().signal })).isError).toBe(true)
   ctx.tools.register({ name: 'unrelated', description: 'An independent tool.', parameters: { type: 'object' }, output: { schema: { type: 'boolean' }, render: () => [{ type: 'text', text: 'independent' }] }, execute: async () => true })
-  const unrelated = await ctx.tools.execute({ agent: first, name: 'unrelated', arguments: {}, callId: ToolCallId('unrelated'), signal: new AbortController().signal })
+  const unrelated = await executeToolFixture(ctx, { agent: first, name: 'unrelated', arguments: {}, callId: ToolCallId('unrelated'), signal: new AbortController().signal })
   expect(unrelated.isError).toBe(false)
 })
 

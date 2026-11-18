@@ -18,8 +18,9 @@ import { abortable, abortError } from './abort.ts'
 import { LspConnection } from './connection.ts'
 import type { ConnectionSpawner, ConnectionSpec, ConnectionWriter } from './connection.ts'
 import type { HostSource } from './host.ts'
-import type { WireInitializeResult, WireServerCapabilities } from './protocol.ts'
+import type { WireServerCapabilities } from './protocol.ts'
 import {
+  initializeCapabilities,
   negotiatePositionEncoding,
   normalizeHover,
   normalizeLocations,
@@ -107,7 +108,7 @@ export class LspInstance {
       .then(() => this.runQuery(request, source, signal))
       .catch(async (error: unknown) => {
         if (this.isTransportFailure(error)) await this.awaitTeardownAttempt()
-        throw error
+        throw this.connection.settledFailure(error)
       })
     // Keep the tail alive regardless of this query's outcome so the next caller still serializes. The
     // tail follows the ACTUAL prior work (this.queue), not the abortable view, so a caller giving up
@@ -125,8 +126,8 @@ export class LspInstance {
       workspaceFolders: [{ uri: this.spec.workspaceUri, name: 'workspace' }],
       capabilities: CLIENT_CAPABILITIES,
       initializationOptions: this.spec.initializationOptions,
-    }) as WireInitializeResult
-    const capabilities = initializeResult.capabilities
+    })
+    const capabilities = initializeCapabilities(initializeResult)
     // An omitted encoding defaults to utf-16; any other value is a protocol error we reject here.
     negotiatePositionEncoding(capabilities.positionEncoding)
     this.capabilities = capabilities

@@ -197,6 +197,7 @@ function mount(
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
           usePanelInfo={() => { throw new Error('unused') }}
+          useRemoteAccess={() => true}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}
@@ -218,6 +219,7 @@ function mount(
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
           usePanelInfo={() => { throw new Error('unused') }}
+          useRemoteAccess={() => true}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}
@@ -242,6 +244,7 @@ function mount(
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
           usePanelInfo={() => { throw new Error('unused') }}
+          useRemoteAccess={() => true}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}

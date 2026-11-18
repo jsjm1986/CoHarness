@@ -34,7 +34,9 @@ const t = (key: string) => (en as Record<string, string>)[key] ?? key
 
 /** The global seat a `plugins.item` entry receives; the card bodies under test never read it. */
 const unusedGlobalHook = (): never => { throw new Error('card fixture provides no global state') }
-const globalStandard = { useSessions: unusedGlobalHook, useWorkspaces: unusedGlobalHook, usePanelInfo: unusedGlobalHook }
+const globalStandard = {
+  useSessions: unusedGlobalHook, useWorkspaces: unusedGlobalHook, usePanelInfo: unusedGlobalHook, useRemoteAccess: unusedGlobalHook,
+}
 
 /** A settled form: nothing staged, everything served. */
 const settled: CardShell = {

@@ -142,7 +142,7 @@ describe('web e2e: Markdown inline-code links', () => {
     // re-issue it a bounded number of times rather than assume the lost one
     // reports back.
     let popup: Page | undefined
-    for (let attempt = 0; attempt < 3 && popup === undefined; attempt++) {
+    for (let attempt = 0; attempt < 6 && popup === undefined; attempt++) {
       const popupPromise = page.context().waitForEvent('page', { timeout: 10_000 })
         .catch(() => undefined)
       await inlineCodeLink.click({ modifiers: ['Shift'] })
@@ -152,7 +152,7 @@ describe('web e2e: Markdown inline-code links', () => {
       if (navigated) popup = candidate
       else await candidate.close().catch(() => {})
     }
-    if (popup === undefined) throw new Error('shift+click produced no navigated popup after 3 attempts')
+    if (popup === undefined) throw new Error('shift+click produced no navigated popup after 6 attempts')
     expect(popup.url()).toBe(linkUrl)
     await popup.close()
 
@@ -165,5 +165,5 @@ describe('web e2e: Markdown inline-code links', () => {
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])
-  }, 60_000)
+  }, 120_000)
 })

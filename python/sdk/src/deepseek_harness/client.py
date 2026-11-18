@@ -14,13 +14,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Callable, TypeAlias, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .errors import JsonRpcError, SdkProtocolError, TransportClosedError
-from .models import IncomingRequest, InitializeResponse, JsonObject, JsonValue, Notification
+from .models import (
+    CommandExecution, IncomingRequest, InitializeResponse, JsonObject, JsonValue, Notification,
+    UserQuestionAnswer, UserQuestionRequest,
+)
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 NotificationFilter: TypeAlias = Callable[[Notification], bool]
+UserQuestionHandler: TypeAlias = Callable[[UserQuestionRequest, threading.Event], UserQuestionAnswer | JsonObject]
 MAX_TIMER_DELAY_SECONDS = 2_147_483_647.0
 MAX_STDOUT_READ_CHARS = 4096
 MAX_STDERR_LINE_BYTES = 64 * 1024
@@ -105,6 +109,8 @@ class HarnessConfig:
     max_session_relationships: int = 10_000
     max_incoming_requests: int = 100
     max_output_bytes: int = 8 * 1024 * 1024
+    # Callbacks run outside the reader; observe the Event to release work on cancellation.
+    on_user_question: UserQuestionHandler | None = None
 
 
 class HarnessClient:
@@ -149,9 +155,11 @@ class HarnessClient:
         self._reader_thread: threading.Thread | None = None
         self._stderr_thread: threading.Thread | None = None
         self._writer_thread: threading.Thread | None = None
+        self._question_tasks: dict[str, tuple[threading.Event, threading.Thread]] = {}
         self._closed = False
         self._runtime_dead = False
         self._notification_failure: TransportClosedError | None = None
+        self._user_question_handler: UserQuestionHandler | None = None
 
     def __enter__(self) -> "HarnessClient":
         self.start()
@@ -170,6 +178,8 @@ class HarnessClient:
                 return
             self._runtime_dead = False
             self._session_parents.clear()
+            self._question_tasks.clear()
+            self._user_question_handler = self.config.on_user_question
             env = os.environ.copy()
             if self.config.env:
                 env.update(self.config.env)
@@ -199,6 +209,8 @@ class HarnessClient:
         with self._lock:
             self._closed = True
             proc = self._proc
+            for cancelled, _thread in self._question_tasks.values():
+                cancelled.set()
         if proc is None:
             self._fail_waiters(self._runtime_closed_error("DeepSeek Harness runtime closed"))
             return
@@ -245,16 +257,27 @@ class HarnessClient:
         model: str,
         max_tokens: int | None = None,
         reasoning_effort: str | None = None,
+        approval_requests: bool = False,
     ) -> InitializeResponse:
+        """Initialize the runtime; approval_requests enables approval/request reception.
+
+        When enabled, drain next_request() concurrently with blocking waits and
+        return one-operation decisions through respond(). Omission preserves the
+        runtime's composed approval answerers.
+        """
         payload: JsonObject = {
             "cwd": str(Path(cwd).resolve()),
             "provider": provider,
             "model": model,
         }
+        if approval_requests:
+            payload["approvalRequests"] = True
         if reasoning_effort is not None:
             payload["reasoningEffort"] = reasoning_effort
         if max_tokens is not None:
             payload["maxTokens"] = max_tokens
+        if self._user_question_handler is not None:
+            payload["capabilities"] = {"userQuestions": True}
         try:
             return self.request("initialize", payload, response_model=InitializeResponse, timeout_seconds=self.config.initialize_timeout_seconds)
         except BaseException:
@@ -279,6 +302,21 @@ class HarnessClient:
             notification_subscription=notification_subscription,
         )
         return response.messageId
+
+    def _query(
+        self, session_id: str, input: str | list[JsonObject],
+    ) -> str | CommandExecution:
+        """Return a validated prompt receipt or command result for high-level run callers."""
+        blocks = [{"type": "text", "text": input}] if isinstance(input, str) else input
+        result = self._request_raw("session/query", {
+            "sessionId": session_id, "contentBlocks": blocks,
+        })
+        if isinstance(result, dict):
+            if result.get("kind") == "prompt" and isinstance(result.get("messageId"), str) and result["messageId"]:
+                return result["messageId"]
+            if result.get("kind") == "command":
+                return _command_execution(result.get("execution"))
+        raise SdkProtocolError("session/query requires a prompt messageId or command execution result")
 
     def resume_session(self, session_id: str) -> None:
         """Restore a persisted session without sending a prompt; propagate restoration failures."""
@@ -608,12 +646,14 @@ class HarnessClient:
         method = message.get("method")
         if isinstance(msg_id, (str, int)) and isinstance(method, str):
             params = message.get("params")
-            try:
-                self._requests.put_nowait(
-                    IncomingRequest(id=msg_id, method=method, payload=params if isinstance(params, dict) else {})
-                )
-            except queue.Full:
-                self._fail_waiters(TransportClosedError("JSON-RPC incoming request queue limit exceeded"))
+            request = IncomingRequest(id=msg_id, method=method, payload=params if isinstance(params, dict) else {})
+            if method == "user-question/ask" and self._user_question_handler is not None:
+                self._start_user_question(request)
+            else:
+                try:
+                    self._requests.put_nowait(request)
+                except queue.Full:
+                    self._fail_waiters(TransportClosedError("JSON-RPC incoming request queue limit exceeded"))
             return
         if isinstance(msg_id, (str, int)):
             with self._lock:
@@ -633,6 +673,10 @@ class HarnessClient:
                 with self._lock:
                     if self._runtime_dead:
                         return
+                    if method == "user-question.cancelled":
+                        task = self._question_tasks.get(str(notification.payload.get("requestId")))
+                        if task is not None:
+                            task[0].set()
                     self._record_session_relationship_locked(notification)
                     subscribers = list(self._notification_subscribers.items())
             except TransportClosedError as exc:
@@ -682,6 +726,8 @@ class HarnessClient:
         self._runtime_dead = True
         self._finish_output()
         with self._lock:
+            for cancelled, _thread in self._question_tasks.values():
+                cancelled.set()
             waiters = list(self._responses.values())
             self._responses.clear()
             subscribers = list(self._notification_subscribers.values())
@@ -706,6 +752,56 @@ class HarnessClient:
                 target.put_nowait(value)
             except queue.Full:
                 return
+
+    def _start_user_question(self, incoming: IncomingRequest) -> None:
+        """Keep the reader free to receive cancellation, other responses, and shutdown."""
+        handler = self._user_question_handler
+        proc = self._proc
+        try:
+            request = UserQuestionRequest.model_validate(incoming.payload)
+            if any(not isinstance(item.get("id"), str) or not isinstance(item.get("question"), str) for item in request.questions):
+                raise ValueError("questions require id and question strings")
+        except ValueError:
+            self.respond_error(incoming.id, code=-32602, message="invalid user-question/ask parameters")
+            return
+        cancelled = threading.Event()
+
+        def answer() -> None:
+            try:
+                if cancelled.is_set() or handler is None:
+                    return
+                result = handler(request, cancelled)
+                wire_result = result.model_dump(exclude_none=True) if isinstance(result, UserQuestionAnswer) else result
+                with self._lock:
+                    if not cancelled.is_set() and self._proc is proc:
+                        self.respond(incoming.id, wire_result)
+            except Exception as exc:
+                with self._lock:
+                    if not cancelled.is_set() and self._proc is proc:
+                        try:
+                            self.respond_error(incoming.id, code=-32603, message=str(exc))
+                        except TransportClosedError:
+                            cancelled.set()
+            finally:
+                with self._lock:
+                    current = self._question_tasks.get(request.request_id)
+                    if current is not None and current[0] is cancelled:
+                        self._question_tasks.pop(request.request_id, None)
+
+        thread = threading.Thread(target=answer, name="dsh-user-question", daemon=True)
+        with self._lock:
+            if self._closed:
+                return
+            if request.request_id in self._question_tasks:
+                self.respond_error(incoming.id, code=-32602, message="duplicate user-question requestId")
+                return
+            self._question_tasks[request.request_id] = (cancelled, thread)
+            try:
+                thread.start()
+            except BaseException:
+                self._question_tasks.pop(request.request_id, None)
+                cancelled.set()
+                raise
 
     def _runtime_closed_error(self, reason: str) -> TransportClosedError:
         diagnostics = self._runtime_diagnostics()
@@ -869,13 +965,16 @@ class NotificationSubscription:
         for _ in range(waiters):
             self._client._put_terminal(self._notifications, TransportClosedError("notification subscription closed"))
 
-    def next(self) -> Notification:
+    def next(self, timeout_seconds: float | None = None) -> Notification:
+        """Read one notification; an optional timeout stops only this local wait."""
         with self._state_lock:
             if self._closed:
                 raise TransportClosedError("notification subscription closed")
             self._waiters += 1
         try:
-            item = self._notifications.get()
+            item = self._notifications.get(timeout=timeout_seconds)
+        except queue.Empty as exc:
+            raise TimeoutError("timed out waiting for an SDK notification") from exc
         finally:
             with self._state_lock:
                 self._waiters = max(0, self._waiters - 1)
@@ -908,3 +1007,11 @@ class _EmptyResponse(BaseModel):
 
 def _int_or_none(value: object) -> int | None:
     return value if isinstance(value, int) else None
+
+
+def _command_execution(value: JsonValue) -> CommandExecution:
+    """Decode native command results and report malformed data as a protocol error."""
+    try:
+        return CommandExecution.model_validate(value)
+    except ValidationError as error:
+        raise SdkProtocolError("session/query returned an invalid command result") from error

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-projection/README.md
 document:
-  en: 3afac96d9473b356287a3a828242d16f7f63a49f
-  zh: 1aa708c9528380aa105181beb5957cd7e32acf56
+  en: d045fcfc9609e1759dc4b6ca59a429c7569cc7fb
+  zh: a3996300b0dbbb10d266e27770eb24a90a863c31
 /:
   en: ab6e765059387cb3
   zh: 61495d48365178df
@@ -21,8 +21,8 @@ document:
   en: 3d965645e833c751
   zh: be3c551412998b79
 /deepseek-ai-dsh-session-projection/service-sessionprojectionregistry-ctx-key-sessionprojections/public-api:
-  en: f191b0774117b43c
-  zh: 69822b6edf813daf
+  en: a5d457f8d15eb39c
+  zh: 539fce4f0b159ed0
 /deepseek-ai-dsh-session-projection/service-sessionprojectionregistry-ctx-key-sessionprojections/key-types:
   en: 2c2240c73000335d
   zh: 3d8182d0bd759b2b

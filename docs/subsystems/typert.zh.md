@@ -412,11 +412,13 @@ type TypertGatewayErrorCode =
   | 'gateway/context-unavailable'
   | 'gateway/definition-unavailable'
   | 'gateway/input-invalid'
+  | 'gateway/interactions-forbidden'
   | 'gateway/invocation-unavailable'
   | 'gateway/lookup-failed'
   | 'gateway/lookup-not-found'
   | 'gateway/lookup-unavailable'
   | 'gateway/method-unavailable'
+  | 'gateway/peer-disposed'
   | 'gateway/provider-mismatch'
   | 'gateway/result-invalid'
   | 'gateway/service-unavailable'
@@ -426,6 +428,45 @@ type TypertGatewayErrorCode =
 ```ts type-equiv
 /** Host dispatcher consumed by Connection adapters. */
 interface TypertGateway {
+  /**
+   * Check for an active owner Client event stream, the only kind that can answer forwarded waterfalls.
+   * @returns whether an owner stream is open and has not been cancelled.
+   */
+  hasLiveClient(): boolean
+
+  /**
+   * Inspect unsettled forwarded events without changing their lifetime.
+   * @returns detached metadata for all unsettled forwarded events in arrival order.
+   */
+  getPendingRemoteEvents(): readonly PendingRemoteEventInfo[]
+
+  /**
+   * Register the application-selected forwarded-event source.
+   * @param source - stream factory installed by the Remote assembly.
+   * @param host - stable Host facts included in each Client generation's opening frame.
+   * @returns disposer removing this exact source and cancelling its active streams.
+   */
+  registerRemoteEvents(
+    source: TypertRemoteEventSource,
+    host: RemoteEventHostInfo,
+  ): () => Promise<void>
+
+  /**
+   * Open the `$events` downlink for one Client carrier generation: the ready
+   * frame binding later `$events/result` calls, then forwarded notifications
+   * and scoped waterfalls until the signal or the source ends the generation.
+   * @param payload - decoded carrier payload; the event stream requires the
+   *   standard Remote payload with an empty args object.
+   * @param signal - logical-stream cancellation joined with the source and Peer lifetimes.
+   * @param peer - Peer the stream speaks for; only an owner principal answers scoped waterfalls.
+   * @returns validated downlink frames in arrival order.
+   */
+  openRemoteEvents(
+    payload: unknown,
+    signal: AbortSignal,
+    peer: PeerScope,
+  ): AsyncGenerator<RemoteEventDownlinkFrame>
+
   /**
    * Invoke one live Remote method without assuming a carrier or response envelope.
    * @param request - decoded endpoint and named wire arguments.
@@ -524,6 +565,87 @@ Types: [Agent](core.zh.md) · [AgentHandle](core.zh.md) · [SessionId](core.zh.m
 
 Source: [`packages/host/apiproxy/src/session-lifecycle.ts`](../../packages/host/apiproxy/src/session-lifecycle.ts)
 
+<a id="ctxremoteaccess--remoteaccessservice"></a>
+
+### `ctx.remoteAccess` — `RemoteAccessService`
+
+Registry of access policies, the Gateway's access decisions, list filtering, and the per-Peer access snapshot. Every composition that mounts the Gateway mounts this service too.
+
+```ts cordis-catalog
+/**
+ * Register the policy of one non-owner principal kind in the caller's
+ * fiber; open snapshots are recomputed on registration and removal.
+ * @param kind - the principal kind the policy serves; never `owner`.
+ * @param policy - business-owned bindings and refusal reasons for principals of `kind`.
+ * @returns disposer removing this policy.
+ * @throws Error when `kind` already has a policy.
+ */
+registerPolicy<K extends Exclude<keyof PrincipalMap, 'owner'>>(kind: K, policy: RemoteAccessPolicy<PrincipalMap[K]>): () => void
+
+/**
+ * Report that the bindings or condition answers for `principal` may have
+ * changed. Business packages call this on every grant, revocation, mode
+ * change, and expiry; open snapshots re-push, and the next failure of each
+ * policy is logged again.
+ * @param principal - affected principal; omitted for every principal.
+ */
+invalidate(principal?: Principal): void
+
+/**
+ * Gateway-only: decide one request whose resources the Gateway resolved.
+ * The owner is allowed, and so is `remoteAccess/follow`: every Peer reads
+ * its own snapshot. Otherwise the action is allowed only when, on every
+ * listed resource, some binding of the principal's policy names that
+ * resource, has a role listing the action, and has no condition or a
+ * condition that allows. `bindings()` is called once per decision.
+ * @param request - the caller or recipient, the action, the resources it
+ *   touches, and a call's arguments.
+ * @returns `allow`; or `deny` with `no-allow` when the principal kind has
+ *   no policy, the first refusing condition's reason on the first resource
+ *   no binding allows, else `explain()`'s reason, else `no-allow`;
+ *   `policy-failed` when `bindings()`, a condition, or `explain()` throws,
+ *   logged once per policy until the next `invalidate()`. The Gateway
+ *   throws `remote-access/denied` for a denied call and drops a denied event.
+ */
+decide(request: RemoteAccessRequest<Principal>): RemoteAccessDecision
+
+/**
+ * Filter items inside a Remote method. The invocation is read from the
+ * Context that accessed this service, so call it as
+ * `this.ctx.remoteAccess.allows(resource)` from the Remote method. Each
+ * check reads the policy's bindings again, so a long-running stream sees
+ * binding changes from the next check on.
+ * @param resource - resource of one result item.
+ * @returns true for the owner and outside a Remote call; otherwise whether
+ *   the invocation's endpoint action is allowed on `resource` without call
+ *   arguments, false when the policy is absent or fails.
+ */
+allows(resource: RemoteAccessResource): boolean
+
+/**
+ * The baseline a page opens with before its snapshot stream connects; every
+ * index the webServer renders carries it under
+ * {@link REMOTE_ACCESS_SNAPSHOT_KEY} for the Peer the page speaks for.
+ * @param principal - the page's caller identity.
+ * @returns the owner baseline for the owner; otherwise the principal's current grants.
+ */
+snapshotFor(principal: Principal): RemoteAccessBaseline
+
+/**
+ * Stream the calling Peer's access snapshot: one baseline, then `upsert`
+ * and `remove` frames after each `invalidate()` and each policy
+ * registration or removal that changes a grant. The owner receives only
+ * `{ owner: true }`. The generation ends when `signal` aborts or this
+ * service unloads, so a reloaded service starts every reader from a fresh
+ * baseline.
+ * @param signal - generation cancellation.
+ * @returns the access frames of one generation.
+ */
+@Remote({ mode: 'stream' }) async *follow(signal: AbortSignal): AsyncIterable<RemoteAccessFrame>
+```
+
+Source: [`packages/api/remote-access/src/index.ts`](../../packages/api/remote-access/src/index.ts)
+
 <a id="ctxtypert--typertregistry"></a>
 
 ### `ctx.typert` — `TypertRegistry`
@@ -596,12 +718,44 @@ Resolve strict generated definitions or conservative SRC markers against current
 
 ```ts cordis-catalog
 /**
+ * Check for an active owner Client event stream, the only kind that can answer forwarded waterfalls.
+ * @returns whether an owner stream is open and has not been cancelled.
+ */
+hasLiveClient(): boolean
+
+/**
+ * Inspect unsettled forwarded events without changing their lifetime.
+ * @returns detached event names and Agent identities.
+ */
+getPendingRemoteEvents(): readonly PendingRemoteEventInfo[]
+
+/**
+ * Register the sole application-selected forwarded-event source.
+ * @param source - stream factory installed by the Remote assembly.
+ * @param host - stable Host facts included in each Client generation's opening frame.
+ * @returns disposer removing this source and cancelling its active streams.
+ */
+registerRemoteEvents( source: TypertRemoteEventSource, host: RemoteEventHostInfo, ): () => Promise<void>
+
+/**
  * Invoke one live Remote method through strict generated reflection or SRC markers.
  * @param request - decoded endpoint and exact named wire arguments.
  * @returns the validated business result.
  * @throws {@link TypertGatewayError} for dispatch, provider, or boundary failures; lookup-policy and business errors retain identity.
  */
 async invoke(request: InvokeRemoteRequest): Promise<unknown>
+
+/**
+ * Open the `$events` downlink for one Client carrier generation: the ready
+ * frame binding later `$events/result` calls, then forwarded notifications
+ * and scoped waterfalls until the signal or the source ends the generation.
+ * @param payload - decoded carrier payload; the event stream requires the
+ *   standard Remote payload with an empty args object.
+ * @param signal - logical-stream cancellation joined with the source and Peer lifetimes.
+ * @param peer - Peer the stream speaks for; only an owner principal answers scoped waterfalls.
+ * @returns validated downlink frames in arrival order.
+ */
+async *openRemoteEvents( payload: unknown, signal: AbortSignal, peer: PeerScope, ): AsyncGenerator< RemoteEventEmitFrame | RemoteEventInvocationFrame | RemoteEventCancellationFrame | RemoteEventReadyFrame >
 ```
 
 Source: [`packages/api/gateway/src/index.ts`](../../packages/api/gateway/src/index.ts)

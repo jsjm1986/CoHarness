@@ -59,7 +59,7 @@
     "@deepseek-ai/dsh-model-access": "workspace:*",
     "@deepseek-ai/dsh-model-provider-config": "workspace:*",
     "@deepseek-ai/dsh-native-command": "workspace:*",
-    "@deepseek-ai/dsh-office-to-pdf": "workspace:*",
+    "@deepseek-ai/dsh-office-kit": "workspace:*",
     "@deepseek-ai/dsh-package-manifest": "workspace:*",
     "@deepseek-ai/dsh-permission-presets": "workspace:*",
     "@deepseek-ai/dsh-sandbox-ssh": "workspace:*",
@@ -86,7 +86,8 @@
     "@deepseek-ai/dsh-workspace-changes": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
     "fflate": "^0.8.3",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
@@ -120,9 +121,10 @@
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
     "@deepseek-ai/dsh-tool-cordis": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-native": "workspace:*",
     "@deepseek-ai/dsh-typert-registry": "workspace:*",
     "@deepseek-ai/dsh-util-time": "workspace:*",
-    "@deepseek-ai/libreoffice-kit": "^0.1.1"
+    "@deepseek-ai/libreoffice-kit": "0.2.3"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-plugin-manager": {

@@ -184,7 +184,7 @@ export function policyPatchText(cfg: GatewayConfig, variant: LaunchVariant): str
   patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
   patchText += `- id: connection\n  config:\n    serverTiming: ${String(cfg.performanceEnabled)}\n`
   if (cfg.officeFontMetadataCacheDirectory !== undefined) {
-    patchText += `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(cfg.officeFontMetadataCacheDirectory)}\n`
+    patchText += `- id: office-kit\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(cfg.officeFontMetadataCacheDirectory)}\n`
   }
   patchText += "- insert:\n    - id: desktop-availability\n      name: '@deepseek-ai/dsh-gateway-execution/desktop-availability'\n"
   // Remote-desktop providers share the gateway's administration files so

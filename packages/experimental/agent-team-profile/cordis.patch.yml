@@ -1,32 +1,14 @@
-# Experimental Agent Teams profile layer. Apply after dsh-base so these replacements
-# keep direct delegation and coordination on the Team tools.
-
-- id: tool-subagent-control
-  disabled: true
-
-- id: tool-subagent-list-agents
-  disabled: true
-
-- id: tool-subagent
-  disabled: true
-
-- id: tool-subagent-fork
-  disabled: true
+# Experimental Agent Teams profile layer. Apply after dsh-base so the shared
+# task board composes with the shipped subagent delegation and control tools:
+# teammates are named continuable subagent children, peer messaging rides
+# send_message, and the four team_task_* tools appear once Team mode is on.
 
 - insert:
     - id: agent-team
       name: '@deepseek-ai/dsh-experimental-agent-team'
-      config:
-        maxMembers: 8
-        maxTasks: 256
-        maxMessageBytes: 65536
-        disposalTimeoutMs: 5000
 
     - id: tool-agent-team
       name: '@deepseek-ai/dsh-experimental-tool-agent-team'
-      config:
-        freshProvider: spawn
-        forkProvider: fork
 
     - id: ui-agent-team
       name: '@deepseek-ai/dsh-experimental-client-ui-agent-team'

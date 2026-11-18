@@ -101,6 +101,41 @@
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocIdentity",
+      "source": "packages/attachment/userdoc/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocIncarnationId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocRootId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocSelection",
+      "source": "packages/attachment/userdoc/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocTrashId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocTrashSelection",
+      "source": "packages/attachment/userdoc/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocUploadOwnerId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
       "doc": "docs/subsystems/boot.md",
       "symbol": "PendingModule",
       "source": "packages/boot/hmr/src/index.ts"
@@ -109,71 +144,6 @@
       "doc": "docs/subsystems/boot.md",
       "symbol": "ProfileReconciliation",
       "source": "packages/boot/hmr/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryScope",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryKind",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryAttribution",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryEntry",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryEntrySummary",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemorySearchHit",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryWriter",
-      "source": "packages/memory/memory/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemorySaveRequest",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryDeleteRequest",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryWriteResult",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryRefusalCode",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryInvalidReason",
-      "source": "packages/memory/memory/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/memory.md",
-      "symbol": "MemoryCursor",
-      "source": "packages/memory/memory/src/types.ts"
     },
     {
       "doc": "docs/subsystems/client-modules.md",
@@ -197,12 +167,12 @@
     },
     {
       "doc": "docs/subsystems/client-modules.md",
-      "symbol": "WebBootRelease",
+      "symbol": "WebBootGraph",
       "source": "packages/client/modules/src/client/manifest.ts"
     },
     {
       "doc": "docs/subsystems/client-modules.md",
-      "symbol": "WebBootGraph",
+      "symbol": "WebBootRelease",
       "source": "packages/client/modules/src/client/manifest.ts"
     },
     {
@@ -492,31 +462,6 @@
       "source": "packages/deliverables/workspace-changes/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
-      "symbol": "FeedbackCategory",
-      "source": "packages/core/session/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/session.md",
-      "symbol": "FeedbackRecord",
-      "source": "packages/core/session/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/session.md",
-      "symbol": "MessageFeedbackItem",
-      "source": "packages/core/session/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/session.md",
-      "symbol": "MessageFeedbackRating",
-      "source": "packages/core/session/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/session.md",
-      "symbol": "MessageFeedbackVersion",
-      "source": "packages/core/session/src/types.ts"
-    },
-    {
       "doc": "docs/subsystems/filesystem.md",
       "symbol": "FileReadOutcome",
       "source": "packages/fs/tool-fs/src/read-render.ts"
@@ -585,6 +530,411 @@
       "doc": "docs/subsystems/filesystem.md",
       "symbol": "FsWriteOutcome",
       "source": "packages/fs/fs/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "BindingOrigin",
+      "source": "packages/experimental/forge-session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "BindingRecord",
+      "source": "packages/experimental/forge-session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "BranchUpdateMethod",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "BranchUpdateRequest",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestCheck",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestIssue",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestKey",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestListener",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestRef",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestReviewer",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestSnapshot",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestState",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChangeRequestUpdate",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "CheckState",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ChecksRollup",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeActionFailure",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeAnchor",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeAutomaticBase",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeBaseBranch",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeBaseBranches",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeBranches",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeChangeRequestDiff",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeChangeRequestListState",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeChangeRequestStatesFrame",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeChangedFile",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeCheckId",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeCheckout",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeCheckoutState",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeCommentAuthor",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeCommentId",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeCommit",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeCommitList",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeCommitRange",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeDiffFile",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeDiffHunk",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeDiffStatus",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeFailure",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeFileLayer",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeLineComment",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeLocalChanges",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeLocalCommits",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeLocalDiff",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeLocalScope",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeMissingWorktree",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgePanelChangeRequest",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgePanelState",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgePanelWorktree",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgePendingReview",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeProvider",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReadiness",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeRepository",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeRerunRequest",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewComment",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewData",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewEvent",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewId",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewRequest",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewResult",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewThread",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewWrite",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewWriteResult",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewerCandidate",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeReviewersRequest",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeSessionWorktree",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeThreadId",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeViewedFiles",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeViewedRequest",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeViewedState",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeWorktreeBlocker",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeWorktreeCreation",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeWorktreeFailure",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeWorktreeRequest",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeWorktreeRestoration",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ForgeWorktreeWaiting",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "MergeRequest",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "Mergeability",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ReviewDecision",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "ReviewVerdict",
+      "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "SessionChangeRequest",
+      "source": "packages/experimental/forge-session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "SessionChangeRequestsListener",
+      "source": "packages/experimental/forge-session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/forge.md",
+      "symbol": "WorktreeRecord",
+      "source": "packages/experimental/client-ui-forge/src/types.ts"
     },
     {
       "doc": "docs/subsystems/goal.md",
@@ -795,6 +1145,11 @@
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "LlmCallKind",
+      "source": "packages/llm/llm/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "LlmConfigurableProvider",
       "source": "packages/llm/llm/src/types.ts"
     },
@@ -895,12 +1250,12 @@
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "PreparedLlmCallGuard",
+      "symbol": "PreparedLlmCall",
       "source": "packages/llm/llm/src/index.ts"
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "PreparedLlmCall",
+      "symbol": "PreparedLlmCallGuard",
       "source": "packages/llm/llm/src/index.ts"
     },
     {
@@ -992,6 +1347,71 @@
       "doc": "docs/subsystems/mcp.md",
       "symbol": "McpResourceRequest",
       "source": "packages/mcp/mcp-resources/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryAttribution",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryCursor",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryDeleteRequest",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryEntry",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryEntrySummary",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryInvalidReason",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryKind",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryRefusalCode",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemorySaveRequest",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryScope",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemorySearchHit",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryWriteResult",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryWriter",
+      "source": "packages/memory/memory/src/index.ts"
     },
     {
       "doc": "docs/subsystems/permission-presets.md",
@@ -1138,6 +1558,71 @@
       "doc": "docs/subsystems/ptc-runtime.md",
       "symbol": "PtcRunSpec",
       "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopActor",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopAttachRequest",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopErrorCode",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopGrant",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopGrantFilter",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopGrantInput",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopGrantScope",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopLevel",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopSession",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopSpec",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopStream",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopTarget",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopTargetStatus",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
     },
     {
       "doc": "docs/subsystems/sandbox.md",
@@ -1631,6 +2116,31 @@
     },
     {
       "doc": "docs/subsystems/session.md",
+      "symbol": "FeedbackCategory",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "FeedbackRecord",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "MessageFeedbackItem",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "MessageFeedbackRating",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "MessageFeedbackVersion",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
       "symbol": "OptionalSessionSeq",
       "source": "packages/core/session/src/types.ts"
     },
@@ -1922,14 +2432,14 @@
     },
     {
       "doc": "docs/subsystems/ssh.md",
-      "symbol": "SshLoopbackForward",
-      "source": "packages/ssh/ssh/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/ssh.md",
       "symbol": "SshConnection",
       "source": "packages/ssh/ssh/src/index.ts",
       "projection": "public-api"
+    },
+    {
+      "doc": "docs/subsystems/ssh.md",
+      "symbol": "SshLoopbackForward",
+      "source": "packages/ssh/ssh/src/index.ts"
     },
     {
       "doc": "docs/subsystems/storage.md",
@@ -1983,6 +2493,11 @@
     },
     {
       "doc": "docs/subsystems/subagent.md",
+      "symbol": "ExternalModelSelection",
+      "source": "packages/subagent/subagent/src/external.ts"
+    },
+    {
+      "doc": "docs/subsystems/subagent.md",
       "symbol": "ResolvedSubagentStartRequest",
       "source": "packages/subagent/subagent/src/types.ts"
     },
@@ -1999,6 +2514,11 @@
     {
       "doc": "docs/subsystems/subagent.md",
       "symbol": "SubagentInterruptAuthority",
+      "source": "packages/subagent/subagent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/subagent.md",
+      "symbol": "SubagentMemberNames",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
@@ -2209,97 +2729,217 @@
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "PostToolDecision",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "PreToolDecision",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "PtcDispatchLog",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tool-executor-ptc/src/runtime-types.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolDefinition",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolDispatchExecution",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolErrorInfo",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecution",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionFailure",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionInput",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionMode",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionResult",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionSuccess",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionToken",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolFailure",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolGuard",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolOutputDefinition",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolRestriction",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolRunContext",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ValueSchemaSpec",
       "source": "packages/core/tools/src/schema.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "InvocationDescriptor",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "InvocationParameterDescriptor",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "InvokeRemoteRequest",
+      "source": "packages/api/gateway/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "PeerScope",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "Principal",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "PrincipalMap",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteAccessResource",
+      "source": "packages/typert/protocol/src/remote-access.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteAccessResourceKind",
+      "source": "packages/typert/protocol/src/remote-access.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteInvocation",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteMethodOptions",
+      "source": "packages/typert/protocol/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteScopeOptions",
+      "source": "packages/typert/protocol/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteStream",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteStreamHandle",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteUplinkWindow",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertClientRemote",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertCodec",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertContextMap",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertGateway",
+      "source": "packages/api/gateway/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertGatewayErrorCode",
+      "source": "packages/api/gateway/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertLookupDefinition",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertLookupMap",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertRegistryContract",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertRemoteNamespaceMap",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertResourceMap",
+      "source": "packages/typert/protocol/src/types.ts"
     },
     {
       "doc": "docs/subsystems/user-questions.md",
@@ -2470,236 +3110,6 @@
       "doc": "packages/client/ui-conversation/README.md",
       "symbol": "ComposerChainProps",
       "source": "packages/client/ui-conversation/src/client/contract/slots.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertLookupMap",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertContextMap",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertLookupDefinition",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertCodec",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "InvocationParameterDescriptor",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "InvocationDescriptor",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "RemoteStream",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "RemoteStreamHandle",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "PrincipalMap",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "Principal",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "PeerScope",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "RemoteUplinkWindow",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "RemoteInvocation",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertResourceMap",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "RemoteAccessResourceKind",
-      "source": "packages/typert/protocol/src/remote-access.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "RemoteAccessResource",
-      "source": "packages/typert/protocol/src/remote-access.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "RemoteScopeOptions",
-      "source": "packages/typert/protocol/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "RemoteMethodOptions",
-      "source": "packages/typert/protocol/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertRegistryContract",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertRemoteNamespaceMap",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "InvokeRemoteRequest",
-      "source": "packages/api/gateway/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertGatewayErrorCode",
-      "source": "packages/api/gateway/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertGateway",
-      "source": "packages/api/gateway/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/typert.md",
-      "symbol": "TypertClientRemote",
-      "source": "packages/typert/protocol/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopTarget",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopLevel",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopGrantScope",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopGrant",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopAttachRequest",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopSpec",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopStream",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopSession",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopActor",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopErrorCode",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopTargetStatus",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopGrantFilter",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/remote-desktop.md",
-      "symbol": "RemoteDesktopGrantInput",
-      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "LlmCallKind",
-      "source": "packages/llm/llm/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/subagent.md",
-      "symbol": "ExternalModelSelection",
-      "source": "packages/subagent/subagent/src/external.ts"
-    },
-    {
-      "doc": "docs/subsystems/attachment.md",
-      "symbol": "UserDocUploadOwnerId",
-      "source": "packages/attachment/userdoc/src/brand.ts"
-    },
-    {
-      "doc": "docs/subsystems/attachment.md",
-      "symbol": "UserDocRootId",
-      "source": "packages/attachment/userdoc/src/brand.ts"
-    },
-    {
-      "doc": "docs/subsystems/attachment.md",
-      "symbol": "UserDocIncarnationId",
-      "source": "packages/attachment/userdoc/src/brand.ts"
-    },
-    {
-      "doc": "docs/subsystems/attachment.md",
-      "symbol": "UserDocTrashId",
-      "source": "packages/attachment/userdoc/src/brand.ts"
-    },
-    {
-      "doc": "docs/subsystems/attachment.md",
-      "symbol": "UserDocIdentity",
-      "source": "packages/attachment/userdoc/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/attachment.md",
-      "symbol": "UserDocSelection",
-      "source": "packages/attachment/userdoc/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/attachment.md",
-      "symbol": "UserDocTrashSelection",
-      "source": "packages/attachment/userdoc/src/types.ts"
     }
   ]
 }

@@ -20,7 +20,7 @@ This family lets an agent delegate work to child agents. Multiple named provider
 | [`subagent-claude-code/`](subagent-claude-code/README.md) | Starts a real Claude Code child through the official Claude Agent SDK | registers on `ctx.subagents` |
 | [`subagent-dsh-sdk/`](subagent-dsh-sdk/README.md) | Starts an out-of-process Harness child through the TypeScript SDK | registers on `ctx.subagents` |
 | [`tool-subagent/`](tool-subagent/README.md) | Exposes delegation to the model | registers on `ctx.tools` |
-| [`tool-subagent-control/`](tool-subagent-control/README.md) | Exposes adjacent-Agent messaging, interrupt, and listing to the model | registers on `ctx.tools` |
+| [`tool-subagent-control/`](tool-subagent-control/README.md) | Exposes subagent-tree messaging, interrupt, and listing to the model | registers on `ctx.tools` |
 
 The Codex and Claude Code packages are independent optional Profile Bundles. Install either or both with `dsh plugin --profile <name> add @deepseek-ai/dsh-subagent-codex @deepseek-ai/dsh-subagent-claude-code`, then restart that Profile; each package registers only its dormant Host provider. To grant a tool, copy a complete Agent Preset, remove `disabled` from each matching tool row, and start a new Session. Removing one package withdraws only that provider and its private runtime closure on the next Profile start.
 
@@ -30,4 +30,4 @@ The subsystem reference — start requests, results, live runs, the provider con
 
 ## Summary
 
-The subagent package family lets an agent delegate a task to a child, continue the child's work, and discover every child it created. Choose a fresh in-process child for isolated work, a history-seeded in-process child when prior conversation matters, or an out-of-process child backed by ACP, Codex, Claude Code, or another Harness runtime. Model-facing tools also let agents message adjacent agents, interrupt work, and list child status. Each child remains visible to its parent whether it is running or stored; the package READMEs document provider-specific setup and limits.
+The subagent package family lets an agent delegate a task to a child, continue the child's work, and discover every child it created. Choose a fresh in-process child for isolated work, a history-seeded in-process child when prior conversation matters, or an out-of-process child backed by ACP, Codex, Claude Code, or another Harness runtime. Model-facing tools also let agents message named members of their subagent tree, interrupt work, and list member status. Each child remains visible to its parent whether it is running or stored; the package READMEs document provider-specific setup and limits.

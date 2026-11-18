@@ -81,7 +81,7 @@ it.each([false, true])('retains the mounted application across WebSocket recover
     }))
     expect(await root.evaluate(element => element.isConnected)).toBe(true)
     expect(console.pageErrors).toEqual([])
-    if (activeSession) expect(await composer.inputValue()).toBe(draft)
+    if (activeSession) await expect.poll(() => composer.inputValue(), { timeout: 15_000 }).toBe(draft)
   }
 
   expect(navigations).toBe(0)

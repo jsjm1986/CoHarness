@@ -183,12 +183,19 @@ export interface ManagedHandshake {
  * @param upstream - the dialed VNC endpoint socket.
  * @param credential - the resolved endpoint credential; `username` may be
  *   absent for None-capable servers.
+ * @param timeoutMs - handshake budget in milliseconds; defaults to
+ *   {@link HANDSHAKE_TIMEOUT_MS}.
  * @returns both directions' already-consumed residual bytes for the pump.
+ *   Both sockets resolve paused: the readers' `data` taps put them in
+ *   flowing mode, so bytes arriving between reader detach and the caller's
+ *   pump attach would be discarded — the caller must `resume()` each socket
+ *   after its own listeners are installed.
  */
 export async function managedHandshake(
   client: Duplex,
   upstream: Duplex,
   credential: { username?: string; password: string },
+  timeoutMs = HANDSHAKE_TIMEOUT_MS,
 ): Promise<ManagedHandshake> {
   const inClient = new ByteReader(client)
   const inUpstream = new ByteReader(upstream)
@@ -196,7 +203,7 @@ export async function managedHandshake(
     const error = new RemoteDesktopError('managed RFB handshake: timed out', 'REMOTE_DESKTOP_TRANSPORT')
     inClient.failWith(error)
     inUpstream.failWith(error)
-  }, HANDSHAKE_TIMEOUT_MS)
+  }, timeoutMs)
   timeout.unref()
   try {
     client.write(RFB_38)
@@ -243,6 +250,8 @@ export async function managedHandshake(
     return { clientResidual: inClient.residual(), upstreamResidual: inUpstream.residual() }
   } finally {
     clearTimeout(timeout)
+    client.pause()
+    upstream.pause()
     inClient.close()
     inUpstream.close()
   }

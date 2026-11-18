@@ -1,3 +1,5 @@
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -66,7 +68,7 @@ function call(
   command: string,
   signal = new AbortController().signal,
 ) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal,
     callId: ToolCallId(`persistent-bash-${++callNumber}`),
     name: 'bash',
@@ -306,6 +308,7 @@ async function setup(
   contexts.push(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(TerminalSessionService)
   const stub = stubBackend(initialMode)
@@ -526,14 +529,18 @@ describe('tool-bash-persistent', () => {
       const controller = new AbortController()
       const cancelled = call(ctx, owner, 'hang', controller.signal)
       const queued = call(ctx, owner, 'after cancellation')
-      setTimeout(() => {
+      try {
+        await expect.poll(() => stub.sessions[0]!.sends).toBe(3)
         controller.abort(new Error('caller stopped'))
-      }, 5)
 
-      expect((await cancelled).isError).toBe(true)
-      expect(text(await queued)).toBe('hello from stub\n[Command finished with exit code 0]')
-      expect(stub.sessions[0]?.closed).toContain('persistent bash command aborted')
-      expect(stub.sessions).toHaveLength(2)
+        expect((await cancelled).isError).toBe(true)
+        expect(text(await queued)).toBe('hello from stub\n[Command finished with exit code 0]')
+        expect(stub.sessions[0]?.closed).toContain('persistent bash command aborted')
+        expect(stub.sessions).toHaveLength(2)
+      } finally {
+        controller.abort(new Error('caller stopped'))
+        await Promise.all([cancelled, queued])
+      }
     },
   )
 
@@ -568,6 +575,7 @@ describe('tool-bash-persistent', () => {
     contexts.push(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(TerminalSessionService)
     const spawnStarted = Promise.withResolvers<undefined>()

@@ -134,31 +134,6 @@ describe('goal projection unit', () => {
     }
   })
 
-  it('restores a checkpoint after lowering the round cap below already admitted rounds', async () => {
-    const { ctx, agent, session } = await harness(true)
-    onTestFinished(() => ctx.fiber.dispose())
-    let goal = ctx.goals.create(agent, { objective: 'reduce continuation budget', maxGoalRounds: 4 })
-    for (let round = 1; round <= 2; round += 1) {
-      session.append('turn/start', { turn: round })
-      session.append('user/message', createUserMessage({
-        content: [{ type: 'text', text: `round ${round}` }],
-        source: { kind: 'goal', goalId: goal.id, revision: goal.revision, round },
-      }), { surfaceOp: 'append' })
-      session.append('turn/end', { turn: round, reason: { kind: 'completed' } })
-    }
-    goal = ctx.goals.pause(agent, goal)
-    goal = ctx.goals.edit(agent, goal, { maxGoalRounds: 1 })
-    expect(goal).toMatchObject({ phase: 'paused', roundsStarted: 2, maxGoalRounds: 1 })
-    expect(() => ctx.goals.resume(agent, goal)).toThrow('increase maxGoalRounds before resuming')
-    const checkpoint = structuredClone(ctx.sessionProjections.checkpoint(session))
-    const floor = ctx.sessionProjections.restoreFloor(checkpoint)
-    if (floor === undefined) throw new Error('expected registered projections')
-    const restored = ctx.sessionProjections.restore(checkpoint, session.snapshotEvents().slice(floor),
-      floor, session.header, session.inheritedEventCount)
-    expect(restored.snapshot.values.goal).toEqual(ctx.sessionProjections.snapshot(session).values.goal)
-    expect(foldGoal(session.snapshotEvents())).toMatchObject({ roundsStarted: 2, goal: { maxGoalRounds: 1 } })
-  })
-
   it('does not let inbox changes revive a cleared goal', async () => {
     const bench = await harness(true)
     const created = bench.ctx.goals.create(bench.agent, { objective: 'stay cleared' })

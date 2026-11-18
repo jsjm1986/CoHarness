@@ -26,7 +26,8 @@ kind: "package-group"
 
 | 包 | 职责 | ctx 键 |
 |---|---|---|
-| [office-to-pdf](office-to-pdf/README.zh.md) | 将已授权 Office 字节转换为完整 PDF，并提供有界队列和缓存 | `ctx.officeToPdf` |
+| [office-kit](office-kit/README.zh.md) | 共享 Office 渲染、转换与重算，并提供有界队列和缓存 | `ctx.officeKit` |
+| [tool-office](tool-office/README.zh.md) | 面向模型的 Office 渲染、转换与重算工具 | — |
 
 -----
 
@@ -35,7 +36,7 @@ kind: "package-group"
 
 消费者负责源文件授权与展示。
 
-- [文档转换](../../docs/subsystems/office-to-pdf.zh.md) — 共享操作和生成的服务参考。
+- [文档转换](../../docs/subsystems/office-kit.zh.md) — 共享操作和生成的服务参考。
 - [独立 kit 所有权](../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.zh.md) — 引擎分发与应用集成。
 - [工作区文件](../host/apiproxy/README.zh.md) — 已授权的有界源文件读取。
 

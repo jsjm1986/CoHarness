@@ -409,6 +409,7 @@ describe('DetailsPanel Output section (search)', () => {
         useSessions={bindSnapshotSelector(sessions)}
         useWorkspaces={bindSnapshotSelector(workspaces)}
         usePanelInfo={(() => { throw new Error('unused') })}
+        useRemoteAccess={() => true}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
           setDraft: () => {},

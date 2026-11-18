@@ -259,6 +259,25 @@ export function stdoutExpectedVariants(
   return [canonical, { file: WINDOWS_STDOUT_SNAPSHOT, cwdPathMode: 'native' }]
 }
 
+/**
+ * Blank the runtime-context message payload in one normalized log. A retained
+ * `sessionFormat` generation is immutable, so its log comparison proves the
+ * migrated structure and tool traffic, not build-contributed section text that
+ * can never be re-pinned.
+ * @param snapshot - one normalized session JSONL string.
+ * @returns the same log with every runtime-context message's payload removed.
+ */
+function stripRetainedRuntimeContext(snapshot: string): string {
+  return snapshot.split('\n').map((line) => {
+    if (line.trim().length === 0 || !line.includes('"runtime-context"')) return line
+    const event = JSON.parse(line) as { type?: string; data?: { content?: unknown; source?: { kind?: string; sections?: unknown } } }
+    if (event.type !== 'user/message' || event.data?.source?.kind !== 'runtime-context') return line
+    delete event.data.content
+    delete event.data.source.sections
+    return JSON.stringify(event)
+  }).join('\n')
+}
+
 /** One suite's inputs: the agent to boot, where its fixtures live, and its scenario table. */
 export interface SnapshotSuiteOptions {
   /** The agent composition every scenario boots. */
@@ -1378,6 +1397,9 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
           : (log: string): string => log
         const writesSessionFixtures = writesCurrentSessionFixtures(manifest, mode)
           && ((RECORDING && scenario.recorded && scenario.hasModelTurn) || (REFRESHING && comparesLog))
+        // Header pins track the current writer's prompt/schema text even for
+        // retained Session generations, whose fixtures stay immutable.
+        const writesPins = (RECORDING && scenario.recorded && scenario.hasModelTurn) || (REFRESHING && comparesLog)
         if (writesSessionFixtures) {
           expect(result.sessionLogs.length, `${mode} produced no session log to harvest`).toBeGreaterThan(0)
           if (REFRESHING) {
@@ -1409,6 +1431,9 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
           await Promise.all(outputFixtures.map((fixture, index) =>
             writeFile(join(dir, outputFixtureFiles[index] as string), fixture)))
           fixtureFiles = outputFixtureFiles
+        }
+        if (writesPins) {
+          expect(result.sessionLogs.length, `${mode} produced no session log to pin headers from`).toBeGreaterThan(0)
           if (scenario.pinsHeader === true) {
             const primary = result.sessionLogs[0] as HarvestedLog
             const prompts = normalizedSystemPrompts(primary.content, ctx)
@@ -1485,8 +1510,10 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
           }
           const actualSnapshots = normalizeSessionSnapshots(harvested, ctx)
           const expectedSnapshots = normalizeSessionSnapshots(fixtures, fixtureCtx)
+          // A retained generation proves structure and traffic, never re-pinned build text.
+          const compare = manifest.sessionFormat === undefined ? (text: string) => text : stripRetainedRuntimeContext
           for (const [index, actual] of actualSnapshots.entries()) {
-            expect(actual, `${fixtureFiles[index]} mismatch`).toEqual(expectedSnapshots[index])
+            expect(compare(actual), `${fixtureFiles[index]} mismatch`).toEqual(compare(expectedSnapshots[index] as string))
           }
         }
 

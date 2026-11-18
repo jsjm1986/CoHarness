@@ -10,7 +10,7 @@ LibreOffice 编译、源码补丁、平台资格验证和大型二进制发布�
 
 ## Decision
 
-`deepseek-harness/libreoffice-kit` 仓库维护可复用的 `@deepseek-ai/libreoffice-kit` Node API、Worker、字体处理、引擎选择、构建配方、补丁、测试和发布。API 不依赖 Cordis。Harness 负责将自己的 `OfficeToPdf` 服务适配到此 API，以及 Session 授权、转换生命周期、传输、Web UI 和应用打包。
+`deepseek-harness/libreoffice-kit` 仓库维护可复用的 `@deepseek-ai/libreoffice-kit` Node API、Worker、字体处理、引擎选择、构建配方、补丁、测试和发布。API 不依赖 Cordis。Harness 负责将自己的 `OfficeKit` 服务适配到此 API，以及 Session 授权、转换生命周期、传输、Web UI 和应用打包。
 
 kit 发布流程独立于 Harness 发布流程。kit 仓库验证并以统一版本发布 Node API 和引擎 npm 包，起始版本为 `0.0.1`。Harness 消费精确的 npm 版本，并在 `pnpm-lock.yaml` 中提交依赖解析结果；Harness 发布既不构建也不发布 kit 包。
 

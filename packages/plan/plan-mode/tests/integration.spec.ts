@@ -5,6 +5,7 @@ import SessionStore, { SessionId, type SessionEvent } from '@deepseek-ai/dsh-ses
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
@@ -28,6 +29,7 @@ async function harness(adapter: MockAdapter): Promise<Context> {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(PlanModeController, PLAN_CONFIG)
@@ -56,8 +58,7 @@ function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
 
 /** Read the plan unit that backs the service in this full composition. */
 function planActive(ctx: Context, agent: Agent): boolean {
-  const state = ctx.sessionProjections.stateOf(agent.session, 'plan')
-  if (state === undefined) throw new Error('plan projection is not registered')
+  const state = ctx.planMode.get(agent)
   return state.active
 }
 
@@ -128,7 +129,7 @@ describe('plan mode through the agent loop', () => {
     expect(log.some(event => event.type === 'user/message' && event.data.source.kind !== 'user')).toBe(false)
   })
 
-  it('a user flip between turns lands at the boundary: one notice and a replaced system node with stable tool schemas', async () => {
+  it('a user flip between turns lands at the boundary: one notice and an added exit tool', async () => {
     const adapter = new MockAdapter([
       textResponse('First turn, default mode.'),
       textResponse('Second turn, plan mode.'),
@@ -140,7 +141,7 @@ describe('plan mode through the agent loop', () => {
     await waitForIdle(ctx, agent)
     expect(planActive(ctx, agent)).toBe(false)
     const first = findEvent(agent.session.snapshotEvents(), 'request/header')
-    expect(first.data.header.tools?.map(tool => tool.name)).toEqual(['exit_plan_mode', 'read', 'write'])
+    expect(first.data.header.tools?.map(tool => tool.name)).toEqual(['read', 'write'])
     const firstSystem = findEvent(agent.session.snapshotEvents(), 'system/message')
     expect(systemText(agent)).not.toContain(PLAN_CONFIG.section)
 
@@ -156,7 +157,7 @@ describe('plan mode through the agent loop', () => {
       { type: 'text', text: 'The user switched this session to plan mode.' },
     ])
     // The changed prompt replaces surface node 0 in place; the header is
-    // re-logged as a series snapshot because tools and config are unchanged.
+    // re-logged as a change because the admitted tool catalog gained the exit.
     const systemNodes = log.filter(event => event.type === 'system/message')
     expect(systemNodes).toHaveLength(2)
     const second = systemNodes[1]
@@ -164,10 +165,10 @@ describe('plan mode through the agent loop', () => {
     expect(second?.sourceEventSeqs).toEqual([firstSystem.seq])
     expect(agent.session.surface.nodes[0]).toBe(second?.seq)
     expect(systemText(agent)).toContain('plan mode')
-    expect(log.filter(event => event.type === 'request/header').map(event => event.data.reason)).toEqual(['initial', 'series'])
+    expect(log.filter(event => event.type === 'request/header').map(event => event.data.reason)).toEqual(['initial', 'change'])
     const secondHeader = findEvent(log, 'request/header', 'last')
     expect(secondHeader.data.header.tools?.map(tool => tool.name)).toEqual(['exit_plan_mode', 'read', 'write'])
-    expect(secondHeader.data.header.tools).toEqual(first.data.header.tools)
+    expect(secondHeader.data.header.tools).not.toEqual(first.data.header.tools)
   })
 
   it('a mode flip at error settlement waits until the step after a same-step retry', async () => {
@@ -205,7 +206,7 @@ describe('plan mode through the agent loop', () => {
 
     expect(adapter.requests).toHaveLength(3)
     expect(requestSystem(adapter.requests[2])).toContain(PLAN_CONFIG.section)
-    expect(adapter.requests[2]?.tools).toEqual(adapter.requests[0]?.tools)
+    expect(adapter.requests[2]?.tools?.map(tool => tool.name)).toEqual(['exit_plan_mode', 'read', 'write'])
     const log = agent.session.snapshotEvents()
     const planMode = findEvent(log, 'plan/mode')
     const firstEnd = log.find(event => event.type === 'step/end'
@@ -228,6 +229,7 @@ describe('plan mode through the agent loop', () => {
   it('a dismissed plan review ends the turn without another model request', async () => {
     const adapter = new MockAdapter([
       toolCallResponse('call-exit', 'exit_plan_mode', { plan: '# Plan\n\ndo things' }),
+      // Consumed only if the dismissal regresses to another model request.
       textResponse('Waiting for your message.'),
     ])
     const ctx = await harness(adapter)

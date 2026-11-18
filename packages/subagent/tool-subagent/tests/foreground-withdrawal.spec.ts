@@ -10,6 +10,8 @@ import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { SubagentResult } from '@deepseek-ai/dsh-subagent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { afterEach, expect, it } from 'vitest'
 import * as tool from '../src/index.ts'
 
@@ -22,6 +24,7 @@ it.each(['completed', 'rejected'] as const)('joins foreground %s result and tran
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   provideWorkingDirectoryFixture(ctx)
   const runtime = ctx.plugin(SubagentRuntime)
   await runtime.await()
@@ -43,7 +46,7 @@ it.each(['completed', 'rejected'] as const)('joins foreground %s result and tran
   const parent = { id: SessionId('foreground-withdrawal-parent'), ctx: ctx.plugin(() => {}).ctx, options: {},
     session: Session.create(SessionId('foreground-withdrawal-parent')) } as unknown as Agent
   ctx.agents.register(parent)
-  const execution = ctx.tools.execute({ signal: new AbortController().signal, callId: ToolCallId('foreground-withdrawal'),
+  const execution = executeToolFixture(ctx, { signal: new AbortController().signal, callId: ToolCallId('foreground-withdrawal'),
     name: 'subagent', arguments: { description: 'owned foreground', prompt: 'work' }, agent: parent })
   let withdrawal: Promise<boolean> | undefined
   try {

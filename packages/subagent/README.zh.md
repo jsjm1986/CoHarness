@@ -20,7 +20,7 @@ kind: "package-group"
 | [`subagent-claude-code/`](subagent-claude-code/README.zh.md) | 通过官方 Claude Agent SDK 启动真实的 Claude Code 子 agent | 注册到 `ctx.subagents` |
 | [`subagent-dsh-sdk/`](subagent-dsh-sdk/README.zh.md) | 通过 TypeScript SDK 启动进程外 Harness 子 agent | 注册到 `ctx.subagents` |
 | [`tool-subagent/`](tool-subagent/README.zh.md) | 向模型公开委派操作 | 注册到 `ctx.tools` |
-| [`tool-subagent-control/`](tool-subagent-control/README.zh.md) | 向模型公开相邻 Agent 消息、中断与列举操作 | 注册到 `ctx.tools` |
+| [`tool-subagent-control/`](tool-subagent-control/README.zh.md) | 向模型公开 subagent 树消息、中断与列举操作 | 注册到 `ctx.tools` |
 
 Codex 与 Claude Code 包是彼此独立的可选 Profile Bundle。使用 `dsh plugin --profile <name> add @deepseek-ai/dsh-subagent-codex @deepseek-ai/dsh-subagent-claude-code` 安装其中一个或两个包，再重启该 Profile；每个包只注册自己的休眠 Host provider。要授予工具，请复制一份完整 Agent Preset，删除各对应工具行的 `disabled`，再启动新 Session。移除其中一个包后，下一次 Profile 启动只会撤回对应 provider 及其私有运行时闭包。
 
@@ -30,4 +30,4 @@ Codex 与 Claude Code 包是彼此独立的可选 Profile Bundle。使用 `dsh p
 
 ## 概述
 
-subagent 包家族让 agent（智能体）将任务委派给子 agent、继续其工作，并发现自己创建的每个子级。隔离工作可选择全新的进程内子级；需要既有对话时可选择带父级历史的进程内子级；也可选择由 ACP（Agent Client Protocol）、Codex、Claude Code 或另一 Harness 运行时支持的进程外子级。面向模型的工具还让 agent 能够向相邻 agent 发送消息、中断工作并列出子级状态。无论子级正在运行还是已存储，父级都能看到它；各包 README 说明各提供方特定的设置与限制。
+subagent 包家族让 agent（智能体）将任务委派给子 agent、继续其工作，并发现自己创建的每个子级。隔离工作可选择全新的进程内子级；需要既有对话时可选择带父级历史的进程内子级；也可选择由 ACP（Agent Client Protocol）、Codex、Claude Code 或另一 Harness 运行时支持的进程外子级。面向模型的工具还让 agent 能够向其 subagent 树中的具名成员发送消息、中断工作并列出成员状态。无论子级正在运行还是已存储，父级都能看到它；各包 README 说明各提供方特定的设置与限制。

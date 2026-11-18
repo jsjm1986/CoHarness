@@ -4,6 +4,7 @@ profile: sdk
 composition: browser-use-stagehand-native
 recording: authored
 header:
-  class: browser-use-stagehand-native
+  class: sdk-browser-use-stagehand-native
+  pin: true
 replay:
   override: true

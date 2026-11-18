@@ -71,6 +71,7 @@ function harness(path = 'a.txt') {
     useSessions: () => { throw new Error('unused') },
     useWorkspaces: () => { throw new Error('unused') },
     usePanelInfo: () => { throw new Error('unused') },
+    useRemoteAccess: () => true,
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: {
@@ -155,7 +156,7 @@ describe('workspace file tab', () => {
     expect(h.close).toHaveBeenCalledOnce()
   })
 
-  it.each(['book.xlsx', 'legacy.xls', 'table.csv'])('routes the %s suffix to the browser spreadsheet body, never office-to-pdf', async (path) => {
+  it.each(['book.xlsx', 'legacy.xls', 'table.csv'])('routes the %s suffix to the browser spreadsheet body, never office-kit', async (path) => {
     const h = harness(path)
     const view = render(<WorkspaceFileTab {...h.props(true)} />)
     await waitFor(() => { expect(view.getByTestId('excel')).toBeTruthy() })

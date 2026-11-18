@@ -753,10 +753,13 @@ it('pins Files offload and inline fallback in assembled requests', async () => {
     const fileImage = { type: 'image', source: { type: 'file', file_id: 'file-api-snapshot-1' } }
     const offloadedImage = `[image omitted to fit request image limits; ${attachmentId}.${normalizedAccess}]`
     const imageHandle = `Image ${attachmentId}; request preview 1x1px.${normalizedAccess}`
-    const runtimeContextFor = (cwd: string): string => 'Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\n'
+    const runtimeContextFor = (cwd: string): string => 'The following information describes your current session:\n\n'
       + `Current working directory: ${JSON.stringify(cwd)}.\n\n`
       + 'Current DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\n'
-      + 'Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).'
+      + 'Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).\n\n'
+      + 'You are the root agent. Your name is "lead".\n\n'
+      + 'To message other agents, use send_message({ agent: "<agent-name>", message: "..." }).\n'
+      + 'Use list_agents({}) to find your collaborator agents and their names.'
     const runtimeContext = runtimeContextFor(result.cwd)
     const messages = requests[0]?.messages as { content?: unknown }[] | undefined
     const offloaded = messages?.find(message => JSON.stringify(message.content).includes('[image omitted'))
@@ -841,10 +844,12 @@ it('packed ACP fixture retains every chunk row kind without changing the logical
       time?: unknown
       type?: unknown
       data?: {
+        content?: Array<{ text?: unknown }>
         durationMs?: unknown
         id?: unknown
         inserted?: Array<{ id?: unknown }>
         message?: { id?: unknown }
+        source?: { kind?: unknown; sections?: Array<{ text?: unknown }> }
         stream?: unknown
       }
     }
@@ -852,7 +857,16 @@ it('packed ACP fixture retains every chunk row kind without changing the logical
     if (cloned.type === 'agent/inbox/spliced') {
       for (const message of cloned.data?.inserted ?? []) delete message.id
     }
-    if (cloned.type === 'user/message') delete cloned.data?.id
+    if (cloned.type === 'user/message') {
+      delete cloned.data?.id
+      // Runtime-context payload is contributed by the replaying build, not the
+      // fixture: the packed generation pins an older section set than the
+      // current source recording, so compare presence, not wording.
+      if (cloned.data?.source?.kind === 'runtime-context') {
+        delete cloned.data.content
+        delete cloned.data.source.sections
+      }
+    }
     if (cloned.type === 'system/message'
       || cloned.type === 'assistant/message'
       || cloned.type === 'tool/result') {

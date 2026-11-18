@@ -18,7 +18,7 @@ const workspace = join(process.cwd(), 'workspace'), home = join(process.cwd(), '
 await mkdir(workspace)
 const plugins = [
   ['credentials/credentials-local', { path: join(home, 'credentials.yaml'), dshHome: home, watch: false }],
-  ['core/session'], ['llm/llm'], ['core/system-prompt'], ['core/tools'], ['core/agent'],
+  ['core/session'], ['llm/llm'], ['core/system-prompt'], ['core/tools'], ['core/tool-executor-native'], ['core/agent'],
   ['session/session-projection'], ['core/agent-loop', { agents: [] }],
   ['fs/fs-local', { cwd: workspace }], ['session/working-directory'],
   ['sandbox/sandbox-local'], ['sandbox/sandbox-policy', { mode: 'danger-full-access', workspaceRoot: workspace }],

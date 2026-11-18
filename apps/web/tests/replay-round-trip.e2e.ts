@@ -111,16 +111,19 @@ describe('web e2e: fresh round trip through the real assembly', () => {
     if (settledSessionId === undefined) throw new Error('the drive turn did not publish a session id')
     const agent = scaffold.ctx.agents.get(settledSessionId)
     if (agent === undefined) throw new Error(`the settled Web agent ${settledSessionId} is no longer live`)
-    const result = await scaffold.ctx.tools.execute({
+    const result = (await scaffold.ctx.tools.execute({
       signal: AbortSignal.timeout(5_000),
-      callId: ToolCallId('web-url-probe'),
-      name: 'bash',
-      arguments: {
-        command: 'printf \'%s\\n\' "$DSH_WEB_URL"',
-        description: 'Print current Web runtime',
-      },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('web-url-probe'),
+        name: 'bash',
+        arguments: JSON.stringify({
+          command: 'printf \'%s\\n\' "$DSH_WEB_URL"',
+          description: 'Print current Web runtime',
+        }),
+      }],
       agent,
-    })
+    })).results[0]!.result
     expect(result.isError).toBe(false)
     expect(result.content.filter(block => block.type === 'text').map(block => block.text).join(''))
       .toBe(`${scaffold.baseUrl}\n`)

@@ -46,6 +46,7 @@ function mount(kind: FontRole = 'code', code = '') {
   const props: FontFamilyRowComponentProps = {
     useSessions: emptySessions(),
     usePanelInfo: emptyPanelInfo(),
+    useRemoteAccess: () => true,
     useWorkspaces: emptyWorkspaces(),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,

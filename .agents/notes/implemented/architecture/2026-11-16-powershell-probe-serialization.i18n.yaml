@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-powershell-probe-serialization.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-16-powershell-probe-serialization.md
+document:
+  en: 50a8f181940cc43369834a1743ab593fb7080a0a
+  zh: 8eaaa21a3b20bcc2906dfc8a8c9540fdb92d424e
+/agent-note-windows-powershell-probes-are-cmdlet-free:
+  en: 2ae1577339715bc4
+  zh: d0903439c089e244
+/agent-note-windows-powershell-probes-are-cmdlet-free/problem:
+  en: 7d90787ceb09d8bd
+  zh: c5026aa1c2b1bc53
+/agent-note-windows-powershell-probes-are-cmdlet-free/decision:
+  en: 61b3977115791c81
+  zh: e5da79bd38f03b5d
+/agent-note-windows-powershell-probes-are-cmdlet-free/consequences:
+  en: f195f9de6ce857b9
+  zh: 8862bf9cd4f698df
+/agent-note-windows-powershell-probes-are-cmdlet-free/alternatives-considered:
+  en: c4db54c8aef5b48f
+  zh: a8e10f67b67973d4
+/agent-note-windows-powershell-probes-are-cmdlet-free/verification:
+  en: 5f69de2160eecac5
+  zh: a7e64b9219259f30

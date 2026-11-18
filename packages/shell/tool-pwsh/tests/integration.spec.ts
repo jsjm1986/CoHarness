@@ -1,6 +1,6 @@
 /**
  * Integration tests: the REAL `@deepseek-ai/dsh-pwsh-local` executor plus the
- * `pwsh` tool, exercised through `ctx.tools.execute()` with a real PowerShell
+ * `pwsh` tool, exercised through `executeToolFixture(ctx, )` with a real PowerShell
  * process. These verify the world — actual commands run, stdout/stderr come
  * back, exit codes render, timeouts abort, background jobs settle through the
  * generic job runtime, and per-session cwd resolution works. The suite
@@ -18,6 +18,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
@@ -40,7 +42,7 @@ let ctx: Context
 
 let callCounter = 0
 function call(name: string, args: unknown, agentObj?: object, signal?: AbortSignal) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: signal ?? testToolSignal,
     callId: ToolCallId(`it-${++callCounter}`),
     name,
@@ -62,6 +64,7 @@ describe.skipIf(!hasPwsh)('pwsh tool over the real pwsh executor', () => {
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(LocalJobRegistry)
     await ctx.plugin(ToolJobs)
     await ctx.plugin(LocalSubprocessRuntime)

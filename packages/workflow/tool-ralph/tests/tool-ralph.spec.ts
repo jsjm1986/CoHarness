@@ -11,6 +11,8 @@ import type { SubagentCapabilities, SubagentProvider, SubagentRun, SubagentStart
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { WorkflowRunId, WorkflowEngine } from '@deepseek-ai/dsh-workflow'
 import type { WorkflowResult, WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import * as toolRalph from '../src/index.ts'
@@ -87,6 +89,7 @@ async function setup(options?: SetupOptions) {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(SessionProjectionRegistry)
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
@@ -109,7 +112,7 @@ function execute(
   args: unknown,
   extra?: { agent?: Agent; signal?: AbortSignal },
 ): Promise<ToolExecutionResult> {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: extra?.signal ?? testToolSignal,
     callId: ToolCallId('ralph-call'),
     name: 'ralph',
@@ -301,6 +304,7 @@ describe('dsh-tool-ralph', () => {
     expect((firstResult.content[0] as { text: string }).text).toContain('No previous handoff was available.')
 
     const later = execute(ctx, { objective: 'Ship it.', maxRounds: 2 }, { agent: parent })
+    await vi.waitFor(() => { expect(engine.requests).toHaveLength(2) })
     const laterResult = await settleCompleted(engine, later, {
       status: 'round-failed',
       roundsStarted: 2,

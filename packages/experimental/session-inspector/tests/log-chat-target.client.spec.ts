@@ -1,6 +1,8 @@
 /** Log inspection submits original coordinates without reading Chat nodes. */
 
 import { expect, it } from 'vitest'
+// The `tool/ptc-dispatch-start` SessionEventMap entry is merged by tool-executor-ptc's types leaf.
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc/types'
 import { SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { sessionLogChatTarget } from '../src/client/views/session-log/chat-target.ts'

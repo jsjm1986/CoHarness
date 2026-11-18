@@ -160,8 +160,13 @@ try {
           const connections = [...sockets].map(socket => new Promise(ready => { socket.once('close', ready); socket.destroy() }))
           await Promise.all([closed, ...connections])
         })
-        await listen(relay)
-        const port = relay.address().port
+        let port
+        for (;;) {
+          await listen(relay)
+          port = relay.address().port
+          if (port < cfg.instancePortBase) break
+          await new Promise((ready, reject) => relay.close(error => error ? reject(error) : ready()))
+        }
         if (context === undefined) db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(port, placement.id)
         else await pool.query(`UPDATE harness.instances i SET port=$1 FROM harness.${placement.kind === 'user' ? 'users' : 'projects'} u WHERE u.id=${placement.kind === 'user' ? 'i.user_id' : 'i.project_id'}
           AND i.organization_id=$2 AND u.public_id=$3`, [port, context.organizationId, placement.id])

@@ -155,7 +155,7 @@ async function remoteFixture() {
   const execution = { cwd: f.request.cwd, target: 'ssh:17', remote: true, subprocess: f.ctx.subprocess }
   const forward = vi.fn<SshConnection['forwardLoopback']>()
   const ssh: Pick<SshConnection, 'ready' | 'forwardLoopback'> = {
-    ready: Promise.resolve({ protocol: 2 as const, hash: 'a'.repeat(64), kind: 'node-script' as const,
+    ready: Promise.resolve({ protocol: 3 as const, hash: 'a'.repeat(64), kind: 'node-script' as const,
       platform: 'linux' as const, nodeVersion: process.version, executable: '/remote/node', root: '/remote/helper', workspace: f.request.cwd }),
     forwardLoopback: forward,
   }

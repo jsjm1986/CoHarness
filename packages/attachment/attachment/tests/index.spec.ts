@@ -218,6 +218,17 @@ describe('isImageAdmissionError', () => {
   })
 })
 
+describe('AttachmentError', () => {
+  it('keeps its literal name and attachment code so tool results record routable error info', () => {
+    const cause = new Error('disk full')
+    const error = new AttachmentError('disk failed', 'ATTACHMENT_WRITE_FAILED', { cause })
+    // The HarnessError-identical shape is deliberate: sharing the base would
+    // cycle dsh-llm → dsh-attachment, so identity travels by name and code.
+    expect(error).toMatchObject({ name: 'AttachmentError', code: 'ATTACHMENT_WRITE_FAILED', message: 'disk failed', cause })
+    expect(isAttachmentError(error)).toBe(true)
+  })
+})
+
 describe('isAttachmentError', () => {
   it('recognizes attachment failures from another package installation by code', () => {
     expect(isAttachmentError(new AttachmentError('bad base64', 'INVALID_FILE_BASE64'))).toBe(true)

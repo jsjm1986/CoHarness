@@ -12,6 +12,7 @@ import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import * as systemPromptPlugin from '@deepseek-ai/dsh-system-prompt'
 import * as toolsPlugin from '@deepseek-ai/dsh-tools'
+import * as nativeToolExecutorPlugin from '@deepseek-ai/dsh-tool-executor-native'
 import * as fsPlugin from '@deepseek-ai/dsh-fs-local'
 import * as toolFsPlugin from '@deepseek-ai/dsh-tool-fs'
 import * as sessionPlugin from '@deepseek-ai/dsh-session'
@@ -51,6 +52,7 @@ describe('session-reference real Loader composition', () => {
       ['@deepseek-ai/dsh-working-directory', workingDirectoryPlugin],
       ['@deepseek-ai/dsh-system-prompt', systemPromptPlugin],
       ['@deepseek-ai/dsh-tools', toolsPlugin],
+      ['@deepseek-ai/dsh-tool-executor-native', nativeToolExecutorPlugin],
       ['@deepseek-ai/dsh-fs-local', fsPlugin],
       ['@deepseek-ai/dsh-tool-fs', toolFsPlugin],
       ['@deepseek-ai/dsh-session-query-sqlite', queryPlugin],
@@ -110,11 +112,15 @@ describe('session-reference real Loader composition', () => {
     const readLines: string[] = []
     let totalLines = Infinity
     for (let offset = 1; offset <= totalLines; offset += 7) {
-      const read = await ctx.tools.execute({
-        name: 'read', callId: ToolCallId(`read-${offset}`),
-        arguments: { file_path: notice.fullSnapshot.locator, offset, limit: 7 },
+      const read = (await ctx.tools.execute({
+        calls: [{
+          type: 'tool-call',
+          id: ToolCallId(`read-${offset}`),
+          name: 'read',
+          arguments: JSON.stringify({ file_path: notice.fullSnapshot.locator, offset, limit: 7 }),
+        }],
         signal: new AbortController().signal,
-      })
+      })).results[0]!.result
       expect(read.isError).toBe(false)
       if (read.isError) throw new Error('Expected saved transcript read')
       const value = read.value as { lines: { text: string }[]; totalLines: number }
@@ -135,6 +141,7 @@ describe('session-reference real Loader composition', () => {
     expect(await readdir(spillRoot)).toEqual([dirname(notice.fullSnapshot.locator).split(/[\\/]/).at(-1)])
 
     const captured = target.deriveMessages()
+    ctx.sessions.announce(ctx.sessions.get(SessionId('reference-source'))!)
     ctx.sessions.get(SessionId('reference-source'))!.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'LATER_SOURCE_MUTATION' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })

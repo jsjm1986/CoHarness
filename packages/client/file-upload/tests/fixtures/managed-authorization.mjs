@@ -47,7 +47,7 @@ try {
     ['credentials/credentials-local', { path: join(home, 'credentials.yaml'), dshHome: home, watch: false }],
     ['host/webserver', { host: '127.0.0.1', port: 0 }], ['client/connection'],
     ['context/gateway-runtime'], ['context/collaboration-gateway'],
-    ['core/session'], ['llm/llm'], ['core/system-prompt'], ['core/tools'], ['core/agent'],
+    ['core/session'], ['llm/llm'], ['core/system-prompt'], ['core/tools'], ['core/tool-executor-native'], ['core/agent'],
     ['session/session-projection'], ['core/agent-loop', { agents: [] }],
     ['interaction/commands'], ['attachment/attachment-local', { dshHome: home }], ['client/file-upload'],
   ]

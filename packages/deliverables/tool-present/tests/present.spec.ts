@@ -14,6 +14,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { turnBoundaryProjectionDefinition } from '@deepseek-ai/dsh-agent-loop'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import type { PresentedFile } from '../src/types.ts'
 import * as Present from '../src/index.ts'
 
@@ -59,6 +60,7 @@ async function setup() {
   cleanups.push(() => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(LocalFileSystem, { cwd: root })
   await ctx.plugin(SessionProjectionRegistry)
@@ -67,10 +69,13 @@ async function setup() {
   await fiber
   const owner = await agent(ctx, root)
   owner.session.append('turn/start', { turn: 1 })
-  const execute = (files: unknown) => ctx.tools.execute({
-    signal: new AbortController().signal, callId: ToolCallId(`call-${++callNumber}`),
-    name: 'present', arguments: { files }, agent: owner,
-  })
+  const execute = async (files: unknown) => (await ctx.tools.execute({
+    calls: [{
+      type: 'tool-call' as const, id: ToolCallId(`call-${++callNumber}`),
+      name: 'present', arguments: JSON.stringify({ files }),
+    }],
+    signal: new AbortController().signal, agent: owner,
+  })).results[0]!.result
   return { ctx, owner, root, fiber, execute }
 }
 
@@ -157,13 +162,19 @@ it('validates deployment limits before registering the tool', () => {
 
 it('requires an agent, an open turn, and a workspace', async () => {
   const { ctx, owner, execute } = await setup()
-  const detached = await ctx.tools.execute({ signal: new AbortController().signal, callId: ToolCallId('detached'), name: 'present', arguments: { files: [{ path: 'a' }] } })
+  const detached = (await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: ToolCallId('detached'), name: 'present', arguments: JSON.stringify({ files: [{ path: 'a' }] }) }],
+    signal: new AbortController().signal,
+  })).results[0]!.result
   expect(detached.isError).toBe(true)
   owner.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
   expect((await execute([{ path: 'a' }])).isError).toBe(true)
   const noWorkspace = await agent(ctx, undefined)
   noWorkspace.session.append('turn/start', { turn: 1 })
-  const absent = await ctx.tools.execute({ signal: new AbortController().signal, callId: ToolCallId('no-workspace'), name: 'present', arguments: { files: [{ path: 'a' }] }, agent: noWorkspace })
+  const absent = (await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: ToolCallId('no-workspace'), name: 'present', arguments: JSON.stringify({ files: [{ path: 'a' }] }) }],
+    signal: new AbortController().signal, agent: noWorkspace,
+  })).results[0]!.result
   expect(absent.isError).toBe(true)
 })
 

@@ -127,6 +127,7 @@ const planUnitStateSchema: ZodType<PlanUnitState> = zod.object({
     wanted: zod.boolean(),
   }).strict().nullable(),
   activeAtLastHeader: zod.boolean().nullable(),
+  entered: zod.boolean(),
 }).strict()
 
 /** Wire payload schema of the `plan` projection. */
@@ -140,7 +141,7 @@ export const planProjectionDefinition = {
   key: 'plan',
   stateVersion: 4,
   stateSchema: planUnitStateSchema,
-  init: () => ({ active: false, wanted: null, running: null, activeAtLastHeader: null }),
+  init: () => ({ active: false, wanted: null, running: null, activeAtLastHeader: null, entered: false }),
   apply: (state, event) => {
     if (event.type === 'command/run' && event.data.name === 'plan') {
       if (event.data.args === undefined) return state
@@ -148,14 +149,13 @@ export const planProjectionDefinition = {
       return { ...state, running: { commandId: event.data.commandId, wanted } }
     }
     if (event.type === 'command/done' && event.data.commandId === state.running?.commandId) {
-      if (event.data.kind === 'error') return { ...state, running: null }
-      const wanted = state.running.wanted !== state.active
+      const wanted = event.data.kind === 'success' && state.running.wanted !== state.active
         ? state.running.wanted
         : null
       return { ...state, wanted, running: null }
     }
     if (event.type === 'plan/mode') {
-      return { ...state, active: event.data.active, wanted: null }
+      return { ...state, active: event.data.active, wanted: null, entered: state.entered || event.data.active }
     }
     if (event.type === 'request/header') {
       return { ...state, activeAtLastHeader: state.active }
@@ -222,8 +222,7 @@ export class PlanModeController extends Service {
       order: ctx.systemPrompt.getSectionOrder('PLAN_POLICY'),
       text: (context) => {
         if (context.agent === undefined) return ''
-        const pending = this.pendingIntents.get(context.agent.session)
-        return (pending?.active ?? this.loggedActive(context.agent.session)) ? this.section : ''
+        return this.selectedActive(context.agent.session) ? this.section : ''
       },
     })
 
@@ -393,11 +392,16 @@ export class PlanModeController extends Service {
         title: 'Plan review',
         content: result.content,
       }),
-    }))
+    }), { when: ({ agent }) => this.selectedActive(agent.session) || this.planState(agent.session).entered })
   }
 
   private loggedActive(session: Session): boolean {
     return this.planState(session).active
+  }
+
+  /** The state a proposed step presents: a pending selection, else the logged state. */
+  private selectedActive(session: Session): boolean {
+    return this.pendingIntents.get(session)?.active ?? this.loggedActive(session)
   }
 
   private hasOpenTurn(session: Session): boolean {

@@ -273,7 +273,7 @@ describe('session title repair on entry', () => {
     await ctx.plugin(SessionTitleService, CONFIG)
     const seed = Session.create(SessionId('legacy-log'))
     seed.append('user/message', createUserMessage({
-      content: [{ type: 'text', text: 'Current runtime context. This snapshot supersedes earlier runtime-context snapshots.' }],
+      content: [{ type: 'text', text: 'The following information describes your current session:' }],
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     seed.append('user/message', createUserMessage({

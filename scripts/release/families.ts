@@ -224,7 +224,10 @@ export abstract class ReleaseFamily {
       onStack.add(member.name)
       for (const dependency of edges(member, INSTALL_SECTIONS)) visit(dependency)
       for (const peer of edges(member, PEER_SECTIONS)) {
-        if (installClosure(peer).has(member.name)) {
+        // A peer that transitively installs anything still on the stack cannot
+        // publish first: placing it now emits it before its own install target.
+        // The peer edge is droppable, the install edge is not.
+        if ([...installClosure(peer)].some(name => onStack.has(name))) {
           droppedPeerEdges.push({ consumer: member.name, peer: peer.name })
           continue
         }
@@ -272,10 +275,18 @@ export abstract class ReleaseFamily {
     sections: readonly string[],
   ): ReleaseMember[] {
     const edges: ReleaseMember[] = []
+    const optionalPeers = member.manifest['peerDependenciesMeta']
     for (const section of sections) {
       const dependencies = member.manifest[section]
       if (dependencies === null || typeof dependencies !== 'object' || Array.isArray(dependencies)) continue
       for (const name of Object.keys(dependencies)) {
+        // An optional peer orders nothing: the package publishes and installs
+        // correctly without it, so honouring the edge can only deadlock.
+        if (section === 'peerDependencies'
+          && optionalPeers !== null
+          && typeof optionalPeers === 'object'
+          && !Array.isArray(optionalPeers)
+          && (optionalPeers as Record<string, { optional?: boolean }>)[name]?.optional === true) continue
         const dependency = byName.get(name)
         if (dependency !== undefined && dependency.name !== member.name) edges.push(dependency)
       }

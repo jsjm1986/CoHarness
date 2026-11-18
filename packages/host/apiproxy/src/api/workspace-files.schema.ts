@@ -1,7 +1,7 @@
 /** Wire schemas for the read-only Workspace file RPCs. */
 
 import { z } from 'zod'
-import type { OfficeToPdfGeneration } from '@deepseek-ai/dsh-office-to-pdf/types'
+import type { OfficeKitGeneration } from '@deepseek-ai/dsh-office-kit/types'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
 import type {
@@ -87,7 +87,7 @@ export const workspaceFilesRenderOfficeRequestSchema = z.object({
 }) satisfies z.ZodType<Wire<RequestPayload<'workspaceFiles.renderOffice'>>>
 
 /** Converter generation admitted after non-empty string validation. */
-const officeGenerationSchema = z.string().min(1) as unknown as z.ZodType<OfficeToPdfGeneration>
+const officeGenerationSchema = z.string().min(1) as unknown as z.ZodType<OfficeKitGeneration>
 
 /** Complete PDF with no Host path or engine diagnostics. */
 export const workspaceFilesRenderOfficeValueSchema = z.object({

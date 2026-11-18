@@ -36,8 +36,11 @@ function consumerEnvironment(consumerRoot: string): NodeJS.ProcessEnv {
   const environment = { ...process.env }
   delete environment.npm_config_user_agent
   delete environment.NPM_CONFIG_USER_AGENT
-  delete environment.NODE_OPTIONS
   delete environment.NODE_PATH
+  // A deterministic bound, not an inherited dev flag: installs of the full
+  // workspace pack exceed Node's default ~4 GiB heap on CI runners.
+  environment.NODE_OPTIONS = '--max-old-space-size=12288'
+
   environment.DSH_HOME = resolve(consumerRoot, '.dsh')
   environment.DSH_AGENTS_HOME = resolve(consumerRoot, '.agents')
   environment.DSH_TELEMETRY_DISABLED = '1'

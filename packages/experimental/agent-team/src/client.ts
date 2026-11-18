@@ -1,13 +1,12 @@
-/** Client-safe Agent Teams request, result, and view vocabulary. */
+/** Client-safe Agent Teams request and view vocabulary. */
 
 export type {
   CreateTeamTaskRequest,
-  TeamMemberView,
+  TeamProjection,
   TeamTaskAction,
   TeamTaskId,
-  TeamTaskMutationResult,
+  TeamTaskSnapshot,
   TeamTaskStatus,
   TeamTaskView,
-  TeamView,
   UpdateTeamTaskRequest,
 } from './types.ts'

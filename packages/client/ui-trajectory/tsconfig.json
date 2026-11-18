@@ -9,22 +9,10 @@
   ],
   "references": [
     {
-      "path": "../locale"
-    },
-    {
-      "path": "../runtime"
-    },
-    {
-      "path": "../ui-conversation"
+      "path": "../../../vendor/cordis"
     },
     {
       "path": "../../attachment/attachment"
-    },
-    {
-      "path": "../ui-primitives"
-    },
-    {
-      "path": "../ui-slots"
     },
     {
       "path": "../../compaction/compaction"
@@ -36,13 +24,28 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../core/tool-executor-ptc"
+    },
+    {
       "path": "../../core/tools"
     },
     {
       "path": "../../llm/llm"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../locale"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../ui-conversation"
+    },
+    {
+      "path": "../ui-primitives"
+    },
+    {
+      "path": "../ui-slots"
     }
   ]
 }

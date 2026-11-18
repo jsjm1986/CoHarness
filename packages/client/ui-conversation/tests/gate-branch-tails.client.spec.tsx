@@ -133,6 +133,7 @@ describe('render branch tails', () => {
         useSessions={bindSnapshotSelector(emptyList)}
         useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
         usePanelInfo={(() => { throw new Error('unused') })}
+        useRemoteAccess={() => true}
         useProjection={(() => undefined)}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
@@ -198,6 +199,7 @@ describe('render branch tails', () => {
         useSessions={bindSnapshotSelector(emptyList)}
         useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
         usePanelInfo={(() => { throw new Error('unused') })}
+        useRemoteAccess={() => true}
         useProjection={(() => undefined)}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{

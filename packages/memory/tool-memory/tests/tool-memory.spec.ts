@@ -5,6 +5,8 @@ import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
 import SessionStore from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { MemorySwitches } from '@deepseek-ai/dsh-memory'
@@ -30,13 +32,14 @@ async function harness(options: {
   })
   await h.ctx.plugin(SystemPrompt)
   await h.ctx.plugin(ToolRuntime)
+  await h.ctx.plugin(NativeToolExecutor)
   const fiber = await h.ctx.plugin(ToolMemory)
   return { ...h, fiber }
 }
 
 /** Execute a memory tool through the real ToolRuntime pipeline. */
 async function call(ctx: Context, name: string, args: Record<string, unknown>, agent: Agent) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal,
     callId: ToolCallId(`call-${++callCounter}`),
     name,
@@ -280,7 +283,7 @@ describe('dsh-tool-memory', () => {
   })
   it('throws the fixed wiring error when no agent stands behind a call', async () => {
     const h = await harness()
-    const result = await h.ctx.tools.execute({
+    const result = await executeToolFixture(h.ctx, {
       signal,
       callId: ToolCallId(`call-${++callCounter}`),
       name: 'memory_read',
@@ -416,6 +419,7 @@ describe('dsh-tool-memory', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     const base = {
       space: 'personal' as const,
       limits: { entryMaxBytes: 100, summaryMaxChars: 20, maxEntriesPerScope: 10, searchMaxResults: 5 },

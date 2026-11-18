@@ -9,40 +9,16 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
       "path": "../../attachment/userdoc"
-    },
-    {
-      "path": "../connection/tsconfig.client.json"
-    },
-    {
-      "path": "../locale"
-    },
-    {
-      "path": "../runtime"
-    },
-    {
-      "path": "../shortcuts/tsconfig.client.json"
-    },
-    {
-      "path": "../ui-input-trigger"
-    },
-    {
-      "path": "../ui-layout"
-    },
-    {
-      "path": "../ui-primitives"
-    },
-    {
-      "path": "../ui-settings"
-    },
-    {
-      "path": "../ui-slots"
-    },
-    {
-      "path": "../userdoc-upload"
     },
     {
       "path": "../../compaction/compaction"
@@ -52,6 +28,9 @@
     },
     {
       "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tool-executor-ptc"
     },
     {
       "path": "../../core/tools"
@@ -99,10 +78,34 @@
       "path": "../../util/workspace-path"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../connection/tsconfig.client.json"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../locale"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../shortcuts/tsconfig.client.json"
+    },
+    {
+      "path": "../ui-input-trigger"
+    },
+    {
+      "path": "../ui-layout"
+    },
+    {
+      "path": "../ui-primitives"
+    },
+    {
+      "path": "../ui-settings"
+    },
+    {
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../userdoc-upload"
     }
   ],
   "exclude": [

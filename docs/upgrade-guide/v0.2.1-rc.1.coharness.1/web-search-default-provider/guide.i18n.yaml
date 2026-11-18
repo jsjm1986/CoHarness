@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/web-search-default-provider/guide.md
+document:
+  en: bff94fb26d8a55e2c01773d9d04afbfd44bb3949
+  zh: cd0d507a81ed4514a60ace5a5cf95b82e5fb79df
+/:
+  en: ab04b0ee3e62de89
+  zh: ff77dc42764311f1
+/default-web-search-provider-is-now-deepseek-search-api:
+  en: 1bed3871e04d4e19
+  zh: f646bb9e115d6267
+/default-web-search-provider-is-now-deepseek-search-api/change:
+  en: 2b7ffb9e3924577f
+  zh: bf115112c5f5f9bb
+/default-web-search-provider-is-now-deepseek-search-api/migration:
+  en: b58138e1f5ac065e
+  zh: e069f2a46beb2bad

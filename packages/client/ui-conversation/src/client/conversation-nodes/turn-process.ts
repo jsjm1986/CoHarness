@@ -5,7 +5,7 @@ import type {
 import { toAssistantBlocks } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
-import type {} from '@deepseek-ai/dsh-tools/types'
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc/client'
 import { hasAssistantReplyContent } from '../contract/assistant-content.ts'
 import type {
   AssistantChatData, ChatNode, FinalAssistantChatData, TurnProcessChatData,

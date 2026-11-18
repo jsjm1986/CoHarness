@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../core/tool-executor-ptc"
+    },
+    {
       "path": "../../client/runtime"
     },
     {

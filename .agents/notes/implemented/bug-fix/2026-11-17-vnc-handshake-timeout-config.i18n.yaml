@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-17-vnc-handshake-timeout-config.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-vnc-handshake-timeout-config.md
+document:
+  en: 6275d598755d46c92891e125b09565a48c01d010
+  zh: ea0a70e6fc6426ade5188fed7c8416a4f112ce03
+/agent-note-vnc-managed-handshake-budget-moves-to-config-so-tests-can-extend-it:
+  en: d3f488837da0b85e
+  zh: ec5fa1f37347f6e4
+/agent-note-vnc-managed-handshake-budget-moves-to-config-so-tests-can-extend-it/problem:
+  en: c4513c2326c1e745
+  zh: 09986e14f268f491
+/agent-note-vnc-managed-handshake-budget-moves-to-config-so-tests-can-extend-it/decision:
+  en: ffd95e3d8a079975
+  zh: 1acaac32b4b988e2
+/agent-note-vnc-managed-handshake-budget-moves-to-config-so-tests-can-extend-it/consequences:
+  en: 17df8e150fd47ddc
+  zh: 91769f1293760502
+/agent-note-vnc-managed-handshake-budget-moves-to-config-so-tests-can-extend-it/alternatives-considered:
+  en: 048a4c8ccccf41bb
+  zh: c97e4ed8fa960896
+/agent-note-vnc-managed-handshake-budget-moves-to-config-so-tests-can-extend-it/verification:
+  en: fe4a9b4f76ccad0e
+  zh: 462f11107643de29

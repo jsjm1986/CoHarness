@@ -9,9 +9,6 @@
   ],
   "references": [
     {
-      "path": "../tools"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -19,6 +16,15 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../tool-executor-native"
+    },
+    {
+      "path": "../tool-executor-ptc"
+    },
+    {
+      "path": "../tools"
     }
   ]
 }

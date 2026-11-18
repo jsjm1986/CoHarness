@@ -4,7 +4,8 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ToolCallId, HarnessError } from '@deepseek-ai/dsh-llm'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
+import ToolRuntime, { type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { DOCUMENT_NOT_FOUND_CODE, DOCUMENT_READ_FAILED_CODE, UserDocError, UserDocId, type UserDocRef, type UserDocStore } from '@deepseek-ai/dsh-userdoc'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import * as ToolUserDoc from '@deepseek-ai/dsh-tool-userdoc'
@@ -95,20 +96,25 @@ async function setup(store = fakeStore()): Promise<{ ctx: Context; agent: Agent 
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   ctx.provide('userDocs', store as never)
   await ctx.plugin(ToolUserDoc, LIMITS)
   return { ctx, agent: fakeAgent(ctx) }
 }
 
 let calls = 0
-function call(ctx: Context, agent: Agent, name: string, args: unknown) {
-  return ctx.tools.execute({
+async function call(ctx: Context, agent: Agent, name: string, args: unknown): Promise<ToolExecutionResult> {
+  const batch = await ctx.tools.execute({
+    calls: [{
+      type: 'tool-call',
+      id: ToolCallId(`userdoc-call-${String(++calls)}`),
+      name,
+      arguments: JSON.stringify(args),
+    }],
     signal: new AbortController().signal,
-    callId: ToolCallId(`userdoc-call-${String(++calls)}`),
-    name,
-    arguments: args,
     agent,
   })
+  return batch.results[0]!.result
 }
 
 function text(result: { readonly content: readonly { readonly type: string; readonly text?: string }[] }): string {
@@ -129,6 +135,7 @@ describe('personal user-document tool registration', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     ctx.provide('userDocs', fakeStore() as never)
     const fiber = await ctx.plugin(ToolUserDoc, LIMITS)
     expect(ctx.tools.schemas()).toHaveLength(2)
@@ -226,12 +233,15 @@ describe('userdoc_list', () => {
 
   it('requires an owning agent and refuses project runtimes', async () => {
     const { ctx } = await setup()
-    const noAgent = await ctx.tools.execute({
+    const noAgent = (await ctx.tools.execute({
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('userdoc-no-agent'),
+        name: 'userdoc_list',
+        arguments: '{}',
+      }],
       signal: new AbortController().signal,
-      callId: ToolCallId('userdoc-no-agent'),
-      name: 'userdoc_list',
-      arguments: {},
-    })
+    })).results[0]!.result
     expect(noAgent.isError).toBe(true)
     if (noAgent.isError) expect(noAgent.error.info).toMatchObject({ code: USERDOC_TOOL_NO_AGENT_CODE })
     ctx.provide('gatewayRuntime', { identity: { kind: 'project' } } as never)

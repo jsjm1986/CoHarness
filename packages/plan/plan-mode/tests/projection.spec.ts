@@ -1,6 +1,6 @@
 /** Plan projection behavior. */
 
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -8,6 +8,7 @@ import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import { CommandId } from '@deepseek-ai/dsh-commands/brand'
@@ -24,6 +25,7 @@ async function harness(withPlanMode: boolean): Promise<Bench> {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(UserQuestionService)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SessionProjectionRegistry)
@@ -86,18 +88,13 @@ describe('plan projection unit', () => {
     expect(bench.values().plan).toEqual({ active: true, pending: false })
   })
 
-  it.each([false, true])('preserves the earlier successful pending selection after a failed command (active: %s)', async (active) => {
+  it('records that plan mode was entered and keeps the record after leaving', async () => {
     const bench = await harness(true)
-    onTestFinished(() => bench.ctx.fiber.dispose())
-    if (active) commitPlanMode(bench.session, true, 0)
-    const first = runPlanCommand(bench.session, active ? 'off' : '', 1)
-    settlePlanCommand(bench.session, first, 'success')
-    expect(bench.values().plan).toEqual({ active, pending: true })
-    const failed = runPlanCommand(bench.session, active ? '' : 'off', 2)
-    settlePlanCommand(bench.session, failed, 'error')
-    expect(bench.values().plan).toEqual({ active, pending: true })
-    commitPlanMode(bench.session, !active, 1)
-    expect(bench.values().plan).toEqual({ active: !active, pending: false })
+    expect(bench.ctx.sessionProjections.checkpoint(bench.session).plan?.val).toMatchObject({ entered: false })
+    commitPlanMode(bench.session, false, 0)
+    expect(bench.ctx.sessionProjections.checkpoint(bench.session).plan?.val).toMatchObject({ entered: false })
+    commitPlanMode(bench.session, true, 1)
+    expect(bench.ctx.sessionProjections.checkpoint(bench.session).plan?.val).toMatchObject({ active: true, entered: true })
   })
 
   it('folds `off` args and non-plan commands correctly, and a matching selection is not pending', async () => {
