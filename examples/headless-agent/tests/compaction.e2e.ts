@@ -56,6 +56,27 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
       maxTokens: 512,
     }, { cwd: workdir })
 
+    // Two text-dense turns first: assistant prose prices at the full route
+    // rate, so the shadowable span grows large enough for a real summary to
+    // shrink beneath it. Tool output carries heuristic pressure but prices
+    // cheaply on the route, so file reads alone leave the span too small.
+    agent.followup(createUserMessage({
+      content: [{
+        type: 'text',
+        text: 'Write a detailed technical essay explaining process scheduling: '
+        + 'cover FCFS, shortest-job-first, round-robin, priority, and multilevel '
+        + 'feedback queues — mechanics, strengths, and weaknesses of each.',
+      }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+    agent.followup(createUserMessage({
+      content: [{
+        type: 'text',
+        text: 'Write a second detailed essay explaining virtual memory: paging '
+        + 'vs segmentation, TLBs, page faults, and replacement algorithms like '
+        + 'LRU and clock — with the same depth.',
+      }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
     agent.followup(createUserMessage({
       content: [{
         type: 'text',
@@ -93,5 +114,5 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
     const answer = finalText(events).toLowerCase()
     expect(answer.length).toBeGreaterThan(0)
     expect(answer).toMatch(/\b(4|four)\b/)
-  }, 240_000)
+  }, 300_000)
 })
