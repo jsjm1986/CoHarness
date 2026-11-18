@@ -190,6 +190,7 @@ function mount(
     useSessions: select => select(sessions),
     useWorkspaces: select => select(workspaces),
     usePanelInfo: select => select({ activePanelId: null }),
+    useRemoteAccess: () => true,
     onDelete: vi.fn<TaskManagerPageProps['onDelete']>(async () => 'deleted'),
     onRetry: vi.fn(async () => {}),
     onNewTask: vi.fn(),
@@ -1613,6 +1614,7 @@ describe('Task manager details', () => {
       size={size}
       active={false}
       usePanelInfo={unread}
+      useRemoteAccess={() => true}
       useSessions={unread}
       useWorkspaces={unread}
     />)

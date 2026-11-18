@@ -39,7 +39,16 @@
       "path": "../../sandbox/sandbox-policy"
     },
     {
+      "path": "../../session/working-directory"
+    },
+    {
       "path": "../../util/code-language"
+    },
+    {
+      "path": "../fs-patch"
+    },
+    {
+      "path": "../../util/values"
     },
     {
       "path": "../fs"

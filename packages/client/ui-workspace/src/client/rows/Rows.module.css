@@ -266,6 +266,20 @@
   color: var(--dsw-alias-label-caption);
 }
 
+/* Resting trailing cell: time label, `sidebar.session.row.trailing` icons,
+   and the pin marker in one hover-hidden group. */
+.rowResting {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.rowResting .pinIndicator {
+  margin-left: 0;
+}
+
 .dot {
   flex: none;
 }
@@ -286,16 +300,20 @@
   display: inline-flex;
 }
 
-.sessionRow:hover .time,
-.sessionRow.menuOpen .time {
+/* Hover swaps the resting cell to the action buttons, which already carry
+   the pin glyph — hide time, trailing icons, and the static marker so they
+   do not double. */
+.sessionRow:hover .rowResting,
+.sessionRow.menuOpen .rowResting,
+:global(html[data-input-modality='keyboard']) .sessionRow:focus-within .rowResting {
   display: none;
 }
 
-/* Hover swaps the trailing cell to the action buttons, which already carry
-   the pin glyph — hide the static marker so they do not double. */
-.sessionRow:hover .pinIndicator,
-.sessionRow.menuOpen .pinIndicator {
-  display: none;
+@media (hover: none) {
+  /* Only update timestamps disappear; pending-interaction labels remain visible. */
+  .sessionRow .timestamp {
+    display: none;
+  }
 }
 
 /* Slot-contributed quick buttons join .rowActions' flex as if unwrapped. */

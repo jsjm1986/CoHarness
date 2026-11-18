@@ -11,7 +11,7 @@ import css from './Tooltip.module.css'
 import { pointerModality } from './input-modality.ts'
 
 /** Bubble placement relative to the anchor. */
-export type TooltipSide = 'right' | 'bottom' | 'top'
+export type TooltipSide = 'right' | 'left' | 'bottom' | 'top'
 
 /**
  * Suppression channel for enclosing tooltip and hover-card anchors: a visible
@@ -80,7 +80,7 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
     : typeof label === 'function' ? label() : label
   const y = pos === null
     ? 0
-    : side === 'right'
+    : side === 'right' || side === 'left'
       ? pos.top + (pos.bottom - pos.top) / 2
       : side === 'top' ? pos.top - gap : pos.bottom + gap
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -116,14 +116,15 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
       const minY = (hostRect?.top ?? 0) + edgeMargin
       const maxY = (hostRect?.bottom ?? window.innerHeight) - edgeMargin
       if (placement === 'right' && pos.x + width > maxX) placement = 'bottom'
-      const offset = placement === 'right' ? 0 : align === 'end' ? width : width / 2
+      else if (placement === 'left' && pos.x - width < minX) placement = 'right'
+      const offset = placement === 'right' ? 0 : placement === 'left' || align === 'end' ? width : width / 2
       const left = Math.max(minX, Math.min(pos.x - offset, maxX - width))
       const fitsBelow = pos.bottom + gap + height <= maxY
       const fitsAbove = pos.top - gap - height >= minY
       if (placement === 'bottom' && !fitsBelow && fitsAbove) placement = 'top'
       else if (placement === 'top' && !fitsAbove && fitsBelow) placement = 'bottom'
       el.style.left = `${left + offset}px`
-      el.style.top = `${placement === 'right' ? (pos.top + pos.bottom) / 2
+      el.style.top = `${placement === 'right' || placement === 'left' ? (pos.top + pos.bottom) / 2
         : placement === 'top' ? pos.top - gap : pos.bottom + gap}px`
       el.dataset.side = placement
       el.style.visibility = 'visible'
@@ -168,7 +169,7 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
     if (el === null) return
     const r = el.getBoundingClientRect()
     setPos({
-      x: side === 'right' ? r.right + 10 : align === 'end' ? r.right : r.left + r.width / 2,
+      x: side === 'right' ? r.right + 10 : side === 'left' ? r.left - 10 : align === 'end' ? r.right : r.left + r.width / 2,
       top: r.top,
       bottom: r.bottom,
     })

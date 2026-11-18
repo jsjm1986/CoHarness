@@ -37,7 +37,7 @@ function toolData(isError: boolean) {
 }
 
 function appendEvent(session: Session, event: SessionEvent) {
-  const append = session.append.bind(session) as (
+  const append = session.append.bind(session) as unknown as (
     type: SessionEvent['type'], data: unknown, metadata?: unknown,
   ) => SessionEvent
   const metadata: { surfaceOp?: unknown; sourceEventSeqs?: unknown } = event

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-14-upstream-context-llm-mcp-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-14-upstream-context-llm-mcp-sync.md
+document:
+  en: 3b2194a7fccbe31dd2c9afdc3524b2aade964abe
+  zh: 08d32f2c7f01d6dc1fef36b5cf8a99038032aaf4
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3:
+  en: 842c73d6543f9380
+  zh: 97e1f28aa2c919b0
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/problem:
+  en: 60c40e23bb5bc3b0
+  zh: 498d089e1b044d08
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/decision:
+  en: 98fdeaa4c07c363f
+  zh: 48826355eba53bf9
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/consequences:
+  en: 1241b4cbd3045a0d
+  zh: bc16a6c1cefc6b77
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/alternatives-considered:
+  en: 2f728fd89913832f
+  zh: e7e0a51ed8734875
+/agent-note-upstream-context-llm-and-mcp-fixes-from-v0-2-2-rc-3/verification:
+  en: 2343dee723ef68b6
+  zh: cb3f30b7a6e68059

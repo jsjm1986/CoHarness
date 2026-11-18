@@ -51,6 +51,10 @@ Stdout 只承载 JSON-RPC 帧。部署不得组合 stdout logger；诊断应写�
 
 `initialize` 是运行时就绪边界：服务器由 Loader 组合挂载时，会等待当前插件树完成所有加载任务后再响应，因此首次提示词能够看到 MCP 初始工具发现等异步同级能力。没有 Loader 的手工组装上下文仍可立即使用。`initialize.serverInfo.name` 的协议稳定值为 `deepseek-harness-sdk-runtime`。可选的正整数 `initialize.maxTokens` 会成为每个 SDK 创建的 agent 及其进程内后代的请求输出上限；非法值会使初始化失败，省略时则不发送 SDK 上限，并应用所选适配器或提供方路由的默认值。`session/prompt` 将一条带标识的用户消息排入队列，并立即返回 `{ messageId }`。服务器将每个持久事实作为 `session.event` 流式发出，并将整个 agent 生命周期的每次状态转换作为 `session.status` 发出；它不会把某条助手消息或 `turn/end` 归属于该提示词。同一会话上的独立请求可以继续排入更多工作。持久化根目录和 persona 由 `cordis.yml` 提供。
 
+`session/query` 路由单个输入：先校验内容块再创建会话；若首个文本块以受支持的命令定义开头（按定义 id 匹配而非显示名），经 `dsh-commands` 原生执行，其余输入则按普通提示词入队。命令执行返回 `{ kind: 'command', execution }`，发出 `command/run`/`command/done` 会话事件，并在 `session.query.completed` 处结束该查询；提示词返回 `{ kind: 'prompt', messageId }`。未识别的斜杠文本按字面提示词保留；参数空白原样保留，包括 Unicode 分隔符；识别到命令后混入非图片内容会直接拒绝而不执行；原生受理遵循各定义的图片附件规则。
+
+两条 opt-in 的服务器到客户端流程桥接运行时的交互能力：`initialize.approvalRequests` 把 `approval/request` 调用转发给客户端，并在拒绝或传输丢失时按拒绝关闭审批；`capabilities.userQuestions` 仅为 SDK 直接创建的 agent 转发 `user-question/ask` 批次，提问方撤回时发出 `user-question.cancelled`。两者对组合中无关的 agent 均不生效。
+
 `session/resume` 在初始化后接受持久化的 `{ sessionId }`，待其 Agent 就绪后返回 `{}`。它通过 `agents.resume()` 加载历史、修复最后一个被中断的轮次，并保留存储的起始目录和当前有效目录，同时应用初始化时选定的模型路由。它不发送新输入。会话缺失、不可读、不兼容或被占用时，请求失败且不创建替代会话；已经持有或仍在打开的 id 视为被占用。对正在恢复的标识发送提示词时，会等待恢复完成；shutdown 会等待进行中的恢复并释放其 Agent。历史事件保留在日志中，不会作为新通知重新发送。
 
 `session/wait` 观察已有 SDK 会话，直到受管理后代及其触发的根 Agent 后续轮次完成。它拒绝未知或已释放的根 Agent，不会创建会话，并在后代检查期间根 Agent 持续空闲后响应。收件箱消息处于停放状态的空闲子级继续驻留，但不延迟此响应；后续唤醒输入可使其继续运行。完成前发出的会话通知在 stdio 传输上先于响应到达。Agent 的运行时错误会保留在对应的确切会话中，直到后续提交的 `turn/end` 记录结果；否则等待请求会失败，即使错误发生在等待请求之前。终止事件已经记录的错误仍通过会话事件表达，后续成功的活动会清除较早的运行时错误。

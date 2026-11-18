@@ -7,6 +7,8 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import LlmRuntime, { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import UserQuestionService, { type AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
 import { expect, it, onTestFinished } from 'vitest'
@@ -20,6 +22,7 @@ it.each(['cancelled', 'disposed', 'replaced', 'registry-withdrawn'] as const)('k
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   const registry = await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(PlanModeController, { section: 'Review the plan before implementation.' })
@@ -41,7 +44,7 @@ it.each(['cancelled', 'disposed', 'replaced', 'registry-withdrawn'] as const)('k
   ctx.on('user-questions/request', async () => ({ answers: [{ id: 'plan-review', selected: ['Approve'] }] }))
   ctx.planMode.set(handle.agent, true)
   try {
-    const result = await ctx.tools.execute({ callId: ToolCallId('review-owner'), name: EXIT_PLAN_MODE,
+    const result = await executeToolFixture(ctx, { callId: ToolCallId('review-owner'), name: EXIT_PLAN_MODE,
       arguments: { plan: '# Approved plan\n\nImplement the approved task.' }, agent: handle.agent, signal: controller.signal })
     await setImmediate()
     expect(ctx.planMode.get(handle.agent)).toEqual({ active: true })

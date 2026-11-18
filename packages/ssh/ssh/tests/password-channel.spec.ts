@@ -51,7 +51,7 @@ function harness(config: Record<string, unknown>) {
   const helper = new SshRpcPeer(child.stdin, child.stdout, 4096, 8, async (method) => {
     if (method !== 'hello') throw new Error(`unexpected helper operation: ${method}`)
     return {
-      protocol: 2, hash: 'a'.repeat(64), platform: 'linux', nodeVersion: 'v24.19.0',
+      protocol: 3, hash: 'a'.repeat(64), platform: 'linux', nodeVersion: 'v24.19.0',
       kind: 'node-script', executable: '/usr/bin/node', root: '/tmp/remote-helper', workspace: '/workspace',
     }
   })

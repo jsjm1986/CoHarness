@@ -1659,9 +1659,9 @@ describe('SessionStore', () => {
 
     await fiber.dispose()
     expect(ctx.sessions.get(SessionId('scoped'))).toBeUndefined()
-    session.append('user/message', createUserMessage({
+    expect(() => session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'late' }], source: { kind: 'user' },
-    }), { surfaceOp: 'append' })
+    }), { surfaceOp: 'append' })).toThrow('cannot append outside a SessionStore')
     expect(observed).toBe(0)
   })
 

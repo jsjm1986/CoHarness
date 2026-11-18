@@ -88,8 +88,11 @@ export async function apply(ctx) {
       const args = mode === 'workflow'
         ? { script: "return await agent('owned child')", meta: { name: 'foreground-recovery', description: 'Preserve child cleanup ownership.' } }
         : { objective: 'Complete one bounded independent task.', maxRounds: 1 }
-      const execute = () => ctx.tools.execute({ name: mode, callId: ToolCallId(`foreground-call-${runIds.length + 1}`),
-        signal: new AbortController().signal, agent: parent, arguments: args })
+      const execute = () => ctx.tools.execute({
+        calls: [{ type: 'tool-call', id: ToolCallId(`foreground-call-${runIds.length + 1}`), name: mode,
+          arguments: JSON.stringify(args) }],
+        signal: new AbortController().signal, agent: parent,
+      }).then(batch => batch.results[0].result)
       const originalEnds = () => mode === 'ralph' ? null : parent.session.snapshotEvents()
         .filter(event => event.type === 'tool-workflow/run-end' && event.data.runId === runIds[0]).length
       try {

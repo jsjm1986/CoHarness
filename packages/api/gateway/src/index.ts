@@ -4,33 +4,96 @@
  * @module @deepseek-ai/dsh-api-gateway
  */
 
+import { randomUUID } from 'node:crypto'
 import { Context, Service, symbols } from '@deepseek-ai/cordis'
 import { createRpcStreamHttpHandler, RPC_STREAM_PATH } from '@deepseek-ai/dsh-client-connection'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
+import { Deque } from '@deepseek-ai/dsh-deque'
+import type {} from '@deepseek-ai/dsh-api-remote-access'
 import { registerMediaReferences } from './media-references.ts'
+import { eventResources } from './access.ts'
 import {
+  isRemoteJsonValue,
   RemoteError,
   remoteErrorOf,
   remoteMethods,
   TypertLookupFailure,
   type InvocationDescriptor,
   type InvocationParameterDescriptor,
+  type PeerScope,
+  type Principal,
+  type RemoteAccessResource,
   type TypertCodec,
   type TypertGatewayBinding,
 } from '@deepseek-ai/dsh-typert-protocol'
+import {
+  isRemoteEventAgentId,
+  parseRemoteEventResult,
+  projectRemoteEventRequest,
+  REMOTE_EVENT_RESULT_ENDPOINT,
+  REMOTE_EVENT_STREAM_ENDPOINT,
+  REMOTE_EVENT_STREAM_READY,
+  restoreRemoteEventRejection,
+  type RemoteEventCancellationFrame,
+  type RemoteEventClientId,
+  type RemoteEventEmitFrame,
+  type RemoteEventHostInfo,
+  type RemoteEventId,
+  type RemoteEventInvocationFrame,
+  type RemoteEventReadyFrame,
+} from './remote-event-protocol.ts'
 import type {
   InvokeRemoteRequest,
+  PendingRemoteEventInfo,
   TypertGateway,
   TypertGatewayAuthorizationRequest,
   TypertGatewayErrorCode,
+  TypertRemoteEventDispatch,
+  TypertRemoteEventFrame,
+  TypertRemoteEventInvocation,
+  TypertRemoteEventOutcome,
+  TypertRemoteEventSource,
 } from './types.ts'
 
 export type { TypertGatewayFaultDetails } from './remote-error-codes.ts'
 export type {
+  RemoteEventAgentId,
+  RemoteEventCancellationFrame,
+  RemoteEventClientId,
+  RemoteEventDownlinkFrame,
+  RemoteEventEmitFrame,
+  RemoteEventHostInfo,
+  RemoteEventId,
+  RemoteEventInvocationFrame,
+  RemoteEventReadyFrame,
+  RemoteEventRejection,
+  RemoteEventResult,
+} from './remote-event-protocol.ts'
+export {
+  isRemoteEventAgentId,
+  isRemoteEventClientId,
+  isRemoteEventId,
+  parseRemoteEventResult,
+  projectRemoteEventRejection,
+  projectRemoteEventRequest,
+  REMOTE_EVENT_RESULT_ENDPOINT,
+  REMOTE_EVENT_STREAM_ENDPOINT,
+  REMOTE_EVENT_STREAM_PAYLOAD,
+  REMOTE_EVENT_STREAM_READY,
+  restoreRemoteEventRejection,
+} from './remote-event-protocol.ts'
+export type {
   InvokeRemoteRequest,
+  PendingRemoteEventInfo,
   TypertGateway,
   TypertGatewayAuthorizationRequest,
   TypertGatewayErrorCode,
+  TypertRemoteEventContext,
+  TypertRemoteEventDispatch,
+  TypertRemoteEventFrame,
+  TypertRemoteEventInvocation,
+  TypertRemoteEventOutcome,
+  TypertRemoteEventSource,
 } from './types.ts'
 
 interface GatewayErrorOptions {
@@ -42,6 +105,38 @@ interface ResolvedBinding {
   readonly binding: TypertGatewayBinding
   readonly original: object
 }
+
+interface RegisteredRemoteEventSource {
+  readonly lifetime: AbortController
+  readonly done: Promise<void>
+  readonly host: RemoteEventHostInfo
+}
+
+interface RemoteEventClient {
+  readonly peer: PeerScope
+  readonly id: RemoteEventClientId
+  readonly queue: RemoteEventQueue
+  readonly signal: AbortSignal
+  readonly deliveries: Map<RemoteEventId, PendingRemoteEvent>
+  /** The stream's Peer principal: only the owner answers scoped waterfalls and receives every broadcast. */
+  readonly principal: Principal
+  /** Only owner streams receive scoped waterfalls they could answer; other Peers receive admitted broadcasts only. */
+  readonly answers: boolean
+}
+
+interface PendingRemoteEvent {
+  readonly id: RemoteEventId
+  readonly source: TypertRemoteEventInvocation
+  readonly frame: RemoteEventInvocationFrame
+  readonly deliveries: Set<RemoteEventClient>
+  releaseContext: () => void
+  releaseSignal: () => void
+}
+
+type RemoteEventWireFrame =
+  | RemoteEventEmitFrame
+  | RemoteEventInvocationFrame
+  | RemoteEventCancellationFrame
 
 type ConnectionRpcResult = Awaited<ReturnType<ConnectionRpcHandler>>
 type ConnectionRpcError = Extract<ConnectionRpcResult, { readonly ok: false }>['error']
@@ -91,6 +186,9 @@ export class TypertGatewayService extends Service implements TypertGateway {
   static inject = ['typert']
 
   private srcClaims: ReadonlySet<string> | undefined
+  private remoteEvents: RegisteredRemoteEventSource | undefined
+  private readonly remoteEventClients = new Map<RemoteEventClientId, RemoteEventClient>()
+  private readonly pendingRemoteEvents = new Map<RemoteEventId, PendingRemoteEvent>()
 
   /**
    * Register the Gateway against the active Typert registry.
@@ -115,7 +213,61 @@ export class TypertGatewayService extends Service implements TypertGateway {
     })
   }
 
+  /**
+   * Check for an active owner Client event stream, the only kind that can answer forwarded waterfalls.
+   * @returns whether an owner stream is open and has not been cancelled.
+   */
+  hasLiveClient(): boolean {
+    for (const client of this.remoteEventClients.values()) {
+      if (client.answers && !client.signal.aborted) return true
+    }
+    return false
+  }
+
+  /**
+   * Inspect unsettled forwarded events without changing their lifetime.
+   * @returns detached event names and Agent identities.
+   */
+  getPendingRemoteEvents(): readonly PendingRemoteEventInfo[] {
+    return [...this.pendingRemoteEvents.values()].map(({ frame }) => ({ event: frame.event, agentId: frame.agentId }))
+  }
+
+  /**
+   * Register the sole application-selected forwarded-event source.
+   * @param source - stream factory installed by the Remote assembly.
+   * @param host - stable Host facts included in each Client generation's opening frame.
+   * @returns disposer removing this source and cancelling its active streams.
+   */
+  registerRemoteEvents(
+    source: TypertRemoteEventSource,
+    host: RemoteEventHostInfo,
+  ): () => Promise<void> {
+    if (this.remoteEvents !== undefined) {
+      throw new Error('typert gateway: forwarded Remote event source is already registered')
+    }
+    const lifetime = new AbortController()
+    const stream = source(lifetime.signal)
+    const done = this.consumeRemoteEvents(stream, lifetime.signal).catch((error: unknown) => {
+      if (this.remoteEvents?.lifetime !== lifetime || lifetime.signal.aborted) return
+      this.closeRemoteEvents(error)
+      this.remoteEvents = undefined
+      lifetime.abort(error)
+    })
+    const registration: RegisteredRemoteEventSource = { lifetime, done, host: { home: host.home } }
+    this.remoteEvents = registration
+    return async () => {
+      if (this.remoteEvents === registration) {
+        this.remoteEvents = undefined
+        const error = new Error('typert gateway: forwarded Remote event source was removed')
+        registration.lifetime.abort(error)
+        this.closeRemoteEvents(error)
+      }
+      await registration.done
+    }
+  }
+
   private claimsEndpoint(endpoint: string): boolean {
+    if (endpoint === REMOTE_EVENT_RESULT_ENDPOINT) return true
     const segments = endpoint.split('/')
     if (segments.length !== 2 || segments[0] === '' || segments[1] === '') return false
     if (this.ctx.typert.local.get(endpoint) !== undefined || this.ctx.typert.local.hasSeen(endpoint)) return true
@@ -231,6 +383,22 @@ export class TypertGatewayService extends Service implements TypertGateway {
     payload: unknown,
     signal: AbortSignal,
   ): Promise<ConnectionRpcResult> {
+    if (endpoint === REMOTE_EVENT_RESULT_ENDPOINT) {
+      try {
+        // The interceptor mounts at trusted-host authority and carries no
+        // Peer, so the result's clientId is the only ownership check: the
+        // minted id reaches the caller only inside its own ready frame.
+        const result = parseRemoteEventResultPayload(payload)
+        const client = this.remoteEventClients.get(result.clientId)
+        if (client === undefined) {
+          throw new Error('typert gateway: Remote event result identifies no active event stream')
+        }
+        this.receiveRemoteEventResult(client, result)
+        return { ok: true, value: undefined }
+      } catch (error) {
+        return rpcFailure(error)
+      }
+    }
     return this.invokeRpc(endpoint, payload, signal)
   }
 
@@ -262,6 +430,256 @@ export class TypertGatewayService extends Service implements TypertGateway {
     } catch (error) {
       return rpcFailure(error)
     }
+  }
+
+  /**
+   * Open the `$events` downlink for one Client carrier generation: the ready
+   * frame binding later `$events/result` calls, then forwarded notifications
+   * and scoped waterfalls until the signal or the source ends the generation.
+   * @param payload - decoded carrier payload; the event stream requires the
+   *   standard Remote payload with an empty args object.
+   * @param signal - logical-stream cancellation joined with the source and Peer lifetimes.
+   * @param peer - Peer the stream speaks for; only an owner principal answers scoped waterfalls.
+   * @returns validated downlink frames in arrival order.
+   */
+  async *openRemoteEvents(
+    payload: unknown,
+    signal: AbortSignal,
+    peer: PeerScope,
+  ): AsyncGenerator<
+    RemoteEventEmitFrame | RemoteEventInvocationFrame | RemoteEventCancellationFrame
+    | RemoteEventReadyFrame
+  > {
+    assertPeerLive(peer, REMOTE_EVENT_STREAM_ENDPOINT)
+    requireInteractions(peer, REMOTE_EVENT_STREAM_ENDPOINT)
+    if (!isObject(payload)
+      || !isPlainObject(payload)
+      || Reflect.ownKeys(payload).length !== 1
+      || !Object.hasOwn(payload, 'args')
+      || !isObject(payload.args)
+      || !isPlainObject(payload.args)
+      || Reflect.ownKeys(payload.args).length !== 0) {
+      throw new TypertGatewayError(
+        'gateway/arguments-invalid',
+        REMOTE_EVENT_STREAM_ENDPOINT,
+        'forwarded Remote event stream requires an empty args object',
+      )
+    }
+    const registration = this.remoteEvents
+    if (registration === undefined) {
+      throw new TypertGatewayError(
+        'gateway/service-unavailable',
+        REMOTE_EVENT_STREAM_ENDPOINT,
+        'forwarded Remote event source is unavailable',
+      )
+    }
+    const lifetime = AbortSignal.any([signal, registration.lifetime.signal, peer.signal])
+    let clientId = randomUUID() as RemoteEventClientId
+    while (this.remoteEventClients.has(clientId)) clientId = randomUUID() as RemoteEventClientId
+    const client: RemoteEventClient = {
+      peer,
+      id: clientId,
+      queue: new RemoteEventQueue(),
+      signal: lifetime,
+      deliveries: new Map(),
+      principal: peer.principal,
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- other packages merge non-owner kinds into PrincipalMap.
+      answers: peer.principal.kind === 'owner',
+    }
+    this.remoteEventClients.set(clientId, client)
+    if (client.answers) {
+      for (const pending of this.pendingRemoteEvents.values()) this.deliverRemoteEvent(pending, client)
+    }
+    try {
+      yield { ...REMOTE_EVENT_STREAM_READY, clientId, host: registration.host }
+      yield* client.queue.iterate(lifetime)
+    } finally {
+      this.removeRemoteEventClient(client)
+    }
+  }
+
+  private async consumeRemoteEvents(
+    source: AsyncIterable<TypertRemoteEventDispatch>,
+    signal: AbortSignal,
+  ): Promise<void> {
+    for await (const dispatch of source) {
+      if (signal.aborted) {
+        if ('context' in dispatch) dispatch.reject(signal.reason)
+        return
+      }
+      if ('context' in dispatch) this.startRemoteEvent(dispatch)
+      else this.broadcastRemoteEvent(dispatch)
+    }
+    if (!signal.aborted) {
+      throw new Error('typert gateway: forwarded Remote event source ended unexpectedly')
+    }
+  }
+
+  private broadcastRemoteEvent(frame: TypertRemoteEventFrame): void {
+    assertRemoteEventFrame(frame)
+    const wire: RemoteEventEmitFrame = {
+      type: 'emit',
+      event: frame.event,
+      args: frame.args,
+    }
+    const access = this.ctx.get('remoteAccess')
+    let resolved = false
+    let resources: readonly RemoteAccessResource[] | undefined
+    for (const client of this.remoteEventClients.values()) {
+      if (!client.answers) {
+        // A non-owner receives the whole notification or nothing: its resources decide, payloads are never trimmed,
+        // and a notification with invalid resources reaches no non-owner. Without a mounted access service every
+        // non-owner delivery is refused, so a composed Host cannot leak by omission.
+        if (!resolved) {
+          resources = eventResources(frame.resources, frame.args)
+          resolved = true
+        }
+        if (resources === undefined || access === undefined) continue
+        if (access.decide({ principal: client.principal, action: `event:${frame.event}`, resources }).kind === 'deny') continue
+      }
+      client.queue.push(wire)
+    }
+  }
+
+  private startRemoteEvent(source: TypertRemoteEventInvocation): void {
+    try {
+      assertRemoteEventName(source)
+      if (!isRemoteEventAgentId(source.context.agentId)) {
+        throw new TypeError(
+          'typert gateway: scoped Remote events require a non-empty Agent identity',
+        )
+      }
+      const projected = projectRemoteEventRequest(source.request, source.context.subject)
+      let id = randomUUID() as RemoteEventId
+      while (this.pendingRemoteEvents.has(id)) id = randomUUID() as RemoteEventId
+      let releaseContext: () => void
+      try {
+        const dispose = source.context.value.effect(
+          () => () => {
+            this.cancelRemoteEvent(
+              pending,
+              new Error('typert gateway: Remote event Agent Context was released'),
+            )
+          },
+          `api-gateway: Remote event ${JSON.stringify(source.event)}`,
+        )
+        releaseContext = () => { void dispose() }
+      } catch {
+        source.resolve({ kind: 'next' })
+        return
+      }
+      const signals = new Set(projected.signal === undefined ? [] : [projected.signal])
+      const abort = (): void => {
+        const reason: unknown = [...signals].find(signal => signal.aborted)?.reason
+        this.cancelRemoteEvent(pending, reason instanceof Error
+          ? reason
+          : new Error('typert gateway: Remote event was cancelled', { cause: reason }))
+      }
+      const pending: PendingRemoteEvent = {
+        id,
+        source,
+        frame: {
+          type: 'waterfall',
+          event: source.event,
+          eventId: id,
+          agentId: source.context.agentId,
+          request: projected.request,
+        },
+        deliveries: new Set(),
+        releaseContext,
+        releaseSignal: () => {
+          for (const signal of signals) signal.removeEventListener('abort', abort)
+        },
+      }
+      this.pendingRemoteEvents.set(id, pending)
+      for (const signal of signals) signal.addEventListener('abort', abort, { once: true })
+      if ([...signals].some(signal => signal.aborted)) abort()
+      else {
+        for (const client of this.remoteEventClients.values()) {
+          if (client.answers) this.deliverRemoteEvent(pending, client)
+        }
+        // No answer-capable Client holds this generation: holding the
+        // waterfall for a later generation would starve every local listener
+        // on a Host with no attached Remote peers.
+        if (pending.deliveries.size === 0) this.settleRemoteEvent(pending, { kind: 'next' })
+      }
+    } catch (error) {
+      source.reject(error)
+    }
+  }
+
+  private deliverRemoteEvent(pending: PendingRemoteEvent, client: RemoteEventClient): void {
+    pending.deliveries.add(client)
+    client.deliveries.set(pending.id, pending)
+    client.queue.push(pending.frame)
+  }
+
+  private receiveRemoteEventResult(
+    client: RemoteEventClient,
+    result: ReturnType<typeof parseRemoteEventResult>,
+  ): void {
+    const pending = this.pendingRemoteEvents.get(result.eventId)
+    // Settlement and Client replacement may race the result request. Results
+    // from a completed event or a superseded delivery are idempotent no-ops.
+    if (pending === undefined || !pending.deliveries.has(client)) return
+    this.removeRemoteEventDelivery(pending, client)
+    if (result.outcome.kind === 'result') {
+      this.settleRemoteEvent(pending, {
+        kind: 'result',
+        value: result.outcome.value,
+      })
+    } else if (result.outcome.kind === 'rejected') {
+      this.cancelRemoteEvent(pending, restoreRemoteEventRejection(result.outcome.error))
+    } else if (pending.deliveries.size === 0) {
+      this.settleRemoteEvent(pending, { kind: 'next' })
+    }
+  }
+
+  private removeRemoteEventDelivery(pending: PendingRemoteEvent, client: RemoteEventClient): void {
+    pending.deliveries.delete(client)
+    client.deliveries.delete(pending.id)
+  }
+
+  private removeRemoteEventClient(client: RemoteEventClient): void {
+    this.remoteEventClients.delete(client.id)
+    for (const pending of [...client.deliveries.values()]) {
+      this.removeRemoteEventDelivery(pending, client)
+      // A disconnect can empty the last delivery: the same starvation rule
+      // applies mid-flight as at start — no remaining answerer, delegate now.
+      if (pending.deliveries.size === 0) this.settleRemoteEvent(pending, { kind: 'next' })
+    }
+    client.queue.end()
+  }
+
+  private settleRemoteEvent(pending: PendingRemoteEvent, outcome: TypertRemoteEventOutcome): void {
+    this.finishRemoteEvent(pending)
+    pending.source.resolve(outcome)
+  }
+
+  private cancelRemoteEvent(pending: PendingRemoteEvent, reason: unknown): void {
+    if (this.pendingRemoteEvents.get(pending.id) !== pending) return
+    this.finishRemoteEvent(pending)
+    pending.source.reject(reason)
+  }
+
+  private finishRemoteEvent(pending: PendingRemoteEvent): void {
+    this.pendingRemoteEvents.delete(pending.id)
+    pending.releaseSignal()
+    pending.releaseContext()
+    const clients = new Set(pending.deliveries)
+    for (const client of clients) this.removeRemoteEventDelivery(pending, client)
+    const cancellation: RemoteEventCancellationFrame = {
+      type: 'cancel',
+      eventId: pending.id,
+    }
+    for (const client of clients) client.queue.push(cancellation)
+  }
+
+  private closeRemoteEvents(reason: unknown): void {
+    for (const pending of [...this.pendingRemoteEvents.values()]) {
+      this.cancelRemoteEvent(pending, reason)
+    }
+    for (const client of [...this.remoteEventClients.values()]) client.queue.end()
   }
 
   private resolveDescriptor(namespace: string, method: string, endpoint: string): InvocationDescriptor {
@@ -510,6 +928,89 @@ export class TypertGatewayService extends Service implements TypertGateway {
     }
     return resolved
   }
+}
+
+class RemoteEventQueue {
+  private readonly frames = new Deque<RemoteEventWireFrame>()
+  private waiter: (() => void) | undefined
+  private closed = false
+
+  push(frame: RemoteEventWireFrame): void {
+    if (this.closed) return
+    this.frames.pushBack(frame)
+    this.waiter?.()
+  }
+
+  end(): void {
+    if (this.closed) return
+    this.closed = true
+    this.waiter?.()
+  }
+
+  /**
+   * Yield buffered and later frames until the queue ends or `signal` aborts.
+   * An abort discards the frames still buffered, so a revoked Peer receives none of them.
+   * @param signal - Client generation lifetime.
+   * @returns the queued wire frames in push order.
+   */
+  async *iterate(signal: AbortSignal): AsyncGenerator<RemoteEventWireFrame> {
+    const abort = (): void => { this.end() }
+    signal.addEventListener('abort', abort, { once: true })
+    try {
+      while (true) {
+        while (this.frames.size > 0 && !signal.aborted) yield this.frames.popFront() as RemoteEventWireFrame
+        if (this.closed || signal.aborted) return
+        await new Promise<void>((resolve) => { this.waiter = resolve })
+        this.waiter = undefined
+      }
+    } finally {
+      signal.removeEventListener('abort', abort)
+    }
+  }
+}
+
+function assertRemoteEventFrame(frame: TypertRemoteEventFrame): void {
+  assertRemoteEventName(frame)
+  if (!Array.isArray(frame.args) || !isRemoteJsonValue(frame.args)) {
+    throw new TypeError(`typert gateway: Remote event ${JSON.stringify(frame.event)} arguments are not lossless JSON data`)
+  }
+}
+
+function assertRemoteEventName(frame: { readonly event: unknown }): void {
+  if (typeof frame.event !== 'string' || frame.event.length === 0) {
+    throw new TypeError('typert gateway: Remote event name must be a nonempty string')
+  }
+}
+
+function requireInteractions(peer: PeerScope, endpoint: string): void {
+  if (peer.interactions !== 'answer') {
+    throw new TypertGatewayError(
+      'gateway/interactions-forbidden', endpoint,
+      'forwarded Remote events require interactions=answer',
+    )
+  }
+}
+
+/**
+ * Refuse a stream whose Peer has been disposed.
+ * @param peer - Peer the stream speaks for.
+ * @param endpoint - endpoint named in the failure.
+ * @throws {@link TypertGatewayError} `gateway/peer-disposed` once the Peer is disposed.
+ */
+function assertPeerLive(peer: PeerScope, endpoint: string): void {
+  if (peer.signal.aborted) {
+    throw new TypertGatewayError('gateway/peer-disposed', endpoint, 'the calling Peer has been disposed')
+  }
+}
+
+function parseRemoteEventResultPayload(payload: unknown): ReturnType<typeof parseRemoteEventResult> {
+  if (!isObject(payload)
+    || !isPlainObject(payload)
+    || Reflect.ownKeys(payload).length !== 1
+    || !Object.hasOwn(payload, 'args')) {
+    throw new Error('typert gateway: Remote event result requires exactly one plain-object args field')
+  }
+  return parseRemoteEventResult(payload.args)
 }
 
 /** Carrier-signal cancellation as the shared failure vocabulary expresses it. */

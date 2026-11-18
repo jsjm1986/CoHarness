@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-15-agent-teams-v2-migration.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md
+document:
+  en: 82b90250f46a4f69609ce8fe2ff8698446bafb0e
+  zh: 076b5444872d67684723c4275a192a1be9f6aad4
+/agent-note-agent-teams-v2-migration-on-experimental-package-paths:
+  en: 579d6b702958a1c3
+  zh: 6071ea0981696a4f
+/agent-note-agent-teams-v2-migration-on-experimental-package-paths/problem:
+  en: 4875291b38ddbe8a
+  zh: 109c91cec0741584
+/agent-note-agent-teams-v2-migration-on-experimental-package-paths/decision:
+  en: a382087fbff580f0
+  zh: 847c015baeb235d3
+/agent-note-agent-teams-v2-migration-on-experimental-package-paths/consequences:
+  en: 11eaa17cfb6ca3c3
+  zh: 5a5f9991ab1416df
+/agent-note-agent-teams-v2-migration-on-experimental-package-paths/alternatives-considered:
+  en: f7fdb214259df197
+  zh: 2af192916fa09bea
+/agent-note-agent-teams-v2-migration-on-experimental-package-paths/verification:
+  en: a2613003c22fb055
+  zh: c738f1b6b4a5bd13

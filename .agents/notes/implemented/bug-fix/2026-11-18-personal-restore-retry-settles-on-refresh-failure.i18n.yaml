@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-18-personal-restore-retry-settles-on-refresh-failure.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-18-personal-restore-retry-settles-on-refresh-failure.md
+document:
+  en: be90eea39df8bffa4910acef424e8eaf349b5e53
+  zh: 9a31b86a1d9f3c86123a83855e1f70105172bac5
+/agent-note-personal-restore-retry-settles-on-refresh-failure:
+  en: 16d8f069df5e92d4
+  zh: 41f2ccc41885531e
+/agent-note-personal-restore-retry-settles-on-refresh-failure/problem:
+  en: 2ca2b1bd32da84d4
+  zh: 6a513bcf7eb7b39b
+/agent-note-personal-restore-retry-settles-on-refresh-failure/decision:
+  en: 8529f0ab76e75719
+  zh: 2029be132bd1b65c
+/agent-note-personal-restore-retry-settles-on-refresh-failure/alternatives-considered:
+  en: 50138085ec6a03df
+  zh: 9c57ea77e1b51e85
+/agent-note-personal-restore-retry-settles-on-refresh-failure/consequences:
+  en: b0b9d5f052a3d5ad
+  zh: a7c1d119abfa72e3
+/agent-note-personal-restore-retry-settles-on-refresh-failure/verification:
+  en: d6135a5fd0461c47
+  zh: ea3283f7b2bbec7b

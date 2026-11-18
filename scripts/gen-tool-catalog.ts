@@ -7,7 +7,7 @@
  */
 
 import { globSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -18,11 +18,15 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
 import GoalService from '@deepseek-ai/dsh-goal'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { type Config as ToolsConfig } from '@deepseek-ai/dsh-tools'
+import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { NativeToolExecutor } from '@deepseek-ai/dsh-tool-executor-native'
+import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
+import NodePtcRuntime from '@deepseek-ai/dsh-ptc-runtime-node'
 import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
 import { PwshLocalExecutor } from '@deepseek-ai/dsh-pwsh-local'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
+import LocalSandboxProvider from '@deepseek-ai/dsh-sandbox-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
 import * as ToolWorkingDirectory from '@deepseek-ai/dsh-tool-working-directory'
@@ -52,6 +56,8 @@ import * as ToolPwshPersistent from '@deepseek-ai/dsh-tool-pwsh-persistent'
 import CordisHostRunner from '@deepseek-ai/dsh-cordis-host-runner'
 import * as ToolCordis from '@deepseek-ai/dsh-tool-cordis'
 import * as ToolPresent from '@deepseek-ai/dsh-tool-present'
+import * as ToolOffice from '@deepseek-ai/dsh-tool-office'
+import type { OfficeKit } from '@deepseek-ai/dsh-office-kit'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import * as ToolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
 import * as ToolUserDoc from '@deepseek-ai/dsh-tool-userdoc'
@@ -77,6 +83,7 @@ import McpResources from '@deepseek-ai/dsh-mcp-resources'
 import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
 import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-use-stagehand-native'
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
+import * as ToolSubagentOar from '@deepseek-ai/dsh-experimental-tool-subagent-oar'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
@@ -170,13 +177,8 @@ export interface ToolPackage {
   mount: (ctx: Context) => Promise<void>
   /** Agent-like scope key whose tool view is catalogued instead of the global view. */
   scope?: (ctx: Context) => Agent
-  /**
-   * Config for the caller's `ToolRuntime` mount. The registry itself ships a
-   * model-facing tool (`run_code`, registered under a non-native `mode`), so
-   * ITS catalog entry boots the registry in the mode that exposes it;
-   * every other entry uses the default (native) registry.
-   */
-  toolsConfig?: ToolsConfig
+  /** The PTC executor exposes `run_code`; every other entry harvests under the native executor. */
+  executor?: 'ptc'
   /**
    * A deployment note rendered after the package's tools, for a fact that
    * booting the package alone cannot show. The registered tool NAME can be a
@@ -261,18 +263,22 @@ const TOOL_PACKAGES: ToolPackage[] = [
       'ask_user_question keeps the original blocking behavior by default; set `mode: timed` to opt into a foreground timeout and pending result while the question remains answerable. In timed mode, `timeout: -1` keeps that call blocking indefinitely.',
   },
   {
-    pkg: '@deepseek-ai/dsh-tools',
-    dir: 'tools',
-    source: 'packages/core/tools/src/ptc.ts',
-    requires: ['ctx.workingDirectory (Agent executions)', 'ctx.tools', 'ctx.ptcRuntime (execution time)', 'ctx.systemPrompt'],
+    pkg: '@deepseek-ai/dsh-tool-executor-ptc',
+    dir: 'tool-executor-ptc',
+    source: 'packages/core/tool-executor-ptc/src/ptc.ts',
+    requires: ['ctx.workingDirectory (Agent executions)', 'ctx.tools', 'ctx.ptcRuntime', 'ctx.systemPrompt'],
     writes: ['tool/call', 'one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call', 'tool/result'],
-    // The registry's OWN tool: run_code exists only under a non-native mode
-    // (the registry registers it in its constructor; the code runtime is read
-    // at assembly/execution time, so the schema harvest needs none mounted).
-    toolsConfig: { mode: 'ptc' },
-    async mount() {},
+    // The PTC executor's OWN tool: run_code is contributed by `describe()`,
+    // which projects the mounted runtime's language and controls.
+    executor: 'ptc',
+    async mount(ctx) {
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LocalSandboxProvider)
+      await ctx.plugin(SandboxPolicy)
+      await ctx.plugin(NodePtcRuntime)
+    },
     note:
-      'Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` (see the PTC mode Agent Note). Under `ptc` it is the registry\'s only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime\'s language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result.',
+      'The PTC executor exposes only run_code to the model and declares other visible capabilities in a generated SDK in the runtime\'s language. Program bindings enter the shared guarded tool pipeline in submission order; concurrency-safe bodies overlap up to maxParallelSubCalls, and nested results remain linked to the outer program. The resolved timeout and maxSubCallsPerMinute set the total call allowance; exceeding it terminates the program.',
   },
   {
     pkg: '@deepseek-ai/dsh-plan-mode',
@@ -440,7 +446,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
           maxInlineTextBytes: 1,
           upload: { protocol: 'resumable-v1', chunkBytes: 65_536, sessionTtlMs: 60_000, resumable: true },
         },
-      } as unknown as UserDocStore)
+      } as UserDocStore)
       await ctx.plugin(ToolUserDoc)
     },
     note:
@@ -523,6 +529,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'In a project-space runtime (Gateway-managed sessions) the scope parameter is omitted from every schema and each tool addresses the shared project scope; the catalog above shows the personal-space variant shipped by the CLI presets.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-office',
+    dir: 'tool-office',
+    source: 'packages/document/tool-office/src/index.ts',
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.fs', 'ctx.agents', 'ctx.officeKit', 'ctx.attachments and ctx.llm for office_render'],
+    writes: ['tool/call', 'tool/result with rendered image attachments', 'temporary converted files in the Office kit output store'],
+    async mount(ctx) {
+      // Schema harvest never renders or converts a document.
+      ctx.provide('officeKit', {} as OfficeKit)
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(ToolOffice)
+    },
+    note: 'Declared to an Agent from the step after it successfully loads an Office skill, and kept while the previous request header declares an Office tool. Admitted calls fail with the Office service\'s unavailable error when LibreOffice Kit is not installed.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',
@@ -624,39 +644,49 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-experimental-tool-agent-team',
     dir: 'tool-agent-team',
     source: 'packages/experimental/tool-agent-team/src/index.ts',
-    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.agentTeams', 'an exact live Team member Agent'],
-    writes: ['tool/call', 'team/member', 'team/message/queued', 'team/message/delivered', 'team/task', 'tool/result'],
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.agentTeams', 'ctx.subagents', 'an exact live Agent in a Team-enabled root tree'],
+    writes: ['tool/call', 'team/mode', 'team/task', 'tool/result'],
     async mount(ctx) {
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(SessionStore)
       const session = ctx.sessions.create(SessionId('tool-catalog-team-lead'))
       let agent!: Agent
-      const membership = {
-        get root() { return agent },
-        id: session.id,
-        role: 'lead' as const,
-        name: 'lead',
-      }
       ctx.provide('agentTeams', {
-        tryMembership: (candidate: Agent) => candidate === agent ? membership : undefined,
-        membership: () => membership,
-      } as unknown as TeamService)
+        isEnabled: () => true,
+      } as Partial<TeamService> as TeamService)
+      ctx.provide('subagents', {
+        resolveName: () => { throw new Error('catalog mount does not execute tools') },
+      } as Partial<SubagentRuntime> as SubagentRuntime)
       await ctx.plugin(Object.assign((inner: Context) => {
         agent = {
           id: session.id,
           session,
           options: {},
           status: 'idle',
-        } as unknown as Agent
+        } as Agent
         Object.assign(agent, { ctx: createScope(inner, agent).ctx })
         inner.agents.register(agent)
-      }, { inject: ['tools', 'systemPrompt', 'agents', 'agentTeams'] }))
+      }, { inject: ['tools', 'systemPrompt', 'agents', 'agentTeams', 'subagents'] }))
       await ctx.plugin(ToolTeam)
       catalogChildScopes.set(ctx, agent)
     },
     scope: ctx => catalogChildScopes.get(ctx) as Agent,
     note:
-      'All ten tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names.',
+      'The four shared-task tools register conditionally on `ctx.agentTeams.isEnabled(caller)`, so they appear only inside a Team-mode root Session tree; the catalog mounts with the mode forced on. Teammate creation, messaging, and interruption stay with the ordinary subagent tools. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-tool-subagent-oar',
+    dir: 'tool-subagent-oar',
+    source: 'packages/experimental/tool-subagent-oar/src/index.ts',
+    requires: ['ctx.tools', 'ctx.subagents', 'ctx.jobs at execution'],
+    writes: ['tool/call', 'child session events through the chosen provider', 'tool/result'],
+    shippedNames: ['subagent_oar'],
+    async mount(ctx) {
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(ToolSubagentOar, { providers: { codex: 'oar-codex', claude: 'oar-claude' } })
+    },
+    note:
+      'One-shot external-runtime delegation: `runtime` enumerates the load-time `providers` map aliases — the catalog shows the shipped `codex`/`claude` pair — and each call resolves the named provider through `ctx.subagents` at execution. The tool requires a one-shot provider with independent context and a `ctx.jobs` registry for background completion delivery; the experimental package mounts in no shipped bundle.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-todo',
@@ -767,7 +797,11 @@ export type ToolCatalog = CatalogPackage[]
  * `scanRoot` defaults to the repo root; a test may point it at a fixture tree.
  */
 export function assertManifestComplete(packages: ToolPackage[] = TOOL_PACKAGES, scanRoot: string = root): void {
-  const onDisk = globSync('packages/*/tool-*', { cwd: scanRoot }).map(p => basename(p)).sort()
+  // Native execution owns no tool definitions; PTC contributes run_code.
+  const onDisk = globSync('packages/*/tool-*', { cwd: scanRoot })
+    .filter(path => basename(dirname(path)) !== 'test-support')
+    .map(p => basename(p))
+    .filter(dir => dir !== 'tool-executor-native').sort()
   const listed = new Set(packages.map(p => p.dir))
   const missing = onDisk.filter(dir => !listed.has(dir))
   if (missing.length > 0) {
@@ -820,9 +854,14 @@ export async function collectToolCatalog(packages: ToolPackage[] = TOOL_PACKAGES
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(LocalFileSystem)
       await ctx.plugin(WorkingDirectory)
-      await ctx.plugin(ToolRuntime, entry.toolsConfig ?? {})
+      await ctx.plugin(ToolRuntime)
+      const executor = entry.executor === 'ptc' ? new PtcExecutor(ctx) : new NativeToolExecutor(ctx)
+      ctx.tools.setExecutor(executor)
       await entry.mount(ctx)
-      const schemas = ctx.tools.schemas(entry.scope?.(ctx)).sort((a, b) => a.name.localeCompare(b.name))
+      const scope = entry.scope?.(ctx)
+      const described = executor.describe(ctx.tools.definitions(scope))
+      const schemas = [...new Map([...ctx.tools.schemas(scope), ...described.schemas].map(schema => [schema.name, schema])).values()]
+        .sort((a, b) => a.name.localeCompare(b.name))
       assertToolsHarvested(entry, schemas.length)
       catalog.push({
         pkg: entry.pkg,

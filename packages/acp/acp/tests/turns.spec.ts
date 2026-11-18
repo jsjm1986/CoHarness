@@ -525,6 +525,56 @@ describe('ACP prompt lifecycle', () => {
     await vi.waitFor(() => { expect(messageText(harness!)).toBe('recovered') })
   })
 
+  it.each(['completed', 'error'] as const)('waits for descendants and reports the later %s summary turn', async (outcome) => {
+    harness = await makeBridgeHarness({ script: [
+      textResponse('waiting'),
+      outcome === 'completed' ? textResponse('summary') : errorResponse('summary failed'),
+    ] })
+    const sessionId = await newSession(harness)
+    const parent = harness.ctx.agents.get(SessionId(sessionId))!
+    const waiting = Promise.withResolvers<undefined>()
+    const children = Promise.withResolvers<boolean>()
+    const waitForChildren = vi.fn()
+      .mockImplementationOnce(() => { waiting.resolve(undefined); return children.promise })
+      .mockResolvedValue(false)
+    harness.ctx.provide('subagents', { waitForChildren, drainContinuableDescendants: vi.fn() } as never)
+    let settled = false
+    const prompt = harness.client.prompt({ sessionId, prompt: [{ type: 'text', text: 'delegate' }] })
+    const observed = prompt.then(() => { settled = true }, () => { settled = true })
+    await waiting.promise
+    expect(settled).toBe(false)
+    parent.followup(createUserMessage({ content: [{ type: 'text', text: 'child result' }], source: { kind: 'test' } }))
+    children.resolve(true)
+    if (outcome === 'completed') {
+      await expect(prompt).resolves.toEqual({ stopReason: 'end_turn' })
+      expect(messageText(harness)).toBe('waitingsummary')
+    } else {
+      await expect(prompt).rejects.toThrow('summary failed')
+    }
+    await observed
+  })
+
+  it('cancels the child wait without closing the session to its next prompt', async () => {
+    harness = await makeBridgeHarness({ script: [textResponse('waiting'), textResponse('next')] })
+    const sessionId = await newSession(harness)
+    const waiting = Promise.withResolvers<undefined>()
+    const children = Promise.withResolvers<boolean>()
+    const waitForChildren = vi.fn()
+      .mockImplementationOnce(() => { waiting.resolve(undefined); return children.promise })
+      .mockResolvedValue(false)
+    const drainContinuableDescendants = vi.fn()
+    harness.ctx.provide('subagents', { waitForChildren, drainContinuableDescendants } as never)
+    const first = harness.client.prompt({ sessionId, prompt: [{ type: 'text', text: 'delegate' }] })
+    await waiting.promise
+    await harness.client.cancel({ sessionId })
+    await expect(first).resolves.toEqual({ stopReason: 'cancelled' })
+    expect(drainContinuableDescendants).not.toHaveBeenCalled()
+    children.resolve(true)
+    await expect(harness.client.prompt({ sessionId, prompt: [{ type: 'text', text: 'again' }] }))
+      .resolves.toEqual({ stopReason: 'end_turn' })
+    expect(messageText(harness)).toBe('waitingnext')
+  })
+
   it('a failed turn with no retry still rejects', async () => {
     harness = await makeBridgeHarness({ script: [errorResponse('terminal boom')] })
     let offered = 0

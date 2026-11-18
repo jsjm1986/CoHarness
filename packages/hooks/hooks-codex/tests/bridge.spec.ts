@@ -8,6 +8,7 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { LocalBashExecutor } from '@deepseek-ai/dsh-bash-local'
@@ -89,7 +90,7 @@ describe('unmatched hooks and directory recovery', () => {
         async execute(args) { return [{ type: 'text', text: args.cd }] },
       }))
       const agent = await ctx.agentLoop.create(SessionId('recovery'), { provider: 'mock', model: 'mock' })
-      const result = await ctx.tools.execute({
+      const result = await executeToolFixture(ctx, {
         name: 'working_directory', callId: ToolCallId('recover'), arguments: { cd: dir },
         agent, signal: new AbortController().signal,
       })

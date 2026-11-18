@@ -53,6 +53,7 @@ try {
   ]))
   const plugins = [
     ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'], ['fs/fs-local'],
+    ['core/tool-executor-native'],
     ['session/session-persistence-jsonl', { root: join(process.cwd(), 'sessions'), compression: 'none' }],
     ['session/session-projection'], ['session/working-directory'], ['core/agent-loop', { agents: [] }], ['subagent/subagent'],
     ['subagent/subagent-dsh-sdk', { providerName: 'startup-child', profile: 'sdk', patches: [patch],

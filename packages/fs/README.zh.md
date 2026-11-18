@@ -15,6 +15,7 @@ kind: "package-group"
 | `fs-local/` | 本地文件系统 `FileSystem` 实现 | （注册 `ctx.fs`） |
 | `fs-sandbox/` | 强制沙箱的 `FileSystem`：扩展 `fs-local`，并按每次调用的模式与工作区根政策约束写入/编辑（只读模式拒绝，工作区写入模式限制在会话工作区与临时根目录内）；读取直接通过 | （注册 `ctx.fs`） |
 | `fs-observation-policy/` | 政策门禁插件：通过 `fs/*` 事件门禁提供已观察状态、编辑前读取和版本防护的写入/编辑 | （无服务，仅有 `fs/*` 监听器） |
+| `fs-patch/` | 纯 Codex 风格 patch 解析器与 LF 文本更新器，提供结构化匹配失败；不依赖 `ctx.fs` | （库 —— 无注册） |
 | `tool-fs/` | 面向模型的 `read`/`write`/`edit` 工具以及执行器（通过 `ctx.fs` 读取，拥有读取窗口逻辑，分派 `fs/*`）；为会话 cwd 相对路径保留文件系统语义，并在已挂载的 `ctx.fs` 实施约束时声明沙箱升级字段 | （注册到 `ctx.tools`） |
 | `tool-fs-search/` | 面向模型的 `glob`/`grep` 发现工具，由经 `ctx.subprocess` spawn 的打包 `@vscode/ripgrep` 二进制文件支持，而不是使用 `ctx.fs` 提供方方法 | （注册到 `ctx.tools`） |
 

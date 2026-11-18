@@ -47,6 +47,7 @@ const kit = {
   useSessions: (() => { throw new Error('unused by usage alert') }) as never,
   useWorkspaces: (() => { throw new Error('unused by usage alert') }) as never,
   usePanelInfo: (() => { throw new Error('unused by usage alert') }) as never,
+  useRemoteAccess: () => true,
 }
 
 describe('usage alert browser plugin', () => {

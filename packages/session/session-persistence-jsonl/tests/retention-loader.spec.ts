@@ -11,6 +11,7 @@ import * as JsonlPlugin from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -31,6 +32,7 @@ it('parks a refused turn, rejects false durability, releases its writer, and com
       '- id: system', "  name: '@deepseek-ai/dsh-system-prompt'",
       '  config:', "    personaPrefix: ''", "    personaSuffix: ''",
       '- id: tools', "  name: '@deepseek-ai/dsh-tools'",
+      '- id: executor', "  name: '@deepseek-ai/dsh-tool-executor-native'",
       '- id: agents', "  name: '@deepseek-ai/dsh-agent'",
       '- id: persistence', "  name: '@deepseek-ai/dsh-session-persistence-jsonl'",
       '  config:', `    root: ${JSON.stringify(join(root, 'sessions'))}`,
@@ -44,6 +46,7 @@ it('parks a refused turn, rejects false durability, releases its writer, and com
       ['@deepseek-ai/dsh-llm', LlmRuntime], ['@deepseek-ai/dsh-session', SessionStore],
       ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
       ['@deepseek-ai/dsh-system-prompt', SystemPrompt], ['@deepseek-ai/dsh-tools', ToolRuntime],
+      ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
       ['@deepseek-ai/dsh-agent', AgentRegistry], ['@deepseek-ai/dsh-agent-loop', AgentLoop],
       ['@deepseek-ai/dsh-session-persistence-jsonl', JsonlPlugin],
     ])

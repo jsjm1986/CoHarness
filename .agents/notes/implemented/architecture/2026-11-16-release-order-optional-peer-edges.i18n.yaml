@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-release-order-optional-peer-edges.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-16-release-order-optional-peer-edges.md
+document:
+  en: be9cdc5cd5735e7b3315b0ff9aa0ecc445299955
+  zh: ae1769e1e7ea783af255af33e32ba2180851db4d
+/agent-note-release-order-optional-peer-and-stack-member-edges:
+  en: 504af2ee01dc7489
+  zh: 242d11ee7d0da5d4
+/agent-note-release-order-optional-peer-and-stack-member-edges/problem:
+  en: 03790f65e4f969cf
+  zh: 076bcddf1ba9c8e7
+/agent-note-release-order-optional-peer-and-stack-member-edges/decision:
+  en: 278aa24765da8df4
+  zh: 24ca50796a96e176
+/agent-note-release-order-optional-peer-and-stack-member-edges/consequences:
+  en: 5274c95765f13cfc
+  zh: d0f18fb964b9e70f
+/agent-note-release-order-optional-peer-and-stack-member-edges/alternatives-considered:
+  en: f3dc673b580a3383
+  zh: 86010a5bf364cdcc
+/agent-note-release-order-optional-peer-and-stack-member-edges/verification:
+  en: 747e383ac0c22860
+  zh: efeaa37af20ab8fd

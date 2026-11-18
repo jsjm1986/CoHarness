@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "syncedTag": "dsh-v0.2.1-rc.2",
-  "syncedCommit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+  "syncedTag": "dsh-v0.2.2-rc.3",
+  "syncedCommit": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
   "packages": {
     "acp/acp": {
       "sovereignty": "adapted"
@@ -12,11 +12,14 @@
       "removedUpstreamPaths": [
         "packages/api/gateway/src/client/journal-stream.ts",
         "packages/api/gateway/src/client/remote-events.ts",
-        "packages/api/gateway/src/client/snapshot-stream.ts",
         "packages/api/gateway/src/client/stream-client.ts",
         "packages/api/gateway/src/stream-protocol.ts",
         "packages/api/gateway/src/stream-server.ts"
       ]
+    },
+    "api/remote-access": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-11-15-forge-panel-remote-access-port.md"
     },
     "api/remote-desktop-controller": {
       "sovereignty": "owned"
@@ -28,7 +31,7 @@
       "sovereignty": "adapted"
     },
     "attachment/attachment": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "attachment/attachment-local": {
       "sovereignty": "adapted",
@@ -40,6 +43,9 @@
     "attachment/userdoc": {
       "sovereignty": "owned"
     },
+    "attachment/userdoc-gateway": {
+      "sovereignty": "owned"
+    },
     "attachment/userdoc-local": {
       "sovereignty": "owned"
     },
@@ -49,6 +55,9 @@
     },
     "boot/cmdline": {
       "sovereignty": "tracked"
+    },
+    "boot/config-editor": {
+      "sovereignty": "adapted"
     },
     "boot/hmr": {
       "sovereignty": "adapted"
@@ -393,7 +402,7 @@
       "sovereignty": "adapted"
     },
     "compaction/compaction-basic": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "compaction/compaction-image-offload": {
       "sovereignty": "tracked"
@@ -405,7 +414,7 @@
       "sovereignty": "adapted"
     },
     "context/agent-instructions": {
-      "sovereignty": "tracked",
+      "sovereignty": "adapted",
       "note": ".agents/notes/implemented/bug-fix/2026-10-12-session-reliability-fixes.md"
     },
     "context/archive-gateway": {
@@ -479,6 +488,12 @@
     "core/system-prompt": {
       "sovereignty": "adapted"
     },
+    "core/tool-executor-native": {
+      "sovereignty": "tracked"
+    },
+    "core/tool-executor-ptc": {
+      "sovereignty": "tracked"
+    },
     "core/tools": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/bug-fix/2026-09-18-tool-scheduler-process-stable-symbol.md"
@@ -498,7 +513,10 @@
     "deliverables/workspace-changes": {
       "sovereignty": "adapted"
     },
-    "document/office-to-pdf": {
+    "document/office-kit": {
+      "sovereignty": "adapted"
+    },
+    "document/tool-office": {
       "sovereignty": "adapted"
     },
     "examples/acp-demo": {
@@ -511,15 +529,12 @@
       "sovereignty": "owned"
     },
     "experimental/agent-team": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/bug-fix/2026-09-26-one-shot-subagent-descriptor-at-publish.md",
-      "removedUpstreamPaths": [
-        "packages/experimental/agent-team/src/persisted.ts",
-        "packages/experimental/agent-team/src/projection.ts"
-      ]
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md"
     },
     "experimental/agent-team-profile": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md"
     },
     "experimental/api-speech-to-text": {
       "sovereignty": "tracked",
@@ -551,7 +566,8 @@
       "note": ".agents/notes/implemented/architecture/2026-10-17-experimental-claude-code-mods-extraction.md"
     },
     "experimental/client-ui-agent-team": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md"
     },
     "experimental/client-ui-claude-code-mods": {
       "sovereignty": "adapted",
@@ -560,6 +576,10 @@
     "experimental/client-ui-cot-translation": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/feature/2026-10-18-cot-translation-port.md"
+    },
+    "experimental/client-ui-forge": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-11-15-forge-panel-remote-access-port.md"
     },
     "experimental/client-ui-voice-input": {
       "sovereignty": "adapted",
@@ -575,6 +595,16 @@
       "sovereignty": "tracked",
       "note": ".agents/notes/implemented/feature/2026-10-18-cot-translation-port.md"
     },
+    "experimental/forge": {
+      "sovereignty": "tracked"
+    },
+    "experimental/forge-github": {
+      "sovereignty": "tracked"
+    },
+    "experimental/forge-session": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-forge-lane-absorption.md"
+    },
     "experimental/inspector": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/feature/2026-10-18-experimental-inspector-port.md"
@@ -585,7 +615,7 @@
     },
     "experimental/plugin-market-bundle": {
       "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "experimental/ptc-runtime-python": {
       "sovereignty": "adapted"
@@ -618,15 +648,24 @@
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
+    "experimental/subagent-oar": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-subagent-oar-absorption.md"
+    },
     "experimental/terminal-bundle": {
       "sovereignty": "tracked",
       "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
     },
     "experimental/tool-agent-team": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-agent-teams-v2-migration.md"
+    },
+    "experimental/tool-subagent-oar": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-11-15-subagent-oar-absorption.md"
     },
     "experimental/tool-worktree": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "experimental/translator": {
       "sovereignty": "adapted",
@@ -661,6 +700,9 @@
     "fs/fs-observation-policy": {
       "sovereignty": "adapted"
     },
+    "fs/fs-patch": {
+      "sovereignty": "tracked"
+    },
     "fs/fs-sandbox": {
       "sovereignty": "adapted"
     },
@@ -686,7 +728,7 @@
       "sovereignty": "adapted"
     },
     "guard/repeat-tool-reminder": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "guard/timeout-policy": {
       "sovereignty": "adapted"
@@ -795,7 +837,7 @@
       "note": ".agents/notes/implemented/bug-fix/2026-09-22-token-meter-file-request-pricing.md"
     },
     "lsp/lsp": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "lsp/lsp-stdio": {
       "sovereignty": "adapted"
@@ -806,8 +848,11 @@
     "mcp/mcp-client": {
       "sovereignty": "adapted"
     },
+    "mcp/mcp-manager": {
+      "sovereignty": "adapted"
+    },
     "mcp/mcp-resources": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "memory/memory": {
       "sovereignty": "owned"
@@ -853,13 +898,13 @@
       "sovereignty": "owned"
     },
     "sandbox/sandbox": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "sandbox/sandbox-local": {
       "sovereignty": "adapted"
     },
     "sandbox/sandbox-policy": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "sandbox/sandbox-windows-acl": {
       "sovereignty": "tracked"
@@ -868,7 +913,7 @@
       "sovereignty": "adapted"
     },
     "schedule/tool-schedule": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "sdk/client": {
       "sovereignty": "adapted"
@@ -952,7 +997,7 @@
       "sovereignty": "adapted"
     },
     "session/session-stats": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "session/session-telemetry": {
       "sovereignty": "adapted"
@@ -973,7 +1018,7 @@
       "sovereignty": "adapted"
     },
     "session/session-turn-outline": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "session/tool-working-directory": {
       "sovereignty": "adapted"
@@ -1029,7 +1074,7 @@
       "sovereignty": "adapted"
     },
     "skill/skill-office": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "skill/tool-skill": {
       "sovereignty": "adapted"
@@ -1063,10 +1108,10 @@
       "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "storage/storage": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "storage/storage-domain": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "storage/storage-json": {
       "sovereignty": "adapted"
@@ -1113,7 +1158,7 @@
       "sovereignty": "adapted"
     },
     "subprocess/win32-process": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "terminal/terminal": {
       "sovereignty": "adapted"
@@ -1147,6 +1192,9 @@
     "test-support/session-snapshot": {
       "sovereignty": "adapted"
     },
+    "test-support/tool-testkit": {
+      "sovereignty": "adapted"
+    },
     "todo/tool-todo": {
       "sovereignty": "adapted"
     },
@@ -1160,7 +1208,7 @@
       "sovereignty": "adapted"
     },
     "typert/registry": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/atomic-write": {
       "sovereignty": "adapted"
@@ -1184,7 +1232,7 @@
       "sovereignty": "tracked"
     },
     "util/http-proxy": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/launch-environment": {
       "sovereignty": "adapted"
@@ -1203,15 +1251,15 @@
       "sovereignty": "adapted"
     },
     "util/package-manifest": {
-      "sovereignty": "tracked",
+      "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
     },
     "util/plugin-market-index": {
       "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md",
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/time": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/timeout": {
       "sovereignty": "tracked"
@@ -1220,10 +1268,10 @@
       "sovereignty": "adapted"
     },
     "util/workspace-path": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "web/tool-web": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "web/web": {
       "sovereignty": "adapted"
@@ -1239,10 +1287,10 @@
       "sovereignty": "adapted"
     },
     "web/web-search-exa": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "web/web-search-perplexity": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "webhook/webhook": {
       "sovereignty": "owned"
@@ -1264,17 +1312,9 @@
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
-    },
-    "attachment/userdoc-gateway": {
-      "sovereignty": "owned"
     }
   },
   "upstreamOnly": [
-    {
-      "package": "api/account-controller",
-      "reason": "official account lane excluded; CoHarness owns auth/quota governance",
-      "replacedBy": "host/apiproxy"
-    },
     {
       "package": "api/job-controller",
       "reason": "job RPC surface folds into the single BFF per locked decision",
@@ -1299,10 +1339,6 @@
       "package": "api/workspace-files",
       "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
       "replacedBy": "host/apiproxy"
-    },
-    {
-      "package": "boot/config-editor",
-      "reason": "upstream profile-patch editor excluded; settings stays on settings.yaml governance (revisit only if the settings port needs atomic patch editing)"
     },
     {
       "package": "client/product-analytics",
@@ -1372,10 +1408,6 @@
       "reason": "official account credentials excluded"
     },
     {
-      "package": "credentials/deepseek-account-platform",
-      "reason": "official account credentials excluded"
-    },
-    {
       "package": "experimental/webworker-packer",
       "reason": "experimental prototype with no cloud consumer"
     },
@@ -1398,18 +1430,9 @@
       "replacedBy": "session/session-telemetry-otel"
     },
     {
-      "package": "api/remote-access",
-      "reason": "upstream generalized Remote RBAC; the fork ports the access-snapshot concepts onto the collaboration authorize seam and keeps the controller-decomposition rejection",
-      "replacedBy": "context/collaboration"
-    },
-    {
       "package": "client/ui-secret-mask",
       "reason": "Credential masking is integrated into client/ui-primitives through the credential scanner, masks, and SecretText consumed by ui-conversation; this implementation replaces the separate upstream plugin.",
       "replacedBy": "client/ui-primitives"
-    },
-    {
-      "package": "client/ui-deepseek-model-label-1017",
-      "reason": "temporary upstream release-badge plugin for the 1017 Flash model label; no fork product surface consumes it"
     },
     {
       "package": "experimental/cua",
@@ -1480,7 +1503,127 @@
     {
       "package": "feedback/message-feedback",
       "reason": "per-message feedback sidecar and remote removed; no consumer"
+    },
+    {
+      "package": "client/ui-account-notifications",
+      "reason": "official account-notification lane; CoHarness owns auth/quota governance",
+      "replacedBy": "host/apiproxy"
+    },
+    {
+      "package": "client/ui-agent-team",
+      "reason": "upstream relocated the agent-team UI into client/; the fork absorbed the v2 projection-driven panel at experimental/client-ui-agent-team",
+      "replacedBy": "experimental/client-ui-agent-team"
+    },
+    {
+      "package": "client/ui-context-menu",
+      "reason": "upstream client UI surface not carried"
+    },
+    {
+      "package": "client/ui-entry-customization",
+      "reason": "upstream client UI surface not carried"
+    },
+    {
+      "package": "client/ui-file-actions",
+      "reason": "upstream client UI surface not carried"
+    },
+    {
+      "package": "client/ui-file-drag",
+      "reason": "upstream client UI surface not carried"
+    },
+    {
+      "package": "deliverables/deliverable-file-references",
+      "reason": "upstream deliverables lane surface not carried"
+    },
+    {
+      "package": "experimental/action-cards",
+      "reason": "upstream experimental action-cards lane not carried"
+    },
+    {
+      "package": "experimental/client-ui-action-cards",
+      "reason": "upstream experimental action-cards lane not carried"
+    },
+    {
+      "package": "experimental/client-ui-creation-recommendations",
+      "reason": "upstream recommendations lane not carried"
+    },
+    {
+      "package": "experimental/client-ui-plugin-recommendations",
+      "reason": "upstream recommendations lane not carried"
+    },
+    {
+      "package": "experimental/client-ui-stats",
+      "reason": "upstream stats lane not carried"
+    },
+    {
+      "package": "experimental/creation-recommendations",
+      "reason": "upstream recommendations lane not carried"
+    },
+    {
+      "package": "experimental/cua-bundle",
+      "reason": "upstream cua bundle composition; fork carries the cua drivers without the bundle"
+    },
+    {
+      "package": "experimental/deepseek-chat-import",
+      "reason": "upstream chat-import lane is account/history coupled; not carried"
+    },
+    {
+      "package": "experimental/forge-bundle",
+      "reason": "upstream patch layer composing the forge lane; release bundles cannot depend on experimental packages and no preset composes the lane, so the bundle has no consumer"
+    },
+    {
+      "package": "experimental/liveshare",
+      "reason": "upstream liveshare lane not carried"
+    },
+    {
+      "package": "experimental/liveshare-protocol",
+      "reason": "upstream liveshare lane not carried"
+    },
+    {
+      "package": "experimental/personalized-recommendations",
+      "reason": "upstream recommendations lane not carried"
+    },
+    {
+      "package": "experimental/plugin-recommendations",
+      "reason": "upstream recommendations lane not carried"
+    },
+    {
+      "package": "experimental/terminal-panel",
+      "reason": "upstream terminal-panel not carried"
+    },
+    {
+      "package": "session/message-quotes",
+      "reason": "upstream message-quotes surface not carried"
+    },
+    {
+      "package": "team/agent-team",
+      "reason": "upstream moved agent-team to team/ with the v2 projection rewrite; the fork absorbed the v2 semantics at experimental/agent-team",
+      "replacedBy": "experimental/agent-team"
+    },
+    {
+      "package": "team/tool-agent-team",
+      "reason": "upstream moved tool-agent-team to team/ with the v2 four-tool task surface; the fork absorbed it at experimental/tool-agent-team",
+      "replacedBy": "experimental/tool-agent-team"
+    },
+    {
+      "package": "util/error",
+      "reason": "upstream util surface not carried"
+    },
+    {
+      "package": "util/file-drag",
+      "reason": "upstream util surface not carried"
+    },
+    {
+      "package": "util/official-bundles",
+      "reason": "upstream util surface not carried"
+    },
+    {
+      "package": "util/plugin-detail",
+      "reason": "upstream util surface not carried"
+    },
+    {
+      "package": "util/ripgrep",
+      "reason": "upstream util surface not carried"
     }
   ],
-  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json"
+  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.2-rc.3.json"
 }

@@ -244,6 +244,7 @@ const INJECTED_TITLE_PREFIXES = [
   '<goal_',
   'Shared-project attribution for the next message',
   'Current runtime context',
+  'The following information describes your current session',
   '[model changed:',
 ] as const
 

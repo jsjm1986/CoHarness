@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/agent-team-profile/README.md
 document:
-  en: 08cde7a032222807efbe6736617948190859b0a0
-  zh: 62e4cf168388f1e5bd930d4e41d7c20b718136dd
+  en: 6698e01aee1dddcf4d5fe0a0a4f80cc485ac907f
+  zh: 86ecaa08de6a39c48176413b325d6510f970984b
 /:
   en: e263a0edd266210f
   zh: c5779bf7f64631d3
@@ -12,8 +12,8 @@ document:
   en: 3deb4b95d9e58c8d
   zh: 0ba043a54428445e
 /deepseek-ai-dsh-experimental-agent-team-profile/summary:
-  en: 3ca34df3ee31841d
-  zh: a413140d89be2d05
+  en: c1c8b95cb4bb5130
+  zh: a547273c4113dd8c
 /deepseek-ai-dsh-experimental-agent-team-profile/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
@@ -21,14 +21,14 @@ document:
   en: bbff250eba0f1b89
   zh: 0a618f05cc88ee2b
 /deepseek-ai-dsh-experimental-agent-team-profile/use-this-package/install-into-a-profile:
-  en: 97ef5916c04bf2a1
-  zh: 51f9d2bc3fca7936
+  en: 557a637f08a79599
+  zh: 780a1bea987657e5
 /deepseek-ai-dsh-experimental-agent-team-profile/use-this-package/what-you-get:
-  en: f0e95e60095fc5cb
-  zh: 8c36603b423475d0
+  en: b47bc19205dd9a66
+  zh: 5f7631bcb09c02dd
 /deepseek-ai-dsh-experimental-agent-team-profile/understand-the-implementation:
-  en: cac23b0774e00717
-  zh: 4446c09b6525587a
+  en: 41bc4d23d9b2a194
+  zh: 42790bf258109f93
 /deepseek-ai-dsh-experimental-agent-team-profile/further-exploration:
   en: 2513c5cb830db597
   zh: 4526de3c323826f3
@@ -39,8 +39,8 @@ document:
   en: 8e1e365ff3b0dfb2
   zh: c6c91fbf1e1df934
 /deepseek-ai-dsh-experimental-agent-team-profile/model-experience/team-policy-and-tools/what-the-model-sees:
-  en: f54dc1725b90365b
-  zh: 5a505996f7684231
+  en: 1bf714da3924f86e
+  zh: d5941cebda541933
 /deepseek-ai-dsh-experimental-agent-team-profile/model-experience/team-policy-and-tools/token-effect:
   en: da8c178179ba50ba
   zh: c53d5863bc14be79

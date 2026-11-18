@@ -78,10 +78,16 @@ type PromptContentPart =
 ```
 
 ```ts type-equiv
-/** Host prompt content whose file receipts are resolved and whose image bytes await admission. */
+/**
+ * Host prompt content whose upload receipts are resolved. An image part
+ * carries encoded bytes awaiting admission, or references an image this
+ * service already stored for an upload the same Session staged, with
+ * `encodedBytes` holding the byte length of that upload.
+ */
 type AttachmentAdmissionPart =
   | PromptContentPart
   | { readonly type: 'file'; readonly attachment: FileAttachmentRef }
+  | { readonly type: 'image'; readonly attachment: ImageAttachmentRef; readonly encodedBytes: number }
 ```
 
 ```ts type-equiv
@@ -257,9 +263,12 @@ abstract validateImage(input: SaveImageAttachment): Promise<void>
 async saveImages(inputs: readonly SaveImageAttachment[]): Promise<readonly ImageAttachmentRef[]>
 
 /**
- * Admit one Host prompt and replace each uploaded image with its durable reference.
- * Text and durable file references pass through unchanged. A prompt without image parts performs no storage operation.
- * @param content - prompt parts in message order after file receipt resolution.
+ * Admit one Host prompt and replace each encoded image with its durable reference.
+ * Text, durable file references, and already stored images pass through unchanged.
+ * Every image part counts toward `maxImagesPerMessage` and `maxMessageImageBytes`;
+ * a stored image counts the bytes of the upload that stored it. Refused content
+ * starts no writes. A prompt without encoded images performs no storage operation.
+ * @param content - prompt parts in message order after upload receipt resolution.
  * @returns admitted prompt parts in the same order as `content`.
  * @throws AttachmentError when the image batch is refused.
  */

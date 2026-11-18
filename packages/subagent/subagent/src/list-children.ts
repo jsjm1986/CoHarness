@@ -25,7 +25,8 @@ import type { SessionInspection, SessionPersistence } from '@deepseek-ai/dsh-ses
 import type { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import type { SessionProjectionCache } from '@deepseek-ai/dsh-session-projection-cache'
 import { SubagentError } from './error.ts'
-import type { SubagentIdentityProjection } from './projection-types.ts'
+import { isAgentName, joinAgentPath } from './names.ts'
+import type { SubagentCatalogEntry, SubagentIdentityProjection } from './projection-types.ts'
 
 /**
  * Concurrent cold inspections per listing; a constant because it bounds one
@@ -51,6 +52,12 @@ export type SubagentDescendantListEntry = SubagentListEntry & {
   readonly parentId: SessionId
   /** Edge distance from the requested root; direct children are `1`. */
   readonly depth: number
+  /**
+   * Slash-separated catalog names from the requested root; absent when this
+   * child or an ancestor below the root recorded no name, or its creator's
+   * catalog is unreadable.
+   */
+  readonly path?: string
 }
 
 type CorpusRecord = { readonly header: SessionHeader; readonly live: Session | undefined }
@@ -125,11 +132,13 @@ export async function listDescendants(
     listing,
     signal,
   )
+  const paths = await descendantPaths(listing, positioned, rootSessionId, signal)
   const entries: SubagentDescendantListEntry[] = []
   positioned.forEach((position, index) => {
     const row = rows[index]
     if (row !== undefined) {
-      entries.push({ ...row, parentId: position.parentId, depth: position.depth })
+      const path = paths[index]
+      entries.push({ ...row, parentId: position.parentId, depth: position.depth, ...path === undefined ? {} : { path } })
     }
   })
   return entries
@@ -270,6 +279,146 @@ async function resolveCandidateRows(
   }
   assertListingNotCancelled(signal)
   return rows
+}
+
+/**
+ * Compute each positioned candidate's name path in traversal order: the
+ * parent's path was already computed — `''` at the requested root — and each
+ * link contributes the name the creator's committed catalog recorded for it.
+ * An unnamed or unreadable link ends the path below it.
+ */
+async function descendantPaths(
+  listing: ListingRuntime,
+  positioned: readonly PositionedCandidate[],
+  rootSessionId: SessionId,
+  signal: AbortSignal | undefined,
+): Promise<(string | undefined)[]> {
+  const byId = new Map<SessionId, string | undefined>()
+  const paths: (string | undefined)[] = []
+  for (const position of positioned) {
+    // Only cataloged members carry a path; an ordinary session below the root
+    // is never in `positioned`, so it contributes an unnamed link.
+    const parentPath = position.parentId === rootSessionId ? '' : byId.get(position.parentId)
+    const name = await catalogChildName(listing, position.parentId, position.record.header.id, signal)
+    const path = joinAgentPath(parentPath, name)
+    byId.set(position.record.header.id, path)
+    paths.push(path)
+  }
+  return paths
+}
+
+/**
+ * Read the name one creator's catalog recorded for a child. The catalog is
+ * derived data for the listing's own projection reads: a fold or read failure
+ * reports the link as unnamed rather than failing the listing.
+ */
+async function catalogChildName(
+  listing: ListingRuntime,
+  parentId: SessionId,
+  childId: SessionId,
+  signal: AbortSignal | undefined,
+): Promise<string | undefined> {
+  const entries = await catalogEntriesOf(listing, parentId, signal)
+  const entry = entries?.find(candidate => candidate.id === childId)
+  return entry === undefined ? undefined : 'name' in entry ? entry.name : undefined
+}
+
+/** Read one creator's catalog, live-preferred, with cold persistence fallback. */
+async function catalogEntriesOf(
+  listing: ListingRuntime,
+  parentId: SessionId,
+  signal: AbortSignal | undefined,
+): Promise<SubagentCatalogEntry[] | undefined> {
+  const { projections, persistence, corpus } = listing
+  const record = corpus.get(parentId)
+  if (record === undefined) return undefined
+  if (record.live !== undefined) {
+    try {
+      return projections.snapshot(record.live).values.subagentCatalog
+    } catch {
+      return undefined
+    }
+  }
+  if (persistence === undefined) return undefined
+  let inspected: SessionInspection
+  try {
+    inspected = await persistence.inspect(parentId, signal)
+  } catch {
+    assertListingNotCancelled(signal)
+    return undefined
+  }
+  assertListingNotCancelled(signal)
+  if (!sameLifecycle(inspected.meta, record.header)) return undefined
+  try {
+    return projections.restore(
+      {},
+      inspected.events,
+      SessionLogOffset(0),
+      inspected.meta,
+      inspected.inheritedEventCount,
+    ).snapshot.values.subagentCatalog
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Resolve a slash-separated name by reading only the catalogs along its path.
+ * @param ctx - context carrying the session store, projection registry, and optional persistence.
+ * @param rootSessionId - tree root whose catalog holds the first name.
+ * @param name - candidate full name relative to the root.
+ * @param signal - cancellation forwarded to each catalog read.
+ * @returns the named member's Session id, or undefined when the text is not a name in this tree.
+ * @throws {@link SubagentError} when the projection registry is unavailable.
+ */
+export async function resolveAgentPath(
+  ctx: Context,
+  rootSessionId: SessionId,
+  name: string,
+  signal?: AbortSignal,
+): Promise<SessionId | undefined> {
+  const segments = name.split('/')
+  if (!segments.every(isAgentName)) return undefined
+  const projections = ctx.get('sessionProjections')
+  if (projections === undefined) {
+    throw new SubagentError(
+      'resolving agent names requires the sessionProjections registry (load @deepseek-ai/dsh-session-projection)',
+      'SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE',
+    )
+  }
+  const sessions = ctx.get('sessions')
+  const persistence = ctx.get('sessionPersistence')
+  const readCatalog = async (id: SessionId): Promise<SubagentCatalogEntry[] | undefined> => {
+    signal?.throwIfAborted()
+    const live = sessions?.get(id)
+    if (live !== undefined) return projections.snapshot(live).values.subagentCatalog
+    if (persistence === undefined) return undefined
+    try {
+      const inspected = await persistence.inspect(id, signal)
+      signal?.throwIfAborted()
+      return projections.restore(
+        {},
+        inspected.events,
+        SessionLogOffset(0),
+        inspected.meta,
+        inspected.inheritedEventCount,
+      ).snapshot.values.subagentCatalog
+    } catch (error) {
+      if (error instanceof SubagentError) throw error
+      signal?.throwIfAborted()
+      return undefined
+    }
+  }
+  let current = rootSessionId
+  for (const [index, segment] of segments.entries()) {
+    const children = await readCatalog(current)
+    const child = children?.find(entry => 'name' in entry && entry.name === segment)
+    if (child === undefined) return undefined
+    // External and unknown children own no local Session, so they are the last segment too.
+    if (index < segments.length - 1 && child.mode !== 'continuable' && child.mode !== 'one-shot') return undefined
+    current = child.id
+  }
+  return current
 }
 
 /** Build origin-classified candidates from the complete tree without recursion. */

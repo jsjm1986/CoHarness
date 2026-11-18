@@ -9,10 +9,19 @@
   ],
   "references": [
     {
-      "path": "../../fs/fs"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../ptc-runtime"
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../fs/fs"
     },
     {
       "path": "../../sandbox/sandbox"
@@ -30,10 +39,7 @@
       "path": "../../util/values"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../ptc-runtime"
     }
   ]
 }

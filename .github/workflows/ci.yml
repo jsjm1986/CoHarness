@@ -974,6 +974,111 @@ jobs:
           external: admin-ui
           command: npm test and build --prefix gateway/admin-ui
 
+  # The Linux gateway job owns the full suite including PostgreSQL lanes, which
+  # Windows runners cannot host; this lane owns the Windows-meaningful subset —
+  # every spec whose body exercises the win32 branches, plus the built native
+  # proofs that assert platform === 'win32' and therefore run nowhere else.
+  # It fires for every gateway input (shared code can regress Windows behavior
+  # even when no Windows-owned file changes), mirrors the windows-native pool
+  # selector, and sweeps on master and the nightly schedule so continuous
+  # coverage does not depend on a pull request touching gateway/.
+  gateway-windows:
+    needs: pr-scope
+    if: >-
+      always() && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
+      || github.event_name == 'schedule'
+      || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      || (github.event_name == 'pull_request'
+        && (needs.pr-scope.outputs.gateway_mode == 'full' || needs.pr-scope.outputs.proof_native_windows == 'true')))
+    runs-on: >-
+      ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && fromJSON('["self-hosted", "dsh-win-ci", "windows"]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-windows-2025-16core'
+          || 'windows-2025' }}
+    name: gateway / windows native specs and proofs
+    timeout-minutes: 45
+    env:
+      DSH_EVIDENCE_JOB_NAME: "gateway / windows native specs and proofs"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-gateway-windows-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Enable Developer Mode (symlink support)
+        shell: pwsh
+        run: >-
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: gateway/package-lock.json
+
+      - name: Install Gateway dependencies
+        shell: pwsh
+        run: npm ci --prefix gateway
+
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      # The gateway vitest config resolves workspace specifiers through
+      # tsconfig paths and emitted-graph aliases; declaration emit only needs
+      # the locked source graph, so scripts stay off here exactly as in the
+      # Linux gateway lane.
+      - name: Install workspace dependencies for declaration emit
+        shell: pwsh
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # host-addon-only is a documented no-op off Linux/macOS — the run keeps
+      # the lane symmetric with the Linux gateway job while the lib build
+      # emits the declarations and bundles the vitest aliases consume.
+      - name: Build the workspace libraries the Gateway graph consumes
+        shell: pwsh
+        run: pnpm run build:native-system && pnpm run build:lib:host
+
+      - name: Test Gateway Windows spec set
+        shell: pwsh
+        run: >-
+          npm test --prefix gateway --
+          tests/config-windows-paths.spec.ts
+          tests/local-runtime-win32-job.spec.ts
+          tests/local-runtime-launcher.spec.ts
+          tests/local-runtime-native-control.spec.ts
+          tests/local-runtime-owner.spec.ts
+          tests/local-runtime-owner-acl-cache.spec.ts
+          tests/local-runtime-protocol.spec.ts
+          tests/local-runtime-reboot.spec.ts
+          tests/node-access-config.spec.ts
+          tests/node-agent.spec.ts
+          tests/node-private-file.spec.ts
+          tests/node-private-sqlite.spec.ts
+
+      # The compiled entry feeds the built native proofs; the clock check
+      # asserts platform === 'win32' and exists precisely for this lane.
+      - name: Build Gateway for native proofs
+        shell: pwsh
+        run: npm run build --prefix gateway
+
+      - name: Prove the Windows principal clock end to end
+        shell: pwsh
+        run: node tests/run-windows-principal-clock.mjs
+        working-directory: gateway
+
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+          external: gateway-windows
+          command: npm test --prefix gateway -- <windows spec set> && node tests/run-windows-principal-clock.mjs
+
   android-build:
     if: github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'
     runs-on: ubuntu-latest
@@ -1512,18 +1617,26 @@ jobs:
           && github.event.pull_request.head.repo.full_name == github.repository
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '6' || '2' }}
+          && '6' || '4' }}
       DSH_COVERAGE_PARTITIONS: >-
         ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '8' || '2' }}
+          && '8' || '4' }}
       # Instrumented process and polling fixtures can exceed Vitest's defaults
       # under the complete lane's partition fan-out and build-backed workload.
       # Hosted Windows runners lose a different spec to the old 30 s floor on
       # roughly every run; the floor now sits above every measured stall.
       DSH_COVERAGE_TEST_TIMEOUT_MS: '90000'
+      DSH_COVERAGE_TIMING_PROFILE: >-
+        ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && 'selfhosted-dsh-win-ci'
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-windows-2025-16core'
+          || 'github-windows-2025' }}
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -1541,6 +1654,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # A pull_request checkout does not carry tags by default; the
+          # sovereignty and upgrade-records gates resolve mirrored release
+          # commits through them.
+          fetch-tags: true
           persist-credentials: false
 
       - name: Enable Developer Mode (symlink support)
@@ -1565,14 +1682,37 @@ jobs:
         shell: pwsh
         run: pnpm install --frozen-lockfile
 
-      - name: Run native Windows gate inventory
+      - name: Compute coverage timing cache key
+        id: coverage-timing
+        shell: pwsh
+        run: node --import tsx/esm scripts/coverage-timing-key.ts >> "$env:GITHUB_OUTPUT"
+
+      - name: Restore compatible scheduling weights
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: .coverage-times.json
+          key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ steps.coverage-timing.outputs.key }}-
+
+      - name: Run complete native Windows gate inventory
         shell: pwsh
         env:
           DSH_WINDOWS_REQUIRED_ONLY: ${{ github.event_name == 'pull_request' && '1' || '0' }}
         # Below the job budget so a wedged gate cannot occupy the slot for the
-        # full 120 minutes before GitHub's own cancellation lands.
-        timeout-minutes: 90
+        # full 120 minutes before GitHub's own cancellation lands. The gate set
+        # grew past the old 90-minute cap: coverage measured ~66 minutes on the
+        # two-partition hosted runner and ~44 minutes under the current
+        # four-partition fan-out, leaving the remaining inventory inside this
+        # bound with headroom.
+        timeout-minutes: 105
         run: pnpm run check:ci:windows-complete
+      - name: Save successful scheduling weights
+        if: success() && hashFiles('.coverage-times.json') != ''
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: .coverage-times.json
+          key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence
@@ -1645,7 +1785,7 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [pr-scope, node-24, node-24-coverage, node-24-bench, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui, windows-native, release-pack, vendor-pack, native-pack, sandbox-proof, provider-proof, pi-ai-proof]
+    needs: [pr-scope, node-24, node-24-coverage, node-24-bench, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui, gateway-windows, windows-native, release-pack, vendor-pack, native-pack, sandbox-proof, provider-proof, pi-ai-proof]
     if: always() && github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v7

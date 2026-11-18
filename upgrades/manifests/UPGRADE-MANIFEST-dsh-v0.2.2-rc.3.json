@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 3,
+  "reviewDate": "2026-11-15",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "previousTag": "dsh-v0.2.1-rc.2",
+    "previousCommit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+    "targetTags": [
+      {
+        "tag": "dsh-v0.2.2-alpha.2",
+        "commit": "f3803c96974ad4a94195fb97e5c637e9c2a3afe3"
+      },
+      {
+        "tag": "dsh-v0.2.2-alpha.3",
+        "commit": "05b1cae8db6e674c5685101494d4eec24652424a"
+      },
+      {
+        "tag": "dsh-v0.2.2-rc.1",
+        "commit": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db"
+      },
+      {
+        "tag": "dsh-v0.2.2-rc.2",
+        "commit": "ddac96760b6edf8fa0fe17cbdcf0b512f4c12b2c"
+      },
+      {
+        "tag": "dsh-v0.2.2-rc.3",
+        "commit": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced"
+      }
+    ]
+  },
+  "baseline": {
+    "commit": "459c70fef096481336e252065938f3a86c93a967",
+    "branch": "master"
+  },
+  "targetVersion": "0.2.2-rc.1.coharness.1",
+  "versionStatus": "proposed-release-families-unverified",
+  "status": "implementation-in-progress",
+  "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.2.2-rc.3.md",
+  "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.2-rc.3.json",
+  "auditEvidence": [
+    "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.2-rc.3.json",
+    "upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-dsh-v0.2.2-rc.3.json",
+    ".agents/notes/implemented/testing/2026-11-15-llm-replay-child-override-slots.md",
+    ".agents/notes/implemented/testing/2026-11-22-web-scaffold-managed-profile.md"
+  ],
+  "verification": [
+    {
+      "phase": "S6",
+      "command": "pnpm run test:web",
+      "exitCode": 0,
+      "note": "built composition; 144 files / 559 tests all green after three real-regression fixes (remote-events zero-delivery starvation, setup-window append durability, settings dialog boot-race)"
+    },
+    {
+      "phase": "S8",
+      "command": "alignment matrix review sweep",
+      "exitCode": 0,
+      "note": "416 rows all implemented-local-tests-passing; per-lane upstream diffs sampled on the highest-risk surfaces; credential/egress/exec risk scan across every pending src diff: zero hits"
+    },
+    {
+      "phase": "S10",
+      "command": "vitest run --config vitest.e2e.config.ts (focused)",
+      "exitCode": 1,
+      "note": "blocked externally: repository .env DEEPSEEK_API_KEY rejected with 401; credential-store key authenticates (/models 200) but the account returns 402 Insufficient Balance for every model call"
+    },
+    {
+      "phase": "S12",
+      "command": "curl https://harness.maycran.com/",
+      "exitCode": 0,
+      "note": "HTTP 502; public deployment unavailable for acceptance until redeployed"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "named-subagent-tree-addressing",
+      "status": "adapt",
+      "localOwner": "subagent owners",
+      "commitScope": [
+        "packages/subagent/tool-subagent-control/",
+        "packages/subagent/subagent-fork-in-process/",
+        "apps/web/tests/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream named-agent addressing carried at 72d5bf7e898: send_message/list_agents/wait_agent name agents by tree position; delegation wrapper text now describes automatic final-answer delivery; interrupt behind config, base patch disables it for ordinary subagents and Team mode"
+    },
+    {
+      "id": "executor-seam-refactor",
+      "status": "adapt",
+      "localOwner": "tool pipeline owners",
+      "commitScope": [
+        "packages/core/tools/",
+        "packages/core/tool-executor-native/",
+        "packages/core/tool-executor-ptc/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "tool dispatch split into pipeline + executors at 0c19590cb4a / e2bd55d9a6a; PTC programs run confined through ctx.subprocess with an empty process.env"
+    },
+    {
+      "id": "remote-events-waterfall-forwarding",
+      "status": "adapt",
+      "localOwner": "gateway owners",
+      "commitScope": [
+        "packages/api/gateway/src/remote-events.ts",
+        "packages/api/remotes/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream 4dd14d1b1d2 forwards ask/approval waterfalls to remote-event Clients with answers capability; audit fix 2484e7e3167 settles 'next' when a start or disconnect leaves zero answerable deliveries — upstream parks pending for late clients, which starves the fork's mux-based local provider forever"
+    },
+    {
+      "id": "agent-teams-v2",
+      "status": "adapt",
+      "localOwner": "team owners",
+      "commitScope": [
+        "packages/team/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream v2 projection rewrite at 991f9b91094; upstream's deleted experimental/agent-team line stays rejected — the fork keeps its own experimental copy"
+    },
+    {
+      "id": "forge-subsystem",
+      "status": "adapt",
+      "localOwner": "forge owners",
+      "commitScope": [
+        "packages/experimental/forge/",
+        "packages/experimental/forge-github/",
+        "packages/experimental/forge-session/",
+        "packages/experimental/client-ui-forge/",
+        "packages/experimental/worktree/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "ported at 6c7be7e93f6 + 34862c2798c + a5326f23a94; gh CLI runner keeps credentials in gh auth and URLs validate strictly; upstream forge-bundle not carried — opt-in experimental, never shipped by default"
+    },
+    {
+      "id": "feedback-packages",
+      "status": "reject",
+      "localOwner": "feedback owners",
+      "commitScope": [
+        "packages/interaction/command-feedback/",
+        "packages/interaction/message-feedback/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "ported at 38624f6ce40 then fully reverted at 713e0be5a08 per fork decision; not carried"
+    },
+    {
+      "id": "deepseek-chat-import",
+      "status": "reject",
+      "localOwner": "experimental owners",
+      "commitScope": [
+        "packages/experimental/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "rc.3 mainline feature (release-merge parent b8c33a15042) importing deepseek.com chat exports; account/history-coupled surface not carried"
+    },
+    {
+      "id": "upstream-client-api-lanes",
+      "status": "reject",
+      "localOwner": "web/BFF owners",
+      "commitScope": [
+        "packages/client/",
+        "packages/api/",
+        "apps/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "80 reject rows: upstream's own client ui-* packages and api *-controller packages duplicate fork-owned apps/web + client + BFF architecture; not carried by design"
+    },
+    {
+      "id": "permission-preset-seeding",
+      "status": "adapt",
+      "localOwner": "interaction owners",
+      "commitScope": [
+        "packages/interaction/",
+        "apps/web/tests/settings-chrome.e2e.ts"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream moved preset pinning from session/created to agent/created; bare Sessions no longer carry permission facts — tests assert via ctx.agents.create"
+    },
+    {
+      "id": "web-search-default-provider",
+      "status": "adapt",
+      "localOwner": "web owners",
+      "commitScope": [
+        "packages/web/",
+        "packages/bundle/base/cordis.patch.yml"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "shipped composition defaults searchProvider to deepseek-search-api (fetch stays http); selecting the deployment default clears the project override rather than persisting a duplicate"
+    },
+    {
+      "id": "str-replace-editor-global",
+      "status": "adapt",
+      "localOwner": "fs owners",
+      "commitScope": [
+        "packages/bundle/base/cordis.patch.yml",
+        "packages/fs/tool-str-replace-editor/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "fork divergence kept intentionally: base patch registers str_replace_editor globally with maxOutputChars 16000; upstream keeps it opt-in per profile patch"
+    },
+    {
+      "id": "session-format-v7",
+      "status": "adapt",
+      "localOwner": "session owners",
+      "commitScope": [
+        "packages/session/session-format-v6-to-v7/",
+        "snapshots/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "newest writer generation is v7; earlier builds refuse it loudly via SessionFormatUnsupportedMigrationError (catalog.spec-locked); v2–v6 committed generations replay unchanged on HEAD"
+    }
+  ]
+}

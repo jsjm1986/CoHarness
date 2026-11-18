@@ -306,6 +306,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
         usePanelInfo={(() => { throw new Error('unused') })}
+        useRemoteAccess={() => true}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
@@ -323,6 +324,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
         usePanelInfo={(() => { throw new Error('unused') })}
+        useRemoteAccess={() => true}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}

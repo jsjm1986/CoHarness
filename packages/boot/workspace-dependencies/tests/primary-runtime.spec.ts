@@ -10,6 +10,7 @@ import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { installPrimaryRuntime, readPrimaryRuntime, workspaceDependencyPaths, type PrimaryRuntimeManifest } from '../src/primary-runtime.ts'
 import * as workspaceDependencies from '../src/index.ts'
@@ -196,12 +197,12 @@ it('loads the real tool through Cordis, exposes installed paths, and unregisters
     const request = { signal: new AbortController().signal, name: 'load_workspace_dependencies', arguments: {} }
     const inaccessible = vi.spyOn(ctx.fs, 'processPathFromHostPath').mockReturnValue(undefined)
     try {
-      const rejected = await ctx.tools.execute({ ...request, callId: ToolCallId('remote') })
+      const rejected = await executeToolFixture(ctx, { ...request, callId: ToolCallId('remote') })
       expect(rejected.isError).toBe(true)
       expect(JSON.stringify(rejected.content)).toContain('unavailable in the current execution target')
       await expect(readFile(join(root, 'runtime.json'))).rejects.toMatchObject({ code: 'ENOENT' })
     } finally { inaccessible.mockRestore() }
-    const results = await Promise.all(['first', 'second'].map(id => ctx.tools.execute({ ...request, callId: ToolCallId(id) })))
+    const results = await Promise.all(['first', 'second'].map(id => executeToolFixture(ctx, { ...request, callId: ToolCallId(id) })))
     for (const result of results) {
       expect(result.isError).toBe(false)
       expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(workspaceDependencyPaths(root, manifest), undefined, 2) }])

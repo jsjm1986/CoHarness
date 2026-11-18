@@ -6,6 +6,8 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { expect, it, onTestFinished } from 'vitest'
 import * as CordisInspectProviders from '../src/host.ts'
 import * as ToolCordis from '../src/index.ts'
@@ -18,12 +20,13 @@ async function setup() {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(CordisHostRunner)
   const hostFiber = await ctx.plugin(CordisInspectProviders)
   const fiber = await ctx.plugin(ToolCordis)
   const id = SessionId('cordis-inspection')
   const agent = { id, ctx, session: ctx.sessions.create(id) } as Agent
-  const execute = (name: string, args: Record<string, unknown> = {}) => ctx.tools.execute({
+  const execute = (name: string, args: Record<string, unknown> = {}) => executeToolFixture(ctx, {
     name,
     callId: ToolCallId(`inspect-${name}`),
     arguments: args,

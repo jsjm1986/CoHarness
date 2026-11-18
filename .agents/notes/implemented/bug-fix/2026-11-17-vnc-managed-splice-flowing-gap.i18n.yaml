@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-17-vnc-managed-splice-flowing-gap.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-vnc-managed-splice-flowing-gap.md
+document:
+  en: 3025f8a2c88333ee2fd94a2a61d66dbf1e0878b4
+  zh: b93b6b357ed06712d8a480ea37928349132fab61
+/agent-note-vnc-managed-splice-pauses-both-sockets-across-the-reader-to-pump-handoff:
+  en: 101196ed9c1626fd
+  zh: b7b32dc3f68322fe
+/agent-note-vnc-managed-splice-pauses-both-sockets-across-the-reader-to-pump-handoff/problem:
+  en: 5936e27fac59ba84
+  zh: ac3e0acd184880d5
+/agent-note-vnc-managed-splice-pauses-both-sockets-across-the-reader-to-pump-handoff/decision:
+  en: b7514b468476fd0a
+  zh: f13b2316cc2def29
+/agent-note-vnc-managed-splice-pauses-both-sockets-across-the-reader-to-pump-handoff/consequences:
+  en: 8f06dcff347fe044
+  zh: 03dab5061c137466
+/agent-note-vnc-managed-splice-pauses-both-sockets-across-the-reader-to-pump-handoff/alternatives-considered:
+  en: 010022f1a5035d08
+  zh: a07e28120a025ba2
+/agent-note-vnc-managed-splice-pauses-both-sockets-across-the-reader-to-pump-handoff/verification:
+  en: 1e412b77bd7b38e6
+  zh: 75e68ebea35d21d1

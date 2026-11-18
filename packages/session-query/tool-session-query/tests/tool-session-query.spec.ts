@@ -32,6 +32,9 @@ import SessionQueryEngine, {
 } from '@deepseek-ai/dsh-session-query'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import { ToolExecutionPipeline } from '@deepseek-ai/dsh-tools/pipeline'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -224,6 +227,7 @@ async function mount(
   registerTurnBoundary(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   if (enforceTimeout) await ctx.plugin(TimeoutPolicy)
   await ctx.plugin(FakeQuery)
   const fiber = await ctx.plugin(ToolSessionQuery, config)
@@ -234,7 +238,7 @@ async function mount(
     ctx,
     fiber,
     caller,
-    call: (toolName, args, options = {}) => ctx.tools.execute({
+    call: (toolName, args, options = {}) => executeToolFixture(ctx, {
       name: toolName,
       arguments: args,
       callId: ToolCallId(`call-${++calls}`),
@@ -323,7 +327,7 @@ describe('registration and schemas', () => {
     ] as const
 
     for (const [name, args, kind] of classifications) {
-      expect(mounted.ctx.tools.executionMode({
+      expect(new ToolExecutionPipeline(mounted.ctx).executionMode({
         name,
         arguments: args,
         callId: ToolCallId(`mode-${name}`),
@@ -626,7 +630,7 @@ describe('workspace authority and lineage redaction', () => {
   it('fails closed without an agent and for direct cross-workspace targets', async () => {
     const mounted = await mount()
     createSession(mounted.ctx, 'outside', '/outside')
-    const missing = await mounted.ctx.tools.execute({
+    const missing = await executeToolFixture(mounted.ctx, {
       name: 'session_trace',
       arguments: {},
       callId: ToolCallId('missing-agent'),
@@ -2031,10 +2035,11 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(FakeQuery)
     await ctx.plugin(ToolSessionQuery)
     const session = createSession(ctx, 'no-boundary-caller', '/work')
-    const result = await ctx.tools.execute({
+    const result = await executeToolFixture(ctx, {
       name: 'session_event_search',
       arguments: { query: 'q' },
       callId: ToolCallId('call-no-boundary'),

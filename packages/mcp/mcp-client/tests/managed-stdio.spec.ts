@@ -18,6 +18,7 @@ afterEach(() => { native.allocate.mockReset() })
 const config: StdioConfig = {
   transport: 'stdio', serverName: 'controlled', command: 'fixture', args: [], env: {}, cwd: '',
   toolCallTimeoutMs: 5_000, failOnStartupError: true, processGraceMs: 50, processCloseTimeoutMs: 5_000,
+  closeTimeoutMs: 5_000, expandTemplates: false,
 }
 
 function processFixture(options: { missingPipe?: boolean; writeError?: boolean } = {}) {

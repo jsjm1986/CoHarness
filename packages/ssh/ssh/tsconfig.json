@@ -12,10 +12,10 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../credentials/credentials"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../credentials/credentials"
     },
     {
       "path": "../../fs/fs"
@@ -25,12 +25,6 @@
     },
     {
       "path": "../../fs/fs-sandbox"
-    },
-    {
-      "path": "../../subprocess/subprocess"
-    },
-    {
-      "path": "../../subprocess/subprocess-local"
     },
     {
       "path": "../../sandbox/sandbox"
@@ -45,7 +39,16 @@
       "path": "../../session/session-projection"
     },
     {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../subprocess/subprocess-local"
+    },
+    {
       "path": "../../util/brand"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

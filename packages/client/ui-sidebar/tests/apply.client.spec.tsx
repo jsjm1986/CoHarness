@@ -51,6 +51,7 @@ function mountSidebar(b: Awaited<ReturnType<typeof bench>>) {
     {...actions} collapsed={false} width={300}
     useViewport={bindSnapshotSelector(hooks.viewport)} usePanels={bindSnapshotSelector(hooks.panels)}
     useSessions={neverHook} useWorkspaces={neverHook} usePanelInfo={neverHook} t={t}
+    useRemoteAccess={() => true}
     renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
       options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
   />)

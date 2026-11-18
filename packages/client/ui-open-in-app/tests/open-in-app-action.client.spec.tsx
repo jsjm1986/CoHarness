@@ -67,6 +67,7 @@ function bench(over: {
     useSession: vi.fn() as never,
     useProjection: vi.fn() as never,
     usePanelInfo: vi.fn() as never,
+    useRemoteAccess: () => true,
     useInput: vi.fn() as never,
     inputActions: vi.fn() as never,
     useSessions,

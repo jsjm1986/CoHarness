@@ -118,11 +118,16 @@ it.each(['loop', 'root'] as const)('unloads %s while a background child is stopp
     return next()
   })
   const started = await ctx.tools.execute({
-    agent: parent, signal: new AbortController().signal,
-    callId: ToolCallId('background-start'), name: 'subagent',
-    arguments: { description: 'child', prompt: 'wait', run_in_background: true },
+    calls: [{
+      type: 'tool-call',
+      id: ToolCallId('background-start'),
+      name: 'subagent',
+      arguments: JSON.stringify({ description: 'child', prompt: 'wait', run_in_background: true }),
+    }],
+    agent: parent,
+    signal: new AbortController().signal,
   })
-  expect(started.isError).toBe(false)
+  expect(started.results[0]?.result.isError).toBe(false)
   const child = await requestEntered.promise
   for (const target of ['next-step', 'next-turn'] as const) {
     child.send(createUserMessage({ content: [{ type: 'text', text: target }], source: { kind: 'user' } }), target, false)

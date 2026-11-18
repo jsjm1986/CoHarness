@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-headless-startup-test-stub.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-11-16-headless-startup-test-stub.md
+document:
+  en: fcfa0dd42800e2e53667e420cb58140f4e4f587b
+  zh: 3faf062b5f69c4dece0672d841f96b7c788786c2
+/agent-note-test-only-headlessstartup-stub-for-overlay-compositions:
+  en: f7a75da5a8207910
+  zh: 7ceeca3461af29df
+/agent-note-test-only-headlessstartup-stub-for-overlay-compositions/problem:
+  en: bdd6883187aa8b2f
+  zh: e53ef88023295b44
+/agent-note-test-only-headlessstartup-stub-for-overlay-compositions/decision:
+  en: 889a999dbb3c8211
+  zh: 7e406916f445e910
+/agent-note-test-only-headlessstartup-stub-for-overlay-compositions/consequences:
+  en: 8fb08a2ed3695f64
+  zh: 98d1873b3b2cf33f
+/agent-note-test-only-headlessstartup-stub-for-overlay-compositions/alternatives-considered:
+  en: cc3a8cea3294dfde
+  zh: 7f0f030278892600
+/agent-note-test-only-headlessstartup-stub-for-overlay-compositions/verification:
+  en: 394e69cc61c0f622
+  zh: d2661c0f8051ece8

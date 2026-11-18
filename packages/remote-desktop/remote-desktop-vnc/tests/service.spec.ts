@@ -15,8 +15,8 @@ import { VncRemoteDesktop } from '../src/index.ts'
 
 const ADMIN = { principal: 'root', admin: true }
 const HANDSHAKE = Buffer.concat([Buffer.from('RFB 003.008\n', 'latin1'), Buffer.from([1, 1])])
-const KEY_EVENT = Buffer.from([3, 1, 0, 0, 0, 0, 0, 0x61])
-const FB_UPDATE_REQUEST = Buffer.from([2, 0, 0, 0, 0, 0, 4, 0, 3, 0])
+const KEY_EVENT = Buffer.from([4, 1, 0, 0, 0, 0, 0, 0x61])
+const FB_UPDATE_REQUEST = Buffer.from([3, 0, 0, 0, 0, 0, 4, 0, 3, 0])
 
 /** One end of an in-memory socket pair: writes push to `peer`; destroy closes both ends. */
 class Loopback extends Duplex {

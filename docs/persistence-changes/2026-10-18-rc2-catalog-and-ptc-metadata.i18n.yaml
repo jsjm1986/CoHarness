@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-18-rc2-catalog-and-ptc-metadata.md
 document:
-  en: e2f090323d69c188c1dcbe994b3651da2f9d94e6
-  zh: c91643b3d5a5d564db7401a9c8ffe4851a43bd1d
+  en: 36c6642668ac8ae517332d09c4cbfea4512a242d
+  zh: 81bceaa6cf03e54bf38a8b118228421aa3deae63
 /:
   en: 3d5a424ae7d7e46b
   zh: c22a8e4a62d8cc1a
@@ -24,8 +24,8 @@ document:
   en: 314c86b6dea089a7
   zh: 0d193de3a3fab8bc
 /2026-10-18-rc2-catalog-and-ptc-metadata/verification:
-  en: 884080251652b13f
-  zh: c53eebe4fe75eec6
+  en: 5b87a9327b3043b8
+  zh: 42f8e59108a87159
 /2026-10-18-rc2-catalog-and-ptc-metadata/dev-note:
   en: b75c8458928b72b9
   zh: 003ba4e17b4b5269

@@ -14,6 +14,7 @@ const { defineTool } = await import(entry('core/tools'))
 const sources = new Map([
   ['@deepseek-ai/dsh-session', 'core/session'], ['@deepseek-ai/dsh-agent', 'core/agent'],
   ['@deepseek-ai/dsh-llm', 'llm/llm'], ['@deepseek-ai/dsh-tools', 'core/tools'],
+  ['@deepseek-ai/dsh-tool-executor-native', 'core/tool-executor-native'],
   ['@deepseek-ai/dsh-system-prompt', 'core/system-prompt'], ['@deepseek-ai/dsh-session-projection', 'session/session-projection'],
   ['@deepseek-ai/dsh-agent-loop', 'core/agent-loop'], ['@deepseek-ai/dsh-user-approval', 'interaction/user-approval'],
 ])
@@ -40,7 +41,12 @@ try {
   ctx.on('tools/pre-execute', async () => ({ kind: 'ask' }))
   const initial = ctx.on('approval/request', () => Promise.resolve('allowed-once'))
   try {
-    const result = await ctx.tools.execute({ agent, name: 'sensitive', arguments: {}, callId: ToolCallId('approved'), signal: new AbortController().signal })
+    const batch = await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId('approved'), name: 'sensitive', arguments: '{}' }],
+      signal: new AbortController().signal,
+      agent,
+    })
+    const result = batch.results[0].result
     assert.equal(result.isError, false)
     assert.equal(toolRuns, 1)
     process.stdout.write(`${JSON.stringify({ operation: 'live-approval', toolRuns, outcome: 'allowed-once' })}\n`)
@@ -59,7 +65,11 @@ try {
       }))
     }
     disposers.push(ctx.on('approval/request', () => { answerers++; return Promise.resolve('allowed-once') }))
-    const pending = ctx.tools.execute({ agent, name: 'sensitive', arguments: {}, callId: ToolCallId(operation), signal: controller.signal })
+    const pending = ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId(operation), name: 'sensitive', arguments: '{}' }],
+      signal: controller.signal,
+      agent,
+    })
     try {
       if (operation !== 'dispatch-cancelled') {
         await entered.promise
@@ -70,7 +80,7 @@ try {
           await owner.fiber.dispose()
         }
       }
-      const result = await pending
+      const result = (await pending).results[0].result
       assert.equal(result.isError, true)
       resume.resolve()
       if (operation !== 'dispatch-cancelled') await resumed.promise

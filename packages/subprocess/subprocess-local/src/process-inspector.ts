@@ -6,7 +6,7 @@ import type { SubprocessTerminalSignal } from '@deepseek-ai/dsh-subprocess'
 import { createWindowsProcessInspector } from './windows-inspector.ts'
 import { parseProcStat } from './proc-stat.ts'
 
-export { parseProcStat, linuxProcessGroupHasLiveMembers } from './proc-stat.ts'
+export { parseProcStat, linuxProcessGroupLiveMember } from './proc-stat.ts'
 
 /** PID plus start identity, preventing teardown escalation after PID reuse. */
 export interface ProcessIdentity {

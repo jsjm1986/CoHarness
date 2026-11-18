@@ -29,7 +29,7 @@ interface PrepareStages { beforeRequest: number; network: number; afterResponse:
 async function readied(page: Page, click: Locator, runtime: string, method: 'create' | 'history'):
 Promise<{ draft: number; ready: number; stages: PrepareStages }> {
   // Observe the DOM from the actual click task. Driver polling must not inflate the local-edit sample.
-  await page.evaluate(() => {
+  const armClock = () => page.evaluate(() => {
     Object.assign(window, { __dshLatency: undefined })
     document.addEventListener('click', () => {
       const marks: { start: number; input?: number; ready?: number; runtime?: string } = { start: performance.now() }
@@ -52,9 +52,23 @@ Promise<{ draft: number; ready: number; stages: PrepareStages }> {
       requestAnimationFrame(measure)
     }, { capture: true, once: true })
   })
+  await armClock()
   await click.click()
-  await page.waitForFunction(() => (window as Window & { __dshLatency?: { ready?: number } }).__dshLatency?.ready !== undefined,
+  const readyMark = () => page.waitForFunction(
+    () => (window as Window & { __dshLatency?: { ready?: number } }).__dshLatency?.ready !== undefined,
     undefined, { timeout: 10_000 })
+  try {
+    await readyMark()
+  } catch (error) {
+    // A sidebar re-render can detach the row between hit-testing and dispatch,
+    // so the application never issues the history request and the ready mark
+    // never lands. Reopening an already-listed conversation is idempotent —
+    // arm a fresh clock and click once more before reporting the stall.
+    if (method !== 'history') throw error
+    await armClock()
+    await click.click()
+    await readyMark()
+  }
   const result = await page.evaluate(({ method, runtime }) => {
     const mark = (window as Window & { __dshLatency?: BrowserMarks }).__dshLatency
     if (mark === undefined) throw new Error('Missing browser preparation timing')

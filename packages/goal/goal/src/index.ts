@@ -97,6 +97,9 @@ const goalProjectionStateSchema: ZodType<GoalProjectionState> = zod.object({
   if (state.current.updatedAt < state.current.createdAt) {
     context.addIssue({ code: 'custom', message: 'current goal update cannot precede its creation' })
   }
+  if (state.current.roundsStarted > state.current.goal.maxGoalRounds) {
+    context.addIssue({ code: 'custom', message: 'current goal rounds cannot exceed its configured limit' })
+  }
 })
 
 /** Build strict fold state from one checkpoint-safe projection state. */
@@ -516,6 +519,7 @@ export class GoalService extends TypertRemoteService {
   private projected(session: Session): GoalProjectionState | undefined {
     const projections = this.ctx.get('sessionProjections')
     if (projections === undefined) return undefined
+    // The projection registration is owned by this live service instance.
     const state = projections.stateOf(session, 'goal')
     if (state === undefined) throw new Error('goal projection is not registered')
     if (state.failure !== null) throw new Error(state.failure)

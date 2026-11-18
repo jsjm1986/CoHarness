@@ -498,7 +498,10 @@ class Hmr extends Service {
           loader.exit()
           return
         }
-        for (const include of includes) await include.refresh()
+        for (const include of includes) {
+          // A rejected refresh reports unsaved runtime changes; Include keeps its running tree.
+          try { await include.refresh() } catch (error) { this.ctx.logger.warn(error) }
+        }
         if (this.stashed.size > 0) {
           try { await this.partialReload() } finally { this.stashed.clear() }
         }
@@ -707,10 +710,12 @@ class Hmr extends Service {
       activated: Fiber[] = [],
     ) => {
       for (const [previousFiber, implementation] of replacements.getActiveImplementations(this.ctx, plugin, fibers)) {
-        const fiber = previousFiber.fiber.parent.registry.plugin(implementation, previousFiber.config, this.getOuterStack).ctx.fiber
+        const wrapper = previousFiber.fiber.parent.registry.plugin(implementation, previousFiber.config, this.getOuterStack)
+        const fiber = wrapper.ctx.fiber
         if (previousFiber.entry !== undefined) {
           fiber.entry = previousFiber.entry
-          previousFiber.entry.fiber = fiber
+          // Like Loader activation, store the registry wrapper; identity checks compare `.ctx.fiber`.
+          previousFiber.entry.fiber = wrapper
         }
         activated.push(fiber)
       }

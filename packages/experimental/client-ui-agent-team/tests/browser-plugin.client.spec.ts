@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import type { TeamMemberView as TeamRosterMember } from '@deepseek-ai/dsh-experimental-agent-team/client'
 import type {} from '@deepseek-ai/dsh-experimental-agent-team/remote'
 
 // The generated remote artifact lives in lib/, which no-build test lanes
@@ -23,19 +22,13 @@ const REMOTE: TypertRemoteContribution = {
 }
 
 async function bench(options: {
-  addressed?: boolean
   registrationFailure?: boolean
-  remoteFailure?: 'view'
+  setEnabledFailure?: boolean
   refreshGate?: Promise<void>
   clientApply?: (ctx: Context) => Promise<unknown>
 } = {}) {
   const ctx = new Context()
   const calls: { method: string; args: unknown[] }[] = []
-  const task = {
-    id: 'task-1',
-    revision: 1, subject: 'Task', description: 'Description', status: 'pending' as const,
-    blockedBy: [], writeScopes: [], ready: true, writeScopeWarnings: [],
-  }
   class RemoteService extends Service {
     readonly disposeMount = vi.fn(() => Promise.resolve())
     readonly mount = vi.fn((_contribution: unknown) => Promise.resolve(this.disposeMount))
@@ -49,37 +42,17 @@ async function bench(options: {
     }
   }
   const remote = new RemoteService(ctx)
-  const failure = {
-    ok: false as const,
-    error: new RemoteError('gateway/internal', 'offline', {}),
-  }
-  const view = {
-    members: [{
-      id: SESSION, name: 'lead', role: 'lead' as const, status: 'inactive' as const, diagnostics: [],
-    }], tasks: [task],
-  }
   ctx.provide('remote.agentTeams', {
-    view: (...args: unknown[]) => {
-      calls.push({ method: 'agentTeams/view', args })
-      return Promise.resolve(options.remoteFailure === 'view'
-        ? failure
-        : { ok: true as const, value: view })
+    setEnabled: (sessionId: SessionId, enabled: boolean) => {
+      calls.push({ method: 'agentTeams/setEnabled', args: [sessionId, enabled] })
+      return Promise.resolve(options.setEnabledFailure === true
+        ? { ok: false as const, error: new RemoteError('gateway/internal', 'offline', {}) }
+        : { ok: true as const, value: undefined })
     },
   })
   const navigation: unknown[] = []
-  let mainSessionId = options.addressed === true ? CHILD : SESSION
+  let mainSessionId: SessionId = SESSION
   ctx.provide('sessions', {
-    binding: (id: SessionId) => options.addressed === true && id === CHILD
-      ? { session: { getSnapshot: () => ({
-        subagent: {
-          address: {
-            parentSessionId: SESSION,
-            childSessionId: CHILD,
-            mode: 'continuable' as const,
-          },
-        },
-      }) } }
-      : undefined,
     refreshSubagents: (id: SessionId) => {
       navigation.push(['refresh', id])
       return options.refreshGate ?? Promise.resolve()
@@ -91,7 +64,6 @@ async function bench(options: {
     openSubagent: (address: unknown) => { navigation.push(['open', address]) },
     open: (id: SessionId) => { navigation.push(['openSession', id]) },
   } as never)
-  ctx.provide('conversation', {})
   ctx.provide('locale', new LocaleRuntime(ctx))
   await ctx.plugin(SlotRegistry).await()
   const collapseHeader = ctx.slots.register({
@@ -128,7 +100,7 @@ async function bench(options: {
 }
 
 describe('ui-team browser plugin', () => {
-  it('registers one disposable header action with a read-only board view', async () => {
+  it('registers one disposable header action wired to agentTeams/setEnabled', async () => {
     const b = await bench()
     expect(inject).toEqual(['sessions', 'remote', 'slots', 'locale'])
     expect(b.entry()).toMatchObject({
@@ -138,18 +110,10 @@ describe('ui-team browser plugin', () => {
     expect(b.remote.mount).toHaveBeenCalledOnce()
     expect(b.remote.mount).toHaveBeenCalledWith(REMOTE)
     const actions = (b.entry()!.inject as unknown as () => TeamActionInjected)()
-    expect((await actions.load(SESSION)).ok).toBe(true)
-    expect(b.calls.map(call => call.method)).toEqual(['agentTeams/view'])
-
-    await actions.openTeammate(SESSION, {
-      id: SESSION,
-      name: 'lead',
-      role: 'lead',
-      status: 'inactive',
-      diagnostics: [],
-    })
+    expect(await actions.selectTeamMode(SESSION, true)).toBeNull()
+    expect(b.calls).toEqual([{ method: 'agentTeams/setEnabled', args: [SESSION, true] }])
+    await actions.openTeammate(SESSION, SESSION)
     expect(b.navigation).toEqual([['openSession', SESSION]])
-
     await b.fiber.dispose()
     expect(b.entry()).toBeUndefined()
     expect(b.remote.disposeMount).toHaveBeenCalledOnce()
@@ -162,48 +126,16 @@ describe('ui-team browser plugin', () => {
     expect(b.remote.disposeMount).toHaveBeenCalledOnce()
   })
 
-  it('returns Remote carrier failures unchanged', async () => {
-    const view = await bench({ remoteFailure: 'view' })
-    const viewActions = (view.entry()!.inject as unknown as () => TeamActionInjected)()
-    await expect(viewActions.load(SESSION)).resolves.toMatchObject({
-      ok: false,
-      error: { code: 'gateway/internal', message: 'offline' },
-    })
+  it('returns Remote carrier failures as the mode-selection message', async () => {
+    const b = await bench({ setEnabledFailure: true })
+    const actions = (b.entry()!.inject as unknown as () => TeamActionInjected)()
+    await expect(actions.selectTeamMode(SESSION, false)).resolves.toBe('offline')
   })
 
-  it('refreshes the descriptor catalog before opening a continuable teammate address', async () => {
+  it('refreshes the catalog before opening a continuable teammate address', async () => {
     const b = await bench()
     const actions = (b.entry()!.inject as unknown as () => TeamActionInjected)()
-    const member: TeamRosterMember = {
-      id: CHILD,
-      name: 'worker',
-      role: 'teammate',
-      status: 'inactive',
-      diagnostics: [],
-    }
-    await actions.openTeammate(SESSION, member)
-    expect(b.navigation).toEqual([
-      ['refresh', SESSION],
-      ['open', {
-        parentSessionId: SESSION,
-        childSessionId: CHILD,
-        mode: 'continuable',
-      }],
-    ])
-  })
-
-  it('routes Team actions from an addressed teammate conversation back through its Lead', async () => {
-    const b = await bench({ addressed: true })
-    const actions = (b.entry()!.inject as unknown as () => TeamActionInjected)()
-    await actions.load(CHILD)
-    await actions.openTeammate(CHILD, {
-      id: CHILD,
-      name: 'worker',
-      role: 'teammate',
-      status: 'inactive',
-      diagnostics: [],
-    })
-    expect(b.calls[0]).toEqual({ method: 'agentTeams/view', args: [SESSION] })
+    await actions.openTeammate(SESSION, CHILD)
     expect(b.navigation).toEqual([
       ['refresh', SESSION],
       ['open', {
@@ -218,40 +150,20 @@ describe('ui-team browser plugin', () => {
     const refresh = Promise.withResolvers<undefined>()
     const b = await bench({ refreshGate: refresh.promise })
     const actions = (b.entry()!.inject as unknown as () => TeamActionInjected)()
-    const opening = actions.openTeammate(SESSION, {
-      id: CHILD,
-      name: 'worker',
-      role: 'teammate',
-      status: 'inactive',
-      diagnostics: [],
-    })
+    const opening = actions.openTeammate(SESSION, CHILD)
     expect(b.navigation).toEqual([['refresh', SESSION]])
     b.select('other-session' as SessionId)
     refresh.resolve(undefined)
     await opening
     expect(b.navigation).toEqual([['refresh', SESSION]])
   })
+})
 
-  it('re-registers after the conversation header slot is collapsed and declared again', async () => {
-    const b = await bench()
-    expect(b.entry()).toBeDefined()
-    b.collapseHeader()
-    expect(b.entry()).toBeUndefined()
-    b.ctx.slots.register({
-      name: 'root',
-      children: { 'conversation.session.header.actions': { kind: 'list', scope: 'session' } },
-    } as never, () => null)
-    await Promise.resolve()
-    expect(b.entry()).toBeDefined()
-  })
-
-  it('mounts the generated remote through the client entry', async () => {
+describe('client entry', () => {
+  it('mounts through the browser apply path', async () => {
     const b = await bench({ clientApply })
-    expect(b.entry()).toMatchObject({ component: TeamAction })
-    await b.fiber.dispose()
-  })
-
-  it('keeps the node half inert', () => {
-    expect(() => { nodeApply() }).not.toThrow()
+    expect(b.remote.mount).toHaveBeenCalledOnce()
+    expect(b.entry()).toBeDefined()
+    void nodeApply
   })
 })

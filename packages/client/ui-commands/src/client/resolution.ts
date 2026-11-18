@@ -34,6 +34,8 @@ export function claimToken(descriptor: CommandDescriptor, t: TranslateNS<'comman
   return name === undefined ? descriptor.name : t(`token.${name}`)
 }
 
+/* jscpd:ignore-start -- Mirrors interaction/commands' alias table and
+   resolution; client rules forbid importing another plugin's internals. */
 const TOKEN_ALIASES = new Map(
   (Object.keys(BUILTINS) as BuiltinCommandName[]).flatMap(name =>
     [zh[`token.${name}`], en[`token.${name}`]].map(token => [token, name] as const)),
@@ -50,4 +52,5 @@ export function resolveCommand(token: string, descriptors: readonly CommandDescr
   if (exact !== undefined) return exact
   const name = TOKEN_ALIASES.get(token)
   return name === undefined ? undefined : descriptors.find(descriptor => descriptor.definitionId === BUILTINS[name])
+  /* jscpd:ignore-end */
 }

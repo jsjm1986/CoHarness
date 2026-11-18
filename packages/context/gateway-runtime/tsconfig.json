@@ -10,43 +10,46 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
       "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     },
     {
       "path": "../../client/connection/tsconfig.host.json"
     },
     {
-      "path": "../../host/webserver"
+      "path": "../../core/agent"
     },
     {
       "path": "../../core/session"
     },
     {
+      "path": "../../host/apiproxy"
+    },
+    {
+      "path": "../../host/webserver"
+    },
+    {
+      "path": "../../llm/model-access"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
       "path": "../../util/brand"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../workspace/workspace"
     },
     {
       "path": "../execution-authority"
     },
     {
       "path": "../resource-budget"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../llm/model-access"
-    },
-    {
-      "path": "../../host/apiproxy"
-    },
-    {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../settings/settings"
     }
   ]
 }

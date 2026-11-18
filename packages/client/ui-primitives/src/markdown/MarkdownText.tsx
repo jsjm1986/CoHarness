@@ -32,6 +32,7 @@ function renderSettled(
   labels: MarkdownLabels,
   fileMentions: MarkdownFileMentions | undefined,
   pathImages: MarkdownPathImages | undefined,
+  omitHtml: boolean,
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
@@ -41,6 +42,7 @@ function renderSettled(
     labels,
     fileMentions,
     pathImages,
+    omitHtml,
     targets,
     footnoteOrder: [],
     footnoteCounts: new Map(),
@@ -70,8 +72,11 @@ class StreamingRenderer {
   private lastText: string | null = null
   private lastRendered: ReactNode[] = []
 
-  /** @param labels - Localized Markdown chrome baked into cached elements; the owner replaces the renderer when it changes. */
-  constructor(private readonly labels: MarkdownLabels) {}
+  /**
+   * @param labels - Localized Markdown chrome baked into cached elements; the owner replaces the renderer when it changes.
+   * @param omitHtml - Whether raw HTML renders nothing; the owner replaces the renderer when it changes.
+   */
+  constructor(private readonly labels: MarkdownLabels, readonly omitHtml: boolean) {}
 
   /**
    * Render the current accumulated text. Idempotent per text value, so React
@@ -106,6 +111,7 @@ class StreamingRenderer {
         labels: this.labels,
         fileMentions: undefined,
         pathImages: undefined,
+        omitHtml: this.omitHtml,
         targets: frameTargets,
         footnoteOrder: this.frozenFootnoteOrder,
         footnoteCounts: this.frozenFootnoteCounts,
@@ -125,6 +131,7 @@ class StreamingRenderer {
       labels: this.labels,
       fileMentions: undefined,
       pathImages: undefined,
+      omitHtml: this.omitHtml,
       targets: frameTargets,
       footnoteOrder: [...this.frozenFootnoteOrder],
       footnoteCounts: new Map(this.frozenFootnoteCounts),
@@ -157,17 +164,20 @@ class StreamingRenderer {
  * streaming message's vocabulary is not final and frozen cached elements
  * must not bake in handlers that could go stale. `variant="compact"` uses
  * secondary typography and tight block spacing without truncating content.
+ * `omitHtml` renders raw HTML as nothing at all — owners of untrusted comment
+ * bodies drop tags their readers should not see literal.
  * @returns A GFM document with TeX math rendered through KaTeX; raw HTML,
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels: providedLabels, fileMentions, pathImages, variant = 'body' }: {
+export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels: providedLabels, fileMentions, pathImages, variant = 'body', omitHtml = false }: {
   text: string
   streaming?: boolean
   labels: MarkdownLabels
   fileMentions?: MarkdownFileMentions | undefined
   pathImages?: MarkdownPathImages | undefined
   variant?: 'body' | 'compact'
+  omitHtml?: boolean
 }) {
   // The compact variant keeps the plain fence chrome; the card toolbar rides
   // the body variant's larger code card.
@@ -179,16 +189,17 @@ export const MarkdownText = memo(function MarkdownText({ text, streaming = false
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, labels, fileMentions, pathImages)
+      return renderSettled(text, labels, fileMentions, pathImages, omitHtml)
     }
     if (
       streamRef.current === null
       || streamLabelsRef.current !== labels
+      || streamRef.current.omitHtml !== omitHtml
     ) {
-      streamRef.current = new StreamingRenderer(labels)
+      streamRef.current = new StreamingRenderer(labels, omitHtml)
       streamLabelsRef.current = labels
     }
     return streamRef.current.render(text)
-  }, [text, streaming, labels, fileMentions, pathImages])
+  }, [text, streaming, labels, fileMentions, pathImages, omitHtml])
   return <div className={clsx(css.markdown, variant === 'compact' && css.compact)}>{children}</div>
 })

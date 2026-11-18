@@ -49,7 +49,7 @@ try {
     })
     peer = new SshRpcPeer(handle.stdout, handle.stdin, 64 * 1024 * 1024, 128)
     const request = (method, body, schema) => peer.request(method, body, schema, AbortSignal.timeout(20_000))
-    const facts = await request('hello', { protocol: 2, workspace, leaseMs: 30_000 }, helloSchema)
+    const facts = await request('hello', { protocol: 3, workspace, leaseMs: 30_000 }, helloSchema)
     assert.match(facts.root, /^\/tmp\/dsh-ssh-[^/]+$/u)
     const prepared = await request('process.prepare', { argv: [process.execPath], cwd: workspace, graceMs: 50,
       stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' } }, preparedSchema)

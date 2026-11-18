@@ -73,7 +73,7 @@ it.skipIf(process.platform === 'win32')('admits the actual local carrier before 
     .toMatchObject({ kind: 'process', origin: 'infrastructure' })
   await expect(access(started)).rejects.toThrow()
   grant.resolve({ signal: permit.signal, release, uncertain })
-  expect(await opening).toMatchObject({ protocol: 2, kind: 'node-script', workspace: root })
+  expect(await opening).toMatchObject({ protocol: 3, kind: 'node-script', workspace: root })
   await expect(access(started)).resolves.toBeUndefined()
   expect(release).not.toHaveBeenCalled()
   await connection.dispose()

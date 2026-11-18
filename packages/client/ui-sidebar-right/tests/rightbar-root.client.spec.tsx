@@ -38,6 +38,7 @@ function mounted(views: readonly SidebarSessionViewSnapshot[], props: Partial<Pa
     useSessions={(<T,>(selector: (state: { current: SessionId | undefined }) => T): T => selector({ current: OTHER })) as never}
     useWorkspaces={vi.fn() as never}
     usePanelInfo={vi.fn() as never}
+    useRemoteAccess={() => true}
     useViews={(<T,>(selector: (views: readonly SidebarSessionViewSnapshot[]) => T): T => selector(views))}
     useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })}
     mountView={mountView}

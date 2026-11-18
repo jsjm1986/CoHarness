@@ -161,7 +161,17 @@ export class HttpFetchProvider implements WebFetchProvider {
       throw error
     }
     const { bytes, truncatedByBytes } = await this.readCapped(response, signal)
-    const decoded = decoder.decode(bytes)
+    let decoded: string
+    try {
+      // Only a real byte-cap truncation permits an incomplete UTF-8 suffix.
+      decoded = decoder.decode(bytes, { stream: decoder.fatal && truncatedByBytes })
+    } catch (error: unknown) {
+      throw new WebError(
+        'response body is not valid UTF-8 for the malformed charset declaration',
+        'WEB_UNSUPPORTED_CONTENT_TYPE',
+        { cause: error },
+      )
+    }
     const truncatedByChars = decoded.length > this.limits.maxBodyChars
     const content = truncatedByChars ? decoded.slice(0, this.limits.maxBodyChars) : decoded
     const body: WebFetchBody = kind === 'html' ? { kind: 'html', content } : { kind: 'text', content }

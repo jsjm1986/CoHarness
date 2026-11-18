@@ -11,14 +11,6 @@ let root: string | undefined
 
 const sandboxUsable = await (async () => {
   if (process.platform !== 'darwin' && process.platform !== 'linux') return false
-  // The denial assertions below need the checkout to sit outside every path a
-  // confined workspace-write may touch; a checkout rooted inside /tmp or the
-  // platform temp dir (both standing writable roots) makes a Seatbelt denial
-  // unreachable, so the file-policy specs skip there.
-  const { canonicalPath } = await import('@deepseek-ai/dsh-sandbox')
-  const { tmpdir } = await import('node:os')
-  const cwd = canonicalPath(process.cwd())
-  if ([canonicalPath('/tmp'), canonicalPath(tmpdir())].some(root => cwd === root || cwd.startsWith(`${root}/`))) return false
   const probe = new Context()
   try {
     await probe.plugin(LocalSandbox)

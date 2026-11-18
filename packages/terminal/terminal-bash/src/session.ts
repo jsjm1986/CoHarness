@@ -162,6 +162,11 @@ class LocalSendOperation implements TerminalSendOperation {
   private cancellationRequested = false
   private initialForegroundLeftWait: boolean
   private initialForegroundPgid: number | undefined
+  private foregroundBusyPolls = 0
+  private expectsEcho = false
+  private echoText = ''
+  private echoMatched = 0
+  private sawNonPromptOutput = false
 
   constructor(
     maxBytes: number,
@@ -213,16 +218,72 @@ class LocalSendOperation implements TerminalSendOperation {
 
   setInitialForeground(foreground: SubprocessTerminalForeground | undefined): void {
     this.initialForegroundPgid = foreground?.processGroupId
-    this.initialForegroundLeftWait = foreground?.inputWaiting !== true
+    this.foregroundBusyPolls = foreground !== undefined && !foreground.inputWaiting ? 1 : 0
+    this.initialForegroundLeftWait = foreground === undefined
+  }
+
+  /**
+   * Record that input was written so a bare prompt redraw cannot count as
+   * completion evidence before its echo or other output arrives.
+   */
+  noteInput(input: string): void {
+    this.expectsEcho = true
+    this.echoText = input.replace(/\s+/g, '')
+    this.echoMatched = 0
+  }
+
+  /**
+   * Consume text the terminal may have produced simply by redrawing the
+   * written input: the tty echoes input in order (wrapped across fragments),
+   * and a line editor may re-render accepted text or earlier segments.
+   * Coverage therefore accepts a fragment occurring at or before the matched
+   * position — contiguous continuation, overlap, or a backward re-render.
+   * Literal output embedded in the input — a marker the wrapper prints —
+   * only occurs ahead of echo coverage and stays evidence. `stty -echo`
+   * shells emit no echo at all, so wrapper markers arm them immediately.
+   * @param text - sanitized non-prompt text of one chunk.
+   * @returns whether the text was fully absorbed as input echo.
+   */
+  absorbEcho(text: string): boolean {
+    if (!this.expectsEcho) return false
+    const normalized = text.replace(/\s+/g, '')
+    if (normalized === '') return true
+    const position = this.echoText.lastIndexOf(normalized, this.echoMatched)
+    if (position < 0) return false
+    this.echoMatched = Math.max(this.echoMatched, position + normalized.length)
+    return true
+  }
+
+  /** Record sanitized text that the prompt's own tail cannot explain. */
+  noteNonPromptOutput(): void {
+    this.sawNonPromptOutput = true
+  }
+
+  /**
+   * Whether a fresh prompt may settle this send. Sends that wrote input first
+   * need either output a stale prompt redraw cannot supply, or the completed
+   * echo replay that proves the injected line left the prompt editor — a
+   * prompt redrawn mid-echo still belongs to the previous command.
+   */
+  get promptEvidenceArmed(): boolean {
+    return !this.expectsEcho || this.sawNonPromptOutput
+      || this.echoMatched >= this.echoText.length
   }
 
   acceptsStdinWait(pgid: number, waiting: boolean): boolean {
     // The same group may still expose the wait that existed before terminal.write.
     // Observe every poll so a departure before the exact-settlement threshold
-    // still makes a later return to that wait post-write evidence.
+    // still makes a later return to that wait post-write evidence. A line
+    // editor's paste-echo churn can flicker the flag for a single poll without
+    // the shell having run the line, so the departure must hold across two
+    // consecutive busy polls before a return counts as completion.
     if (pgid !== this.initialForegroundPgid) return waiting
-    if (!waiting) this.initialForegroundLeftWait = true
-    return waiting && this.initialForegroundLeftWait
+    if (!waiting) {
+      if (++this.foregroundBusyPolls >= 2) this.initialForegroundLeftWait = true
+      return false
+    }
+    this.foregroundBusyPolls = 0
+    return this.initialForegroundLeftWait
   }
 
   cancel(): boolean {
@@ -243,7 +304,7 @@ export class LocalPtySession implements TerminalBackendSession {
   private readonly emulatorData: IDisposable
   private readonly sanitizer: TerminalSanitizer
   private readonly scrollback: BoundedTextBuffer
-  private readonly outputEnded = Promise.withResolvers<undefined>()
+  private readonly outputEnded = Promise.withResolvers<void>()
   private readonly completion: Promise<void>
   private statusValue: TerminalSessionStatus = { kind: 'running' }
   // TODO(pty-send-state-consolidation): Fold the per-send fields below
@@ -314,8 +375,8 @@ export class LocalPtySession implements TerminalBackendSession {
     try {
       const operation = this.startSend({ text: '', submit: false, ...signal !== undefined ? { signal } : {} })
       const result = await operation.done
-      if (result.waitReason === 'session_exit') throw new Error('PTY shell exited during startup')
-      if (result.waitReason === 'timeout') throw new Error('PTY shell did not reach readiness before startup timeout')
+      if (result.waitReason === 'session_exit') throw new TerminalError('PTY shell exited during startup', 'STARTUP_EXITED')
+      if (result.waitReason === 'timeout') throw new TerminalError('PTY shell did not reach readiness before startup timeout', 'STARTUP_TIMEOUT')
       this.motd = result.viewport
     } catch (error: unknown) {
       signal?.throwIfAborted()
@@ -326,8 +387,8 @@ export class LocalPtySession implements TerminalBackendSession {
   }
 
   startSend(request: TerminalSendRequest): TerminalSendOperation {
-    if (this.closing) throw new Error('PTY session is closing')
-    if (this.statusValue.kind === 'exited') throw new Error('PTY session has exited')
+    if (this.closing) throw new TerminalError('PTY session is closing', 'SESSION_CLOSING')
+    if (this.statusValue.kind === 'exited') throw new TerminalError('PTY session has exited', 'SESSION_EXITED')
     if (this.active !== undefined) {
       const draining = this.activeWrite !== undefined
         ? ' or draining provider write'
@@ -336,7 +397,12 @@ export class LocalPtySession implements TerminalBackendSession {
           : ''
       throw new TerminalError(`PTY session already has an active send${draining}`, 'SEND_ACTIVE')
     }
-    if (request.signal?.aborted === true) throw new Error('PTY send aborted before write')
+    if (request.signal?.aborted === true) {
+      // Named as a cancellation so the tool registry classifies it as the caller's abort.
+      const aborted = new Error('PTY send aborted before write')
+      aborted.name = 'AbortError'
+      throw aborted
+    }
 
     const operation = new LocalSendOperation(
       this.config.maxReadBytes,
@@ -391,6 +457,7 @@ export class LocalPtySession implements TerminalBackendSession {
       const input = `${request.text}${request.submit ? '\r' : ''}`
       if (input.length > 0 && !operation.cancelRequested) {
         this.resetReadinessEvidence()
+        operation.noteInput(input)
         const write = this.terminal.write(input)
         this.activeWrite = write.then(() => true, () => false)
         try {
@@ -452,7 +519,7 @@ export class LocalPtySession implements TerminalBackendSession {
   }
 
   async signal(signal: TerminalSignal): Promise<TerminalSignalResult> {
-    if (this.closing) throw new Error('PTY session is closing')
+    if (this.closing) throw new TerminalError('PTY session is closing', 'SESSION_CLOSING')
     const targetPgid = await this.terminal.signalForeground(signal)
     return { delivered: true, targetPgid }
   }
@@ -484,19 +551,31 @@ export class LocalPtySession implements TerminalBackendSession {
     this.onData(this.decoder.decode())
     this.appendOutput(this.sanitizer.flush())
     this.closeEmulator()
-    this.outputEnded.resolve(undefined)
+    this.outputEnded.resolve()
   }
 
   private readonly onTerminalError = (error: Error): void => {
     this.closeEmulator()
     this.onTransportFailure(error)
-    this.outputEnded.resolve(undefined)
+    this.outputEnded.resolve()
   }
 
   private onData(data: string): void {
     const sanitized = this.sanitizer.push(data)
     this.appendOutput(sanitized.text)
-    if (sanitized.prompt) {
+    // Text beyond the prompt's own tail is consumption evidence a stale prompt
+    // redraw cannot supply: a trailing repaint from the previous command can
+    // land inside this send and must not arm its prompt settlement alone. A
+    // prompt-tail fragment split across the send boundary is no such evidence
+    // either, and text mid-tail is still prompt until the tail completes.
+    const promptTail = sanitized.prompt ? sanitized.promptTail || '' : ''
+    const content = sanitized.text.slice(0, Math.max(0, sanitized.text.length - promptTail.length))
+    const midTail = !sanitized.prompt && this.promptSeen && !this.promptTextSeen
+    if (content.length > 0 && !CONTROLLED_PROMPT.startsWith(content) && !midTail
+      && this.active?.absorbEcho(content) === false) {
+      this.active.noteNonPromptOutput()
+    }
+    if (sanitized.prompt && (this.active?.promptEvidenceArmed ?? true)) {
       // TODO(pty-delayed-signal-prompt): With a reproducer, define a marker-generation boundary
       // before attributing a signal-delayed prompt to a later send.
       // Bash can print PROMPT_COMMAND before the kernel publishes its return
@@ -567,7 +646,7 @@ export class LocalPtySession implements TerminalBackendSession {
         this.shellPgid = foreground.processGroupId
       }
       if (this.promptSeen && this.promptTextSeen && idleFor >= this.config.pollIntervalMs
-        && foreground?.processGroupId === this.shellPgid) {
+        && foreground?.processGroupId === this.shellPgid && operation.promptEvidenceArmed) {
         this.settleActive('stdin_read')
         return
       }

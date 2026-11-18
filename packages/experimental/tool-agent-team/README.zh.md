@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "Agent Teams 模式下的条件共享任务工具与策略"
 kind: "package-reference"
 ---
 
@@ -7,80 +7,70 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-[`ctx.agentTeams`](../agent-team/README.zh.md) 的 scoped 模型适配器。它会在每个隐式 Lead 与持久 teammate scope 中安装 Agent Teams 策略和协作工具。scoped Team 定义会覆盖同名的旧全局 continuable-subagent control，因此同时挂载两者的组合必须禁用旧定义。
+[`ctx.agentTeams`](../agent-team/README.zh.md) 的模型面适配器。它只注册四个共享任务工具外加一节系统提示词策略，每项都以调用方根 Session 开启 Team 模式为条件。teammate 的创建、发现、消息与中断仍归标准 subagent 工具（`subagent`、`subagent_fork`、`list_agents`、`send_message`、`interrupt_agent`）；本包刻意不提供任何 Team 专用协作面。
 
 ## 概述
 
-本包让模型创建具名 teammate、向它们发送消息、查看可用状态、等待进展、中断卡住的工作，并通过共享任务板协调。每个团队成员都会获得相同的九个工具，以及在共享工作区协调的指引。当模型只应在你明确要求后运行团队时，选择本包。它会取代同名的旧版 subagent 控件，因此同时需要两者的组合必须禁用旧定义。本包以实验性名称公开发布，但不提供稳定性保证。
+本包让模型通过一块共享的、带修订校验的任务板协调委派工作：创建带依赖与建议写范围的任务，列出与读取板面，并应用 compare-and-set 转移——claim、release、edit、set_dependencies、complete、reopen、reassign 与 delete。工具仅在根 Session 开启 Team 模式时存在，因此同一组合可同时服务普通会话与 Team 会话而不互相泄漏任务工具。本包以实验名称发布，不提供稳定性保证。
 
 ## 目录
 
-- [配置](#config)
-- [工具与权限](#tools-and-authority)
-- [模型体验](#model-experience)
-- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+- [Config](#config)
+- [Tools and authority](#tools-and-authority)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
 <a id="config"></a>
-## 配置
+## Config
 
 ```yaml
 - id: tool-agent-team
   name: '@deepseek-ai/dsh-experimental-tool-agent-team'
-  config:
-    freshProvider: spawn
-    forkProvider: fork
 ```
 
-`freshProvider` 与 `forkProvider` 选择已注册的 continuable-subagent provider。任何声明 `prepareContinuable` 的提供方都可用，包括外部运行时提供方：`llm` 服务挂载时的 `subagent-claude-code` 与 `subagent-codex`，以及设置 `resume: true` 的 `subagent-acp`——它们把耐用 Team 成员保留为进程内子级，同时把模型调用路由到各自外部运行时的可续接会话。不具备该能力的提供方会以 `UNSUPPORTED_CAPABILITY` 拒绝 spawn。固定模型策略仅在用户明确要求 Agent Teams 或 teammate 时创建 teammate。
+本插件不接受配置。已退役的 `interrupt`、`freshProvider` 与 `forkProvider` 键会在加载时显式报错；teammate 请经 `subagent` 工具提供方创建，中断请使用 `interrupt_agent`。
 
 <a id="tools-and-authority"></a>
-## 工具与权限
+## Tools and authority
 
-生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-tool-agent-team)负责精确 schema。该适配器提供 teammate 创建；quiet 与 waking peer 投递；roster 列表、等待和仅限 Lead 的 interrupt；以及任务 create／list／get／CAS update 操作。
+生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-tool-agent-team)拥有精确 schema。适配器提供 `team_task_create`、`team_task_list`、`team_task_get` 与 `team_task_update`；每项注册都以 `ctx.agentTeams.isEnabled(caller)` 为条件，因此工具发现与策略节只在 Team 会话中出现。
 
-每个工具都要求完全相同的调用 `Agent`。`spawn_teammate` 与 `interrupt_agent` 在 `ctx.agentTeams` 内部强制执行 Lead 权限，而不只依赖描述。所有成员都可以与任意 peer 通讯并使用任务板。任务变更保留领域层的 Owner／Lead 与 revision 校验。
+`team_task_update` 是 compare-and-set：`expected_revision` 必须与板面当前修订一致，否则调用以 `TEAM_TASK_STALE_REVISION` 失败——并发成员以此避免互相覆盖。`owner` 参数是经 `ctx.subagents.resolveName` 解析的 agent 名称——`subagent` 返回、`list_agents` 展示的持久名称，含根相对路径。reassign 仅 root 可用；root 可指定自己或任何可延续后代。其他成员只能 claim 就绪的无主任务并管理自己拥有的任务。任务结果会把内部 owner Session id 替换为成员的 agent 名称。
 
-创建与列表结果以 `target`——持久化成员名——标识成员，面向模型的输出不含成员 Session ID。消息、中断调用与任务工具的 `owner` 参数都使用该值。`inactive` 表示没有轮次在执行，无论成员已加载还是需恢复；它不描述任务完成或结果。`provisioning` 与 `failed` 描述成员创建生命周期。
-
-`send_message` 在 mail 持久化后即成功，并且绝不会唤醒 inactive target。`followup_task` 还会让该消息成为 target 的下一个 turn，并可冷恢复 target。`queued` 结果表示持久工作已经接受，不能重试。任务 ready 不会启动 owner。`wait_agent` 在注册 10,000 到 3,600,000 毫秒的边等待前，会检查是否有另一个 running 或 provisioning member；如果没有，它会立即返回 `noProgress`，提示重新 list 并使用 `followup_task`。否则它会等待调用后发生的一条 Team 边，默认 30,000 毫秒；由于不会回放更早的变化，调用方需要在唤醒或超时后重新 list。
-
-插件监听 Agent publication，并通过对应 Agent scope 安装注册。因此，fresh 创建与 cold resume 都会在第一次模型请求前获得相同工具／提示词集合。Agent dispose 和插件 HMR 会移除全部 scoped 注册；重新加载插件会为仍 live 的每个成员安装一套新注册，而不改变 continuation Activation。
+就绪、阻塞与 `writeScopeWarnings` 是建议性协调：`write_scopes` 为评审记录意图而非文件锁。任务变化不会投递消息或唤醒空闲 agent——需要其他成员行动时请使用 `send_message`。
 
 <a id="model-experience"></a>
-## 模型体验
+## Model Experience
 
-### Team 策略与工具
+### Team policy and tools
 
-#### 模型看到什么
+#### What the model sees
 
-一段共享 system 策略会说明显式 delegation 要求、共享 cwd 行为、文件陈旧版本恢复、Bash／formatter／codegen 风险、task／write-scope 协调、Steer 投递、mailbox 不重试规则，以及 Lead 必须在回答前等待。Lead 与 teammate 的全部九个 Team schema 相同；执行时检查仅限 Lead 的操作权限。`spawn_teammate` 在初始 user 消息前加上 `<system-reminder>\nYou are teammate "<name>".\n</system-reminder>`，接着是一个空行和任务。该前缀不含 Team id，禁用运行时上下文时也能生效。fork 继承历史，不额外添加 Lead 身份消息。
+开启 Team 模式时，一节共享策略说明共享工作目录、写范围与依赖协调、claim-update-complete 工作流，以及任务变化不会唤醒任何成员——Lead 必须在最终答复前等待所需 teammate。未开启的会话看不到该节与这些工具。任务结果以紧凑 JSON 行从[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-tool-agent-team)的四个 `team_task_*` 工具返回；板面本身仅记入日志，不进入派生历史。
 
-#### Token 影响
+#### Token effect
 
-每次 Team member 请求都有固定策略与 schema 成本。初始身份文本随普通历史经历后续步骤、冷恢复和压缩；插件不扫描或重新插入它。工具调用会增加紧凑 JSON roster、task、wait 或 receipt 结果。Peer 内容由 Team 领域保留在 target 历史中。
+策略节与四个 schema 在每次 Team 模式请求上消耗 token；其他会话零成本。工具调用只增加小型 JSON 结果。
 
-#### KV Cache 影响
+#### KV Cache effect
 
-provider／model、共享 system 策略和工具 schema 相同时，fork 保留父请求前缀并追加带身份前缀的初始任务。工具结果与 peer 消息追加在可复用请求前缀之后。原先在 system prompt 中记录身份的 Session，首次使用此布局请求时可能改变该前缀；提供方实际缓存命中仍为尽力而为。
+开启 Team 模式会把策略节与 schema 插入系统前缀，因此会话的首次 Team 模式请求会重建提供方前缀；同模式下的后续请求复用该前缀。同模式的 teammate 会话共享完全相同的前缀。
 
-<a id="known-limitations-and-deferred-work"></a>
+## Known Limitations and Deferred Work
 
-<a id="known-limitations-and-deferred-work"></a>
-## 已知限制与暂缓事项
-
-- **提示词策略只负责协调，不负责 confinement**：它无法阻止 Bash 或外部进程写入重叠文件。
-- **不会自主创建 Team**：除非用户明确要求 delegation，普通任务不会触发组队。
-- **没有 Web 控制功能**：浏览器 roster 与任务板呈现不属于该 runtime 包。
+- **写范围仅为建议**——Bash、格式化工具、代码生成器与外部进程可绕过重叠告警；Lead 必须评审最终 diff。
+- **无 Team 自有等待原语**——Lead 依赖 `send_message` 回执与结算通知等待；任务变化不会中断或唤醒任何成员。
+- **reassign 仅 root**——teammate 不能把自己的任务转给同伴，只能 release 供重新 claim。
 
 <a id="dev-note"></a>
 ### 开发备注
 
 <details>
-<summary>维护者的工作上下文——点击展开</summary>
+<summary>Working context for maintainers — click to expand</summary>
 
-无。
+None.
 
 </details>

@@ -12,19 +12,13 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/loader"
-    },
-    {
       "path": "../../../vendor/include"
     },
     {
-      "path": "../../util/brand"
+      "path": "../../../vendor/loader"
     },
     {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/session"
+      "path": "../../context/execution-authority"
     },
     {
       "path": "../../core/agent"
@@ -33,19 +27,28 @@
       "path": "../../core/agent-default-model"
     },
     {
-      "path": "../../preset/agent-preset-registry"
+      "path": "../../core/session"
     },
     {
       "path": "../../interaction/permission-presets"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../preset/agent-preset-registry"
+    },
+    {
       "path": "../../session/session-title"
     },
     {
-      "path": "../../workspace/workspace"
+      "path": "../../util/brand"
     },
     {
-      "path": "../../context/execution-authority"
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../workspace/workspace"
     }
   ]
 }

@@ -28,4 +28,4 @@ Status: implemented
 
 ## 验证
 
-真实 Loader [示例](../../../../packages/lsp/lsp-stdio/tests/fixtures/cleanup-retry.mjs) 通过受控的原生清理观察失败保留一个真实 stdio 服务器。它验证旧服务器清理结束后才开始替代分配，最后等待两台原生服务器退出。单元用例覆盖并发释放失败、查询准入关闭、失败池项保留和其他实例清理错误的汇总。
+[生命周期套件](../../../../packages/lsp/lsp-stdio/tests/lifecycle.spec.ts) 在兄弟实例排空后保留失败实例并对真实 stdio 服务器重试清理。它验证旧服务器清理结束后才开始替代分配，最后等待两台原生服务器退出。单元用例覆盖并发释放失败、查询准入关闭、失败池项保留和其他实例清理错误的汇总。

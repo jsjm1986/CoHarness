@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-15-llm-replay-child-override-slots.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-15-llm-replay-child-override-slots.md
+document:
+  en: 0cc6931c68e32e184f455f85270700fbdf31fe69
+  zh: 3750a334aab609ee8105f0ef088a4730c8a678fb
+/agent-note-llm-replay-binds-per-child-override-sidecars-into-child-script-slots:
+  en: fc93152ff21556e8
+  zh: 3bddeeabef3a0010
+/agent-note-llm-replay-binds-per-child-override-sidecars-into-child-script-slots/problem:
+  en: b5c7372463013a1f
+  zh: 343b6056ff786817
+/agent-note-llm-replay-binds-per-child-override-sidecars-into-child-script-slots/decision:
+  en: d406b82eb6543511
+  zh: 768dc3ebd99829a9
+/agent-note-llm-replay-binds-per-child-override-sidecars-into-child-script-slots/alternatives-considered:
+  en: 125135f3a10845c1
+  zh: f5f06e7bc5d64779
+/agent-note-llm-replay-binds-per-child-override-sidecars-into-child-script-slots/consequences:
+  en: 031c436546259bd3
+  zh: a0ae7f02ab607d5d

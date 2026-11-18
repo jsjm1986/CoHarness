@@ -62,10 +62,14 @@ describe('release families', () => {
       '@deepseek-ai/dsh-experimental-client-ui-agent-team',
       '@deepseek-ai/dsh-experimental-client-ui-claude-code-mods',
       '@deepseek-ai/dsh-experimental-client-ui-cot-translation',
+      '@deepseek-ai/dsh-experimental-client-ui-forge',
       '@deepseek-ai/dsh-experimental-client-ui-voice-input',
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp',
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native',
       '@deepseek-ai/dsh-experimental-cot-translation-bundle',
+      '@deepseek-ai/dsh-experimental-forge-github',
+      '@deepseek-ai/dsh-experimental-forge-session',
+      '@deepseek-ai/dsh-experimental-forge',
       '@deepseek-ai/dsh-experimental-inspector-profile',
       '@deepseek-ai/dsh-experimental-inspector',
       '@deepseek-ai/dsh-experimental-plugin-market-bundle',
@@ -77,8 +81,10 @@ describe('release families', () => {
       '@deepseek-ai/dsh-experimental-session-titles-bundle',
       '@deepseek-ai/dsh-experimental-speech-to-text-sensevoice',
       '@deepseek-ai/dsh-experimental-speech-to-text',
+      '@deepseek-ai/dsh-experimental-subagent-oar',
       '@deepseek-ai/dsh-experimental-terminal-bundle',
       '@deepseek-ai/dsh-experimental-tool-agent-team',
+      '@deepseek-ai/dsh-experimental-tool-subagent-oar',
       '@deepseek-ai/dsh-experimental-tool-worktree',
       '@deepseek-ai/dsh-experimental-translator',
       '@deepseek-ai/dsh-experimental-voice-input-bundle',
@@ -258,7 +264,7 @@ describe('release families', () => {
     ])
   })
 
-  it('refuses an order that would publish a consumer before a dependency it installs', () => {
+  it('drops the peer edge that would publish a consumer before a dependency it installs', () => {
     const dsh = releaseFamily('dsh')
     const members = [
       member('packages/a/alpha', '@deepseek-ai/dsh-alpha', { peerDependencies: { '@deepseek-ai/dsh-bravo': 'workspace:^' } }),
@@ -266,11 +272,38 @@ describe('release families', () => {
       member('packages/a/charlie', '@deepseek-ai/dsh-charlie', { dependencies: { '@deepseek-ai/dsh-alpha': 'workspace:^' } }),
     ]
 
-    // A cycle of two peer edges closed by one install edge: dropping a peer edge
-    // would order this, and the traversal drops the install edge instead. That
-    // order would publish charlie before the alpha it installs, so it is refused
-    // here rather than published.
-    expect(() => { dsh.publishOrder(members) }).toThrow(/no publish order honours @deepseek-ai\/dsh-charlie -> @deepseek-ai\/dsh-alpha/)
+    // A cycle of two peer edges closed by one install edge resolves by dropping
+    // the peer edge that would seat charlie before the alpha it installs; the
+    // install edge is the only one that cannot give.
+    const plan = dsh.publishOrder(members)
+    expect(plan.order.map(entry => entry.name)).toEqual([
+      '@deepseek-ai/dsh-bravo',
+      '@deepseek-ai/dsh-alpha',
+      '@deepseek-ai/dsh-charlie',
+    ])
+    expect(plan.droppedPeerEdges).toEqual([
+      { consumer: '@deepseek-ai/dsh-bravo', peer: '@deepseek-ai/dsh-charlie' },
+    ])
+  })
+
+  it('does not order through an optional peer edge', () => {
+    const dsh = releaseFamily('dsh')
+    const members = [
+      member('packages/a/alpha', '@deepseek-ai/dsh-alpha', { peerDependencies: { '@deepseek-ai/dsh-bravo': 'workspace:^' } }),
+      member('packages/a/bravo', '@deepseek-ai/dsh-bravo', {
+        peerDependencies: { '@deepseek-ai/dsh-charlie': 'workspace:^' },
+        peerDependenciesMeta: { '@deepseek-ai/dsh-charlie': { optional: true } },
+      }),
+      member('packages/a/charlie', '@deepseek-ai/dsh-charlie', { dependencies: { '@deepseek-ai/dsh-alpha': 'workspace:^' } }),
+    ]
+
+    // The optional peer edge is not a constraint: without skipping it this
+    // mixed cycle would publish charlie before the alpha it installs.
+    expect(dsh.publishOrder(members).order.map(entry => entry.name)).toEqual([
+      '@deepseek-ai/dsh-bravo',
+      '@deepseek-ai/dsh-alpha',
+      '@deepseek-ai/dsh-charlie',
+    ])
   })
 
   it('ignores devDependencies when ordering', () => {

@@ -10,12 +10,15 @@ import type { SessionFormatArtifact, SessionFormatJsonObject, SessionFormatJsonV
  * @returns validated catalog payload.
  */
 export function catalogFact(value: SessionFormatJsonValue, subject = 'subagent/catalog'): SessionFormatJsonObject {
-  if (!isSessionFormatJsonObject(value) || (value['version'] !== 0 && value['version'] !== 1 && value['version'] !== 2)
+  if (!isSessionFormatJsonObject(value)
+    || (value['version'] !== 0 && value['version'] !== 1 && value['version'] !== 2 && value['version'] !== 3)
     || typeof value['childId'] !== 'string'
     || (value['mode'] !== 'continuable' && value['mode'] !== 'one-shot' && value['mode'] !== 'unknown' && value['mode'] !== 'external')
     || (value['version'] === 0 && (value['mode'] === 'unknown' || value['mode'] === 'external'))
     || (value['version'] === 1 && value['mode'] === 'external')
     || (value['version'] === 2 && value['mode'] !== 'external')
+    || (value['version'] === 3 && (value['mode'] === 'one-shot' || value['mode'] === 'unknown'))
+    || (value['version'] === 3 && typeof value['name'] !== 'string')
     || (value['mode'] === 'continuable' && typeof value['label'] !== 'string')
     || (value['label'] !== undefined && typeof value['label'] !== 'string')) {
     throw new SessionFormatError(`${subject} requires a supported versioned catalog fact`)

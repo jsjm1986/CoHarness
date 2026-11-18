@@ -904,7 +904,9 @@ function npmClientEnvironment(): NodeJS.ProcessEnv {
 
 function installedArtifactEnvironment(consumerRoot: string): NodeJS.ProcessEnv {
   const environment = npmClientEnvironment()
-  delete environment.NODE_OPTIONS
+  // Deterministic bound, not an inherited dev flag: installed-artifact
+  // verification exceeds Node's default ~4 GiB heap on CI runners.
+  environment.NODE_OPTIONS = '--max-old-space-size=12288'
   delete environment.NODE_PATH
   environment.DSH_HOME = resolve(consumerRoot, '.dsh')
   environment.DSH_AGENTS_HOME = resolve(consumerRoot, '.agents')

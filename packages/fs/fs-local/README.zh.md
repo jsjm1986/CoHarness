@@ -19,7 +19,7 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 
 ## 概述
 
-使用 `dsh-fs-local` 可在宿主文件系统上读取、列出、原子写入和编辑文件。相对路径从可配置的基准目录解析，而绝对路径和父目录遍历不受限制。到达同一文件的路径和符号链接共享一个身份。写入保留文件权限，可选版本防护会拒绝陈旧覆盖。直接访问宿主文件时选择本包；需要约束变更时使用 `fs-sandbox`。
+使用 `dsh-fs-local` 可在宿主文件系统上读取、列出、监听、原子写入、编辑、打补丁、删除和移动文件。相对路径从可配置的基准目录解析，而绝对路径和父目录遍历不受限制。到达同一文件的路径和符号链接共享一个身份。写入保留文件权限，可选版本防护会拒绝陈旧覆盖。移动还可应用 hunk，并分别报告已发布目标与源删除。直接访问宿主文件时选择本包；需要约束变更时使用 `fs-sandbox`。
 
 ## 目录
 
@@ -33,7 +33,7 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 <a id="behavior"></a>
 ## 行为
 
-- **`resolve(path, opts?)`**：相对 `path` 在调用方提供 `opts.cwd` 时以该值为基准解析（面向模型的工具会传入调用 agent（智能体）的会话 cwd；见[每会话 cwd Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-fs-per-session-cwd.zh.md)），否则以 `config.cwd` 为基准（默认 `process.cwd()`）；绝对 `path` 会忽略两者。`opts.signal` 会在本地解析前后检查，远程同级后端则可以用它中止往返。`targetKey` 是文件的 `realpath`，因此经符号链接到达同一文件的两个输入路径会共享一个身份，写入/编辑落在链接目标上，同时保留链接。尚不存在的路径在父目录存在时使用 realpath 后的父目录加 basename；只有父目录无法解析时才回退到绝对路径。`displayPath` 是绝对但未经解析的路径。在 POSIX 上，`symlink/..` 遍历符号链接目标的父目录；`..` 之前存在缺失目录时拒绝解析。Windows 保留原生驱动器相对路径解析。
+- **`resolve(path, opts?)`**：相对 `path` 在调用方提供 `opts.cwd` 时以该值为基准解析（面向模型的工具会传入调用 agent（智能体）的会话 cwd；见[每会话 cwd Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-fs-per-session-cwd.zh.md)），否则以 `config.cwd` 为基准（默认 `process.cwd()`）；绝对 `path` 会忽略两者。请求路径为 `~` 或以 `~/`（Windows 上也包括 `~\`）开头时，从宿主用户主目录开始；`~user`、后续的 `~` 段与目录项名称保持字面含义。`opts.signal` 会在本地解析前后检查，远程同级后端则可以用它中止往返。`targetKey` 是文件的 `realpath`，因此经符号链接到达同一文件的两个输入路径会共享一个身份，写入/编辑落在链接目标上，同时保留链接。尚不存在的路径在父目录存在时使用 realpath 后的父目录加 basename；只有父目录无法解析时才回退到绝对路径。`displayPath` 是绝对但未经解析的路径。在 POSIX 上，`symlink/..` 遍历符号链接目标的父目录；`..` 之前存在缺失目录时拒绝解析。Windows 保留原生驱动器相对路径解析。
 - **执行世界坐标**：`processPath` 公开目标的规范化宿主路径，`fileUrl` 通过 Node 的平台感知 URL 转换对该路径编码，`contains` 则使用平台路径语义检查身份相等或后代包含关系，消费方无需解析 `targetKey`。
 - **`stat` / `lstat`**：返回目标元数据；目标不存在时返回 `undefined`。`stat` 为已解析目标报告 `FsInfo`（`version` 是由 bigint `dev:ino:size:mtimeNs:ctimeNs` 派生的不透明 token，`type` 为 `file`/`directory`/`other`，`size` 以字节计）；路径形态的 `lstat` 不跟随最后一个符号链接，报告 `FsPathInfo`，因此可以返回 `symlink`。两者都会在异步元数据探测前后检查取消，因此异步探测进行期间发生的中止会报告 `FS_ABORTED`，而非陈旧的不存在结果。
 - **`readText` / `streamText`**：只支持 UTF-8。`readText` 读取整个文件；`streamText` 按分片解码，因此超大文件无需整体保存在内存中，消费方也可以自行限制保留量。两者都会拒绝无效 UTF-8、包含 NUL 字节的二进制样本（`FS_NOT_TEXT`）以及非普通文件目标。`read` 工具（`@deepseek-ai/dsh-tool-fs`）拥有行窗口逻辑。
@@ -41,6 +41,11 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 - **`listDir`**：按稳定的 `name.localeCompare()` 顺序列出一层目录。每个条目携带子项 basename、类型、解析后的子目标（`displayPath` 位于所列目录下，`targetKey` 是 realpath 身份）和低成本 stat 元数据（`version`，普通文件另有 `size`）。它绝不会打开或解码文件内容。缺失目标报告 `FS_NOT_FOUND`，文件/特殊文件目标报告 `FS_NOT_DIRECTORY`，已中止调用报告 `FS_ABORTED`，权限失败报告 `FS_PERMISSION_DENIED`，其他列出或子项元数据 I/O 失败报告 `FS_IO_ERROR`。损坏/消失的子项以无元数据的 `other` 返回，但解析子项时出现权限/I/O 失败会让整个列表以结构化 `FsError` 失败。
 - **`writeText`**：原子写入。它会向排他打开的临时文件（`wx`、`0o600`）写入；该文件位于目标旁随机命名的私有暂存目录（`0o700`）内，随后执行 fsync 并发布。现有文件的 mode 会保留，新文件默认为 `0o600`；Windows 上的新文件继承目标目录的 DACL，而替换会在写入前把目标 DACL 复制到空临时文件，并通过 `ReplaceFileW` 发布，使原访问策略得以保留（见 [Windows DACL 保留 Agent Note](../../../.agents/notes/implemented/bug-fix/2026-07-19-windows-atomic-write-dacl-preservation.zh.md)）。`expected` 防护是可选的：省略时无条件创建或覆盖；`createIfAbsent` 通过硬链接把暂存文件发布到目标位置，以实现原子且不替换的发布，因此初始探测后创建的普通文件会被保留，并以 `FS_NOT_OBSERVED` 拒绝本次写入；非普通路径条目也会被保留，并以 `FS_NOT_REGULAR_FILE` 拒绝；`replaceIfVersion` 只在观察到的版本上替换（目标缺失或版本不匹配均为 `FS_STALE_VERSION`）。仅当打开后的旧文件和 UTF-8 替换内容都严格低于 `config.diffBasisMaxBytes`（默认 10 MiB）时，覆写才返回旧文本作为上下文 diff 基础。即使外部写入方在初次探测后替换文件或改变文件大小，文件描述符读取仍会强制执行该上限；否则提供方返回 `before: null`，由展示层使用整文件回退。
 - **`editText`**：在同一原语之上依次执行原子的字面量读取、修改和写入，并通过变更锁按目标串行化。`expected` 防护是可选的：提供时，会在字面量匹配之前校验版本（陈旧编辑报告 `FS_STALE_VERSION`，绝不会针对较新内容报告 `FS_EDIT_NOT_FOUND`/`FS_AMBIGUOUS_EDIT`）；省略时，无条件编辑当前内容。无论哪种情况，目标缺失都报告 `FS_STALE_VERSION`。匹配时规范化为 LF，随后恢复文件主要的 CRLF/LF 风格；空 `oldString` / 零匹配报告 `FS_EDIT_NOT_FOUND`，未设置 `replace_all` 的多个匹配则报告 `FS_AMBIGUOUS_EDIT`。
+- **`patchText`**：在版本检查的同一把锁内通过 `applyHunks` 应用解析后的 `PatchHunk`；上下文不匹配以 `FS_PATCH_MISMATCH` 拒绝，目标缺失以 `FS_STALE_VERSION` 拒绝。补丁文本内部按 LF 规范化，并恢复为源文件的行尾风格；结果文本使用 LF。
+- **`deleteFile`**：校验可选版本防护，在 `diffBasisMaxBytes` 下捕获有界的 `before` 基准（二进制内容为 `null`），随后以非递归方式删除普通文件；目录及其他条目会被拒绝。
+- **`moveFile`**：按 `targetKey` 字典序锁定源与目标（无死锁），按需修改源文本，原子发布目标后再删除源。是两个效果而非一个事务：源删除失败返回已发布的目标及 `sourceDeleted: false` 与结构化 `sourceFailure`；相同目标在任何 I/O 之前以 `FS_SAME_TARGET` 拒绝。在目标提交点之前检查取消。
+- **`watch`**：Chokidar 通过 OS 事件观察单个文件或目录的直接子项，不轮询、不递归；文件监听使用经过过滤的父目录监听，因此就绪后也覆盖最初缺失文件的创建。
+- **errno 分类**：解析、元数据、读取、列出及变更失败都经由 `dsh-fs` 的 `fsErrorFromErrno`，因此每个 errno 都变为类型化 `FsError` 错误码（`ENOENT`/`ENOTDIR` → `FS_NOT_FOUND`，`EACCES`/`EPERM` → `FS_PERMISSION_DENIED`，其他 Node I/O 错误 → `FS_IO_ERROR`），原错误作为 `cause`；不带 errno 错误码的抛值属于缺陷，原样传播。
 
 包根 SDK 接口包含默认/具名 `LocalFileSystem` 类和 `Config`。原始 I/O 位于 `src/fsio.ts`（不依赖 Cordis，单独进行单元测试）；`src/index.ts` 是轻量服务接线。
 

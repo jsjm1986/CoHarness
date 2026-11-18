@@ -9,6 +9,8 @@ import type { SessionEvent, SessionHeader, SessionLogOffset } from '@deepseek-ai
 import SessionPersistence, { type SessionEventSuffix, type SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as checkpointPolicy from '../src/index.ts'
 
 const contexts: Context[] = []
@@ -51,6 +53,7 @@ async function setup(): Promise<Context> {
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(TestPersistence)
   await ctx.plugin(checkpointPolicy)
   return ctx
@@ -128,9 +131,11 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
     const session = ctx.sessions.create(SessionId('tool-checkpoint'))
     const agent = { session } as Agent
     const gate = Promise.withResolvers<undefined>()
+    const flushStarted = Promise.withResolvers<undefined>()
     const order: string[] = []
     ctx.on('session/flush', async () => {
       order.push('flush:start')
+      flushStarted.resolve(undefined)
       await gate.promise
       order.push('flush:end')
     })
@@ -140,11 +145,11 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
       execute: async () => { order.push('tool'); return null },
     })
 
-    const pending = ctx.tools.execute({
+    const pending = executeToolFixture(ctx, {
       callId: ToolCallId('write-1'), name: 'write', arguments: {}, agent,
       signal: new AbortController().signal,
     })
-    await Promise.resolve()
+    await flushStarted.promise
     expect(order).toEqual(['flush:start'])
     gate.resolve(undefined)
     await expect(pending).resolves.toMatchObject({ isError: false })
@@ -157,9 +162,11 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
     const agent = { session } as Agent
     const controller = new AbortController()
     const gate = Promise.withResolvers<undefined>()
+    const flushStarted = Promise.withResolvers<undefined>()
     const order: string[] = []
     ctx.on('session/flush', async () => {
       order.push('flush:start')
+      flushStarted.resolve(undefined)
       await gate.promise
       order.push('flush:end')
     })
@@ -169,11 +176,11 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
       execute: async () => { order.push('tool'); return null },
     })
 
-    const pending = ctx.tools.execute({
+    const pending = executeToolFixture(ctx, {
       callId: ToolCallId('write-cancelled'), name: 'write', arguments: {}, agent,
       signal: controller.signal,
     })
-    await Promise.resolve()
+    await flushStarted.promise
     expect(order).toEqual(['flush:start'])
     controller.abort('cancelled during checkpoint')
     gate.resolve(undefined)
@@ -200,7 +207,7 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
       output: { schema: { type: 'null' }, render: () => [] },
       execute: async () => { ran = true; return null },
     })
-    const result = await ctx.tools.execute({
+    const result = await executeToolFixture(ctx, {
       callId: ToolCallId('write-2'), name: 'write', arguments: {}, agent,
       signal: new AbortController().signal,
     })
@@ -220,7 +227,7 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
       output: { schema: { type: 'null' }, render: () => [] },
       execute: async () => null,
     })
-    await ctx.tools.execute({
+    await executeToolFixture(ctx, {
       callId: ToolCallId('nested-1'), name: 'nested', arguments: {}, agent,
       parent: Symbol('outer') as never,
       signal: new AbortController().signal,
@@ -251,6 +258,7 @@ describe('session-checkpoint-policy lifecycle', () => {
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(TestPersistence)
     const session = ctx.sessions.create(SessionId('disposed-policy'))
     let flushes = 0

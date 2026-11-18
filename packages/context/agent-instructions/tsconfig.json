@@ -9,13 +9,16 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../core/agent"
     },
     {
       "path": "../../core/session"
-    },
-    {
-      "path": "../../session/session-projection"
     },
     {
       "path": "../../core/tools"
@@ -27,16 +30,16 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../util/home-paths"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../../session/session-projection"
     },
     {
       "path": "../../session/working-directory"
+    },
+    {
+      "path": "../../util/home-paths"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

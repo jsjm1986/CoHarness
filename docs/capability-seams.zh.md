@@ -43,8 +43,8 @@ flowchart LR
   pkg_ui_plugin_manager["ui-plugin-manager"]
   svc_pluginRegistryProbe["ctx.pluginRegistryProbe<br/>Registry reachability probing for the install dialog"]
   svc_profileContext["ctx.profileContext<br/>Launcher-owned profile data"]
-  pkg_office_to_pdf["office-to-pdf"]
-  svc_officeToPdf["ctx.officeToPdf<br/>Office to PDF conversion"]
+  pkg_office_kit["office-kit"]
+  svc_officeKit["ctx.officeKit<br/>Office rendering, conversion, and recalculation"]
   pkg_experimental_inspector["experimental-inspector"]
   svc_inspector["ctx.inspector<br/>Cross-realm runtime inspection"]
   pkg_experimental_worktree["experimental-worktree"]
@@ -205,6 +205,7 @@ flowchart LR
   pkg_headless["headless"]
   svc_agentLoop["ctx.agentLoop<br/>Concrete loop driver"]
   pkg_agent_spine_demo["agent-spine-demo"]
+  svc_headlessStartup["ctx.headlessStartup<br/>One-shot headless invocation values"]
   pkg_goal["goal"]
   svc_goals["ctx.goals<br/>Same-session goal domain"]
   pkg_ssh["ssh"]
@@ -319,6 +320,19 @@ flowchart LR
   pkg_experimental_speech_to_text["experimental-speech-to-text"]
   svc_speechToText["ctx.speechToText<br/>Experimental speech recognition providers"]
   pkg_experimental_speech_to_text_sensevoice["experimental-speech-to-text-sensevoice"]
+  pkg_config_editor["config-editor"]
+  svc_configEditor["ctx.configEditor<br/>Persisted plugin configuration inspection and editing"]
+  pkg_mcp_manager["mcp-manager"]
+  svc_mcpManager["ctx.mcpManager<br/>Managed MCP server registry"]
+  pkg_api_remote_access["api-remote-access"]
+  svc_remoteAccess["ctx.remoteAccess<br/>Method-level remote access policy registry"]
+  pkg_experimental_client_ui_forge["experimental-client-ui-forge"]
+  pkg_experimental_forge["experimental-forge"]
+  svc_forge["ctx.forge<br/>Change-request provider registry"]
+  pkg_experimental_forge_github["experimental-forge-github"]
+  pkg_experimental_forge_session["experimental-forge-session"]
+  svc_forgeSession["ctx.forgeSession<br/>Session-bound change-request bindings"]
+  svc_forgePanel["ctx.forgePanel<br/>Forge panel Remote"]
   pkg_acp --> svc_approval
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
@@ -326,6 +340,7 @@ flowchart LR
   pkg_agent_preset_registry --> svc_agentPresets
   pkg_agent_team --> svc_agentTeams
   pkg_api_gateway --> svc_typertGateway
+  pkg_api_remote_access --> svc_remoteAccess
   pkg_api_remotes --> svc_sessionController
   pkg_api_terminal_controller --> svc_terminalController
   pkg_api_terminal_controller --> svc_userTerminalAdministration
@@ -350,6 +365,7 @@ flowchart LR
   pkg_computer_use --> svc_computerUse
   pkg_computer_use --> svc_computerUseAuthorization
   pkg_computer_use --> svc_computerUseEnvironment
+  pkg_config_editor --> svc_configEditor
   pkg_cordis_host_runner --> svc_cordisInspect
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
@@ -365,8 +381,12 @@ flowchart LR
   pkg_experimental_browser_use_stagehand_native --> svc_browserUse
   pkg_experimental_claude_code_mods --> svc_claudeCodeMods
   pkg_experimental_client_ui_cot_translation --> svc_cotTranslation
+  pkg_experimental_client_ui_forge --> svc_forgePanel
   pkg_experimental_computer_use_cua_driver_mcp --> svc_computerUse
   pkg_experimental_computer_use_cua_driver_native --> svc_computerUse
+  pkg_experimental_forge --> svc_forge
+  pkg_experimental_forge_github --> svc_forge
+  pkg_experimental_forge_session --> svc_forgeSession
   pkg_experimental_inspector --> svc_inspector
   pkg_experimental_ptc_runtime_python --> svc_ptcRuntime
   pkg_experimental_speech_to_text --> svc_speechToText
@@ -386,6 +406,7 @@ flowchart LR
   pkg_gateway_execution --> svc_userTerminalAuthorization
   pkg_gateway_runtime --> svc_gatewayRuntime
   pkg_goal --> svc_goals
+  pkg_headless --> svc_headlessStartup
   pkg_hmr --> svc_hmr
   pkg_host_apiproxy --> svc_hostSessionLifecycle
   pkg_jobs --> svc_jobs
@@ -397,12 +418,13 @@ flowchart LR
   pkg_lsp --> svc_lsp
   pkg_lsp_local --> svc_lsp
   pkg_mcp_client --> svc_mcpResources
+  pkg_mcp_manager --> svc_mcpManager
   pkg_mcp_resources --> svc_mcpResources
   pkg_memory --> svc_memory
   pkg_model_access --> svc_modelAccess
   pkg_model_provider_config --> svc_modelProviderConfig
   pkg_modules --> svc_clientModules
-  pkg_office_to_pdf --> svc_officeToPdf
+  pkg_office_kit --> svc_officeKit
   pkg_permission_presets --> svc_permissionPresetAuthorization
   pkg_permission_presets --> svc_permissionPresets
   pkg_plan_mode --> svc_planMode
@@ -530,9 +552,13 @@ flowchart LR
   svc_executionAuthority --> pkg_subagent
   svc_executionAuthority --> pkg_subagent_in_process_driver
   svc_fileUploads --> pkg_commands
+  svc_forge --> pkg_experimental_client_ui_forge
+  svc_forge --> pkg_experimental_forge_session
+  svc_forgeSession --> pkg_experimental_client_ui_forge
   svc_fs --> pkg_tool_fs
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
+  svc_headlessStartup --> pkg_headless
   svc_hmr --> pkg_app_boot
   svc_hostSessionLifecycle --> pkg_archive_gateway
   svc_hostSessionLifecycle --> pkg_host_apiproxy
@@ -551,7 +577,7 @@ flowchart LR
   svc_modelAccess --> pkg_apiproxy
   svc_modelProviderConfig --> pkg_apiproxy
   svc_modelProviderConfig --> pkg_llm_pi_ai
-  svc_officeToPdf --> pkg_host_apiproxy
+  svc_officeKit --> pkg_host_apiproxy
   svc_permissionPresetAuthorization --> pkg_collaboration_gateway
   svc_pluginManagementAuthorization --> pkg_cordis_host_runner
   svc_pluginManagementAuthorization --> pkg_plugin_manager
@@ -562,6 +588,7 @@ flowchart LR
   svc_pluginRegistryProbe --> pkg_ui_plugin_manager
   svc_profileContext --> pkg_plugin_manager
   svc_ptcRuntime --> pkg_tools
+  svc_remoteAccess --> pkg_experimental_client_ui_forge
   svc_remoteDesktop --> pkg_remote_desktop_controller
   svc_remoteDesktop --> pkg_remote_desktop_stream
   svc_sandbox --> pkg_bash_sandbox
@@ -697,7 +724,7 @@ flowchart LR
 | `ctx.pluginMarket` | `core` | [`plugin-market`](../packages/boot/plugin-market) | - | [`client-ui-plugin-market`](../packages/client/ui-plugin-market), [`plugin-market`](../packages/boot/plugin-market) | - | 拉取并校验用户配置的索引源；安装经由插件管理器完成。 |
 | `ctx.pluginRegistryProbe` | `core` | `ui-plugin-manager` | - | `ui-plugin-manager` | - | 通过 Host fetch 代理竞速已配置的公共 registry，缓存首个应答供插件页安装对话框预选。 |
 | `ctx.profileContext` | `core` | [`app-boot`](../packages/boot/app-boot) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | dsh 启动器提供纯数据 profile 位置与组合输入；重载调度属于 dsh-hmr。 |
-| `ctx.officeToPdf` | `core` | [`office-to-pdf`](../packages/document/office-to-pdf) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | 已授权的延迟源读取交由有界 Host 转换器处理，采用声明的原生引擎或 Node WASM。 |
+| `ctx.officeKit` | `core` | [`office-kit`](../packages/document/office-kit) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | 已授权的延迟源读取交由有界 Host 转换器处理，采用声明的原生引擎或 Node WASM。 |
 | `ctx.inspector` | `core` | [`experimental-inspector`](../packages/experimental/inspector) | - | - | - | 拥有 Worker 托管的 CDP 目标，以及与传输无关的 Host 与 Client 观测和 Cordis 树查询 API。 |
 | `ctx.worktrees` | `seam` | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-tool-worktree`](../packages/experimental/tool-worktree) | - | 显式实验组合从固定的本地提交创建工作树。检出目录与共享 Git 元数据受现有写权限约束；工作目录服务拥有创建后的 Session 目录。 |
 | `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | 连接持有的提供方在调用方 agent 作用域内提供共享资源工具。 |
@@ -746,6 +773,7 @@ flowchart LR
 | `ctx.agents` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`acp`](../packages/acp/acp), `subagent-inprocess` | - | 拥有实时 Agent 句柄、创建／恢复工厂 seam，以及进程本地的发起方传播。 |
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`headless`](../packages/bundle/headless), [`host-apiproxy`](../packages/host/apiproxy) | - | 通过 settings 分层默认 `ModelSelection`，让直接入口与 Host 支撑的 Agent 入口共享同一个状态所有者。 |
 | `ctx.agentLoop` | `bundle` | [`agent-loop`](../packages/core/agent-loop) | - | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | - | 唯一的具体循环插件；扩展包依赖 dsh-agent 的事件和服务，而不依赖此包。 |
+| `ctx.headlessStartup` | `bundle` | [`headless`](../packages/bundle/headless) | - | [`headless`](../packages/bundle/headless) | - | 一次性解析任务、Session 身份、权限选项与输出模式；运行器消费已发布值而不再重读 argv。 |
 | `ctx.goals` | `core` | [`goal`](../packages/goal/goal) | - | - | - | 从会话日志折叠带修订版本的目标状态，并将实时延续激活保留在进程本地。 |
 | `ctx.ssh` | `core` | [`ssh`](../packages/ssh/ssh) | - | [`fs-ssh`](../packages/ssh/fs-ssh), [`subprocess-ssh`](../packages/ssh/subprocess-ssh), [`sandbox-ssh`](../packages/ssh/sandbox-ssh) | - | 负责一条经过认证的 OpenSSH 连接、已安装辅助程序身份、独立程序流，以及配套远端提供方的断连清理。 |
 | `ctx.subprocess` | `seam` | [`subprocess`](../packages/subprocess/subprocess) | [`subprocess-local`](../packages/subprocess/subprocess-local), [`subprocess-ssh`](../packages/ssh/subprocess-ssh) | [`bash-local`](../packages/shell/bash-local), [`bash-sandbox`](../packages/shell/bash-sandbox), [`terminal-bash`](../packages/terminal/terminal-bash), [`lsp-stdio`](../packages/lsp/lsp-stdio), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | - | Bash 执行器、PTY shell 后端、LSP Host，以及进程外 ACP、Codex 和 Claude Code subagent 后端都通过 ctx.subprocess 执行 spawn；该服务负责进程坐标、进程树／会话生命周期、stdio 处置、终端机制和 kill 升级。 |
@@ -786,5 +814,11 @@ flowchart LR
 | `ctx.remoteDesktop` | `seam` | [`remote-desktop`](../packages/remote-desktop/remote-desktop) | [`remote-desktop-vnc`](../packages/remote-desktop/remote-desktop-vnc) | [`remote-desktop-stream`](../packages/remote-desktop/remote-desktop-stream), `remote-desktop-controller` | - | resolve 将已认证参与者映射为受授权约束的 spec；attach 返回存活会话并由 serveStream 推送其通道。 |
 | `ctx.remoteDesktopController` | `core` | `remote-desktop-controller` | - | - | - | 将已认证请求主体映射为服务参与者，并对授权、attach、状态与审计操作执行管理员检查。 |
 | `ctx.speechToText` | `seam` | [`experimental-speech-to-text`](../packages/experimental/speech-to-text) | [`experimental-speech-to-text-sensevoice`](../packages/experimental/speech-to-text-sensevoice) | [`experimental-api-speech-to-text`](../packages/experimental/api-speech-to-text) | - | 路由显式识别器；浏览器通过已认证 Remote 使用，转写文本在提交前保留在草稿中。 |
+| `ctx.configEditor` | `service` | [`config-editor`](../packages/boot/config-editor) | - | - | - | 读取 profile 加载器条目，区分继承值与覆盖值，并将校验后的编辑写回 profile 配置。 |
+| `ctx.mcpManager` | `service` | [`mcp-manager`](../packages/mcp/mcp-manager) | - | - | - | 拥有部署管理的 MCP 服务器定义及其与 Client 和管理面共享的生命周期状态。 |
+| `ctx.remoteAccess` | `service` | [`api-remote-access`](../packages/api/remote-access) | - | [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | 注册按资源的非属主策略，发布按 Peer 的访问快照并过滤列表；Typert 网关不经其分发，因为 authorize 请求不携带 principal。 |
+| `ctx.forge` | `seam` | [`experimental-forge`](../packages/experimental/forge) | [`experimental-forge-github`](../packages/experimental/forge-github) | [`experimental-forge-session`](../packages/experimental/forge-session), [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | 托管变更请求操作的提供方 seam：就绪、快照、diff、评审、合并与检查重跑经注册的提供方记录路由。 |
+| `ctx.forgeSession` | `service` | [`experimental-forge-session`](../packages/experimental/forge-session) | - | [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | 将每个 Session 绑定到其提供方仓库坐标与变更请求行，使面板查询保持 Session 作用域。 |
+| `ctx.forgePanel` | `service` | [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | - | - | 实验性 forge 面板背后的 Host Remote；浏览器 Client 经已认证 Remote 传输消费，尚无出厂 preset 挂载。 |
 
 维护模式：混合模式。服务从 Cordis 声明中发现；接口、实现和消费方角色在 `scripts/gen-doc-graphs.ts` 中分类，并设有完整性守卫。

@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../fs-patch"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

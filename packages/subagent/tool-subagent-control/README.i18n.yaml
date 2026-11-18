@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/tool-subagent-control/README.md
 document:
-  en: 427bf5e7c58e3fd2c7f0ca927dbaa4313b642324
-  zh: ca144c050b76f46f3d33356ccec48dd488767abf
+  en: 8af03844d4d5c304f8285538d9e4cc7f0b0098e9
+  zh: 71273b3377bacc7c40c39cb8de0cf4ae64bdf015
 /:
   en: aef64316a93b182f
   zh: 61495d48365178df
 /deepseek-ai-dsh-tool-subagent-control:
-  en: c64a0fc822bdf8cf
-  zh: 3feb3bf1b83d97cd
+  en: 2efb8c938068aa24
+  zh: 6f4a201039ce33f2
 /deepseek-ai-dsh-tool-subagent-control/summary:
-  en: 7464eb99b6f618eb
-  zh: 8c7628c8e9f163ca
+  en: 310273be4ff47c91
+  zh: 27df13a33bd06cfe
 /deepseek-ai-dsh-tool-subagent-control/table-of-contents:
   en: b4683d2a53256fda
   zh: 4e65ff63dc8c48fe
@@ -24,20 +24,35 @@ document:
   en: e4c7376d4f29dbd5
   zh: 6b7a9eaf69c9ea53
 /deepseek-ai-dsh-tool-subagent-control/model-experience/tool-schema/what-the-model-sees:
-  en: a63be096ee9c4873
-  zh: cd1bd116ccc66318
+  en: cdccc2a593ec28c4
+  zh: 4a6eddf769d4af66
 /deepseek-ai-dsh-tool-subagent-control/model-experience/tool-schema/token-effect:
-  en: db207dc8d5860684
-  zh: ad2663b4967fbca9
+  en: 282c65ac0eebfbdd
+  zh: 9074c5f785666033
 /deepseek-ai-dsh-tool-subagent-control/model-experience/tool-schema/kv-cache-effect:
-  en: 4b77d42b96b3519d
-  zh: dd393d8f0f6536c1
+  en: 0246cbe064cbbad9
+  zh: 901a17f10e83c830
+/deepseek-ai-dsh-tool-subagent-control/model-experience/identity-context:
+  en: dd94228b0c43a490
+  zh: 56e740edf262c474
+/deepseek-ai-dsh-tool-subagent-control/model-experience/identity-context/what-the-model-sees:
+  en: fbfc84cc09368f49
+  zh: 231b0e294b402e39
+/deepseek-ai-dsh-tool-subagent-control/model-experience/identity-context/what-the-model-sees/subagent-identity:
+  en: fc2b3383d52ded16
+  zh: fc2b3383d52ded16
+/deepseek-ai-dsh-tool-subagent-control/model-experience/identity-context/token-effect:
+  en: 37a7eed766856ea0
+  zh: 12f3f9b309e106d9
+/deepseek-ai-dsh-tool-subagent-control/model-experience/identity-context/kv-cache-effect:
+  en: 07377e851dbcc79e
+  zh: 7bb3ada453db5d67
 /deepseek-ai-dsh-tool-subagent-control/model-experience/interrupt-result:
   en: d64e936e83e89a2b
   zh: b9905c33af6cca45
 /deepseek-ai-dsh-tool-subagent-control/model-experience/interrupt-result/what-the-model-sees:
-  en: 89305619897680ba
-  zh: e610a844fc09c53f
+  en: 917ab5f74a23687d
+  zh: 97dacd5811ef7d66
 /deepseek-ai-dsh-tool-subagent-control/model-experience/interrupt-result/token-effect:
   en: 5d1bcef28b5f18da
   zh: 027d67d93d660e76
@@ -48,11 +63,11 @@ document:
   en: ab964e307bd37dca
   zh: 03f975252f838a42
 /deepseek-ai-dsh-tool-subagent-control/model-experience/delivery-result/what-the-model-sees:
-  en: 4a0a4955589012ae
-  zh: 2bbbb5196a8aa4fd
+  en: 87420f25ef9ba836
+  zh: 8aa3150260da1bcb
 /deepseek-ai-dsh-tool-subagent-control/model-experience/delivery-result/token-effect:
-  en: 0f134e37e4bd9965
-  zh: ceb858d01266e976
+  en: 643a1ab9944e94ce
+  zh: 7906e9585dbb4d4c
 /deepseek-ai-dsh-tool-subagent-control/model-experience/delivery-result/kv-cache-effect:
   en: f5d5f97a153f7c70
   zh: 3d6bc05b9eadfbc2
@@ -60,17 +75,17 @@ document:
   en: 094e55d258f2ec2e
   zh: f364bc9046530bff
 /deepseek-ai-dsh-tool-subagent-control/model-experience/listing-result/what-the-model-sees:
-  en: 636df8fc47560461
-  zh: b9aa3c1b7b741de9
+  en: e04c6159aed2a941
+  zh: bc024ba205408ab3
 /deepseek-ai-dsh-tool-subagent-control/model-experience/listing-result/token-effect:
-  en: d5c21b66bbbed504
-  zh: 58e26de0773deeaf
+  en: 73ffd5b898374eef
+  zh: 2860b44428685058
 /deepseek-ai-dsh-tool-subagent-control/model-experience/listing-result/kv-cache-effect:
   en: 4a629edb36a17e32
   zh: 67a242f3dea3a056
 /deepseek-ai-dsh-tool-subagent-control/known-limitations-and-deferred-work:
-  en: 5f197ad9a7cea799
-  zh: f891b99d7dd395bd
+  en: 234aa8e82c073ce8
+  zh: 84f1b9cfffb2bdf0
 /deepseek-ai-dsh-tool-subagent-control/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

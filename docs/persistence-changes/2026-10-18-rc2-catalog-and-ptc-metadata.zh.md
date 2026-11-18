@@ -44,7 +44,7 @@ Catalog payload 版本 0 和 1 的字段及含义保持不变。版本 2 标识�
 <a id="verification"></a>
 ## 验证
 
-`pnpm exec vitest run packages/subagent/subagent/tests/catalog.spec.ts packages/core/tools/tests/ptc.spec.ts` 通过 136 项测试。覆盖混合 catalog 版本、非法版本与 mode 组合，以及分离后的 PTC 元数据在 Session 恢复后仍保留、且不改变绑定结果或落盘内容策略。
+`pnpm exec vitest run packages/subagent/subagent/tests/catalog.spec.ts packages/core/tool-executor-ptc/tests/ptc.spec.ts` 通过 136 项测试。覆盖混合 catalog 版本、非法版本与 mode 组合，以及分离后的 PTC 元数据在 Session 恢复后仍保留、且不改变绑定结果或落盘内容策略。
 
 <a id="dev-note"></a>
 ## 开发备注

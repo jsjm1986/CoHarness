@@ -124,7 +124,7 @@ interface ResolvedSubagentStartRequest extends SubagentStartRequest {
 
 Spawn alone supports an independent `agentPreset`; omission and fork inherit the parent's active composition. The [child preset rules](../../packages/subagent/subagent/README.md#restoring-child-composition) define explicit selection, event ordering, and historical restoration.
 
-A **continuable background subagent** is one durable child Session with at most one process-local **Activation**, the period when a reconstructed child Agent is resident. An Activation is not a request, result, cancellation, or Task: it may execute many FIFO turns and stays resident while descendants it created are still running. The continuation manager owns activation admission, direct-parent authorization, the live ownership graph, cold resume, and child-first disposal; the Agent loop owns all turn ordering and execution. No continuable path creates a Task or an intermediate result-bearing wrapper.
+A **continuable background subagent** is one durable child Session with at most one process-local **Activation**, the period when a reconstructed child Agent is resident. An Activation is not a request, result, cancellation, or Task: it may execute many FIFO turns and stays resident while descendants it created are still running. The continuation manager owns activation admission, tree authorization, the live ownership graph, cold resume, and child-first disposal; the Agent loop owns all turn ordering and execution. No continuable path creates a Task or an intermediate result-bearing wrapper.
 
 ```text
 persisted Session
@@ -134,9 +134,9 @@ persisted Session
        -> zero or more owned child Activations
 ```
 
-`SubagentRuntime.startContinuable()` reserves the stable child id, snapshots the versioned `subagent/descriptor` payload, asks the named provider for its detached `ContinuableCreateSpec`, creates the child Agent through a private activation-owner scope, establishes any continuable-parent ownership, and submits the initial prompt. It resolves with `{ childId, messageId }` when inbox acceptance yields the message id — without waiting for the turn to start or for the message to enter the Session log. Every failure before that acceptance rejects with neither id, disposing any created handle and rolling back the Activation and parent ownership.
+`SubagentRuntime.startContinuable()` reserves the stable child id, snapshots the versioned `subagent/descriptor` payload, asks the named provider for its detached `ContinuableCreateSpec`, creates the child Agent through a private activation-owner scope, establishes any continuable-parent ownership, and submits the initial prompt. It resolves with `{ childId, name, messageId }` when inbox acceptance yields the message id — without waiting for the turn to start or for the message to enter the Session log. Every failure before that acceptance rejects with neither id, disposing any created handle and rolling back the Activation and parent ownership.
 
-`SubagentRuntime.sendMessage()` is the sole model-authored message operation. It accepts the exact live sender plus a target id, permits only a direct parent or direct continuable child, derives sender attribution itself, and routes a direct-child target by Activation residency:
+`SubagentRuntime.sendMessage()` is the sole model-authored message operation. It accepts the exact live sender plus a target id, requires the resolved target to be the root or another continuable member of the sender's subagent tree, derives sender attribution itself, and routes the member by Activation residency:
 
 | Target Activation state | `sendMessage` |
 |---|---|
@@ -148,9 +148,21 @@ persisted Session
 
 The Agent inbox is the only queue. Every Agent message uses `Agent.steer()`: an idle target starts a turn, while a running target claims it at the nearest step boundary. Successful delivery returns the accepted `MessageId`; the existing `agent/inbox/inserted`, `agent/inbox/claimed`, and `agent/inbox/discarded` events remain the message-lifecycle observations, and the continuation layer defines no subagent-specific delivery route.
 
-Authority comes from the exact live sender. Parent-to-child delivery requires the target's `SessionHeader.parentSession` to name the sender; child-to-parent delivery requires the sender's resident Activation to name the target. Siblings, ancestors beyond one edge, self-targets, stale Agent objects, and one-shot children are rejected. Each accepted message is framed as `Agent <sender-id> sent a message:` and records `AgentMessageSource`; the source records the sender but grants no authority.
+Authority comes from the exact live sender and shared tree membership: the sender must be the live tree root or a resident continuable member, and the resolved target must belong to the same root's tree. Only the cold target materializes — under the tree root — while its own creation ancestors may stay offline. Self-targets, members of another tree, stale Agent objects, and one-shot children are rejected. Each accepted message is framed as `Agent <sender-name> sent a message:` and records `AgentMessageSource`; the source records the sender but grants no authority.
 
 For `startContinuable()` and `sendMessage()`, the caller signal owns lookup, materialization, and admission only until inbox acceptance. Afterwards the manager owns the Activation independently: later caller cancellation neither cancels the accepted turn nor disposes the child. Human browser prompts remain a separate private Queue adapter and therefore still produce distinct FIFO turns.
+
+Every cataloged child carries a durable name unique among its creator's children; the [package README](../../packages/subagent/subagent/README.md#agent-names) defines the name rule, default selection, and duplicate rejection. Session ids remain the execution identity for routing, persistence, and authorization; names are model-facing references. The root is always `lead`, and a descendant's full name is the slash-separated path of sibling names from the root, such as `reviewer/checker`; `listDescendants()` rows carry it as `path` when every link below the root is named, and a member at or below an unnamed historical link falls back to its Session id. `namesOf(agent)` reports a live member's own name and its direct creator's by the same rule, `rootOf(agent)` resolves a live member's tree root, and `resolveName(caller, name, signal)` maps `lead` or a full name to its Session id — any other text that names no member returns unchanged as an id, while an unmatched slash-separated path fails with `AGENT_NAME_NOT_FOUND`. Resolution grants no authority: `sendMessage()` authorizes the resolved id.
+
+```ts type-equiv
+/** Model-facing names of one live tree member and its direct creator. */
+interface SubagentMemberNames {
+  /** `lead` for the root, the slash-separated path for a named descendant, otherwise the Session id. */
+  readonly self: string
+  /** The direct creator's name by the same rule; absent for the root. */
+  readonly parent?: string
+}
+```
 
 `SubagentRuntime.interrupt(targetSessionId, authority)` is the one public stop: it authorizes synchronously, issues `Agent.cancel(cause, { keepInbox: true })` on the live target, and returns without awaiting quiescence. The Activation, its unclaimed pending inbox work, and published descendants are untouched; work already claimed into the interrupted turn is not requeued. Once the interrupted driver is idle, a waking send resumes the parked FIFO queue. An absent target — unknown, one-shot, or already settled — and a manager-less composition are accepted no-ops. For a live target, a mismatched parent address or caller outside its live ancestry rejects with `UNAUTHORIZED`; stale ancestor objects and self-targeting ancestor requests reject before target lookup.
 
@@ -170,7 +182,7 @@ Every Activation owns its `AgentHandle` and an `ownedChildren: Set<SessionId>`; 
 Final settlement awaits `ctx.sessions.flush(session)` but ignores its participation boolean because an arbitrary listener cannot prove that a persistence backend stored the state. Rejection is logged without failing the Activation, and the manager still disposes the handle and releases ownership; the persisted child state may then be missing or stale on a later resume. Manager unload invokes an internal manager-wide drain that closes admission and disposes every live forest; `drainContinuableDescendants(parents)` closes admission only below exact live host-owned Agents and disposes their continuable descendants while unrelated forests remain live. Both await already-admitted materializations in their scope, propagate cancellation top-down, release handles child-first, and await every selected branch despite individual failures. Durable child Sessions survive that process-local teardown.
 
 ```ts type-equiv
-/** Durable attribution for one model-authored message between adjacent Agents. */
+/** Durable attribution for one model-authored message between Agents. */
 interface AgentMessageSource {
   readonly kind: 'agent-message'
   /** A message another agent addressed to this one (`relay` context form). */
@@ -183,7 +195,7 @@ interface AgentMessageSource {
 ```
 
 ```ts type-equiv
-/** Options for one model-authored message between adjacent Agents. */
+/** Options for one model-authored message within a subagent tree. */
 interface SubagentSendMessageOptions {
   /** Caller cancellation, owning the operation only until inbox acceptance. */
   readonly signal: AbortSignal
@@ -197,6 +209,11 @@ interface ContinuableStart {
   readonly childId: SessionId
   /** The accepted initial prompt's inbox message id. */
   readonly messageId: MessageId
+  /**
+   * Model-facing name: the slash-separated path from the subagent tree root
+   * when every creator below the root is named, otherwise the child Session id.
+   */
+  readonly name: string
 }
 ```
 
@@ -216,6 +233,8 @@ interface SubagentSettledMessageSource {
   readonly form: 'notice'
   /** One-line account of how the child ended. */
   readonly summary: string
+  /** Exact execution stop reason; absent on historical notices. Writers always include it. */
+  readonly stopReason?: ActivationTerminal['stopReason']
   /** Session id of the child that settled. */
   readonly senderSessionId: SessionId
   /** Participants captured when the sender produced this delivery. */
@@ -282,7 +301,7 @@ type ExternalModelSelection =
 
 `SubagentRuntime.listChildren(parentSessionId)` enumerates the parent's direct session-backed subagents from the live-preferred merge of `ctx.sessions.list()` and optional `ctx.sessionPersistence.list()` — no query service, and no Agent is loaded or resumed. Candidates are the direct children whose durable header carries `origin: 'subagent'`; the marker classifies enumeration and coarse generic-route denial but cannot establish a valid descriptor, resumability, or authorization — the projection fold owns identity, and the Activation contract owns resume. Each row's `mode`/`label` is the registered `subagent` projection unit's value, served through a three-rung ladder: the registry's watermark cache for a live child (zero log reads); the optional projection checkpoint cache for a cold one (`cachedSnapshot` — an identity passing the own-suffix seq gate is final, because an own descriptor is immutable once appended); otherwise one `persistence.inspect()` reading folded through the registry (bounded concurrency, recomputed per listing). The cache is a pure optional accelerator: absent, serving the `null` sentinel or missing the key, failing the seq gate, or faulting, it falls silently through to the authoritative refold. The fold is `subagent/descriptor` last-wins with no failure channel: the child's own descriptor overrides a fork-seeded ancestor's, and a malformed or unknown-version payload folds to a serializable `null` sentinel, treated as no value. The result is one `SubagentListEntry[]` in `createdAt`-then-id order: a served identity yields a `child` entry with `mode: 'one-shot' | 'continuable'` and `activity: 'running' | 'inactive'`; continuable entries always carry `label`, while one-shot entries carry it only when the start caller supplied presentation metadata. A settled candidate whose fold served no identity yields a `corrupt` diagnostic — missing, malformed, and unknown-version descriptors deliberately undistinguished (`unsupported` remains in the type but is never produced); a running candidate without an identity is omitted (the creation window before its descriptor lands); a failed cold inspection yields one `unavailable` diagnostic retried on the next listing, so one damaged sibling cannot hide healthy children. `hasChildren` marks a direct descendant with durable subagent origin, read from the same merged material. Activity snapshots only whether the logical record is live in `ctx.sessions`, not outcome or resumability. Absent persistence, enumeration is live-only rather than an error — a cold child cannot be resumed then either. `listChildren()` throws `SubagentError` with code `SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE` when the `ctx.sessionProjections` registry is absent and `SUBAGENT_CONTROL_SESSION_STORE_UNAVAILABLE` when the session store is, both checked before any read so a deployment with zero children still fails deterministically; the list tool requires `ctx.subagents` and `ctx.agents` at plugin load. A service consumer such as a UI can display both modes and choose an unlabeled one-shot fallback, while the model-facing `list_agents` adapter (the separately loadable `/list-agents` plugin of [dsh-tool-subagent-control](../../packages/subagent/tool-subagent-control)) keeps only continuable entries and refines status through the live Agent registry into `running`/`inactive`; `inactive` includes loaded and storage-only children without describing task completion or outcome. Listing does not consult the continuation manager's Activation map, Agent registry, or provider availability; `send_message` remains the authoritative delivery-time operation, and a listed running continuable child may still reject delivery as an ownership conflict. The read-path rationale lives in [the list-identity-projection Agent Note](../../.agents/notes/implemented/architecture/2026-08-06-subagent-list-identity-projection.md).
 
-`SubagentRuntime.listDescendants(rootSessionId)` applies the same live-preferred corpus and projection-backed interpretation to the root's complete descendant tree in stable pre-order. Ordinary sessions and one-shot children remain traversal nodes, so continuable descendants below them are discovered; only `origin: 'subagent'` candidates produce rows. Each returned child or diagnostic adds its position from the enumerated durable header, while a cold inspection revalidates that complete lifecycle before serving identity:
+`SubagentRuntime.listDescendants(rootSessionId)` applies the same live-preferred corpus and projection-backed interpretation to the root's complete descendant tree in stable pre-order. Ordinary sessions and one-shot children remain traversal nodes, so continuable descendants below them are discovered; only `origin: 'subagent'` candidates produce rows. Each returned child or diagnostic adds its position from the enumerated durable header and, when every catalog link below the root is named, the member's full slash-separated name as `path`, while a cold inspection revalidates that complete lifecycle before serving identity:
 
 ```ts type-equiv
 /**
@@ -295,6 +314,12 @@ type SubagentDescendantListEntry = SubagentListEntry & {
   readonly parentId: SessionId
   /** Edge distance from the requested root; direct children are `1`. */
   readonly depth: number
+  /**
+   * Slash-separated catalog names from the requested root; absent when this
+   * child or an ancestor below the root recorded no name, or its creator's
+   * catalog is unreadable.
+   */
+  readonly path?: string
 }
 ```
 
@@ -523,26 +548,64 @@ resolveMaxDepth(configured?: number | 'provider-managed'): number | undefined
  * turn to start or for the message to reach the Session log; any earlier
  * failure rejects with no ids and rolls back the child entirely.
  * @param spec - provider, delegation request, and caller cancellation.
- * @returns the durable child id and the accepted prompt's message id.
+ * @returns the durable child id, the committed model-facing member name,
+ *   and the accepted prompt's message id.
  * @throws when continuation services are unavailable or materialization fails.
  */
 async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>
 
 /**
- * Steer one model-authored message to the sender's direct parent or direct
- * continuable child. A running target admits it at the nearest step boundary;
- * an idle target starts a turn, and an absent direct child cold-resumes from
- * persistence. The service derives durable sender attribution from the exact
- * live sender. Caller cancellation stops only pre-acceptance work.
+ * Steer one model-authored message to another member of the sender's
+ * subagent tree — the root, a sibling, a deeper descendant, or the sender's
+ * direct parent. A running target admits it at the nearest step boundary;
+ * an idle target starts a turn, and an absent member cold-resumes from
+ * persistence under the shared tree root without requiring its own creator
+ * live. The service derives durable sender attribution from the exact live
+ * sender. Caller cancellation stops only pre-acceptance work.
  * @param sender - exact live Agent authorizing and originating the message.
- * @param targetId - durable direct-parent or direct-child session id.
+ * @param targetId - durable session id of another member of the same tree.
  * @param content - model-authored content to deliver.
  * @param options - caller cancellation before inbox acceptance.
  * @returns the accepted message's inbox id.
- * @throws when continuation services are unavailable, adjacency is rejected,
- *   or the message was not admitted.
+ * @throws when continuation services are unavailable, the target is outside
+ *   the sender's tree, or the message was not admitted.
  */
 async sendMessage( sender: Agent, targetId: SessionId, content: ContentBlock[], options: SubagentSendMessageOptions, ): Promise<MessageId>
+
+/**
+ * Resolve the exact live Agent at the root of the caller's subagent tree. A
+ * root is the caller itself when it never became a subagent member; a
+ * member's root stays reachable only while that exact root Agent is live.
+ * @param caller - exact live Agent selecting the subagent tree.
+ * @returns the live subagent tree root.
+ * @throws {SubagentError} `UNAUTHORIZED` when the caller is stale or a member
+ *   whose tree root is not live.
+ */
+rootOf(caller: Agent): Agent
+
+/**
+ * Report the model-facing names of a live member and its direct creator.
+ * The root reports `lead` and no parent; a member reports its slash-separated
+ * path — or its raw Session id where a historical catalog link was unnamed —
+ * and its creator's name by the same rule.
+ * @param agent - exact live root or resident tree member.
+ * @returns the member's own name and, for a member, its creator's.
+ * @throws {SubagentError} `UNAUTHORIZED` when the caller has no active runtime owner.
+ */
+namesOf(agent: Agent): SubagentMemberNames
+
+/**
+ * Resolve one model-facing name or Session id into the durable member id it
+ * addresses. `lead` names the caller's tree root and a slash-separated path
+ * walks committed catalog names from it; a simple name matching no committed
+ * entry falls back to the raw Session id.
+ * @param caller - exact live Agent selecting the subagent tree.
+ * @param name - the target's name path or a raw Session id.
+ * @param signal - caller cancellation forwarded to catalog reads.
+ * @returns the durable Session id to address.
+ * @throws {SubagentError} `AGENT_NAME_NOT_FOUND` for an unmatched slash path.
+ */
+resolveName(caller: Agent, name: string, signal?: AbortSignal): Promise<SessionId>
 
 /**
  * Interrupt one live continuable child's current turn under a human parent

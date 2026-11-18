@@ -79,6 +79,16 @@ describe('policy helpers', () => {
     expect(decoderForCharset('iso-8859-1').encoding).toBe('windows-1252')
     expect(() => decoderForCharset('not-a-charset')).toThrow(expect.objectContaining({ code: 'WEB_UNSUPPORTED_CONTENT_TYPE' }))
   })
+
+  it.each(['utf-8,gbk', 'gbk,utf8', 'not-a-charset, utf-8', 'utf-8 utf8'])('requires strict UTF-8 for %s', (charset) => {
+    const decoder = decoderForCharset(charset)
+    expect(decoder.encoding).toBe('utf-8')
+    expect(decoder.fatal).toBe(true)
+  })
+
+  it.each(['gb2312,gbk', 'windows-1252,gbk', ','])('rejects a malformed declaration without UTF-8: %s', (charset) => {
+    expect(() => decoderForCharset(charset)).toThrow(expect.objectContaining({ code: 'WEB_UNSUPPORTED_CONTENT_TYPE' }))
+  })
 })
 
 describe('public-network policy', () => {
@@ -580,5 +590,86 @@ describe('web-fetch-http plugin registration', () => {
     await expect(ctx.web.fetch({ url: `${base}/` }))
       .resolves.toMatchObject({ statusCode: 200 })
     await fiber.dispose()
+  })
+})
+
+describe('HttpFetchProvider charset recovery', () => {
+  it.each(['utf-8,gbk', 'gbk,utf8', 'not-a-charset, utf-8'])('decodes UTF-8 HTML declared as %s', async (charset) => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-type': `text/html; charset=${charset}` })
+      res.end('<meta charset="UTF-8"><p>你好</p>')
+    }
+    const result = await provider().fetch({ url: base })
+    expect(result.body).toEqual({ kind: 'html', content: '<meta charset="UTF-8"><p>你好</p>' })
+    expect(result.truncated).toBe(false)
+  })
+
+  it.each([
+    ['gbk,utf-8', [0xE4, 0xB8]], // Valid GBK, but an incomplete UTF-8 sequence at EOF.
+    ['gbk,utf-8', [0xE4]],
+    ['gbk,utf-8', [0x81, 0x20]],
+    ['gbk,utf-8', [0xD6, 0xD0, 0xCE, 0xC4]],
+    ['not-a-charset,utf-8', [0xD6, 0xD0, 0xCE, 0xC4]],
+    ['utf8,utf-8', [0x81, 0x20]],
+  ] as const)('rejects non-UTF-8 bytes for %s: %j', async (charset, bytes) => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-type': `text/plain; charset=${charset}` })
+      res.end(Buffer.from(bytes))
+    }
+    await expect(provider().fetch({ url: base })).rejects.toThrow(expect.objectContaining({
+      code: 'WEB_UNSUPPORTED_CONTENT_TYPE',
+      message: 'response body is not valid UTF-8 for the malformed charset declaration',
+    }))
+  })
+
+  it.each(['gb2312,gbk', 'windows-1252,gbk'])('rejects a legacy-only compound declaration: %s', async (charset) => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-type': `text/plain; charset=${charset}` })
+      res.end(Buffer.from([0xD6, 0xD0, 0xCE, 0xC4]))
+    }
+    await expect(provider().fetch({ url: base })).rejects.toThrow(expect.objectContaining({
+      code: 'WEB_UNSUPPORTED_CONTENT_TYPE', message: `unsupported charset "${charset}"`,
+    }))
+  })
+
+  it('keeps single-label GBK decoding', async () => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain; charset=gbk' })
+      res.end(Buffer.from([0xD6, 0xD0, 0xCE, 0xC4]))
+    }
+    expect((await provider().fetch({ url: base })).body.content).toBe('中文')
+  })
+
+  it('keeps replacement decoding for a single declared charset', async () => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' })
+      res.end(Buffer.from([0xE4, 0xB8]))
+    }
+    expect((await provider().fetch({ url: base })).body.content).toBe('�')
+  })
+
+  it.each([
+    ['中文', 5, true],
+    ['中文', 3, true],
+    ['中', 3, false],
+  ] as const)('returns complete UTF-8 characters for %j with byte cap %i (truncated: %s)', async (body, maxResponseBytes, truncated) => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain; charset=gbk,utf-8' })
+      res.end(body)
+    }
+    const result = await provider({ maxResponseBytes }).fetch({ url: base })
+    expect(result.body.content).toBe('中')
+    expect(result.truncated).toBe(truncated)
+  })
+
+  it('validates EOF when the response exactly fills the byte cap', async () => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain; charset=gbk,utf-8' })
+      res.end(Buffer.from([0xE4, 0xB8]))
+    }
+    await expect(provider({ maxResponseBytes: 2 }).fetch({ url: base })).rejects.toThrow(expect.objectContaining({
+      code: 'WEB_UNSUPPORTED_CONTENT_TYPE',
+      message: 'response body is not valid UTF-8 for the malformed charset declaration',
+    }))
   })
 })

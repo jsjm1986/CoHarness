@@ -60,6 +60,7 @@ const EXPECTED_TOOLS = [
   'session_search',
   'session_trace',
   'skill',
+  'str_replace_editor',
   'subagent',
   'subagent_fork',
   'todo_write',
@@ -154,11 +155,11 @@ it('assembles the shipped Web transport, catalog, guidance, and defaults', async
       "mode": "always",
     }
   `)
-  // The directory tool is global; every other model-facing row lives in a
-  // preset mounted under one session's scope, so a caller must name the agent
-  // to see anything else. This composes from the deployment default — what a
-  // session that names no preset gets.
-  expect(ctx.tools.schemas().map(schema => schema.name)).toEqual(['working_directory'])
+  // The directory and patch-editor tools are global; every other model-facing
+  // row lives in a preset mounted under one session's scope, so a caller must
+  // name the agent to see anything else. This composes from the deployment
+  // default — what a session that names no preset gets.
+  expect(ctx.tools.schemas().map(schema => schema.name)).toEqual(['str_replace_editor', 'working_directory'])
   const handle = await ctx.agents.create({
     sessionId: SessionId('shipped-composition'),
     setup: agentCtx => ctx.agentPresets.mount(agentCtx).then(() => undefined),
@@ -221,17 +222,20 @@ it('lets a preset producer reach the background-job registry', async () => {
     // `tool-bash` is a preset row and `tasks` is a host registry; the producer
     // resolves it with `ctx.get`, so a registry hidden behind a preset realm
     // fails here — with every task control still listed in the catalog above.
-    const started = await ctx.tools.execute({
+    const started = (await ctx.tools.execute({
       signal,
-      callId: ToolCallId('shipped-bash-background'),
-      name: 'bash',
-      arguments: {
-        command: 'printf SHIPPED_BACKGROUND_OK',
-        description: 'shipped background probe',
-        run_in_background: true,
-      },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('shipped-bash-background'),
+        name: 'bash',
+        arguments: JSON.stringify({
+          command: 'printf SHIPPED_BACKGROUND_OK',
+          description: 'shipped background probe',
+          run_in_background: true,
+        }),
+      }],
       agent: handle.agent,
-    })
+    })).results[0]!.result
     // The registry mints `<kind>-<16 lowercase hex>` job ids; capture the one
     // this start produced so the controls below address it, not a guess.
     const ack = started.content.map(block => block.type === 'text' ? block.text : '').join('')
@@ -244,13 +248,16 @@ it('lets a preset producer reach the background-job registry', async () => {
 
     // The controller reads what the producer started: same registry, one
     // owner. A per-preset registry would list nothing here even on success.
-    const listed = await ctx.tools.execute({
+    const listed = (await ctx.tools.execute({
       signal,
-      callId: ToolCallId('shipped-task-list'),
-      name: 'job_list',
-      arguments: {},
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('shipped-task-list'),
+        name: 'job_list',
+        arguments: '{}',
+      }],
       agent: handle.agent,
-    })
+    })).results[0]!.result
     expect(listed.isError).toBe(false)
     expect(listed.content).toEqual([
       { type: 'text', text: expect.stringContaining(`${jobId} [bash]`) as string },
@@ -258,13 +265,16 @@ it('lets a preset producer reach the background-job registry', async () => {
 
     // The full round trip: the output a host-plane producer wrote is collected
     // through a preset-plane control, which is the linkage the realm severed.
-    const collected = await ctx.tools.execute({
+    const collected = (await ctx.tools.execute({
       signal,
-      callId: ToolCallId('shipped-task-output'),
-      name: 'job_output',
-      arguments: { job_id: jobId, wait: true },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('shipped-task-output'),
+        name: 'job_output',
+        arguments: JSON.stringify({ job_id: jobId, wait: true }),
+      }],
       agent: handle.agent,
-    })
+    })).results[0]!.result
     expect(collected.isError).toBe(false)
     expect(collected.content).toEqual([
       { type: 'text', text: expect.stringContaining('SHIPPED_BACKGROUND_OK') as unknown as string },

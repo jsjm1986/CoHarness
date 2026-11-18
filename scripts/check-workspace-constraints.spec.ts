@@ -396,6 +396,12 @@ describe('package payload constraints', () => {
     ])
   })
 
+  it('publishes the shared chunk beside a second pipeline entry', () => {
+    expect(expectedDshPackageFiles({
+      exports: { './pipeline': { types: './lib/types/pipeline.d.ts', default: './lib/pipeline.js' } },
+    })).toEqual(['lib/index.js', 'lib/pipeline.js', 'lib/shared-*.js', 'lib/types/**/*.d.ts'])
+  })
+
   it('exempts the private plugin market generator from release rules in its own directory only', () => {
     const dir = 'apps/plugin-market-generator'
     const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']

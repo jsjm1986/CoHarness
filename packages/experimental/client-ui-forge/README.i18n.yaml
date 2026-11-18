@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/client-ui-forge/README.md
+document:
+  en: 87f2e4aa8c74e9c7ff290ef07a068ce6ffd18224
+  zh: 842f8292e1ef1bf2c137bae6246afdc08e8b6b89
+/:
+  en: 27cf01b13f177106
+  zh: c4b56ad7dfe7b1c7
+/deepseek-ai-dsh-experimental-client-ui-forge:
+  en: 8ca3d802a44c6fd1
+  zh: 2723c9e28ecea7f7
+/deepseek-ai-dsh-experimental-client-ui-forge/summary:
+  en: ba5e34b6896e03e6
+  zh: 516d4ae6aa123804
+/deepseek-ai-dsh-experimental-client-ui-forge/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 2f8a621b991260a1
+/deepseek-ai-dsh-experimental-client-ui-forge/use-this-package:
+  en: 9756672b4471c8d9
+  zh: f2d203f61154b9a8
+/deepseek-ai-dsh-experimental-client-ui-forge/understand-the-implementation:
+  en: c9541603ea971f46
+  zh: 15c41326e3fb29e4
+/deepseek-ai-dsh-experimental-client-ui-forge/further-exploration:
+  en: b1e12dd9eabb5ed9
+  zh: b9e877e55a48ba95
+/deepseek-ai-dsh-experimental-client-ui-forge/model-experience:
+  en: 795766e162ebf4df
+  zh: 893de3302798330a
+/deepseek-ai-dsh-experimental-client-ui-forge/model-experience/kv-cache-effect:
+  en: 2bc25a99e17789c4
+  zh: 4bec723fbf249d28
+/deepseek-ai-dsh-experimental-client-ui-forge/known-limitations-and-deferred-work:
+  en: ce81ac206a34e8a6
+  zh: 81353d67b3aa5ee4
+/deepseek-ai-dsh-experimental-client-ui-forge/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

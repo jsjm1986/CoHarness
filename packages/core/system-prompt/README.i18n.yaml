@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/system-prompt/README.md
 document:
-  en: a4d402909134630d221bbedb9af4aea56a2f070f
-  zh: 3a05d4979bada50aaa64f9d51b35a1066d398cd1
+  en: 2b19b274e38559ab1ddf9a5ec0dac42f57e07a21
+  zh: a65fa8a06efa283369ddb3d80c8dba22ebd58f1d
 /:
   en: 51d99b2500db958f
   zh: 91f2b113ba7989fd
@@ -75,8 +75,8 @@ document:
   en: 3039bc5e7a796b21
   zh: 6b7a9eaf69c9ea53
 /deepseek-ai-dsh-system-prompt/model-experience/tool-schemas/what-the-model-sees:
-  en: a983ef220593cf73
-  zh: 28770612ffc1be60
+  en: 52a3697cc414b197
+  zh: 134c99ab558ecd0c
 /deepseek-ai-dsh-system-prompt/model-experience/tool-schemas/token-effect:
   en: f3a7d374c55e1720
   zh: 0ee48af678cb875f

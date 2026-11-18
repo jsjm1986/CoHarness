@@ -2,7 +2,7 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { materializeProfilePatch } from '../../../packages/test-support/session-snapshot/lib/index.js'
+import { materializeProfilePatch } from '../../../../../packages/test-support/session-snapshot/lib/index.js'
 
 const cwd = process.argv[2]
 if (cwd === undefined) throw new Error('Memory SDK fixture requires its owned workspace')

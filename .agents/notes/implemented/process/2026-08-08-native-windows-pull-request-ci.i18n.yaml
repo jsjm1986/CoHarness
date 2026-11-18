@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-08-native-windows-pull-request-ci.md
 document:
-  en: a17b131fb445a8df729565c8a35a03d21132d5d7
-  zh: 3ceebfe62009837971ec4d8b7f7beccca4cec01c
+  en: b12898cadb443b2d91f9464948870f9a1ac10123
+  zh: 1ed118819546f417433dff224a3ca735bcb9ccea
 /agent-note-dual-wine-and-native-windows-pull-request-ci:
   en: aac9f226287cb060
   zh: 07081f36326b96f3
@@ -12,8 +12,8 @@ document:
   en: a9f59ecc355617d3
   zh: c172bea4cc9bbbe4
 /agent-note-dual-wine-and-native-windows-pull-request-ci/decision:
-  en: b7b97aad43710d68
-  zh: f498611c90ce9568
+  en: d163e6083f63ed00
+  zh: ac10cb88055ce13c
 /agent-note-dual-wine-and-native-windows-pull-request-ci/alternatives-considered:
   en: fe896004eb49c376
   zh: 151cda7d5e0adecc

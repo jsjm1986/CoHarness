@@ -19,6 +19,22 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     workingDirectory: WorkingDirectoryService
   }
+  interface Events {
+    /**
+     * Coordinate directory validation and publication with a resource operation
+     * on the directory, such as a checkout being removed. A listener that must
+     * wait awaits that operation, then calls `next()`; every other listener
+     * calls `next()` at once. A rejection fails this access and leaves the
+     * recorded directory unchanged; it is not a fallback.
+     * @param request - owner, requested path (null validates the current directory), and the access's cancellation.
+     * @param next - perform validation and commit.
+     * @mode waterfall
+     */
+    'working-directory/access'(
+      request: { agent: Agent; path: string | null; signal: AbortSignal },
+      next: () => Promise<string>,
+    ): Promise<string>
+  }
 }
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -139,7 +155,7 @@ export class WorkingDirectoryService extends Service {
    * @throws when the original project is also unavailable.
    */
   ensure(agent: Agent, signal?: AbortSignal): Promise<string> {
-    return this.serialize(agent, signal, async (control) => {
+    return this.serialize(agent, signal, control => this.ctx.waterfall('working-directory/access', { agent, path: null, signal: control }, async () => {
       const fs = this.fsFor(agent)
       const current = this.get(agent.session)
       const original = agent.session.header.cwd ?? this.defaultDirectory
@@ -189,7 +205,7 @@ export class WorkingDirectoryService extends Service {
       this.transportWarned.delete(agent.session)
       this.commit(agent, restored, true, control)
       return restored
-    })
+    }))
   }
 
   /**
@@ -214,11 +230,11 @@ export class WorkingDirectoryService extends Service {
    * @throws when the requested path is not an existing directory inside the project root.
    */
   set(agent: Agent, path: string, signal?: AbortSignal): Promise<string> {
-    return this.serialize(agent, signal, async (control) => {
+    return this.serialize(agent, signal, control => this.ctx.waterfall('working-directory/access', { agent, path, signal: control }, async () => {
       const directory = await this.resolveCanonical(agent, path, this.get(agent.session), control)
       this.commit(agent, directory, false, control)
       return directory
-    })
+    }))
   }
 
   /**

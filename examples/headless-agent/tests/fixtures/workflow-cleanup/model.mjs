@@ -80,10 +80,11 @@ export async function apply(ctx) {
           await run.dispose()
           proof = { mode, cleanupRejected, retainedTransport, transportClosedByRetry: transportClosed }
         } else {
-          const accepted = await ctx.tools.execute({
-            name: 'workflow', callId: ToolCallId('workflow-cleanup'), signal: new AbortController().signal,
-            arguments: { ...source, run_in_background: true }, agent: parent,
-          })
+          const accepted = (await ctx.tools.execute({
+            calls: [{ type: 'tool-call', id: ToolCallId('workflow-cleanup'), name: 'workflow',
+              arguments: JSON.stringify({ ...source, run_in_background: true }) }],
+            signal: new AbortController().signal, agent: parent,
+          })).results[0].result
           assert.equal(accepted.isError, false)
           const runId = accepted.value.runId
           jobId = accepted.value.jobId

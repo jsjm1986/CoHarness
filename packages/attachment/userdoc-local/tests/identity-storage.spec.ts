@@ -204,7 +204,8 @@ it('bounds the entire marker read and continues after short filesystem reads', a
 it('refuses a marker changed between directory lookup and descriptor acquisition', async () => {
   const f = await fixture()
   await f.storage.bindDomain(f.rootId)
-  faults.changedHandlePath = f.marker
+  // Patch the lookup-side identity; the open-descriptor stat then disagrees on win32 and POSIX alike.
+  faults.objects.set(f.marker, { ino: 0n })
   await expect(f.storage.bindDomain(f.rootId)).rejects.toThrow('changed while opening')
 })
 

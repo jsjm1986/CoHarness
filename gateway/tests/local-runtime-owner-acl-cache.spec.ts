@@ -6,7 +6,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerNonce, type LocalRuntimeOwnerRecord } from '../src/local-runtime-owner.ts'
 
 const command = vi.hoisted(() => vi.fn())
-vi.mock('../src/child-command.ts', () => ({ runGatewayChildCommand: command }))
+vi.mock('../src/child-command.ts', () => ({
+  runGatewayChildCommand: command,
+  runWindowsShellProbe: (args: string[], timeoutMs: number, signal?: AbortSignal, maxBuffer?: number) => command('powershell.exe', args, timeoutMs, signal, maxBuffer),
+}))
 const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
 const roots: string[] = []
 const identity = { node: 'cached-node', kind: 'project' as const, ownerId: 7, runtimeKey: 'project-7',

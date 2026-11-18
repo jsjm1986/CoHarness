@@ -29,13 +29,15 @@
     path: ':memory:'
     openAt: never
 
-- id: tools
-  config:
-    # TEMPORARY workaround: DSH_TOOLS_MODE (native|ptc) opts a whole dsh
-    # process into PTC mode while per-session tool-presentation selection is being
-    # designed; unset keeps the schema default (native). Remove the env seam
-    # once the web UI owns the choice per session.
-    mode: !!js process.env.DSH_TOOLS_MODE
+# TEMPORARY workaround: DSH_TOOLS_MODE (native|ptc) opts a whole dsh
+# process into PTC mode while per-session tool-executor selection is being
+# designed; unset keeps the base default (native). Remove the env seam
+# once the web UI owns the choice per session.
+- id: tool-executor-native
+  disabled: !!js "process.env.DSH_TOOLS_MODE === 'ptc'"
+
+- id: tool-executor-ptc
+  disabled: !!js "process.env.DSH_TOOLS_MODE !== 'ptc'"
 
 # ── web-only host rows, the transport layer, and the browser roster ─────────
 
@@ -133,6 +135,14 @@
 
     - id: userdoc-http
       name: '@deepseek-ai/dsh-host-userdoc-http'
+
+    # One shared MCP server fleet: Settings-configured servers plus servers
+    # that installed plugins register, with status and recovery over Remote.
+    # Credential templates and OAuth grants resolve through the credentials
+    # provider, so the manager starts after it.
+    - id: mcp-manager
+      name: '@deepseek-ai/dsh-mcp-manager'
+      inject: [credentials]
 
     - id: cordis-host-runner
       name: '@deepseek-ai/dsh-cordis-host-runner'
@@ -479,9 +489,6 @@
 - id: tool-fs-search
   disabled: true
 
-- id: tool-str-replace-editor
-  disabled: true
-
 # The `skill` REGISTRY stays in the host plane. It is host+per-scope layered
 # (the tools-registry shape): deployment-level providers — repository plugins,
 # a host skill-filesystem row — register into its global layer, while a preset's
@@ -573,8 +580,8 @@
 # `dsh-agent-preset-registry`' own default (`includeUserRoot`), so a composition that
 # never reaches that patch still finds a person's presets.
 - insert:
-    - id: office-to-pdf
-      name: '@deepseek-ai/dsh-office-to-pdf'
+    - id: office-kit
+      name: '@deepseek-ai/dsh-office-kit'
 
     - id: agent-preset-registry
       name: '@deepseek-ai/dsh-agent-preset-registry'

@@ -10,7 +10,7 @@ English | [中文](2026-09-26-one-shot-subagent-descriptor-at-publish.zh.md)
 
 ## Decision
 
-[TeamRoster.subagentDescriptor](../../../../packages/experimental/agent-team/src/roster.ts) treats `session.header.origin === "subagent"` as the classification first: `childSessionMeta` writes that marker into the durable session header at creation, so it is visible before `agent/created` announces the child. The descriptor fold remains as the authority for sessions created before the origin field existed, and for cold-resumed children whose own events already carry it.
+[The origin-classified child enumeration](../../../../packages/subagent/subagent/src/list-children.ts) treats `session.header.origin === "subagent"` as the classification first: `childSessionMeta` writes that marker into the durable session header at creation, so it is visible before `agent/created` announces the child. The descriptor fold remains as the authority for sessions created before the origin field existed, and for cold-resumed children whose own events already carry it.
 
 ## Alternatives considered
 

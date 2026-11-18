@@ -15,6 +15,7 @@ The filesystem stack: a provider contract (execution-world paths, bounded text I
 | `fs-local/` | Local-filesystem `FileSystem` implementation | (registers `ctx.fs`) |
 | `fs-sandbox/` | Sandbox-enforcing `FileSystem`: extends `fs-local` and fences write/edit by the per-call mode + workspace root policy (read-only denies, workspace-write contains to the session workspace + temp roots), reads pass through | (registers `ctx.fs`) |
 | `fs-observation-policy/` | Policy gate plugin: observed-state + read-before-edit + version-guarded write/edit, via the `fs/*` event gate | (no service — `fs/*` listeners) |
+| `fs-patch/` | Pure Codex-style patch parser and LF text updater with structured match failures; no `ctx.fs` dependency | (library — no registration) |
 | `tool-fs/` | Model-facing `read`/`write`/`edit` tools AND the executor (reads via `ctx.fs`, owns read windowing, dispatches `fs/*`); preserves filesystem semantics for session-cwd-relative paths and advertises sandbox escalation fields when the mounted `ctx.fs` confines | (registers on `ctx.tools`) |
 | `tool-fs-search/` | Model-facing `glob`/`grep` discovery tools backed by the packaged `@vscode/ripgrep` binary spawned through `ctx.subprocess`, NOT by `ctx.fs` provider methods | (registers on `ctx.tools`) |
 

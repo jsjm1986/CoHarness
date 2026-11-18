@@ -7,7 +7,7 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { isAbsolute, join, normalize, relative, sep } from 'node:path'
 import { grantArgs as landlockGrantArgs } from '@deepseek-ai/node-addon-system/landlock-run'
-import { writableRoots } from '@deepseek-ai/dsh-sandbox'
+import { workspaceWritableRoots, writableRoots } from '@deepseek-ai/dsh-sandbox'
 import type { SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 
 /** systemd's system-manager credential root; `LoadCredential=` files live in per-unit directories below it. */
@@ -73,7 +73,7 @@ export function bwrapProfileArgs(policy: SandboxPolicy, hidden: readonly string[
   const args = ['--ro-bind', '/', '/', ...hidden.flatMap(path => ['--tmpfs', path]), '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent']
   if (policy.mode === 'workspace-write') {
     args.push('--tmpfs', '/tmp')
-    args.push('--bind', policy.workspaceRoot, policy.workspaceRoot)
+    for (const root of workspaceWritableRoots(policy)) args.push('--bind', root, root)
   }
   return args
 }
@@ -93,7 +93,7 @@ export function landlockProfileArgs(
 ): string[] {
   const readWrite = ['/dev/null']
   if (policy.mode === 'workspace-write') {
-    readWrite.push('/tmp', policy.workspaceRoot)
+    readWrite.push('/tmp', ...workspaceWritableRoots(policy))
   }
   return landlockGrantArgs({ readOnly: readableRoots(hidden), readWrite })
 }

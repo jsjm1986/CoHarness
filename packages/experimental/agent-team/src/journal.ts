@@ -2,34 +2,35 @@
 
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionEventMap, SessionId } from '@deepseek-ai/dsh-session'
-import { foldTeam } from './fold.ts'
-import type { TeamEventType, TeamFoldState } from './fold.ts'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { TeamState } from './projection.ts'
 
-type AppendTeamEvent = <T extends TeamEventType>(type: T, data: SessionEventMap[T]) => void
-type MutableTeamEventType = 'team/member' | 'team/task' | 'team/message/queued' | 'team/message/delivered'
+import { TeamId } from './types.ts'
+import { TeamError } from './error.ts'
+import type { TeamTaskSnapshot } from './types.ts'
 
 /** Owns per-Lead transaction order and committed Team event publication. */
 export class TeamJournal {
   private readonly tails = new Map<SessionId, Promise<void>>()
 
   /**
-   * @param ctx - Team service context with the injected Session service.
-   * @param onCommit - synchronous notification after the Team event flush succeeds.
+   * @param ctx - Team service context with the injected Session services.
    */
   constructor(
     private readonly ctx: Context,
-    private readonly onCommit: (root: Agent) => void,
   ) {}
 
   /**
-   * Fold authoritative Team state for one exact live Lead.
+   * Read authoritative Team state for one exact live Lead.
    * @param root - exact live Team Lead.
-   * @returns current replay state selected by the Lead Team id.
+   * @returns current projected state selected by the Lead Team id.
+   * @throws when the durable Team projection has failed or is unloaded.
    */
-  state(root: Agent): TeamFoldState {
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-    return foldTeam(root.id, root.session.snapshotEvents())
+  state(root: Agent): TeamState {
+    const projection = this.ctx.sessionProjections.stateOf(root.session, 'agentTeam')
+    if (projection === undefined) throw new Error('agentTeam projection is not registered')
+    if (projection.failure !== undefined) throw new Error(projection.failure)
+    return projection
   }
 
   /**
@@ -52,22 +53,22 @@ export class TeamJournal {
   }
 
   /**
-   * Append and checkpoint one root-owned Team event before publication.
-   * @param root - exact live Lead whose Session owns the event.
-   * @param type - Team event discriminant.
-   * @param data - payload correlated with the event type.
+   * Append and flush one task revision.
+   * @param root - live tree root whose Session stores the task.
+   * @param task - complete committed task revision.
+   * @throws TEAM_TASK_PERSISTENCE_UNCONFIRMED after append when flush fails or has no listener; read the task before retrying.
    */
-  async appendAndFlush<T extends MutableTeamEventType>(
-    root: Agent,
-    type: T,
-    data: SessionEventMap[T],
-  ): Promise<void> {
-    // Team events never enter the conversation surface. This narrower local
-    // capability removes Session.append's conditional surface argument while
-    // preserving the event-key/payload correlation.
-    const append = root.session.append.bind(root.session) as unknown as AppendTeamEvent
-    append(type, data)
-    await this.ctx.sessions.flush(root.session)
-    this.onCommit(root)
+  async appendAndFlush(root: Agent, task: TeamTaskSnapshot): Promise<void> {
+    root.session.append('team/task', { version: 2, teamId: TeamId(root.id), task })
+    try {
+      const participated = await this.ctx.sessions.flush(root.session)
+      if (!participated) throw new Error('No session durability listener participated')
+    } catch (error: unknown) {
+      throw new TeamError(
+        `task "${task.id}" revision ${task.revision} is visible, but persistence was not confirmed; read the task before retrying`,
+        'TEAM_TASK_PERSISTENCE_UNCONFIRMED',
+        { cause: error },
+      )
+    }
   }
 }

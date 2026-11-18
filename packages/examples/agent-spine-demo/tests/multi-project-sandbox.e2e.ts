@@ -89,25 +89,25 @@ describe('one-context multi-project sandbox', () => {
     const { active, agentA, agentB } = await agents()
     const [aOwn, bOwn, aCross, bCross] = await Promise.all([
       active.tools.execute({
-        callId: ToolCallId('bash-a-own'), name: 'bash', agent: agentA,
+        calls: [{ type: 'tool-call', id: ToolCallId('bash-a-own'), name: 'bash', arguments: JSON.stringify({ command: 'printf a > a-owned.txt', description: 'Write project A marker' }) }],
+        agent: agentA,
         signal: new AbortController().signal,
-        arguments: { command: 'printf a > a-owned.txt', description: 'Write project A marker' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('bash-b-own'), name: 'bash', agent: agentB,
+        calls: [{ type: 'tool-call', id: ToolCallId('bash-b-own'), name: 'bash', arguments: JSON.stringify({ command: 'printf b > b-owned.txt', description: 'Write project B marker' }) }],
+        agent: agentB,
         signal: new AbortController().signal,
-        arguments: { command: 'printf b > b-owned.txt', description: 'Write project B marker' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('bash-a-cross'), name: 'bash', agent: agentA,
+        calls: [{ type: 'tool-call', id: ToolCallId('bash-a-cross'), name: 'bash', arguments: JSON.stringify({ command: `printf cross > ../${basename(projectB)}/from-a.txt`, description: 'Attempt project B write' }) }],
+        agent: agentA,
         signal: new AbortController().signal,
-        arguments: { command: `printf cross > ../${basename(projectB)}/from-a.txt`, description: 'Attempt project B write' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('bash-b-cross'), name: 'bash', agent: agentB,
+        calls: [{ type: 'tool-call', id: ToolCallId('bash-b-cross'), name: 'bash', arguments: JSON.stringify({ command: `printf cross > ../${basename(projectA)}/from-b.txt`, description: 'Attempt project A write' }) }],
+        agent: agentB,
         signal: new AbortController().signal,
-        arguments: { command: `printf cross > ../${basename(projectA)}/from-b.txt`, description: 'Attempt project A write' },
-      }),
+      }).then(batch => batch.results[0]!.result),
     ])
 
     expect(aOwn.isError).toBe(false)
@@ -126,25 +126,25 @@ describe('one-context multi-project sandbox', () => {
     const { active, agentA, agentB } = await agents()
     const [aOwn, bOwn, aCross, bCross] = await Promise.all([
       active.tools.execute({
-        callId: ToolCallId('fs-a-own'), name: 'write', agent: agentA,
+        calls: [{ type: 'tool-call', id: ToolCallId('fs-a-own'), name: 'write', arguments: JSON.stringify({ file_path: 'a-owned.txt', content: 'a' }) }],
+        agent: agentA,
         signal: new AbortController().signal,
-        arguments: { file_path: 'a-owned.txt', content: 'a' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('fs-b-own'), name: 'write', agent: agentB,
+        calls: [{ type: 'tool-call', id: ToolCallId('fs-b-own'), name: 'write', arguments: JSON.stringify({ file_path: 'b-owned.txt', content: 'b' }) }],
+        agent: agentB,
         signal: new AbortController().signal,
-        arguments: { file_path: 'b-owned.txt', content: 'b' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('fs-a-cross'), name: 'write', agent: agentA,
+        calls: [{ type: 'tool-call', id: ToolCallId('fs-a-cross'), name: 'write', arguments: JSON.stringify({ file_path: join(projectB, 'from-a.txt'), content: 'cross' }) }],
+        agent: agentA,
         signal: new AbortController().signal,
-        arguments: { file_path: join(projectB, 'from-a.txt'), content: 'cross' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('fs-b-cross'), name: 'write', agent: agentB,
+        calls: [{ type: 'tool-call', id: ToolCallId('fs-b-cross'), name: 'write', arguments: JSON.stringify({ file_path: join(projectA, 'from-b.txt'), content: 'cross' }) }],
+        agent: agentB,
         signal: new AbortController().signal,
-        arguments: { file_path: join(projectA, 'from-b.txt'), content: 'cross' },
-      }),
+      }).then(batch => batch.results[0]!.result),
     ])
 
     expect(aOwn.isError).toBe(false)
@@ -175,25 +175,25 @@ describe('one-context multi-project sandbox', () => {
 
     const [bashOwn, bashLexical, fsOwn, fsLexical] = await Promise.all([
       active.tools.execute({
-        callId: ToolCallId('bash-symlink-own'), name: 'bash', agent: handle.agent,
+        calls: [{ type: 'tool-call', id: ToolCallId('bash-symlink-own'), name: 'bash', arguments: JSON.stringify({ command: 'printf bash > bash-owned.txt', description: 'Write physical workspace marker' }) }],
+        agent: handle.agent,
         signal: new AbortController().signal,
-        arguments: { command: 'printf bash > bash-owned.txt', description: 'Write physical workspace marker' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('bash-symlink-lexical'), name: 'bash', agent: handle.agent,
+        calls: [{ type: 'tool-call', id: ToolCallId('bash-symlink-lexical'), name: 'bash', arguments: JSON.stringify({ command: `printf escaped > ${join(lexicalRoot, 'bash-escaped.txt')}`, description: 'Attempt lexical workspace write' }) }],
+        agent: handle.agent,
         signal: new AbortController().signal,
-        arguments: { command: `printf escaped > ${join(lexicalRoot, 'bash-escaped.txt')}`, description: 'Attempt lexical workspace write' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('fs-symlink-own'), name: 'write', agent: handle.agent,
+        calls: [{ type: 'tool-call', id: ToolCallId('fs-symlink-own'), name: 'write', arguments: JSON.stringify({ file_path: 'fs-owned.txt', content: 'fs' }) }],
+        agent: handle.agent,
         signal: new AbortController().signal,
-        arguments: { file_path: 'fs-owned.txt', content: 'fs' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('fs-symlink-lexical'), name: 'write', agent: handle.agent,
+        calls: [{ type: 'tool-call', id: ToolCallId('fs-symlink-lexical'), name: 'write', arguments: JSON.stringify({ file_path: join(lexicalRoot, 'fs-escaped.txt'), content: 'escaped' }) }],
+        agent: handle.agent,
         signal: new AbortController().signal,
-        arguments: { file_path: join(lexicalRoot, 'fs-escaped.txt'), content: 'escaped' },
-      }),
+      }).then(batch => batch.results[0]!.result),
     ])
 
     expect(bashOwn.isError).toBe(false)
@@ -226,15 +226,15 @@ describe('one-context multi-project sandbox', () => {
 
     const [bashRead, fsRead] = await Promise.all([
       active.tools.execute({
-        callId: ToolCallId('bash-symlink-parent-read'), name: 'bash', agent: handle.agent,
+        calls: [{ type: 'tool-call', id: ToolCallId('bash-symlink-parent-read'), name: 'bash', arguments: JSON.stringify({ command: 'cat ../shared.txt', description: 'Read through the physical parent' }) }],
+        agent: handle.agent,
         signal: new AbortController().signal,
-        arguments: { command: 'cat ../shared.txt', description: 'Read through the physical parent' },
-      }),
+      }).then(batch => batch.results[0]!.result),
       active.tools.execute({
-        callId: ToolCallId('fs-symlink-parent-read'), name: 'read', agent: handle.agent,
+        calls: [{ type: 'tool-call', id: ToolCallId('fs-symlink-parent-read'), name: 'read', arguments: JSON.stringify({ file_path: '../shared.txt' }) }],
+        agent: handle.agent,
         signal: new AbortController().signal,
-        arguments: { file_path: '../shared.txt' },
-      }),
+      }).then(batch => batch.results[0]!.result),
     ])
 
     expect(bashRead.isError).toBe(false)

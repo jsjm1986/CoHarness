@@ -271,7 +271,7 @@ Runs the `internal/update` waterfall first, so update hooks (and HMR) can veto o
 
 **Returns** nothing; the restart runs behind the `internal/update` waterfall.
 
-[Source](../../vendor/cordis/src/fiber.ts#L736)
+[Source](../../vendor/cordis/src/fiber.ts#L737)
 
 ## Effect
 

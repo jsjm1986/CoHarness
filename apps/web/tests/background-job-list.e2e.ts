@@ -88,13 +88,16 @@ describe.skipIf(MODE === 'record')('web e2e: background job list', () => {
     const trigger = page.getByRole('button', { name: '1 background job running' })
     expect(await trigger.count()).toBe(0)
 
-    const started = await scaffold.ctx.tools.execute({
+    const started = (await scaffold.ctx.tools.execute({
       signal: new AbortController().signal,
-      callId: ToolCallId('background-job-list-e2e'),
-      name: 'bash',
-      arguments: { command: COMMAND, description: 'Hold a background slot open', run_in_background: true },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('background-job-list-e2e'),
+        name: 'bash',
+        arguments: JSON.stringify({ command: COMMAND, description: 'Hold a background slot open', run_in_background: true }),
+      }],
       agent,
-    })
+    })).results[0]!.result
     const reported = started.content.map(block => block.type === 'text' ? block.text : '').join('')
     const matched = /\bbash-[0-9a-f]{16}\b/.exec(reported)
     if (matched === null) throw new Error(`background bash reported no job id: ${reported}`)

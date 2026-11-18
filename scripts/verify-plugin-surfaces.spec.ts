@@ -32,8 +32,10 @@ describe('verify-plugin-surfaces', () => {
       '@deepseek-ai/dsh-model-governance',
       '@deepseek-ai/dsh-steward-tools',
     ])
-    expect(facts.dynamicClientPackages.length).toBe(69)
+    expect(facts.dynamicClientPackages.length).toBe(71)
     expect(facts.dynamicClientPackages).not.toContain('@deepseek-ai/dsh-client-ui-message-feedback')
+    expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-api-remote-access')
+    expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-experimental-client-ui-forge')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-memory')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-workbench')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-open-in-app')

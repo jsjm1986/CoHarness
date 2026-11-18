@@ -423,6 +423,7 @@ export function ConversationContent({
       })}
       {renderSlot('conversation.hero.context', { compact, ...(sessionId === undefined ? {} : { conversationId: sessionId }) })}
       {renderSlot('conversation.hero.agentPreset', {})}
+      {sessionId === undefined ? null : renderSlot('conversation.hero.options', {})}
     </div>
   )
 

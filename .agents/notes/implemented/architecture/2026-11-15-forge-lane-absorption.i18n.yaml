@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-15-forge-lane-absorption.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-15-forge-lane-absorption.md
+document:
+  en: aa054c104e4f47f6a928066f17c6e8179ac56214
+  zh: 188dc8e1b770d779a3f65c7a8cc50fb3a1358923
+/agent-note-forge-lane-and-worktree-generation-absorption:
+  en: d71fddedae820683
+  zh: 94cf6f81a1a23c50
+/agent-note-forge-lane-and-worktree-generation-absorption/problem:
+  en: 6c2897e570ceebd1
+  zh: fe4cafd88eb82f88
+/agent-note-forge-lane-and-worktree-generation-absorption/decision:
+  en: 4413c395d1b1bf4b
+  zh: 9849db232bd850f9
+/agent-note-forge-lane-and-worktree-generation-absorption/consequences:
+  en: c80d166f0ad57fbc
+  zh: 5d89bc108583fc2d
+/agent-note-forge-lane-and-worktree-generation-absorption/alternatives-considered:
+  en: c09c14179d9a5419
+  zh: 4783c3ce0ff5448b
+/agent-note-forge-lane-and-worktree-generation-absorption/verification:
+  en: c3886ae67d8a6f5a
+  zh: fbff9fd9e67ee103

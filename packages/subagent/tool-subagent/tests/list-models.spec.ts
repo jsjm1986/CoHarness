@@ -12,6 +12,8 @@ import type {
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -69,6 +71,7 @@ async function setupListTool(routes = [
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   registerListSubagentModels(ctx, { routes })
   return ctx
 }
@@ -78,6 +81,7 @@ async function setupAllowedListTool() {
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   registerListSubagentModels(ctx, {
     routes: [
       { provider: 'alpha', model: 'fast' },
@@ -91,7 +95,7 @@ async function setupAllowedListTool() {
 let counter = 0
 
 function call(ctx: Context, args: unknown) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     signal: testToolSignal,
     callId: ToolCallId(`list-models-${++counter}`),
     name: 'list_subagent_models',
@@ -106,6 +110,7 @@ describe('list_subagent_models', () => {
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(tool, { provider: 'unused' })
@@ -116,6 +121,7 @@ describe('list_subagent_models', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     registerListSubagentModels(ctx, { routes: [{ provider: 'alpha', model: 'fast' }] })

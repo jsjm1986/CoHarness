@@ -63,7 +63,7 @@ describe('current candidate CI result admission', () => {
     for (const key of Object.keys(input.proofs) as (keyof typeof input.proofs)[]) input.proofs[key] = true
     const jobs = requiredPrJobs(input, commit)
     expect(jobs).toEqual([
-      'gateway', 'gateway-admin-ui', 'native-pack', 'node-24', 'node-24-consumers', 'node-24-coverage',
+      'gateway', 'gateway-admin-ui', 'gateway-windows', 'native-pack', 'node-24', 'node-24-consumers', 'node-24-coverage',
       'node-compat', 'pi-ai-proof', 'pr-scope', 'provider-proof', 'python-runtime', 'python-sdk',
       'release-pack', 'sandbox-proof', 'vendor-pack', 'web-verification', 'windows', 'windows-native',
     ])

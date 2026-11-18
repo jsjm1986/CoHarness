@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-15-upstream-tools-executor-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-15-upstream-tools-executor-sync.md
+document:
+  en: 5de078f52d0561a2b50a0e514a52be1f45e610aa
+  zh: 437afabd040b00413f00629985cec44f1cc3bc3d
+/agent-note-upstream-tools-executor-seam-and-tool-office-sync:
+  en: a846a1091f4ef5a5
+  zh: d0b27ac5c174817b
+/agent-note-upstream-tools-executor-seam-and-tool-office-sync/problem:
+  en: eab19483892fda09
+  zh: bb1f719e01c1d65d
+/agent-note-upstream-tools-executor-seam-and-tool-office-sync/decision:
+  en: 001a164c53c3dd6a
+  zh: a281a14da385a381
+/agent-note-upstream-tools-executor-seam-and-tool-office-sync/consequences:
+  en: b712a7cc9e7fcdcc
+  zh: 3a75b5d8321d961b
+/agent-note-upstream-tools-executor-seam-and-tool-office-sync/alternatives-considered:
+  en: b5750b01cb51de52
+  zh: 9cbfd01e5bb7453f
+/agent-note-upstream-tools-executor-seam-and-tool-office-sync/verification:
+  en: 9d2d614d85ed0883
+  zh: 57b8661d2df15cd0

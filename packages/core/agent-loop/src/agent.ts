@@ -12,6 +12,7 @@ import type {
   AgentStatus,
   CancelOptions,
   InboxTarget,
+  ModelSelection,
   PreStepDecision,
   RequestErrorAction,
 } from '@deepseek-ai/dsh-agent'
@@ -28,6 +29,7 @@ import {
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { EpochHeader, RequestContext, Session, SessionId, SessionSeq, TurnEndReason, UserMessage } from '@deepseek-ai/dsh-session'
+import type { ResolvedToolSet } from '@deepseek-ai/dsh-tools'
 import { canonicalHeader, headerEquals, ToolCallRecovery } from '@deepseek-ai/dsh-session'
 import { joinContextSections, renderContextSections, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
@@ -58,6 +60,7 @@ type PreparedStep =
     messages: UserMessage[]
     startsRequestSeries?: true
     assembly: PromptAssembly
+    toolSet: ResolvedToolSet
   }
 
 /**
@@ -323,27 +326,67 @@ export class ReactLoopAgent implements Agent {
     }
   }
 
+  /**
+   * The model route this step's tool activation sees: the host model-selection
+   * projection's pending route wins over everything, the declared options
+   * route outranks the recorded last-used or persisted header route (a resumed
+   * or forked agent may deliberately switch models), and an agent whose route
+   * only the `agent/request` waterfall supplies resolves activation against
+   * empty fields and still fails loudly at request preparation.
+   */
+  private stepModelSelection(): ModelSelection {
+    const projections = this.loopCtx.get('sessionProjections') as {
+      stateOf(session: Session, key: string): unknown
+    } | undefined
+    const state = projections?.stateOf(this.session, 'modelSelection') as {
+      readonly pending: ModelSelection | null
+      readonly lastUsed: ModelSelection | null
+    } | undefined
+    const header = this.session.requestHeader()?.config
+    return state?.pending
+      ?? (this.options.provider !== undefined && this.options.model !== undefined
+        ? { provider: this.options.provider, model: this.options.model }
+        : undefined)
+      ?? state?.lastUsed
+      ?? (header === undefined ? undefined : {
+        provider: header.provider,
+        model: header.model,
+        ...(header.reasoningEffort === undefined ? {} : { reasoningEffort: header.reasoningEffort }),
+      })
+      ?? { provider: this.options.provider ?? '', model: this.options.model ?? '' }
+  }
+
   private async preStep(target: InboxTarget, position: { turn: number; step: number }): Promise<PreparedStep> {
     /* v8 ignore next -- private callers establish the running phase before proposing a step */
     if (this.phase.kind !== 'running') throw new Error(`agent "${this.id}": pre-step outside running phase`)
     const signal = this.phase.abort.signal
     const claimed = this.inbox.claim(target, position.turn)
-    const assembly = await this.loopCtx.systemPrompt.assemble(assembleContextFor(this, signal))
-    signal.throwIfAborted()
-    const decision = await this.dispatch.waterfall(
-      'agent/pre-step', { messages: claimed, ...position, signal },
-      (): Promise<PreStepDecision> => {
-        const sections = renderContextSections(assembly)
-        const context = this.runtimeContext.project(joinContextSections(sections), sections)
-        return Promise.resolve<PreStepDecision>({
-          kind: 'enter',
-          messages: context === undefined ? claimed : [...claimed, context],
-        })
-      },
-    )
-    signal.throwIfAborted()
-    if (decision.kind === 'reject') return decision
-    return { ...decision, assembly }
+    const selection = this.stepModelSelection()
+    const toolSet = await this.loopCtx.tools.resolve({ agent: this, modelSelection: selection, signal })
+    try {
+      const assembly = await this.loopCtx.systemPrompt.assemble({ ...assembleContextFor(this, signal), toolSet })
+      signal.throwIfAborted()
+      const decision = await this.dispatch.waterfall(
+        'agent/pre-step', { messages: claimed, ...position, signal },
+        (): Promise<PreStepDecision> => {
+          const sections = renderContextSections(assembly)
+          const context = this.runtimeContext.project(joinContextSections(sections), sections)
+          return Promise.resolve<PreStepDecision>({
+            kind: 'enter',
+            messages: context === undefined ? claimed : [...claimed, context],
+          })
+        },
+      )
+      signal.throwIfAborted()
+      if (decision.kind === 'reject') {
+        toolSet.dispose()
+        return decision
+      }
+      return { ...decision, assembly, toolSet }
+    } catch (error: unknown) {
+      toolSet.dispose()
+      throw error
+    }
   }
 
   /** Whether the assembled tool schemas differ from the logged request header's. */
@@ -382,42 +425,47 @@ export class ReactLoopAgent implements Agent {
           turnEnds = { kind: 'blocked' }
           return false
         }
-        if (turnEnds && decision.messages.length === 0) break
-        // A removed waking message or an enter decision rewritten to empty
-        // still owns the initial turn boundary, but it spends no model call.
-        if (phase.step === 0 && decision.messages.length === 0) {
-          turnEnds = { kind: 'completed' }
-          return false
-        }
-        signal.throwIfAborted()
-        this.session.append('step/start', { turn, step })
-        phase.step = step
-        const toolRecovery = new ToolCallRecovery()
-        const stopRecovery = this.ctx.on('session/event', (session, event) => {
-          if (session === this.session) toolRecovery.observe(event)
-        })
         try {
-          // max-tokens is sticky: once any step hits the ceiling, later steps
-          // that complete normally must not downgrade the turn outcome.
-          const stepEnd = await this.step(decision)
-          // max-tokens stays sticky: a later completed step must not
-          // downgrade the turn outcome.
-          if (turnEnds === null || turnEnds.kind !== 'max-tokens') turnEnds = stepEnd
-        } catch (error: unknown) {
-          try {
-            for (const event of toolRecovery.results()) {
-              this.session.append('tool/result', event.data, {
-                surfaceOp: 'append',
-                ...event.sourceEventSeqs === undefined ? {} : { sourceEventSeqs: event.sourceEventSeqs },
-              })
-            }
-          } catch (recoveryError: unknown) {
-            throw new AggregateError([error, recoveryError], 'Step failed and its pending tool results could not be recorded', { cause: error })
+          if (turnEnds && decision.messages.length === 0) break
+          // A removed waking message or an enter decision rewritten to empty
+          // still owns the initial turn boundary, but it spends no model call.
+          if (phase.step === 0 && decision.messages.length === 0) {
+            turnEnds = { kind: 'completed' }
+            return false
           }
-          throw error
+          signal.throwIfAborted()
+          this.session.append('step/start', { turn, step })
+          phase.step = step
+          const toolRecovery = new ToolCallRecovery()
+          const stopRecovery = this.ctx.on('session/event', (session, event) => {
+            if (session === this.session) toolRecovery.observe(event)
+          })
+          try {
+            // max-tokens is sticky: once any step hits the ceiling, later steps
+            // that complete normally must not downgrade the turn outcome.
+            const stepEnd = await this.step(decision)
+            // max-tokens stays sticky: a later completed step must not
+            // downgrade the turn outcome.
+            if (turnEnds === null || turnEnds.kind !== 'max-tokens') turnEnds = stepEnd
+          } catch (error: unknown) {
+            try {
+              for (const event of toolRecovery.results()) {
+                this.session.append('tool/result', event.data, {
+                  surfaceOp: 'append',
+                  ...event.sourceEventSeqs === undefined ? {} : { sourceEventSeqs: event.sourceEventSeqs },
+                })
+              }
+            } catch (recoveryError: unknown) {
+              throw new AggregateError([error, recoveryError], 'Step failed and its pending tool results could not be recorded', { cause: error })
+            }
+            throw error
+          } finally {
+            stopRecovery()
+            this.session.append('step/end', { turn, step })
+          }
         } finally {
-          stopRecovery()
-          this.session.append('step/end', { turn, step })
+          // Admission closes once the step's tool batch settles or no step opens.
+          decision.toolSet.dispose()
         }
         signal.throwIfAborted()
         if (turnEnds && this.inbox.nextStep.length === 0) {
@@ -624,6 +672,7 @@ export class ReactLoopAgent implements Agent {
         const { concluded } = await executeToolCalls(
           this.loopCtx, turn, step, toolCalls, signal,
           context => this.inbox.splice('next-step', this.inbox.nextStep.length, 0, [context]),
+          decision.toolSet,
         )
         return concluded ? { kind: 'completed' } : null
       } catch (error: unknown) {
@@ -645,13 +694,16 @@ export class ReactLoopAgent implements Agent {
     // effort owned by that exact model. Later steps re-resolve marked defaults.
     const persistedHeader = session.requestHeader()
     const persistedConfig = persistedHeader?.config
-    const route = { provider: this.options.provider ?? '', model: this.options.model ?? '' }
+    // The step-resolved route carries recorded selections and persisted
+    // headers, so resumed or forked agents continue their logged route even
+    // when their own options declare none.
+    const route = this.stepModelSelection()
     const persistedReasoningEffort = persistedConfig?.provider === route.provider
       && persistedConfig.model === route.model
       && persistedHeader?.adapterDefaults?.reasoningEffort !== true
       ? persistedConfig.reasoningEffort
       : undefined
-    const reasoningEffort = this.options.reasoningEffort ?? persistedReasoningEffort
+    const reasoningEffort = this.options.reasoningEffort ?? route.reasoningEffort ?? persistedReasoningEffort
     const maxTokens = this.options.maxTokens
     const seedConfig = deepFreeze(structuredClone(
       this.requestHeaderLogged

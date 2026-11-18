@@ -106,6 +106,19 @@ export type ProjectionChangeListener = (
 ) => void
 
 /**
+ * Event-level change-feed listener: one committed event changed the raw `view`
+ * result of at least one client-visible unit by `Object.is` for one session.
+ * `changes` holds one entry per such unit in registration order, each with the
+ * unit's `key` and its schema-validated view as `val`; `seq` is the seq of the
+ * causing event.
+ */
+export type ProjectionEventChangeListener = (
+  session: Session,
+  changes: readonly { readonly key: Extract<keyof SessionProjectionMap, string>; readonly val: unknown }[],
+  seq: SessionSeq,
+) => void
+
+/**
  * One consistent read cut over every registered client-visible unit for one session.
  * `asOfSeq` is the shared watermark — the seq of the last event every value
  * reflects (`-1` for an empty log, mirroring `session/subscribed.lastSeq`).
@@ -170,7 +183,12 @@ interface UnitCell {
 interface Registration {
   readonly def: ErasedDefinition
   readonly cells: WeakMap<Session, UnitCell>
-  /** Live registrants sharing this unit; the last one out removes the key. */
+  /**
+   * Live registrants sharing this unit. `0` marks a released predecessor: the
+   * entry leaves live drives, restores, and client snapshots while
+   * `checkpoint()` keeps serving each Session's last cell until the key
+   * registers again; a retained handle read can still advance those cells.
+   */
   refs: number
 }
 
@@ -199,6 +217,7 @@ function cursorBefore(offset: SessionLogOffset): SessionSeqCursor {
 export class SessionProjectionRegistry extends Service {
   private readonly registrations = new Map<string, Registration>()
   private readonly listeners = new Set<ProjectionChangeListener>()
+  private readonly eventListeners = new Set<ProjectionEventChangeListener>()
   /** Bumps when the set of registered projection keys changes. */
   private registrationRevision = 0
 
@@ -214,6 +233,7 @@ export class SessionProjectionRegistry extends Service {
     ctx.on('session/created', (session: Session) => {
       if (session.seq !== 0) return
       for (const registration of this.registrations.values()) {
+        if (registration.refs === 0) continue
         if (registration.cells.has(session)) continue
         registration.cells.set(session, {
           state: registration.def.init(session.header, session.inheritedEventCount),
@@ -288,7 +308,7 @@ export class SessionProjectionRegistry extends Service {
     const dispose = this.ctx.effect(function* (this: SessionProjectionRegistry) {
       const key = erased.key
       const existing = this.registrations.get(key)
-      if (existing === undefined) {
+      if (existing === undefined || existing.refs === 0) {
         this.registrations.set(key, { def: erased, cells: new WeakMap(), refs: 1 })
         this.registrationRevision += 1
       } else {
@@ -302,10 +322,7 @@ export class SessionProjectionRegistry extends Service {
         /* v8 ignore next -- the disposer runs once per successful registration, so the entry it counted is still here */
         if (live === undefined) return
         live.refs -= 1
-        if (live.refs === 0) {
-          this.registrations.delete(key)
-          this.registrationRevision += 1
-        }
+        if (live.refs === 0) this.registrationRevision += 1
       }
     }.bind(this), 'sessionProjections.register()')
     // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; keep the Cordis disposer so effects can adopt it.
@@ -329,6 +346,26 @@ export class SessionProjectionRegistry extends Service {
   }
 
   /**
+   * Subscribe to the event-level change feed. The registration is an effect on
+   * the calling context's fiber. The listener runs synchronously inside the
+   * committed event's `session/event` handling, once after every unit has been
+   * driven and after every {@link onChanged} call for that event. If a unit or
+   * an {@link onChanged} listener throws during that drive, the listener still
+   * receives the changes made before the throw.
+   * @param listener - called once per committed event that changed at least one client-visible unit's raw view by `Object.is`.
+   * @returns the exact disposer that unsubscribes.
+   */
+  onEventChanged(listener: ProjectionEventChangeListener): () => void {
+    const dispose = this.ctx.effect(() => {
+      this.eventListeners.add(listener)
+      return () => {
+        this.eventListeners.delete(listener)
+      }
+    }, 'sessionProjections.onEventChanged()')
+    return () => void dispose()
+  }
+
+  /**
    * Read one unit's current host state without computing unrelated views.
    * The returned value is live; callers must not mutate it.
    * @param session - the session whose state is read.
@@ -340,7 +377,7 @@ export class SessionProjectionRegistry extends Service {
     key: K,
   ): SessionProjectionStateMap[K] | undefined {
     const registration = this.registrations.get(key)
-    if (registration === undefined) return undefined
+    if (registration === undefined || registration.refs === 0) return undefined
     this.materializeCells(session)
     return this.cellFor(registration, session).state as SessionProjectionStateMap[K]
   }
@@ -357,6 +394,7 @@ export class SessionProjectionRegistry extends Service {
     const values: Record<string, unknown> = {}
     this.materializeCells(session)
     for (const registration of this.registrations.values()) {
+      if (registration.refs === 0) continue
       if (registration.def.wire === undefined) continue
       const cell = this.cellFor(registration, session)
       values[registration.def.key] = this.viewCell(registration, cell)
@@ -375,13 +413,20 @@ export class SessionProjectionRegistry extends Service {
    * mutable state, and a caller reaching the live reference could corrupt
    * every subsequent snapshot and frame through it (plain JSON by the unit
    * contract, so the clone is total).
+   * A released unit contributes the Session's last cell: the registry no
+   * longer advances that cell, while a retained handle read still advances
+   * it forward, so a writer running after a plugin unloads keeps that unit's
+   * latest state; a Session that has no cell of it gets no row.
    * @param session - the session whose unit states are checkpointed.
-   * @returns one row per registered key.
+   * @returns one row per live key, plus one per released key with a cell for this Session.
    */
   checkpoint(session: Session): ProjectionCheckpoint {
     const rows: ProjectionCheckpoint = {}
     for (const registration of this.registrations.values()) {
-      const cell = this.cellFor(registration, session)
+      const cell = registration.refs === 0
+        ? registration.cells.get(session)
+        : this.cellFor(registration, session)
+      if (cell === undefined) continue
       rows[registration.def.key] = {
         ver: registration.def.stateVersion,
         seq: cell.observedSeq,
@@ -410,6 +455,7 @@ export class SessionProjectionRegistry extends Service {
   restoreFloor(checkpoint: ProjectionCheckpoint): SessionLogOffset | undefined {
     let floor: number | undefined
     for (const registration of this.registrations.values()) {
+      if (registration.refs === 0) continue
       const row = checkpoint[registration.def.key]
       const need = row !== undefined && row.ver === registration.def.stateVersion
         ? Math.max(row.seq + 1, 0)
@@ -437,6 +483,7 @@ export class SessionProjectionRegistry extends Service {
     const values: Record<string, unknown> = {}
     const selected = keys === undefined ? undefined : new Set<string>(keys)
     for (const registration of this.registrations.values()) {
+      if (registration.refs === 0) continue
       const def = registration.def
       if (def.wire === undefined) continue
       if (selected !== undefined && !selected.has(def.key)) continue
@@ -490,6 +537,7 @@ export class SessionProjectionRegistry extends Service {
     const values: Record<string, unknown> = {}
     const refreshed: ProjectionCheckpoint = {}
     for (const registration of this.registrations.values()) {
+      if (registration.refs === 0) continue
       const def = registration.def
       const row = checkpoint[def.key]
       const usable = row !== undefined
@@ -543,6 +591,7 @@ export class SessionProjectionRegistry extends Service {
     const endSeq: SessionSeqCursor = events.at(-1)?.seq ?? cursorBefore(baseSeq)
     let complete = true
     for (const registration of this.registrations.values()) {
+      if (registration.refs === 0) continue
       const current = registration.cells.get(session)
       if (current?.observedSeq !== endSeq) {
         complete = false
@@ -552,6 +601,7 @@ export class SessionProjectionRegistry extends Service {
     if (complete) {
       const values: Record<string, unknown> = {}
       for (const registration of this.registrations.values()) {
+        if (registration.refs === 0) continue
         if (registration.def.wire === undefined) continue
         const current = registration.cells.get(session) as UnitCell
         values[registration.def.key] = this.viewCell(registration, current)
@@ -566,6 +616,7 @@ export class SessionProjectionRegistry extends Service {
       session.inheritedEventCount,
     )
     for (const registration of this.registrations.values()) {
+      if (registration.refs === 0) continue
       const row = restored.checkpoint[registration.def.key]
       if (row === undefined) continue
       const current = registration.cells.get(session)
@@ -635,54 +686,78 @@ export class SessionProjectionRegistry extends Service {
 
   /** Materialize every registered unit at the Session's current cursor. */
   private materializeCells(session: Session): void {
-    for (const registration of this.registrations.values()) this.cellFor(registration, session)
+    for (const registration of this.registrations.values()) {
+      if (registration.refs === 0) continue
+      this.cellFor(registration, session)
+    }
   }
 
-  /** Eager drive: pass one committed event through every registered unit; notify on changed references. */
+  /**
+   * Eager drive: pass one committed event through every registered unit; notify
+   * per-key listeners on each changed raw view reference, then event listeners
+   * once. When a unit or a per-key listener throws, event listeners still
+   * receive the changes collected before the throw, and the error then
+   * propagates.
+   */
   private drive(session: Session, event: SessionEvent): void {
-    for (const registration of this.registrations.values()) {
-      let cell = registration.cells.get(session)
-      if (cell !== undefined && cell.observedSeq >= event.seq) continue
-      if (cell === undefined) {
-        // Late build mid-stream: fold history before this event (seq = log
-        // index, so the prefix slice is exact), then take the normal gate.
-        cell = this.buildCell(
-          registration.def,
-          session.header,
-          session.inheritedEventCount,
-          // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-          session.snapshotEvents(SessionLogOffset(0), SessionLogOffset(event.seq)),
-        )
-        registration.cells.set(session, cell)
-      } else {
-        this.advanceCell(
-          registration.def,
-          cell,
-          session,
-          event.seq === 0 ? -1 : SessionSeq(event.seq - 1),
-        )
-      }
-      const previousState = cell.state
-      const next = registration.def.apply(previousState, event)
-      const changed = !Object.is(next, previousState)
-      cell.state = next
-      cell.observedSeq = event.seq
-      const wire = registration.def.wire
-      if (changed && wire !== undefined) {
-        const views = cell.views
-        views[0] = views[1]
-        if (this.listeners.size > 0) {
-          views[1] = wire.view(next)
-          if (!Object.is(views[0], views[1])) {
-            const value = wire.viewSchema.parse(views[1])
-            for (const listener of this.listeners) {
-              listener(session, registration.def.key as Extract<keyof SessionProjectionMap, string>, value, event.seq)
-            }
-          }
+    const observed = this.listeners.size > 0 || this.eventListeners.size > 0
+    const changes: { key: Extract<keyof SessionProjectionMap, string>; val: unknown }[] = []
+    try {
+      for (const registration of this.registrations.values()) {
+        if (registration.refs === 0) continue
+        let cell = registration.cells.get(session)
+        if (cell !== undefined && cell.observedSeq >= event.seq) continue
+        if (cell === undefined) {
+          // Late build mid-stream: fold history before this event (seq = log
+          // index, so the prefix slice is exact), then take the normal gate.
+          cell = this.buildCell(
+            registration.def,
+            session.header,
+            session.inheritedEventCount,
+            // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+            session.snapshotEvents(SessionLogOffset(0), SessionLogOffset(event.seq)),
+          )
+          registration.cells.set(session, cell)
         } else {
-          // Do not retain a view while nobody consumes the feed; the next
-          // subscriber receives a fresh comparison baseline.
-          views[1] = undefined
+          this.advanceCell(
+            registration.def,
+            cell,
+            session,
+            event.seq === 0 ? -1 : SessionSeq(event.seq - 1),
+          )
+        }
+        const previousState = cell.state
+        const next = registration.def.apply(previousState, event)
+        const changed = !Object.is(next, previousState)
+        cell.state = next
+        cell.observedSeq = event.seq
+        const wire = registration.def.wire
+        if (changed && wire !== undefined) {
+          const views = cell.views
+          views[0] = views[1]
+          if (observed) {
+            views[1] = wire.view(next)
+            if (!Object.is(views[0], views[1])) {
+              const key = registration.def.key as Extract<keyof SessionProjectionMap, string>
+              const value = wire.viewSchema.parse(views[1])
+              changes.push({ key, val: value })
+              for (const listener of this.listeners) {
+                listener(session, key, value, event.seq)
+              }
+            }
+          } else {
+            // Do not retain a view while nobody consumes the feed; the next
+            // subscriber receives a fresh comparison baseline.
+            views[1] = undefined
+          }
+        }
+        // An unchanged state keeps its current view as the valid comparison
+        // value for the next state change.
+      }
+    } finally {
+      if (changes.length > 0) {
+        for (const listener of this.eventListeners) {
+          listener(session, changes, event.seq)
         }
       }
     }

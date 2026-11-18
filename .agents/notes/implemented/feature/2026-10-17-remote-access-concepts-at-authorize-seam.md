@@ -18,7 +18,7 @@ Keep `apiproxy` sovereign and map the upstream concepts onto the existing collab
 
 ## Alternatives considered
 
-Porting `packages/api/remote-access` wholesale would create a second authorization stack beside collaboration authority — two decide paths for the same operations, which both drift. Upstream's snapshot frames and grant stream (`follow()`/`REMOTE_ACCESS_SNAPSHOT_KEY`) duplicate what participants already learn through `participant.scope` and the gateway `access` response; upstream's resource-kind role objects have no counterpart here because this fork's resource model is root-inherited Session ACLs with four action classes.
+Porting `packages/api/remote-access` wholesale would create a second authorization stack beside collaboration authority — two decide paths for the same operations, which both drift. The package is carried anyway for the forge panel's `allows`/snapshot surface under the [panel and remote-access port](2026-11-15-forge-panel-remote-access-port.md): its `decide` has no caller while `typert-gateway/authorize` carries no principal, so the single-path rationale survives. Upstream's snapshot frames and grant stream (`follow()`/`REMOTE_ACCESS_SNAPSHOT_KEY`) duplicate what participants already learn through `participant.scope` and the gateway `access` response; upstream's resource-kind role objects have no counterpart here because this fork's resource model is root-inherited Session ACLs with four action classes.
 
 ## Consequences
 

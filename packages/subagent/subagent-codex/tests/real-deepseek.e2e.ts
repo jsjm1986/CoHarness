@@ -116,9 +116,9 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
 
       const parent = {
         id: 'deepseek-e2e-parent',
-        session: { header: { cwd: workspace }, append: vi.fn<Agent['session']['append']>() as Agent['session']['append'] },
+        session: { header: { cwd: workspace }, append: vi.fn<Agent['session']['append']>() as unknown as Agent['session']['append'] },
         ctx,
-      } as Agent
+      } as unknown as Agent
       const run = await ctx.subagents.start('codex', {
         prompt: [{
           type: 'text',

@@ -91,6 +91,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     useInputDraftSessions: hook<readonly SessionId[]>([]),
     useWorkspaces: hook(workspaceState([])),
     usePanelInfo: hook({ activePanelId: null }),
+    useRemoteAccess: () => true,
     useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
@@ -723,6 +724,7 @@ describe('WorkspaceBrowser', () => {
             useSessions={hook(sessionState([]))}
             useWorkspaces={hook(workspaceState([]))}
             usePanelInfo={hook({ activePanelId: null })}
+            useRemoteAccess={() => true}
             useArchived={selector => selector(archivedSet.current)}
             useMenuOpenState={() => openState}
             useShortcuts={selector => selector([])}

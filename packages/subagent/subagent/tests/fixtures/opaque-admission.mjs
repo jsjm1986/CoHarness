@@ -17,7 +17,7 @@ const { ResourceAdmissionError } = await import(entry('context/resource-budget')
 const stateDir = join(process.cwd(), 'external-members')
 const config = join(process.cwd(), 'cordis.yml')
 await writeFile(config, JSON.stringify([
-  { name: entry('core/session') }, { name: entry('core/tools') }, { name: entry('core/system-prompt') },
+  { name: entry('core/session') }, { name: entry('core/tools') }, { name: entry('core/tool-executor-native') }, { name: entry('core/system-prompt') },
   { name: entry('session/session-persistence-jsonl'), config: { root: join(process.cwd(), 'sessions'), compression: 'none' } },
   { name: entry('session/session-projection') },
   { name: entry('fs/fs-local') }, { name: entry('session/working-directory') },

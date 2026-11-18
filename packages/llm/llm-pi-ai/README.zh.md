@@ -24,6 +24,7 @@ kind: "package-reference"
 - [提供方／模型路由与回放](#providermodel-routing-and-replay)
 - [词汇差异](#vocabulary-differences)
 - [应用归因](#app-attribution)
+- [请求标头](#request-headers)
 - [依赖体量](#dependency-weight)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
@@ -207,6 +208,11 @@ entry config 与可编辑的 `llm-pi-ai` settings namespace 属于个人 Provide
 ## 应用归因
 
 每个请求都携带 dsh-llm `attributionHeaders()` 的共享归因标头，并通过 pi-ai `headers` 流选项合并。不会合成提供方特定应用归因标头。详见[强制应用归因 note](../../../.agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.zh.md)与 dsh-llm 的 `src/attribution.ts`。
+
+<a id="request-headers"></a>
+## 请求标头
+
+插件可以通过同步的 `llm-pi-ai/request-headers` waterfall 贡献对模型隐藏的传输元数据。每次推理调用提供不可变的路由元数据（`PiAiRequestHeaderContext`）与其 profile 标头的一份新 `Headers` 副本；配置名仅在大小写上不同的时候，最后一个条目生效。端点属于预备好的模型，因此并发调用与配置变更不会交换标头状态。监听器编辑该副本、调用 `next()` 并在返回时释放引用；`ctx.on()` 会在所属插件卸载时移除其注册。Harness 归因在所有贡献者之后应用，pi-ai 收到的是分离的标头记录。
 
 <a id="dependency-weight"></a>
 ## 依赖体量

@@ -389,6 +389,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
     usePanelInfo: (() => { throw new Error('unused') }),
+    useRemoteAccess: () => true,
     useProjection: (() => undefined),
     useRevealTarget: (<S,>(selector: (value: undefined) => S) => selector(undefined)),
     ackReveal: () => {},
@@ -523,6 +524,7 @@ describe('Focused Chat disclosures', () => {
       useProjection: () => undefined,
       useInput: () => { throw new Error('unused') },
       usePanelInfo: () => { throw new Error('unused') },
+      useRemoteAccess: () => true,
       inputActions: {
         setDraft: () => {},
         addImages: () => true,

@@ -54,6 +54,24 @@ export type KeyedStandardSource = (key: string) => HostObservable<unknown> | und
 export interface RootStandardSourceContribution {
   /** Fixed root hook sources; each key must be unique across contributors. */
   readonly hooks?: Readonly<Record<string, HostObservable<unknown>>>
+  /**
+   * Open-key root hook source families; the rendered prop is `use<Name>(key)`.
+   * Bare names must be unique across contributors, and the rendered prop name
+   * must not collide with a contributed plain prop.
+   */
+  readonly keyedHooks?: Readonly<Record<string, KeyedStandardSource>>
+  /** Stable plain values copied verbatim into root standard props. */
+  readonly props?: Readonly<Record<string, unknown>>
+}
+
+/** The merged root contribution roster the registry publishes each revision. */
+export interface RootStandardSourceSnapshot {
+  /** Bare name → fixed root hook source. */
+  readonly hooks: Readonly<Record<string, HostObservable<unknown>>>
+  /** Bare name → open-key root hook source family. */
+  readonly keyedHooks: Readonly<Record<string, KeyedStandardSource>>
+  /** Contributed plain props copied verbatim into root standard props. */
+  readonly props: Readonly<Record<string, unknown>>
 }
 
 /**
@@ -269,11 +287,11 @@ export interface SlotRendererHost {
    */
   subscribeRootRevision(fn: () => void): () => void
   /**
-   * Snapshot the contributed root hook sources by bare name. Read once per
+   * Snapshot the merged root contribution roster. Read once per
    * {@link getRootRevision} value — a fresh record per roster change.
-   * @returns name → bare source.
+   * @returns fixed hooks, keyed hook families, and plain props by bare name.
    */
-  rootSources(): Readonly<Record<string, HostObservable<unknown>>>
+  rootSources(): RootStandardSourceSnapshot
   /**
    * Installed locale face backing the `t` standard seat (absent until the
    * locale plugin installs one; rendering an entry that declared `locale:`

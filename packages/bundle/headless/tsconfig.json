@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../boot/cmdline"
     },
     {
@@ -24,19 +33,22 @@
       "path": "../../fs/fs"
     },
     {
+      "path": "../../interaction/permission-presets"
+    },
+    {
+      "path": "../../interaction/user-approval"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../sandbox/sandbox-policy"
     },
     {
       "path": "../../session-query/session-query"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../../util/brand"
     }
   ]
 }

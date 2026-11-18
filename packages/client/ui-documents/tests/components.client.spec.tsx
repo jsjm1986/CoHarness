@@ -167,6 +167,7 @@ function renderPickerButton(wide = false, attachDocument?: () => boolean) {
     useSessions: useNoCurrentSession as never,
     useWorkspaces: undefined as never,
     usePanelInfo: undefined as never,
+    useRemoteAccess: () => true,
     useDeployment: ((selector: (value: unknown) => unknown) =>
       selector({ phase: 'ready', showComputer: false, aggregateComputers: false })) as never,
     ...(attachDocument === undefined ? {} : { attachDocument }),

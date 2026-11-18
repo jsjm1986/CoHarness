@@ -14,6 +14,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as retry from '../src/index.ts'
 
 let root: string | undefined
@@ -63,6 +64,7 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
     ['@deepseek-ai/dsh-session', SessionStore],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-llm-retry', retry],
     ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
@@ -93,6 +95,7 @@ describe('real Loader composition', () => {
       "- name: '@deepseek-ai/dsh-session'",
       "- name: '@deepseek-ai/dsh-system-prompt'",
       "- name: '@deepseek-ai/dsh-tools'",
+      "- name: '@deepseek-ai/dsh-tool-executor-native'",
       "- name: '@deepseek-ai/dsh-agent'",
       "- name: '@deepseek-ai/dsh-llm-retry'",
       "- name: '@deepseek-ai/dsh-session-projection'",

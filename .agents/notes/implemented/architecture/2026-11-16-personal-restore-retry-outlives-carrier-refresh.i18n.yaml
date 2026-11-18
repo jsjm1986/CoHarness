@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-personal-restore-retry-outlives-carrier-refresh.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-16-personal-restore-retry-outlives-carrier-refresh.md
+document:
+  en: 360d7ec2f205ada4b3f849f1d454b24b6459fa06
+  zh: 95597de18802f11ad098883712889f958d770af9
+/agent-note-a-saved-selection-restore-retry-outlives-the-refresh-that-carries-it:
+  en: 515b215a65e8a40b
+  zh: 84396187c7e0522b
+/agent-note-a-saved-selection-restore-retry-outlives-the-refresh-that-carries-it/problem:
+  en: 61fab666f3170c33
+  zh: e650ae8796a7187e
+/agent-note-a-saved-selection-restore-retry-outlives-the-refresh-that-carries-it/decision:
+  en: bdae5c3ef0859f95
+  zh: 6c01a61958711ad1
+/agent-note-a-saved-selection-restore-retry-outlives-the-refresh-that-carries-it/alternatives-considered:
+  en: ff8b0249bfd05cf3
+  zh: 9b605c2dbeffc48b
+/agent-note-a-saved-selection-restore-retry-outlives-the-refresh-that-carries-it/consequences:
+  en: f20873d53bc0349d
+  zh: 8fa5dfc7c3cf15b4
+/agent-note-a-saved-selection-restore-retry-outlives-the-refresh-that-carries-it/verification:
+  en: c7dbea74263813b1
+  zh: 5b7ca502e14df6a9

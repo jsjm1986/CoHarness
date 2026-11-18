@@ -33,6 +33,7 @@
     "@deepseek-ai/cordis": "workspace:~"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-fs-patch": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
     "chokidar": "^5.0.0",
     "koffi": "3.1.1"

@@ -8,6 +8,7 @@
   "files": [
     "src/client/index.ts",
     "src/client/remote-stream.ts",
+    "src/client/snapshot-stream.ts",
     "src/client/stream-error.ts"
   ],
   "references": [

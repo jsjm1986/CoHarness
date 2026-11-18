@@ -21,7 +21,7 @@ import { VncGrantStore } from '../src/grants.ts'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 
 const HANDSHAKE = Buffer.concat([Buffer.from('RFB 003.008\n', 'latin1'), Buffer.from([1, 1])])
-const KEY_EVENT = Buffer.from([3, 1, 0, 0, 0, 0, 0, 0x61])
+const KEY_EVENT = Buffer.from([4, 1, 0, 0, 0, 0, 0, 0x61])
 
 class Loopback extends Duplex {
   peer!: Loopback

@@ -1364,8 +1364,6 @@ describe('mapStopReason / mapUsage', () => {
   it('maps routable HTTP-ish error messages to stable codes', () => {
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage: 'HTTP 401: bad key' })))
       .toMatchObject({ kind: 'error', failure: { code: 'AUTH' } })
-    expect(mapStopReason(assistant({ stopReason: 'error', errorMessage: 'HTTP 403: INSUFFICIENT_BALANCE' })))
-      .toMatchObject({ kind: 'error', failure: { code: 'QUOTA' } })
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage: 'HTTP 429: rate limit' })))
       .toMatchObject({ kind: 'error', failure: { code: 'RATE_LIMIT' } })
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage: 'HTTP 429: insufficient_quota' })))
@@ -1402,6 +1400,19 @@ describe('mapStopReason / mapUsage', () => {
       stopReason: 'error',
       errorMessage: 'vector length limit exceeded',
     }))).toMatchObject({ kind: 'error', failure: { code: 'PI_AI_ERROR' } })
+  })
+
+  it.each([
+    // The gateway body as the Anthropic SDK renders it: the gateway's own 500 leads.
+    ['a gateway 500 relaying an upstream 401', '500 {"error":{"origin":"upstream","message":"upstream returned an error response: User not found.","type":"upstream_error","code":"upstream_response_error","upstream":{"provider":"custom","status":401,"body":{"error":{"type":"<nil>","message":"User not found."},"type":"error"}}}}', 'SERVER'],
+    ['a 502 quoting a non-retryable 400', '502 {"error":{"message":"upstream status 400"}}', 'SERVER'],
+    ['a 400 quoting a retryable 429', '400 {"error":{"message":"upstream returned 429 Too Many Requests"}}', 'INVALID_REQUEST'],
+    ['a 404 quoting a 403', '404 {"error":{"message":"upstream status 403"}}', 'PI_AI_ERROR'],
+    ['a leading 401', '401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}', 'AUTH'],
+    ['a leading 429', '429 Too Many Requests: slow down', 'RATE_LIMIT'],
+  ] as const)('classifies %s by its leading response status', (_label, errorMessage, code) => {
+    expect(mapStopReason(assistant({ stopReason: 'error', errorMessage })))
+      .toEqual({ kind: 'error', failure: { message: errorMessage, code } })
   })
 
   it.each([

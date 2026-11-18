@@ -28,3 +28,8 @@
   config:
     root: './.sessions'
     compression: !!js "process.env.DSH_SNAPSHOT === undefined ? 'zstd' : 'none'"
+
+# Replaces the disabled invocation provider so injected `headlessStartup` reads resolve.
+- insert:
+    - id: headless-startup-test-stub
+      name: '../../../../../packages/test-support/loader-smoke/tests/fixtures/headless-startup-stub.ts'

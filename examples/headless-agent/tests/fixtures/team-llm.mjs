@@ -33,6 +33,12 @@ function latestToolText(messages) {
   return message.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('\n')
 }
 
+function userText(messages) {
+  return messages.flatMap(message => message.role === 'user'
+    ? message.content.filter(block => block.type === 'text').map(block => block.text)
+    : []).join('\n')
+}
+
 function toolChunks(specs) {
   const chunks = []
   for (const [index, spec] of specs.entries()) {
@@ -76,7 +82,7 @@ function researcher(messages) {
   if (!names.includes('send_message')) {
     return toolChunks([
       { name: 'team_task_update', args: { task_id: 'task-1', expected_revision: 2, action: 'complete' } },
-      { name: 'send_message', args: { target: 'implementer', message: 'Research complete: use the deterministic finding.' } },
+      { name: 'send_message', args: { agent: 'implementer', message: 'Research complete: use the deterministic finding.' } },
     ])
   }
   return textChunks('Research teammate complete.')
@@ -86,8 +92,16 @@ function implementer(messages) {
   const names = calls(messages)
   const last = latestAssistantCalls(messages)
   const text = latestToolText(messages)
+  const informed = userText(messages).includes('Research complete')
+  if (!names.includes('team_task_get')) return toolChunks([{ name: 'team_task_get', args: { task_id: 'task-1' } }])
+  if (!informed) {
+    // The first pass may run before task-1 exists (not-found error) or while it
+    // is still open; either way this turn ends and the researcher's send_message
+    // starts the follow-up turn.
+    return textChunks('Waiting for the research finding.')
+  }
   if (!names.includes('team_task_create')) {
-    if (last.includes('team_task_get') && text.includes('"subject":"Research"')) {
+    if (text.includes('"status":"completed"')) {
       return toolChunks([{ name: 'team_task_create', args: {
         subject: 'Implementation',
         description: 'Apply the deterministic finding.',
@@ -95,29 +109,17 @@ function implementer(messages) {
         write_scopes: ['implementation'],
       } }])
     }
-    if (last.includes('wait_agent')) {
-      return toolChunks([{ name: 'team_task_get', args: { task_id: 'task-1' } }])
-    }
-    return toolChunks([{ name: 'wait_agent', args: { timeout_ms: 10000 } }])
+    return toolChunks([{ name: 'team_task_get', args: { task_id: 'task-1' } }])
   }
   if (!hasTaskAction(messages, 'claim')) {
-    if (last.includes('team_task_get') && text.includes('"status":"completed"')) {
-      return toolChunks([{ name: 'team_task_update', args: {
-        task_id: 'task-2', expected_revision: 1, action: 'claim',
-      } }])
-    }
-    if (last.includes('team_task_get')) {
-      return toolChunks([{ name: 'team_task_get', args: { task_id: 'task-1' } }])
-    }
-    if (last.includes('wait_agent')) {
-      return toolChunks([{ name: 'team_task_get', args: { task_id: 'task-1' } }])
-    }
-    return toolChunks([{ name: 'team_task_get', args: { task_id: 'task-1' } }])
+    return toolChunks([{ name: 'team_task_update', args: {
+      task_id: 'task-2', expected_revision: 1, action: 'claim',
+    } }])
   }
   if (!names.includes('send_message')) {
     return toolChunks([
       { name: 'team_task_update', args: { task_id: 'task-2', expected_revision: 2, action: 'complete' } },
-      { name: 'send_message', args: { target: 'lead', message: 'Implementation complete and verified.' } },
+      { name: 'send_message', args: { agent: 'lead', message: 'Implementation complete and verified.' } },
     ])
   }
   return textChunks('Implementation teammate complete.')
@@ -126,52 +128,56 @@ function implementer(messages) {
 function lead(messages) {
   const names = calls(messages)
   const last = latestAssistantCalls(messages)
-  const spawned = names.filter(name => name === 'spawn_teammate').length
+  const text = latestToolText(messages)
+  const spawned = names.filter(name => name === 'subagent').length
   if (spawned === 0) {
     return toolChunks([{
-      name: 'spawn_teammate',
+      name: 'subagent',
       args: {
+        description: 'Own deterministic implementation',
         name: 'implementer',
-        description: 'Own deterministic implementation.',
         prompt: 'IMPLEMENTER_MARK: wait for research, complete dependent task 2, report to lead.',
-        context: 'fresh',
       },
     }])
   }
   if (spawned === 1) {
     return toolChunks([{
-      name: 'spawn_teammate',
+      name: 'subagent',
       args: {
+        description: 'Own deterministic research',
         name: 'researcher',
-        description: 'Own deterministic research.',
         prompt: 'RESEARCHER_MARK: complete research task 1, message implementer, then finish.',
-        context: 'fresh',
       },
     }])
   }
-  const result = latestToolText(messages)
-  if (last.includes('team_task_list')) {
-    const completed = result.match(/"status":"completed"/gu)?.length ?? 0
-    if (completed >= 2) return toolChunks([{ name: 'list_agents', args: {} }])
-    return toolChunks([{ name: 'team_task_list', args: {} }])
-  }
   if (last.includes('list_agents')) {
-    const inactive = result.match(/"status":"inactive"/gu)?.length ?? 0
+    const inactive = text.match(/\[inactive\]/gu)?.length ?? 0
     if (inactive >= 2) return textChunks('TEAM_WORKFLOW_OK: both teammates and dependent tasks completed.')
+    if (names.filter(name => name === 'list_agents').length >= 50) {
+      return textChunks('Waiting for teammates to settle.')
+    }
     return toolChunks([{ name: 'list_agents', args: {} }])
   }
-  if (last.includes('wait_agent')) return toolChunks([{ name: 'team_task_list', args: {} }])
-  return toolChunks([{ name: 'wait_agent', args: { timeout_ms: 10000 } }])
+  if (last.includes('team_task_list')) {
+    const completed = text.match(/"status":"completed"/gu)?.length ?? 0
+    if (completed >= 2) return toolChunks([{ name: 'list_agents', args: {} }])
+    // The Lead must keep its turn alive: v2 has no wait tool, so peer
+    // `send_message` deliveries steer into this turn only while it runs.
+    // Text without a tool call ends the run before teammates can report.
+    if (names.filter(name => name === 'team_task_list').length >= 200) {
+      return textChunks('Waiting for shared tasks to complete.')
+    }
+    return toolChunks([{ name: 'team_task_list', args: {} }])
+  }
+  return toolChunks([{ name: 'team_task_list', args: {} }])
 }
 
 class TeamFixtureAdapter extends LlmAdapter {
   async * stream(options) {
-    const userText = options.messages.flatMap(message => message.role === 'user'
-      ? message.content.filter(block => block.type === 'text').map(block => block.text)
-      : []).join('\n')
-    const chunks = userText.includes('RESEARCHER_MARK')
+    const text = userText(options.messages)
+    const chunks = text.includes('RESEARCHER_MARK')
       ? researcher(options.messages)
-      : userText.includes('IMPLEMENTER_MARK')
+      : text.includes('IMPLEMENTER_MARK')
         ? implementer(options.messages)
         : lead(options.messages)
     for (const chunk of chunks) {

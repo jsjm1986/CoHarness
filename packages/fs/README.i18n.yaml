@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/README.md
 document:
-  en: ad6c5e03020cf828105132ffe06a4a115455bf6d
-  zh: 01c4c7fda5077d6431b17475d2edca1d6faf4ec0
+  en: becda9952ddae3778defd012d2b81e219727e01c
+  zh: b67fadf4957ff850ddec51527c9d600846a12565
 /:
   en: 0126a936443e2abd
   zh: 5bd6fa8ddf4daed3
 /fs-filesystem-capability-family:
-  en: 26931876bc9a45e7
-  zh: 1f797286f82c7733
+  en: b4fa59c1c5fd17b5
+  zh: 079a33ad97c2a69e
 /fs-filesystem-capability-family/summary:
   en: 7d52fac0842e833e
   zh: 53402054019f2e45

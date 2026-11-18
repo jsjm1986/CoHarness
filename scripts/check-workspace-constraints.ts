@@ -215,8 +215,9 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // The CPython side ships as source .py files, published as-is rather than built.
   '@deepseek-ai/dsh-experimental-ptc-runtime-python': ['py/**/*.py'],
   '@deepseek-ai/dsh-experimental-speech-to-text-sensevoice': ['runtime/assets.json'],
-  // Node execution modes each launch a separately bundled bootstrap.
-  '@deepseek-ai/dsh-ptc-runtime-node': ['lib/process.js', 'lib/persistent-process.js'],
+  // Node execution modes each launch a separately bundled bootstrap; the
+  // ./configuration subpath ships its profile-editor helper beside them.
+  '@deepseek-ai/dsh-ptc-runtime-node': ['lib/configuration.js', 'lib/process.js', 'lib/persistent-process.js'],
   // The Inspector owns a Worker and a mirrored frontend outside package export paths.
   '@deepseek-ai/dsh-experimental-inspector': ['lib/client.*.js', 'lib/worker.js', 'lib/devtools/**'],
   // TODO(alpha.2): restore 'presets' when the shipped compositions move from
@@ -333,6 +334,9 @@ export function expectedDshPackageFiles(manifest: PackageManifest): readonly str
     ...exportDefault(manifest, './loader') === './lib/loader.js' ? ['lib/loader.js'] : [],
     // A store subpath ships its own bundle (single-entry builds; no shared chunk).
     ...exportDefault(manifest, './store') === './lib/store/index.js' ? ['lib/store/index.js'] : [],
+    // A second pipeline entry makes the build multi-entry: its code-split
+    // shared chunk is a published artifact (the name carries a content hash).
+    ...exportDefault(manifest, './pipeline') === './lib/pipeline.js' ? ['lib/pipeline.js', 'lib/shared-*.js'] : [],
     // A surface bundle's startup row is its own bundle: the Loader imports it
     // as a row module, so it cannot ride inside the package entry.
     ...exportDefault(manifest, './startup') === './lib/startup.js' ? ['lib/startup.js'] : [],

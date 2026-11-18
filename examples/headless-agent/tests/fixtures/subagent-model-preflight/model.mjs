@@ -64,8 +64,9 @@ export async function apply(ctx) {
     async *stream(options, dispatchRequest) {
       await dispatchRequest(async () => {})
       const parent = ctx.agents.get(options.sessionId); assert.ok(parent)
-      const result = await ctx.tools.execute({ signal: options.signal, callId: ToolCallId('child-model-preflight'), name: 'subagent',
-        arguments: { description: 'preflight ownership', prompt: 'work', run_in_background: mode === 'background' }, agent: parent })
+      const result = (await ctx.tools.execute({ signal: options.signal, agent: parent,
+        calls: [{ type: 'tool-call', id: ToolCallId('child-model-preflight'), name: 'subagent',
+          arguments: JSON.stringify({ description: 'preflight ownership', prompt: 'work', run_in_background: mode === 'background' }) }] })).results[0].result
       await withdrawal
       const proof = { mode, metadataStarted, runtimeCancelled, responseClosed, providerFinishedBeforeWithdrawal,
         withdrawalWhileResponseOpen, childStarts, toolError: result.isError }

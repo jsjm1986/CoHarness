@@ -48,6 +48,7 @@ describe('TranscriptViewRow', () => {
       useSessions: emptySessions(),
       useWorkspaces: emptyWorkspaces(),
       usePanelInfo: emptyPanelInfo(),
+      useRemoteAccess: () => true,
       useTranscriptView: bindSnapshotSelector(policy.mode),
       useSettings: bindSnapshotSelector(policy.settings),
       setTranscriptView: (mode) => { policy.setMode(mode) },
@@ -71,6 +72,7 @@ describe('TranscriptViewRow', () => {
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
         usePanelInfo={emptyPanelInfo()}
+        useRemoteAccess={() => true}
         useTranscriptView={bindSnapshotSelector(policy.mode)}
         useSettings={bindSnapshotSelector(policy.settings)}
         setTranscriptView={vi.fn()}
@@ -93,6 +95,7 @@ describe('PerformanceUsageRow', () => {
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
         usePanelInfo={emptyPanelInfo()}
+        useRemoteAccess={() => true}
         usePerformanceUsage={bindSnapshotSelector(policy.mode)}
         useSettings={bindSnapshotSelector(policy.settings)}
         setPerformanceUsage={(mode) => { policy.setMode(mode) }}
@@ -116,6 +119,7 @@ describe('LinkOpeningRow', () => {
       useSessions: emptySessions(),
       useWorkspaces: emptyWorkspaces(),
       usePanelInfo: emptyPanelInfo(),
+      useRemoteAccess: () => true,
       useLinkOpening: bindSnapshotSelector(policy.destination),
       useBrowserAvailable: bindSnapshotSelector(createSnapshotStore(browserAvailable)),
       useSettings: bindSnapshotSelector(policy.settings),

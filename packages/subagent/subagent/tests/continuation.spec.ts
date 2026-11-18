@@ -1850,10 +1850,12 @@ describe('continuable durability and teardown', () => {
     expect(cancel).toHaveBeenCalledWith({ kind: 'parent' })
     expect(ctx.agents.get(sibling.childId)).toBe(siblingAgent)
     releaseTarget.resolve(undefined)
-    releaseGrandchild.resolve(undefined)
     await drained
     expect(ctx.agents.get(target.childId)).toBeUndefined()
-    expect(ctx.agents.get(grandchild.childId)).toBeUndefined()
+    // The selected member's descendant stays resident under the tree root.
+    expect(ctx.agents.get(grandchild.childId)).toBeDefined()
+    releaseGrandchild.resolve(undefined)
+    await waitNoActivation(ctx, grandchild.childId)
     expect(ctx.agents.get(sibling.childId)).toBe(siblingAgent)
     releaseSibling.resolve(undefined)
     await waitNoActivation(ctx, sibling.childId)
@@ -1910,28 +1912,22 @@ describe('continuable durability and teardown', () => {
       .rejects.toMatchObject({ code: 'UNAUTHORIZED' })
   })
 
-  it('finds scoped descendants after an intermediate one-shot Agent leaves the registry', async () => {
+  it('finds scoped descendants after an intermediate creator leaves the registry', async () => {
     const releaseIntermediate = Promise.withResolvers<undefined>()
     const releaseDescendant = Promise.withResolvers<undefined>()
     const adapter = new GatedAdapter([
-      { chunks: textResponse('one-shot'), gate: releaseIntermediate.promise },
+      { chunks: textResponse('intermediate'), gate: releaseIntermediate.promise },
       { chunks: textResponse('continuable descendant'), gate: releaseDescendant.promise },
     ])
     const { ctx, parent } = await setupWith(adapter)
-    const run = await ctx.subagents.start('spawn', {
-      label: 'one-shot task',
-      prompt: message('one-shot task'),
-      parent,
-      signal: testSignal,
-    })
-    const intermediate = run.localAgent
-    expect(intermediate).toBeDefined()
-    if (intermediate === undefined) throw new Error('spawn must publish a local Agent')
-    const descendant = await ctx.subagents.startContinuable(startSpec(intermediate))
+    const intermediate = await ctx.subagents.startContinuable(startSpec(parent))
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    const intermediateAgent = ctx.agents.get(intermediate.childId)!
+    const descendant = await ctx.subagents.startContinuable(startSpec(intermediateAgent))
     await vi.waitFor(() => { expect(adapter.requests).toHaveLength(2) })
 
-    const intermediateId = intermediate.id
-    const disposingIntermediate = run.dispose()
+    const intermediateId = intermediate.childId
+    const disposingIntermediate = ctx.subagents.drainContinuableChildren(parent, [intermediateId])
     releaseIntermediate.resolve(undefined)
     await disposingIntermediate
     expect(ctx.agents.get(intermediateId)).toBeUndefined()
@@ -2713,7 +2709,7 @@ describe('continuable adjacent-Agent delivery', () => {
       signal: testSignal,
     })).rejects.toMatchObject({
       code: 'UNAUTHORIZED',
-      message: `agent "${childId}" is not a resident continuable child and cannot send to parent "${parent.id}"`,
+      message: 'agent has no active runtime owner',
     })
 
     await handle.dispose()
@@ -2750,7 +2746,7 @@ describe('continuable adjacent-Agent delivery', () => {
       senderSessionId: started.childId,
     })
     expect(delivered?.content).toEqual([
-      { type: 'text', text: `Agent ${started.childId} sent a message: ` },
+      { type: 'text', text: `Agent ${started.name} sent a message: ` },
       { type: 'text', text: 'an explicit message' },
     ])
 
@@ -2761,7 +2757,7 @@ describe('continuable adjacent-Agent delivery', () => {
     })
   })
 
-  it('rejects child-to-parent delivery when the direct parent is not live', async () => {
+  it.each(['absent', 'replaced'] as const)('rejects delivery when the subagent tree root is %s', async (state) => {
     const releaseChild = Promise.withResolvers<undefined>()
     const adapter = new GatedAdapter([
       { chunks: textResponse('child answer'), gate: releaseChild.promise },
@@ -2775,19 +2771,19 @@ describe('continuable adjacent-Agent delivery', () => {
     })
     const get = ctx.agents.get.bind(ctx.agents)
     const getSpy = vi.spyOn(ctx.agents, 'get').mockImplementation(id => (
-      id === parent.id ? undefined : get(id)
+      id === parent.id ? state === 'absent' ? undefined : { ...parent } : get(id)
     ))
 
     await expect(ctx.subagents.sendMessage(child, parent.id, message('cannot arrive'), {
       signal: testSignal,
-    })).rejects.toMatchObject({ code: 'PARENT_UNAVAILABLE' })
+    })).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
 
     getSpy.mockRestore()
     releaseChild.resolve(undefined)
     await waitNoActivation(ctx, started.childId)
   })
 
-  it('translates direct-parent Steer rejection into an availability error', async () => {
+  it('propagates the subagent tree root inbox rejection', async () => {
     const releaseChild = Promise.withResolvers<undefined>()
     const adapter = new GatedAdapter([
       { chunks: textResponse('child answer'), gate: releaseChild.promise },
@@ -2804,7 +2800,7 @@ describe('continuable adjacent-Agent delivery', () => {
 
     await expect(ctx.subagents.sendMessage(child, parent.id, message('cannot arrive'), {
       signal: testSignal,
-    })).rejects.toMatchObject({ code: 'PARENT_UNAVAILABLE', cause: rejection })
+    })).rejects.toBe(rejection)
 
     releaseChild.resolve(undefined)
     await waitNoActivation(ctx, started.childId)
@@ -2821,12 +2817,12 @@ describe('continuable settlement delivery', () => {
     const notice = settlementNotices(parent)[0]!
     expect(notice.sender).toBe(started.childId)
     expect(notice.text).toBe(
-      `Background subagent ${started.childId} finished and will do no further work unless you send it more.`
+      `Background subagent ${started.name} finished and will do no further work unless you send it more.`
       + '\nIts closing message:\nthe answer',
     )
     // The collapsed row states the outcome without the child's content.
     expect(notice.summary).toBe(
-      `Background subagent ${started.childId} finished and will do no further work unless you send it more.`,
+      `Background subagent ${started.name} finished and will do no further work unless you send it more.`,
     )
   })
 
@@ -2856,7 +2852,7 @@ describe('continuable settlement delivery', () => {
 
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} ran out of room before it finished.`
+      `Background subagent ${started.name} ran out of room before it finished.`
       + '\nIts closing message:\nhalf an ans',
     )
   })
@@ -2875,7 +2871,7 @@ describe('continuable settlement delivery', () => {
 
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} declined the task.`
+      `Background subagent ${started.name} declined the task.`
       + '\nIt left no closing message.',
     )
   })
@@ -2906,7 +2902,7 @@ describe('continuable settlement delivery', () => {
     const child = await loadStoredSession(ctx.sessionPersistence, started.childId)
     expect(hasUserText(child.events, 'second task')).toBe(false)
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} failed before it finished.`
+      `Background subagent ${started.name} failed before it finished.`
       + '\nIts closing message:\nthe answer',
     )
   })
@@ -2942,7 +2938,7 @@ describe('continuable settlement delivery', () => {
     // task had finished.
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} was stopped before it finished.`
+      `Background subagent ${started.name} was stopped before it finished.`
       + '\nIts closing message:\nthe answer',
     )
   })
@@ -2969,7 +2965,7 @@ describe('continuable settlement delivery', () => {
     // that genuinely finished with no output.
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} was stopped before it finished.`
+      `Background subagent ${started.name} was stopped before it finished.`
       + '\nIt left no closing message.',
     )
   })
@@ -2996,7 +2992,7 @@ describe('continuable settlement delivery', () => {
 
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} was stopped before it finished.`
+      `Background subagent ${started.name} was stopped before it finished.`
       + '\nIt left no closing message.',
     )
   })
@@ -3038,7 +3034,7 @@ describe('continuable settlement delivery', () => {
     expect(hasUserText(child.session.snapshotEvents(), 'never runs')).toBe(false)
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} was stopped before it finished.`
+      `Background subagent ${started.name} was stopped before it finished.`
       + '\nIts closing message:\nthe answer',
     )
   })
@@ -3060,7 +3056,7 @@ describe('continuable settlement delivery', () => {
     await waitNoActivation(ctx, started.childId)
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} failed before it finished.\nIt left no closing message.`,
+      `Background subagent ${started.name} failed before it finished.\nIt left no closing message.`,
     )
   })
 
@@ -3200,7 +3196,7 @@ describe('continuable settlement delivery', () => {
     // message when that parent is disposed next is pinned by the test below.
     expect(settlementNotices(parent)).toHaveLength(1)
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} was stopped before it finished.`
+      `Background subagent ${started.name} was stopped before it finished.`
       + '\nIt left no closing message.',
     )
     expect(parent.session.snapshotEvents().some(event => event.type === 'agent/inbox/spliced')).toBe(true)
@@ -3925,7 +3921,7 @@ describe('continuable structured output', () => {
 
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} finished and will do no further work unless you send it more.`
+      `Background subagent ${started.name} finished and will do no further work unless you send it more.`
       + '\nIt left no closing message.'
       + '\nStructured result: {"answer":42}',
     )
@@ -3941,7 +3937,7 @@ describe('continuable structured output', () => {
 
     await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
     expect(settlementNotices(parent)[0]!.text).toBe(
-      `Background subagent ${started.childId} failed before it finished.`
+      `Background subagent ${started.name} failed before it finished.`
       + '\nIts closing message:\nprose answer',
     )
   })

@@ -9,18 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/scope"
-    },
-    {
-      "path": "../jobs"
-    },
-    {
-      "path": "../../util/timeout"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -31,6 +19,21 @@
     },
     {
       "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../util/timeout"
+    },
+    {
+      "path": "../jobs"
     }
   ]
 }

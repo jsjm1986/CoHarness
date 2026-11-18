@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-25-upstream-mcp-manager-absorption.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-upstream-mcp-manager-absorption.md
+document:
+  en: 13bdfeac9bd1a312cb165edc9d617d7deee99aa3
+  zh: 51ae57f1bdec3aff3e761b3444fc8657792d6039
+/agent-note-upstream-mcp-manager-absorption:
+  en: babe6e780ca95c7b
+  zh: 9098cdaec29d7bab
+/agent-note-upstream-mcp-manager-absorption/problem:
+  en: bef364d1122146d5
+  zh: a491af2a83702ab1
+/agent-note-upstream-mcp-manager-absorption/decision:
+  en: 0693d48976da26b8
+  zh: 80ac3f3851dd36d9
+/agent-note-upstream-mcp-manager-absorption/consequences:
+  en: 0e7bac3727e28fa5
+  zh: f35cc0f179a41122
+/agent-note-upstream-mcp-manager-absorption/alternatives-considered:
+  en: 6013d783df7f85b2
+  zh: 0ae4c4028e65dc64
+/agent-note-upstream-mcp-manager-absorption/verification:
+  en: 23eb3f2528d81304
+  zh: ffc28fe3630ed905

@@ -16,6 +16,7 @@ import { installJobIdleVeto } from './idle-release.ts'
 import type { JobEvents, JobId, JobOutputRead, JobRead, JobSpec, JobView } from './types.ts'
 
 export { JobId } from './types.ts'
+export { JOB_ERROR_CODES, JobError, type JobErrorCode } from './error.ts'
 export { renderJobFailure } from './failure.ts'
 export type {
   JobAppendOptions,

@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -60,7 +60,7 @@ describe('minimal agent preset', () => {
       ? [event.data.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')]
       : [])
     expect(runtimeContexts).toEqual([
-      `Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: ${JSON.stringify(agentHandle.agent.session.header.cwd)}.`,
+      `The following information describes your current session:\n\nCurrent working directory: ${JSON.stringify(agentHandle.agent.session.header.cwd)}.`,
     ])
     // The recorded call ran through the preset's persistent shell: the session
     // committed exactly the replayed `bash` call and its real result.
@@ -85,18 +85,36 @@ describe('minimal agent preset', () => {
     const signal = new AbortController().signal
     await scaffold.ctx.tools.execute({
       signal,
-      callId: ToolCallId('minimal-bash-state-setup'),
-      name: 'bash',
-      arguments: { command: `cd ${JSON.stringify(stateDir)} && export DSH_MINIMAL_STATE=PERSISTED` },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('minimal-bash-state-setup'),
+        name: 'bash',
+        arguments: JSON.stringify({ command: `cd ${JSON.stringify(stateDir)} && export DSH_MINIMAL_STATE=PERSISTED` }),
+      }],
       agent: agentHandle.agent,
     })
-    const bash = await scaffold.ctx.tools.execute({
+    const bash = (await scaffold.ctx.tools.execute({
       signal,
-      callId: ToolCallId('minimal-bash-state-read'),
-      name: 'bash',
-      arguments: { command: 'printf \'%s:%s\n\' "$DSH_MINIMAL_STATE" "$PWD"' },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('minimal-bash-state-read'),
+        name: 'bash',
+        arguments: JSON.stringify({ command: 'printf \'%s:%s\n\' "$DSH_MINIMAL_STATE" "$PWD"' }),
+      }],
       agent: agentHandle.agent,
-    })
+    })).results[0]!.result
+    const seedPath = join(scaffold.workspaceCwd, 'preset-smoke.txt')
+    await writeFile(seedPath, 'MINIMAL_EDITOR_OK\n')
+    const editor = (await scaffold.ctx.tools.execute({
+      signal,
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('minimal-editor-smoke'),
+        name: 'str_replace_editor',
+        arguments: JSON.stringify({ command: 'view', path: seedPath }),
+      }],
+      agent: agentHandle.agent,
+    })).results[0]!.result
 
     const text = (result: typeof bash): string => result.content
       .filter(block => block.type === 'text')
@@ -116,13 +134,18 @@ describe('minimal agent preset', () => {
       prompt: systemPrompt,
       tools: requestHeader.tools?.map(tool => tool.name),
       bash: text(bash),
+      editor: text(editor),
     }).toMatchInlineSnapshot(`
       {
         "bash": "PERSISTED:{{cwd}}/persistent-state
       [Command finished with exit code 0]",
+        "editor": "Here's the content of {{cwd}}/preset-smoke.txt with line numbers (which has a total of 2 lines):
+           1  MINIMAL_EDITOR_OK
+           2",
         "prompt": "You are a helpful software engineer assistant.",
         "tools": [
           "bash",
+          "str_replace_editor",
           "working_directory",
         ],
       }

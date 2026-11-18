@@ -34,8 +34,27 @@ vi.mock('@deepseek-ai/dsh-subprocess-local', async (importOriginal) => {
       }
       const closed = Promise.withResolvers<SubprocessOutcome>()
       void closed.promise.catch(() => {})
-      child.on('close', (exitCode: number | null, signal: NodeJS.Signals | null) => { closed.resolve({ exitCode, signal }) })
-      child.on('error', (error: Error) => { closed.reject(error) })
+      // A real child exit closes the kernel's pipe write-ends, so the host's
+      // stdout/stderr/fd-3 readers observe EOF. These fixtures own the
+      // PassThrough ends; end them where the real exit/error/terminate would,
+      // or every settling run rides the close bound instead of draining.
+      const endPipes = (): void => {
+        for (const stream of [child.stdin, child.stdout, child.stderr, child.stdio[3]]) {
+          if (stream === undefined || stream.destroyed || stream.writableEnded) continue
+          try { stream.end() } catch {
+            // A fixture whose write-end IS the injected failure (e.g. stdin.end
+            // throws EPIPE) must not turn teardown into a second failure.
+          }
+        }
+      }
+      child.on('close', (exitCode: number | null, signal: NodeJS.Signals | null) => {
+        endPipes()
+        closed.resolve({ exitCode, signal })
+      })
+      child.on('error', (error: Error) => {
+        endPipes()
+        closed.reject(error)
+      })
       return {
         stdin: child.stdin, stdout: child.stdout, stderr: child.stderr,
         control: failures.missingPipe ? undefined : child.stdio[3], collected: {},
@@ -43,7 +62,12 @@ vi.mock('@deepseek-ai/dsh-subprocess-local', async (importOriginal) => {
           if (failures.rangeError !== undefined) throw failures.rangeError
           return !failures.rangeExit
         },
-        terminate: () => { if (child.pid === undefined) closed.resolve({ exitCode: null, signal: 'SIGTERM' }) },
+        terminate: () => {
+          if (child.pid === undefined) {
+            endPipes()
+            closed.resolve({ exitCode: null, signal: 'SIGTERM' })
+          }
+        },
       }
     }
   }

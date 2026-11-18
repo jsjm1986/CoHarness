@@ -18,7 +18,7 @@ Status: implemented
 
 ## Alternatives considered
 
-整体移植 `packages/api/remote-access` 会在协作 authority 旁边产生第二套授权栈——同一批操作出现两条判定路径，两者必然漂移。上游的快照帧与授权流（`follow()`/`REMOTE_ACCESS_SNAPSHOT_KEY`）与参与者已通过 `participant.scope` 和网关 `access` 响应获知的内容重复；上游按资源种类的 role 对象在这里没有对应物，因为本分支的资源模型是根继承的 Session ACL 与四个 action 类别。
+整体移植 `packages/api/remote-access` 会在协作 authority 旁边产生第二套授权栈——同一批操作出现两条判定路径，两者必然漂移。该包仍在[面板与 remote-access 移植](2026-11-15-forge-panel-remote-access-port.zh.md)下为 forge 面板的 `allows`/快照面而携带：其 `decide` 在 `typert-gateway/authorize` 不携带 principal 期间没有调用者，单路径理由因此成立。上游的快照帧与授权流（`follow()`/`REMOTE_ACCESS_SNAPSHOT_KEY`）与参与者已通过 `participant.scope` 和网关 `access` 响应获知的内容重复；上游按资源种类的 role 对象在这里没有对应物，因为本分支的资源模型是根继承的 Session ACL 与四个 action 类别。
 
 ## Consequences
 

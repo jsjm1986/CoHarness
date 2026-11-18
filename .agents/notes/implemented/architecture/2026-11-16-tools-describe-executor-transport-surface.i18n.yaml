@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-tools-describe-executor-transport-surface.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-16-tools-describe-executor-transport-surface.md
+document:
+  en: 7f3fafa22b29e7a14a56560f5745a7cb111be54f
+  zh: c159a9c0be2093e4ef898a3c997b03dfb0e51bed
+/agent-note-tools-describe-exposes-executor-transport-tools:
+  en: dad2cba2fce2a6e4
+  zh: ee467619625dcbfe
+/agent-note-tools-describe-exposes-executor-transport-tools/problem:
+  en: 2029ff246f80ab0f
+  zh: f18f8ef1eaa578c0
+/agent-note-tools-describe-exposes-executor-transport-tools/decision:
+  en: 7acf5ac8c69cf45c
+  zh: 8229bc905d218aef
+/agent-note-tools-describe-exposes-executor-transport-tools/consequences:
+  en: 7375d29e4463c58d
+  zh: 828a434729b8a0ab
+/agent-note-tools-describe-exposes-executor-transport-tools/alternatives-considered:
+  en: 2f56ddaeb50a494e
+  zh: 18c2b99792794b82
+/agent-note-tools-describe-exposes-executor-transport-tools/verification:
+  en: ffa42be8417e3510
+  zh: 4dc635d2d139c769

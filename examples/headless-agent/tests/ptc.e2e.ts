@@ -90,19 +90,25 @@ let keylessCall = 0
 const testToolSignal = new AbortController().signal
 
 /** Execute one outer PTC mode call through the real registry and worker. */
-function runCode(
+async function runCode(
   harness: Context,
   code: string,
   signal: AbortSignal = testToolSignal,
   agent?: Agent,
 ): Promise<ToolExecutionResult> {
-  return harness.tools.execute({
-    callId: ToolCallId(`keyless-code-${++keylessCall}`),
-    name: RUN_CODE_NAME,
-    arguments: { code, description: 'Run the e2e program' },
+  const batch = await harness.tools.execute({
+    calls: [{
+      type: 'tool-call',
+      id: ToolCallId(`keyless-code-${++keylessCall}`),
+      name: RUN_CODE_NAME,
+      arguments: JSON.stringify({ code, description: 'Run the e2e program' }),
+    }],
     signal,
     ...(agent === undefined ? {} : { agent }),
   })
+  const outcome = batch.results[0]
+  if (outcome === undefined) throw new Error('PTC batch omitted the run_code result')
+  return outcome.result
 }
 
 /** Read the optional completion from a successful canonical `run_code` value. */
@@ -303,11 +309,12 @@ describe('PTC mode typed values: keyless real-worker contracts', () => {
       return { provider: provider.id, names: inspected.data.tools.map(tool => tool.name) };
     `, testToolSignal, agent))
 
+    // Under the PTC executor `run_code` is the one directly callable tool; the
+    // inspected list names it alongside the mounted cordis_inspect tools.
     expect(value).toEqual({
       provider: 'Tool',
       names: [
-        'cordis_inspect_list', 'cordis_inspect_query', 'cordis_inspect_self',
-        'run_code',
+        'cordis_inspect_list', 'cordis_inspect_query', 'cordis_inspect_self', 'run_code',
       ],
     })
     for (const retired of ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine']) {

@@ -44,7 +44,7 @@ Catalog payload versions 0 and 1 retain their fields and meanings. Version 2 ide
 <a id="verification"></a>
 ## Verification
 
-`pnpm exec vitest run packages/subagent/subagent/tests/catalog.spec.ts packages/core/tools/tests/ptc.spec.ts` passed 136 tests. Coverage includes mixed catalog versions, invalid version/mode combinations, and detached PTC metadata surviving Session restoration without changing the binding result or logged-content policy.
+`pnpm exec vitest run packages/subagent/subagent/tests/catalog.spec.ts packages/core/tool-executor-ptc/tests/ptc.spec.ts` passed 136 tests. Coverage includes mixed catalog versions, invalid version/mode combinations, and detached PTC metadata surviving Session restoration without changing the binding result or logged-content policy.
 
 <a id="dev-note"></a>
 ## Dev Note

@@ -317,13 +317,16 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
       source: { kind: 'user' },
     })
     await workspace.attachSession(afterHandle.agent.id)
-    const afterCreated = await scaffold.ctx.tools.execute({
+    const afterCreated = (await scaffold.ctx.tools.execute({
       signal: AbortSignal.timeout(10_000),
-      callId: ToolCallId('schedule-after-create'),
-      name: 'schedule_create',
-      arguments: { prompt: AFTER_PROMPT, title: AFTER_PROMPT, after_seconds: 1 },
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('schedule-after-create'),
+        name: 'schedule_create',
+        arguments: JSON.stringify({ prompt: AFTER_PROMPT, title: AFTER_PROMPT, after_seconds: 1 }),
+      }],
       agent: afterHandle.agent,
-    })
+    })).results[0]!.result
     if (afterCreated.isError) {
       throw new Error(`Schedule After create failed: ${JSON.stringify(afterCreated.value)}`)
     }
@@ -381,13 +384,16 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     })
     await scaffold.ctx.schedule.delete({ sessionId: everyHandle.agent.id, id: wake.id })
     await workspace.attachSession(everyHandle.agent.id)
-    const everyListed = await scaffold.ctx.tools.execute({
+    const everyListed = (await scaffold.ctx.tools.execute({
       signal: AbortSignal.timeout(10_000),
-      callId: ToolCallId('schedule-every-list'),
-      name: 'schedule_list',
-      arguments: {},
+      calls: [{
+        type: 'tool-call',
+        id: ToolCallId('schedule-every-list'),
+        name: 'schedule_list',
+        arguments: '{}',
+      }],
       agent: everyHandle.agent,
-    })
+    })).results[0]!.result
     expect(everyListed.isError).toBe(false)
     everyAssistantReply = await waitForReply(everyHandle, EVERY_REPLY, 15_000)
     await everyHandle.agent.whenIdle()
@@ -1104,10 +1110,14 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     })
     const time = clock.format(new Date(Date.now() + 3_600_000))
     const prompt = 'Inspect the daily calendar rule'
-    const result = await scaffold.ctx.tools.execute({
-      signal: AbortSignal.timeout(10_000), callId: ToolCallId('schedule-daily-catalog-create'),
-      name: 'schedule_create', arguments: { prompt, title: prompt, daily: { time, time_zone: timeZone } }, agent,
-    })
+    const result = (await scaffold.ctx.tools.execute({
+      signal: AbortSignal.timeout(10_000),
+      calls: [{
+        type: 'tool-call', id: ToolCallId('schedule-daily-catalog-create'),
+        name: 'schedule_create', arguments: JSON.stringify({ prompt, title: prompt, daily: { time, time_zone: timeZone } }),
+      }],
+      agent,
+    })).results[0]!.result
     const created = (await scaffold.ctx.schedule.catalog()).find(task => (
       task.sessionId === CATALOG_SESSION_ID && task.prompt === prompt
     ))

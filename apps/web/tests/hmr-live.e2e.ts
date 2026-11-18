@@ -9,6 +9,7 @@ import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { Fiber } from '@deepseek-ai/cordis'
+import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { CLIENT_BUILD_RECORD_PATH, readClientBuildRecord } from '../../../scripts/client-build-environment.ts'
@@ -142,7 +143,11 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
       return identity
     }, randomUUID())
 
-    await writeFile(sourcePath, updatedSource)
+    // fs.writeFile truncates before writing, so the dev:web watcher can read
+    // a partially written file and emit a transform error before HMR delivers
+    // the rebuilt module. The atomic sibling rename only ever exposes the
+    // complete file.
+    await writeFileAtomic(sourcePath, updatedSource, { mode: 0o644 })
     await page.locator('[data-phase]').getByText(newText, { exact: true }).waitFor({ timeout: 30_000 })
     expect(await page.evaluate(() => (window as Window & { __dshHmrPageIdentity?: string }).__dshHmrPageIdentity))
       .toBe(pageIdentity)

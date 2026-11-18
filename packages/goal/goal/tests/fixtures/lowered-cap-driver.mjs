@@ -12,7 +12,8 @@ const { LlmAdapter } = await import(entry('llm/llm'))
 const { SessionId } = await import(entry('core/session'))
 const plugins = [
   ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
-  ['session/session-projection'], ['core/agent-loop', { agents: [] }], ['interaction/commands'],
+  ['core/tool-executor-native'], ['session/session-projection'], ['core/agent-loop', { agents: [] }],
+  ['interaction/commands'],
   ['goal/goal', { defaultMaxGoalRounds: 4 }], ['goal/command-goal'], ['goal/goal-round-driver'],
 ]
 const config = join(process.cwd(), 'cordis.yml')

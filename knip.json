@@ -17,7 +17,8 @@
   ],
   "ignoreWorkspaces": [
     "vendor/*",
-    "python/sdk-runtime"
+    "python/sdk-runtime",
+    "snapshots"
   ],
   "ignoreDependencies": [
     "@deepseek-ai/cordis",
@@ -341,6 +342,7 @@
     "packages/core/tools": {
       "entry": [
         "tests/**/*.spec.ts",
+        "tests/exports.built.e2e.ts",
         "tests/fixtures/literal-sdk.ts"
       ],
       "project": [
@@ -615,7 +617,8 @@
     },
     "packages/experimental/agent-team": {
       "entry": [
-        "tests/**/*.e2e.ts"
+        "tests/**/*.e2e.ts",
+        "tests/enable-team-fixture.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -1082,6 +1085,10 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-tool-executor-native",
+        "@deepseek-ai/dsh-tool-executor-ptc"
       ]
     },
     "packages/bundle/web-app": {
@@ -1752,10 +1759,9 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/document/office-to-pdf": {
+    "packages/document/office-kit": {
       "entry": [
-        "tests/**/*.spec.ts",
-        "tests/**/*.perf.ts"
+        "tests/**/*.spec.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -1780,6 +1786,83 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ]
+    },
+    "packages/api/remote-access": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/remote-standin.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
+    "packages/boot/config-editor": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/core/tool-executor-native": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/core/tool-executor-ptc": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/experimental/client-ui-forge": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx",
+        "tests/remote-standin.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ]
+    },
+    "packages/experimental/subagent-oar": {
+      "entry": [
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/**/*.ts",
+        "tests/fixtures/**/*.mjs"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-agent-loop-testkit",
+        "@deepseek-ai/dsh-app-boot",
+        "@deepseek-ai/dsh-experimental-tool-subagent-oar",
+        "@deepseek-ai/dsh-session-checkpoint-policy",
+        "@deepseek-ai/dsh-session-persistence-jsonl",
+        "@deepseek-ai/dsh-subagent-claude-code",
+        "@deepseek-ai/dsh-tool-jobs"
+      ]
+    },
+    "packages/mcp/mcp-manager": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
       ]
     }
   }

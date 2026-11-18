@@ -111,11 +111,12 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       textCompletion(WAKING_ANSWER),
     ]))
     await writeFile(
-      join(sidecarRoot, 'session.jsonl'),
-      '{"type":"session","version":0,"id":"primary","createdAt":0}\n',
+      join(sidecarRoot, 'child-shell.jsonl'),
+      '{"type":"session","version":0,"id":"recorded-child","createdAt":1784998084443}\n',
     )
     // The parent's one prompted turn replays this recorded single text-only
-    // call (binding is positional, not lineage-aware).
+    // call as the primary fixture; the child's script rides its own slot's
+    // override so the session/created announcement still binds it.
     const parentTurnPath = join(sidecarRoot, 'parent-turn.jsonl')
     const base = await readFile(BASE_FIXTURE, 'utf8')
     const [header, ...events] = base.trimEnd().split('\n')
@@ -128,9 +129,9 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       '',
     ].join('\n'))
     scaffold = await launchWebScaffold({
-      replayFixture: join(sidecarRoot, 'session.jsonl'),
-      replayOverride: join(sidecarRoot, 'replay.override.json'),
-      replayChildFixtures: [parentTurnPath],
+      replayFixture: parentTurnPath,
+      replayChildFixtures: [join(sidecarRoot, 'child-shell.jsonl')],
+      replayChildOverrideFiles: [join(sidecarRoot, 'replay.override.json')],
     })
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
@@ -208,7 +209,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
         name: 'Parent session offline; sending is unavailable but you can still stop the run',
       })
       await input.waitFor({ timeout: 15_000 })
-      await page.getByText(/^Explain event sourcing in one sentence\.Your parent agent id is /)
+      await page.getByText(/^Explain event sourcing in one sentence\.Your final answer is delivered /)
         .waitFor({ timeout: 15_000 })
       expect(await input.isDisabled()).toBe(true)
       const stop = page.getByRole('button', { name: 'Stop generating' })
@@ -349,7 +350,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       ? event.data.content.flatMap(block => block.type === 'text' ? [block.text] : [])
       : [])
     expect(userTexts[0]).toBe(INITIAL)
-    expect(userTexts[1]).toMatch(/^Your parent agent id is .+send_message\(\{ agent_id: /)
+    expect(userTexts[1]).toMatch(/^Your final answer is delivered automatically if your parent is still online\./)
     expect(userTexts.slice(2)).toEqual([REARM, REARM_WAKE, FOLLOWUP, WAKING])
     const imageMessage = loaded.events.find(event => event.type === 'user/message'
       && event.data.content.some(block => block.type === 'image'))

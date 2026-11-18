@@ -33,7 +33,7 @@ import { dirname, join } from 'node:path'
 import type { Dirent } from 'node:fs'
 import { StorageError } from '@deepseek-ai/dsh-storage'
 import type { KvUnit, KvUnitDescriptor } from '@deepseek-ai/dsh-storage'
-import { writeAtomic } from './atomic.ts'
+import { fsyncDirectory, writeAtomic } from './atomic.ts'
 import { parseRecord, serializeRecord } from './format.ts'
 import type { UnitState } from './format.ts'
 
@@ -295,7 +295,18 @@ export class PerRecordJsonUnit implements KvUnit {
   async deleteRecord(table: string, key: string): Promise<void> {
     this.assertOpen()
     assertSafeKey(this.descriptor.name, key)
-    await this.tracked(rm(join(this.tableDir(table), `${key}.json`), { force: true }))
+    const dir = this.tableDir(table)
+    await this.tracked((async () => {
+      await rm(join(dir, `${key}.json`), { force: true })
+      // The unlink only names a directory entry; sync it so the deletion
+      // itself is crash-durable like a writeAtomic publish.
+      try {
+        await fsyncDirectory(dir)
+      } catch {
+        // A deletion without the directory sync weakens crash durability;
+        // the entry is already gone, so rejecting would fork memory from media.
+      }
+    })())
   }
 
   /**

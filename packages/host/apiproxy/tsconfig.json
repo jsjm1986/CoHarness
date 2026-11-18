@@ -9,6 +9,18 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/include"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../api/remotes/tsconfig.host.json"
     },
     {
@@ -30,6 +42,9 @@
       "path": "../../context/collaboration"
     },
     {
+      "path": "../../context/execution-authority"
+    },
+    {
       "path": "../../context/userdoc-context"
     },
     {
@@ -45,6 +60,9 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../core/tool-executor-ptc"
+    },
+    {
       "path": "../../core/tools"
     },
     {
@@ -54,7 +72,10 @@
       "path": "../../deliverables/workspace-changes"
     },
     {
-      "path": "../../document/office-to-pdf"
+      "path": "../../document/office-kit"
+    },
+    {
+      "path": "../../experimental/agent-team"
     },
     {
       "path": "../../extensions/cordis-host-runner"
@@ -66,7 +87,7 @@
       "path": "../../goal/goal"
     },
     {
-      "path": "../directory-picker"
+      "path": "../../goal/goal-round-driver"
     },
     {
       "path": "../../interaction/commands"
@@ -93,10 +114,10 @@
       "path": "../../llm/model-provider-config"
     },
     {
-      "path": "../../preset/agent-preset-registry"
+      "path": "../../memory/memory"
     },
     {
-      "path": "../../memory/memory"
+      "path": "../../preset/agent-preset-registry"
     },
     {
       "path": "../../schedule/schedule"
@@ -106,6 +127,9 @@
     },
     {
       "path": "../../session/session-persistence"
+    },
+    {
+      "path": "../../session/session-persistence-jsonl"
     },
     {
       "path": "../../session/session-projection"
@@ -126,16 +150,16 @@
       "path": "../../skill/skill"
     },
     {
-      "path": "../../ssh/ssh"
-    },
-    {
       "path": "../../ssh/fs-ssh"
     },
     {
-      "path": "../../ssh/subprocess-ssh"
+      "path": "../../ssh/sandbox-ssh"
     },
     {
-      "path": "../../ssh/sandbox-ssh"
+      "path": "../../ssh/ssh"
+    },
+    {
+      "path": "../../ssh/subprocess-ssh"
     },
     {
       "path": "../../subagent/subagent"
@@ -147,13 +171,13 @@
       "path": "../../util/brand"
     },
     {
-      "path": "../../util/package-manifest"
-    },
-    {
       "path": "../../util/crypto"
     },
     {
       "path": "../../util/native-command"
+    },
+    {
+      "path": "../../util/package-manifest"
     },
     {
       "path": "../../util/time"
@@ -162,28 +186,7 @@
       "path": "../../workspace/workspace"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../context/execution-authority"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
-      "path": "../../../vendor/include"
-    },
-    {
-      "path": "../../experimental/agent-team"
-    },
-    {
-      "path": "../../goal/goal-round-driver"
-    },
-    {
-      "path": "../../session/session-persistence-jsonl"
+      "path": "../directory-picker"
     }
   ]
 }

@@ -26,6 +26,9 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
+  "dependencies": {
+    "@deepseek-ai/dsh-fs-patch": "workspace:*"
+  },
   "peerDependencies": {
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",

@@ -90,19 +90,25 @@ let keylessCall = 0
 const testToolSignal = new AbortController().signal
 
 /** Execute one outer PTC mode call through the real registry and Node process. */
-function runCode(
+async function runCode(
   harness: Context,
   code: string,
   signal: AbortSignal = testToolSignal,
   agent?: Agent,
 ): Promise<ToolExecutionResult> {
-  return harness.tools.execute({
-    callId: ToolCallId(`keyless-code-${++keylessCall}`),
-    name: RUN_CODE_NAME,
-    arguments: { code, description: 'Run the e2e program' },
+  const batch = await harness.tools.execute({
+    calls: [{
+      type: 'tool-call',
+      id: ToolCallId(`keyless-code-${++keylessCall}`),
+      name: RUN_CODE_NAME,
+      arguments: JSON.stringify({ code, description: 'Run the e2e program' }),
+    }],
     signal,
     ...(agent === undefined ? {} : { agent }),
   })
+  const outcome = batch.results[0]
+  if (outcome === undefined) throw new Error('PTC batch omitted the run_code result')
+  return outcome.result
 }
 
 /** Read the optional completion from a successful canonical `run_code` value. */

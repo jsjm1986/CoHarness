@@ -31,6 +31,7 @@ function props(readCall: DetailsSlotProps['readCall']): DetailsSlotProps {
       state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({ items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })),
     usePanelInfo: () => { throw new Error('unused') },
+    useRemoteAccess: () => true,
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: {

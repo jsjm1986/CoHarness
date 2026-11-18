@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/system-prompt.md
 document:
-  en: 7a370187222212028d07a0e974a4c7ddec5087e9
-  zh: 2fce0d89d1b9e12b8509962b8400eb6d1703a844
+  en: 2b707b4cf7d68ea222172005a0da05ffe8bda248
+  zh: 2f0c8e5d1da240053f9f7dd9ed5f79fbf953a383
 /system-prompt-assembly:
   en: 7ad02b2146520e7b
   zh: 93cb93c7aa12ceb4

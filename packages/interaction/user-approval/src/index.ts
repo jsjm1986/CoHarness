@@ -7,6 +7,7 @@
 import { randomUUID } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { z as zod } from 'zod'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, type ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -17,13 +18,21 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
-import type { Session } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
+import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
     approval: ApprovalService
+  }
+}
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    /** Projected approval-policy override and turn enclosure for one session. */
+    approvalState: ApprovalState
   }
 }
 
@@ -73,27 +82,72 @@ export const APPROVAL_POLICIES: readonly ApprovalPolicy[] = ['ask', 'never']
 const NEVER_SENTENCE = 'Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).'
 /** Model-facing statement for an interactive policy that may still fail closed. */
 const ASK_SENTENCE = 'Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.'
+/** Model-facing policy names in switch notices; a bare `never` reads as "approval is never granted". */
+const POLICY_NOTICE_NAMES: Readonly<Record<ApprovalPolicy, string>> = {
+  ask: 'ask the user for approval',
+  never: 'never ask the user for approval',
+}
 
 /**
- * Whether the log currently sits inside an open turn (a `turn/start` not yet
- * closed by a `turn/end`) — the {@link ApprovalService.request} precondition.
- * The audit pair must be turn-enclosed: the turn is the durable log's
- * commit/replay boundary, so a bare event appended between turns is
+ * The projection unit's session state: the last `approval/policy` value plus
+ * the open-turn flag {@link ApprovalService.request} gates on. Turn enclosure
+ * is folded here because the audit pair must be enclosed by the durable
+ * log's commit/replay boundary — a bare event appended between turns is
  * indistinguishable from a crash tail and silently dropped on reload.
  */
-function hasOpenTurn(session: Session): boolean {
+interface ApprovalState {
+  policy: ApprovalPolicy | null
+  // Mirrors the turn enclosure without requiring an agent registry.
+  turnOpen: boolean
+}
+
+const approvalStateDefinition = {
+  key: 'approvalState',
+  stateVersion: 1,
+  stateSchema: zod.object({
+    policy: zod.enum(['ask', 'never']).nullable(),
+    turnOpen: zod.boolean(),
+  }),
+  init: (): ApprovalState => ({ policy: null, turnOpen: false }),
+  apply(state: ApprovalState, event: SessionEvent): ApprovalState {
+    switch (event.type) {
+      case 'approval/policy':
+        return state.policy === event.data.policy ? state : { ...state, policy: event.data.policy }
+      case 'turn/start':
+        return state.turnOpen ? state : { ...state, turnOpen: true }
+      case 'turn/end':
+        return state.turnOpen ? { ...state, turnOpen: false } : state
+      default:
+        return state
+    }
+  },
+} satisfies ProjectionDefinition<'approvalState', ApprovalState>
+
+/**
+ * Backward log fold for compositions without the projection registry: the
+ * last `approval/policy` wins and the log is inside a turn only when its
+ * latest turn boundary is `turn/start`. Mirrors {@link approvalStateDefinition}
+ * so the two read paths agree; kept because `dsh-user-approval` predates the
+ * registry in still-supported cordis.yml assemblies.
+ */
+function legacyApprovalState(session: Session): ApprovalState {
+  let policy: ApprovalPolicy | null = null
+  let turnOpen: boolean | undefined
   for (let seq = session.seq - 1; seq >= 0; seq -= 1) {
     // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-    const type = session.eventAt(SessionSeq(seq))?.type
-    if (type === 'turn/start') return true
-    if (type === 'turn/end') return false
+    const event = session.eventAt(SessionSeq(seq))
+    if (event === undefined) continue
+    if (policy === null && event.type === 'approval/policy') policy = event.data.policy
+    if (turnOpen === undefined && event.type === 'turn/start') turnOpen = true
+    if (turnOpen === undefined && event.type === 'turn/end') turnOpen = false
+    if (policy !== null && turnOpen !== undefined) break
   }
-  return false
+  return { policy, turnOpen: turnOpen ?? false }
 }
 
 /**
  * Append the sole durable representation of a session policy override. Invalid
- * values throw before the log changes; consumers fold the new value on each read.
+ * values throw before the log changes; projected state follows the committed record.
  * @param session - the session the override belongs to.
  * @param policy - the policy in effect until the next switch.
  */
@@ -162,12 +216,20 @@ export class ApprovalService extends Service {
       this.lifetime.abort(new Error('approval service was withdrawn'))
       await Promise.all(this.pending)
     }, 'approval: accepted requests')
+  }
+
+  protected [Service.init](): void {
+    // Optional like `dsh-user-questions`: registry-less compositions keep the
+    // direct log fold in `approvalStateOf`.
+    this.ctx.inject(['sessionProjections'], (scope: Context) => {
+      scope.sessionProjections.register(approvalStateDefinition)
+    })
 
     const effective = (agent: Agent): ApprovalPolicy => this.effectivePolicy(agent.session)
 
     // The complete current value travels after retained history, so switching
     // policy does not rewrite the stable system-prompt cache prefix.
-    ctx.inject(['systemPrompt'], (scope: Context) => {
+    this.ctx.inject(['systemPrompt'], (scope: Context) => {
       scope.systemPrompt.context({
         name: 'approval:policy',
         order: scope.systemPrompt.getContextOrder('APPROVAL_POLICY'),
@@ -197,7 +259,7 @@ export class ApprovalService extends Service {
     agent.inject(createUserMessage({
       content: [{
         type: 'text',
-        text: `The approval policy changed from "${previous}" to "${policy}" (changed by the user).`,
+        text: `The user changed the approval policy from "${POLICY_NOTICE_NAMES[previous]}" to "${POLICY_NOTICE_NAMES[policy]}".`,
       }],
       source: { kind: 'user-approval' },
     }))
@@ -229,7 +291,7 @@ export class ApprovalService extends Service {
     this.pending.add(completion.promise)
     try {
       const session = req.agent.session
-      if (!hasOpenTurn(session)) {
+      if (!this.approvalStateOf(session).turnOpen) {
         throw new Error(
           'approval.request() outside an open turn: the approval/asked + approval/decided audit pair '
           + 'must be turn-enclosed (a bare event between turns is crash-tail garbage on reload). '
@@ -270,12 +332,17 @@ export class ApprovalService extends Service {
    * @returns the last logged policy, or `undefined` without one.
    */
   overrideOf(session: Session): ApprovalPolicy | undefined {
-    for (let seq = session.seq - 1; seq >= 0; seq -= 1) {
-      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-      const event = session.eventAt(SessionSeq(seq))
-      if (event?.type === 'approval/policy') return event.data.policy
-    }
-    return undefined
+    return this.approvalStateOf(session).policy ?? undefined
+  }
+
+  /**
+   * The session's approval state: the registered unit's projected value, else
+   * the direct log fold for registry-less assemblies.
+   * @param session - session whose state is read.
+   * @returns the projected `{ policy, turnOpen }` pair.
+   */
+  private approvalStateOf(session: Session): ApprovalState {
+    return this.ctx.get('sessionProjections')?.stateOf(session, 'approvalState') ?? legacyApprovalState(session)
   }
 
   /**

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-16-python-single-exe-runtime-context-fixtures.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-16-python-single-exe-runtime-context-fixtures.md
+document:
+  en: e3ce4a291c8ece0fdb4acfeacca0ec419f3dbac3
+  zh: c51d97fd2de379c9eb14414315502a626e55c7c6
+/agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text:
+  en: b76902772db41c3f
+  zh: 01a88e37771cada9
+/agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text/problem:
+  en: d4004f81e3a65626
+  zh: 01df92c271e97735
+/agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text/decision:
+  en: 019c2b9f1dfa6f0b
+  zh: 983c297e82078aea
+/agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text/consequences:
+  en: 1c3cfe54807a97bc
+  zh: 8f013d750dc9a013
+/agent-note-python-single-exe-smoke-fixtures-re-aligned-to-the-fork-s-runtime-context-text/alternatives-considered:
+  en: 0bf8ea34afd49e5a
+  zh: 2ac7807df44d9f84

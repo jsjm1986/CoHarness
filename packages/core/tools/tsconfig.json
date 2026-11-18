@@ -9,16 +9,25 @@
   ],
   "references": [
     {
-      "path": "../agent"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../scope"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../session"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../system-prompt"
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/system-prompt"
     },
     {
       "path": "../../interaction/user-approval"
@@ -27,34 +36,7 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../ptc-runtime/ptc-runtime"
-    },
-    {
-      "path": "../../sandbox/sandbox"
-    },
-    {
-      "path": "../../sandbox/sandbox-policy"
-    },
-    {
-      "path": "../../session/working-directory"
-    },
-    {
-      "path": "../../util/brand"
-    },
-    {
       "path": "../../util/values"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

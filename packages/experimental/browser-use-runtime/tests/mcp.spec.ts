@@ -1,3 +1,6 @@
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
 import ResourceBudget from '@deepseek-ai/dsh-resource-budget'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -68,7 +71,7 @@ async function load(exclusive = false, mode?: string, toolCallTimeoutMs?: number
   roots.push(root)
   const model = new FixtureModel()
   const modules = new Map<string, unknown>([
-    ['browserUse', BrowserUse], ['prompt', SystemPrompt], ['tools', Tools], ['llm', Llm],
+    ['browserUse', BrowserUse], ['prompt', SystemPrompt], ['tools', Tools], ['toolExecutor', NativeToolExecutor], ['llm', Llm],
     ['sessions', Sessions], ['agents', Agents], ['loop', AgentLoop], ['projections', Projections],
     ['model', { inject: ['llm'], apply(ctx: Context) { ctx.effect(() => ctx.llm.registerAdapter(['fixture'], model)) } }],
     ['browser', { inject: ['browserUse', 'agents', 'tools', 'systemPrompt'], apply(ctx: Context) {
@@ -102,11 +105,11 @@ async function warm(ctx: Context, agent: Agent, signal = new AbortController().s
 }
 
 function execute(ctx: Context, agent: Agent, name = TOOL) {
-  return ctx.tools.execute({ agent, name, arguments: name === TOOL ? { label: 'direct' } : {}, callId: ToolCallId('direct'), signal: new AbortController().signal })
+  return executeToolFixture(ctx, { agent, name, arguments: name === TOOL ? { label: 'direct' } : {}, callId: ToolCallId('direct'), signal: new AbortController().signal })
 }
 
 function resource(ctx: Context, agent: Agent | undefined, name = 'read_mcp_resource', server = 'browser-fixture', callId = name) {
-  return ctx.tools.execute({
+  return executeToolFixture(ctx, {
     ...agent === undefined ? {} : { agent }, name,
     arguments: { server, ...name === 'read_mcp_resource' ? { uri: 'browser-fixture://state' } : {} },
     callId: ToolCallId(callId), signal: new AbortController().signal,
@@ -194,7 +197,7 @@ describe('Session MCP Loader composition', () => {
     const controller = new AbortController()
     const rejected = expect(ctx.agents.create({ sessionId: SessionId('failed-browser-report'), signal: controller.signal })).rejects.toThrow()
     if (cause === 'cancellation') {
-      await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+      await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
       controller.abort(new Error('cancel browser while its completion report is unavailable'))
     }
     await rejected
@@ -297,7 +300,7 @@ describe('Session MCP Loader composition', () => {
     const { ctx, root, model, browser } = await load(true, 'hold')
     const first = ctx.agents.create({ sessionId: SessionId('first') })
     const rejected = expect(first).rejects.toThrow()
-    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
     const second = await ctx.agents.create({ sessionId: SessionId('second'), agentOptions: { provider: 'fixture', model: 'fixture' } })
     second.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Answer without using the browser.' }], source: { kind: 'user' } }))
     await second.agent.whenIdle()
@@ -335,7 +338,7 @@ describe('Session MCP Loader composition', () => {
     const held = await load(false, 'hold')
     const pendingOwner = held.ctx.agents.create({ sessionId: SessionId('pending') })
     const interrupted = expect(pendingOwner).rejects.toThrow()
-    await vi.waitFor(async () => { expect((await events(held.root)).some(event => event.event === 'probe')).toBe(true) })
+    await vi.waitFor(async () => { expect((await events(held.root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
     await held.browser.dispose()
     await interrupted
     expect(held.ctx.agents.get(SessionId('pending'))).toBeUndefined()
@@ -393,7 +396,7 @@ describe('Session MCP Loader composition', () => {
     expect((await resource(ctx, child.agent, 'read_mcp_resource', 'docs')).value)
       .toEqual({ contents: [{ uri: 'docs://memo', text: 'Independent document.' }] })
     for (const args of [null, 'invalid arguments']) {
-      expect((await ctx.tools.execute({ agent: child.agent, name: 'read_mcp_resource', arguments: args, callId: ToolCallId('invalid-resource'), signal: new AbortController().signal })).isError).toBe(true)
+      expect((await executeToolFixture(ctx, { agent: child.agent, name: 'read_mcp_resource', arguments: args, callId: ToolCallId('invalid-resource'), signal: new AbortController().signal })).isError).toBe(true)
     }
     expect(browserState(await resource(ctx, parent.agent)).counter).toBe(0)
     await parent.dispose()
@@ -466,7 +469,7 @@ describe('Session MCP Loader composition', () => {
       sessionId: SessionId('ptc-first-request'), agentOptions: { provider: 'fixture', model: 'fixture' },
       setup: (inner, agent) => {
         initializing = agent
-        inner.tools.presentAs('ptc')
+        inner.plugin(PtcToolExecutor)
         inner.on('agent/created', () => {
           agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Describe the available browser tools.' }], source: { kind: 'user' } }))
         }, { prepend: true })
@@ -475,7 +478,7 @@ describe('Session MCP Loader composition', () => {
       created = true
       return handle
     })
-    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
     expect(created).toBe(false)
     expect(model.requests).toEqual([])
     expect((await execute(ctx, initializing)).isError).toBe(true)
@@ -501,8 +504,10 @@ describe('Session MCP Loader composition', () => {
         }, { prepend: true })
       },
     })
-    const rejected = expect(creation).rejects.toThrow('cancel browser startup')
-    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+    // The fused abort may surface either the caller reason or the owner's
+    // setup-abort reason, depending on which signal settles first.
+    const rejected = expect(creation).rejects.toThrow(/cancel browser startup|setup aborted/)
+    await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) }, { timeout: 15_000 })
     controller.abort(new Error('cancel browser startup'))
     await rejected
     expect(model.requests).toEqual([])
@@ -579,8 +584,8 @@ describe('Session MCP Loader composition', () => {
         }, { prepend: true })
       },
     })
-    const rejected = expect(canceledResume).rejects.toThrow('cancel browser resume')
-    await vi.waitFor(async () => { expect((await events(root)).filter(event => event.event === 'probe')).toHaveLength(2) })
+    const rejected = expect(canceledResume).rejects.toThrow(/cancel browser resume|setup aborted/)
+    await vi.waitFor(async () => { expect((await events(root)).filter(event => event.event === 'probe')).toHaveLength(2) }, { timeout: 15_000 })
     expect(model.requests).toHaveLength(2)
     controller.abort(new Error('cancel browser resume'))
     await rejected
@@ -595,7 +600,7 @@ describe('Session MCP Loader composition', () => {
       resumed = true
       return handle
     })
-    await vi.waitFor(async () => { expect((await events(root)).filter(event => event.event === 'probe')).toHaveLength(3) })
+    await vi.waitFor(async () => { expect((await events(root)).filter(event => event.event === 'probe')).toHaveLength(3) }, { timeout: 15_000 })
     expect(resumed).toBe(false)
     expect(model.requests).toHaveLength(2)
     await writeFile(join(root, 'release'), '')

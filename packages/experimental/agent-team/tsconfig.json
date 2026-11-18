@@ -9,6 +9,18 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -21,6 +33,9 @@
       "path": "../../session/session-persistence"
     },
     {
+      "path": "../../session/session-projection"
+    },
+    {
       "path": "../../subagent/subagent"
     },
     {
@@ -28,18 +43,6 @@
     },
     {
       "path": "../../util/brand"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../context/execution-authority"
     }
   ]
 }

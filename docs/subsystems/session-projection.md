@@ -233,6 +233,18 @@ register< K extends Exclude<keyof SessionProjectionStateMap, keyof SessionProjec
 onChanged(listener: ProjectionChangeListener): () => void
 
 /**
+ * Subscribe to the event-level change feed. The registration is an effect on
+ * the calling context's fiber. The listener runs synchronously inside the
+ * committed event's `session/event` handling, once after every unit has been
+ * driven and after every {@link onChanged} call for that event. If a unit or
+ * an {@link onChanged} listener throws during that drive, the listener still
+ * receives the changes made before the throw.
+ * @param listener - called once per committed event that changed at least one client-visible unit's raw view by `Object.is`.
+ * @returns the exact disposer that unsubscribes.
+ */
+onEventChanged(listener: ProjectionEventChangeListener): () => void
+
+/**
  * Read one unit's current host state without computing unrelated views.
  * The returned value is live; callers must not mutate it.
  * @param session - the session whose state is read.
@@ -262,8 +274,12 @@ snapshot(session: Session): ProjectionSnapshot
  * mutable state, and a caller reaching the live reference could corrupt
  * every subsequent snapshot and frame through it (plain JSON by the unit
  * contract, so the clone is total).
+ * A released unit contributes the Session's last cell: the registry no
+ * longer advances that cell, while a retained handle read still advances
+ * it forward, so a writer running after a plugin unloads keeps that unit's
+ * latest state; a Session that has no cell of it gets no row.
  * @param session - the session whose unit states are checkpointed.
- * @returns one row per registered key.
+ * @returns one row per live key, plus one per released key with a cell for this Session.
  */
 checkpoint(session: Session): ProjectionCheckpoint
 

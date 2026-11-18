@@ -6,7 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { FsError } from '@deepseek-ai/dsh-fs'
-import OfficeToPdf from '@deepseek-ai/dsh-office-to-pdf'
+import OfficeKit from '@deepseek-ai/dsh-office-kit'
 import type { Converter } from '@deepseek-ai/libreoffice-kit'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createWorkspaceFilesApi } from '../src/workspace-files.ts'
@@ -35,7 +35,7 @@ async function harness({ mounted = true, bytes = 4 }: { mounted?: boolean; bytes
     convert: vi.fn<Converter['convert']>().mockRejectedValue(new Error('Unexpected Converter.convert call')),
     recalculate: vi.fn<Converter['recalculate']>().mockRejectedValue(new Error('Unexpected Converter.recalculate call')),
   }))
-  if (mounted) await ctx.plugin(OfficeToPdf, { maxInputBytes: 32, maxSourceBytes: 32 })
+  if (mounted) await ctx.plugin(OfficeKit, { maxInputBytes: 32, maxSourceBytes: 32, outputDirectory: join(root, 'outputs') })
   const id = SessionId('office-reader')
   ctx.sessions.create(id, { meta: { cwd: root } })
   const lifetime = new AbortController()

@@ -273,7 +273,7 @@ update(config: any, noSave = false)
 
 **返回**无；重新启动操作在 `internal/update` waterfall 后执行。
 
-[源码](../../vendor/cordis/src/fiber.ts#L736)
+[源码](../../vendor/cordis/src/fiber.ts#L737)
 
 ## Effect
 

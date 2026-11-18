@@ -39,6 +39,8 @@ const catalog: PermissionCatalog = {
     { value: 'workspace-write', name: 'workspace-write', description: '工作区可写' },
     { value: 'danger-full-access', name: 'danger-full-access', description: '完全访问' },
   ],
+  defaultOptions: [{ value: 'read-only', name: 'read-only', description: '仅读取' }],
+  defaultPreset: 'read-only',
 }
 
 const value: PermissionSelectValue = {
@@ -51,7 +53,7 @@ describe('PermissionSelect mobile presentation', () => {
   it('keeps selected Auto visible and explains how to leave it without silently changing the mode', () => {
     const command = vi.fn(() => Promise.resolve(true))
     render(<PermissionSelect value={{ currentValue: 'auto' }}
-      catalog={{ options: [...catalog.options, { value: 'auto', name: 'auto' }] }}
+      catalog={{ ...catalog, options: [...catalog.options, { value: 'auto', name: 'auto' }] }}
       availability="standard" locked={false} command={command} t={t} presentation="section" />)
     expect(screen.getByRole('status').textContent).toContain('Auto is selected but unavailable')
     expect(screen.getByRole('menuitemradio', { name: /Auto/ }).getAttribute('aria-checked')).toBe('true')
@@ -76,7 +78,7 @@ describe('PermissionSelect mobile presentation', () => {
   })
   it('disables Full and Auto for an account without those qualifications', () => {
     const command = vi.fn(() => Promise.resolve(true))
-    render(<PermissionSelect value={value} catalog={{ options: [...catalog.options, { value: 'auto', name: 'auto' }] }}
+    render(<PermissionSelect value={value} catalog={{ ...catalog, options: [...catalog.options, { value: 'auto', name: 'auto' }] }}
       availability="standard" locked={false} command={command} t={t} presentation="section" />)
     const full = screen.getByRole('menuitemradio', { name: /Full access/ }) as HTMLButtonElement
     const auto = screen.getByRole('menuitemradio', { name: /Auto/ }) as HTMLButtonElement

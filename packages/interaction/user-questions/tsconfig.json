@@ -9,6 +9,21 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/collaboration"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -16,6 +31,9 @@
     },
     {
       "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tool-executor-ptc"
     },
     {
       "path": "../../core/tools"
@@ -28,21 +46,6 @@
     },
     {
       "path": "../../typert/protocol"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../context/execution-authority"
-    },
-    {
-      "path": "../../context/collaboration"
     }
   ]
 }

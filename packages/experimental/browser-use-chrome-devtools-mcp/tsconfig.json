@@ -9,10 +9,13 @@
   ],
   "references": [
     {
-      "path": "../browser-use-runtime"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../session/working-directory"
+    },
+    {
+      "path": "../browser-use-runtime"
     }
   ]
 }

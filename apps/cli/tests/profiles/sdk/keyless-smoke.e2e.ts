@@ -62,14 +62,14 @@ function waitForLine(
 
 describe('Python SDK dsh profile keyless smoke', () => {
   it.each([
-    { label: 'reports max-token turns with the default mapping config', envValue: undefined, editorEnabled: false },
-    { label: 'reports max-token turns with mapping enabled through env', envValue: 'true', editorEnabled: false },
-    { label: 'reports max-token turns with mapping disabled through env', envValue: 'false', editorEnabled: false },
-    { label: 'allows an explicit patch to enable str_replace_editor', envValue: undefined, editorEnabled: true },
-  ])('$label', async ({ envValue, editorEnabled }) => {
+    { label: 'reports max-token turns with the default mapping config', envValue: undefined },
+    { label: 'reports max-token turns with mapping enabled through env', envValue: 'true' },
+    { label: 'reports max-token turns with mapping disabled through env', envValue: 'false' },
+    { label: 'tolerates an explicit patch re-declaring str_replace_editor', envValue: undefined, patchEditor: true },
+  ])('$label', async ({ envValue, patchEditor = false }) => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-python-sdk-runtime-smoke-'))
     const editorPatch = join(root, 'editor.patch.yml')
-    if (editorEnabled) await writeFile(editorPatch, [
+    if (patchEditor) await writeFile(editorPatch, [
       '- insert:',
       '    - id: tool-str-replace-editor',
       "      name: '@deepseek-ai/dsh-tool-str-replace-editor'",
@@ -95,7 +95,7 @@ describe('Python SDK dsh profile keyless smoke', () => {
       ...launch.args,
       '--profile',
       'sdk',
-      ...(editorEnabled ? ['--patch', editorPatch] : []),
+      ...(patchEditor ? ['--patch', editorPatch] : []),
     ], {
       cwd: repoRoot,
       env: {
@@ -177,7 +177,7 @@ describe('Python SDK dsh profile keyless smoke', () => {
       expect(modelRequests[0]?.output_config).toEqual({ effort: 'max' })
       expect(modelRequests[0]?.max_tokens).toBe(1234)
       expect(toolNames).toEqual(expect.arrayContaining(['read', 'write', 'edit', 'web_fetch', 'web_search']))
-      expect(toolNames.includes('str_replace_editor')).toBe(editorEnabled)
+      expect(toolNames).toContain('str_replace_editor')
       expect(toolNames).not.toContain('list_subagent_models')
 
       child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'shutdown' })}\n`)

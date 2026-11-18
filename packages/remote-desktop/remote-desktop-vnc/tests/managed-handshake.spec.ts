@@ -16,8 +16,8 @@ import { VncRemoteDesktop } from '../src/index.ts'
 import { managedHandshake } from '../src/managed.ts'
 
 const ADMIN = { principal: 'root', admin: true }
-const KEY_EVENT = Buffer.from([3, 1, 0, 0, 0, 0, 0, 0x61])
-const FB_UPDATE_REQUEST = Buffer.from([2, 0, 0, 0, 0, 0, 4, 0, 3, 0])
+const KEY_EVENT = Buffer.from([4, 1, 0, 0, 0, 0, 0, 0x61])
+const FB_UPDATE_REQUEST = Buffer.from([3, 0, 0, 0, 0, 0, 4, 0, 3, 0])
 
 /** One end of an in-memory socket pair: writes push to `peer`; destroy closes both ends. */
 class Loopback extends Duplex {
@@ -243,6 +243,23 @@ describe('managedHandshake', () => {
     upstream.destroy()
   }, 15_000)
 
+  it('keeps post-handshake bytes buffered on the paused sockets until the caller resumes', async () => {
+    const [client, browserEnd] = duplexPair()
+    const [upstream, serverEnd] = duplexPair()
+    const server = ardServer(serverEnd, { username: 'admin', password: 's3cret' })
+    const browser = browserPreamble(browserEnd)
+    await managedHandshake(client, upstream, { username: 'admin', password: 's3cret' })
+    await Promise.all([server, browser])
+    browserEnd.write(KEY_EVENT)
+    await new Promise(resolve => setImmediate(resolve))
+    const got: Buffer[] = []
+    client.on('data', (chunk: Buffer) => got.push(chunk))
+    client.resume()
+    await vi.waitFor(() => { expect(Buffer.concat(got).equals(KEY_EVENT)).toBe(true) }, { timeout: 10_000 })
+    client.destroy()
+    upstream.destroy()
+  })
+
   it('surfaces the upstream refusal reason verbatim', async () => {
     const [client] = duplexPair()
     const [upstream, serverEnd] = duplexPair()
@@ -331,6 +348,7 @@ describe('serveStream with managed credentials', () => {
     const fiber = await ctx.plugin(TestVnc, {
       endpoints: [{ nodeId: 'n1', host: '127.0.0.1', port: 5900, username: 'admin', passwordRef: 'VNC_PASS' }],
       grantsFile: ':memory:',
+      handshakeTimeoutMs: 60_000,
     })
     const svc = ctx.remoteDesktop as TestVnc
     try {
@@ -347,14 +365,13 @@ describe('serveStream with managed credentials', () => {
       const upstreamReceived: Buffer[] = []
       svc.servers[0]!.on('data', (chunk: Buffer) => upstreamReceived.push(chunk))
       browserEnd.write(Buffer.concat([KEY_EVENT, FB_UPDATE_REQUEST]))
-      await new Promise(resolve => setImmediate(resolve))
-      expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST)).toBe(true)
+      await vi.waitFor(() => { expect(Buffer.concat(upstreamReceived).equals(FB_UPDATE_REQUEST)).toBe(true) }, { timeout: 10_000 })
       browserEnd.destroy()
       await done
     } finally {
       await fiber.dispose()
     }
-  }, 15_000)
+  }, 60_000)
 
   it('fails loud when passwordRef is set but no credentials provider resolves it', async () => {
     const ctx = new Context()

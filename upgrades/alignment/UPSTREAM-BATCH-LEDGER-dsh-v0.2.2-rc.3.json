@@ -1,0 +1,384 @@
+{
+  "release": "dsh-v0.2.2-rc.3",
+  "base": "dsh-v0.2.2-rc.2",
+  "branch": "sync/upstream-v0.2.2-rc3-p0",
+  "scope": "4216 commits / 1089 fix / 374 feat — selective sync per user policy: backport applicable bugs, absorb deep features, skip account/i18n/incidental",
+  "batches": {
+    "@deepseek-ai/cordis": {
+      "commit": "7a7a9dc9e18",
+      "applied": [
+        "canonical Fiber migration (fiber.ts ctx.fiber self-reference)",
+        "app-boot previousFibers",
+        "boot-hmr dispose path",
+        "goal stateOf projection",
+        "translator owner.fiber identity"
+      ],
+      "na": [
+        "entry-tree commit-journal fixes — fork carries pre-journal loader",
+        "typert colon-id — already present"
+      ],
+      "notes": "vendor/AGENTS.md sync log updated"
+    },
+    "tools": {
+      "commit": "66896839610",
+      "applied": [
+        "persistent bash history-expansion disable",
+        "unclassified cancellation -> TOOL_ABORTED",
+        "tool-goal populated-fields ignored",
+        "grep empty-include guard",
+        "abort-after-settle classification + tests"
+      ],
+      "na": [
+        "tool-executor-* commits — new packages, feature batch",
+        "pipeline ctx.tools capture — different architecture",
+        "plan-mode check — already fixed form",
+        "session/types comments — doc drift",
+        "setExecutor — absent",
+        "locale commits — i18n batch skipped"
+      ]
+    },
+    "ptc": {
+      "commit": "e2bd55d9a6a",
+      "applied": [
+        "whole ptc-runtime-node refactor absorbed (worker/rpc/evaluators)",
+        "sandbox registerWritableRoot + additionalWritableRoots",
+        "session announcement four-state + append guards",
+        "spawn Promise adaptation",
+        "vitest vm-modules pool"
+      ],
+      "notes": "860+ tests green; PTC批含 sandbox/escalation/policy 适配"
+    },
+    "fs": {
+      "commit": "991405a67cf",
+      "applied": [
+        "~ expansion at resolve/lstat entry (ae0dfd1003+32004176bf)",
+        "glob directory-prefix pruning under 8KiB argv (12f63eaf89 group)",
+        "read-tool guidance wording (15c9e6006b)"
+      ],
+      "na": [
+        "writable-root grant validation — already via PTC batch",
+        "patch-parser quadratic trim — fs-patch feature batch",
+        "fs-sandbox delete/move fence — apply_patch feature batch",
+        "tool-error refactor/concurrency — feature batch"
+      ]
+    },
+    "session": {
+      "commit": "e0d84e167ec",
+      "applied": [
+        "session publish before async agent setup; agent publish after setup commit",
+        "failed setup emits session/created + session/disposed, no agent/created",
+        "concurrent same-id creation rejected pre-setup",
+        "released projection units retained for checkpoint",
+        "command/done append containment"
+      ],
+      "deferred": [
+        "batch append API (5e77db2d5c et al) — feature batch",
+        "projection per-event frames — perf refactor"
+      ],
+      "na": [
+        "sparse-append guard — inside batch path only"
+      ]
+    },
+    "agent-loop": {
+      "commit": "e0d84e167ec + 71dffc818f1",
+      "applied": [
+        "prompt prefix preserved at series start when text unchanged (2676c67f32)",
+        "natural-language runtime-context intro with section-based dedup (022da17f27)"
+      ],
+      "na": [
+        "rejected-route diagnostics (b015d18e81) — structure absent"
+      ]
+    },
+    "compaction": {
+      "commit": "71dffc818f1",
+      "applied": [
+        "compact history before model switches; MODEL_SWITCH_COMPACTION_FAILED preserves route (321d6362c5)"
+      ],
+      "na": [
+        "aa685be0a44 — superseded, not in rc.3"
+      ]
+    },
+    "llm-deepseek": {
+      "commit": "71dffc818f1",
+      "applied": [
+        "catalog context window synced to official listing 1,048,576 (e3a485bd32)"
+      ],
+      "na": [
+        "all-deferred placeholder added-then-reverted upstream (156dad153d+624c3e91a9) — net equals current serializer"
+      ]
+    },
+    "mcp-client": {
+      "commit": "71dffc818f1",
+      "applied": [
+        "cause-chain diagnostics describeError (032fd5f6d5)",
+        "generation-entitled tool commits + abandoned flag (5285c6dcc4)",
+        "give-up dispose containment + resolveReconnectPolicy export (09570cf383 partial)"
+      ],
+      "na": [
+        "probe abort + async status listeners — probe.ts/status.ts absent (mcp-manager batch)"
+      ]
+    },
+    "jobs": {
+      "commit": null,
+      "na": [
+        "ed645016cd inline-output settlement — different tool-jobs generation, no inline path"
+      ]
+    },
+    "web-search": {
+      "commit": null,
+      "na": [
+        "8b085b7e35 credential order — no deepseekAccount route locally"
+      ]
+    },
+    "terminal": {
+      "commit": null,
+      "na": [
+        "3ce9462e7f — local TerminalBackendCleanupError already aggregates both failures"
+      ]
+    },
+    "approval-interaction": {
+      "commit": "fa0d3b0f1ca",
+      "applied": [
+        "ToolArgsError classification in tool-ask-user timed + tool-workflow (5a8dc54372 partial)",
+        "ToolContextUnavailableError taxonomy — already present in packages/core/tools (contracts.ts/error-codes.ts)"
+      ],
+      "na": [
+        "fda29f726d PROVIDER_ERROR message — no answerer path locally"
+      ]
+    },
+    "office": {
+      "commit": null,
+      "pending": "resolved — tool-office absorbed in 541b73282f6; skill/office activation wired"
+    },
+    "sdk": {
+      "commit": null,
+      "pending": "20 fixes incl. live-runtime approval routing — feature-coupled to upstream sdk generation; dedicated pass deferred"
+    },
+    "subagent": {
+      "commit": "72d5bf7e898",
+      "applied": [
+        "catalog v3 durable names + sibling uniqueness",
+        "rootOf/namesOf/resolveName tree addressing",
+        "tree-scoped sendMessage path routing"
+      ],
+      "na": [
+        "manager.ts closing/inbox-wait lifecycle — different local subagent manager generation"
+      ],
+      "notes": "absorbed via named-subagent/tree-addressing lane commit 72d5bf7e898; entry written after that landing, supersedes prior prior-generation assessment"
+    },
+    "cua": {
+      "commit": null,
+      "na": "89 fixes upstream macOS packaging/signing line — different lineage; generic candidates (0-999 coords, click-hold cap, cancel balance) remain deferred pending evidence local cua shares the defect"
+    },
+    "schedule": {
+      "commit": null,
+      "pending": "10 fixes mostly upstream schedule UI generation; timezone diagnostics candidates unverified — low-value, deferred"
+    }
+  },
+  "skipped_per_policy": [
+    "settings-account/API-key adapter (account-specific)",
+    "ja/es/fr/de/ru/pt-BR i18n",
+    "client/web/desktop UI fixes — deep fork divergence",
+    "ci/release infra — selective reference only",
+    "forge fixes — pending forge feature decision"
+  ],
+  "feature_candidates": [
+    "team/agent-team + tool-agent-team",
+    "forge suite",
+    "tool-executor-native/ptc",
+    "mcp-manager",
+    "fs-patch",
+    "office-kit/tool-office",
+    "subagent-oar",
+    "terminal-controller",
+    "session batch-append API",
+    "deepseek-chat-import",
+    "message-quotes/log-export",
+    "client-ui-stats",
+    "ToolContextUnavailableError taxonomy"
+  ],
+  "batches_applied": [
+    {
+      "commit": "fb4357c453e",
+      "upstream": [
+        "b096659245"
+      ],
+      "scope": "session: ordinary forks drop parentSession lineage; ACP resume/list treat seeded forks as resumable"
+    },
+    {
+      "commit": "76782c30c7e",
+      "upstream": [
+        "fs-patch package (new in rc.3)"
+      ],
+      "scope": "wholesale absorption: pure patch parser + LF text updater, 147 tests pass"
+    },
+    {
+      "commit": "3d61bf9802d",
+      "upstream": [
+        "office-kit package (document group, rc.3)"
+      ],
+      "scope": "office-kit replaces office-to-pdf; libreoffice-kit 0.2.3; render Remote endpoints dropped (apiproxy owns file auth); fontMetadataCacheDirectory kept; tool-office deferred to tool-executor batch"
+    },
+    {
+      "batch": "apply_patch tool + ctx.fs move/delete/patch",
+      "commit": "220621287c0",
+      "notes": "FileSystem +patchText/deleteFile/moveFile; fs-local/fs-sandbox/fs-ssh providers; helper protocol 3; apply_patch opt-in tool + TOOL_APPLY_PATCH section; fsErrorFromErrno/FS_ERROR_CODES exports; fs/delete-intent event; local divergences (realpath targetKey, readByteRange, watch, expandHomePrefix, guarded reads) preserved",
+      "tests": "fs 930, ssh 314, tool-fs 474 green; verify-cordis-catalog, translation-pairing, export-jsdoc clean"
+    }
+  ],
+  "deferred_design": [
+    {
+      "upstream": [
+        "a11de46bfd",
+        "1f4cfad656",
+        "6e1eebe215",
+        "681d947cad",
+        "d2d79aae65",
+        "632f5b5b48",
+        "4618fddfb5",
+        "6c0b6c7aa3",
+        "0cb47b9d03",
+        "1f522605ed",
+        "a4c933ad1f"
+      ],
+      "reason": "agent/subagent lifecycle-hardening series targets upstream newer architecture (lifetimeSignal, named catalog, joins); local ReactLoopAgent is prior generation — needs design port as a unit, not individual guards"
+    }
+  ],
+  "not_applicable": [
+    {
+      "upstream": "999f30aae9",
+      "reason": "ownsAgent/rootOf ownership routing absent in local sdk server generation"
+    },
+    {
+      "upstream": "917cf6c267",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "0c78c4c710",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "1950259ce1",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "ae334bd17e",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "f7379ef366",
+      "feature": "sdk-run-commands"
+    },
+    {
+      "upstream": "a2bf1d8c4d",
+      "reason": "baseline-only change"
+    },
+    {
+      "upstream": "5771a93f2e",
+      "feature": "sdk-run-commands + python wheel packaging"
+    },
+    {
+      "upstream": "1c9490b410",
+      "reason": "resource-cache bootstrap branch absent in local runtime-bootstrap generation"
+    },
+    {
+      "upstream": "9557a247a8",
+      "reason": "local tool-schedule already checks delegation depth before try"
+    },
+    {
+      "upstream": "3c7cfb8cf8",
+      "reason": "storage-domain package absent locally"
+    }
+  ],
+  "feature_batch_remaining": [
+    "mcp-manager",
+    "subagent-oar",
+    "terminal-controller",
+    "agent-team",
+    "forge",
+    "sdk-run-commands"
+  ],
+  "feature_blocked": [
+    {
+      "feature": "mcp-manager",
+      "blocker": "requires upstream mcp-client generation (probe.ts/status.ts/templates.ts/credentials.ts/generation.ts surface absent; local mcp-client is prior generation with managed-stdio divergence)"
+    },
+    {
+      "feature": "subagent-oar",
+      "blocker": "experimental bridge; new third-party runtime deps (@earendil-works/pi-ai, pi-coding-agent, agentclientprotocol/sdk) — supply-chain cost vs optional capability"
+    },
+    {
+      "feature": "session batch append API",
+      "resolved": "absorbed in e8d5f3786bd — Session.append(SessionEventInput[]) with validate-all-then-commit-all, prepareBatch isolated fold, read() spanning log+candidates; appendAdmissions per-member with full rollback and announcement guards kept; 3618 session tests green"
+    }
+  ],
+  "feature_skipped": [
+    {
+      "feature": "terminal-controller",
+      "reason": "zero src changes rc.2→rc.3 (version bump only); local creator-ownership authorization layer is deliberate divergence — upstream duplex-attach rewrite needs dedicated merge strategy if ever adopted"
+    }
+  ],
+  "feature_assessment": [
+    {
+      "feature": "tool-executor (native/ptc)",
+      "verdict": "deferred — architecture divergence",
+      "note": "upstream core/tools rebuilt around executor.ts/pipeline.ts seam (batch/contracts/error-codes/events); local tools is a 2007-line monolith with PTC inline. Absorbing executor packages requires re-architecting tools first — dedicated refactor project, not a sync batch."
+    },
+    {
+      "feature": "office-kit + tool-office",
+      "verdict": "feature-batch port",
+      "note": "replaces local office-to-pdf; requires libreoffice-kit 0.1.x→0.2.x bump (patch/notices/packaging cascade) + ctx.workspaceFiles seam decision (ctx.get optional but renderImages needs it; local uses host-apiproxy workspace-files RPC instead)"
+    },
+    {
+      "feature": "agent-team",
+      "verdict": "same-lineage merge candidate",
+      "note": "upstream team/agent-team shares file lineage (client/error/journal/task-board/task-graph/types/validation) with local experimental/agent-team; local adds mailbox/lifecycle/roster/activity/fold + ui-agent-team client. A real merge, not absorption — dedicated session."
+    },
+    {
+      "feature": "forge",
+      "verdict": "deferred",
+      "note": "355 files — largest batch, dedicated session"
+    },
+    {
+      "feature": "apply_patch tool + ctx.fs move/delete/patch",
+      "verdict": "feature-batch port",
+      "note": "upstream tool-fs ships apply-patch.ts/-output/-presentation + patch/ dir + enableApplyPatch config flag; fs service gains move/delete outcome types (FsDeleteOutcome, move outcome, errno.ts) absent locally; fs-patch library already absorbed in 76782c30c7e — remaining: service ops + tool + presentation + tests; dedicated session"
+    }
+  ],
+  "tools_refactor_plan": {
+    "decision": "path A — follow upstream executor-seam rebuild (user approved)",
+    "stages": [
+      "1. land upstream tools wholesale (batch/contracts/events/error-codes/executor/pipeline + rebuilt index/schema/json-schema/presentation)",
+      "2. add tool-executor-native + tool-executor-ptc packages",
+      "3. reapply local deltas: PtcProgramFormat script, tools/ptc-dispatch-log waterfall (spill-policy dep), isUnclassifiedCancellation, knownNames",
+      "4. rewire agent-loop: tool-calls.ts scheduler → ctx.tools.execute(ToolBatchInput), remove append helpers, consume ToolBatchResult",
+      "5. config migration: tools Config{mode,maxParallelSubCalls} → toolCallErrorDetail; ~25 cordis.yml remounts",
+      "6. error-class rewire: ToolNotFoundError/ToolOutputError → result-based; tests + api-catalog regen"
+    ],
+    "local_deltas": [
+      "PtcProgramFormat script",
+      "tools/ptc-dispatch-log (spill-policy, apiproxy, browser-use)",
+      "knownNames",
+      "agent-tool-presentation ptcRuntime keying"
+    ],
+    "unchanged": "4 waterfall events identical names+payloads; defineTool/ToolArgsError/schema/json-schema/presentation identical"
+  },
+  "tool-executor": {
+    "status": "absorbed",
+    "decision": "follow_upstream_refactor",
+    "commits": [
+      "0c19590cb4a",
+      "b2ab7036ca9",
+      "bba610dffe9",
+      "0d4c74b4dfc",
+      "541b73282f6"
+    ],
+    "notes": "Adopted upstream executor-seam: core/tools split (executor/pipeline/contracts), NativeToolExecutor + PtcToolExecutor packages, batch ctx.tools.execute({calls}), PromptPresentation split (ctx.systemPrompt.tools). Testkit absorbed. All consumer specs migrated; fixtures mount executors explicitly. Verified: goal 162, compaction+session-title 126, subagent groups 1199, llm+persistence 1286, apiproxy+bundle 968, sweep 2047 — all green.",
+    "divergence": [
+      "fork keeps parentSession (local corpus-scan traversal/purge need the edge; upstream walks catalog projections); origin still not inherited",
+      "goal service throws goal projection is not registered on unregistered unit (upstream blind-derefs)",
+      "ptc-runtime-node publishes lib/configuration.js via packageFileExtras"
+    ],
+    "tool_office": "absorbed in 541b73282f6 — ResolvedToolSet step lifecycle wired into agent-loop preStep (resolve→assemble→execute→dispose), stepModelSelection() seeds resumed/fork routes (pending??options??lastUsed??header), admission snapshots pin registrations by identity (mid-step replace → UNKNOWN_TOOL), outputOwner dual-path rootOf()/parentSession-lineage; tool-office 127 green, agent-loop 462 green, catalog regen + pairing clean"
+  }
+}

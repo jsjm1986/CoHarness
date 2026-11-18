@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { SESSION_FORMAT_VERSION, SessionSeq } from '@deepseek-ai/dsh-session'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import DeepSeekLlmApiExtensionRegistry from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import LlmRuntime, {
@@ -59,6 +59,19 @@ const TEXT_CHUNKS: StreamChunk[] = [
 
 const COMPACTION_ID = CompactionId('replay-compaction')
 
+/** Minimal `session/created` payload: the replay listener only reads id, origin, and parentSession. */
+function fakeSession(id: string, origin: 'root' | 'subagent'): Session {
+  return {
+    id: SessionId(id),
+    header: {
+      id: SessionId(id),
+      ...origin === 'subagent'
+        ? { origin: 'subagent' as const, parentSession: SessionId('live-parent') }
+        : {},
+    },
+  } as Session
+}
+
 /** Build a minimal session-JSONL string: a header line + the given events. */
 function sessionJsonl(
   events: SessionEvent[],
@@ -85,7 +98,7 @@ function sessionJsonl(
       data: { inherited: true },
     } as unknown as SessionEvent)
     for (let i = 0; i < rows.length; i += 1) {
-      rows[i] = { ...rows[i], seq: SessionSeq(i) } as SessionEvent
+      rows[i] = { ...rows[i], seq: SessionSeq(i) } as unknown as SessionEvent
     }
   }
   return [headerLine, ...rows.map(e => JSON.stringify(e))].join('\n') + '\n'
@@ -100,7 +113,7 @@ function replaySessionJsonl(
   const events: SessionEvent[] = []
   let seq = 0
   const push = (type: string, data: SessionEvent['data']): void => {
-    events.push({ type, seq: SessionSeq(seq++), time: 0, data } as SessionEvent)
+    events.push({ type, seq: SessionSeq(seq++), time: 0, data } as unknown as SessionEvent)
   }
   push('turn/start', { turn: 1 })
   for (const [index, chunks] of calls.entries()) {
@@ -812,7 +825,7 @@ describe('installLlmReplay (through the real LlmRuntime)', () => {
     })
 
     it('skips non-string request leaves when building the corpus', () => {
-      const messages = requestMessages.map(message => ({ ...message, seq: 7 })) as unknown as GenerateOptions['messages']
+      const messages = requestMessages.map(message => ({ ...message, seq: 7 })) as GenerateOptions['messages']
       const entry: ReplayEntry = { kind: 'chunks', chunks: scriptedCall('{"goal_id":"{{fromRequest:goal-42[a-z]+}}"}') }
       const resolved = resolveScriptedEntry(entry, messages)
       if (resolved.kind !== 'chunks') throw new Error('expected chunks entry')
@@ -1579,7 +1592,7 @@ describe('installLlmReplay (per-session keying)', () => {
     await expect(drain(ctx.llm.stream(live('live-parent')))).rejects.toThrow(/used before.*bound/)
   })
 
-  it('learns a background child id from its started-subagent tool result', async () => {
+  it('learns a background child id from its session/created event', async () => {
     const reference: StreamChunk[] = [
       { type: 'text-delta', index: 0, text: '{{session:2}}' },
       { type: 'finish', reason: { kind: 'stop' } },
@@ -1589,17 +1602,11 @@ describe('installLlmReplay (per-session keying)', () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     installLlmReplay(ctx, { file: parentFile, childFiles: [childFile] })
-    const options: GenerateOptions = {
-      ...live('live-parent'),
-      messages: [
-        createAssistantMessage({ content: [{ type: 'tool-call', id: ToolCallId('start'), name: 'subagent', arguments: '{}' }],
-          source: { provider: 'm', model: 'm' } }),
-        createToolResultMessage({ callId: ToolCallId('start'), isError: false,
-          content: [{ type: 'text', text: 'started subagent live-child-before-call' }] }),
-      ],
-    }
+    // A primary session carries no parentSession and never claims a child slot.
+    ctx.emit('session/created', fakeSession('live-parent', 'root'))
+    ctx.emit('session/created', fakeSession('live-child-before-call', 'subagent'))
 
-    expect(await drain(ctx.llm.stream(options))).toEqual([
+    expect(await drain(ctx.llm.stream(live('live-parent')))).toEqual([
       { type: 'text-delta', index: 0, text: 'live-child-before-call' },
       { type: 'finish', reason: { kind: 'stop' } },
     ])

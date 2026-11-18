@@ -243,6 +243,13 @@ export interface LaunchOptions {
    */
   replayChildFixtures?: string[]
   /**
+   * Sidecar overrides indexed parallel to {@link replayChildFixtures}: a bare
+   * entry array replaces that child's derived script, `{ patches }` swaps the
+   * named call indexes. For nested-agent scenarios whose child calls need
+   * throw/hang entries a recorded log cannot express; replay/refresh only.
+   */
+  replayChildOverrideFiles?: string[]
+  /**
    * Optional replay.override.json sidecar (whole-script replacement or
    * `{ patches }` augmentation) for throw/hang scenarios not expressible as
    * recorded chunks; replay/refresh only.
@@ -556,7 +563,10 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       // Never the derived harness-home root: a developer's own presets must not
       // be able to change a golden, whatever roots a scenario asks for.
       : [{ id: 'agent-preset-registry', config: { ...options.agentPresets, includeUserRoot: false } }],
-    ...options.toolsMode === undefined ? [] : [{ id: 'tools', config: { mode: options.toolsMode } }],
+    ...options.toolsMode === undefined ? [] : [
+      { id: 'tool-executor-native', disabled: options.toolsMode === 'ptc' },
+      { id: 'tool-executor-ptc', disabled: options.toolsMode !== 'ptc' },
+    ],
     // The shipped Web bundle already owns both runners and the Cordis UI. This
     // scenario adds only the model-facing tools that exercise those services.
     ...options.cordisTools === true
@@ -761,6 +771,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
         })),
         ...(options.replayOverride === undefined ? {} : { overrideFile: options.replayOverride }),
         ...(options.replayChildFixtures === undefined ? {} : { childFiles: options.replayChildFixtures }),
+        ...(options.replayChildOverrideFiles === undefined ? {} : { childOverrideFiles: options.replayChildOverrideFiles }),
         ...(options.paceMs === undefined ? {} : { paceMs: options.paceMs }),
       })
     } else if (mode !== 'record' && options.deepSeekMissingCredential !== true) {

@@ -242,7 +242,7 @@ describe('LocalPtySession readiness and output', () => {
     expect(inspections).toBe(3)
     expect(terminal.writes).toEqual(['\x1b[1;6R', '\x1b[1;6R', 'caller input\r'])
 
-    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    terminal.emitData('caller input\r\n\x1b]133;D;0\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
@@ -268,7 +268,7 @@ describe('LocalPtySession readiness and output', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(terminal.writes).toEqual(['\x1b[1;6R', 'caller input\r'])
 
-    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    terminal.emitData('caller input\r\n\x1b]133;D;0\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
@@ -502,7 +502,7 @@ describe('LocalPtySession readiness and output', () => {
 
     await vi.advanceTimersByTimeAsync(0)
     expect(inspections).toBe(1)
-    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    terminal.emitData('true\r\n\x1b]133;D;0\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
@@ -525,7 +525,7 @@ describe('LocalPtySession readiness and output', () => {
     expect(terminal.writes).toEqual(['long-running-command\r'])
     expect(settled).toBe(false)
 
-    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    terminal.emitData('long-running-command\r\n\x1b]133;D;0\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
@@ -546,6 +546,7 @@ describe('LocalPtySession readiness and output', () => {
 
       // The marker arrives; its printable tail is delayed by the host. The plain bound
       // (`idleSilenceMs + handoffGraceMs`) passes without settling the silence tier.
+      terminal.emitData('slow-render\r\n')
       terminal.emitData('\x1b]133;D;0\x07')
       await vi.advanceTimersByTimeAsync(70)
       expect(settled).toBeUndefined()
@@ -570,6 +571,7 @@ describe('LocalPtySession readiness and output', () => {
       const operation = session.startSend({ text: 'slow-render', submit: true })
       await Promise.resolve()
       await Promise.resolve()
+      terminal.emitData('slow-render\r\n')
       terminal.emitData('\x1b]133;D;0\x07')
       await vi.advanceTimersByTimeAsync(70)
       expect((await operation.done).waitReason).toBe('inferred_idle')
@@ -592,6 +594,7 @@ describe('LocalPtySession readiness and output', () => {
       let settled: string | undefined
       void operation.done.then((result) => { settled = result.waitReason })
 
+      terminal.emitData('silent-render\r\n')
       terminal.emitData('\x1b]133;D;0\x07')
       await vi.advanceTimersByTimeAsync(70)
       expect(settled).toBeUndefined()
@@ -616,6 +619,7 @@ describe('LocalPtySession readiness and output', () => {
 
       // The prompt arrives and is immediately followed by command output, so the tail is no
       // longer completable and the tolerance has nothing left to wait for.
+      terminal.emitData('noisy-command\r\n')
       terminal.emitData('\x1b]133;D;0\x07dsh> ')
       terminal.emitData('partial output')
       await vi.advanceTimersByTimeAsync(70)
@@ -649,7 +653,7 @@ describe('LocalPtySession readiness and output', () => {
     vi.useFakeTimers()
     const terminal = new FakeTerminal()
     const inspector = new FakeInspector()
-    const session = makeSession(terminal, inspector, config())
+    const session = makeSession(terminal, inspector, config({ idleSilenceMs: 200 }))
     await initialize(session, terminal)
 
     inspector.waiting = true
@@ -659,10 +663,21 @@ describe('LocalPtySession readiness and output', () => {
     await vi.advanceTimersByTimeAsync(20)
     expect(settled).toBe(false)
 
+    // A single busy poll is only churn evidence; the wait's departure must
+    // hold across consecutive polls before its return settles the send.
     inspector.waiting = false
     await vi.advanceTimersByTimeAsync(10)
     expect(settled).toBe(false)
     inspector.waiting = true
+    terminal.emitData('echo rea')
+    await vi.advanceTimersByTimeAsync(10)
+    expect(settled).toBe(false)
+
+    inspector.waiting = false
+    await vi.advanceTimersByTimeAsync(10)
+    await vi.advanceTimersByTimeAsync(10)
+    inspector.waiting = true
+    terminal.emitData('dy\r\nready\r\n')
     await vi.advanceTimersByTimeAsync(10)
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
@@ -684,8 +699,9 @@ describe('LocalPtySession readiness and output', () => {
     void operation.done.then(() => { settled = true })
     inspector.waiting = false
     await vi.advanceTimersByTimeAsync(10)
+    await vi.advanceTimersByTimeAsync(10)
     inspector.waiting = true
-    await vi.advanceTimersByTimeAsync(30)
+    await vi.advanceTimersByTimeAsync(20)
     expect(settled).toBe(false)
     await vi.advanceTimersByTimeAsync(10)
     expect(settled).toBe(true)
@@ -735,7 +751,7 @@ describe('LocalPtySession readiness and output', () => {
     await Promise.resolve()
     expect(inspector.groups).toContainEqual([456, 'SIGINT'])
     expect(terminal.writes).not.toContain('\x03')
-    terminal.emitData('\x1b]133;D;130\x07dsh> ')
+    terminal.emitData('sleep\r\n\x1b]133;D;130\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
     await operation.done
 
@@ -961,7 +977,7 @@ describe('LocalPtySession readiness and output', () => {
     writeGate.resolve(undefined)
     await vi.advanceTimersByTimeAsync(0)
     expect(inspector.groups).toContainEqual([456, 'SIGINT'])
-    terminal.emitData('\x1b]133;D;130\x07dsh> ')
+    terminal.emitData('must be interrupted\r\n\x1b]133;D;130\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
     await operation.done
   })
@@ -1262,6 +1278,133 @@ describe('LocalPtySession readiness and output', () => {
     expect(await operation.done).toMatchObject({ waitReason: 'stdin_read' })
   })
 
+  it('does not settle a send on a prompt repaint that lands before its own echo', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    const operation = session.startSend({ text: 'echo hi', submit: true })
+    let settled = false
+    void operation.done.then(() => { settled = true })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(terminal.writes).toEqual(['echo hi\r'])
+
+    // The previous command's trailing repaint lands inside this send's window
+    // before the written input echoes; it cannot be the send's own prompt.
+    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(40)
+    expect(settled).toBe(false)
+
+    terminal.emitData('echo hi\r\nhi\r\n\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
+  it('does not settle on a single-poll stdin-wait departure flicker during input echo', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    inspector.waiting = true
+    const operation = session.startSend({ text: 'slow command', submit: true })
+    let settled = false
+    void operation.done.then(() => { settled = true })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(terminal.writes).toEqual(['slow command\r'])
+
+    // A line editor's paste-echo churn can flicker inputWaiting for a single
+    // poll while the written line is still rendering: the departure and return
+    // do not prove the command ran, so the send must keep waiting.
+    inspector.waiting = false
+    await vi.advanceTimersByTimeAsync(10)
+    inspector.waiting = true
+    terminal.emitData('slow comm')
+    await vi.advanceTimersByTimeAsync(10)
+    expect(settled).toBe(false)
+
+    // A sustained busy departure followed by the wait is completion evidence.
+    terminal.emitData('and\r\n')
+    inspector.waiting = false
+    await vi.advanceTimersByTimeAsync(10)
+    await vi.advanceTimersByTimeAsync(10)
+    inspector.waiting = true
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
+  it('does not settle on a stale prompt inside a partial input echo', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    const command = '; $LASTEXITCODE = $null; $__s = 1; try { Invoke-Expression "Write-Output cwd=$PWD" }'
+    const operation = session.startSend({ text: command, submit: true })
+    let settled = false
+    void operation.done.then(() => { settled = true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // The echo replay is mid-flight when the previous prompt lands: neither
+    // the redrawn input tail nor the stale prompt can settle this send.
+    terminal.emitData(command.slice(0, 40))
+    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(40)
+    expect(settled).toBe(false)
+
+    terminal.emitData('cwd=/tmp/x\r\n\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
+  it('arms on marker output embedded in a stty -echo wrapper', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    // Persistent shells run `stty -echo`: no echo arrives, and the wrapper's
+    // printed start marker is a substring of the written input. Absorbing it
+    // as echo would leave the replacement shell's prompt unarmed forever.
+    const command = "printf '%s\\n' '__DSH_START_a'; eval -- 'exec bash -i'"
+    const operation = session.startSend({ text: command, submit: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    terminal.emitData('\r\n')
+    terminal.emitData('__DSH_START_a\r\n')
+    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
+  it('settles a silent command on its post-echo prompt', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    const operation = session.startSend({ text: 'cd /tmp/x', submit: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // No command output: the completed echo replay is the consumption
+    // evidence, and the fresh prompt after it may settle the send.
+    terminal.emitData('cd /tmp/x\r\n')
+    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await operation.done).waitReason).toBe('stdin_read')
+  })
+
   it('retains a prompt marker until the startup shell regains the foreground group', async () => {
     vi.useFakeTimers()
     const terminal = new FakeTerminal()
@@ -1275,7 +1418,7 @@ describe('LocalPtySession readiness and output', () => {
     await Promise.resolve()
     await Promise.resolve()
     inspector.pgid = 789
-    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    terminal.emitData('run\r\n\x1b]133;D;0\x07dsh> ')
     await vi.advanceTimersByTimeAsync(50)
     expect(settled).toBe(false)
 
@@ -1298,7 +1441,7 @@ describe('LocalPtySession readiness and output', () => {
     await Promise.resolve()
     await Promise.resolve()
     inspector.pgid = 789
-    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    terminal.emitData('run\r\n\x1b]133;D;0\x07dsh> ')
     // One poll past the silence bound would already have settled inferred_idle.
     await vi.advanceTimersByTimeAsync(70)
     expect(settled).toBe(false)
@@ -1468,7 +1611,7 @@ describe('LocalPtySession readiness and output', () => {
     successorInspection.resolve({ processGroupId: 456, inputWaiting: false })
     await Promise.resolve()
     await Promise.resolve()
-    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    terminal.emitData('successor\r\n\x1b]133;D;0\x07dsh> ')
     await vi.advanceTimersByTimeAsync(10)
     expect(terminal.writes).toEqual(['successor\r'])
     expect((await current.done).waitReason).toBe('stdin_read')

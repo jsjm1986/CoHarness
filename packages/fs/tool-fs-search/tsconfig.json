@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../core/session"
     },
     {
@@ -19,6 +28,9 @@
     },
     {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session/working-directory"
     },
     {
       "path": "../../shell/shell"
@@ -37,15 +49,6 @@
     },
     {
       "path": "../../util/values"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

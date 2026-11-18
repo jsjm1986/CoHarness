@@ -395,7 +395,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     await openSubagentCatalog(page, '3 subagents')
     await page.getByRole('button', { name: `Open ${LABEL} in sidebar` }).click()
     const sidebarChat = page.locator('[data-sidebar-chat]')
-    await sidebarChat.getByText(/^Explain event sourcing in one sentence\.Your parent agent id is /)
+    await sidebarChat.getByText(/^Explain event sourcing in one sentence\.Your final answer is delivered /)
       .waitFor({ timeout: 15_000 })
     await compareOrRefreshGolden(
       SIDEBAR_CHAT_EXPECTED,
@@ -419,7 +419,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     await openSubagentCatalog(page, '3 subagents')
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
     await expect.poll(
-      () => page.getByText(/^Explain event sourcing in one sentence\.Your parent agent id is /).count(),
+      () => page.getByText(/^Explain event sourcing in one sentence\.Your final answer is delivered /).count(),
       { timeout: 15_000 },
     ).toBe(1)
     if (scaffold.ctx.agents.get(childId) !== undefined) {

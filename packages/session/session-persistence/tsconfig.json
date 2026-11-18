@@ -9,10 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../core/session"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../session-format"
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../core/session"
     },
     {
       "path": "../../util/brand"
@@ -21,10 +24,10 @@
       "path": "../../util/timeout"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../util/values"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../session-format"
     },
     {
       "path": "../session-format-catalog"

@@ -12,22 +12,25 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../core/agent"
+      "path": "../../context/execution-authority"
     },
     {
-      "path": "../../core/tools"
+      "path": "../../core/agent"
     },
     {
       "path": "../../core/system-prompt"
     },
     {
+      "path": "../../core/tools"
+    },
+    {
       "path": "../../llm/llm"
     },
     {
-      "path": "../memory"
+      "path": "../../typert/protocol"
     },
     {
-      "path": "../../typert/protocol"
+      "path": "../memory"
     }
   ]
 }

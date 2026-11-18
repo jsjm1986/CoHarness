@@ -51,12 +51,16 @@ try {
       && message.source.kind === 'skill-catalog')?.content
     : undefined
   const summary = (await ctx.skills.list()).find(skill => skill.name === 'coharness-badge')
-  const result = await ctx.tools.execute({
-    callId: ToolCallId('dsh-badge-snapshot'),
-    name: 'skill',
-    arguments: { name: 'coharness-badge' },
+  const batch = await ctx.tools.execute({
+    calls: [{
+      type: 'tool-call',
+      id: ToolCallId('dsh-badge-snapshot'),
+      name: 'skill',
+      arguments: JSON.stringify({ name: 'coharness-badge' }),
+    }],
     signal: new AbortController().signal,
   })
+  const result = batch.results[0]?.result
   process.stdout.write(`${JSON.stringify({ catalog: catalog ?? null, summary: summary ?? null, result })}\n`)
 } finally {
   await ctx.fiber.dispose()

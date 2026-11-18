@@ -28,7 +28,7 @@ const t: TriggerContentProps['t'] = key => (en as Record<string, string>)[key] ?
 
 // Global standard kit stubs: none of these components consume the hooks.
 const unusedHook = (() => { throw new Error('unused by settings-general components') }) as never
-const kit = { useSessions: unusedHook, useWorkspaces: unusedHook, usePanelInfo: unusedHook }
+const kit = { useSessions: unusedHook, useWorkspaces: unusedHook, usePanelInfo: unusedHook, useRemoteAccess: unusedHook }
 
 describe('chrome content', () => {
   it('TriggerContent renders the icon with the label in the wide column', () => {

@@ -138,6 +138,7 @@ function harness(options: {
     useSessions: unusedHook,
     useWorkspaces: unusedHook,
     usePanelInfo: unusedHook,
+    useRemoteAccess: () => true,
     controller,
     useModels: bindSnapshotSelector(controller.store),
     api: face as never,

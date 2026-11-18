@@ -17,6 +17,7 @@ import {
   SessionId,
 } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-title'
+import { DEFAULT_MAX_IMAGE_BYTES } from '@deepseek-ai/dsh-attachment-local'
 import {
   assertFixtureInventory,
   captureStableAria,
@@ -228,7 +229,7 @@ describe('web e2e: Markdown image rendering', () => {
     await writeFile(join(scaffold.workspaceCwd, 'corrupt.png'), 'invalid image')
     const oversized = await open(join(scaffold.workspaceCwd, 'oversized.png'), 'w')
     try {
-      await oversized.truncate(20 * 1024 * 1024 + 1)
+      await oversized.truncate(DEFAULT_MAX_IMAGE_BYTES + 1)
     } finally {
       await oversized.close()
     }
@@ -334,7 +335,7 @@ describe('web e2e: Markdown image rendering', () => {
     await page.getByText(`Image preview unavailable · ${join(scaffold.workspaceCwd, 'corrupt.png')}`, { exact: true }).waitFor()
     expect(mediaResponses).toEqual(new Map([
       [join(scaffold.workspaceCwd, 'valid.png'), 200],
-      [`${scaffold.workspaceCwd}/./local-image.png`, 200],
+      [join(scaffold.workspaceCwd, 'local-image.png'), 200],
       [join(scaffold.workspaceCwd, 'test workspace/测试图.png'), 200],
       [join(scaffold.workspaceCwd, 'test workspace/测试#100%.png'), 200],
       [join(scaffold.workspaceCwd, 'oversized.png'), 413],

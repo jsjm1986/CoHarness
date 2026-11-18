@@ -74,6 +74,7 @@
     "@deepseek-ai/dsh-session-stats": "workspace:*",
     "@deepseek-ai/dsh-settings": "workspace:*",
     "@deepseek-ai/dsh-token-meter": "workspace:*",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
     "@deepseek-ai/dsh-tool-todo": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-userdoc": "workspace:*",
@@ -118,7 +119,8 @@
     "@types/react": "~19.2.7",
     "@types/react-dom": "~19.2.4",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*"
   },
   "files": [
     "locale/*.json",

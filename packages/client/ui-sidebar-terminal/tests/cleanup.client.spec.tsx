@@ -16,6 +16,7 @@ const standard: Omit<CleanupProps, 'useCloseFailures' | 'retryClose' | 't'> = {
   useSessions: unusedHook,
   useWorkspaces: unusedHook,
   usePanelInfo: unusedHook,
+  useRemoteAccess: () => true,
 }
 
 it('stays absent for ordinary closes and offers a retry only after cleanup fails', () => {
