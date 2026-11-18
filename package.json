@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.28.5",
+  "packageManager": "pnpm@11.28.6",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
@@ -278,7 +278,7 @@
     "oxlint": "1.80.0",
     "oxlint-tsgolint": "7.0.2001",
     "papaparse": "5.7.0",
-    "pnpm": "11.28.5",
+    "pnpm": "11.28.6",
     "publint": "^0.3.24",
     "punycode": "2.3.1",
     "semver": "^7.8.5",
