@@ -189,6 +189,15 @@ describe('CI workflow', () => {
     expect(windowsNative['runs-on']).toContain('dsh-win-ci')
     expect(windowsNative['runs-on']).toContain('dsh-windows-2025-16core')
     expect(windowsNative['runs-on']).toContain('windows-2025')
+    for (const id of ['gateway', 'gateway-admin-ui', 'node-compat', 'python-sdk', 'python-runtime', 'windows-native']) {
+      const job = workflow.jobs[id]
+      if (!isRecord(job)) throw new TypeError(`Missing job ${id}`)
+      expect(job.if).toMatch(/^!cancelled\(\) &&/)
+    }
+    expect(windowsNative.steps).toEqual(expect.arrayContaining([expect.objectContaining({
+      run: 'pnpm run check:ci:windows-complete',
+      env: { DSH_WINDOWS_REQUIRED_ONLY: "${{ github.event_name == 'pull_request' && '1' || '0' }}" },
+    })]))
     expect(windowsNative.name).toBe('windows node 24 / native complete')
     // Native platform changes require the real kernel; unrelated changes keep the sweep.
     expect(windowsNative.if).toContain("github.event_name == 'schedule'")
@@ -530,7 +539,7 @@ describe('CI workflow', () => {
       ...['release_pack', 'vendor_pack', 'native_pack', 'sandbox', 'provider', 'pi_ai'].map(proof =>
         `github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_${proof} == 'true'`),
       ...['compat', 'python', 'gateway', 'admin_ui'].map(mode =>
-        `always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit') || (github.event_name == 'pull_request' && needs.pr-scope.outputs.${mode}_mode == 'full'))`),
+        `!cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit') || (github.event_name == 'pull_request' && needs.pr-scope.outputs.${mode}_mode == 'full'))`),
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'",
       "github.event_name == 'pull_request'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'",

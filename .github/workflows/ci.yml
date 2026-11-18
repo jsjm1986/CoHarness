@@ -818,7 +818,7 @@ jobs:
   gateway:
     needs: pr-scope
     if: >-
-      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.gateway_mode == 'full'))
     runs-on: ubuntu-latest
     name: gateway / typecheck and unit tests
@@ -937,7 +937,7 @@ jobs:
   gateway-admin-ui:
     needs: pr-scope
     if: >-
-      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.admin_ui_mode == 'full'))
     runs-on: ubuntu-latest
     name: gateway admin UI / build and tests
@@ -1368,7 +1368,7 @@ jobs:
     # The compatibility smokes exercise runtime behaviour, so documentation-only
     # changes no longer pay for two extra full installs.
     if: >-
-      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'))
     # Each compatibility contract receives an independent standard hosted job.
     runs-on: ${{ matrix.runner }}
@@ -1423,7 +1423,7 @@ jobs:
     # The keyless Python suite only exercises `python/**`, so it follows the Python
     # surface rather than running on every pull request.
     if: >-
-      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'))
     runs-on: ubuntu-latest
     name: python 3.10 / keyless SDK
@@ -1469,7 +1469,7 @@ jobs:
     # The Python lanes build and exercise `python/**` plus the packaged runtime,
     # so they follow the Python surface rather than the coverage decision.
     if: >-
-      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'))
     name: python runtime / release-shaped matrix
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
@@ -1591,11 +1591,10 @@ jobs:
   windows-native:
     # The static lane is the cheap supersede fence: a stale run is cancelled
     # before this two-hour job starts, so it cannot become an unkillable job
-    # holding the concurrency slot. On push/schedule node-24 does not exist and
-    # its empty result lets the always() conditions decide.
+    # holding the concurrency slot. A newer PR head can also cancel an active job.
     needs: [pr-scope, node-24]
     if: >-
-      always() && (needs.node-24.result != 'failure' && needs.node-24.result != 'cancelled')
+      !cancelled() && (needs.node-24.result != 'failure' && needs.node-24.result != 'cancelled')
       && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
       || github.event_name == 'schedule'
       || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
@@ -1698,6 +1697,8 @@ jobs:
 
       - name: Run complete native Windows gate inventory
         shell: pwsh
+        env:
+          DSH_WINDOWS_REQUIRED_ONLY: ${{ github.event_name == 'pull_request' && '1' || '0' }}
         # Below the job budget so a wedged gate cannot occupy the slot for the
         # full 120 minutes before GitHub's own cancellation lands. The gate set
         # grew past the old 90-minute cap: coverage measured ~66 minutes on the

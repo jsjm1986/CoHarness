@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-06-path-gated-pr-ci.md
 document:
-  en: 2c17a8c5ea15687eb7ec51219276008153af990c
-  zh: 825eceb1f866fae8ee9025fc6dbc8e38ab6cd2d0
+  en: 73f40b875be0bd413c46163f135813de1e68a156
+  zh: 5b05a376fed38b955e596fe5cd1c4012322af8dd
 /agent-note-path-gated-pull-request-ci-lanes:
   en: 9a8cd154fce39753
   zh: bd68de26e93fb243
@@ -12,8 +12,8 @@ document:
   en: f012de201881d797
   zh: a40d59e12e0eff99
 /agent-note-path-gated-pull-request-ci-lanes/decision:
-  en: 70afb76560f89e4d
-  zh: de0321afc9d8b273
+  en: f8cb6923550ef160
+  zh: cc83eb0fc5d39569
 /agent-note-path-gated-pull-request-ci-lanes/alternatives-considered:
   en: 79de8a4f66265e51
   zh: 13ca76a974a7585a
