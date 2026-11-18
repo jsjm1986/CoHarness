@@ -654,7 +654,14 @@ export class LocalPtySession implements TerminalBackendSession {
       const startupHasOutput = !this.initializing || !this.scrollback.isEmpty
       const acceptsStdinWait = startupHasOutput && foreground !== undefined
         && operation.acceptsStdinWait(foreground.processGroupId, foreground.inputWaiting)
-      if (elapsed >= this.config.exactProbeAfterMs && acceptsStdinWait) {
+      // The wait's return is observed ahead of the byte stream: a shell that
+      // just resumed its stdin read already emitted everything it will, but
+      // those bytes can still be in flight. Settling on the bare observation
+      // hands the command's tail to the next send's capture window, so the
+      // exact path holds until the stream has been quiet for one poll — the
+      // same quiet bound the prompt path requires.
+      if (elapsed >= this.config.exactProbeAfterMs && acceptsStdinWait
+        && idleFor >= this.config.pollIntervalMs) {
         this.settleActive('stdin_read')
         return
       }

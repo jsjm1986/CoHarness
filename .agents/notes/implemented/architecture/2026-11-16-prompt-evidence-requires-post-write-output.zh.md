@@ -18,7 +18,7 @@ CI 轨迹完整呈现了该竞态：`observe` send 在 +1595ms 写入其 417 单
 
 回显吸收不得吞掉同时出现在输入中的字面输出。持久 shell 运行 `stty -echo`，回显根本不会到达——然而 wrapper 自身的 `printf '<start marker>'` 输出是写入 wrapper 的子串，若按回显匹配，`exec` 替换出的 shell 将永远无法武装（其唯一结算路径是替换后 shell 的 prompt)。`absorbEcho` 因此按位置匹配——`lastIndexOf(fragment, echoMatched)`——连续回显、重叠与回溯重绘被吸收，而出现在回显覆盖位置之前的输出仍计为证据。
 
-空 send(`text: ''`）从不置位 `expectsEcho`，仍仅凭 prompt 证据结算；它们是工具循环的等待迭代，提前返回无损。探针路径（`acceptsStdinWait`）本就要求前台进程组自 send 开始后离开过输入等待；该离开现在须跨两次连续轮询持续，记录于 [stdin 等待的离开须跨连续轮询持续](../bug-fix/2026-11-17-stdin-wait-departure-sustained.zh.md)。
+空 send(`text: ''`）从不置位 `expectsEcho`，仍仅凭 prompt 证据结算；它们是工具循环的等待迭代，提前返回无损。探针路径（`acceptsStdinWait`）本就要求前台进程组自 send 开始后离开过输入等待；该离开须跨两次连续轮询持续，记录于 [stdin 等待的离开须跨连续轮询持续](../bug-fix/2026-11-17-stdin-wait-departure-sustained.zh.md)，接受的回归在输出流静默一个轮询周期后才结算，记录于 [返回的 stdin 等待须保持到输出流静默](../bug-fix/2026-11-19-stdin-wait-return-holds-until-output-quiet.zh.md)。
 
 ## 影响
 

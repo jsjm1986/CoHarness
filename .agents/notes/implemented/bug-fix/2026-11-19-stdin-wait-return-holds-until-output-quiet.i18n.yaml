@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-19-stdin-wait-return-holds-until-output-quiet.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-19-stdin-wait-return-holds-until-output-quiet.md
+document:
+  en: a447897ded5dd8401d9e4584b9ad212fd994b5f6
+  zh: ea277b4204198b7fa89dc24b8d0b3736d6d91e36
+/agent-note-a-returned-stdin-wait-holds-until-the-output-stream-goes-quiet:
+  en: 8eef892ddf74f168
+  zh: 4120c6901812fa1e
+/agent-note-a-returned-stdin-wait-holds-until-the-output-stream-goes-quiet/problem:
+  en: 444897221e306ae3
+  zh: e60729dcb1e7ed0d
+/agent-note-a-returned-stdin-wait-holds-until-the-output-stream-goes-quiet/decision:
+  en: 45383f725be67643
+  zh: c193157ba4631660
+/agent-note-a-returned-stdin-wait-holds-until-the-output-stream-goes-quiet/alternatives-considered:
+  en: ba53a52a61b3d53c
+  zh: 3e770c81dfd631fe
+/agent-note-a-returned-stdin-wait-holds-until-the-output-stream-goes-quiet/consequences:
+  en: e81d4d5a9659b154
+  zh: 15a208bcf5d8cfd5
+/agent-note-a-returned-stdin-wait-holds-until-the-output-stream-goes-quiet/verification:
+  en: a9fca4be1fc8a42a
+  zh: 48e6d47d6c5cb57f

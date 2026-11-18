@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-stdin-wait-departure-sustained.md
 document:
-  en: 35b9bf52cb994e629251ece844ca9a1098a485c5
-  zh: 75b51e6a35df51dd0b5436a67a82e1c38a869eee
+  en: f8b6c25437c2c3cefd11e2866f67e09f02de2ea4
+  zh: 834eddabdf82451f9200007853af1de6169c8308
 /agent-note-stdin-wait-departure-must-hold-across-consecutive-polls:
   en: b1e02dbfa9679dc4
   zh: 219da79018f92518
@@ -12,8 +12,8 @@ document:
   en: 5b421f5c268a6267
   zh: 8990b3747328c50a
 /agent-note-stdin-wait-departure-must-hold-across-consecutive-polls/decision:
-  en: c983fc10ad85555b
-  zh: b57d4657e11fbc0f
+  en: 7c1f511fa126fddd
+  zh: e97e24750710678c
 /agent-note-stdin-wait-departure-must-hold-across-consecutive-polls/alternatives-considered:
   en: 8c9a5882ef50bef0
   zh: 658434fa779416bd

@@ -12,7 +12,7 @@ Status: implemented
 
 离开现在必须持续才算数:`acceptsStdinWait` 维护一个 `foregroundBusyPolls` 计数器，对每个连续的 `waiting === false` 轮询递增，只在第二个连续 busy 观测上置位 `initialForegroundLeftWait`;任何 `waiting === true` 轮询把计数清零但不解除置位。`setInitialForeground` 在初始前台已是 busy 时把计数器种子设为 1，于是已离开的进程组还需要一次确认轮询，而不是在首次返回时就结算。
 
-于是单次闪烁轮询不再使 send 结算——回显抖动无法骗过它——而真实执行会把 `inputWaiting === false` 保持许多轮询，完成离开置位，之后回到等待仍照旧以 `stdin_read` 结算。
+于是单次闪烁轮询不再使 send 结算——回显抖动无法骗过它——而真实执行会把 `inputWaiting === false` 保持许多轮询，完成离开置位，之后回到等待在输出流同样静默一个轮询周期后以 `stdin_read` 结算([返回的 stdin 等待须保持到输出流静默](2026-11-19-stdin-wait-return-holds-until-output-quiet.zh.md))。
 
 ## 已考虑过的替代方案
 

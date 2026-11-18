@@ -682,6 +682,41 @@ describe('LocalPtySession readiness and output', () => {
     expect((await operation.done).waitReason).toBe('stdin_read')
   })
 
+  it('holds a returned stdin wait until the output stream goes quiet for one poll', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    try {
+      await initialize(session, terminal)
+      inspector.waiting = true
+      const operation = session.startSend({ text: 'flood', submit: true })
+      let settled: string | undefined
+      void operation.done.then((result) => { settled = result.waitReason })
+
+      // The wait's departure must hold across consecutive busy polls before
+      // its return counts as completion evidence.
+      inspector.waiting = false
+      await vi.advanceTimersByTimeAsync(10)
+      await vi.advanceTimersByTimeAsync(10)
+
+      // The shell returns to its stdin read while the command's tail is still
+      // in flight: the wait is real, but settling on it now would hand the
+      // in-flight tail to the next send's capture window.
+      inspector.waiting = true
+      await vi.advanceTimersByTimeAsync(5)
+      terminal.emitData('tail\r\n')
+      await vi.advanceTimersByTimeAsync(5)
+      expect(settled).toBeUndefined()
+
+      // Once the stream has stayed quiet for one poll the exact path settles.
+      await vi.advanceTimersByTimeAsync(10)
+      expect(await operation.done).toMatchObject({ waitReason: 'stdin_read' })
+    } finally {
+      await session.close('drained stdin wait cleanup')
+    }
+  })
+
   it('tracks a pre-write wait exit before exact probing begins', async () => {
     vi.useFakeTimers()
     const terminal = new FakeTerminal()

@@ -12,7 +12,7 @@ English | [中文](2026-11-17-stdin-wait-departure-sustained.zh.md)
 
 A departure now must persist to count: `acceptsStdinWait` keeps a `foregroundBusyPolls` counter, increments it on each consecutive `waiting === false` poll, and arms `initialForegroundLeftWait` only at the second consecutive busy observation; any `waiting === true` poll resets the counter without disarming. `setInitialForeground` seeds the counter to 1 when the initial foreground is already busy, so an already-departed group needs one more confirming poll rather than settling on its first return.
 
-One flicker poll therefore leaves the send open — echo churn cannot settle it — while a real execution, which holds `inputWaiting === false` for many polls, arms the departure and a later return to the wait still settles `stdin_read` as before.
+One flicker poll therefore leaves the send open — echo churn cannot settle it — while a real execution, which holds `inputWaiting === false` for many polls, arms the departure and a later return to the wait settles `stdin_read` once the output stream has also gone quiet for one poll ([a returned stdin wait holds until the output stream goes quiet](2026-11-19-stdin-wait-return-holds-until-output-quiet.md)).
 
 ## Alternatives considered
 
