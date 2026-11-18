@@ -713,6 +713,12 @@ function ciWindowsCompleteGates(): Gate[] {
     ...gate,
     needs: [...new Set(['build', ...(gate.needs ?? [])])],
   }))
+  const required = [
+    ciBuildGate(),
+    pnpmScript('windows-site', 'docs:build', { label: 'production site' }),
+    ...coverage,
+  ]
+  if (process.env.DSH_WINDOWS_REQUIRED_ONLY === '1') return required
   const coverageAfter = coverage.map(gate => gate.id)
   const observational = ciWindowsObservationalGates()
     // The required production site replaces the observational MPA build; both
@@ -726,12 +732,7 @@ function ciWindowsCompleteGates(): Gate[] {
         ...(gate.after ?? []).map(id => id === 'docs-site-build' ? 'windows-site' : id),
       ])],
     }))
-  return [
-    ciBuildGate(),
-    pnpmScript('windows-site', 'docs:build', { label: 'production site' }),
-    ...coverage,
-    ...observational,
-  ]
+  return [...required, ...observational]
 }
 
 function ciWindowsObservationalGates(): Gate[] {
