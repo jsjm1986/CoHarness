@@ -237,6 +237,7 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
         .replaceAll(normalizedKey, fixtureSource)
         .replace(/- text: Done \$\n(\s*)- group "[^"]+": "(pnpm add file:[^"]+)"/,
           '- text: "Done $ $2"')
+        .replace(/pnpm v\d+\.\d+\.\d+/g, 'pnpm v{{pnpmVersion}}')
       await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'approved.expected.md'), approvedSnapshot, MODE)
       expect(pageErrors).toEqual([])
     } catch (error) {
