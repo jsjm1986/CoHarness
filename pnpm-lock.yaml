@@ -208,8 +208,8 @@ importers:
         specifier: 5.7.0
         version: 5.7.0
       pnpm:
-        specifier: 11.28.5
-        version: 11.28.5
+        specifier: 11.28.6
+        version: 11.28.6
       publint:
         specifier: ^0.3.24
         version: 0.3.24
@@ -2181,8 +2181,8 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0
       pnpm:
-        specifier: 11.28.5
-        version: 11.28.5
+        specifier: 11.28.6
+        version: 11.28.6
 
   packages/boot/plugin-market:
     dependencies:
@@ -8968,7 +8968,7 @@ importers:
         version: link:../../../vendor/schemastery
       execa:
         specifier: ^10.0.1
-        version: 10.2.1
+        version: 10.2.0
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -22252,8 +22252,8 @@ packages:
     resolution: {integrity: sha512-Cxl6MKxB1dr1H0FHmiizJ+lavKF7pV+fcDZFyqMB8d5m7qUPm/OtZYcD5vPWePKxSnTQ57KuBd9mtdZ3oNCvyQ==}
     engines: {node: '>=22'}
 
-  execa@10.2.1:
-    resolution: {integrity: sha512-/Bofl3ZBh2Q4/PG0W63qFzP5vDAypi8Zc90UWTBzaDNIYiX7apPOd0N6L8hG8CojUdq4V51adu8BObP+iVsSTw==}
+  execa@10.2.0:
+    resolution: {integrity: sha512-j1pFOVxaybMVCTNHSBuISL2KQcDS3KIE1wBmUp4n2X+1FgaQI2ZDJVy9TYxDyMCzYojRIMh9O8X/UoWZtxTJdw==}
     engines: {node: '>=22'}
 
   expand-template@2.0.3:
@@ -23738,8 +23738,8 @@ packages:
     resolution: {integrity: sha512-ZIfcLJC+7E7FBFnDxm9MPmt7D+DidyQ26lewieO75AdhA2ayMtsJSES0iWzqJQbcVRSrTufQoy0DR94xHue0oA==}
     engines: {node: '>=10.4.0'}
 
-  pnpm@11.28.5:
-    resolution: {integrity: sha512-SEVj0wtMKtJ8tIqpT/KzAtvOvI/2vyiBbCWJiG4UbOf3bzVPO8GkOOb16XaMMCqgpvet2CMpA81M+BQmy8FNng==}
+  pnpm@11.28.6:
+    resolution: {integrity: sha512-VdkDkMOzkELxUFoml3ifAlbG2Vuyi918tzGvGIfJ8mKe9YGsufTk7HcgJMggPCrtIqAymblxA/3PMmaOkF0AJA==}
     engines: {node: '>=22.13'}
     hasBin: true
 
@@ -29226,7 +29226,7 @@ snapshots:
       which-command: 0.1.0
       yoctocolors: 2.2.0
 
-  execa@10.2.1:
+  execa@10.2.0:
     dependencies:
       '@sindresorhus/merge-streams': 4.0.0
       figures: 6.1.0
@@ -30990,7 +30990,7 @@ snapshots:
       base64-js: 1.5.1
       xmlbuilder: 15.1.1
 
-  pnpm@11.28.5: {}
+  pnpm@11.28.6: {}
 
   points-on-curve@0.2.0: {}
 
