@@ -243,6 +243,12 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
         }
         workspaces.setDirectoryState('error')
         console.error('[personal-directory] Metadata refresh failed:', error)
+        // A failed refresh also settles the directory: an armed selection
+        // retry resumes against the last published catalog instead of
+        // waiting for an unrelated trigger to consume it.
+        const retry = selectionRetry
+        selectionRetry = false
+        restoreSelection(retry)
       }
     }).finally(() => {
       clearTimeout(deadline); requests.delete(flight)

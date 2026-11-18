@@ -17,7 +17,7 @@ Status: implemented
 
 ## 决策
 
-重试请求是挂起的意图，不是调用参数。`refresh(true)` 在任何提前返回之前先记录 `selectionRetry = true`；下一次发布目录的 refresh 通过 `restoreSelection(selectionRetry)` 应用并消费它。被中止、被取代、被丢弃和被策略跳过的 refresh 因此都无法丢失这次重试——与 `retryQueued`（在飞恢复）和 `revisitQueued`（在飞 revisit）同一合流惯例。
+重试请求是挂起的意图，不是调用参数。`refresh(true)` 在任何提前返回之前先记录 `selectionRetry = true`；下一次结算目录的 refresh——发布元数据或失败——通过 `restoreSelection(selectionRetry)` 应用并消费它。被中止、被取代、被丢弃和被策略跳过的 refresh 因此都无法丢失这次重试——与 `retryQueued`（在飞恢复）和 `revisitQueued`（在飞 revisit）同一合流惯例。
 
 该标志随账户作用域（`identity()`）重置，因为排队中的重试属于它所恢复的那个账户的选择。
 

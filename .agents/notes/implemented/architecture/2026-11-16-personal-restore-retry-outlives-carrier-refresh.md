@@ -17,7 +17,7 @@ Either way `restoreSelection(true)` never ran: the pending conversation intent s
 
 ## Decision
 
-A retry request is a pending intent, not a call argument. `refresh(true)` records `selectionRetry = true` before any early return; whichever refresh next publishes the directory applies it via `restoreSelection(selectionRetry)` and consumes it. Aborted, superseded, dropped, and policy-skipped refreshes therefore cannot lose the retry — the same coalescing idiom as `retryQueued` (in-flight restore) and `revisitQueued` (in-flight revisit).
+A retry request is a pending intent, not a call argument. `refresh(true)` records `selectionRetry = true` before any early return; whichever refresh next settles the directory — publishing metadata or failing — applies it via `restoreSelection(selectionRetry)` and consumes it. Aborted, superseded, dropped, and policy-skipped refreshes therefore cannot lose the retry — the same coalescing idiom as `retryQueued` (in-flight restore) and `revisitQueued` (in-flight revisit).
 
 The flag resets with the account scope (`identity()`), because a queued retry belongs to the account whose selection it restores.
 
