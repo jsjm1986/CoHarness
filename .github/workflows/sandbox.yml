@@ -73,10 +73,10 @@ jobs:
             runner: landlock
             timeout: 20
           # seatbelt adds the full darwin unit suite under the sandbox e2e; hosted
-          # macOS runner speed varies enough that 20m sits under the real wall time.
+          # macOS runner speed varies enough that 35m still loses to slow runners.
           - os: macos-latest
             runner: seatbelt
-            timeout: 35
+            timeout: 50
     name: sandbox e2e (${{ matrix.runner }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ matrix.timeout }}
