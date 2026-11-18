@@ -14,7 +14,7 @@ The CI workflow adds a small `pr-scope` classifier, [`scripts/ci-pr-scope.ts`](.
 
 [`scripts/ci-pr-scope.ts`](../../../../scripts/ci-pr-scope.ts) emits the commit-bound validation plan. The `all checks passed` job uses [`scripts/verify-pr-results.ts`](../../../../scripts/verify-pr-results.ts) to require success from every selected job and permit intentional omissions.
 
-The scope command computes changed paths against the base SHA from GitHub's pull-request event after a full checkout. Default `shadow` execution takes the union of frozen and candidate lane selections; an explicit `candidate` policy selects the candidate plan. Local tests exercise documentation-only, installer, and source/dependency classifications without GitHub Actions.
+The scope command computes changed paths against the base SHA from GitHub's pull-request event after a full checkout. Default `shadow` execution takes the union of frozen and candidate lane selections; an explicit `candidate` policy selects the candidate plan. Local tests exercise documentation-only, installer, and source/dependency classifications without GitHub Actions. Changes to the directory guard’s listed TypeScript sources, tests and build manifests select the packed workspace, sandbox and native Windows proofs. New files and plugin composition changes retain the unknown-input fallback.
 
 ## Alternatives considered
 

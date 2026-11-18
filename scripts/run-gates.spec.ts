@@ -128,6 +128,11 @@ function withPnpmEntrypoint<T>(action: () => T, entrypoint = '/private/pnpm.cjs'
   }
 }
 
+function windowsInventory(tier: 'complete' | 'required'): Gate[] {
+  return withEnv('DSH_WINDOWS_REQUIRED_ONLY', tier === 'required' ? '1' : '0',
+    () => withPnpmEntrypoint(() => gatesForMode('ci-windows-complete')))
+}
+
 function withEnv<T>(name: string, value: string | undefined, action: () => T): T {
   const previous = process.env[name]
   if (value === undefined) Reflect.deleteProperty(process.env, name)
@@ -437,7 +442,7 @@ describe('gate graph validation', () => {
   )
 
   it('keeps native Windows coverage blocking and behind the complete build', () => {
-    const complete = withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))
+    const complete = windowsInventory('complete')
     const observational = withPnpmEntrypoint(() => gatesForMode('ci-windows-observational-ready'))
       .filter(gate => gate.id !== 'docs-site-build')
     const byId = new Map(complete.map(subject => [subject.id, subject]))
@@ -459,6 +464,12 @@ describe('gate graph validation', () => {
     }
   })
 
+  it('keeps every blocking native Windows check on pull requests', () => {
+    const complete = windowsInventory('complete')
+    expect(complete.some(gate => gate.allowFailure)).toBe(true)
+    expect(windowsInventory('required')).toEqual(complete.filter(gate => !gate.allowFailure))
+  })
+
   it('runs the Windows built-bin smoke after other observational gates settle', () => {
     const observational = withPnpmEntrypoint(() => gatesForMode('ci-windows-observational-ready'))
     const builtBin = observational.find(gate => gate.id === 'built-bin-smoke')
@@ -467,7 +478,7 @@ describe('gate graph validation', () => {
       observational.filter(gate => gate.id !== 'built-bin-smoke').map(gate => gate.id),
     )
 
-    const completeBuiltBin = withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))
+    const completeBuiltBin = windowsInventory('complete')
       .find(gate => gate.id === 'built-bin-smoke')
     expect(completeBuiltBin?.after).toContain('windows-site')
     expect(completeBuiltBin?.after).not.toContain('docs-site-build')
@@ -475,7 +486,7 @@ describe('gate graph validation', () => {
 
   it('reuses the Windows build without dropping diagnostics or rebuilding the workspace', () => {
     const ready = withPnpmEntrypoint(() => gatesForMode('ci-windows-observational-ready'))
-    const complete = withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))
+    const complete = windowsInventory('complete')
     const { scripts } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
       scripts: Record<string, string>
     }
@@ -520,7 +531,7 @@ describe('gate graph validation', () => {
     // (coverageTestTimeoutOptions); a gate argument would add a second owner.
     for (const budget of ['15000', undefined]) {
       const gates = withEnv('DSH_COVERAGE_TEST_TIMEOUT_MS', budget, () =>
-        withPnpmEntrypoint(() => gatesForMode('ci-windows-complete')))
+        windowsInventory('complete'))
       for (const id of ['coverage', 'coverage-exempt-heavy']) {
         const gate = gates.find(subject => subject.id === id)
         if (gate === undefined) throw new Error(`ci-windows-complete must define the ${id} gate`)
@@ -562,7 +573,7 @@ describe('gate graph validation', () => {
 
   it('selects partitioned coverage only when explicitly configured', () => {
     const coverage = withEnv('DSH_COVERAGE_PARTITIONS', '3', () =>
-      withPnpmEntrypoint(() => gatesForMode('ci-windows-complete').find(subject => subject.id === 'coverage')))
+      windowsInventory('complete').find(subject => subject.id === 'coverage'))
 
     expect(coverage).toMatchObject({
       displayCommand: 'DSH_COVERAGE_PARTITIONS=3 pnpm run test:coverage:partitioned',
@@ -574,7 +585,7 @@ describe('gate graph validation', () => {
 
   it('rejects an invalid coverage partition count before starting a gate', () => {
     expect(() => withEnv('DSH_COVERAGE_PARTITIONS', '1', () =>
-      withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))))
+      windowsInventory('complete')))
       .toThrow('DSH_COVERAGE_PARTITIONS must be an integer greater than 1')
   })
 
