@@ -25,7 +25,7 @@ async function pushErrorBody(response: Response): Promise<string> {
 }
 
 /** Provider used to address one Android push registration. */
-export type PushProvider = 'fcm' | 'jpush'
+export type PushProvider = 'fcm' | 'jpush' | 'unifiedpush'
 
 /** Android device registration accepted by the authenticated account API. */
 export interface PushDeviceRegistration {
@@ -400,6 +400,57 @@ export class JpushRestSender implements PushSender {
   }
 }
 
+/**
+ * UnifiedPush sender addressed by a distributor-issued endpoint URL stored as the device token.
+ * Endpoints are write-capability URLs supplied by clients, so sends are confined to the configured
+ * host allowlist: anything else is rejected before any network work.
+ */
+export class UnifiedPushEndpointSender implements PushSender {
+  constructor(
+    private readonly allowlist: readonly string[],
+    private readonly request: typeof fetch = fetch,
+  ) {}
+
+  async send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, signal?: AbortSignal): Promise<PushSendReceipt> {
+    signal?.throwIfAborted()
+    let endpoint: URL
+    try {
+      endpoint = new URL(input.token)
+    } catch {
+      throw new PushSendError('UnifiedPush endpoint is not a valid URL', true)
+    }
+    const host = endpoint.hostname.toLowerCase()
+    if (endpoint.protocol !== 'https:'
+      || !this.allowlist.some(allowed => host === allowed || host.endsWith(`.${allowed}`))) {
+      throw new PushSendError('UnifiedPush endpoint host is not in the allowlist', true)
+    }
+    const response = await this.request(endpoint.toString(), {
+      method: 'POST',
+      signal,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'AI 回复完成',
+        body: '点击查看回复',
+        runtimeId: input.runtimeId,
+        sessionId: input.sessionId,
+        eventSeq: String(input.eventSeq),
+      }),
+    })
+    if (response.ok) {
+      try {
+        const parsed = object(JSON.parse(await pushErrorBody(response)))
+        const messageId = nonEmptyString(parsed?.id)
+        return messageId === undefined ? {} : { messageId }
+      } catch {
+        // An accepted send stays accepted when the push server omits a parseable id.
+        return {}
+      }
+    }
+    const body = await pushErrorBody(response)
+    throw new PushSendError(`UnifiedPush send failed with HTTP ${String(response.status)}`, response.status === 400)
+  }
+}
+
 class UnconfiguredPushSender implements PushSender {
   async send(_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<PushSendReceipt> {
     throw new PushSendError('Push provider is not configured', false)
@@ -428,7 +479,10 @@ function senderFor(cfg: GatewayConfig, request: typeof fetch): PushSenderMap {
   const jpush = jpushAppKey !== undefined && jpushMasterSecret !== undefined
     ? new JpushRestSender(jpushAppKey, jpushMasterSecret, request)
     : disabled
-  return { fcm, jpush }
+  const unifiedpush = cfg.upEndpointAllowlist === undefined
+    ? disabled
+    : new UnifiedPushEndpointSender(cfg.upEndpointAllowlist, request)
+  return { fcm, jpush, unifiedpush }
 }
 
 /** PostgreSQL device registry with current recipient authority and retryable delivery claims. */
@@ -448,12 +502,13 @@ export class PostgresPushService implements GatewayPushService {
     if (sender === undefined) {
       this.senders = senderFor(cfg, request)
     } else if (isPushSender(sender)) {
-      this.senders = { fcm: sender, jpush: sender }
+      this.senders = { fcm: sender, jpush: sender, unifiedpush: sender }
     } else {
       const disabled = new UnconfiguredPushSender()
       this.senders = {
         fcm: sender.fcm ?? disabled,
         jpush: sender.jpush ?? disabled,
+        unifiedpush: sender.unifiedpush ?? disabled,
       }
     }
   }

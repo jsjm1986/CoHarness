@@ -238,6 +238,8 @@ export interface GatewayConfig {
   jpushAppKey?: string
   /** Owner-only JPush master secret used by the Gateway REST sender. */
   jpushMasterSecret?: string
+  /** UnifiedPush endpoint host allowlist (exact or subdomain match); absent disables the provider. */
+  upEndpointAllowlist?: readonly string[]
   /** Total budget for credential preparation and one outbound completion notification. */
   pushDeliveryTimeoutMs: number
   /** Lifetime of a pending delivery claim before retry; exceeds the send budget. */
@@ -697,6 +699,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if ((jpushAppKey === undefined) !== (jpushMasterSecret === undefined)) {
     throw new Error('HGW_JPUSH_APP_KEY and HGW_JPUSH_MASTER_SECRET must be configured together')
   }
+  const upEndpointAllowlist = env.HGW_UP_ENDPOINT_ALLOWLIST
+    ?.split(',').map(host => host.trim().toLowerCase()).filter(host => host !== '')
   const pushDeliveryTimeoutMs = timerDelay(env.HGW_PUSH_DELIVERY_TIMEOUT_MS, 30_000, 'HGW_PUSH_DELIVERY_TIMEOUT_MS')
   const pushDeliveryLeaseMs = timerDelay(env.HGW_PUSH_DELIVERY_LEASE_MS, 120_000, 'HGW_PUSH_DELIVERY_LEASE_MS')
   if (pushDeliveryLeaseMs <= pushDeliveryTimeoutMs) {
@@ -1040,6 +1044,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     fcmServiceAccountFile: env.HGW_FCM_SERVICE_ACCOUNT_FILE?.trim() || undefined,
     jpushAppKey,
     jpushMasterSecret,
+    upEndpointAllowlist: upEndpointAllowlist !== undefined && upEndpointAllowlist.length > 0
+      ? upEndpointAllowlist : undefined,
     pushDeliveryTimeoutMs,
     pushDeliveryLeaseMs,
     desktop,

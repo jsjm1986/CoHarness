@@ -44,10 +44,17 @@ public final class PushReceiptReporter {
         } catch (RuntimeException error) {
             token = "";
         }
+        report(context, "jpush", token == null ? "" : token.trim(), sessionId, eventSeq, kind);
+    }
+
+    /** Post one outcome receipt; empty token or malformed sequence drops silently. */
+    public static void report(Context context, String provider, String token,
+        String sessionId, String eventSeq, String kind) {
+        if (!BuildConfig.NATIVE_PUSH_ENABLED || context == null || token.isEmpty()) return;
         JSONObject payload = new JSONObject();
         try {
-            payload.put("provider", "jpush");
-            payload.put("token", token == null ? "" : token.trim());
+            payload.put("provider", provider);
+            payload.put("token", token);
             payload.put("sessionId", sessionId);
             payload.put("eventSeq", Long.parseLong(eventSeq));
             payload.put("kind", kind);

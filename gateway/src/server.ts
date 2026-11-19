@@ -1475,7 +1475,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const deviceId = input?.deviceId === undefined ? undefined : stringField(input.deviceId)
       const appVersion = input?.appVersion === undefined ? undefined : stringField(input.appVersion)
       if (token === undefined || token.length > 4096 || platform !== 'android'
-        || (provider !== 'fcm' && provider !== 'jpush')
+        || (provider !== 'fcm' && provider !== 'jpush' && provider !== 'unifiedpush')
         || (input?.deviceId !== undefined && deviceId === undefined)
         || (input?.appVersion !== undefined && appVersion === undefined)) {
         send(res, 400, '{"error":"invalid-push-device"}', 'application/json')
@@ -1513,7 +1513,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const eventSeq = input?.eventSeq
       const kind = input?.kind
       if (token === undefined || token.length > 4096
-        || (provider !== 'fcm' && provider !== 'jpush')
+        || (provider !== 'fcm' && provider !== 'jpush' && provider !== 'unifiedpush')
         || sessionId === undefined || sessionId.length > 512
         || typeof eventSeq !== 'number' || !Number.isSafeInteger(eventSeq) || eventSeq < 0
         || (kind !== 'arrived' && kind !== 'opened')) {

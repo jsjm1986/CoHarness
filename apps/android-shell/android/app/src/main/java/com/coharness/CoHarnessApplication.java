@@ -21,10 +21,19 @@ public final class CoHarnessApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        if (!BuildConfig.NATIVE_PUSH_ENABLED || !isMainProcess() || !jPushAppKeyConfigured(this)) return;
-        if (getSharedPreferences(PUSH_PREFERENCES, MODE_PRIVATE)
-            .getBoolean(JPUSH_CONSENT, false)) {
+        if (!BuildConfig.NATIVE_PUSH_ENABLED || !isMainProcess()) return;
+        if (jPushAppKeyConfigured(this)
+            && getSharedPreferences(PUSH_PREFERENCES, MODE_PRIVATE).getBoolean(JPUSH_CONSENT, false)) {
             initializeJPush(this);
+        }
+        // Re-register silently when a distributor was acknowledged earlier; no UI on cold start.
+        try {
+            if (org.unifiedpush.android.connector.UnifiedPush.getAckDistributor(this) != null) {
+                org.unifiedpush.android.connector.UnifiedPush.register(
+                    this, org.unifiedpush.android.connector.ConstantsKt.INSTANCE_DEFAULT, null, null);
+            }
+        } catch (RuntimeException error) {
+            Log.w(TAG, "UnifiedPush re-registration failed; continuing without it", error);
         }
     }
 

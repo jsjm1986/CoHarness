@@ -86,7 +86,20 @@ repositories {
     }
 }
 
+configurations.configureEach {
+    // The UnifiedPush connector depends on com.google.crypto.tink:tink; force the
+    // Android artifact so a second tink copy can never enter the dependency graph.
+    def tink = 'com.google.crypto.tink:tink-android:1.20.0'
+    resolutionStrategy {
+        force(tink)
+        dependencySubstitution {
+            substitute module('com.google.crypto.tink:tink') using module(tink)
+        }
+    }
+}
+
 dependencies {
+    implementation 'org.unifiedpush.android:connector:3.3.5'
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"

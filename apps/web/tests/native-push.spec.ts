@@ -10,6 +10,8 @@ const bridge = vi.hoisted(() => ({
   fcm: false,
   jpush: true,
   statusSupported: true,
+  unifiedpushConfigured: false,
+  unifiedpushEndpoint: '',
 }))
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -29,9 +31,15 @@ vi.mock('@capacitor/core', () => ({
         jpushInitialized: true,
         notificationsEnabled: true,
         registrationId: 'private-test-token',
+        unifiedpushDistributor: bridge.unifiedpushConfigured ? 'io.heckel.ntfy' : '',
+        unifiedpushEndpoint: bridge.unifiedpushEndpoint,
       }
     },
     initializeJPush: async () => ({ configured: true }),
+    initializeUnifiedPush: async () => {
+      if (!bridge.statusSupported) throw new Error('method not found')
+      return { configured: bridge.unifiedpushConfigured, distributors: [] }
+    },
     getJPushRegistrationId: async () => ({ registrationId: 'private-test-token' }),
     addListener: async (event: string, callback: (data: unknown) => void) => { bridge.listeners.set(event, callback) },
   } },
@@ -63,6 +71,8 @@ describe('Android Web notification protocol', () => {
     bridge.fcm = false
     bridge.jpush = true
     bridge.statusSupported = true
+    bridge.unifiedpushConfigured = false
+    bridge.unifiedpushEndpoint = ''
   })
 
   it('registers the Android provider on a private endpoint and navigates notification sessions', async () => {
@@ -121,6 +131,45 @@ describe('Android Web notification protocol', () => {
     vi.stubGlobal('localStorage', { setItem: (key: string, value: string) => storage.set(key, value) })
     await setupNativePush()
     await vi.waitFor(() => { expect(storage.get('hgw.push.device-id.jpush')).toBe('test-device') })
+  })
+
+  it('registers stored and live UnifiedPush endpoints under their own provider', async () => {
+    bridge.unifiedpushConfigured = true
+    bridge.unifiedpushEndpoint = 'https://ntfy.example.com/upSTORED'
+    const requests: { url: string | undefined; body: unknown }[] = []
+    server = createServer((request, response) => {
+      request.setEncoding('utf8')
+      let body = ''
+      request.on('data', (chunk: string) => { body += chunk })
+      request.on('end', () => {
+        requests.push({ url: request.url, body: JSON.parse(body) as unknown })
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ id: 'test-device' }))
+      })
+    })
+    server.listen(0, '127.0.0.1')
+    await once(server, 'listening')
+    const address = server.address()
+    if (address === null || typeof address === 'string') throw new Error('test endpoint has no TCP address')
+    const endpoint = `http://127.0.0.1:${String(address.port)}`
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', (url: string, options: RequestInit) => originalFetch(new URL(url, endpoint), options))
+    const storage = new Map<string, string>()
+    vi.stubGlobal('localStorage', { setItem: (key: string, value: string) => storage.set(key, value) })
+    await setupNativePush()
+    await vi.waitFor(() => { expect(storage.get('hgw.push.device-id.unifiedpush')).toBe('test-device') })
+    expect(requests).toContainEqual({ url: '/account/api/push-devices', body: {
+      token: 'https://ntfy.example.com/upSTORED', platform: 'android', provider: 'unifiedpush',
+    } })
+    const endpointListener = bridge.listeners.get('unifiedPushEndpoint')
+    expect(endpointListener).toBeTypeOf('function')
+    requests.length = 0
+    endpointListener!({ endpoint: 'https://ntfy.example.com/upNEW' })
+    await vi.waitFor(() => {
+      expect(requests).toEqual([{ url: '/account/api/push-devices', body: {
+        token: 'https://ntfy.example.com/upNEW', platform: 'android', provider: 'unifiedpush',
+      } }])
+    })
   })
 
   it('keeps hosted Web sessions outside native registration', async () => {
