@@ -330,10 +330,22 @@ jobs:
       # fallback resolved on 24.04.
       - uses: ./.github/actions/prepare-ci-apt
       - name: Install CJK font faces
-        timeout-minutes: 5
+        timeout-minutes: 20
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          # Mirror stalls have burned the whole download budget inside a single
+          # attempt; cap each attempt and retry on a fresh connection, and
+          # repair dpkg state if a kill landed mid-unpack.
+          for attempt in 1 2 3; do
+            if timeout -k 30 240 bash -euc '
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+            '; then exit 0; fi
+            echo "CJK font install attempt $attempt failed; repairing dpkg state and retrying on a fresh connection"
+            sudo dpkg --configure -a || true
+            sudo apt-get install -f -y || true
+            sleep 15
+          done
+          exit 1
 
       - name: Resolve coverage timing identity
         if: needs.pr-scope.outputs.coverage_mode == 'full'
@@ -416,8 +428,18 @@ jobs:
 
       - uses: ./.github/actions/prepare-ci-apt
       - name: Install benchmark browser and hosted dependencies
-        timeout-minutes: 5
-        run: pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium
+        timeout-minutes: 20
+        run: |
+          # The Playwright CDN has stalled a healthy download past the old
+          # five-minute cap; cap each attempt and retry on a fresh connection.
+          for attempt in 1 2 3; do
+            if timeout -k 30 240 pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium; then exit 0; fi
+            echo "playwright install attempt $attempt failed; repairing dpkg state and retrying on a fresh connection"
+            sudo dpkg --configure -a || true
+            sudo apt-get install -f -y || true
+            sleep 15
+          done
+          exit 1
 
       - name: Run performance benchmarks
         env:
@@ -760,8 +782,18 @@ jobs:
           && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
           || github.event.pull_request.user.login == 'dependabot[bot]')
-        timeout-minutes: 5
-        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium webkit
+        timeout-minutes: 20
+        run: |
+          # The Playwright CDN has stalled a healthy download past the old
+          # five-minute cap; cap each attempt and retry on a fresh connection.
+          for attempt in 1 2 3; do
+            if timeout -k 30 240 pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium webkit; then exit 0; fi
+            echo "playwright install attempt $attempt failed; repairing dpkg state and retrying on a fresh connection"
+            sudo dpkg --configure -a || true
+            sudo apt-get install -f -y || true
+            sleep 15
+          done
+          exit 1
 
       # The persistent VM image owns Playwright's Linux system packages; do
       # not mutate the shared host with apt on every failover run.
@@ -1219,8 +1251,18 @@ jobs:
 
       - uses: ./.github/actions/prepare-ci-apt
       - name: Install Playwright Chromium and hosted dependencies
-        timeout-minutes: 5
-        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
+        timeout-minutes: 20
+        run: |
+          # The Playwright CDN has stalled a healthy download past the old
+          # five-minute cap; cap each attempt and retry on a fresh connection.
+          for attempt in 1 2 3; do
+            if timeout -k 30 240 pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium; then exit 0; fi
+            echo "playwright install attempt $attempt failed; repairing dpkg state and retrying on a fresh connection"
+            sudo dpkg --configure -a || true
+            sudo apt-get install -f -y || true
+            sleep 15
+          done
+          exit 1
 
       - name: Run full Linux audit
         run: pnpm run check:ci:linux-primary
@@ -1326,8 +1368,18 @@ jobs:
 
       - uses: ./.github/actions/prepare-ci-apt
       - name: Install Playwright Chromium and hosted dependencies
-        timeout-minutes: 5
-        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
+        timeout-minutes: 20
+        run: |
+          # The Playwright CDN has stalled a healthy download past the old
+          # five-minute cap; cap each attempt and retry on a fresh connection.
+          for attempt in 1 2 3; do
+            if timeout -k 30 240 pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium; then exit 0; fi
+            echo "playwright install attempt $attempt failed; repairing dpkg state and retrying on a fresh connection"
+            sudo dpkg --configure -a || true
+            sudo apt-get install -f -y || true
+            sleep 15
+          done
+          exit 1
 
       - name: Populate the PR browser cache from master
         if: github.event_name == 'push' && github.ref == 'refs/heads/master' && steps.browser-cache.outputs.cache-hit != 'true'
@@ -1543,27 +1595,41 @@ jobs:
       # binary on PATH.
       - uses: ./.github/actions/prepare-ci-apt
       - name: Install Wine
-        timeout-minutes: 5
+        timeout-minutes: 20
         run: |
-          if compgen -G "$HOME/wine-debs/*.deb" > /dev/null; then
-            # The restored archive is the full --download-only closure of
-            # `wine` for this runner image, so installing the .debs directly
-            # with dpkg needs no repository access. apt-get would instead
-            # re-download the same 100+ MB closure from the mirror, which has
-            # stalled the job past its budget on a degraded runner network.
-            # If the archive cannot satisfy the closure, fall back to the apt
-            # network install.
-            if ! sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$HOME"/wine-debs/*.deb; then
-              sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a || true
-              sudo apt-get install -y --no-install-recommends "$HOME"/wine-debs/*.deb
+          # Mirror stalls have burned the whole download budget inside a single
+          # attempt; cap each attempt and retry on a fresh connection, and
+          # repair dpkg state if a kill landed mid-unpack.
+          install_wine() {
+            if compgen -G "$HOME/wine-debs/*.deb" > /dev/null; then
+              # The restored archive is the full --download-only closure of
+              # `wine` for this runner image, so installing the .debs directly
+              # with dpkg needs no repository access. apt-get would instead
+              # re-download the same 100+ MB closure from the mirror, which has
+              # stalled the job past its budget on a degraded runner network.
+              # If the archive cannot satisfy the closure, fall back to the apt
+              # network install.
+              if ! sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$HOME"/wine-debs/*.deb; then
+                sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a || true
+                sudo apt-get install -y --no-install-recommends "$HOME"/wine-debs/*.deb
+              fi
+            else
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends --download-only wine
+              mkdir -p "$HOME/wine-debs"
+              cp /var/cache/apt/archives/*.deb "$HOME/wine-debs/" 2>/dev/null || true
+              sudo apt-get install -y --no-install-recommends wine
             fi
-          else
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends --download-only wine
-            mkdir -p "$HOME/wine-debs"
-            cp /var/cache/apt/archives/*.deb "$HOME/wine-debs/" 2>/dev/null || true
-            sudo apt-get install -y --no-install-recommends wine
-          fi
+          }
+          export -f install_wine
+          for attempt in 1 2 3; do
+            if timeout -k 30 240 bash -c 'install_wine'; then exit 0; fi
+            echo "wine install attempt $attempt failed; repairing dpkg state and retrying on a fresh connection"
+            sudo dpkg --configure -a || true
+            sudo apt-get install -f -y || true
+            sleep 15
+          done
+          exit 1
 
       - name: Run the Wine Windows gates
         run: bash scripts/wine-windows-gates.sh
@@ -1627,8 +1693,10 @@ jobs:
       # Instrumented process and polling fixtures can exceed Vitest's defaults
       # under the complete lane's partition fan-out and build-backed workload.
       # Hosted Windows runners lose a different spec to the old 30 s floor on
-      # roughly every run; the floor now sits above every measured stall.
-      DSH_COVERAGE_TEST_TIMEOUT_MS: '90000'
+      # roughly every run, and a degraded-runner draw in the hosted pool has
+      # pushed a dozen lsp-stdio lifecycle cases past the 90 s floor in one
+      # run (~6 s nominal for the whole file on a healthy runner).
+      DSH_COVERAGE_TEST_TIMEOUT_MS: '180000'
       DSH_COVERAGE_TIMING_PROFILE: >-
         ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
