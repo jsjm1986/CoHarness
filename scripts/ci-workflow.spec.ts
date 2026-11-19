@@ -543,6 +543,7 @@ describe('CI workflow', () => {
       ...['compat', 'python', 'gateway', 'admin_ui'].map(mode =>
         `!cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit') || (github.event_name == 'pull_request' && needs.pr-scope.outputs.${mode}_mode == 'full'))`),
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'",
+      "!cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit') || (github.event_name == 'pull_request' && needs.pr-scope.outputs.android_mode == 'full'))",
       "github.event_name == 'pull_request'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'",
