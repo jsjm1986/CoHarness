@@ -301,11 +301,13 @@ describe('CI workflow', () => {
       DSH_EVIDENCE_JOB_NAME: 'node 24 / benchmarks',
       DSH_EVIDENCE_ARTIFACT_NAME: 'gate-evidence-node-24-bench-${{ github.run_attempt }}',
     })
-    expect(node24Bench.steps).toContainEqual(expect.objectContaining({
-      name: 'Install benchmark browser and hosted dependencies',
-      'timeout-minutes': 20,
-      run: expect.stringContaining('playwright install --with-deps chromium'),
-    }))
+    const benchInstallStep = (node24Bench.steps as unknown[]).find(
+      (step): step is Record<string, unknown> =>
+        isRecord(step) && step.name === 'Install benchmark browser and hosted dependencies',
+    )
+    expect(benchInstallStep).toMatchObject({ 'timeout-minutes': 20 })
+    expect(String(benchInstallStep?.run))
+      .toContain('pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium')
     expect(JSON.stringify(node24Bench.steps)).not.toContain('DSH_CI_FAILOVER_LINUX')
     expect(node24Bench.steps).toContainEqual({
       name: 'Run performance benchmarks',
