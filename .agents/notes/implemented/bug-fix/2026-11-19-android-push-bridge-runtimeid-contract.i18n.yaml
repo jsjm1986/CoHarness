@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-19-android-push-bridge-runtimeid-contract.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-19-android-push-bridge-runtimeid-contract.md
+document:
+  en: 3666cc39d4e5e6a03416df932f99e21ef40a37f1
+  zh: faa189c688c5ed6a8648c198263221463e294a90
+/agent-note-android-push-bridge-requires-the-runtimeid-intent-extra:
+  en: e8b68ed50d08cef0
+  zh: 408edad80b4e3895
+/agent-note-android-push-bridge-requires-the-runtimeid-intent-extra/problem:
+  en: 2ecf087a849db424
+  zh: 19dbe4fa62f6f16c
+/agent-note-android-push-bridge-requires-the-runtimeid-intent-extra/decision:
+  en: 2305ee829d21b456
+  zh: b647e4fe0bb60a9e
+/agent-note-android-push-bridge-requires-the-runtimeid-intent-extra/alternatives-considered:
+  en: 30782dc9d89f275e
+  zh: 6ce5511517224289
+/agent-note-android-push-bridge-requires-the-runtimeid-intent-extra/consequences:
+  en: 7a79b2c22d2cb355
+  zh: 2a136901261730be
+/agent-note-android-push-bridge-requires-the-runtimeid-intent-extra/verification:
+  en: 975616ed4067ada6
+  zh: b015e9cd54557089

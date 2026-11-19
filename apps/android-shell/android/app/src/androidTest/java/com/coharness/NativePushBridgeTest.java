@@ -23,6 +23,7 @@ public class NativePushBridgeTest {
         String session = UUID.randomUUID().toString();
         Intent intent = new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(), MainActivity.class)
             .putExtra(NativePushStatusPlugin.EXTRA_SESSION_ID, session)
+            .putExtra(NativePushStatusPlugin.EXTRA_RUNTIME_ID, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             .putExtra(NativePushStatusPlugin.EXTRA_EVENT_SEQ, "42");
         try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(intent)) {
             long deadline = SystemClock.elapsedRealtime() + 20_000;
@@ -39,6 +40,7 @@ public class NativePushBridgeTest {
             }
             assertNotNull("MainActivity must deliver through the real Capacitor listener", observed);
             assertEquals(session, observed.getJSONObject("payload").getString("sessionId"));
+            assertEquals("a1b2c3d4-e5f6-7890-abcd-ef1234567890", observed.getJSONObject("payload").getString("runtimeId"));
             assertEquals("42", observed.getJSONObject("payload").getString("eventSeq"));
         }
     }
@@ -65,13 +67,16 @@ public class NativePushBridgeTest {
         Listener listener = new Listener();
         Intent intent = new Intent()
             .putExtra(NativePushStatusPlugin.EXTRA_SESSION_ID, " session-17 ")
+            .putExtra(NativePushStatusPlugin.EXTRA_RUNTIME_ID, " a1b2c3d4-e5f6-7890-abcd-ef1234567890 ")
             .putExtra(NativePushStatusPlugin.EXTRA_EVENT_SEQ, " 42 ");
         listener.handleInitialIntent(intent);
         assertEquals("notificationAction", listener.event);
         assertEquals("session-17", listener.payload.getString("sessionId"));
+        assertEquals("a1b2c3d4-e5f6-7890-abcd-ef1234567890", listener.payload.getString("runtimeId"));
         assertEquals("42", listener.payload.getString("eventSeq"));
         assertTrue(listener.retained);
         assertFalse(intent.hasExtra(NativePushStatusPlugin.EXTRA_SESSION_ID));
+        assertFalse(intent.hasExtra(NativePushStatusPlugin.EXTRA_RUNTIME_ID));
         listener.handleInitialIntent(intent);
         assertEquals(1, listener.deliveries);
     }
@@ -81,9 +86,16 @@ public class NativePushBridgeTest {
         Listener listener = new Listener();
         listener.handleOnNewIntent(new Intent().putExtra(NativePushStatusPlugin.EXTRA_SESSION_ID, " "));
         listener.handleInitialIntent(null);
-        assertEquals(0, listener.deliveries);
+        listener.handleOnNewIntent(new Intent()
+            .putExtra(NativePushStatusPlugin.EXTRA_SESSION_ID, "warm-session")
+            .putExtra(NativePushStatusPlugin.EXTRA_RUNTIME_ID, " "));
         listener.handleOnNewIntent(new Intent().putExtra(NativePushStatusPlugin.EXTRA_SESSION_ID, "warm-session"));
+        assertEquals(0, listener.deliveries);
+        listener.handleOnNewIntent(new Intent()
+            .putExtra(NativePushStatusPlugin.EXTRA_SESSION_ID, "warm-session")
+            .putExtra(NativePushStatusPlugin.EXTRA_RUNTIME_ID, "a1b2c3d4-e5f6-7890-abcd-ef1234567890"));
         assertEquals("warm-session", listener.payload.getString("sessionId"));
+        assertEquals("a1b2c3d4-e5f6-7890-abcd-ef1234567890", listener.payload.getString("runtimeId"));
         assertFalse(listener.payload.has("eventSeq"));
     }
 }

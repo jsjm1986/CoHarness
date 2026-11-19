@@ -79,7 +79,7 @@ public class NativePushStatusPlugin extends Plugin {
         if (intent == null) return;
         String sessionId = intent.getStringExtra(EXTRA_SESSION_ID);
         String runtimeId = intent.getStringExtra(EXTRA_RUNTIME_ID);
-        if (sessionId == null || sessionId.trim().isEmpty() || runtimeId == null) return;
+        if (sessionId == null || sessionId.trim().isEmpty() || runtimeId == null || runtimeId.trim().isEmpty()) return;
         JSObject result = new JSObject();
         result.put("sessionId", sessionId.trim());
         result.put("runtimeId", runtimeId.trim());
