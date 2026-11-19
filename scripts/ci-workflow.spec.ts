@@ -207,7 +207,7 @@ describe('CI workflow', () => {
     expect(windowsNative.if).toContain("needs.node-24.result != 'failure'")
     expect(windowsNative.if).toContain("needs.node-24.result != 'cancelled'")
     expect(windowsNative.env).toMatchObject({
-      DSH_COVERAGE_TEST_TIMEOUT_MS: '90000',
+      DSH_COVERAGE_TEST_TIMEOUT_MS: '180000',
     })
     expectExternalCapacityExpression(windowsNative.env.DSH_COVERAGE_PARTITIONS, '8', '4')
     expectExternalCapacityExpression(windowsNative.env.DSH_COVERAGE_MAX_WORKERS, '6', '4')
@@ -301,11 +301,13 @@ describe('CI workflow', () => {
       DSH_EVIDENCE_JOB_NAME: 'node 24 / benchmarks',
       DSH_EVIDENCE_ARTIFACT_NAME: 'gate-evidence-node-24-bench-${{ github.run_attempt }}',
     })
-    expect(node24Bench.steps).toContainEqual({
-      name: 'Install benchmark browser and hosted dependencies',
-      'timeout-minutes': 5,
-      run: 'pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium',
-    })
+    const benchInstallStep = (node24Bench.steps as unknown[]).find(
+      (step): step is Record<string, unknown> =>
+        isRecord(step) && step.name === 'Install benchmark browser and hosted dependencies',
+    )
+    expect(benchInstallStep).toMatchObject({ 'timeout-minutes': 20 })
+    expect(String(benchInstallStep?.run))
+      .toContain('pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium')
     expect(JSON.stringify(node24Bench.steps)).not.toContain('DSH_CI_FAILOVER_LINUX')
     expect(node24Bench.steps).toContainEqual({
       name: 'Run performance benchmarks',

@@ -50,7 +50,11 @@ function verifyConsumers(workflow: Workflow, expectedCount: number): void {
   const consumers = aptConsumers(workflow)
   expect(consumers.length).toBe(expectedCount)
   for (const { index, step, steps } of consumers) {
-    expect(step['timeout-minutes'], `${String(step.name)} must carry the 5m provisioning budget`).toBe(5)
+    // Retried installs cap each attempt inside the run block and carry a
+    // larger step budget; single-shot consumers keep the 5m bound.
+    const retried = typeof step.run === 'string' && step.run.includes('for attempt in')
+    expect(step['timeout-minutes'], `${String(step.name)} must carry the ${retried ? 20 : 5}m provisioning budget`)
+      .toBe(retried ? 20 : 5)
     const prior = steps[index - 1]
     expect(prior !== undefined && isPrepareStep(prior), `preparation must run immediately before ${String(step.name)}`).toBe(true)
     expect(norm(prior?.if), `preparation condition must match ${String(step.name)}`).toBe(norm(step.if))

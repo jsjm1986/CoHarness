@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-19-ci-install-retries-and-windows-timeout-floor.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-11-19-ci-install-retries-and-windows-timeout-floor.md
+document:
+  en: 6b2f26289f24551b914d812e612d4f2f5fd353e9
+  zh: ffdaf083c8cd166c54764fd63d70e2ce391461ed
+/agent-note-ci-install-retries-and-the-windows-native-timeout-floor:
+  en: 960f8cd199ba2ab0
+  zh: fac8464a69372db3
+/agent-note-ci-install-retries-and-the-windows-native-timeout-floor/problem:
+  en: a8689720574829b9
+  zh: fe01742518302681
+/agent-note-ci-install-retries-and-the-windows-native-timeout-floor/decision:
+  en: 5804ee95d073f2ef
+  zh: fbc5ad150865d6d0
+/agent-note-ci-install-retries-and-the-windows-native-timeout-floor/alternatives-considered:
+  en: 6122ae7ec9bc9c37
+  zh: 0606624de0a1434c
+/agent-note-ci-install-retries-and-the-windows-native-timeout-floor/verification:
+  en: 4e3f5dfc474f5f93
+  zh: 4acb027a25489485
+/agent-note-ci-install-retries-and-the-windows-native-timeout-floor/consequences:
+  en: 41cc6b683644797e
+  zh: 23e787cd8972b1dc
