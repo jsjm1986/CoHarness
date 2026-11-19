@@ -18,7 +18,7 @@ Add `unifiedpush` as a third `PushProvider` using the [UnifiedPush](https://unif
 - `NativePushStatusPlugin.initializeUnifiedPush` resolves `tryUseCurrentOrDefaultDistributor` (needs an Activity for the system picker), then `UnifiedPush.register`; `getPushStatus` reports the acknowledged distributor and stored endpoint. `CoHarnessApplication` re-registers silently on cold start when a distributor was acknowledged.
 - `apps/web/src/native-push.ts` registers stored and event-delivered endpoints under `provider: 'unifiedpush'`; shells too old to return a status never expose the method and take the previous behavior. Both "nothing configured" early returns now permit a status-capable shell so UnifiedPush works on devices with neither FCM nor JPush.
 
-## Alternatives Considered
+## Alternatives considered
 
 - **WorkManager polling + local notifications**: zero external dependency, but ~15-minute granularity and further suppression under MIUI power management — acceptable only as a degraded fallback, not a delivery path.
 - **Embedded foreground service polling ntfy directly (no distributor)**: one APK instead of two, but duplicates the connection work ntfy already does, adds a permanent foreground-service notification, and still dies under MIUI — the distributor process is strictly more resilient.

@@ -142,7 +142,7 @@ describe('Android Web notification protocol', () => {
       let body = ''
       request.on('data', (chunk: string) => { body += chunk })
       request.on('end', () => {
-        requests.push({ url: request.url, body: JSON.parse(body) as unknown })
+        requests.push({ url: request.url, body: JSON.parse(body) })
         response.writeHead(200, { 'content-type': 'application/json' })
         response.end(JSON.stringify({ id: 'test-device' }))
       })

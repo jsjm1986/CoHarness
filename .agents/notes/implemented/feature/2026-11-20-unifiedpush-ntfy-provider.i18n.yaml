@@ -3,7 +3,7 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-20-unifiedpush-ntfy-provider.md
 document:
-  en: 83f33c1442553afa7f38e0e0ac9971ad6c012235
+  en: c6f91788a14f46d92d71ed80c5af2730e85d1d7a
   zh: ee4324b3901f9b015c17f39fb9badc55197b5dfc
 /agent-note-unifiedpush-provider-via-ntfy-distributor:
   en: 1cc69bd81cc8a9ef
@@ -15,7 +15,7 @@ document:
   en: 8c485ba6f95a917f
   zh: 9d4c64d7f95945d3
 /agent-note-unifiedpush-provider-via-ntfy-distributor/alternatives-considered:
-  en: 954231fcdab640c7
+  en: 2a29731a72e24a27
   zh: eb67d17cf2a4d140
 /agent-note-unifiedpush-provider-via-ntfy-distributor/verification-redmi-k30-ultra-ntfy-f-droid-1-25-2:
   en: fdbed3690d410a70
