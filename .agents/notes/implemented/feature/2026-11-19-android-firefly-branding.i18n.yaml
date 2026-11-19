@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-19-android-firefly-branding.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-19-android-firefly-branding.md
+document:
+  en: a496607f3f5aed232dbbd247fa3748ad9b6af2b2
+  zh: 0b5a5bc84a3f8b8162a21c5a686ebf277b5a9e1c
+/agent-note-android-launcher-and-splash-artwork-use-the-firefly-brand-mark:
+  en: be2d91592c246c68
+  zh: aa8e81a989ff8d6c
+/agent-note-android-launcher-and-splash-artwork-use-the-firefly-brand-mark/problem:
+  en: edf6b2c5f76d7812
+  zh: 2970d5c60d0bd205
+/agent-note-android-launcher-and-splash-artwork-use-the-firefly-brand-mark/decision:
+  en: 6cfbb33781b13e6e
+  zh: 475e29b644780cf6
+/agent-note-android-launcher-and-splash-artwork-use-the-firefly-brand-mark/alternatives-considered:
+  en: 19db3168863b138e
+  zh: 93927b709c67e9bb
+/agent-note-android-launcher-and-splash-artwork-use-the-firefly-brand-mark/consequences:
+  en: b35afb24042a4d22
+  zh: 6e031dd162be892e
+/agent-note-android-launcher-and-splash-artwork-use-the-firefly-brand-mark/verification:
+  en: 7c1d81ec110d5d16
+  zh: ce374758568c8fd6
