@@ -43,6 +43,12 @@ public final class CoHarnessApplication extends Application {
             .getBoolean(JPUSH_CONSENT, false);
     }
 
+    /** Whether the user already completed the notification-consent flow that enables JPush. */
+    static boolean jpushConsentGranted(Context context) {
+        return context.getApplicationContext().getSharedPreferences(PUSH_PREFERENCES, Context.MODE_PRIVATE)
+            .getBoolean(JPUSH_CONSENT, false);
+    }
+
     /** Enables JPush after the native notification-consent flow has completed. */
     public static boolean initializeJPush(Context context) {
         Context appContext = context.getApplicationContext();
