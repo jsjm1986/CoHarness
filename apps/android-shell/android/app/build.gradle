@@ -38,6 +38,8 @@ android {
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "boolean", "NATIVE_PUSH_ENABLED", "true"
+        buildConfigField "String", "PUSH_GATEWAY_ORIGIN",
+            "\"${propertyOrEnvironment('DSH_ANDROID_WEB_URL', 'https://harness.maycran.com').replaceAll('/+$', '')}\""
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }

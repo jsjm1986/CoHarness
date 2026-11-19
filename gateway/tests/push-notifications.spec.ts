@@ -37,7 +37,7 @@ const SESSION_ID = 'session-1'
 const DEVICE_ID = 'device-1'
 
 type Sender = {
-  send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<void>
+  send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<{ messageId?: string }>
 }
 
 interface RecordedQuery {
@@ -93,7 +93,7 @@ function poolFixture(plan: QueryPlan = {}): {
     }
     throw new Error(`unexpected query: ${text}`)
   })
-  const sender = { send: vi.fn(async (_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<void> => {}) }
+  const sender = { send: vi.fn(async (_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<{ messageId?: string }> => ({})) }
   return { pool: { query, connect: async () => ({ query, release: () => {} }) } as unknown as Pool, queries, sender }
 }
 
@@ -216,7 +216,7 @@ describe('PostgresPushService', () => {
   })
 
   it('routes a JPush device through the JPush sender', async () => {
-    const sender = { send: vi.fn(async (_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<void> => {}) }
+    const sender = { send: vi.fn(async (_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<{ messageId?: string }> => ({})) }
     const fixture = poolFixture({ deviceProvider: 'jpush' })
     const push = new PostgresPushService(
       { pool: fixture.pool, organizationId: ORGANIZATION_ID },
@@ -231,20 +231,36 @@ describe('PostgresPushService', () => {
     expect(sender.send).toHaveBeenCalledWith({ runtimeId: RUNTIME_ID, token: 'device-token', sessionId: SESSION_ID, eventSeq: 20 }, expect.any(AbortSignal))
   })
 
-  it('preserves confirmed provider acceptance when response-body cleanup fails', async () => {
-    const failure = new Error('fixture body cleanup failed')
-    const request = vi.fn(async () => new Response(new ReadableStream({ cancel() { throw failure } }), { status: 200 }))
+  it('preserves confirmed provider acceptance when the response body has no parseable msg_id', async () => {
+    const request = vi.fn(async () => new Response('not-json', { status: 200 }))
     const fixture = poolFixture({ deviceProvider: 'jpush' })
     const sender = new JpushRestSender('fixture-app', 'fixture-secret', request)
     const push = new PostgresPushService({ pool: fixture.pool, organizationId: ORGANIZATION_ID }, loadConfig({}), fetch, sender)
     const report = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       await push.notifyCompleted(RUNTIME_ID, SESSION_ID, 28)
-      expect(report).toHaveBeenCalledExactlyOnceWith('[gateway] accepted push response cleanup failed:', failure)
-      expect(fixture.queries.filter(query => query.text.includes("status='sent'"))).toHaveLength(1)
+      const sent = fixture.queries.filter(query => query.text.includes("status='sent'"))
+      expect(sent).toHaveLength(1)
+      expect(sent[0]?.text).toContain('provider_msg_id')
+      expect(sent[0]?.values?.at(-1)).toBeNull()
       expect(fixture.queries.some(query => query.text.includes("status='failed',last_error"))).toBe(false)
       expect(fixture.queries.some(query => query.text.includes('DELETE FROM harness.push_devices'))).toBe(false)
+      expect(report).not.toHaveBeenCalled()
     } finally { report.mockRestore() }
+  })
+
+  it('stores the JPush msg_id on the accepted delivery', async () => {
+    const request = vi.fn(async () => new Response(JSON.stringify({ sendno: '0', msg_id: '1708251234' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+    const fixture = poolFixture({ deviceProvider: 'jpush' })
+    const sender = new JpushRestSender('fixture-app', 'fixture-secret', request)
+    const push = new PostgresPushService({ pool: fixture.pool, organizationId: ORGANIZATION_ID }, loadConfig({}), fetch, sender)
+    await push.notifyCompleted(RUNTIME_ID, SESSION_ID, 29)
+    const sent = fixture.queries.filter(query => query.text.includes("status='sent'"))
+    expect(sent).toHaveLength(1)
+    expect(sent[0]?.values?.at(-1)).toBe('1708251234')
   })
 })
 
@@ -258,7 +274,7 @@ describe('FcmHttpV1Sender', () => {
       authControl.failure = new Error('temporary-authentication-client-failure')
       await expect(sender.send(input)).rejects.toThrow('temporary-authentication-client-failure')
       await rm(credentials)
-      await expect(sender.send(input)).resolves.toBeUndefined()
+      await expect(sender.send(input)).resolves.toEqual({})
       expect(authControl.calls - previous.calls).toBe(2)
       expect(request).toHaveBeenCalledOnce()
     } finally { Object.assign(authControl, previous); await rm(directory, { recursive: true, force: true }) }
@@ -271,7 +287,7 @@ describe('FcmHttpV1Sender', () => {
     try {
       await expect(sender.send(input)).rejects.toMatchObject({ code: 'ENOENT' })
       await writeFile(credentials, JSON.stringify({ client_email: 'sender@example.test', private_key: 'fixture-private-key' }))
-      await expect(sender.send(input)).resolves.toBeUndefined()
+      await expect(sender.send(input)).resolves.toEqual({})
       expect(request).toHaveBeenCalledOnce()
     } finally { await rm(directory, { recursive: true, force: true }) }
   })

@@ -17,6 +17,17 @@ interface NativePushStatusPlugin extends Plugin {
   isJPushConfigured(): Promise<{ configured: boolean }>
   initializeJPush(): Promise<{ configured: boolean }>
   getJPushRegistrationId(): Promise<{ registrationId: string }>
+  getPushStatus(): Promise<NativePushStatusResult>
+}
+
+/** Device push health reported by the Android shell; absent in browsers and older shells. */
+export interface NativePushStatusResult {
+  configured: boolean
+  fcmConfigured: boolean
+  jpushConfigured: boolean
+  jpushInitialized: boolean
+  notificationsEnabled: boolean
+  registrationId: string
 }
 
 const NativePushStatus = registerPlugin<NativePushStatusPlugin>('NativePushStatus')
@@ -71,6 +82,18 @@ async function registerJPushDevice(configured: boolean): Promise<void> {
       return
     }
     await wait(1000)
+  }
+}
+
+/** Read the shell's push configuration and consent state; `null` outside the Android shell or on older shells. */
+export async function getNativePushStatus(): Promise<NativePushStatusResult | null> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android'
+    || !Capacitor.isPluginAvailable('NativePushStatus')) return null
+  try {
+    return await NativePushStatus.getPushStatus()
+  } catch (error: unknown) {
+    console.warn('[web] native push status lookup failed:', error)
+    return null
   }
 }
 

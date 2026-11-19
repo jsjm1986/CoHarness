@@ -41,7 +41,7 @@ describePg('PostgreSQL push ownership', () => {
       await pool.query(`INSERT INTO harness.conversation_sessions(id,organization_id,creator_user_id,session_format_version,
         created_at,updated_at,visibility,root_session_id) VALUES($1,$2,$3,0,now(),now(),'personal',$1)`, [sessionId, organizationId, creator.id])
       const cfg = loadConfig({}), context = { pool, organizationId }, token = `fixture-device-${randomUUID()}`
-      const sender = { send: vi.fn(async (_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, _signal?: AbortSignal) => {}) }
+      const sender = { send: vi.fn(async (_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, _signal?: AbortSignal) => ({})) }
       const service = new PostgresPushService(context, cfg, fetch, sender)
       const device = await service.registerDevice(creator.publicId, { token, platform: 'android', provider })
       return { context, cfg, sender, service, creator, other, runtimeId: runtimes.get(creator.id)!, otherRuntimeId: runtimes.get(other.id)!, sessionId, personalNode, device, token, provider, close: () => removeFixtureOrganization(pool, organizationId) }
@@ -119,7 +119,7 @@ describePg('PostgreSQL push ownership', () => {
     let entered!: () => void, release!: () => void
     const observed = new Promise<void>(done => { entered = done }), gate = new Promise<void>(done => { release = done })
     let calls = 0
-    f.sender.send.mockImplementation(async () => { calls += 1; if (calls === 1) { entered(); await gate } })
+    f.sender.send.mockImplementation(async () => { calls += 1; if (calls === 1) { entered(); await gate } return {} })
     let first: Promise<void> | undefined, second: Promise<void> | undefined
     try {
       first = f.service.notifyCompleted(f.runtimeId, f.sessionId, 17)
@@ -177,7 +177,7 @@ describePg('PostgreSQL push ownership', () => {
     let entered!: () => void, release!: () => void
     const observed = new Promise<void>(done => { entered = done }), gate = new Promise<void>(done => { release = done })
     let calls = 0, first: Promise<void> | undefined
-    f.sender.send.mockImplementation(async () => { calls += 1; if (calls === 1) { entered(); await gate; throw new Error('late-worker-failure') } })
+    f.sender.send.mockImplementation(async () => { calls += 1; if (calls === 1) { entered(); await gate; throw new Error('late-worker-failure') } return {} })
     try {
       first = f.service.notifyCompleted(f.runtimeId, f.sessionId, 20); await observed
       await pool.query("UPDATE harness.push_deliveries SET updated_at=clock_timestamp()-($2+1)*interval '1 millisecond' WHERE organization_id=$1", [f.context.organizationId, f.cfg.pushDeliveryLeaseMs])
@@ -193,7 +193,7 @@ describePg('PostgreSQL push ownership', () => {
   it('releases its transaction before sending and can retry an explicitly failed delivery', async () => {
     const f = await fixture(), limited = createPostgresPool(databaseUrl!, { max: 1 }), log = vi.spyOn(console, 'error').mockImplementation(() => {})
     let calls = 0
-    const sender = { send: async () => { await limited.query('SELECT 1'); calls += 1; if (calls === 1) throw new Error('temporary-provider-failure') } }
+    const sender = { send: async () => { await limited.query('SELECT 1'); calls += 1; if (calls === 1) throw new Error('temporary-provider-failure'); return {} } }
     try {
       const service = new PostgresPushService({ ...f.context, pool: limited }, f.cfg, fetch, sender)
       await service.notifyCompleted(f.runtimeId, f.sessionId, 21)
@@ -207,7 +207,7 @@ describePg('PostgreSQL push ownership', () => {
   it('bounds a sender that never settles and aborts its transport without removing the device', async () => {
     const f = await fixture(), log = vi.spyOn(console, 'error').mockImplementation(() => {})
     let signal: AbortSignal | undefined
-    const sender = { send: async (_input: unknown, current?: AbortSignal) => { signal = current; await new Promise<void>(() => {}) } }
+    const sender = { send: async (_input: unknown, current?: AbortSignal) => { signal = current; await new Promise<void>(() => {}); return {} } }
     const cfg = loadConfig({ HGW_PUSH_DELIVERY_TIMEOUT_MS: '50', HGW_PUSH_DELIVERY_LEASE_MS: '1000' })
     try {
       await new PostgresPushService(f.context, cfg, fetch, sender).notifyCompleted(f.runtimeId, f.sessionId, 22)
@@ -343,6 +343,56 @@ describePg('PostgreSQL push ownership', () => {
       await f.service.notifyCompleted(sibling, f.sessionId, 34)
       expect(f.sender.send).toHaveBeenCalledTimes(3)
       expect(f.sender.send.mock.calls.at(-1)?.[0].runtimeId).toBe(sibling)
+    } finally { await f.close() }
+  })
+
+  it('records arrival and open receipts and exposes them through device and administrator views', async () => {
+    const f = await fixture('jpush')
+    try {
+      await f.service.notifyCompleted(f.runtimeId, f.sessionId, 41)
+      const receipt = (kind: 'arrived' | 'opened') => f.service.recordReceipt(f.creator.publicId, {
+        provider: 'jpush', token: f.token, sessionId: f.sessionId, eventSeq: 41, kind,
+      })
+      expect(await receipt('arrived')).toBe('recorded')
+      let row = (await pool.query<{ delivered_at: Date | null; opened_at: Date | null }>(`SELECT delivered_at,opened_at
+        FROM harness.push_deliveries WHERE organization_id=$1 AND session_id=$2 AND device_id=$3`,
+      [f.context.organizationId, f.sessionId, f.device.id])).rows[0]!
+      expect(row.delivered_at).not.toBeNull()
+      expect(row.opened_at).toBeNull()
+      expect(await receipt('arrived')).toBe('recorded')
+      expect(await receipt('opened')).toBe('recorded')
+      row = (await pool.query<{ delivered_at: Date | null; opened_at: Date | null }>(`SELECT delivered_at,opened_at
+        FROM harness.push_deliveries WHERE organization_id=$1 AND session_id=$2 AND device_id=$3`,
+      [f.context.organizationId, f.sessionId, f.device.id])).rows[0]!
+      expect(row.opened_at).not.toBeNull()
+
+      const listed = await f.service.listDevices(f.creator.publicId)
+      expect(listed.devices).toHaveLength(1)
+      const view = listed.devices[0]!
+      expect(view.provider).toBe('jpush')
+      expect(view.lastDelivery?.sessionId).toBe(f.sessionId)
+      expect(view.lastDelivery?.deliveredAt).not.toBeNull()
+      expect(view.lastDelivery?.openedAt).not.toBeNull()
+      expect(await f.service.listDevices(f.other.publicId)).toEqual({ devices: [] })
+
+      const overview = await f.service.adminOverview()
+      expect(overview.devices).toHaveLength(1)
+      expect(overview.devices[0]?.username).toBe('creator')
+      expect(overview.deliveries).toHaveLength(1)
+      expect(overview.deliveries[0]?.status).toBe('sent')
+      expect(overview.deliveries[0]?.deliveredAt).not.toBeNull()
+      expect(overview.stats.byStatus.sent).toBe(1)
+      expect(overview.stats.byProvider.jpush?.sent).toBe(1)
+
+      expect(await f.service.recordReceipt(f.other.publicId, {
+        provider: 'jpush', token: f.token, sessionId: f.sessionId, eventSeq: 41, kind: 'arrived',
+      })).toBe('missing')
+      expect(await f.service.recordReceipt(f.creator.publicId, {
+        provider: 'jpush', token: `foreign-${f.token}`, sessionId: f.sessionId, eventSeq: 41, kind: 'arrived',
+      })).toBe('missing')
+      expect(await f.service.recordReceipt(f.creator.publicId, {
+        provider: 'jpush', token: f.token, sessionId: `unknown-${f.sessionId}`, eventSeq: 41, kind: 'arrived',
+      })).toBe('missing')
     } finally { await f.close() }
   })
 

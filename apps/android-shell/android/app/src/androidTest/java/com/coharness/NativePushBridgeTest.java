@@ -6,6 +6,7 @@ import android.os.SystemClock;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import cn.jpush.android.api.NotificationMessage;
 import com.getcapacitor.JSObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -13,6 +14,8 @@ import org.json.JSONObject;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /** Exercises the ordinary variant's notification Intent on a real Android runtime. */
@@ -97,5 +100,78 @@ public class NativePushBridgeTest {
         assertEquals("warm-session", listener.payload.getString("sessionId"));
         assertEquals("a1b2c3d4-e5f6-7890-abcd-ef1234567890", listener.payload.getString("runtimeId"));
         assertFalse(listener.payload.has("eventSeq"));
+    }
+
+    private static List<JSONObject> awaitReceipt(List<JSONObject> captured) throws Exception {
+        long deadline = SystemClock.elapsedRealtime() + 5_000;
+        while (captured.isEmpty() && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(25);
+        return captured;
+    }
+
+    private static NotificationMessage notification(String sessionId, String eventSeq) throws Exception {
+        NotificationMessage message = new NotificationMessage();
+        message.notificationExtras = new JSONObject()
+            .put("sessionId", sessionId)
+            .put("runtimeId", UUID.randomUUID().toString())
+            .put("eventSeq", eventSeq)
+            .toString();
+        return message;
+    }
+
+    @Test
+    public void arrivalReportsThroughTheReceiptSink() throws Exception {
+        assertTrue("diagnostic APKs cannot supply native proof", BuildConfig.NATIVE_PUSH_ENABLED);
+        List<JSONObject> captured = new ArrayList<>();
+        PushReceiptReporter.setSink(captured::add);
+        try {
+            new CoHarnessPushReceiver().onNotifyMessageArrived(
+                InstrumentationRegistry.getInstrumentation().getTargetContext(),
+                notification("arrival-session", "41"));
+            List<JSONObject> receipts = awaitReceipt(captured);
+            assertEquals(1, receipts.size());
+            JSONObject payload = receipts.get(0);
+            assertEquals("arrived", payload.getString("kind"));
+            assertEquals("jpush", payload.getString("provider"));
+            assertEquals("arrival-session", payload.getString("sessionId"));
+            assertEquals(41L, payload.getLong("eventSeq"));
+            assertTrue(payload.has("token"));
+        } finally {
+            PushReceiptReporter.setSink(null);
+        }
+    }
+
+    @Test
+    public void openedReportsThroughTheReceiptSink() throws Exception {
+        List<JSONObject> captured = new ArrayList<>();
+        PushReceiptReporter.setSink(captured::add);
+        try {
+            PushReceiptReporter.reportMessage(
+                InstrumentationRegistry.getInstrumentation().getTargetContext(),
+                "opened", notification("opened-session", "42"));
+            JSONObject payload = awaitReceipt(captured).get(0);
+            assertEquals("opened", payload.getString("kind"));
+            assertEquals("opened-session", payload.getString("sessionId"));
+            assertEquals(42L, payload.getLong("eventSeq"));
+        } finally {
+            PushReceiptReporter.setSink(null);
+        }
+    }
+
+    @Test
+    public void malformedExtrasAndBadSequencesReportNothing() throws Exception {
+        List<JSONObject> captured = new ArrayList<>();
+        PushReceiptReporter.setSink(captured::add);
+        try {
+            android.content.Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+            NotificationMessage malformed = new NotificationMessage();
+            malformed.notificationExtras = "{not-json";
+            PushReceiptReporter.reportMessage(context, "arrived", malformed);
+            PushReceiptReporter.reportMessage(context, "arrived", notification("missing-seq", ""));
+            PushReceiptReporter.reportMessage(context, "arrived", notification("bad-seq-session", "not-a-number"));
+            SystemClock.sleep(300);
+            assertTrue(captured.isEmpty());
+        } finally {
+            PushReceiptReporter.setSink(null);
+        }
     }
 }
