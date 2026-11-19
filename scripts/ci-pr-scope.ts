@@ -44,8 +44,8 @@ export interface CiPrScope {
   readonly gatewayMode: 'skip' | 'full'
   /** The independent Gateway administration UI project. */
   readonly adminUiMode: 'skip' | 'full'
-  /** Android is optional and runs only through the manual android-audit suite. */
-  readonly androidMode: 'skip'
+  /** The Android shell debug build, lint, and unit-test lane; the emulator bridge stays manual-only. */
+  readonly androidMode: 'skip' | 'full'
   /** Explicit consumer rules used to explain added lanes. */
   readonly consumerReasons: ReturnType<typeof consumerReasons>
 }
@@ -142,6 +142,10 @@ function isGatewayPath(path: string): boolean {
 
 function isAdminUiPath(path: string): boolean {
   return path.startsWith(policy.adminUiPrefix)
+}
+
+function isAndroidPath(path: string): boolean {
+  return path.startsWith('apps/android-shell/')
 }
 
 /**
@@ -346,8 +350,9 @@ export function classifyCiPrScope(
   const reasons = consumerReasons(paths.filter(path => !isInertPath(path) || isModelInputPath(path)))
   const gatewayReachable = reasons.gateway.length > 0 || paths.some(path => !isInertPath(path) && isGatewayPath(path))
   const adminUiReachable = reasons.adminUi.length > 0 || paths.some(path => !isInertPath(path) && isAdminUiPath(path))
+  const androidReachable = reasons.android.length > 0 || paths.some(path => !isInertPath(path) && isAndroidPath(path))
   const common = {
-    androidMode: 'skip' as const,
+    androidMode: androidReachable ? 'full' as const : 'skip' as const,
     consumerReasons: reasons,
     changedSourceFiles,
     changedPackageFiles,
@@ -387,7 +392,7 @@ export function classifyCiPrScope(
     windowsMode: 'full',
     gatewayMode: 'full',
     adminUiMode: 'full',
-    androidMode: 'skip',
+    androidMode: 'full',
     consumerReasons: { python: ['unknown-or-empty-diff'], gateway: ['unknown-or-empty-diff'], adminUi: ['unknown-or-empty-diff'], android: ['unknown-or-empty-diff'] },
   }
 
@@ -511,10 +516,10 @@ function scopeChanges(
   if (removedScenarios.length > 0) removed.push({ lane: 'web', from: removedScenarios, to: [],
     reason: candidate.webScenarios.length > 0 ? 'exact-scenario-owners-and-smokes'
       : proseOnlyBrowserExpansion ? 'accompanying-inert-prose' : 'unexplained' })
-  for (const lane of ['compatMode', 'windowsMode', 'pythonMode', 'gatewayMode', 'adminUiMode'] as const) {
+  for (const lane of ['compatMode', 'windowsMode', 'pythonMode', 'gatewayMode', 'adminUiMode', 'androidMode'] as const) {
     if (previous[lane] === candidate[lane]) continue
     const changes = candidate[lane] === 'full' ? added : removed
-    const claimed = paths.filter(path => lane === 'gatewayMode' ? isGatewayPath(path) : lane === 'adminUiMode' && isAdminUiPath(path))
+    const claimed = paths.filter(path => lane === 'gatewayMode' ? isGatewayPath(path) : lane === 'adminUiMode' ? isAdminUiPath(path) : lane === 'androidMode' && isAndroidPath(path))
     const inertConsumer = claimed.length > 0 && claimed.every(isInertProsePath)
     changes.push({ lane, from: previous[lane], to: candidate[lane],
       reason: changes === added ? 'consumer-input-policy' : inertConsumer ? 'inert-consumer-documentation' : 'unexplained' })
@@ -640,7 +645,7 @@ function main(): void {
   writeFileSync(`.artifacts/gates/selection-${commit}.json`, JSON.stringify({
     version: 1, kind: 'selection', phase: plans.policy, commit, baseline, paths, runtimePaths: runtimeInputPaths(paths),
     ...plans, executed: result, proofs,
-    optionalConsumers: { android: { policy: 'manual-only', suite: 'android-audit', affectedRules: plans.candidate.consumerReasons.android } },
+    optionalConsumers: { android: { policy: 'diff-scoped', suite: 'android-audit', affectedRules: plans.candidate.consumerReasons.android } },
   }, null, 2) + '\n')
   console.error(`ci-pr-scope: decision=${plans.executionSource}, baseline=${plans.baselineStatus}`)
   if (result.snapshotMode === 'focused') {
@@ -702,6 +707,7 @@ function main(): void {
         windowsMode: result.windowsMode,
         gatewayMode: result.gatewayMode,
         adminUiMode: result.adminUiMode,
+        androidMode: result.androidMode,
       },
     })}`,
   ].join('\n')}\n`)
@@ -735,6 +741,7 @@ export function unionConsumerSelection(previous: CiPrScope, candidate: CiPrScope
     pythonMode: previous.pythonMode === 'full' ? 'full' : candidate.pythonMode,
     gatewayMode: previous.gatewayMode === 'full' ? 'full' : candidate.gatewayMode,
     adminUiMode: previous.adminUiMode === 'full' ? 'full' : candidate.adminUiMode,
+    androidMode: previous.androidMode === 'full' ? 'full' : candidate.androidMode,
   }
 }
 

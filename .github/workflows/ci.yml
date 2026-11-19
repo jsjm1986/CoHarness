@@ -1112,7 +1112,10 @@ jobs:
           command: npm test --prefix gateway -- <windows spec set> && node tests/run-windows-principal-clock.mjs
 
   android-build:
-    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'
+    needs: pr-scope
+    if: >-
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit')
+      || (github.event_name == 'pull_request' && needs.pr-scope.outputs.android_mode == 'full'))
     runs-on: ubuntu-latest
     name: android / debug build and lint
     outputs:
@@ -1853,7 +1856,7 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [pr-scope, node-24, node-24-coverage, node-24-bench, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui, gateway-windows, windows-native, release-pack, vendor-pack, native-pack, sandbox-proof, provider-proof, pi-ai-proof]
+    needs: [pr-scope, node-24, node-24-coverage, node-24-bench, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui, gateway-windows, windows-native, release-pack, vendor-pack, native-pack, sandbox-proof, provider-proof, pi-ai-proof, android-build]
     if: always() && github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v7

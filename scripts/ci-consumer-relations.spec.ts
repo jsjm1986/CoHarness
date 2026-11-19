@@ -24,9 +24,12 @@ describe('fork consumer selection', () => {
     for (const lane of lanes) expect(reasons[lane as keyof typeof reasons].length).toBeGreaterThan(0)
   })
 
-  it('records Android impact without scheduling optional native verification', () => {
-    for (const path of ['docs/testing.md', 'apps/web/src/style.css', 'packages/util/timeout/src/index.ts', 'apps/web/src/native-push.ts', 'apps/android-shell/android/app/build.gradle']) {
+  it('schedules the Android build lane only for shell and consumer changes', () => {
+    for (const path of ['docs/testing.md', 'apps/web/src/style.css', 'packages/util/timeout/src/index.ts']) {
       expect(classifyCiPrScope([path], '').androidMode, path).toBe('skip')
+    }
+    for (const path of ['apps/web/src/native-push.ts', 'apps/android-shell/android/app/build.gradle']) {
+      expect(classifyCiPrScope([path], '').androidMode, path).toBe('full')
     }
     expect(classifyCiPrScope(['gateway/README.md'], '')).toMatchObject({ gatewayMode: 'skip', adminUiMode: 'skip' })
     expect(consumerReasons(['packages/core-other/index.ts']).python).toEqual([])

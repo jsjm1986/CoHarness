@@ -7,6 +7,7 @@ const scopeJobs = {
   windowsMode: 'windows',
   gatewayMode: 'gateway',
   adminUiMode: 'gateway-admin-ui',
+  androidMode: 'android-build',
 } as const
 
 const proofJobs = {

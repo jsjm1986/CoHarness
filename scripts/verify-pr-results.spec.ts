@@ -11,7 +11,7 @@ function plan() {
     version: 1, commit,
     scope: {
       runExpensive: false, compatMode: 'skip', pythonMode: 'skip', windowsMode: 'skip',
-      gatewayMode: 'skip', adminUiMode: 'skip',
+      gatewayMode: 'skip', adminUiMode: 'skip', androidMode: 'skip',
       coverageMode: 'skip', snapshotMode: 'skip', webGroups: [] as string[], webScenarios: [] as string[],
     },
     proofs: {
@@ -59,11 +59,11 @@ describe('current candidate CI result admission', () => {
   it('requires every selected consumer and real environment proof', () => {
     const input = plan()
     input.scope = { ...input.scope, runExpensive: true, coverageMode: 'full', snapshotMode: 'full',
-      compatMode: 'full', pythonMode: 'full', windowsMode: 'full', gatewayMode: 'full', adminUiMode: 'full' }
+      compatMode: 'full', pythonMode: 'full', windowsMode: 'full', gatewayMode: 'full', adminUiMode: 'full', androidMode: 'full' }
     for (const key of Object.keys(input.proofs) as (keyof typeof input.proofs)[]) input.proofs[key] = true
     const jobs = requiredPrJobs(input, commit)
     expect(jobs).toEqual([
-      'gateway', 'gateway-admin-ui', 'gateway-windows', 'native-pack', 'node-24', 'node-24-consumers', 'node-24-coverage',
+      'android-build', 'gateway', 'gateway-admin-ui', 'gateway-windows', 'native-pack', 'node-24', 'node-24-consumers', 'node-24-coverage',
       'node-compat', 'pi-ai-proof', 'pr-scope', 'provider-proof', 'python-runtime', 'python-sdk',
       'release-pack', 'sandbox-proof', 'vendor-pack', 'web-verification', 'windows', 'windows-native',
     ])
