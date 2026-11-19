@@ -21,7 +21,7 @@ interface NativePushStatusPlugin extends Plugin {
 }
 
 /** Device push health reported by the Android shell; absent in browsers and older shells. */
-export interface NativePushStatusResult {
+interface NativePushStatusResult {
   configured: boolean
   fcmConfigured: boolean
   jpushConfigured: boolean
@@ -86,7 +86,7 @@ async function registerJPushDevice(configured: boolean): Promise<void> {
 }
 
 /** Read the shell's push configuration and consent state; `null` outside the Android shell or on older shells. */
-export async function getNativePushStatus(): Promise<NativePushStatusResult | null> {
+async function getNativePushStatus(): Promise<NativePushStatusResult | null> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android'
     || !Capacitor.isPluginAvailable('NativePushStatus')) return null
   try {
@@ -105,17 +105,23 @@ export async function setupNativePush(): Promise<void> {
   let fcmConfigured = true
   let jpushConfigured = jpushAvailable
   if (jpushAvailable) {
-    try {
-      fcmConfigured = (await NativePushStatus.isFcmConfigured()).configured
-    } catch (error: unknown) {
-      // Older shells do not expose the method; retain the previous FCM behavior.
-      console.warn('[web] FCM configuration lookup failed:', error)
-    }
-    try {
-      jpushConfigured = (await NativePushStatus.isJPushConfigured()).configured
-    } catch (error: unknown) {
-      console.warn('[web] JPush configuration lookup failed:', error)
-      jpushConfigured = false
+    const status = await getNativePushStatus()
+    if (status !== null) {
+      fcmConfigured = status.fcmConfigured
+      jpushConfigured = status.jpushConfigured
+    } else {
+      try {
+        fcmConfigured = (await NativePushStatus.isFcmConfigured()).configured
+      } catch (error: unknown) {
+        // Older shells do not expose the method; retain the previous FCM behavior.
+        console.warn('[web] FCM configuration lookup failed:', error)
+      }
+      try {
+        jpushConfigured = (await NativePushStatus.isJPushConfigured()).configured
+      } catch (error: unknown) {
+        console.warn('[web] JPush configuration lookup failed:', error)
+        jpushConfigured = false
+      }
     }
   }
   if (!fcmConfigured && !jpushConfigured) return
