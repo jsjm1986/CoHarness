@@ -103,7 +103,11 @@ public class NativePushBridgeTest {
     }
 
     private static List<JSONObject> awaitReceipt(List<JSONObject> captured) throws Exception {
-        long deadline = SystemClock.elapsedRealtime() + 5_000;
+        return awaitReceipt(captured, 5_000);
+    }
+
+    private static List<JSONObject> awaitReceipt(List<JSONObject> captured, long timeoutMs) throws Exception {
+        long deadline = SystemClock.elapsedRealtime() + timeoutMs;
         while (captured.isEmpty() && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(25);
         return captured;
     }
@@ -154,6 +158,128 @@ public class NativePushBridgeTest {
             assertEquals(42L, payload.getLong("eventSeq"));
         } finally {
             PushReceiptReporter.setSink(null);
+        }
+    }
+
+    @Test
+    public void unifiedpushMessageReportsArrivedAndDropsMalformed() throws Exception {
+        android.content.Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        String endpoint = "https://ntfy.example.com/upTESTTOKEN";
+        context.getSharedPreferences(CoHarnessPushService.UP_PREFERENCES, android.content.Context.MODE_PRIVATE)
+            .edit().putString(CoHarnessPushService.UP_ENDPOINT, endpoint).apply();
+        List<JSONObject> captured = new ArrayList<>();
+        PushReceiptReporter.setSink(captured::add);
+        try {
+            String runtimeId = UUID.randomUUID().toString();
+            CoHarnessPushService.handleUpMessage(context, new JSONObject()
+                .put("title", "AI 回复完成").put("body", "点击查看回复")
+                .put("sessionId", "up-arrival-session").put("runtimeId", runtimeId)
+                .put("eventSeq", "77").toString());
+            List<JSONObject> receipts = awaitReceipt(captured);
+            assertEquals(1, receipts.size());
+            JSONObject payload = receipts.get(0);
+            assertEquals("arrived", payload.getString("kind"));
+            assertEquals("unifiedpush", payload.getString("provider"));
+            assertEquals(endpoint, payload.getString("token"));
+            assertEquals("up-arrival-session", payload.getString("sessionId"));
+            assertEquals(77L, payload.getLong("eventSeq"));
+            CoHarnessPushService.handleUpMessage(context, "{not-json");
+            CoHarnessPushService.handleUpMessage(context, new JSONObject()
+                .put("sessionId", "no-runtime").toString());
+            CoHarnessPushService.handleUpMessage(context, new JSONObject()
+                .put("sessionId", "no-seq").put("runtimeId", runtimeId).toString());
+            SystemClock.sleep(300);
+            assertEquals(1, captured.size());
+        } finally {
+            PushReceiptReporter.setSink(null);
+            context.getSharedPreferences(CoHarnessPushService.UP_PREFERENCES, android.content.Context.MODE_PRIVATE)
+                .edit().remove(CoHarnessPushService.UP_ENDPOINT).apply();
+        }
+    }
+
+    @Test
+    public void unifiedpushLaunchIntentReportsOpenedOnce() throws Exception {
+        android.content.Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        String endpoint = "https://ntfy.example.com/upTESTTOKEN";
+        context.getSharedPreferences(CoHarnessPushService.UP_PREFERENCES, android.content.Context.MODE_PRIVATE)
+            .edit().putString(CoHarnessPushService.UP_ENDPOINT, endpoint).apply();
+        List<JSONObject> captured = new ArrayList<>();
+        PushReceiptReporter.setSink(captured::add);
+        try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(
+            new Intent(context, MainActivity.class)
+                .putExtra(NativePushStatusPlugin.EXTRA_SESSION_ID, "up-opened-session")
+                .putExtra(NativePushStatusPlugin.EXTRA_RUNTIME_ID, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+                .putExtra(NativePushStatusPlugin.EXTRA_EVENT_SEQ, "88")
+                .putExtra(NativePushStatusPlugin.EXTRA_PUSH_PROVIDER, "unifiedpush"))) {
+            List<JSONObject> receipts = awaitReceipt(captured);
+            assertEquals(1, receipts.size());
+            JSONObject payload = receipts.get(0);
+            assertEquals("opened", payload.getString("kind"));
+            assertEquals("unifiedpush", payload.getString("provider"));
+            assertEquals(endpoint, payload.getString("token"));
+            assertEquals(88L, payload.getLong("eventSeq"));
+        } finally {
+            PushReceiptReporter.setSink(null);
+            context.getSharedPreferences(CoHarnessPushService.UP_PREFERENCES, android.content.Context.MODE_PRIVATE)
+                .edit().remove(CoHarnessPushService.UP_ENDPOINT).apply();
+        }
+    }
+
+    @Test
+    public void unifiedpushRealDistributorDeliversPostedMessage() throws Exception {
+        android.content.Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        java.util.List<String> distributors = org.unifiedpush.android.connector.UnifiedPush.getDistributors(context);
+        org.junit.Assume.assumeTrue("no UnifiedPush distributor installed", !distributors.isEmpty());
+        org.unifiedpush.android.connector.UnifiedPush.saveDistributor(context, distributors.get(0));
+        try {
+            org.unifiedpush.android.connector.UnifiedPush.register(
+                context, org.unifiedpush.android.connector.ConstantsKt.INSTANCE_DEFAULT, null, null);
+            String endpoint = null;
+            long deadline = SystemClock.elapsedRealtime() + 15_000;
+            while (SystemClock.elapsedRealtime() < deadline && endpoint == null) {
+                String stored = CoHarnessPushService.storedEndpoint(context);
+                if (!stored.isEmpty()) endpoint = stored;
+                else SystemClock.sleep(100);
+            }
+            assertNotNull("distributor must issue an endpoint", endpoint);
+            List<JSONObject> captured = new ArrayList<>();
+            PushReceiptReporter.setSink(captured::add);
+            try {
+                String runtimeId = UUID.randomUUID().toString();
+                String payload = new JSONObject()
+                    .put("title", "AI 回复完成").put("body", "点击查看回复")
+                    .put("sessionId", "up-e2e-session").put("runtimeId", runtimeId)
+                    .put("eventSeq", "99").toString();
+                String deliveryEndpoint = endpoint;
+                new Thread(() -> {
+                    try {
+                        HttpURLConnection connection = (HttpURLConnection) new URL(deliveryEndpoint).openConnection();
+                        connection.setRequestMethod("POST");
+                        connection.setRequestProperty("content-type", "application/json");
+                        connection.setConnectTimeout(10_000);
+                        connection.setReadTimeout(10_000);
+                        connection.setDoOutput(true);
+                        connection.getOutputStream().write(payload.getBytes(StandardCharsets.UTF_8));
+                        connection.getOutputStream().close();
+                        connection.getInputStream().close();
+                        connection.disconnect();
+                    } catch (Exception error) {
+                        throw new RuntimeException(error);
+                    }
+                }).join(15_000);
+                List<JSONObject> receipts = awaitReceipt(captured, 30_000);
+                assertEquals(1, receipts.size());
+                JSONObject receipt = receipts.get(0);
+                assertEquals("arrived", receipt.getString("kind"));
+                assertEquals("unifiedpush", receipt.getString("provider"));
+                assertEquals("up-e2e-session", receipt.getString("sessionId"));
+                assertEquals(99L, receipt.getLong("eventSeq"));
+            } finally {
+                PushReceiptReporter.setSink(null);
+            }
+        } finally {
+            context.getSharedPreferences(CoHarnessPushService.UP_PREFERENCES, android.content.Context.MODE_PRIVATE)
+                .edit().remove(CoHarnessPushService.UP_ENDPOINT).apply();
         }
     }
 

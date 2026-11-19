@@ -9,6 +9,7 @@ import {
   FcmHttpV1Sender,
   JpushRestSender,
   PostgresPushService,
+  UnifiedPushEndpointSender,
   type PushDeviceRegistration,
   type PushProvider,
 } from '../src/push-notifications.ts'
@@ -231,6 +232,22 @@ describe('PostgresPushService', () => {
     expect(sender.send).toHaveBeenCalledWith({ runtimeId: RUNTIME_ID, token: 'device-token', sessionId: SESSION_ID, eventSeq: 20 }, expect.any(AbortSignal))
   })
 
+  it('routes a UnifiedPush device through the UnifiedPush sender', async () => {
+    const sender = { send: vi.fn(async (_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<{ messageId?: string }> => ({})) }
+    const fixture = poolFixture({ deviceProvider: 'unifiedpush' })
+    const push = new PostgresPushService(
+      { pool: fixture.pool, organizationId: ORGANIZATION_ID },
+      loadConfig({}),
+      fetch,
+      { unifiedpush: sender },
+    )
+
+    await push.registerDevice(42, { token: 'https://ntfy.example.com/upDevice', platform: 'android', provider: 'unifiedpush' })
+    await push.notifyCompleted(RUNTIME_ID, SESSION_ID, 20)
+
+    expect(sender.send).toHaveBeenCalledWith({ runtimeId: RUNTIME_ID, token: 'device-token', sessionId: SESSION_ID, eventSeq: 20 }, expect.any(AbortSignal))
+  })
+
   it('preserves confirmed provider acceptance when the response body has no parseable msg_id', async () => {
     const request = vi.fn(async () => new Response('not-json', { status: 200 }))
     const fixture = poolFixture({ deviceProvider: 'jpush' })
@@ -356,5 +373,65 @@ describe('JpushRestSender', () => {
     await expect(new JpushRestSender('app-key', 'master-secret', request).send({ runtimeId: RUNTIME_ID,
       token: 'registration-id', sessionId: SESSION_ID, eventSeq: 21,
     })).rejects.toMatchObject({ message: 'JPush send failed with HTTP 500', invalidToken: false })
+  })
+})
+
+describe('UnifiedPushEndpointSender', () => {
+  const sender = (request: typeof fetch) => new UnifiedPushEndpointSender(['ntfy.example.com'], request)
+
+  it('posts the session payload to the allowlisted endpoint and returns the server id', async () => {
+    const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>
+      expect(body).toEqual({
+        title: 'AI 回复完成', body: '点击查看回复',
+        runtimeId: RUNTIME_ID, sessionId: SESSION_ID, eventSeq: '22',
+      })
+      return new Response(JSON.stringify({ id: 'up-msg-9' }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    const receipt = await sender(request).send({ runtimeId: RUNTIME_ID,
+      token: 'https://ntfy.example.com/upA1b2C3', sessionId: SESSION_ID, eventSeq: 22,
+    })
+    expect(receipt).toEqual({ messageId: 'up-msg-9' })
+    expect(request).toHaveBeenCalledOnce()
+    expect(String(vi.mocked(request).mock.calls[0]?.[0])).toBe('https://ntfy.example.com/upA1b2C3')
+  })
+
+  it('accepts an allowlisted subdomain endpoint', async () => {
+    const request = vi.fn(async () => new Response('{}', { status: 202 }))
+    await sender(request).send({ runtimeId: RUNTIME_ID,
+      token: 'https://push.eu.ntfy.example.com/upZZ', sessionId: SESSION_ID, eventSeq: 1,
+    })
+    expect(request).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a foreign endpoint host before any request', async () => {
+    const request = vi.fn(async () => new Response('{}', { status: 200 }))
+    await expect(sender(request).send({ runtimeId: RUNTIME_ID,
+      token: 'https://evil.example.org/upA1b2C3', sessionId: SESSION_ID, eventSeq: 22,
+    })).rejects.toMatchObject({ invalidToken: true })
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-https endpoint before any request', async () => {
+    const request = vi.fn(async () => new Response('{}', { status: 200 }))
+    await expect(sender(request).send({ runtimeId: RUNTIME_ID,
+      token: 'http://ntfy.example.com/upA1b2C3', sessionId: SESSION_ID, eventSeq: 22,
+    })).rejects.toMatchObject({ invalidToken: true })
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('rejects a malformed endpoint before any request', async () => {
+    const request = vi.fn(async () => new Response('{}', { status: 200 }))
+    await expect(sender(request).send({ runtimeId: RUNTIME_ID,
+      token: 'not-a-url', sessionId: SESSION_ID, eventSeq: 22,
+    })).rejects.toMatchObject({ invalidToken: true })
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('fails the send on a non-2xx endpoint response', async () => {
+    const request = vi.fn(async () => new Response('nope', { status: 500 }))
+    await expect(sender(request).send({ runtimeId: RUNTIME_ID,
+      token: 'https://ntfy.example.com/upA1b2C3', sessionId: SESSION_ID, eventSeq: 22,
+    })).rejects.toMatchObject({ message: 'UnifiedPush send failed with HTTP 500', invalidToken: false })
   })
 })

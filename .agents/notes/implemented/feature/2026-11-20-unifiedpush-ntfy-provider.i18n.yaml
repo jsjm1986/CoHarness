@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-20-unifiedpush-ntfy-provider.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-20-unifiedpush-ntfy-provider.md
+document:
+  en: c6f91788a14f46d92d71ed80c5af2730e85d1d7a
+  zh: ee4324b3901f9b015c17f39fb9badc55197b5dfc
+/agent-note-unifiedpush-provider-via-ntfy-distributor:
+  en: 1cc69bd81cc8a9ef
+  zh: 6a0f19e8427dac0a
+/agent-note-unifiedpush-provider-via-ntfy-distributor/problem:
+  en: e6f77d99f5f92005
+  zh: a332b5e17f40f64b
+/agent-note-unifiedpush-provider-via-ntfy-distributor/decision:
+  en: 8c485ba6f95a917f
+  zh: 9d4c64d7f95945d3
+/agent-note-unifiedpush-provider-via-ntfy-distributor/alternatives-considered:
+  en: 2a29731a72e24a27
+  zh: eb67d17cf2a4d140
+/agent-note-unifiedpush-provider-via-ntfy-distributor/verification-redmi-k30-ultra-ntfy-f-droid-1-25-2:
+  en: fdbed3690d410a70
+  zh: 925f25ab27aeae5f
+/agent-note-unifiedpush-provider-via-ntfy-distributor/consequences:
+  en: 1a3ea495ad45ef81
+  zh: 6e3c65002b257ebf

@@ -4,7 +4,7 @@ import { PushNotifications } from '@capacitor/push-notifications'
 const DEVICE_ID_KEY = 'hgw.push.device-id'
 const CHANNEL_ID = 'ai-replies'
 
-type PushProvider = 'fcm' | 'jpush'
+type PushProvider = 'fcm' | 'jpush' | 'unifiedpush'
 
 interface NativeNotificationAction {
   sessionId?: string
@@ -18,6 +18,7 @@ interface NativePushStatusPlugin extends Plugin {
   initializeJPush(): Promise<{ configured: boolean }>
   getJPushRegistrationId(): Promise<{ registrationId: string }>
   getPushStatus(): Promise<NativePushStatusResult>
+  initializeUnifiedPush(): Promise<{ configured: boolean; distributors?: string[] }>
 }
 
 /** Device push health reported by the Android shell; absent in browsers and older shells. */
@@ -28,6 +29,8 @@ interface NativePushStatusResult {
   jpushInitialized: boolean
   notificationsEnabled: boolean
   registrationId: string
+  unifiedpushDistributor?: string
+  unifiedpushEndpoint?: string
 }
 
 const NativePushStatus = registerPlugin<NativePushStatusPlugin>('NativePushStatus')
@@ -104,8 +107,10 @@ export async function setupNativePush(): Promise<void> {
   const pushPluginAvailable = Capacitor.isPluginAvailable('PushNotifications')
   let fcmConfigured = true
   let jpushConfigured = jpushAvailable
+  let nativeStatus: NativePushStatusResult | null = null
   if (jpushAvailable) {
     const status = await getNativePushStatus()
+    nativeStatus = status
     if (status !== null) {
       fcmConfigured = status.fcmConfigured
       jpushConfigured = status.jpushConfigured
@@ -124,7 +129,9 @@ export async function setupNativePush(): Promise<void> {
       }
     }
   }
-  if (!fcmConfigured && !jpushConfigured) return
+  // A status-capable shell can still deliver UnifiedPush when FCM/JPush are absent.
+  const unifiedpushCapable = nativeStatus !== null
+  if (!fcmConfigured && !jpushConfigured && !unifiedpushCapable) return
 
   if (pushPluginAvailable) {
     try {
@@ -135,7 +142,7 @@ export async function setupNativePush(): Promise<void> {
       if (received.receive !== 'granted') return
     } catch (error: unknown) {
       console.warn('[web] push permission check failed:', error)
-      if (!jpushConfigured) return
+      if (!jpushConfigured && !unifiedpushCapable) return
     }
   }
 
@@ -147,7 +154,7 @@ export async function setupNativePush(): Promise<void> {
       jpushConfigured = false
     }
   }
-  if (!fcmConfigured && !jpushConfigured) return
+  if (!fcmConfigured && !jpushConfigured && !unifiedpushCapable) return
 
   if (fcmConfigured && pushPluginAvailable) {
     await PushNotifications.addListener('registration', ({ value }) => {
@@ -186,4 +193,27 @@ export async function setupNativePush(): Promise<void> {
     }
   }
   if (jpushAvailable && jpushConfigured) void registerJPushDevice(jpushConfigured)
+
+  // UnifiedPush: only shells new enough to return a status expose the method; a missing
+  // distributor or picker cancellation resolves `configured: false` rather than throwing.
+  if (jpushAvailable && nativeStatus !== null) {
+    try {
+      const unifiedpush = await NativePushStatus.initializeUnifiedPush()
+      if (unifiedpush.configured) {
+        await NativePushStatus.addListener('unifiedPushEndpoint', (event: { endpoint?: unknown }) => {
+          const endpoint = stringValue(event.endpoint)
+          if (endpoint === undefined) return
+          void registerToken(endpoint, 'unifiedpush').catch((error: unknown) => {
+            console.warn('[web] UnifiedPush device registration failed:', error)
+          })
+        })
+        const stored = stringValue(nativeStatus.unifiedpushEndpoint)
+        if (stored !== undefined) {
+          await registerToken(stored, 'unifiedpush')
+        }
+      }
+    } catch (error: unknown) {
+      console.warn('[web] UnifiedPush initialization failed:', error)
+    }
+  }
 }
