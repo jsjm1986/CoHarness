@@ -79,6 +79,9 @@ public final class PushReceiptReporter {
             connection.setReadTimeout(5_000);
             connection.setRequestMethod("POST");
             connection.setRequestProperty("content-type", "application/json");
+            // Native clients send no Origin header; the Gateway CSRF gate rejects cookie-authed
+            // /account/api/* POSTs without one, so present the same origin the WebView would.
+            connection.setRequestProperty("origin", origin);
             String cookies;
             try {
                 cookies = CookieManager.getInstance().getCookie(origin);
