@@ -65,6 +65,31 @@ public class NativePushStatusPlugin extends Plugin {
         call.resolve(result);
     }
 
+    @PluginMethod
+    public void getPushStatus(PluginCall call) {
+        boolean fcmConfigured = BuildConfig.NATIVE_PUSH_ENABLED && isFcmConfigured();
+        boolean jpushConfigured = BuildConfig.NATIVE_PUSH_ENABLED && jPushAppKeyConfigured();
+        String registrationId = "";
+        if (jpushConfigured && CoHarnessApplication.jpushConsentGranted(getContext())) {
+            try {
+                String value = JPushInterface.getRegistrationID(getContext());
+                if (value != null) registrationId = value.trim();
+            } catch (RuntimeException error) {
+                Log.w("NativePushStatus", "JPush RegistrationID lookup failed", error);
+            }
+        }
+        JSObject result = new JSObject();
+        result.put("configured", fcmConfigured || jpushConfigured);
+        result.put("fcmConfigured", fcmConfigured);
+        result.put("jpushConfigured", jpushConfigured);
+        result.put("jpushInitialized", BuildConfig.NATIVE_PUSH_ENABLED
+            && jpushConfigured && CoHarnessApplication.jpushConsentGranted(getContext()));
+        result.put("notificationsEnabled",
+            androidx.core.app.NotificationManagerCompat.from(getContext()).areNotificationsEnabled());
+        result.put("registrationId", registrationId);
+        call.resolve(result);
+    }
+
     @Override
     protected void handleOnNewIntent(Intent intent) {
         handleNotificationIntent(intent);

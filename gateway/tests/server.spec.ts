@@ -928,6 +928,9 @@ describe('gateway server', () => {
     deps.push = {
       registerDevice,
       removeDevice,
+      listDevices: vi.fn(async () => ({ devices: [] })),
+      recordReceipt: vi.fn(async () => 'recorded' as const),
+      adminOverview: vi.fn(async () => ({ devices: [], deliveries: [], stats: { devices: 0, byStatus: {}, byProvider: {} } })),
       notifyCompleted: vi.fn(async () => {}),
     }
     const cookie = await login(base, 'root-admin', 'pw-12345678')
@@ -980,6 +983,81 @@ describe('gateway server', () => {
     })
     expect(malformed.status).toBe(400)
     expect(await malformed.json()).toEqual({ error: 'invalid-push-device-id' })
+  })
+
+  it('lists the account push devices and records device receipts', async () => {
+    const { deps, base } = await setup()
+    const device = {
+      id: '018f8c3e-9d74-7f2e-b4a1-2c3d4e5f6a7b',
+      provider: 'jpush' as const,
+      deviceId: 'pixel-1',
+      appVersion: '1.0.0',
+      createdAt: '2026-11-19T00:00:00.000Z',
+      updatedAt: '2026-11-19T00:00:00.000Z',
+      lastSeenAt: '2026-11-19T00:00:00.000Z',
+      lastDelivery: null,
+    }
+    const recordReceipt = vi.fn(async (userId: number, input: {
+      provider: 'fcm' | 'jpush'
+      token: string
+      sessionId: string
+      eventSeq: number
+      kind: 'arrived' | 'opened'
+    }) => userId === 1 && input.token === 'jpush-token' ? 'recorded' as const : 'missing' as const)
+    deps.push = {
+      registerDevice: vi.fn(async () => ({ id: 'device' })),
+      removeDevice: vi.fn(async () => false),
+      listDevices: vi.fn(async (userId: number) => ({ devices: userId === 1 ? [device] : [] })),
+      recordReceipt,
+      adminOverview: vi.fn(async () => ({ devices: [], deliveries: [], stats: { devices: 0, byStatus: {}, byProvider: {} } })),
+      notifyCompleted: vi.fn(async () => {}),
+    }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+
+    const listed = await fetch(`${base}/account/api/push-devices`, { headers: { cookie, origin: base } })
+    expect(listed.status).toBe(200)
+    expect(await listed.json()).toEqual({ devices: [device] })
+
+    const arrived = await fetch(`${base}/account/api/push-receipts`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'jpush', token: 'jpush-token', sessionId: 'session-9', eventSeq: 12, kind: 'arrived' }),
+    })
+    expect(arrived.status).toBe(200)
+    expect(await arrived.json()).toEqual({ recorded: true })
+    expect(recordReceipt).toHaveBeenCalledWith(1, {
+      provider: 'jpush', token: 'jpush-token', sessionId: 'session-9', eventSeq: 12, kind: 'arrived',
+    })
+
+    const missing = await fetch(`${base}/account/api/push-receipts`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'jpush', token: 'other-token', sessionId: 'session-9', eventSeq: 12, kind: 'opened' }),
+    })
+    expect(missing.status).toBe(404)
+    expect(await missing.json()).toEqual({ error: 'push-receipt-target-missing' })
+
+    const invalid = await fetch(`${base}/account/api/push-receipts`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'jpush', token: 'jpush-token', sessionId: 'session-9', eventSeq: -1, kind: 'arrived' }),
+    })
+    expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toEqual({ error: 'invalid-push-receipt' })
+
+    const invalidKind = await fetch(`${base}/account/api/push-receipts`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'jpush', token: 'jpush-token', sessionId: 'session-9', eventSeq: 12, kind: 'clicked' }),
+    })
+    expect(invalidKind.status).toBe(400)
+
+    const anonymous = await fetch(`${base}/account/api/push-receipts`, {
+      method: 'POST',
+      headers: { origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'jpush', token: 'jpush-token', sessionId: 'session-9', eventSeq: 12, kind: 'arrived' }),
+    })
+    expect(anonymous.status).toBe(401)
   })
 
   it('forces password change before proxying', async () => {

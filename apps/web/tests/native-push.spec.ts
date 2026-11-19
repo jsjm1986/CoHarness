@@ -9,6 +9,7 @@ const bridge = vi.hoisted(() => ({
   listeners: new Map<string, (data: unknown) => void>(),
   fcm: false,
   jpush: true,
+  statusSupported: true,
 }))
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -19,6 +20,17 @@ vi.mock('@capacitor/core', () => ({
   registerPlugin: (name: string) => { bridge.requestedName = name; return {
     isFcmConfigured: async () => ({ configured: bridge.fcm }),
     isJPushConfigured: async () => ({ configured: bridge.jpush }),
+    getPushStatus: async () => {
+      if (!bridge.statusSupported) throw new Error('method not found')
+      return {
+        configured: bridge.fcm || bridge.jpush,
+        fcmConfigured: bridge.fcm,
+        jpushConfigured: bridge.jpush,
+        jpushInitialized: true,
+        notificationsEnabled: true,
+        registrationId: 'private-test-token',
+      }
+    },
     initializeJPush: async () => ({ configured: true }),
     getJPushRegistrationId: async () => ({ registrationId: 'private-test-token' }),
     addListener: async (event: string, callback: (data: unknown) => void) => { bridge.listeners.set(event, callback) },
@@ -50,6 +62,7 @@ describe('Android Web notification protocol', () => {
     bridge.native = true
     bridge.fcm = false
     bridge.jpush = true
+    bridge.statusSupported = true
   })
 
   it('registers the Android provider on a private endpoint and navigates notification sessions', async () => {
@@ -99,6 +112,15 @@ describe('Android Web notification protocol', () => {
     action!({ sessionId: 'session-17', runtimeId: 'invalid' })
     action!({ eventSeq: '42' })
     expect(assign).toHaveBeenCalledTimes(2)
+  })
+
+  it('falls back to per-method configuration lookups on shells without getPushStatus', async () => {
+    bridge.statusSupported = false
+    const storage = new Map<string, string>()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'test-device' }))))
+    vi.stubGlobal('localStorage', { setItem: (key: string, value: string) => storage.set(key, value) })
+    await setupNativePush()
+    await vi.waitFor(() => { expect(storage.get('hgw.push.device-id.jpush')).toBe('test-device') })
   })
 
   it('keeps hosted Web sessions outside native registration', async () => {

@@ -24,12 +24,6 @@ async function pushErrorBody(response: Response): Promise<string> {
   }
 }
 
-/** Release an accepted response without turning a body-cleanup failure into another notification attempt. */
-async function closeAcceptedPushResponse(response: Response): Promise<void> {
-  try { await response.body?.cancel() }
-  catch (error) { console.error('[gateway] accepted push response cleanup failed:', error) }
-}
-
 /** Provider used to address one Android push registration. */
 export type PushProvider = 'fcm' | 'jpush'
 
@@ -40,6 +34,54 @@ export interface PushDeviceRegistration {
   provider?: PushProvider
   deviceId?: string
   appVersion?: string
+}
+
+/** Device-reported outcome for one accepted delivery; the device authenticates with its provider token. */
+export interface PushReceiptInput {
+  provider: PushProvider
+  token: string
+  sessionId: string
+  eventSeq: number
+  kind: 'arrived' | 'opened'
+}
+
+/** Latest recorded outcome for one registered device. */
+export interface PushDeviceView {
+  id: string
+  provider: PushProvider
+  deviceId: string | null
+  appVersion: string | null
+  createdAt: string
+  updatedAt: string
+  lastSeenAt: string
+  lastDelivery: PushDeliveryView | null
+}
+
+/** One durable delivery row as exposed by the account and administrator read surfaces. */
+export interface PushDeliveryView {
+  sessionId: string
+  eventSeq: number
+  deviceId: string
+  status: string
+  attempts: number
+  lastError: string | null
+  providerMsgId: string | null
+  createdAt: string
+  updatedAt: string
+  sentAt: string | null
+  deliveredAt: string | null
+  openedAt: string | null
+}
+
+/** Administrator-visible organization snapshot of push devices and recent deliveries. */
+export interface PushOverview {
+  devices: Array<PushDeviceView & { userId: string; username: string }>
+  deliveries: PushDeliveryView[]
+  stats: {
+    devices: number
+    byStatus: Record<string, number>
+    byProvider: Record<string, Record<string, number>>
+  }
 }
 
 /** Push capability consumed by the Gateway HTTP and runtime handlers. */
@@ -59,6 +101,24 @@ export interface GatewayPushService {
    */
   removeDevice(userId: number, deviceId: string): Promise<boolean>
   /**
+   * List the authenticated account's registered devices with each device's latest delivery outcome.
+   * @param userId - server-authenticated public account id.
+   * @returns devices ordered by most recent registration activity.
+   */
+  listDevices(userId: number): Promise<{ devices: PushDeviceView[] }>
+  /**
+   * Record a device-reported arrival or open against the accepted delivery owned by that device.
+   * @param userId - server-authenticated public account id; the device must still belong to this account.
+   * @param input - validated receipt carrying the provider token, session id, event sequence, and outcome kind.
+   * @returns `recorded` when a matching accepted delivery was marked (or was already marked), `missing` otherwise.
+   */
+  recordReceipt(userId: number, input: PushReceiptInput): Promise<'recorded' | 'missing'>
+  /**
+   * Organization-wide devices, recent deliveries, and outcome counts for administrator diagnostics.
+   * @returns the snapshot; caller-level administrator admission owns authorization.
+   */
+  adminOverview(): Promise<PushOverview>
+  /**
    * Notify the creator after a completed turn has durably committed; this method supplies no persistence proof.
    * @param runtimeId - authenticated owning Runtime, also carried by the notification.
    * @param sessionId - committed conversation id; recipient eligibility, inherited visibility and device ownership are checked at claim admission.
@@ -69,9 +129,14 @@ export interface GatewayPushService {
   notifyCompleted(runtimeId: RuntimeId, sessionId: string, eventSeq: number): Promise<void>
 }
 
+/** Provider-issued identifier for one accepted send, when the provider response supplies one. */
+interface PushSendReceipt {
+  messageId?: string
+}
+
 interface PushSender {
   /** Without a signal the direct caller owns the deadline; the configured delivery service always supplies one. */
-  send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, signal?: AbortSignal): Promise<void>
+  send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, signal?: AbortSignal): Promise<PushSendReceipt>
 }
 
 interface AccessTokenClient {
@@ -88,6 +153,67 @@ interface DeviceRow {
   id: string
   token: string
   provider: PushProvider
+}
+
+interface PushDeviceRow {
+  id: string
+  provider: PushProvider
+  device_id: string | null
+  app_version: string | null
+  created_at: Date
+  updated_at: Date
+  last_seen_at: Date
+}
+
+/** Delivery columns arrive as driver types from `SELECT *` and as JSON values from `row_to_json`. */
+interface PushDeliveryRow {
+  session_id: string
+  event_seq: string | number
+  device_id: string
+  status: string
+  attempts: number
+  last_error: string | null
+  provider_msg_id: string | null
+  created_at: Date | string
+  updated_at: Date | string
+  sent_at: Date | string | null
+  delivered_at: Date | string | null
+  opened_at: Date | string | null
+}
+
+function timestampView(value: Date | string | null | undefined): string | null {
+  if (value instanceof Date) return value.toISOString()
+  return typeof value === 'string' ? value : null
+}
+
+function deliveryView(row: PushDeliveryRow): PushDeliveryView {
+  return {
+    sessionId: row.session_id,
+    eventSeq: Number(row.event_seq),
+    deviceId: row.device_id,
+    status: row.status,
+    attempts: row.attempts,
+    lastError: row.last_error,
+    providerMsgId: row.provider_msg_id ?? null,
+    createdAt: timestampView(row.created_at) ?? '',
+    updatedAt: timestampView(row.updated_at) ?? '',
+    sentAt: timestampView(row.sent_at),
+    deliveredAt: timestampView(row.delivered_at),
+    openedAt: timestampView(row.opened_at),
+  }
+}
+
+function deviceView(row: PushDeviceRow & { last_delivery?: PushDeliveryRow | null }): PushDeviceView {
+  return {
+    id: row.id,
+    provider: row.provider,
+    deviceId: row.device_id,
+    appVersion: row.app_version,
+    createdAt: timestampView(row.created_at) ?? '',
+    updatedAt: timestampView(row.updated_at) ?? '',
+    lastSeenAt: timestampView(row.last_seen_at) ?? '',
+    lastDelivery: row.last_delivery === undefined || row.last_delivery === null ? null : deliveryView(row.last_delivery),
+  }
 }
 
 class PushSendError extends Error {
@@ -128,7 +254,7 @@ export class FcmHttpV1Sender implements PushSender {
     private readonly request: typeof fetch = fetch,
   ) {}
 
-  async send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, signal?: AbortSignal): Promise<void> {
+  async send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, signal?: AbortSignal): Promise<PushSendReceipt> {
     signal?.throwIfAborted()
     const account = await this.loadAccount()
     signal?.throwIfAborted()
@@ -169,7 +295,16 @@ export class FcmHttpV1Sender implements PushSender {
         }),
       },
     )
-    if (response.ok) { await closeAcceptedPushResponse(response); return }
+    if (response.ok) {
+      try {
+        const parsed = object(JSON.parse(await pushErrorBody(response)))
+        const messageId = nonEmptyString(parsed?.name)
+        return messageId === undefined ? {} : { messageId }
+      } catch {
+        // An accepted send stays accepted when the provider omits a parseable message name.
+        return {}
+      }
+    }
     const body = await pushErrorBody(response)
     let code: string | undefined
     try {
@@ -221,7 +356,7 @@ export class JpushRestSender implements PushSender {
     private readonly endpoint = JPUSH_ENDPOINT,
   ) {}
 
-  async send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, signal?: AbortSignal): Promise<void> {
+  async send(input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }, signal?: AbortSignal): Promise<PushSendReceipt> {
     signal?.throwIfAborted()
     const authorization = Buffer.from(`${this.appKey}:${this.masterSecret}`, 'utf8').toString('base64')
     const response = await this.request(this.endpoint, {
@@ -248,7 +383,16 @@ export class JpushRestSender implements PushSender {
         },
       }),
     })
-    if (response.ok) { await closeAcceptedPushResponse(response); return }
+    if (response.ok) {
+      try {
+        const parsed = object(JSON.parse(await pushErrorBody(response)))
+        const messageId = nonEmptyString(parsed?.msg_id)
+        return messageId === undefined ? {} : { messageId }
+      } catch {
+        // An accepted send stays accepted when the provider omits a parseable msg_id.
+        return {}
+      }
+    }
     const body = await pushErrorBody(response)
     const invalidToken = response.status === 400
       && /(registration[_ -]?id|invalid audience|invalid registration|1003|1004)/i.test(body)
@@ -257,7 +401,7 @@ export class JpushRestSender implements PushSender {
 }
 
 class UnconfiguredPushSender implements PushSender {
-  async send(_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<void> {
+  async send(_input: { token: string; runtimeId: RuntimeId; sessionId: string; eventSeq: number }): Promise<PushSendReceipt> {
     throw new PushSendError('Push provider is not configured', false)
   }
 }
@@ -339,6 +483,80 @@ export class PostgresPushService implements GatewayPushService {
         WHERE organization_id=$1 AND id=$2 AND user_id=$3`, [this.context.organizationId, deviceId, account.id])
       return result.rowCount === 1
     })
+  }
+
+  async listDevices(userId: number): Promise<{ devices: PushDeviceView[] }> {
+    return transaction(this.context.pool, async client => {
+      const account = await lockActiveAccount(client, this.context, userId)
+      const result = await client.query<PushDeviceRow & { last_delivery: PushDeliveryRow | null }>(`SELECT
+        device.id::text,device.provider,device.device_id,device.app_version,device.created_at,device.updated_at,device.last_seen_at,
+        (SELECT row_to_json(latest) FROM (SELECT * FROM harness.push_deliveries delivery
+          WHERE delivery.organization_id=device.organization_id AND delivery.device_id=device.id
+          ORDER BY delivery.updated_at DESC LIMIT 1) latest) last_delivery
+        FROM harness.push_devices device
+        WHERE device.organization_id=$1 AND device.user_id=$2
+        ORDER BY device.updated_at DESC`, [this.context.organizationId, account.id])
+      return { devices: result.rows.map(deviceView) }
+    })
+  }
+
+  async recordReceipt(userId: number, input: PushReceiptInput): Promise<'recorded' | 'missing'> {
+    return transaction(this.context.pool, async client => {
+      const account = await lockActiveAccount(client, this.context, userId)
+      const device = (await client.query<{ id: string }>(`SELECT id::text FROM harness.push_devices
+        WHERE organization_id=$1 AND provider=$2 AND token=$3 AND user_id=$4 FOR SHARE`,
+      [this.context.organizationId, input.provider, input.token, account.id])).rows[0]
+      if (device === undefined) return 'missing'
+      const marked = input.kind === 'arrived'
+        ? await client.query(`UPDATE harness.push_deliveries SET
+            delivered_at=clock_timestamp(),updated_at=clock_timestamp()
+            WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4 AND delivered_at IS NULL`,
+          [this.context.organizationId, input.sessionId, input.eventSeq, device.id])
+        : await client.query(`UPDATE harness.push_deliveries SET
+            delivered_at=COALESCE(delivered_at,clock_timestamp()),opened_at=clock_timestamp(),updated_at=clock_timestamp()
+            WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4 AND opened_at IS NULL`,
+          [this.context.organizationId, input.sessionId, input.eventSeq, device.id])
+      if (marked.rowCount === 1) return 'recorded'
+      const existing = await client.query(`SELECT 1 FROM harness.push_deliveries
+        WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4`,
+        [this.context.organizationId, input.sessionId, input.eventSeq, device.id])
+      return existing.rowCount === 1 ? 'recorded' : 'missing'
+    })
+  }
+
+  async adminOverview(): Promise<PushOverview> {
+    const [devices, deliveries, stats] = await Promise.all([
+      this.context.pool.query<(PushDeviceRow & { user_id: string; username: string; last_delivery: PushDeliveryRow | null })>(`SELECT
+        device.id::text,device.provider,device.device_id,device.app_version,device.created_at,device.updated_at,device.last_seen_at,
+        device.user_id::text user_id,account.username,
+        (SELECT row_to_json(latest) FROM (SELECT * FROM harness.push_deliveries delivery
+          WHERE delivery.organization_id=device.organization_id AND delivery.device_id=device.id
+          ORDER BY delivery.updated_at DESC LIMIT 1) latest) last_delivery
+        FROM harness.push_devices device
+        JOIN harness.users account ON account.organization_id=device.organization_id AND account.id=device.user_id
+        WHERE device.organization_id=$1
+        ORDER BY device.updated_at DESC`, [this.context.organizationId]),
+      this.context.pool.query<PushDeliveryRow>(`SELECT * FROM harness.push_deliveries
+        WHERE organization_id=$1 ORDER BY updated_at DESC LIMIT 200`, [this.context.organizationId]),
+      this.context.pool.query<{ provider: string; status: string; count: string }>(`SELECT
+        device.provider,delivery.status,count(*)::text count
+        FROM harness.push_deliveries delivery JOIN harness.push_devices device
+          ON device.organization_id=delivery.organization_id AND device.id=delivery.device_id
+        WHERE delivery.organization_id=$1 GROUP BY device.provider,delivery.status`, [this.context.organizationId]),
+    ])
+    const byStatus: Record<string, number> = {}
+    const byProvider: Record<string, Record<string, number>> = {}
+    for (const row of stats.rows) {
+      const count = Number(row.count)
+      byStatus[row.status] = (byStatus[row.status] ?? 0) + count
+      const provider = byProvider[row.provider] ?? (byProvider[row.provider] = {})
+      provider[row.status] = (provider[row.status] ?? 0) + count
+    }
+    return {
+      devices: devices.rows.map(row => ({ ...deviceView(row), userId: row.user_id, username: row.username })),
+      deliveries: deliveries.rows.map(deliveryView),
+      stats: { devices: devices.rowCount ?? 0, byStatus, byProvider },
+    }
   }
 
   /** Retain project membership, computer access and Steward qualification before the conversation lock. */
@@ -426,7 +644,7 @@ export class PostgresPushService implements GatewayPushService {
   }
 
   /** Own the complete send deadline, including late credential preparation; provider HTTP retains no database connection. */
-  private async send(device: DeviceRow, runtimeId: RuntimeId, sessionId: string, eventSeq: number): Promise<void> {
+  private async send(device: DeviceRow, runtimeId: RuntimeId, sessionId: string, eventSeq: number): Promise<PushSendReceipt> {
     const abort = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
     const deadline = new Promise<never>((_resolve, reject) => {
@@ -437,7 +655,7 @@ export class PostgresPushService implements GatewayPushService {
       }, this.timeoutMs)
     })
     try {
-      await Promise.race([
+      return await Promise.race([
         Promise.resolve().then(() => this.senders[device.provider].send({ token: device.token, runtimeId, sessionId, eventSeq }, abort.signal)),
         deadline,
       ])
@@ -457,8 +675,9 @@ export class PostgresPushService implements GatewayPushService {
       const claim = await this.claimDelivery(runtimeId, sessionId, eventSeq, publicNumber(owner.public_id, 'user'), candidate.id)
       if (claim === null) continue
       const { device, attempt } = claim
+      let receipt: PushSendReceipt
       try {
-        await this.send(device, runtimeId, sessionId, eventSeq)
+        receipt = await this.send(device, runtimeId, sessionId, eventSeq)
       } catch (error: unknown) {
         try {
           const failed = await this.context.pool.query(`UPDATE harness.push_deliveries SET
@@ -478,9 +697,9 @@ export class PostgresPushService implements GatewayPushService {
         continue
       }
       await this.context.pool.query(`UPDATE harness.push_deliveries SET
-        status='sent',sent_at=clock_timestamp(),updated_at=clock_timestamp(),last_error=NULL
+        status='sent',sent_at=clock_timestamp(),updated_at=clock_timestamp(),last_error=NULL,provider_msg_id=$7
         WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4 AND attempts=$5 AND runtime_id=$6 AND status='pending'`,
-      [this.context.organizationId, sessionId, eventSeq, device.id, attempt, runtimeId])
+      [this.context.organizationId, sessionId, eventSeq, device.id, attempt, runtimeId, receipt.messageId ?? null])
     }
   }
 

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-19-push-delivery-outcome-receipts.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-19-push-delivery-outcome-receipts.md
+document:
+  en: 5b843ce002e98999004c04aa5a21ecb63cb9787d
+  zh: f14315ce51fd0c71c7022776819611bff7679077
+/agent-note-device-reported-push-delivery-outcome-receipts:
+  en: 89b6948e2e10507f
+  zh: f23c562f6438bc4a
+/agent-note-device-reported-push-delivery-outcome-receipts/problem:
+  en: 7aaf7d20c0a20a9b
+  zh: e8b2f5b23cb44546
+/agent-note-device-reported-push-delivery-outcome-receipts/decision:
+  en: 9a71c8466f8d41c9
+  zh: f0e2bfd7a4abe3a4
+/agent-note-device-reported-push-delivery-outcome-receipts/consequences:
+  en: 00b11b92f2fe1e47
+  zh: bc001c7e658cbfbe
+/agent-note-device-reported-push-delivery-outcome-receipts/alternatives-considered:
+  en: 840c7bc33bae2b9b
+  zh: 36d5455164dc0fd5
+/agent-note-device-reported-push-delivery-outcome-receipts/verification:
+  en: f32c87d3a089f47c
+  zh: 0461c498724df78e

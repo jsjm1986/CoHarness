@@ -10,9 +10,16 @@ import org.json.JSONObject;
 /** Routes a JPush notification click into the existing Capacitor activity. */
 public final class CoHarnessPushReceiver extends JPushMessageReceiver {
     @Override
+    public void onNotifyMessageArrived(Context context, NotificationMessage message) {
+        super.onNotifyMessageArrived(context, message);
+        PushReceiptReporter.reportMessage(context, "arrived", message);
+    }
+
+    @Override
     public void onNotifyMessageOpened(Context context, NotificationMessage message) {
         super.onNotifyMessageOpened(context, message);
         if (message == null) return;
+        PushReceiptReporter.reportMessage(context, "opened", message);
         JSONObject extras;
         try {
             extras = new JSONObject(message.notificationExtras == null ? "{}" : message.notificationExtras);

@@ -1492,6 +1492,45 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       return
     }
 
+    if (pathname === '/account/api/push-devices' && req.method === 'GET') {
+      if (deps.push === undefined) {
+        send(res, 503, '{"error":"push-unavailable"}', 'application/json')
+        return
+      }
+      send(res, 200, JSON.stringify(await deps.push.listDevices(user.id)), 'application/json')
+      return
+    }
+
+    if (pathname === '/account/api/push-receipts' && req.method === 'POST') {
+      if (deps.push === undefined) {
+        send(res, 503, '{"error":"push-unavailable"}', 'application/json')
+        return
+      }
+      const input = jsonObject(await readBody(req))
+      const token = stringField(input?.token)
+      const provider = input?.provider
+      const sessionId = stringField(input?.sessionId)
+      const eventSeq = input?.eventSeq
+      const kind = input?.kind
+      if (token === undefined || token.length > 4096
+        || (provider !== 'fcm' && provider !== 'jpush')
+        || sessionId === undefined || sessionId.length > 512
+        || typeof eventSeq !== 'number' || !Number.isSafeInteger(eventSeq) || eventSeq < 0
+        || (kind !== 'arrived' && kind !== 'opened')) {
+        send(res, 400, '{"error":"invalid-push-receipt"}', 'application/json')
+        return
+      }
+      const outcome = await deps.push.recordReceipt(user.id, {
+        provider, token, sessionId, eventSeq, kind,
+      })
+      if (outcome === 'missing') {
+        send(res, 404, '{"error":"push-receipt-target-missing"}', 'application/json')
+        return
+      }
+      send(res, 200, '{"recorded":true}', 'application/json')
+      return
+    }
+
     const pushDeviceRoute = pathname.match(/^\/account\/api\/push-devices\/([^/]+)$/)
     if (pushDeviceRoute !== null && req.method === 'DELETE') {
       if (deps.push === undefined) {

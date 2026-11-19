@@ -440,6 +440,11 @@ async function dispatch(
     await reply.json(200, result)
     return true
   }
+  if (pathname === '/admin/api/push/overview' && method === 'GET') {
+    if (deps.push === undefined) { await reply.error(503, 'push-unavailable'); return true }
+    await reply.json(200, await deps.push.adminOverview())
+    return true
+  }
   if (pathname === '/admin/api/webhook-deliveries' && method === 'GET') {
     if (deps.webhookDeliveries === undefined) { await reply.error(503, 'webhook-deliveries-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
