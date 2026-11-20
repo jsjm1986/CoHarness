@@ -472,7 +472,8 @@ function renderListItem(
 }
 
 function scrollWideTable(event: KeyboardEvent<HTMLDivElement>): void {
-  if (event.defaultPrevented || event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+  if (event.defaultPrevented || event.target !== event.currentTarget) return
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
   const scrollport = event.currentTarget
   if (scrollport.scrollWidth <= scrollport.clientWidth) return
