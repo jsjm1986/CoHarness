@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-19-android-build-pr-gate.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-11-19-android-build-pr-gate.md
+document:
+  en: b6bbbf7aa3b707bc210ac3484011f56e852b72cb
+  zh: abb0ae68940eddeee9493f0d4a0c66ed649dd2a5
+/agent-note-diff-scoped-android-build-gate-on-pull-requests:
+  en: 691ced4444bf3442
+  zh: 5e0a8a116b56e9f2
+/agent-note-diff-scoped-android-build-gate-on-pull-requests/problem:
+  en: 23700e5ddba91dff
+  zh: 44b31d5e501172e4
+/agent-note-diff-scoped-android-build-gate-on-pull-requests/decision:
+  en: 63460d20ae424024
+  zh: 7b69ca8b217fc063
+/agent-note-diff-scoped-android-build-gate-on-pull-requests/alternatives-considered:
+  en: ef72b09a4b9d23d3
+  zh: 41e9879857097ea4
+/agent-note-diff-scoped-android-build-gate-on-pull-requests/verification:
+  en: bf6fc575353ec11c
+  zh: f6d5afe67b71a6e9
+/agent-note-diff-scoped-android-build-gate-on-pull-requests/consequences:
+  en: f697df28b7f02350
+  zh: f6098152c879b184

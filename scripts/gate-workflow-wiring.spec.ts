@@ -64,14 +64,15 @@ describe('public gate and workflow wiring', () => {
     } finally { vi.unstubAllEnvs() }
   })
 
-  it('keeps Android manual-only and executes pinned Ruff in required Python CI', () => {
+  it('gates Android build on shell diffs while the emulator bridge stays manual-only', () => {
     const jobs = workflow('ci').jobs
-    expect(jobs['all-checks-passed']!.needs).not.toContain('android-build')
+    expect(jobs['all-checks-passed']!.needs).toContain('android-build')
     expect(jobs['all-checks-passed']!.needs).not.toContain('android-bridge')
     expect(jobs['all-checks-passed']!.steps!.some(step => step.run === 'node scripts/verify-pr-results.ts')).toBe(true)
-    for (const id of ['android-build', 'android-bridge']) {
-      expect(jobs[id]!.if).toBe("github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'")
-    }
+    expect(jobs['android-build']!.needs).toContain('pr-scope')
+    expect(jobs['android-build']!.if).toContain("github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'")
+    expect(jobs['android-build']!.if).toContain("github.event_name == 'pull_request' && needs.pr-scope.outputs.android_mode == 'full'")
+    expect(jobs['android-bridge']!.if).toBe("github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'")
     expect(jobs['python-sdk']!.steps!.some(step => step.run?.includes('--locked --project python/sdk --group quality ruff check'))).toBe(true)
     expect(jobs['android-build']!.steps!.some(step => step.run === 'pnpm run check:android')).toBe(true)
     expect(jobs['android-build']!.steps!.find(step => step.uses?.startsWith('android-actions/setup-android@'))?.with?.packages).toBe('platform-tools')
