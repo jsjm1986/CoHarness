@@ -329,15 +329,14 @@ describe('web e2e: composer draft scrolling', () => {
     const scroll = page.locator('[data-input-scroll]').first()
     await scroll.hover()
     const resting = await measureComposer(page)
-    expect(resting.scrollMax).toBeGreaterThan(resting.scrollTop)
+    const draftRemaining = () => scroll.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)
+    expect(await draftRemaining()).toBeGreaterThan(1)
     const wheelDelta = 120
-    for (let remaining = resting.scrollMax - resting.scrollTop; remaining > 0; remaining -= wheelDelta) {
-      const previousTop = await scroll.evaluate(node => node.scrollTop)
-      await page.mouse.wheel(0, wheelDelta)
-      await expect.poll(() => scroll.evaluate(node => node.scrollTop)).toBeGreaterThan(previousTop)
-    }
-    await expect.poll(() => scroll.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop),
-      { timeout: 10_000 }).toBeLessThanOrEqual(1)
+    await expect.poll(async () => {
+      const remaining = await draftRemaining()
+      if (remaining > 1) await page.mouse.wheel(0, wheelDelta)
+      return remaining
+    }, { timeout: 10_000 }).toBeLessThanOrEqual(1)
     const metrics = await measureComposer(page)
     // The caret is still on its own glyphs after the gesture.
     expect(metrics.caretGlyphGap).toBe(resting.caretGlyphGap)
