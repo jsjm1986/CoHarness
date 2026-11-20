@@ -3,11 +3,30 @@ import { completionBarrier } from './support.ts'
 import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
+import type { Locator } from 'playwright'
 import { computerBrowser } from './computer-browser.ts'
 import { launchPersonalComputersFixture, personalTargets } from './personal-computers-fixture.ts'
 import { clientSessionKey, type ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { compareOrRefreshGolden, webSnapshotMode } from './scaffold.ts'
+
+async function selectComputerConversation(group: Locator, computer: string, workspace: string, title: string): Promise<void> {
+  const heading = group.getByRole('button', { name: computer, exact: true })
+  await heading.evaluate((button) => {
+    if (button instanceof HTMLButtonElement && button.getAttribute('aria-expanded') === 'false') button.click()
+  })
+  await expect.poll(() => heading.getAttribute('aria-expanded')).toBe('true')
+  const conversation = group.getByText(title, { exact: true })
+  const workspaceLabel = group.getByText(workspace, { exact: true })
+  await expect.poll(async () => await conversation.isVisible() || await workspaceLabel.isVisible()).toBe(true)
+  if (!await conversation.isVisible()) {
+    await workspaceLabel.evaluate((label) => {
+      const row = label.closest<HTMLElement>('[role="treeitem"]')
+      if (row?.getAttribute('aria-expanded') === 'false') row.click()
+    })
+  }
+  await conversation.click()
+}
 
 it('reloads two authenticated computer tabs without reading the other computer\'s raw conversation', async () => {
   const sessionIds = ['office-only-history', 'compute-only-history'] as const
@@ -39,16 +58,8 @@ it('reloads two authenticated computer tabs without reading the other computer\'
       url.searchParams.set('dshRuntime', target.runtimeId)
       await page.goto(url.href, { waitUntil: 'networkidle' })
       const group = page.getByRole('region', { name: target.nodeName, exact: true })
-      const heading = group.getByRole('button', { name: target.nodeName, exact: true })
-      await heading.evaluate((button) => {
-        if (button instanceof HTMLButtonElement && button.getAttribute('aria-expanded') === 'false') button.click()
-      })
-      await expect.poll(() => heading.getAttribute('aria-expanded')).toBe('true')
-      const row = group.getByText(index === 0 ? 'Office conversation' : 'Compute conversation', { exact: true })
-      const workspace = group.getByText(index === 0 ? 'Office work' : 'Compute work', { exact: true })
-      await expect.poll(async () => await row.isVisible() || await workspace.isVisible()).toBe(true)
-      if (!await row.isVisible()) await workspace.click()
-      await row.click()
+      await selectComputerConversation(group, target.nodeName,
+        index === 0 ? 'Office work' : 'Compute work', index === 0 ? 'Office conversation' : 'Compute conversation')
       await page.locator('[data-conversation-intent]').waitFor({ state: 'hidden' })
       const editor = page.locator(`[data-conversation-session="${key}"] textarea:enabled`)
       await editor.waitFor()
@@ -94,11 +105,7 @@ it('keeps typed input in the same conversation while its authenticated connectio
     url.searchParams.set('dshRuntime', target.runtimeId)
     await page.goto(url.href, { waitUntil: 'networkidle' })
     const computer = page.getByRole('region', { name: target.nodeName, exact: true })
-    const heading = computer.getByRole('button', { name: target.nodeName, exact: true })
-    if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
-    const conversation = computer.getByText('Office conversation', { exact: true })
-    if (!await conversation.isVisible()) await computer.getByText('Office work', { exact: true }).click()
-    await conversation.click()
+    await selectComputerConversation(computer, target.nodeName, 'Office work', 'Office conversation')
     await page.locator('[data-conversation-intent]').waitFor({ state: 'hidden' })
     const input = page.locator('[data-composer-seat] textarea:visible')
     const saved = page.waitForResponse(response => response.request().method() === 'PUT' && response.ok()
