@@ -274,6 +274,8 @@ describe('web e2e: responsive shell modes', () => {
           await page.screenshot({ path: join(screenshots, `sidebar-controls-${engine}-${width}-${height}-${colorScheme}.png`) })
         }
       }
+      await composer.hover()
+      await topbar.getByRole('tooltip').waitFor({ state: 'hidden' })
       await compareOrRefreshGolden(SIDEBAR_CONTROLS_EXPECTED,
         await captureStableAria(page, '[class*="topbar"]:has(> [data-mobile-app-header])', isolated.workspaceCwd), MODE)
       await right.focus()

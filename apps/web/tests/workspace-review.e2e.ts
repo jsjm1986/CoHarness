@@ -663,6 +663,7 @@ describe('web e2e: delivered files and historical review', () => {
       await expect.poll(() => review.textContent()).toContain('before the turn')
       const native = review.locator('[data-review-tool="open-native"]')
       const nativeMore = review.locator('[data-review-tool="open-native-more"]')
+      const previousControl = process.platform === 'darwin' && responsiveBrowserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab'
       open.mockImplementationOnce(async (request) => {
         await reviewOpenGate.promise
         return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'Review desktop open unavailable', details: {} } } }
@@ -674,7 +675,7 @@ describe('web e2e: delivered files and historical review', () => {
       reviewOpenGate.resolve()
       await expect.poll(() => native.getAttribute('data-error')).toBe('true')
       await nativeMore.focus()
-      await target.keyboard.press('Shift+Tab')
+      await target.keyboard.press(previousControl)
       expect(await native.evaluate(element => element === document.activeElement)).toBe(true)
       await target.getByRole('tooltip').getByText('Could not open. Click to retry.', { exact: true }).waitFor()
       await auditWorkflowState(target, 'deliverables', 'review-native-open-failed', review, [native, nativeMore])
@@ -698,7 +699,7 @@ describe('web e2e: delivered files and historical review', () => {
       reviewRevealGate.resolve()
       await expect.poll(() => native.getAttribute('data-error')).toBe('true')
       await nativeMore.focus()
-      await target.keyboard.press('Shift+Tab')
+      await target.keyboard.press(previousControl)
       expect(await native.evaluate(element => element === document.activeElement)).toBe(true)
       await target.getByRole('tooltip').getByText('Could not open containing folder. Try again.', { exact: true }).waitFor()
       await auditWorkflowState(target, 'deliverables', 'review-native-reveal-failed', review, [native, nativeMore])

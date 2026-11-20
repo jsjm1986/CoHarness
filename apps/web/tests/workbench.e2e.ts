@@ -1405,7 +1405,8 @@ describe('web: Cordis Workspace workbench', () => {
     await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).focus()
     await toolbar.hover()
     await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('0')
-    await page.keyboard.press('Tab')
+    const paneTab = process.platform === 'darwin' && responsiveBrowserName === 'webkit' ? 'Alt+Tab' : 'Tab'
+    await page.keyboard.press(paneTab)
     await expect.poll(() => firstHeader.evaluate(node => node.contains(document.activeElement))).toBe(true)
     await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('1')
     await firstHeader.getByRole('button', { name: 'More pane actions', exact: true }).click()

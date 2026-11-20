@@ -1386,28 +1386,32 @@ describe('web e2e: document manager', () => {
 
     const upload = dialog.getByRole('button', { name: 'Upload Document' })
     const more = dialog.locator('[data-documents-toolbar-more]')
+    await Promise.all([
+      dialog.getByRole('group', { name: 'Document filters' }).waitFor(),
+      upload.waitFor(),
+      more.waitFor(),
+    ])
     // Measure all four boxes in one synchronous pass: sequential boundingBox
     // calls observe different layouts while the dialog still settles, and on a
     // loaded runner upload/more can read rows apart mid-reflow.
-    const boxes = await page.evaluate(() => {
+    const boxes = await dialog.evaluate((element) => {
       const box = (el: Element | null | undefined) => {
         const rect = el?.getBoundingClientRect()
         return rect === undefined ? null
           : { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
       }
-      const dialog = [...document.querySelectorAll('[role="dialog"]')]
-        .find(el => el.getAttribute('aria-label') === 'Document Manager')
-      const filterContainer = dialog?.querySelector('[role="group"][aria-label="Document filters"]')?.parentElement?.parentElement
+      const filters = element.querySelector('[role="group"][aria-label="Document filters"]')
+      const filterContainer = filters?.parentElement?.parentElement
       const filterStyle = filterContainer === undefined || filterContainer === null ? undefined : getComputedStyle(filterContainer)
       return {
-        dialogBox: box(dialog),
+        dialogBox: box(element),
         filterRowWidth: filterStyle === undefined ? 0 : filterContainer!.clientWidth
           - Number.parseFloat(filterStyle.paddingLeft) - Number.parseFloat(filterStyle.paddingRight),
-        searchBox: box(dialog?.querySelector('[role="group"][aria-label="Document filters"]')),
-        uploadBox: box(dialog && [...dialog.querySelectorAll('button')]
+        searchBox: box(filters),
+        uploadBox: box([...element.querySelectorAll('button')]
           .find(el => el.getAttribute('aria-label') === 'Upload Document'
             || el.textContent?.includes('Upload Document'))),
-        moreBox: box(dialog?.querySelector('[data-documents-toolbar-more]')),
+        moreBox: box(element.querySelector('[data-documents-toolbar-more]')),
       }
     })
     const { dialogBox, searchBox, uploadBox, moreBox } = boxes

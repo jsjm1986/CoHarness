@@ -834,11 +834,7 @@ export function ConversationRoot(props: ConversationRootProps) {
       {pending !== undefined && (pending.paneId === undefined || !paneIds.includes(pending.paneId)) && editor}
       {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed, layout: layoutPreset, onSelectLayout: applyLayout, toolsHostId })}
       {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', { viewport }) : (
-        <div
-          className={css.workbenchGrid}
-          data-workbench-grid=""
-          style={{ gridTemplateRows: rows.map(row => row.every(id => collapsed.has(id)) ? 'auto' : 'minmax(min-content, 1fr)').join(' ') }}
-        >
+        <div className={css.workbenchGrid} data-workbench-grid="">
           {rows.map((row, rowIndex) => {
             const ratioStart = rowIndex * columns
             const ratios = row.map((_, index) => viewport.paneRatios[ratioStart + index] ?? 1)
@@ -850,6 +846,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                 key={rowIndex}
                 className={css.workbenchRow}
                 data-workbench-row=""
+                data-collapsed={expandedInRow === 0 || undefined}
                 style={{ minWidth: expandedInRow > 1 ? row.reduce((sum, id) => sum + (collapsed.has(id) ? 46 : minimumPaneWidth), 0) : 0,
                   gridTemplateColumns: row.map((id, column) => collapsed.has(id)
                     ? '46px'

@@ -51,6 +51,8 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 
 在 Workbench 的标签和堆叠布局中，每个包含展开面板的行都会填满可用宽度。一个展开面板与 46px 折叠身份细条并排时也如此。这些呈现方式保留已保存的面板比例，面板回到更宽的一行时按该比例分配相对宽度。
 
+包含展开面板的行共享工作台滚动区的可视高度。原生横向滚动条会减少行的可用高度。完全折叠的行按内容高度布局。
+
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 
 审批通过本包声明的链条接管编辑器：`ApprovalPanel` 注册为按选择器路由的 `'conversation.composer'` 配置项（ui-user-questions 模式），在审批等待未决期间取代 InputBar 占据编辑器（琥珀色条、工具名称、独立的理由——询问方提供 `displayReason` 时经本项注入的 locale 席位解析其本地化文案，否则用审计 `reason`——来自运行中调用的配对 shell 命令或格式化的非 shell 参数、一次性的拒绝／允许）。`contract/slots.ts` 中的 `PendingApproval` 领域面在运行时 `PendingWait` 载体之上拥有 wire 编码——带审计关联的 `ApprovalResponsePayload` 值；广播的 `approval/resolved` 帧使等待落定并恢复编辑器。运行时 manager 会将所有审批或问题等待通过 `SessionSummary.pendingInteraction` 投影出来，未实例化的会话也不例外；`ui-workspace` 负责其侧边栏呈现。未决等待完全离开消息流：问题（ui-user-questions）与审批（ApprovalPanel）都经编辑器接管作答，不再保留只读占位卡。编辑器底行的 Access 席位挂载 `PermissionSelect`，由 host 计算的 `permissions` 投影经标准工具包 `useProjection` 供数（key 缺席即隐藏 chip）；chip 打开 Menu 原语下拉，内置 preset id 通过当前 locale 解析，部署自定义名称保持原文；普通安全预设会立即经输入栏注入的 `command` 回调提交 `/permission <preset>`，而 `danger-full-access` 使用本地化的完全权限标签，选择后先打开页面内的 Modal 风险确认。用户勾选确认项前启用按钮始终不可用；取消、Escape、关闭按钮与点击遮罩都不会提交命令。审批提交失败时显示行内警告，原决策按钮恢复可用以供手动重试。审批详情不会超过会话滚动容器的高度；较矮面板中的整张卡片可滚动到操作区。作答后的审批正文保留完整对比度；状态色用于提示条背景与色点，状态和失败文案使用主题主文字色。手机会话设置使用共享弹窗焦点循环，紧凑输入区的扩展内容换行时避开模型和发送控件。
