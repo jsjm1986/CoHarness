@@ -226,6 +226,10 @@ it.skipIf(MODE === 'record').each([
   if (chinese) {
     const compactWidth = 200
     await target.setViewportSize({ width: compactWidth, height: viewport.height })
+    await expect.poll(async () => {
+      const body = await sheet.boundingBox()
+      return body !== null && body.x >= 0 && body.x + body.width <= compactWidth
+    }).toBe(true)
     const close = preview.getByRole('button', { name: labels.close, exact: true })
     const compactBefore = { body: await sheet.boundingBox(), reload: await reload.boundingBox(), close: await close.boundingBox() }
     console.info('[preview-continuity-wrapped-actions-before]', JSON.stringify({ width: compactWidth, before: compactBefore }))

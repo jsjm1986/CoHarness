@@ -130,14 +130,17 @@ describe('web e2e: responsive shell modes', () => {
     await page.getByRole('button', { name: 'Open sidebar', exact: true }).waitFor()
     expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
     expect(await page.evaluate(() => matchMedia('(hover: hover)').matches)).toBe(false)
+    const shell = page.locator('[data-viewport]').first()
     await page.addStyleTag({ content: '* { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important } p { margin-block-end: 2em !important }' })
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' })
       for (const viewport of [profile.viewport, { width: profile.viewport.height, height: profile.viewport.width }, profile.viewport]) {
         await page.setViewportSize(viewport)
         await expect.poll(() => page.evaluate(() => innerWidth)).toBe(viewport.width)
+        const mode = viewport.width < 768 ? 'compact' : viewport.width < 1024 ? 'medium' : viewport.width < 1440 ? 'expanded' : 'wide'
+        await expect.poll(() => shell.getAttribute('data-viewport')).toBe(mode)
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
-        if (viewport.width < 768) {
+        if (mode === 'compact') {
           const open = page.getByRole('button', { name: 'Open sidebar', exact: true })
           if (await open.count()) await open.tap()
         }

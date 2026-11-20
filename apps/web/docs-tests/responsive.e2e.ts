@@ -248,9 +248,8 @@ async function closeAppearance(page: Page): Promise<void> {
     }
     return
   }
-  // An `open` flyout ignores hover loss; dismiss it with a real outside click,
-  // then also end the pointer hover for the hover-only state.
-  await page.evaluate(() => { document.body.click() })
+  // Outside touch closes the expanded menu. Pointer departure clears its hover state.
+  await page.locator('.VPContent h1').first().tap()
   await page.mouse.move(0, 0)
   await page.locator('.VPNavBarExtra .menu').waitFor({ state: 'hidden' })
 }
