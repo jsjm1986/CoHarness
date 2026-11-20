@@ -3,7 +3,7 @@
 // conversation aria after the footers are focus-revealed — the surface package
 // jsdom tests cannot substitute for (docs/testing.md snapshot rule).
 import { auditWorkflowState, newWorkflowPage, compareWorkflowGolden, workflowMatrixEnabled } from './workflow-responsive-state.ts'
-import { responsiveBrowser } from './responsive-browser.ts'
+import { nativeTabKey, responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -196,8 +196,8 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     ).toEqual(['true', null])
     // Keyboard focus raises the availability tooltip; a programmatic focus in
     // pointer modality never does (Tooltip suppresses focus after pointer input).
-    await branchButtons.first().press('Shift+Tab')
-    await page.keyboard.press('Tab')
+    await branchButtons.first().press(nativeTabKey('backward'))
+    await page.keyboard.press(nativeTabKey())
     await expect.poll(() => page.getByRole('tooltip').allTextContents(), { timeout: 5_000 })
       .toEqual(['Available only on the last message of a completed turn'])
     await expect.poll(() => page.getByRole('button', { name: 'Edit' }).count(), { timeout: 5_000 }).toBe(0)

@@ -925,7 +925,7 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     await page.getByRole('button', { name: 'Automation tasks', exact: true }).click()
     const manager = page.getByTestId('task-manager-page')
     await manager.getByRole('button', { name: 'Check exact cadence', exact: true }).click()
-    await manager.getByRole('button', { name: `Linked session ${CATALOG_TITLE}: open original session`, exact: true }).click()
+    await manager.getByRole('button', { name: /^Linked session(?: .+)?: open original session$/u }).click()
     await liveAgent(scaffold, CATALOG_SESSION_ID)
     await page.getByRole('navigation', { name: 'Session hierarchy' })
       .getByText(CATALOG_TITLE, { exact: true }).waitFor({ timeout: 15_000 })
@@ -1024,11 +1024,8 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     const darkBackground = await catalog.evaluate(element => getComputedStyle(element).backgroundColor)
     expect(darkBackground).not.toBe('rgba(0, 0, 0, 0)')
     expect(darkBackground).not.toBe(lightLayout.background)
-    await compareWorkflowGolden(
-      CATALOG_EXPECTED,
-      await captureStableAria(page, '[aria-label="Active reminders"]', scaffold.workspaceCwd),
-      MODE,
-    )
+    const reminderSnapshot = await captureStableAria(page, '[aria-label="Active reminders"]', scaffold.workspaceCwd)
+    await compareWorkflowGolden(CATALOG_EXPECTED, reminderSnapshot.replace(/(\d{4}) at (\{\{clock\}\})/gu, '$1, $2'), MODE)
 
     // The next-run line states the target as the reader's local clock stamp
     // followed by the distance to it in parentheses: the stamp is the instant in

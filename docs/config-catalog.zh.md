@@ -1597,7 +1597,7 @@ export interface Config {
   workspaceCatalogTimeoutMs?: number
   /** Loader entry ids that must each have one active instance before readiness; absent means no additional entries. */
   requiredPlugins?: string[]
-  /** Log metadata-only timings for provider-backed model attempts. Defaults to false. */
+  /** Log metadata-only timings for managed model input, resource admission and provider attempts. Defaults to false. */
   modelTimings?: boolean
 }
 ```
@@ -3009,7 +3009,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-remote-desktop-vnc`
 
-- `source`: [`packages/remote-desktop/remote-desktop-vnc/src/index.ts:101`](../packages/remote-desktop/remote-desktop-vnc/src/index.ts)
+- `source`: [`packages/remote-desktop/remote-desktop-vnc/src/index.ts:102`](../packages/remote-desktop/remote-desktop-vnc/src/index.ts)
 
 ```ts config-catalog
 type ResolvedConfig = Required<Config>

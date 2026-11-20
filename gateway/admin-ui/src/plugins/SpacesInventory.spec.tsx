@@ -54,7 +54,7 @@ it('lists every space with its reported composition summary and saved-state fall
   expect(screen.getAllByText(/保存的组合/).length).toBeGreaterThan(0)
 })
 
-it('expands a space into bundle cards with provenance and live row phases', async () => {
+it('expands a space into bundle cards with installation sources and live row phases', async () => {
   const user = userEvent.setup()
   render(<SpacesInventory t={t} onPick={() => {}} />)
   const summary = await screen.findByText('owner')

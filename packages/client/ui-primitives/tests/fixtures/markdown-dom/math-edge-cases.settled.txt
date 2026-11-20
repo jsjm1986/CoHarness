@@ -9,7 +9,7 @@
               <mstyle mathcolor="#cc0000">
                 <mtext>
                   #text "\\href"
-            <annotation encoding="application/x-tex">
+            <annotation aria-hidden="true" encoding="application/x-tex">
               #text "\\href{javascript:alert(1)}{unsafe}"
       <span aria-hidden="true" class="katex-html">
         <span class="katex-base">
@@ -40,7 +40,7 @@
                     <mrow>
                       <mi>
                         #text "θ"
-                    <annotation encoding="application/x-tex">
+                    <annotation aria-hidden="true" encoding="application/x-tex">
                       #text "\\theta"
               <span aria-hidden="true" class="katex-html">
                 <span class="katex-base">
@@ -58,7 +58,7 @@
                           #text "1"
                         <mn>
                           #text "5"
-                    <annotation encoding="application/x-tex">
+                    <annotation aria-hidden="true" encoding="application/x-tex">
                       #text "\\frac{1}{5}"
               <span aria-hidden="true" class="katex-html">
                 <span class="katex-base">
@@ -99,7 +99,7 @@
               <msqrt>
                 <mn>
                   #text "2"
-            <annotation encoding="application/x-tex">
+            <annotation aria-hidden="true" encoding="application/x-tex">
               #text "\\sqrt{2}\n"
       <span aria-hidden="true" class="katex-html">
         <span class="katex-base">

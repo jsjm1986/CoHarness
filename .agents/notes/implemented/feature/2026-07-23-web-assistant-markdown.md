@@ -24,6 +24,8 @@ Assistant-authored link destinations are restricted to absolute HTTP, HTTPS, and
 
 Fenced code and GFM tables own horizontal overflow so long content cannot widen the conversation column.
 
+Focused wide table wrappers handle horizontal arrow keys because WebKit leaves a native focused scrollport stationary. KaTeX output exposes the MathML expression and marks the TeX source annotation as hidden from assistive technology.
+
 ## Alternatives considered
 
 **Promote the existing mdast and micromark development dependencies and maintain a custom React walker.** This avoids a new parser family but makes the product own every node mapping, GFM extension, and security-sensitive rendering branch. The dedicated React renderer keeps that traversal upstream while preserving an AST-to-React path. *Later reversed on new evidence — incremental streaming parsing needs AST-level input the string-only wrapper cannot provide; the [incremental AST renderer note](../architecture/2026-08-06-web-markdown-incremental-ast-renderer.md) owns that decision.*

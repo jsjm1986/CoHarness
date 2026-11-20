@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-catalog.md
 document:
-  en: 6c0ff4b381bb81cee61c887b3d44f92095a3fe10
-  zh: e3e96898bdc25c5dd861202de98c10920d9f38fa
+  en: ff8388aa5f71bf9d2a6dbcc7cfebdb21f3fbe17d
+  zh: f6a0c4654323c02c65a76339153006c7a55c0cf8
 /:
   en: a11f106978c9dce7
   zh: a11f106978c9dce7
@@ -177,8 +177,8 @@ document:
   en: 9edf4ef31e60e880
   zh: 9edf4ef31e60e880
 /session-persistence-event-catalog/events/model/model-selection-log-only:
-  en: c68a4a09b518c7ab
-  zh: 0baf7d170a27b8be
+  en: 97daa85e2b2f2fe0
+  zh: 0cf1de00835c9959
 /session-persistence-event-catalog/events/permission:
   en: 19917bc5438e60af
   zh: 19917bc5438e60af
@@ -672,11 +672,11 @@ document:
   en: f9ff02bdc95614bc
   zh: 0927a2230c6ae47a
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13:
-  en: 0ede6ab37bfbed84
-  zh: a43a1f6604045b39
+  en: 515a80ba5506d7ee
+  zh: 7a06dfc346236126
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-admission:
-  en: ec8f45687ff37ca4
-  zh: 26055992f805b51e
+  en: 0eee1c7f86c0b09c
+  zh: 41bccf6182dc78d4
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-documents:
   en: a638b79cac382f23
   zh: 9cad8144614b9f6f
@@ -696,14 +696,14 @@ document:
   en: 206e41d285e19ebc
   zh: 38b561a90d5df6ed
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-participant-scope-variant-0:
-  en: c631c2bab991045c
-  zh: 4797a47c7428929c
+  en: 506860b73019947f
+  zh: 6a7ab144034c6840
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-participant-scope-variant-0-mode:
   en: 372aef21a1c0ba4d
   zh: 387575c83e4be268
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-participant-scope-variant-1:
-  en: 150e19328a0bd3dd
-  zh: f32e98ae93a98a2b
+  en: 47371c44f540bead
+  zh: 24a23976035217c0
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-14:
   en: cac3143bf208c162
   zh: 1be76384b3da7077
@@ -1992,11 +1992,11 @@ document:
   en: bde1bd9486faecde
   zh: fd113f2436cacd79
 /session-persistence-event-catalog/resolved-persistence-types/packages-host-apiproxy-src-api-sessions-ts-authenticatedparticipant:
-  en: aa3d087911588f3d
-  zh: ce0f45326f0e24b4
+  en: 34294db2d520e8c2
+  zh: 9746877943f7a083
 /session-persistence-event-catalog/resolved-persistence-types/packages-host-apiproxy-src-api-sessions-ts-modelselection:
-  en: 30eebd3d9976815a
-  zh: d4a74d74da520b21
+  en: c6317c25b4a0afa5
+  zh: 95656e4ceb8b7462
 /session-persistence-event-catalog/resolved-persistence-types/packages-interaction-commands-src-types-ts-commandsource:
   en: 54011737af646f70
   zh: 2513511e3c18d7e1

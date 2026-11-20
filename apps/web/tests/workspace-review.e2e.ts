@@ -1,5 +1,5 @@
 /** Historical workspace review through the shipped recorder, RPC, and Web consumers. */
-import { responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
+import { nativeTabKey, responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
 import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -663,7 +663,7 @@ describe('web e2e: delivered files and historical review', () => {
       await expect.poll(() => review.textContent()).toContain('before the turn')
       const native = review.locator('[data-review-tool="open-native"]')
       const nativeMore = review.locator('[data-review-tool="open-native-more"]')
-      const previousControl = process.platform === 'darwin' && responsiveBrowserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab'
+      const previousControl = nativeTabKey('backward')
       open.mockImplementationOnce(async (request) => {
         await reviewOpenGate.promise
         return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'Review desktop open unavailable', details: {} } } }

@@ -35,7 +35,7 @@ function sourceLabel(source: string | undefined, t: Translate): string {
   return t('sourceRegistry')
 }
 
-/** One reported bundle: its display name, version, provenance, state, and declared rows with live phases. */
+/** One reported bundle: its display name, version, installation source, state, and declared rows with live phases. */
 function BundleCard({ bundle, live, resolveText, t }: {
   readonly bundle: PluginInventoryBundle
   readonly live: ReadonlyMap<string, PluginInventoryPlugin>

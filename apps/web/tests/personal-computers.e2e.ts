@@ -30,10 +30,14 @@ it('publishes a fast computer search before a slow peer and keeps computer and c
     for (const owner of ['Office', 'Compute']) {
       const computer = page.getByRole('region', { name: `${owner} computer`, exact: true })
       const heading = computer.getByRole('button', { name: `${owner} computer`, exact: true })
-      if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+      await heading.evaluate((button) => {
+        if (button instanceof HTMLButtonElement && button.getAttribute('aria-expanded') === 'false') button.click()
+      })
+      await expect.poll(() => heading.getAttribute('aria-expanded')).toBe('true')
       const row = computer.locator('[data-row-key^="session:"]').first()
-      await computer.getByText(`${owner} work`, { exact: true }).waitFor()
-      if (!await row.isVisible()) await computer.getByText(`${owner} work`, { exact: true }).click()
+      const workspace = computer.getByText(`${owner} work`, { exact: true })
+      await expect.poll(async () => await row.isVisible() || await workspace.isVisible()).toBe(true)
+      if (!await row.isVisible()) await workspace.click()
       await row.click()
       await page.locator('[data-conversation-intent]').waitFor({ state: 'hidden' })
     }

@@ -1,7 +1,7 @@
 // Real Web composition and transport, with recorded LLM streams for keyless
 // concurrency/approval coverage and measured pane layouts. Workspaces and Sessions are created through
 // their production actions; the workbench receives no fixture-only UI state.
-import { responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
+import { nativeTabKey, responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
 import { mkdir, readFile, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -1405,8 +1405,7 @@ describe('web: Cordis Workspace workbench', () => {
     await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).focus()
     await toolbar.hover()
     await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('0')
-    const paneTab = process.platform === 'darwin' && responsiveBrowserName === 'webkit' ? 'Alt+Tab' : 'Tab'
-    await page.keyboard.press(paneTab)
+    await page.keyboard.press(nativeTabKey())
     await expect.poll(() => firstHeader.evaluate(node => node.contains(document.activeElement))).toBe(true)
     await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('1')
     await firstHeader.getByRole('button', { name: 'More pane actions', exact: true }).click()

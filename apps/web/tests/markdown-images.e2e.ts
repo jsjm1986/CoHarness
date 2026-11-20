@@ -3,7 +3,7 @@
 // separate image origin proves remote loads carry no referrer, and real
 // files below the scaffold workspace exercise the authenticated /api/file
 // route, its byte cap, and the preview/lightbox affordances.
-import { responsiveBrowser } from './responsive-browser.ts'
+import { nativeTabKey, responsiveBrowser } from './responsive-browser.ts'
 import type {} from '@deepseek-ai/dsh-host-apiproxy'
 import { auditWorkflowState, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 import { mkdir, open, writeFile } from 'node:fs/promises'
@@ -360,8 +360,8 @@ describe('web e2e: Markdown image rendering', () => {
     await expect.poll(() => hoverImage.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1)
     await page.keyboard.press('Escape')
     await hoverImage.waitFor({ state: 'detached' })
-    await link.press('Tab')
-    await page.keyboard.press('Shift+Tab')
+    await link.press(nativeTabKey())
+    await page.keyboard.press(nativeTabKey('backward'))
     await hoverImage.waitFor()
     await page.keyboard.press('Escape')
     await hoverImage.waitFor({ state: 'detached' })

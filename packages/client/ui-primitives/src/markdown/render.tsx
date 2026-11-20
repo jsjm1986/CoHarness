@@ -17,7 +17,7 @@
  */
 
 import { Fragment, createElement, useCallback, useState } from 'react'
-import type { Key, ReactNode } from 'react'
+import type { Key, KeyboardEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
@@ -471,6 +471,15 @@ function renderListItem(
   )
 }
 
+function scrollWideTable(event: KeyboardEvent<HTMLDivElement>): void {
+  if (event.defaultPrevented || event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  const scrollport = event.currentTarget
+  if (scrollport.scrollWidth <= scrollport.clientWidth) return
+  event.preventDefault()
+  scrollport.scrollBy({ left: event.key === 'ArrowLeft' ? -40 : 40 })
+}
+
 function renderTable(node: Md.Table, key: Key, context: MarkdownRenderContext): ReactNode {
   const align = node.align ?? null
   const [headRow, ...bodyRows] = node.children
@@ -481,6 +490,7 @@ function renderTable(node: Md.Table, key: Key, context: MarkdownRenderContext): 
       key={key}
       className={clsx(css.tableScroll, wide ? 'md-table-wide' : css.tableFill)}
       tabIndex={wide ? 0 : undefined}
+      onKeyDown={wide ? scrollWideTable : undefined}
     >
       <table>
         {headRow !== undefined && <thead>{renderTableRow(headRow, 'th', align, 0, context)}</thead>}

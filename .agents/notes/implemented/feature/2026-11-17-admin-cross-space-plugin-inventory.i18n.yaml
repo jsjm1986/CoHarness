@@ -3,7 +3,7 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-17-admin-cross-space-plugin-inventory.md
 document:
-  en: 2273b2dc9c34b397a8dc2e0c51fbb0ef41e3d1bd
+  en: d3d9c3888135d883631bef171ba4295ec31c575a
   zh: 7c03d4c2c5296e12ad46a7da1747c78f53c5a7cb
 /agent-note-admin-cross-space-plugin-inventory:
   en: 072a381e0d9ecda6
@@ -12,7 +12,7 @@ document:
   en: c76eb1370aa0faa3
   zh: dc95391e322ff52d
 /agent-note-admin-cross-space-plugin-inventory/decision:
-  en: 98e7bf0012aac7a3
+  en: ce15e7a6b5672004
   zh: cd0881df06f9b0ae
 /agent-note-admin-cross-space-plugin-inventory/alternatives-considered:
   en: 3f449cdf63781f23
@@ -21,5 +21,5 @@ document:
   en: 1e8aecaa54a10ac8
   zh: a586559ec8fd44a4
 /agent-note-admin-cross-space-plugin-inventory/verification:
-  en: c0bfe376c661f758
+  en: b23267574f8d2786
   zh: a192be76d67f9704

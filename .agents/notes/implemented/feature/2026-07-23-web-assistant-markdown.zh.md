@@ -24,6 +24,8 @@ assistant 生成的链接目标地址仅限绝对 HTTP、HTTPS 与 mailto URL。
 
 围栏代码与 GFM 表格各自处理横向溢出，因此较长内容无法撑宽对话栏。
 
+宽表格的滚动容器在获得焦点时处理左右方向键。WebKit 的原生滚动容器在相同按键下保持原位。KaTeX 输出向辅助技术暴露 MathML 表达式，并隐藏 TeX 源码注解。
+
 ## 考虑过的替代方案
 
 **将现有的 mdast 与 micromark 开发依赖提升为正式依赖，并维护自定义 React walker。**此方案避免引入新的解析器体系，但产品需要自行负责每种节点映射、GFM 扩展和安全敏感的渲染分支。专用 React 渲染器将这套遍历交由上游维护，同时保留 AST 到 React 的处理路径。*后因新证据被推翻——增量流式解析需要纯字符串封装无法提供的 AST 级输入；该决策由[增量 AST 渲染器 Note](../architecture/2026-08-06-web-markdown-incremental-ast-renderer.zh.md) 拥有。*

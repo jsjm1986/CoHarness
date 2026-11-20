@@ -18,7 +18,7 @@
 // Zero model calls: the transcript is a closed turn assembled through the
 // Session API and seeded cold; a stray stream would fail loud with
 // NO_ADAPTER.
-import { responsiveBrowser } from './responsive-browser.ts'
+import { nativeTabKey, responsiveBrowser } from './responsive-browser.ts'
 import { auditWorkflowState, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
@@ -419,9 +419,9 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
     await sweep()
     await settleAt(1680)
     const wide = page.locator('[class*="tableScroll"]', { hasText: WIDE_MARKER })
-    // Chromium makes scrollable containers keyboard-focusable by default;
-    // arrow keys then scroll the focused wrapper.
-    await wide.focus()
+    await wide.press(nativeTabKey('backward'))
+    await page.keyboard.press(nativeTabKey())
+    await expect.poll(() => wide.evaluate(element => element.matches(':focus-visible'))).toBe(true)
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowRight')
     await expect.poll(() => wide.evaluate(element => element.scrollLeft), { timeout: 5_000 })

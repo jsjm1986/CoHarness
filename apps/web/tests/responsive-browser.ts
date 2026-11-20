@@ -11,6 +11,16 @@ if (requestedBrowser !== 'chromium' && requestedBrowser !== 'webkit' && requeste
 /** Selected browser engine; Chromium remains the default for existing local runs. */
 export const responsiveBrowserName = requestedBrowser
 const selectedBrowser = { chromium, webkit, firefox }[requestedBrowser]
+
+/** The host browser's key for traversing all sequential focus stops.
+ * @param direction - The focus traversal direction.
+ * @returns The Playwright key chord.
+ */
+export function nativeTabKey(direction: 'forward' | 'backward' = 'forward'): string {
+  const tab = direction === 'backward' ? 'Shift+Tab' : 'Tab'
+  return process.platform === 'darwin' && requestedBrowser === 'webkit' ? `Alt+${tab}` : tab
+}
+
 /** Disposable browser launcher for real local HTTP fixtures. */
 export const responsiveBrowser = {
   /**

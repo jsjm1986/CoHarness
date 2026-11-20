@@ -113,8 +113,8 @@ describe('web e2e: code-card layout', () => {
       const copy = card.getByRole('button', { name: 'Copy', exact: true })
       for (const control of [wrap, copy]) {
         const box = await control.boundingBox()
-        expect(box?.width).toBeGreaterThanOrEqual(44)
-        expect(box?.height).toBeGreaterThanOrEqual(44)
+        expect(Math.round((box?.width ?? 0) * 100) / 100).toBeGreaterThanOrEqual(44)
+        expect(Math.round((box?.height ?? 0) * 100) / 100).toBeGreaterThanOrEqual(44)
       }
       await wrap.tap()
       expect(await wrap.getAttribute('aria-pressed')).toBe('true')

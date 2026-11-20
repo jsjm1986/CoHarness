@@ -18,7 +18,7 @@ Persist a runtime-reported **observed inventory** per space and render it in the
 
 **Gateway.** `PostgresPluginInventory.report` re-uses `resolvePluginRuntimeOwner` — the instance row must still match the credential's owner, runtime, node, and generation, so a stale process cannot overwrite its successor — then upserts into harness or node_content per the owner's content binding. Wire parsing bounds counts, strings, icons, and drops unknown fields. `GET /admin/api/plugins/inventory` lists every instance row on this node (user, project, steward; never just spaces holding `plugin_states`), joined with the last report and the saved desired composition; a corrupt stored payload degrades to absent rather than hiding the space. Reads never start stopped runtimes.
 
-**Presentation.** `SpacesInventory` renders one expandable card per space: running/stopped, report time, bundle/entry/failed counts, bundle cards with localized titles and provenance badges (built-in, npm, git, local/self-developed, archive), declared rows joined to live fiber phases, and a `SavedComposition` fallback clearly labeled as saved-not-observed. A filter matches space names, bundle and module names, and localized titles, answering "who installed X" in v1. The manage button binds the existing target picker; steward rows stay read-only through the existing policy.
+**Presentation.** `SpacesInventory` renders one expandable card per space: running/stopped, report time, bundle/entry/failed counts, bundle cards with localized titles and installation source badges (built-in, npm, git, local/self-developed, archive), declared rows joined to live fiber phases, and a `SavedComposition` fallback clearly labeled as saved-not-observed. A filter matches space names, bundle and module names, and localized titles, answering "who installed X" in v1. The manage button binds the existing target picker; steward rows stay read-only through the existing policy.
 
 ## Alternatives considered
 
@@ -40,4 +40,4 @@ Persist a runtime-reported **observed inventory** per space and render it in the
 - `gateway/tests/plugin-inventory.spec.ts` covers wire validation, report/list round-trip, stale-generation rejection, and the saved-state fallback for an unreported project (PostgreSQL suite).
 - `packages/boot/plugin-manager/tests/manager.spec.ts` covers the startup report, the post-change report, and unreachable-store degradation.
 - `packages/context/gateway-execution/tests/plugin-management.spec.ts` covers the forwarding contract.
-- `gateway/admin-ui/src/plugins/SpacesInventory.spec.tsx` covers listing, expansion, provenance and phase badges, filtering, and target binding.
+- `gateway/admin-ui/src/plugins/SpacesInventory.spec.tsx` covers listing, expansion, installation source and phase badges, filtering, and target binding.

@@ -271,8 +271,6 @@
   padding-bottom: 0;
 }
 
-/* Chromium keyboard-focuses scrollable containers by default; the ring uses
-   the sheet's link focus color. */
 .tableScroll:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
